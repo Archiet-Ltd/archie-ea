@@ -226,20 +226,31 @@ def _footer(reg: dict[str, Any]) -> dict[str, Any]:
     return {"rows": [{"id": "site-map", "label": "Site map", "columns": [c for c in columns if c["items"]]}]}
 
 
-def signed_in_target(href: str) -> str:
-    """Where a link to a coming-soon module goes for a signed-in person: its working screen when it has one.
+def _released_entries() -> list[dict[str, Any]]:
+    """The coming-soon entries whose working screen is released: the one check every surface reads.
 
-    The menus and the footer already do this from the registry's ``signed_in`` entries; the features
-    page reads the same entries, so one module never opens "not built yet" from one place and its
-    working screen from another.
+    The menus, the footer, the home page and the features page all promote an entry on this list and
+    nothing else, signed in or not; a visitor and a signed-in person differ only in where its link goes.
+    """
+    released = []
+    for entry in raw_registry()["product"]["coming_soon"]["items"]:
+        live = entry.get("signed_in")
+        # the same wave check the menu applies: a working screen that is not released yet is not offered
+        if live and live.get("href") and wave_released({**entry, "href": live["href"]}):
+            released.append(entry)
+    return released
+
+
+def signed_in_target(href: str) -> str:
+    """Where a link to a released module goes: the working screen for a signed-in person, its own page for a visitor.
+
+    The features page reads the same entries as the menus and the footer, so one module never opens
+    "not built yet" from one place and its working screen from another.
     """
     if _signed_in():
-        for entry in raw_registry()["product"]["coming_soon"]["items"]:
-            live = entry.get("signed_in")
-            if live and live.get("href") and entry["href"] == href:
-                # the same wave check the menu applies: a working screen that is not released yet is not offered
-                if wave_released({**entry, "href": live["href"]}):
-                    return live["href"]
+        for entry in _released_entries():
+            if entry["href"] == href:
+                return entry["signed_in"]["href"]
     return href
 
 
@@ -247,17 +258,24 @@ def _drop_sentences_for_unreleased_screens(text: str) -> str:
     """Keep one of two paragraphs by the release check of a screen, the check the menu uses.
 
     A paragraph with id ``needs-<screen>`` stays only once that screen's release wave is released; one with
-    id ``until-<screen>`` stays only while it is not. ``simulations`` stands for the screen at
-    ``/simulations``. A section can then say early access or available, never both.
+    id ``until-<screen>`` stays only while it is not; one with id ``visitor-needs-<screen>`` stays only once
+    it is released and only for a person who is not signed in. ``simulations`` stands for the screen at
+    ``/simulations``. A section can then say early access or available, never both, and a signed-in person
+    is never told to sign in.
     """
     import re
 
     def keep_or_drop(match: "re.Match[str]") -> str:
+        kind = match.group(1)
         released = wave_released({"href": "/" + match.group(2)})
-        wanted = released if match.group(1) == "needs" else not released
+        wanted = {
+            "needs": released,
+            "until": not released,
+            "visitor-needs": released and not _signed_in(),
+        }[kind]
         return "<p>%s</p>\n" % match.group(3) if wanted else ""
 
-    return re.sub(r'<p id="(needs|until)-([a-z0-9-]+)">(.*?)</p>\s*', keep_or_drop, text, flags=re.S)
+    return re.sub(r'<p id="(needs|until|visitor-needs)-([a-z0-9-]+)">(.*?)</p>\s*', keep_or_drop, text, flags=re.S)
 
 
 def open_signed_in_links(body_html: str) -> str:
@@ -266,19 +284,20 @@ def open_signed_in_links(body_html: str) -> str:
     text = str.__str__(body_html)
     text = _drop_sentences_for_unreleased_screens(text)
     opened = []
-    for entry in raw_registry()["product"]["coming_soon"]["items"]:
+    for entry in _released_entries():
         target = signed_in_target(entry["href"])
         if target != entry["href"]:
             text = text.replace('href="%s"' % entry["href"], 'href="%s"' % target)
-            opened.append(target)
+        opened.append(target)
     return type(body_html)(_list_opened_as_available(text, opened))
 
 
 def _list_opened_as_available(text: str, opened: list[str]) -> str:
     """Move the Coming soon entries a signed-in person can already open into their own Available now list.
 
-    The waiting-list sentence then stands only above what is not available; when nothing is left
-    waiting, the Coming soon section goes with it.
+    A released module is listed there for a visitor as well as a signed-in person. The waiting-list
+    sentence then stands only above what is not available; when nothing is left waiting, the Coming
+    soon section goes with it.
     """
     import re
 
@@ -296,7 +315,8 @@ def _list_opened_as_available(text: str, opened: list[str]) -> str:
     if not live:
         return text
     tail = section[end + len("</ul>"):]
-    available = '<h2 id="available-now">Available now</h2>\n\n<p>You are signed in, so these open on the working screen.</p>\n<ul>\n%s\n</ul>\n' % "\n".join(live)
+    intro = "You are signed in, so these open on the working screen." if _signed_in() else "These are available now."
+    available = '<h2 id="available-now">Available now</h2>\n\n<p>%s</p>\n<ul>\n%s\n</ul>\n' % (intro, "\n".join(live))
     if not waiting:
         return head + available + tail
     keep = section[:end].split("<ul>")[0]
@@ -324,19 +344,21 @@ def site_registry() -> dict[str, Any]:
         columns = [column for column in columns if column]
     soon = product["coming_soon"]
     solutions_soon = raw["solutions"]["coming_soon"]
-    if _signed_in():
-        # a capability a signed-in person can already use is listed as available, not as coming soon
-        promoted: set[str] = set()
-        for group in groups:
-            for entry in soon["items"]:
-                live = entry.get("signed_in")
-                if live and live.get("group") == group["id"] and live.get("blurb"):
-                    opened = _visible([_item({**entry, "href": live["href"], "blurb": live["blurb"]})])
-                    group["items"] += opened
-                    if opened:
-                        promoted.add(entry["label"])
-        soon = {**soon, "items": [i for i in soon["items"] if i["label"] not in promoted]}
-        solutions_soon = {**solutions_soon, "items": [i for i in solutions_soon["items"] if i["label"] not in promoted]}
+    # a capability whose screen is released is listed as available, not as coming soon, for everyone;
+    # a signed-in person's link opens the working screen, a visitor's its own page
+    promoted: set[str] = set()
+    for group in groups:
+        for entry in _released_entries():
+            live = entry["signed_in"]
+            if live.get("group") == group["id"] and live.get("blurb"):
+                opened = _visible([_item({**entry, "href": live["href"], "blurb": live["blurb"]})])
+                if not _signed_in():
+                    opened = [{**i, "href": entry["href"]} for i in opened]
+                group["items"] += opened
+                if opened:
+                    promoted.add(entry["label"])
+    soon = {**soon, "items": [i for i in soon["items"] if i["label"] not in promoted]}
+    solutions_soon = {**solutions_soon, "items": [i for i in solutions_soon["items"] if i["label"] not in promoted]}
 
     reg: dict[str, Any] = {
         "nav": list(raw["nav"]),
@@ -375,6 +397,23 @@ def site_registry() -> dict[str, Any]:
     reg["resources"]["groups"] = [g for g in reg["resources"]["groups"] if g["items"]]
     reg["footer"] = _footer(reg)
     return reg
+
+
+def registry_entry(label: str) -> dict[str, Any] | None:
+    """One product entry by label, as the menus show it: in its menu group once released, else under coming soon.
+
+    A page that names a module outside the menus (the home page) reads this, so it says "coming soon"
+    exactly while the menu and the footer do.
+    """
+    reg = site_registry()
+    for group in reg["product"]["groups"]:
+        for item in group["items"]:
+            if item["label"] == label:
+                return item
+    for item in reg["product"]["coming_soon"]["items"]:
+        if item["label"] == label:
+            return item
+    return None
 
 
 def registry_links(reg: dict[str, Any] | None = None) -> list[dict[str, Any]]:

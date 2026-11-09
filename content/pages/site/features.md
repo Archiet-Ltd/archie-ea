@@ -257,8 +257,10 @@ cost, risk, resilience and capacity before money is committed. It is not open ye
 
 <p id="needs-simulations"><strong>Available.</strong> <a href="/modules/scenario-modelling">Scenarios</a> lets you run a change on a copy of
 the model and see the effect on the elements, applications, running cost and risks it reaches, save it under a name and
-compare saved scenarios side by side with a colleague. Sign in to open it. The impact question shows exactly what one
+compare saved scenarios side by side with a colleague. The impact question shows exactly what one
 failure would break.</p>
+
+<p id="visitor-needs-simulations">Sign in to open it.</p>
 
 <h3 id="agentic-automation">Agentic Automation</h3>
 
