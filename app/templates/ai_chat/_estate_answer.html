@@ -35,7 +35,7 @@
     {% set heading = 'What breaks if ' ~ name_of(answer.params.element_id) ~ ' fails' %}
 {% endif %}
 {% set total = answer.summary.total %}
-<div class="space-y-3" data-answer-cards data-question="{{ question }}"{% if answer.params.element_id %} data-element-id="{{ answer.params.element_id }}"{% endif %} data-answer-address="{{ answer.address }}" data-answer-kind="{{ kind }}">
+<div class="space-y-3" data-answer-cards data-question="{{ question }}"{% if answer.params.element_id and kind == 'impact' %} data-element-id="{{ answer.params.element_id }}"{% endif %} data-answer-address="{{ answer.address }}" data-answer-kind="{{ kind }}">
     {% call card() %}
         {% call card_header() %}
             {% call card_title(class='text-base') %}{{ heading }}{% endcall %}

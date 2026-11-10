@@ -536,21 +536,16 @@ def _github_sourced_records(organization_id: int, **_: Any) -> Dict[str, Any]:
 
 
 def _resolve_service_element(organization_id: int, service: Optional[str]):
-    """The one ArchiMate element in *organization_id* a service name names,
-    or ``None``. Uses the one entity matcher (never a second name lookup);
-    an ambiguous or absent name resolves to nothing, so impact is never
-    computed for a guessed element."""
-    if not service or not service.strip():
-        return None
+    """The one ArchiMate element in *organization_id* a service name names, or ``None``.
+    The name means what ``element_each_name_means`` says it means, the same element the
+    overview, the cards and a typed question use; an absent name resolves to nothing."""
     from app.models.archimate_core import ArchiMateElement
-    from app.modules.intelligence.services.matcher_service import MatcherService
+    from app.modules.dashboard.services.overview_figures import element_named
 
-    result = MatcherService.match_by_name(service.strip(), org_id=organization_id)
-    if result.matched_element_id is None:
+    element_id = element_named(organization_id, service)
+    if element_id is None:
         return None
-    return ArchiMateElement.query.filter_by(
-        id=result.matched_element_id, organization_id=organization_id,
-    ).first()
+    return ArchiMateElement.query.filter_by(id=element_id, organization_id=organization_id).first()
 
 
 def _first_recorded(element_ids: List[int], organization_id: int) -> Dict[int, Any]:

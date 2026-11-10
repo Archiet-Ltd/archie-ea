@@ -348,6 +348,26 @@ entries:
       - path: app/utils/duplicate_guard.py
         reason: find_duplicate_by_name is the canonical duplicate lookup of the name-matching entry
 
+  # Searched before adding: "name", "resolve" and "matcher". name-matching (normaliser and duplicate lookup) and
+  # entity-matching (imports and proposals) both exist; neither says which element a shared name means in an answer.
+  - id: answer-name-resolution
+    concept: Which element a name means in any answer (typed question, catalogue, assistant tools, slash commands)
+    status: active
+    canonical:
+      path: app/modules/dashboard/services/overview_figures.py
+      symbols: [element_each_name_means, element_named]
+    reuse: >
+      element_named(org_id, name) finds the elements a name matches ignoring case, spacing, "-" and "_", and
+      element_each_name_means picks one: the most recorded relationships, then the application's own element, then
+      the one recorded first. Every answer path calls it so card, answer and tools agree. Never pick an element
+      with .first() or an ilike lookup in answer code; MatcherService stays the matcher for imports and proposals.
+    must_not_create:
+      - id: answer-name-picker
+        regex: 'ArchiMateElement\.name\.ilike\([^)]*\)\s*\)\s*\.first\('
+    known_exceptions:
+      - path: app/modules/genome/patch/grounding.py
+        reason: grounds a patch against one element for the genome, not an answer to a person; moves to the rule in a later round
+
   - id: impact-answer
     concept: What breaks if this element changes or fails (impact answer)
     status: active

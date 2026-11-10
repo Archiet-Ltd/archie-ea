@@ -12,6 +12,16 @@ from app import db
 logger = logging.getLogger(__name__)
 
 
+def _element_meant_by(name, model):
+    """The element the name means in the active organisation, by the one rule every answer uses."""
+    from app.middleware.tenant_context import current_org_id
+    from app.modules.dashboard.services.overview_figures import element_named
+
+    org_id = current_org_id()
+    element_id = element_named(org_id, str(name or "").strip()) if org_id is not None else None
+    return model.query.filter_by(id=element_id, organization_id=org_id).first() if element_id else None
+
+
 class CommandParserService:
     """Parse and execute slash commands in AI chat messages."""
 
@@ -686,9 +696,7 @@ class CommandParserService:
             from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
             # Fuzzy search by name (case-insensitive LIKE)
-            element = ArchiMateElement.query.filter(
-                ArchiMateElement.name.ilike(f"%{element_name}%")
-            ).first()
+            element = _element_meant_by(element_name, ArchiMateElement)
 
             if not element:
                 return {
@@ -1258,14 +1266,7 @@ class CommandParserService:
         from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
         from app import db
 
-        el = ArchiMateElement.query.filter(
-            db.func.lower(ArchiMateElement.name) == args.strip().lower()
-        ).first()
-        if not el:
-            # Fuzzy match
-            el = ArchiMateElement.query.filter(
-                ArchiMateElement.name.ilike(f"%{args.strip()}%")
-            ).first()
+        el = _element_meant_by(args, ArchiMateElement)
         if not el:
             return {"response": f"Element not found: `{args}`", "domain": domain, "command_type": "dependencies"}
 

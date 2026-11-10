@@ -21,6 +21,10 @@ from app.modules.dashboard.services.overview_figures import element_each_name_me
 from app.utils.duplicate_guard import folded_column
 
 
+# The largest id the database stores: a posted id above it is not an element, and is not asked about.
+MAX_ELEMENT_ID = 2**31 - 1
+
+
 def named_element_ids(message: str, organization_id: int) -> list:
     """Ids of the organisation's elements whose whole name appears in *message*,
     the longest names first so "Payments service" wins over "Payments"."""
@@ -48,6 +52,8 @@ def owned_element_id(element_id: Any, organization_id: Optional[int]) -> Optiona
     """*element_id* when it is an element of this organisation, else ``None``: a posted id
     from another organisation, or one that is not a whole number, is ignored."""
     if organization_id is None or isinstance(element_id, bool) or not isinstance(element_id, int):
+        return None
+    if not 0 < element_id <= MAX_ELEMENT_ID:
         return None
     return db.session.execute(
         db.select(ArchiMateElement.id).where(

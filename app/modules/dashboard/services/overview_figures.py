@@ -243,7 +243,14 @@ def _relationship_pairs(org_id, element_id=None):
     touching *element_id*. The one place relationships are read for these counts."""
     from app.models import ArchiMateRelationship as R
 
-    query = db.select(R.source_id, R.target_id).where(R.organization_id == org_id)
+    from app.models import ArchiMateElement as E
+
+    # A relationship with a deleted element at either end is not a connection any more: bulk
+    # delete keeps the row so a restore brings it back, but no count or answer reads it meanwhile.
+    live = db.select(E.id).where(E.organization_id == org_id, E.deleted_at.is_(None))
+    query = db.select(R.source_id, R.target_id).where(
+        R.organization_id == org_id, R.source_id.in_(live), R.target_id.in_(live)
+    )
     if element_id is not None:
         query = query.where(or_(R.source_id == element_id, R.target_id == element_id))
     return db.session.execute(query).all()
@@ -259,6 +266,9 @@ def relationship_ends(org_id):
         if target_id != source_id:
             ends[target_id] += 1
     return ends
+
+
+_SEPARATORS = str.maketrans("-_", "  ")
 
 
 def element_each_name_means(org_id, rows, ends=None):
@@ -293,6 +303,27 @@ def element_each_name_means(org_id, rows, ends=None):
     return {key: element_id for key, (_, element_id) in best.items()}
 
 
+def element_named(org_id, name):
+    """The id of the one element *name* means in this organisation, or ``None`` when no element
+    carries it. A name matches ignoring case, spacing, ``-`` and ``_``; among elements sharing it
+    ``element_each_name_means`` picks. Every answer path calls this, never ``.first()``."""
+    from app.models import ArchiMateElement as E
+    from app.utils.duplicate_guard import folded_column, normalize_name
+
+    key = normalize_name(str(name or "").translate(_SEPARATORS))
+    if not key:
+        return None
+    rows = db.session.execute(
+        db.select(E.id).where(
+            E.organization_id == org_id,
+            E.deleted_at.is_(None),
+            folded_column(func.translate(E.name, "-_", "  ")) == key,
+        )
+    ).all()
+    meant = element_each_name_means(org_id, [(row.id, key) for row in rows])
+    return meant.get(key)
+
+
 def relationship_split(org_id, element_id):
     """What makes up one element's count in ``relationship_ends``: how many relationships lead
     from it, how many lead to it (one that does both counts once, as leading from it), and how
@@ -315,7 +346,7 @@ def _relationships(org_id, now):
     from app.models import ArchiMateRelationship as R
     from app.models.audit_log import AuditLog
 
-    total = db.session.execute(db.select(func.count(R.id)).where(R.organization_id == org_id)).scalar_one()
+    total = len(_relationship_pairs(org_id))
     if not total:
         return {"total": 0}
     since = now - timedelta(days=30)
