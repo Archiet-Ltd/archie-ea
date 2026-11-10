@@ -16,6 +16,7 @@ Primary entry points:
 """
 
 import concurrent.futures
+import contextvars
 import json
 import logging
 import time
@@ -70,7 +71,7 @@ def _log_orphaned_future_exception(future: "concurrent.futures.Future") -> None:
         )
 
 
-def _call_generate_from_prompt_in_app_context(app, prompt: str, org_id) -> str:
+def _call_generate_from_prompt_in_app_context(app, prompt: str, org_id, timeout=None) -> str:
     """Run LLMService.generate_from_prompt inside *app*'s application context.
 
     The executor thread has no Flask context of its own. generate_from_prompt
@@ -95,7 +96,9 @@ def _call_generate_from_prompt_in_app_context(app, prompt: str, org_id) -> str:
     with app.app_context():
         g.current_org_id = org_id
         return LLMService.generate_from_prompt(
-            prompt, use_cache=True, timeout=LLM_CLASSIFY_TIMEOUT_SECONDS
+            prompt,
+            use_cache=True,
+            timeout=LLM_CLASSIFY_TIMEOUT_SECONDS if timeout is None else timeout,
         )
 
 
@@ -205,6 +208,12 @@ def _rule_based_classify(app: ApplicationComponent) -> tuple:
     return "unknown", 0.40, ["no_signal"]  # fabricated-ok: designed confidence weight for the no-signal classifier fallthrough
 
 
+# Per-request ceiling set by classify_applications(llm_timeout_seconds=...).
+_llm_timeout_override: contextvars.ContextVar = contextvars.ContextVar(
+    "llm_classify_timeout_override", default=None
+)
+
+
 def _llm_classify_batch(apps: List[ApplicationComponent]) -> List[Dict]:
     """
     Classify a batch of apps via LLM.
@@ -258,16 +267,21 @@ def _llm_classify_batch(apps: List[ApplicationComponent]) -> List[Dict]:
         from app.middleware.tenant_context import current_org_id as _current_org_id
 
         org_id = _current_org_id()
+        timeout_seconds = _llm_timeout_override.get()
+        limit = (
+            LLM_CLASSIFY_TIMEOUT_SECONDS
+            if timeout_seconds is None
+            else min(timeout_seconds, LLM_CLASSIFY_TIMEOUT_SECONDS)
+        )
         future = _llm_classify_executor.submit(
-            _call_generate_from_prompt_in_app_context, app, prompt, org_id
+            _call_generate_from_prompt_in_app_context, app, prompt, org_id, limit
         )
         future.add_done_callback(_log_orphaned_future_exception)
         try:
-            raw = future.result(timeout=LLM_CLASSIFY_TIMEOUT_SECONDS)
+            raw = future.result(timeout=limit)
         except concurrent.futures.TimeoutError as exc:
             raise LLMClassificationTimeoutError(
-                f"LLM classification call exceeded the "
-                f"{LLM_CLASSIFY_TIMEOUT_SECONDS}s timeout"
+                f"LLM classification call exceeded the {limit}s timeout"
             ) from exc
         # Extract JSON array from response (LLM may wrap in markdown fences)
         raw = raw.strip()
@@ -344,6 +358,7 @@ class ApplicationPatternClassifierService:
         batch_size: int = 50,
         use_llm: bool = True,
         time_budget_seconds: Optional[float] = None,
+        llm_timeout_seconds: Optional[float] = None,
     ) -> List[Dict]:
         """
         Classify applications and persist arch_pattern to the database.
@@ -364,8 +379,15 @@ class ApplicationPatternClassifierService:
             query = query.filter(ApplicationComponent.id.in_(app_ids))
         apps: List[ApplicationComponent] = query.all()
 
-        results: List[Dict] = []
         self.llm_truncated = False
+        token = _llm_timeout_override.set(llm_timeout_seconds)
+        try:
+            return self._classify_batches(apps, batch_size, use_llm, time_budget_seconds)
+        finally:
+            _llm_timeout_override.reset(token)
+
+    def _classify_batches(self, apps, batch_size, use_llm, time_budget_seconds) -> List[Dict]:
+        results: List[Dict] = []
         deadline = (
             time.monotonic() + time_budget_seconds
             if time_budget_seconds is not None
@@ -420,7 +442,10 @@ class ApplicationPatternClassifierService:
         return results
 
     def classify_portfolio(
-        self, batch_size: int = 50, time_budget_seconds: Optional[float] = None
+        self,
+        batch_size: int = 50,
+        time_budget_seconds: Optional[float] = None,
+        llm_timeout_seconds: Optional[float] = None,
     ) -> Dict:
         """
         Classify the full application portfolio in batches.
@@ -434,6 +459,7 @@ class ApplicationPatternClassifierService:
             app_ids=None,
             batch_size=batch_size,
             time_budget_seconds=time_budget_seconds,
+            llm_timeout_seconds=llm_timeout_seconds,
         )
 
         by_pattern: Dict[str, int] = {}

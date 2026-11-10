@@ -1,14 +1,16 @@
 """An architect opens the pages an inventory sweep flagged and each one is whole.
 
 In a new organisation with a capability that has no importance rating, a
-two-level capability tree, and twenty-one applications, the architect:
+two-level capability tree, and twenty-two applications (one past its end of life, the rest with no
+lifecycle data), the architect:
 
 * opens Capability Health and reads a plain "Not rated", never the word None;
 * follows the two old dashboard addresses (impact analysis, gap analysis) and
   lands on the live page each name promises;
 * opens the vendor mapping tool and its back link lands on the vendor list;
-* opens the element list, runs Tech Debt Analysis and sees the result without a
-  script error;
+* opens the element list, runs Tech Debt Analysis and reads each application by
+  name: the one past its end of life with its real factors, the others "Not rated"
+  with the reason, and a way to see the rows beyond the first twenty;
 * opens the capability tree, clicks "All" and sees the tree with no policy error;
 * opens the connectors page and gets a page, not a server error;
 * asks for the application patterns and gets an answer in under five seconds.
@@ -19,6 +21,7 @@ error or uncaught script error is allowed on any of them.
 
 import os
 import time
+from datetime import date
 
 import pytest
 
@@ -45,6 +48,8 @@ def _seed(org_id, tag):
         db.session.flush()
         db.session.add(UnifiedCapability(name="Tree leaf %s" % tag, code="DE-L-%s" % tag[:4], level=2,
                                          parent_capability_id=root.id, organization_id=org_id))
+        db.session.add(ApplicationComponent(name="Legacy billing %s" % tag, organization_id=org_id,
+                                            end_of_life_date=date(2020, 1, 1), version="5.1"))
         for number in range(21):
             db.session.add(ApplicationComponent(name="Dead end app %d %s" % (number, tag), organization_id=org_id))
         db.session.commit()
@@ -112,7 +117,24 @@ def test_swept_pages_are_whole(browser, live_server, tmp_path_factory):
             goto("/architecture/elements")
             page.get_by_role("button", name="Tech Debt Analysis").click()
             page.get_by_text("Technology Debt Scores").wait_for(timeout=PAGE_TIMEOUT)
-            page.get_by_text("elements analyzed").wait_for(timeout=PAGE_TIMEOUT)
+            page.get_by_text("Showing 20 of 22 applications analysed").wait_for(timeout=PAGE_TIMEOUT)
+            debt = page.locator("table.dense-table", has_text="Debt Score")
+            legacy = debt.locator("tr", has_text="Legacy billing %s" % tag)
+            assert legacy.count() == 1
+            assert legacy.locator("td").nth(2).inner_text().strip() == "100%"
+            if width >= 1024:
+                assert "End of life has passed" in legacy.inner_text()
+                assert "Old major version" in legacy.inner_text()
+            assert "No debt factors recorded" not in debt.inner_text()
+            unrated = debt.locator("tr", has_text="Dead end app 0 %s" % tag)
+            assert unrated.count() == 0 or "Not rated" in unrated.inner_text()
+            page.get_by_test_id("debt-show-all").click()
+            page.get_by_text("Showing 22 of 22 applications analysed").wait_for(timeout=PAGE_TIMEOUT)
+            unrated = debt.locator("tr", has_text="Dead end app 3 %s" % tag)
+            assert unrated.count() == 1
+            text = unrated.inner_text()
+            assert "Not rated" in text and "0%" not in text.replace("100%", "")
+            assert "no end-of-life date, version, support status recorded" in text
             assert page.get_by_text("Could not load debt scores").count() == 0
             shot("tech-debt")
 
@@ -131,7 +153,7 @@ def test_swept_pages_are_whole(browser, live_server, tmp_path_factory):
             status, payload = api(page, "GET", "/api/ea-workflows/sa/application-patterns")
             elapsed = time.monotonic() - started
             assert status == 200, (status, payload)
-            assert payload["patterns"]["classified"] == 21, payload
+            assert payload["patterns"]["classified"] == 22, payload
             assert elapsed < PATTERNS_BUDGET_SECONDS, "patterns took %.1fs" % elapsed
 
             assert problems == [], problems

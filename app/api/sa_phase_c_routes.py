@@ -44,6 +44,11 @@ def get_disposition_matrix():
 # ---------------------------------------------------------------------------
 
 
+# A person waiting on this address gets an answer or a plain error within this
+# many seconds; the model call is bounded by LLMService's own timeout parameter.
+PATTERNS_LLM_TIMEOUT_SECONDS = 4
+
+
 @sa_phase_c_bp.route("/application-patterns", methods=["GET"])
 @login_required
 def get_application_patterns():
@@ -59,17 +64,18 @@ def get_application_patterns():
         # stalled this request for 10+ minutes. Bound the wall clock; apps not
         # reached in time get the deterministic rule engine, and the response
         # reports the split (patterns.by_source / patterns.llm_truncated).
-        patterns = svc.classify_portfolio(time_budget_seconds=60)
+        patterns = svc.classify_portfolio(
+            time_budget_seconds=60, llm_timeout_seconds=PATTERNS_LLM_TIMEOUT_SECONDS
+        )
         return jsonify({"patterns": patterns}), 200
     except LLMClassificationTimeoutError as exc:
         logger.error("application-patterns timed out: %s", exc)
         return jsonify({
-            "error": "Application pattern classification timed out",
-            "detail": str(exc),
+            "error": "The AI provider did not answer in time. Try again in a moment.",
         }), 504
     except Exception as exc:
         logger.error("application-patterns error: %s", exc, exc_info=True)
-        return jsonify({"error": "Failed to classify portfolio", "detail": str(exc)}), 500
+        return jsonify({"error": "Could not classify the portfolio. Try again in a moment."}), 500
 
 
 # ---------------------------------------------------------------------------

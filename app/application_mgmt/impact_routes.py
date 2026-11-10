@@ -21,9 +21,9 @@ from . import application_mgmt
 @login_required
 def impact_hub():
     """Old address: the impact analysis page lives under /enterprise/analysis."""
-    return redirect(
-        url_for("enterprise.impact_analysis", **request.args.to_dict()), code=301
-    )
+    target = url_for("enterprise.impact_analysis")
+    query = request.query_string.decode("utf-8", errors="replace")
+    return redirect(target + ("?" + query if query else ""), code=301)
 
 
 @application_mgmt.route("/impact-analysis/simulate", methods=["POST"])

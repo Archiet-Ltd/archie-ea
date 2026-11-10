@@ -82,7 +82,9 @@ def application_gap_analysis_api(application_id):
 @login_required
 def portfolio_gap_analysis():
     """Old address: the enterprise gap register lives under /enterprise/implementation."""
-    return redirect(url_for("enterprise.gap_analysis"), code=301)
+    target = url_for("enterprise.gap_analysis")
+    query = request.query_string.decode("utf-8", errors="replace")
+    return redirect(target + ("?" + query if query else ""), code=301)
 
 @application_mgmt.route("/portfolio/gap-analysis/api")
 @login_required

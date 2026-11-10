@@ -56,6 +56,29 @@ def _risk_tier(score: float) -> str:
     return "low"
 
 
+_DEBT_INPUTS = ("end-of-life date", "version", "support status")
+
+
+def _debt_factors(result):
+    """Plain names for the inputs that raised an application's debt score."""
+    factors = []
+    eol = result.get("eol_score", 0)
+    if eol >= 100:
+        factors.append("End of life has passed")
+    elif eol >= 75:
+        factors.append("End of life within 12 months")
+    elif eol >= 50:
+        factors.append("End of life within 24 months")
+    if result.get("version_score", 0) > 0:
+        factors.append("Old major version")
+    support = result.get("support_status_score", 0)
+    if support >= 80:
+        factors.append("Unsupported by the vendor")
+    elif support > 0:
+        factors.append("Limited vendor support")
+    return factors
+
+
 @phase_d_bp.route("/api/ea/phase-d/debt-scores", methods=["GET"])
 @login_required
 def debt_scores():
@@ -75,10 +98,25 @@ def debt_scores():
         apps = ApplicationComponent.query.all()
         svc = TechnologyRoadmapService()
         scores = []
-        summary = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+        summary = {"critical": 0, "high": 0, "medium": 0, "low": 0, "not_rated": 0}
         for app in apps:
-            result = svc.score_technology_debt(app.id)
-            debt_score = result.get("debt_score", 0) if result else 0
+            result = svc.score_technology_debt(app.id) or {}
+            missing = result.get("missing_data")
+            if not result or missing is None or len(missing) == len(_DEBT_INPUTS):
+                # Nothing to measure: not rated, never a confident 0.
+                summary["not_rated"] += 1
+                scores.append(
+                    {
+                        "app_id": app.id,
+                        "app_name": app.name,
+                        "debt_score": None,
+                        "risk_tier": None,
+                        "factors": [],
+                        "reason": "Not rated: no " + ", ".join(_DEBT_INPUTS) + " recorded",
+                    }
+                )
+                continue
+            debt_score = result.get("debt_score", 0)
             tier = _risk_tier(float(debt_score))
             summary[tier] += 1
             scores.append(
@@ -87,12 +125,14 @@ def debt_scores():
                     "app_name": app.name,
                     "debt_score": debt_score,
                     "risk_tier": tier,
+                    "factors": _debt_factors(result),
+                    "reason": None,
                 }
             )
         return jsonify({"scores": scores, "summary": summary}), 200
     except Exception as exc:
         logger.error("debt-scores error: %s", exc, exc_info=True)
-        return jsonify({"error": "Failed to compute debt scores", "detail": str(exc)}), 500
+        return jsonify({"error": "Could not compute the debt scores. Try again in a moment."}), 500
 
 
 # ---------------------------------------------------------------------------

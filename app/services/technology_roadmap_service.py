@@ -682,7 +682,8 @@ class TechnologyRoadmapService:
 
         Returns a dict with keys:
             app_id, app_name, debt_score, risk_tier,
-            eol_score, version_score, support_status_score
+            eol_score, version_score, support_status_score,
+            missing_data (names of the inputs the application has no value for)
 
         Returns {} when the application is not found.
 
@@ -774,6 +775,15 @@ class TechnologyRoadmapService:
                 "eol_score": eol_score,
                 "version_score": version_score,
                 "support_status_score": support_status_score,
+                "missing_data": [
+                    label
+                    for label, present in (
+                        ("end-of-life date", eol_date is not None),
+                        ("version", bool(version_str)),
+                        ("support status", bool(support_status)),
+                    )
+                    if not present
+                ],
             }
 
         except Exception as exc:
