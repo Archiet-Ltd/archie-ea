@@ -33,6 +33,9 @@ READ_ONLY_ALLOWED = {
     "application_mgmt.api_submit_stakeholder_scores": (
         "An invited stakeholder submits their own scores; the route checks it is the invited person or an administrator."
     ),
+    "application_mgmt.api_invite_stakeholder": (
+        "The owner of an analysis invites a stakeholder to it; the route checks the owner or an administrator."
+    ),
     "application_mgmt.api_remove_stakeholder": (
         "The owner of an analysis removes a stakeholder from it; the route checks the owner or an administrator."
     ),
@@ -168,13 +171,25 @@ def _route_answers_for_itself(app, endpoint):
     """Whether the view behind ``endpoint`` gives its own answer to a person who may not write.
 
     A route that already asks the permission matrix for the very record it changes, that shows
-    everyone but a platform administrator "not found", or that looks the record up in the caller's
-    organisation first and then asks the write rule, gives that answer itself.
+    everyone but a platform administrator "not found", whose role check refuses this person, or
+    that looks the record up in the caller's organisation first and then asks the write rule,
+    gives that answer itself.
     """
     if endpoint in ANSWERS_FOR_ITSELF:
         return True
     view = app.view_functions.get(endpoint)
-    return bool(getattr(view, "matrix_guard", None) or getattr(view, "answers_non_platform_admins", False))
+    if getattr(view, "matrix_guard", None) or getattr(view, "answers_non_platform_admins", False):
+        return True
+    # A route behind a role check refuses, in its own words, a person that check refuses.
+    roles = getattr(view, "role_guard", None)
+    if roles:
+        from flask_login import current_user
+
+        from app._decorators_base import _effective_roles
+
+        if current_user.is_authenticated and not (_effective_roles(current_user) & roles):
+            return True
+    return False
 
 
 # Tables the request machinery writes for anyone (the session registry, the audit trail of the

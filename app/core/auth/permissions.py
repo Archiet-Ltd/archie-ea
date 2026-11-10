@@ -225,8 +225,6 @@ _WRITE_CELLS = tuple(
     for object_type in OBJECT_TYPES
     for action in ("create", "edit", "delete", "bulk_delete")
 )
-# The persona that edits the model itself (``can_change_model``): enterprise and business architects.
-_MODEL_EDITING_PERSONA = (("edit", "archimate"),)
 _GOVERNANCE_WRITE_CELLS = tuple(
     (action, object_type)
     for object_type, actions in GOVERNANCE_ACTIONS.items()
@@ -255,17 +253,17 @@ def may_write(
     """Whether ``user`` may change the model; the one answer for the write guard and the AI chat.
 
     The rule: a person may change the model when the permission matrix grants them a create, edit
-    or delete on a model record (or the persona that edits the model), or when their platform role
-    carries write permission and their organisation role is not viewer; a governance persona that
-    grants one thing (a board vote, a portfolio role, a solution) is not a model writer, and the
-    route that persona is meant for grants what it permits. Naming ``object_type`` asks the same
+    or delete on a model record, or when their platform role
+    carries write permission and their organisation role is not viewer; a governance persona (a
+    board vote, a portfolio role, a solution, editing the model on a read-only account) is not a
+    model writer, and the route that persona is meant for grants what it permits. Naming ``object_type`` asks the same
     question of one kind of record, as the form for that record does.
     """
     if user is None or not getattr(user, "is_authenticated", False):
         return False
     if object_type is not None:
         return _decide(user, action, object_type, organization_id)
-    for cell_action, cell_object in _WRITE_CELLS + _MODEL_EDITING_PERSONA:
+    for cell_action, cell_object in _WRITE_CELLS:
         if _decide(user, cell_action, cell_object, organization_id):
             return True
     from app.models.user import Permission

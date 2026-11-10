@@ -527,6 +527,10 @@ def require_roles(*allowed_roles):
         # is active.
         if any(_normalize_role_name(r) == "admin" for r in allowed_roles):
             decorated_function._active_org_rbac_gate = "require_roles"
+        # The write guard reads this to let the route give its own refusal to a person it refuses.
+        decorated_function.role_guard = frozenset(
+            n for n in (_normalize_role_name(r) for r in allowed_roles) if n
+        )
 
         return decorated_function
 

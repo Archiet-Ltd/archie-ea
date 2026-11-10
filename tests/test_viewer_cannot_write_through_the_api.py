@@ -85,8 +85,9 @@ def _application(db_session, org, name):
 
 
 # Tables that grow when a person is turned away, by design: the sign-in the test makes for each call,
-# and the audit entry that records the refusal. Neither is the model.
-BOOKKEEPING_TABLES = ("user_sessions", "soc2_audit_log")
+# the audit entry that records the refusal, and the error report a route's own refusal files. None is
+# the model.
+BOOKKEEPING_TABLES = ("user_sessions", "soc2_audit_log", "error_events")
 
 
 def _table_counts(db_session):

@@ -62,6 +62,7 @@ def _radar_roles_required(view):
             raise
         return view(*args, **kwargs)
 
+    wrapper.role_guard = getattr(role_gate, "role_guard", None)
     return wrapper
 
 

@@ -681,8 +681,13 @@ def complete_deliverable(deliverable_id):
     Body: { "complete": bool }
     Returns: { "success": true, "deliverable": {...} }
     """
+    from app.core.auth.permissions import can_change_model, may_write
     from app.services.adm_deliverable_service import set_complete
 
+    # Ticking a deliverable records progress on the architecture: a person who may change the
+    # model, or the persona that edits it.
+    if not (may_write(current_user) or can_change_model(current_user)):
+        return jsonify({"success": False, "error": "Your role can read the checklist but not change it."}), 403
     data = request.get_json() or {}
     try:
         item = set_complete(deliverable_id, bool(data.get("complete", False)))
