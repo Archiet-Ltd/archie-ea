@@ -209,8 +209,9 @@ def test_administrator_saves_billing_details_and_they_survive_a_reload(browser, 
         form.get_by_label("Purchase-order number").fill(po_number)
         form.get_by_role("button", name="Save billing details").click()
         page.wait_for_load_state("domcontentloaded")
-        expect(page.get_by_test_id("billing-page").get_by_text(
-            "Billing details saved. Future invoices carry them.")).to_be_visible(timeout=PAGE_TIMEOUT)
+        # The confirmation is the layout's toast, which sits outside the billing section.
+        expect(page.get_by_text("Billing details saved. Future invoices carry them.").first).to_be_visible(
+            timeout=PAGE_TIMEOUT)
 
         page.reload(wait_until="domcontentloaded")
         form = page.get_by_test_id("billing-details-form")
