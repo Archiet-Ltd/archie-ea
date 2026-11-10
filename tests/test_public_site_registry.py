@@ -39,6 +39,7 @@ PRODUCT_ITEMS = [
 ]
 PRODUCT_SOON = [
     ("Software and tool discovery", "Coming soon: discover the software and tools you actually pay for and use."),
+    ("Bring your SysML models", "Early access: bring SysML models into your enterprise model as ArchiMate."),
 ]
 SOLUTIONS = [
     ("Application rationalisation", "Find overlapping applications and decide which to keep, consolidate or retire."),

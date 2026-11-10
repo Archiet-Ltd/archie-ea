@@ -21,6 +21,9 @@
       {% for g in groups %}
       <li><a href="{{ url_for('early_access.page', slug=g.slug) }}">{{ g.title }}</a>{% if g.blurb %}: {{ g.blurb }}{% endif %}</li>
       {% endfor %}
+      {% for p in pages %}
+      <li><a href="{{ p.href }}">{{ p.title }}</a>{% if p.blurb %}: {{ p.blurb }}{% endif %}</li>
+      {% endfor %}
     </ul>
   </article>
 </div>

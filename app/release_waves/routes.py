@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from email_validator import EmailNotValidError, validate_email
 from flask import Blueprint, abort, make_response, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -43,6 +45,22 @@ def coming_groups() -> list[dict]:
         if has_page(info) and info["title"] not in seen:
             seen[info["title"]] = {"slug": code_slug(code), "title": info["title"], "blurb": info["blurb"]}
     return [seen[k] for k in sorted(seen)]
+
+
+def coming_pages() -> list[dict]:
+    """The waiting-list pages the public menu lists as coming, other than a capability group already listed.
+
+    Each carries the menu's own label and address and its one-line description without the menu's lead-in words."""
+    from app.services.site_registry import site_registry
+
+    taken = {g["title"] for g in coming_groups()}
+    pages = []
+    for item in site_registry()["product"]["coming_soon"]["items"]:
+        if item["label"] in taken:
+            continue
+        blurb = re.sub(r"^(Coming soon|Early access):\s*", "", item.get("blurb") or "")
+        pages.append({"href": item["href"], "title": item["label"], "blurb": blurb})
+    return sorted(pages, key=lambda p: p["title"])
 
 
 def _page(slug: str, *, thanks: bool = False, error: str | None = None, title: str | None = None, blurb: str | None = None):
@@ -134,7 +152,7 @@ def simulations():
 
 @early_access_bp.route("/early-access")
 def hub():
-    return render_template("public/early_access_hub.html", groups=coming_groups())
+    return render_template("public/early_access_hub.html", groups=coming_groups(), pages=coming_pages())
 
 
 @early_access_bp.route("/early-access/<slug>")

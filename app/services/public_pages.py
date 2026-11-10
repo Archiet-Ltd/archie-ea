@@ -315,6 +315,7 @@ MODULE_RECORDING_DEFECTS: dict[str, str] = {
                        "business unit column is a dash, so no decision can be shown.",
     "scenario-modelling": "There is no screen: the module is not built yet.",
     "software-and-tool-discovery": "There is no screen: the module is not built yet.",
+    "sysml-to-archimate": "There is no screen: the module is not built yet.",
     "solutions": "A solution opens with \"No problem statement yet\", no cost and 8% readiness; all four listed "
                  "solutions still need setting up. The page itself redirects to /modules/arb today.",
     "value-streams": "The stages of the value stream carry \"No description yet\", \"No entry criteria yet\" and "
