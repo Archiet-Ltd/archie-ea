@@ -15,6 +15,7 @@ Tools marked 'approve' tier are queued for user confirmation — not executed.
 from app.modules.ai_chat.tools.executor import ToolCall
 import json
 import logging
+import time
 from typing import Callable, Optional
 from app.modules.ai_chat.services.ai_hallucination_detector import (
     Grounding,
@@ -322,6 +323,8 @@ class AgentRunner:
         # to run() identifies the specific turn within that session.
         self.chat_session_id = chat_session_id
         self._turn_id: Optional[str] = None
+        # When this turn must stop (time.monotonic()); set by run().
+        self._turn_deadline: Optional[float] = None
         # What this turn may state: tool results, the context handed to the
         # model, the conversation so far and the user's own words. The citation
         # gate in _finalize refuses an answer that states a fact about the
@@ -696,7 +699,10 @@ class AgentRunner:
         # conversation). Any approval queued during this call to run() carries
         # this id so it can be traced back to the specific run that raised it.
         import uuid as _uuid
+        from app.modules.ai_chat.services import model_defaults
+
         self._turn_id = str(_uuid.uuid4())
+        self._turn_deadline = time.monotonic() + float(model_defaults.CHAT_TURN_BUDGET_SECONDS)
 
         self._context_struct = None
         # Build system prompt with live domain context
@@ -835,6 +841,13 @@ class AgentRunner:
             self._held_tokens = []
             llm_resp = None
             while llm_resp is None:
+                if self._budget_left() <= 0:
+                    logger.warning("AgentRunner: turn budget spent before %s/%s answered", provider, model)
+                    return self._finalize(
+                        self._fallback("LLM call failed: the turn's time budget is spent", busy=True),
+                        user_message=user_message, domain=domain, context=context,
+                        persona=persona, model_used=model,
+                    )
                 try:
                     llm_resp = self._call_llm(
                         provider, model, api_key, system_prompt, messages, tool_schemas,
@@ -1182,6 +1195,26 @@ class AgentRunner:
     # LLM call (tool-enabled)                                             #
     # ------------------------------------------------------------------ #
 
+    def _budget_left(self) -> Optional[float]:
+        """Seconds left of this turn's budget, or None when no turn is running."""
+        if self._turn_deadline is None:
+            return None
+        return self._turn_deadline - time.monotonic()
+
+    def _call_timeout(self) -> float:
+        """How long one provider call may wait: the first-token limit, or what is left of the turn."""
+        from app.modules.ai_chat.services import model_defaults
+
+        left = self._budget_left()
+        limit = float(model_defaults.PROVIDER_FIRST_TOKEN_SECONDS)
+        return limit if left is None else max(0.5, min(limit, left))
+
+    def _check_budget(self) -> None:
+        """Stop a call that is still receiving when the turn's budget is spent."""
+        left = self._budget_left()
+        if left is not None and left <= 0:
+            raise TimeoutError("the turn's time budget is spent")
+
     def _call_llm(
         self,
         provider: str,
@@ -1275,7 +1308,7 @@ class AgentRunner:
         from app.modules.ai_chat.services.llm_service_impl import LLMService
 
         LLMService._guard_provider_call("anthropic", model, prompt=system_prompt)
-        client = anthropic.Anthropic(api_key=api_key, timeout=90.0)
+        client = anthropic.Anthropic(api_key=api_key, timeout=self._call_timeout(), max_retries=0)
         max_tokens = 8192 if "sonnet" in model or "opus" in model else 4096
 
         response = client.messages.create(
@@ -1312,7 +1345,7 @@ class AgentRunner:
         from app.modules.ai_chat.services.llm_service_impl import LLMService
 
         LLMService._guard_provider_call("anthropic", model, prompt=system_prompt)
-        client = anthropic.Anthropic(api_key=api_key, timeout=90.0)
+        client = anthropic.Anthropic(api_key=api_key, timeout=self._call_timeout(), max_retries=0)
         max_tokens = 8192 if "sonnet" in model or "opus" in model else 4096
 
         with client.messages.stream(
@@ -1330,6 +1363,7 @@ class AgentRunner:
             tool_choice={"type": "auto"},
         ) as stream:
             for text in stream.text_stream:
+                self._check_budget()
                 self._emit_token(text)
             final = stream.get_final_message()
 
@@ -1366,7 +1400,7 @@ class AgentRunner:
         elif not provider and base_url and "integrate.api.nvidia.com" in base_url:
             provider_name = "nvidia"
         LLMService._guard_provider_call(provider_name, model, prompt=system_prompt)
-        client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=self._call_timeout(), max_retries=0)
         full_messages = [{"role": "system", "content": system_prompt}] + messages
 
         # Newer OpenAI models (o1, o3, gpt-5.x) require max_completion_tokens; all other models
@@ -1404,7 +1438,7 @@ class AgentRunner:
         elif not provider and base_url and "integrate.api.nvidia.com" in base_url:
             provider_name = "nvidia"
         LLMService._guard_provider_call(provider_name, model, prompt=system_prompt)
-        client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=self._call_timeout(), max_retries=0)
         full_messages = [{"role": "system", "content": system_prompt}] + messages
 
         text_acc = ""
@@ -1425,6 +1459,7 @@ class AgentRunner:
             extra_body=self._provider_extra_body(provider_name),
         ) as stream:
             for chunk in stream:
+                self._check_budget()
                 if getattr(chunk, "usage", None):
                     usage = chunk.usage
                 if not chunk.choices:

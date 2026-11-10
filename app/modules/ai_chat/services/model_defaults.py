@@ -113,6 +113,13 @@ OPENAI_COMPATIBLE_BASE_URLS = {
 MISTRAL_CHAT_URL = "https://api.mistral.ai/v1/chat/completions"
 
 
+# How long the chat waits. Each provider call gives up after PROVIDER_FIRST_TOKEN_SECONDS without a first
+# token, and the whole turn stops at CHAT_TURN_BUDGET_SECONDS whatever the providers do; the person then
+# reads the busy message with Retry. Set here once; the chat's provider chain reads them at call time.
+PROVIDER_FIRST_TOKEN_SECONDS = 25.0
+CHAT_TURN_BUDGET_SECONDS = 60.0
+
+
 def is_free_model(provider: str, model: str = "") -> bool:
     """True when this provider and model are a free tier that must not read an organisation's data."""
     provider = (provider or "").strip().lower()
