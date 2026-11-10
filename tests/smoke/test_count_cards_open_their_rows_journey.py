@@ -214,9 +214,10 @@ def test_every_count_card_opens_the_rows_it_counts(browser, live_server, viewpor
             _click_card(page, "gap-open-" + level, r"severity=%s&status=open" % level, count, rows=_gap_rows,
                         shot="gaps-open-" + level if level == "high" else None, viewport=viewport, theme=theme)
         page.goto(old_address + "?severity=critical", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        assert page.url == register + "?severity=critical", page.url
-        assert _gap_rows(page) == CRITICAL
-        assert "%d of %d" % (CRITICAL, RECORDED) in page.get_by_test_id("gap-severity-filter").inner_text()
+        assert page.url == register + "?severity=critical&status=open", page.url
+        # the old address lists the open gaps its figure counted, not the resolved critical one as well
+        assert _gap_rows(page) == OPEN_CRITICAL
+        assert "%d of %d" % (OPEN_CRITICAL, RECORDED) in page.get_by_test_id("gap-severity-filter").inner_text()
         page.goto(old_address + "?severity=bogus", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.url == register, page.url
         # the real Risk assessment keeps its own figures
