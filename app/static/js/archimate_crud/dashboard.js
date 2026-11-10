@@ -158,7 +158,12 @@ document.addEventListener('alpine:init', function() {
                 // them, still) returns [] and the modal stays name+description only.
                 let et = this.formData.element_type;
                 let cfg = et ? this.fieldConfigs[et] : null;
-                return (cfg && Array.isArray(cfg.fields)) ? cfg.fields : [];
+                let fields = (cfg && Array.isArray(cfg.fields)) ? cfg.fields : [];
+                // An element with no dedicated record has nowhere to keep typed values: offer only its state.
+                if (this.editingElement && this.editingElement.typed === false) {
+                    return fields.filter(function(f) { return f.name === 'architecture_state'; });
+                }
+                return fields;
             },
 
             get elementGroups() {
@@ -366,8 +371,9 @@ document.addEventListener('alpine:init', function() {
 
             init() {
                 var self = this;
+                var fieldConfigsLoaded = Promise.resolve();
                 if (APP_CONFIG.fieldConfigsUrl) {
-                    Platform.fetch.get(APP_CONFIG.fieldConfigsUrl, null, { silent: true })
+                    fieldConfigsLoaded = Platform.fetch.get(APP_CONFIG.fieldConfigsUrl, null, { silent: true })
                         .then(function(data) { self.fieldConfigs = data || {}; })
                         .catch(function(err) {
                             // Non-fatal: typed fields just fall back to the plain
@@ -393,8 +399,9 @@ document.addEventListener('alpine:init', function() {
                 window.addEventListener('popstate', this.popstateHandler);
                 this.loadElements(false);
                 if (APP_CONFIG.editTarget) {
-                    // Reached from an element's Edit link: open that element's form.
-                    setTimeout(function() { self.openEditModal(APP_CONFIG.editTarget); }, 0);
+                    // Reached from an element's Edit link: open that element's form once the typed field
+                    // list has loaded, so every stored value is in the form before it can be saved.
+                    fieldConfigsLoaded.then(function() { self.openEditModal(APP_CONFIG.editTarget); });
                 }
                 this.loadAllLayerCounts();
                 this.loadViewpoints().then(function() {
@@ -665,7 +672,7 @@ document.addEventListener('alpine:init', function() {
             },
             editPageUrl(el) {
                 if (!el) return '#';
-                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id + '/edit';
+                return '/architecture/' + this.activeTab + '/' + el.element_type + '/' + el.id + '/edit' + (el.ae ? '?ae=1' : '');
             },
 
             formatTypeName(type) {

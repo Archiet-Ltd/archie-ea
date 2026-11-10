@@ -170,7 +170,7 @@
         </div>
         <div data-testid="kpi-updated" class="flex [&>*]:w-full">
             {% if changed %}
-                {{ stat_card('Last updated', changed.strftime('%d %b %Y'), hint=('Reviewed ' ~ element.last_reviewed_date.strftime('%d %b %Y')) if element.last_reviewed_date else ('When it was recorded' if changed_is_recorded else 'Not reviewed yet')) }}
+                {{ stat_card('Recorded' if changed_is_recorded else 'Last updated', changed.strftime('%d %b %Y'), hint=('Reviewed ' ~ element.last_reviewed_date.strftime('%d %b %Y')) if element.last_reviewed_date else ('Date it was added to the model' if changed_is_recorded else 'Not reviewed yet')) }}
             {% else %}
                 {{ stat_card('Last updated', 'Not recorded', hint='Shown after the next edit') }}
             {% endif %}
@@ -299,6 +299,7 @@
                 No description yet.{% if can_change_model() %} <a href="{{ edit_url }}" class="text-primary underline hover:underline">Edit to add one</a> so the next person knows what this is.{% else %} An architect can add one.{% endif %}
             </p>
             {% endif %}
+            {% if page.description_origin %}<p class="text-xs text-muted-foreground" data-testid="element-description-origin">{{ page.description_origin }}</p>{% endif %}
 
             <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 text-sm">
                 {% if has_owner_field %}

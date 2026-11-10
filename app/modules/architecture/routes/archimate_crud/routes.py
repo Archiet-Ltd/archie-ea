@@ -453,7 +453,11 @@ _SKIP_FIELDS = frozenset(
 
 
 # Columns a person never needs to read; administrators see them under "Technical details".
-_TECHNICAL_FIELDS = frozenset({"color", "auto_generated"})
+# The provenance columns are said in words on the page (where the element came from, and the date card), so
+# their raw values are kept to the Technical details panel.
+_TECHNICAL_FIELDS = frozenset({
+    "color", "auto_generated", "recorded_at", "source_kind", "source_ref", "source_label", "source_recorded_at",
+})
 _SNAKE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _ACRONYMS = ("Acm", "Api", "Id", "Url", "Sap", "Rfc", "Bapi", "Arb")
 
@@ -1754,10 +1758,19 @@ def remove_technology_cost(element_id):
     return redirect(back)
 
 
-def _recorded_description(text):
-    """The description a person wrote, or "" for text a tool filled in on its own."""
-    text = (text or "").strip()
-    return "" if text.startswith("Inferred from ") else text
+def _description_origin(ae_row):
+    """Where an element's description came from, in words, from the element's provenance record."""
+    kind = (getattr(ae_row, "source_kind", None) or "").strip().lower()
+    label = (getattr(ae_row, "source_label", None) or "").strip()
+    if kind == "import":
+        return "Imported from %s." % label if label else "Imported from a model file."
+    if kind == "connector":
+        return "Brought in by %s." % label if label else "Brought in by a connected tool."
+    if kind == "derived":
+        return "Worked out from the rest of the model, not written by a person."
+    if kind == "sample":
+        return "Sample data."
+    return ""
 
 
 def _element_page(element, element_type, ae_id, relationships):
@@ -1784,13 +1797,29 @@ def _element_page(element, element_type, ae_id, relationships):
     return {
         "subtitle": element_page.subtitle_for(element_type, current_user, _plain_name),
         # The dedicated table may hold no description while the model-graph row does; show whichever has words.
-        "description": _recorded_description(
-            getattr(element, "description", None) or getattr(ae_row, "description", None)
-        ),
+        "description": (
+            getattr(element, "description", None) or getattr(ae_row, "description", None) or ""
+        ).strip(),
+        "description_origin": _description_origin(ae_row),
         "connections": connections,
         "lines": element_page.answer_lines(element_type, connections, **common),
         **element_page.plateau_facts(element, element_type, ae_row, href_for=href_for),
     }
+
+
+def _typed_record(element, from_ae, element_type):
+    """The record that holds an element's typed values (Goal type, service type, ...), or None.
+
+    A dedicated record is its own; for a model-graph row it is the dedicated record that mirrors it.
+    """
+    if not from_ae:
+        return element
+    model_class = MODEL_REGISTRY.get(element_type)
+    if model_class is None or not hasattr(model_class, "archimate_element_id"):
+        return None
+    return model_class.query.filter_by(  # tenant-scoping-ok: keyed by the id of an archimate_elements row already loaded under the tenant filter
+        archimate_element_id=element.id
+    ).first()
 
 
 def _resolve_edit_target(element_type, element_id):
@@ -1880,6 +1909,8 @@ def update_element(layer, element_type, element_id):
                         mirror.name = element.name
                     if hasattr(mirror, "description"):  # model-safety-ok: polymorphic ArchiMate elements
                         mirror.description = element.description
+                    # Every typed value the form offers (Goal type, service type, ...) is kept on that record.
+                    _set_model_fields(mirror, data, type(mirror), element_type)
             # As-is / to-be state (ArchiMateElement.plateau), if the form set it.
             # Works for a native ArchiMateElement (element itself) and a linked one.
             _apply_architecture_state(element, data)
@@ -1917,17 +1948,36 @@ def update_element(layer, element_type, element_id):
 
     # The Edit link opens the edit form for this element over its layer page; saving
     # returns to the element's own page.
+    typed_record = _typed_record(element, _from_ae, element_type)
     edit_target = {
         "id": element.id,
         "element_type": element_type,
         "name": getattr(element, "name", None) or getattr(element, "title", None) or "",
         "description": getattr(element, "description", None) or "",
         "ae": bool(_from_ae),
+        # An element with no dedicated record has nowhere to keep typed values, so the form does not offer them.
+        "typed": typed_record is not None,
         "return_url": url_for(
             "archimate_crud.detail_element", layer=layer, element_type=element_type,
             element_id=element.id, **({"ae": 1} if _from_ae else {}),
         ),
     }
+    # Every value the form shows, from the same field list the form is built from, so a save that changes
+    # only the name sends back what is stored.
+    ae_row = element if _from_ae else (
+        ArchiMateElement.query.filter_by(id=element.archimate_element_id).first()
+        if getattr(element, "archimate_element_id", None) else None
+    )
+    for field in (ELEMENT_FIELD_CONFIGS.get(element_type) or {}).get("fields", []):
+        name = field["name"]
+        if name == "architecture_state":
+            value = getattr(ae_row, "togaf_plateau", None)
+            value = value if value in _ARCHITECTURE_STATES else ""
+        elif typed_record is None:
+            continue
+        else:
+            value = getattr(typed_record, name, None)
+        edit_target[name] = "" if value is None else value
     return render_template(
         "archimate_crud/dashboard.html",
         layer=layer,
@@ -1939,6 +1989,12 @@ def update_element(layer, element_type, element_id):
         selected_layer=_selected_layer_for(layer),
         element_field_configs=ELEMENT_FIELD_CONFIGS,
     )
+
+
+def _plain_table_words(table_name):
+    """A table's records in plain words: "archimate_elements" reads "model elements"."""
+    words = table_name.replace("_", " ")
+    return "model " + words[len("archimate "):] if words.startswith("archimate ") else words
 
 
 def _delete_blockers(ae_row):
@@ -1965,7 +2021,7 @@ def _delete_blockers(ae_row):
                 db.select(db.func.count()).select_from(table).where(fk.parent == ae_row.id)
             ).scalar() or 0
             if count:
-                blockers.append((table.name.replace("_", " "), count))
+                blockers.append((_plain_table_words(table.name), count))
     return blockers
 
 
@@ -1990,10 +2046,10 @@ def delete_check(layer, element_type, element_id):
     ).first()
     blockers = _delete_blockers(ae_row)
     if blockers:
-        listed = ", ".join(f"{n} in {w}" for w, n in blockers)
+        listed = ", ".join(f"{w} ({n})" for w, n in blockers)
         return jsonify({
             "allowed": False,
-            "reason": f"It is still referenced ({listed}). Remove those references first.",
+            "reason": f"It is still used by {listed}. Remove those links first.",
         })
     ae_ids = [ae_row.id] if ae_row is not None else []
     relationships = ArchiMateRelationship.query.filter(

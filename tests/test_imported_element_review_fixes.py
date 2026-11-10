@@ -139,5 +139,5 @@ def test_refusal_names_records_in_plain_words(app, db_session, make_org, client,
     login_as(client, user)
     body = client.get("/architecture/motivation/Goal/%d/delete-check?ae=1" % row.id).get_json()
     assert body["allowed"] is False
-    assert "1 model element comments" in body["reason"], body["reason"]
+    assert body["reason"] == "It is still used by model element comments (1). Remove those links first."
     assert "archimate" not in body["reason"].lower()
