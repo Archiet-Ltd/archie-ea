@@ -7,6 +7,8 @@ from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
 import pytest
 from playwright.sync_api import expect, sync_playwright
 
+from app.basecoat_kit import register_basecoat_helpers
+
 ROOT = Path(__file__).resolve().parents[1]
 BASE = 'http://model-viewer.test'
 
@@ -25,6 +27,7 @@ def test_model_viewer_navigation_and_card_contract(engine, scenario):
     env = Environment(loader=ChoiceLoader([
         DictLoader({'layouts/admin_base.html': shell}),
         FileSystemLoader(ROOT / 'app/templates')]), autoescape=True)
+    register_basecoat_helpers(env)
     document = env.get_template('architecture_assistant/archimate_model_viewer.html').render()
     with sync_playwright() as pw:
         browser = getattr(pw, engine).launch()
