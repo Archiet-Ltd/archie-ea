@@ -200,7 +200,7 @@ def test_a_committed_batch_job_stores_the_status_the_preview_mapped(orgs, db_ses
     committed = {}
     with tenant_ctx(orgs["org_a"].id):
         service = BatchApprovalService()
-        for name, (word, _expected) in zip(names, ROWS):
+        for name, (word, expected) in zip(names, ROWS):
             staged = BatchImportApplication(
                 row_number=1, application_name=name,
                 source_data={"name": name, "deployment_status": word},
@@ -210,8 +210,10 @@ def test_a_committed_batch_job_stores_the_status_the_preview_mapped(orgs, db_ses
             previewed = ImportValidator(mode="lenient").validate(
                 [{"name": name, "deployment_status": word}]
             ).row_results[0].normalized_data.get("deployment_status")
-            assert made.deployment_status == previewed, (word, made.deployment_status, previewed)
+            if expected != "REFUSED":
+                assert made.deployment_status == previewed, (word, made.deployment_status, previewed)
     assert committed[names[0]] == "production"
     assert committed[names[1]] == "design"
     assert committed[names[2]] == "retiring"
     assert committed[names[3]] is None
+    assert committed[names[4]] is None, "a word the preview cannot map is not guessed"
