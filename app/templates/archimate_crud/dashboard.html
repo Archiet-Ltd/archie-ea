@@ -20,7 +20,7 @@
                 <section class="border-l-4 pl-4 border-{{ selected_layer.color_token[2:] }}" data-testid="architecture-page-header">
                 {% macro _ps_sub() %}<span class="block max-w-3xl">{{ selected_layer.description }}
                     <span aria-hidden="true">&mdash;</span>
-                    <span x-text="layerTotalKnown ? layerTotal + ' repository ' + (layerTotal === 1 ? 'item' : 'items') : 'repository total unavailable'">repository total unavailable</span></span>{% endmacro %}
+                    <span data-testid="layer-header-total" x-text="elementsPending ? 'loading repository items' : (layerTotalKnown ? layerTotal + ' repository ' + (layerTotal === 1 ? 'item' : 'items') : 'repository total unavailable')">loading repository items</span></span>{% endmacro %}
                 {% macro _ps_actions() %}
                     {{ button(text='Create element', variant='default', icon='plus', attrs_dict={'@click': 'openCreateModal()'}, testid='btn-create-element', aria_label='Create element') }}
                     {% if can_change_model() %}

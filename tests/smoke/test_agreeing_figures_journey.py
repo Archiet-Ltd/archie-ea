@@ -272,7 +272,8 @@ def test_layer_figures_read_as_loading_then_the_total_and_unavailable_only_on_fa
         expect(card).to_have_attribute("aria-busy", "true", timeout=PAGE_TIMEOUT)
         expect(card.locator('[data-state="loading"]')).to_be_visible()
         body = page.locator("body").inner_text()
-        assert "Repository total unavailable" not in body and "— total" not in body, body[:600]
+        assert "total unavailable" not in body.lower() and "— total" not in body, body[:600]
+        expect(page.locator('[data-testid="layer-header-total"]')).to_have_text("loading repository items")
         expect(page.locator('[data-testid="layer-total"]')).to_have_text("Loading")
         _frame(page, "layer-loading", viewport["width"], theme)
 
@@ -281,6 +282,7 @@ def test_layer_figures_read_as_loading_then_the_total_and_unavailable_only_on_fa
         held.pop().continue_()
         expect(card).to_have_attribute("aria-busy", "false", timeout=PAGE_TIMEOUT)
         assert _number(page, "repository-elements-card") == 4
+        expect(page.locator('[data-testid="layer-header-total"]')).to_have_text("4 repository items")
         expect(page.locator('[data-testid="layer-total"]')).to_have_text("4 total")
         assert _tab_count(page, "Business") == 4 == _list_total(page)
     finally:
@@ -297,6 +299,7 @@ def test_layer_figures_read_as_loading_then_the_total_and_unavailable_only_on_fa
         expect(card_of(page)).to_contain_text("Repository total unavailable", timeout=PAGE_TIMEOUT)
         expect(card_of(page)).to_have_attribute("aria-busy", "false")
         expect(page.locator('[data-testid="layer-total"]')).to_have_text("— total")
+        expect(page.locator('[data-testid="layer-header-total"]')).to_have_text("repository total unavailable")
         _frame(page, "layer-failed", viewport["width"], theme)
     finally:
         context.close()
