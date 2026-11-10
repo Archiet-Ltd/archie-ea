@@ -886,7 +886,7 @@ let ComposerPersistence = (function() {
                 self.checkRelationshipHealth();
 
                 self.$nextTick(function() {
-                    self.fitCanvas();
+                    self.fitCanvasReadable();
                     self.refreshMaturityOverlay();
                     /* CMP2-001: Re-apply state overlay after loading viewpoint */
                     if (self.stateViewMode !== 'all') { self.applyStateOverlay(); }
@@ -2507,7 +2507,7 @@ let ComposerPersistence = (function() {
                 self.statusText = 'Viewing snapshot: ' + data.name;
 
                 self.$nextTick(function() {
-                    self.fitCanvas();
+                    self.fitCanvasReadable();
                     if (window.lucide) lucide.createIcons();
                 });
             })

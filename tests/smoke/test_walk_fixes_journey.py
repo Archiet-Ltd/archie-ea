@@ -99,7 +99,7 @@ def test_composer_opens_readable_and_quality_agrees_with_its_warnings(browser, l
         page.wait_for_function(
             "() => { const r = document.querySelector('[x-data=\"composerApp()\"]');"
             " if (!r || !window.Alpine) return false; const d = Alpine.$data(r);"
-            " return d.elementCount > 1 && !d.viewpointLoading; }", timeout=PAGE_TIMEOUT)
+            " return d.elementCount > 1 && !d.viewpointLoading; }", polling=500, timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(2500)  # the quick check and the quality figure settle after the load
         state = page.evaluate(COMPOSER_STATE)
         assert state["zoom"] >= 50, state
@@ -118,6 +118,103 @@ def test_composer_opens_readable_and_quality_agrees_with_its_warnings(browser, l
             ".joint-element", "els => els.slice(0, 20).map(e => e.getBoundingClientRect().width)")
         assert widths and max(widths) >= 80, widths
         _shot(page, "composer")
+    finally:
+        context.close()
+
+
+# --- composer toolbar and saved views at a phone width ---------------------------------------------
+
+def test_saved_layered_view_opens_readable_and_the_phone_toolbar_shows_quality_and_warnings(
+        browser, live_server, demo):
+    name = "Layered view %s" % uuid.uuid4().hex[:6]
+    context = _context(browser, "dark", 390, 844)
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, DEMO_EMAIL)
+        page.goto(live_server + "/archimate/composer?viewpoint=layered", wait_until="domcontentloaded",
+                  timeout=PAGE_TIMEOUT)
+        page.wait_for_function(
+            "() => { const r = document.querySelector('[x-data=\"composerApp()\"]');"
+            " if (!r || !window.Alpine) return false; const d = Alpine.$data(r);"
+            " return d.elementCount > 1 && !d.viewpointLoading; }", polling=500, timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(2500)
+        # Quality and warnings are on the toolbar at 390, and the toolbar does not scroll sideways.
+        quality = page.get_by_role("button", name="Diagram quality score, open details")
+        expect(quality).to_be_visible()
+        warnings = page.get_by_test_id("composer-view-actions").get_by_text(re.compile(r"^\d+ warnings?$"))
+        expect(warnings).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(1500)
+        opened = page.evaluate(COMPOSER_STATE)
+        assert opened["warnings"] > 0, opened
+        assert quality.inner_text().strip() == "Quality %s%%" % opened["score"], (quality.inner_text(), opened)
+        assert warnings.inner_text().split()[0] == str(opened["warnings"]), (warnings.inner_text(), opened)
+        assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"), "sideways scroll"
+        _shot(page, "composer-toolbar")
+
+        # Save the view, then open it again from the library: it opens as readable as the viewpoint did.
+        page.locator("#composer-canvas").click(position={"x": 5, "y": 5})
+        page.keyboard.press("Control+s")
+        name_box = page.locator('[aria-label="Viewpoint name"]')
+        expect(name_box).to_be_visible(timeout=PAGE_TIMEOUT)
+        name_box.fill(name)
+        with page.expect_response(
+                lambda r: "/archimate/api/saved-viewpoints" in r.url and r.request.method in ("POST", "PUT"),
+                timeout=PAGE_TIMEOUT) as saved:
+            page.get_by_role("button", name=re.compile("^Save$")).click()
+        assert saved.value.status < 400, saved.value.text()[:300]
+        expect(name_box).to_be_hidden(timeout=PAGE_TIMEOUT)
+
+        page.goto(live_server + "/archimate/diagrams", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.locator("tbody tr", has_text=name)
+        expect(row).to_have_count(1, timeout=PAGE_TIMEOUT)
+        row.get_by_role("link", name="Open").click()
+        page.wait_for_url(re.compile(r"/archimate/composer\?.*viewpoint_id=\d+"), timeout=PAGE_TIMEOUT)
+        # A saved view of 500 shapes keeps the page busy while it draws: read the state until it settles.
+        reopened = None
+        for _ in range(60):
+            reopened = page.evaluate(COMPOSER_STATE)
+            if reopened["elements"] > 1 and not reopened["loading"]:
+                break
+            page.wait_for_timeout(2000)
+        page.wait_for_timeout(2500)
+        reopened = page.evaluate(COMPOSER_STATE)
+        assert reopened["elements"] == opened["elements"], (opened, reopened)
+        assert reopened["zoom"] >= 50, "the saved view opened at %s%%: %s" % (reopened["zoom"], reopened)
+        _shot(page, "composer-saved-view")
+    finally:
+        context.close()
+
+
+# --- the vendor capability matrix --------------------------------------------------------------------
+
+MATRIX = "/dashboards/vendor-capability-matrix"
+
+
+def _strong_fits(page):
+    return page.locator("p", has_text="Strong Fits").locator("xpath=following-sibling::p").inner_text().strip()
+
+
+def test_matrix_shows_a_dash_before_a_figure_and_explains_an_empty_category_list(browser, live_server, demo):
+    context = _context(browser, "light", 1440, 900)
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, DEMO_EMAIL)
+        _goto(page, live_server, MATRIX)
+        # Nothing is computed until a category is picked: a dash, as the three cards beside it show.
+        assert _strong_fits(page) == "—", _strong_fits(page)
+        _shot(page, "matrix-before-figure")
+
+        # With no category to pick, the page says why and offers the next step, which lands on content.
+        page.route("**/vendor-capability-matrix?only_categories=1", lambda route: route.fulfill(
+            status=200, content_type="application/json", body="[]"))
+        _goto(page, live_server, MATRIX)
+        expect(page.get_by_test_id("no-categories")).to_contain_text("No vendor products are recorded")
+        assert _strong_fits(page) == "—"
+        _shot(page, "matrix-no-categories")
+        page.get_by_test_id("no-categories-next").click()
+        page.wait_for_url(re.compile(r"/applications/vendors/catalogue"), timeout=PAGE_TIMEOUT)
+        assert page.locator("main h1").first.inner_text().strip()
+        assert len(page.locator("main").inner_text().strip()) > 80
     finally:
         context.close()
 
@@ -200,14 +297,18 @@ def test_named_controls_show_a_focus_ring_when_tabbed_to(browser, live_server, d
         _assert_rings(stops, heads, "impact analysis at %d" % width)
         _shot(page, "focus-impact-analysis")
 
-        if width <= 500:
-            context.clear_cookies()
-            sign_in(page, live_server, demo["admin_email"])
-            for path, named in (("/enterprise/implementation/gap-analysis", ["New gap"]),
-                                ("/admin/team", ["Send invitation"]),
-                                ("/admin/connectors", ["Save connector"])):
-                _goto(page, live_server, path)
-                _assert_rings(_tab_stops(page, named), named, "%s at %d" % (path, width))
+        # Gaps, Team and Connectors are an administrator's pages; read them at both widths.
+        context.clear_cookies()
+        sign_in(page, live_server, demo["admin_email"])
+        for path, named in (("/enterprise/implementation/gap-analysis", ["New gap", "Gap", "Status"]),
+                            ("/admin/team", ["Send invitation"]),
+                            ("/admin/connectors", ["Save connector"])):
+            _goto(page, live_server, path)
+            _assert_rings(_tab_stops(page, named), named, "%s at %d" % (path, width))
+        # The Work package header is plain text, not a control: it has no focus to show, and no control
+        # of the gaps table may be skipped on the way to it.
+        _goto(page, live_server, "/enterprise/implementation/gap-analysis")
+        expect(page.locator("thead").get_by_text("Work package", exact=True).first).to_be_visible()
     finally:
         context.close()
 

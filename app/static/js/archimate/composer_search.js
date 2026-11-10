@@ -157,15 +157,7 @@ let ComposerSearch = (function() {
                  * loadSavedViewpoint(). */
                 self.viewpointDirty = false;
                 self.$nextTick(function() {
-                    self.fitCanvas();
-                    /* A large model fitted whole is a wall of shapes at 10%: open at a
-                       readable size on the top-left of the drawing (Ctrl+0 still fits all). */
-                    if (self.zoomPercent < 50) {
-                        let area = self.graph.getBBox(self.graph.getElements());
-                        self.setZoom(50);
-                        if (area) self.paper.translate(40 - area.x * 0.5, 40 - area.y * 0.5);
-                        self._scheduleMiniMapUpdate();
-                    }
+                    self.fitCanvasReadable();
                     if (window.lucide) lucide.createIcons();
                     if (self.intelligenceEnabled) self.fetchIntelligence();
                     /* GAP-CMP-002/003: Update validation badge + orphan highlights */
