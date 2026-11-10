@@ -3830,6 +3830,9 @@ function composerApp() {
 
                 self.validationErrors = errors;
                 self.validationWarnings = warnings;
+                /* The quality figure is worked out from the same graph and the
+                   warnings just counted, so the two always agree. */
+                if (typeof self.computeComplianceScore === 'function') self.computeComplianceScore();
             }, 300);
         },
 

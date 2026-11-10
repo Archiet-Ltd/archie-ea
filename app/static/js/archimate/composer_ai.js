@@ -1901,9 +1901,11 @@ let ComposerAI = (function() {
 
             /* (a) Orphan elements: no connected links → -5 each, max -25 */
             let orphanPenalty = 0;
+            let orphanCount = 0;
             elements.forEach(function(el) {
                 let connected = self.graph.getConnectedLinks(el);
                 if (connected.length === 0) {
+                    orphanCount++;
                     let pen = Math.min(5, 25 - orphanPenalty);
                     if (pen > 0) {
                         orphanPenalty += pen;
@@ -1917,6 +1919,18 @@ let ComposerAI = (function() {
                 }
             });
             score -= orphanPenalty;
+
+            /* (a2) The toolbar's warning count is the one list of warnings: any it
+               shows beyond the orphans above (duplicate names) lowers the figure too,
+               so the quality figure and the warnings count cannot disagree. */
+            let countedOrphans = elements.length >= 2 ? orphanCount : 0;
+            let otherWarnings = Math.max(0, (self.validationWarnings || 0) - countedOrphans);
+            if (otherWarnings > 0) {
+                let dupPenalty = Math.min(10, 2 * otherWarnings);
+                score -= dupPenalty;
+                deductions.push({ rule: 'Duplicate name', penalty: dupPenalty, elementId: null,
+                    message: otherWarnings + (otherWarnings === 1 ? ' name is used by more than one element' : ' names are each used by more than one element') });
+            }
 
             /* (b) Layer coverage — only check if >= 5 elements */
             if (elements.length >= 5) {
