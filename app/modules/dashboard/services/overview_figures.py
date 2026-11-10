@@ -590,7 +590,8 @@ def _activity(changes, now, org_id):
         "week": {
             "rows": weekly_rows,
             "total": len(week),
-            "added": sum(1 for c in week if c.action == "insert"),
+            # records added, counted once like "Records added": the chart above counts changes
+            "added": sum(1 for c in inserts if c.valid_from.date() >= week_start),
             "updated": sum(1 for c in week if c.action == "update"),
             "removed": sum(1 for c in week if c.action == "delete"),
         },

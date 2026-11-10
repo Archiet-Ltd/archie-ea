@@ -11,6 +11,7 @@ import re
 import time
 
 import pytest
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import expect
 
 from tests.smoke.test_signup_brings_the_company_in_journey import (  # noqa: F401  (fixtures and helpers)
@@ -51,6 +52,29 @@ def _figures(page, base):
     return int(numbers.first.inner_text()), connected, by_hand
 
 
+def _added_this_week(page):
+    """The "Added" figure of "Changes this week" on the Overview, as a person reads it."""
+    item = page.get_by_role("listitem").filter(has_text=re.compile(r"^\s*Added\s*\d+\s*$"))
+    expect(item.first).to_be_visible()
+    return int(re.search(r"\d+", item.first.inner_text()).group())
+
+
+def _wait_until_listed(page, base, name):
+    """Open the applications list until it shows the application the person just saved."""
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        try:
+            page.goto(base + "/applications/", wait_until="domcontentloaded")
+        except PlaywrightError:
+            # the save's own navigation was still under way and took the page over: look again
+            page.wait_for_load_state("domcontentloaded")
+            continue
+        if name in page.locator("main").inner_text():
+            return
+        page.wait_for_timeout(500)
+    raise AssertionError("%s never appeared in the applications list" % name)
+
+
 def test_the_overview_after_a_sign_up_read_agrees_with_sign_up_and_counts_one_added_by_hand(browser, server, people, app):
     base = str(server)
     context, page = new_page(browser)
@@ -66,6 +90,7 @@ def test_the_overview_after_a_sign_up_read_agrees_with_sign_up_and_counts_one_ad
         # The Overview says what sign-up said, and none of it by hand.
         total, connected, by_hand = _figures(page, base)
         assert (total, connected, by_hand) == (added, added, 0), (total, connected, by_hand)
+        assert _added_this_week(page) == added, "Changes this week: Added disagrees with Records added"
         shoot(page, "overview-after-a-read")
 
         # One application typed in by the person is the one by hand.
@@ -73,11 +98,11 @@ def test_the_overview_after_a_sign_up_read_agrees_with_sign_up_and_counts_one_ad
         page.get_by_test_id("btn-add-application").click()
         page.locator("#ca-name").fill("Treasury Desk")
         page.locator("form:has(#ca-name) button[type=submit]").click()
-        page.wait_for_timeout(2000)
-        page.goto(base + "/applications/", wait_until="domcontentloaded")
+        _wait_until_listed(page, base, "Treasury Desk")
         expect(page.locator("main")).to_contain_text("Treasury Desk")
         total, connected, by_hand = _figures(page, base)
         assert (total, connected, by_hand) == (added + 1, added, 1), (total, connected, by_hand)
+        assert _added_this_week(page) == added + 1, "Changes this week: Added disagrees with Records added"
         shoot(page, "overview-after-one-by-hand")
 
         # Step 4: the way to the AI settings page and back, kept after a key is saved.
@@ -147,5 +172,88 @@ def test_a_read_that_cannot_open_the_saved_token_says_so_in_a_plain_sentence(bro
         page.get_by_role("link", name="Read again").click()
         page.wait_for_url("**/admin/connectors/github")
         assert len(page.locator("main").inner_text().strip()) > 40
+    finally:
+        context.close()
+
+
+def _spoil_the_organisations_key(app, email):
+    """The organisation's saved key becomes one this server's master key did not seal (a wrong server key)."""
+    from cryptography.fernet import Fernet
+
+    with app.app_context():
+        from app import db
+        from app.models.connector_config import OrganizationEncryptionKey
+        from app.models.user import User
+
+        org_id = User.query.filter_by(email=email).one().organization_id
+        key = OrganizationEncryptionKey.query.filter_by(organization_id=org_id).one()
+        key.encrypted_key = Fernet(Fernet.generate_key()).encrypt(Fernet.generate_key())
+        db.session.commit()
+    return org_id
+
+
+def _the_read_status(page, base):
+    return page.request.get(base + "/admin/connectors/github/status").json()
+
+
+def _wait_for_the_second_read(page, base):
+    deadline = time.monotonic() + 240
+    while time.monotonic() < deadline:
+        state = _the_read_status(page, base)
+        if state["state"] in ("done", "failed"):
+            return state
+        page.wait_for_timeout(3000)
+    raise AssertionError("the read never finished: %s" % _the_read_status(page, base))
+
+
+def test_a_new_token_on_the_connect_page_replaces_details_this_server_cannot_open(browser, server, people, app):
+    base = str(server)
+    context, page = new_page(browser)
+    try:
+        email, _started = sign_up(page, base, people)
+        page.get_by_label("GitHub organisation").fill("acme")
+        page.get_by_label("Read-only token").fill(TOKEN)
+        page.get_by_role("button", name="Connect GitHub").click()
+        expect(page.get_by_test_id("signup-status-github")).to_contain_text(re.compile("GitHub is connected|Reading GitHub now|Read 16"), timeout=60000)
+        _wait_for_the_read(page, base)
+        _spoil_the_organisations_key(app, email)
+
+        page.goto(base + "/admin/connectors/github", wait_until="domcontentloaded")
+        page.get_by_label("Read-only token").fill(TOKEN)
+        page.get_by_role("button", name="Save and read again").click()
+        page.wait_for_url("**/admin/connectors/github")
+        main = page.locator("main").inner_text()
+        assert "Internal Server Error" not in main, main
+        expect(page.locator("main")).to_contain_text("Connected. Reading your repositories now")
+        shoot(page, "connect-page-after-save-with-a-wrong-server-key")
+        state = _wait_for_the_second_read(page, base)
+        assert state["state"] == "done" and state["counts"]["repositories"] == 16, state
+        assert state["has_token"] is True
+    finally:
+        context.close()
+
+
+def test_a_new_token_in_sign_up_replaces_details_this_server_cannot_open(browser, server, people, app):
+    base = str(server)
+    context, page = new_page(browser)
+    try:
+        email, _started = sign_up(page, base, people)
+        page.get_by_label("GitHub organisation").fill("acme")
+        page.get_by_label("Read-only token").fill(TOKEN)
+        page.get_by_role("button", name="Connect GitHub").click()
+        expect(page.get_by_test_id("signup-status-github")).to_contain_text(re.compile("GitHub is connected|Reading GitHub now|Read 16"), timeout=60000)
+        _wait_for_the_read(page, base)
+        _spoil_the_organisations_key(app, email)
+
+        page.goto(base + "/account/welcome", wait_until="domcontentloaded")
+        page.get_by_label("GitHub organisation").fill("acme")
+        page.get_by_label("Read-only token").fill(TOKEN)
+        page.get_by_role("button", name="Connect GitHub").click()
+        status = page.get_by_test_id("signup-status-github")
+        expect(status).to_contain_text(re.compile("GitHub is connected|Reading GitHub now|Read 16"), timeout=60000)
+        assert "Internal Server Error" not in page.locator("main").inner_text()
+        shoot(page, "sign-up-after-save-with-a-wrong-server-key")
+        state = _wait_for_the_second_read(page, base)
+        assert state["state"] == "done" and state["counts"]["repositories"] == 16, state
     finally:
         context.close()
