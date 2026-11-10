@@ -115,22 +115,13 @@ mechanisms:
   tenant_context: request's organisation, captured before the thread starts and re-set inside it
 - kind: thread
   file: app/modules/ai_chat/services/agent_runner.py
-  entry: AgentRunner._read_within_turn
-  purpose: Runs one provider read so the turn's wall clock can end it; the waiting thread gives up on it at
-    the deadline and the read is dropped
+  entry: read_before
+  purpose: Runs one provider read (the agent's, and a lookup with a time limit) so a wall clock can end it; the
+    waiting thread gives up on it at the deadline and the read is dropped
   class: request-helper
   disposition: keep
-  tenant_context: 'none: the read holds only the provider call; the organisation is resolved and the
-    provider guard run on the turn thread before it starts'
-- kind: thread
-  file: app/modules/ai_chat/services/llm_service_impl.py
-  entry: LLMService._within_wall_clock
-  purpose: Runs one provider call that has a time limit so the caller can stop waiting at the limit; the
-    late result is dropped
-  class: request-helper
-  disposition: keep
-  tenant_context: 'request context copied in; the organisation is resolved from it inside the call, and the
-    caller does not touch the database again after it stops waiting'
+  tenant_context: 'request context copied in; the agent read holds only the provider call, and a lookup
+    resolves its organisation from that context inside the call'
 - kind: thread
   file: app/modules/architecture/routes/archimate_routes.py
   entry: _run_archimate_llm_generation

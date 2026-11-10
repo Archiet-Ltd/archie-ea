@@ -310,6 +310,44 @@ def _quietly(fn: Callable) -> None:
         pass
 
 
+def read_before(work: Callable, deadline: float, closer: Optional[Callable] = None):
+    """Run ``work(read)`` on a helper thread and return its result, or raise TimeoutError by ``deadline``
+    (a time.monotonic() value): no first token (``read.first``) within PROVIDER_FIRST_TOKEN_SECONDS, or no
+    end by the deadline, abandons the read (``closer`` is called, its later output is dropped). The one
+    wall clock for every provider read, whatever bytes arrive; the request context is copied in."""
+    import contextvars
+
+    from app.modules.ai_chat.services import model_defaults
+
+    read = _ProviderRead()
+    context = contextvars.copy_context()
+
+    def target():
+        try:
+            read.result = context.run(work, read)
+        except BaseException as exc:  # handed to the waiting thread
+            read.error = exc
+        finally:
+            read.first.set()
+            read.done.set()
+
+    threading.Thread(target=target, daemon=True, name="provider-read").start()
+    first_limit = max(0.0, min(float(model_defaults.PROVIDER_FIRST_TOKEN_SECONDS), deadline - time.monotonic()))
+    reason = None
+    if not read.first.wait(first_limit):
+        reason = "no first token within %.0f seconds" % first_limit
+    elif not read.done.wait(max(0.0, deadline - time.monotonic())):
+        reason = "the turn's time budget is spent"
+    if reason is not None:
+        read.abandoned = True
+        if closer is not None:
+            _quietly(closer)
+        raise TimeoutError(reason)
+    if read.error is not None:
+        raise read.error
+    return read.result
+
+
 class AgentRunner:
     """
     Orchestrates the LLM tool-use loop for a single user turn.
@@ -1320,40 +1358,9 @@ class AgentRunner:
         provider chain treats like any refused call. ``work`` receives a handle whose ``chunk()`` it calls
         for every parsed chunk. With no turn running there is no deadline and ``work`` runs on this thread.
         """
-        from app.modules.ai_chat.services import model_defaults
-
-        read = _ProviderRead()
-        left = self._budget_left()
-        if left is None:
-            return work(read)
-        import contextvars
-
-        context = contextvars.copy_context()
-
-        def target():
-            try:
-                read.result = context.run(work, read)
-            except BaseException as exc:  # handed to the waiting thread
-                read.error = exc
-            finally:
-                read.first.set()
-                read.done.set()
-
-        threading.Thread(target=target, daemon=True, name="provider-read").start()
-        first_limit = max(0.0, min(float(model_defaults.PROVIDER_FIRST_TOKEN_SECONDS), left))
-        reason = None
-        if not read.first.wait(first_limit):
-            reason = "no first token within %.0f seconds" % first_limit
-        elif not read.done.wait(max(0.0, self._budget_left())):
-            reason = "the turn's time budget is spent"
-        if reason is not None:
-            read.abandoned = True
-            if closer is not None:
-                _quietly(closer)
-            raise TimeoutError(reason)
-        if read.error is not None:
-            raise read.error
-        return read.result
+        if self._budget_left() is None:
+            return work(_ProviderRead())
+        return read_before(work, self._turn_deadline, closer)
 
     def _call_llm(
         self,

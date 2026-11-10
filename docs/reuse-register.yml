@@ -1035,7 +1035,7 @@ entries:
       The chat has one budget (CHAT_TURN_BUDGET_SECONDS), one margin (CHAT_TURN_MARGIN_SECONDS) and one first-token
       limit, all in model_defaults. A provider call under the agent ends by that wall clock through
       AgentRunner._read_within_turn (plain, text-only and streamed reads alike); a call with a time_limit ends by it
-      through LLMService._within_wall_clock; the page aborts the stored-answer lookup at the lookup limit plus the
+      through read_before; the page aborts the stored-answer lookup at the lookup limit plus the
       margin, read from the page's own settings. Do not add a second timeout constant or rely on a client timeout,
       which is a gap between bytes. What a Retry tells the model and the person is read from the approval record
       through AIChatApprovalService.recorded_changes and same_change, filtered by organisation, person and
