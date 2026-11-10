@@ -205,7 +205,6 @@ let ComposerSearch = (function() {
                 card.attr('typeLabel/text', row.count + plural);
                 card.attr('typeLabel/fontSize', 20);
                 card.attr('typeLabel/y', 72);
-                card.attr('typeLabel/fill', 'rgba(26,26,26,0.75)');
                 card.set('elName', row.title);
                 card.set('isLayerSummary', true);
                 card.set('summaryLayer', row.layer);
