@@ -422,12 +422,12 @@ def test_an_organisation_with_no_products_gets_an_explained_empty_list(browser, 
     assert page.locator("[data-testid='architecture-true-empty-state']").is_visible()
     assert not page.locator("[data-testid='architecture-filtered-empty-state']").is_visible()
     assert page.locator("[data-testid='architecture-true-empty-state'] button", has_text="Create element").is_visible()
+    _shot(page, "products-list-empty", scheme, width)
     # The filtered sentence appears only once a person sets a filter that matches nothing.
     page.locator("#architecture-search, [data-testid='filter-search']").first.fill("zzz no such thing")
     page.wait_for_selector("[data-testid='architecture-filtered-empty-state']", state="visible", timeout=PAGE_TIMEOUT)
     assert "No elements match these filters" in page.locator("main").inner_text()
     assert not page.locator("[data-testid='architecture-true-empty-state']").is_visible()
-    _shot(page, "products-list-empty", scheme, width)
     context.close()
 
 
