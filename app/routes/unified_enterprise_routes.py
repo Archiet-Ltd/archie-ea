@@ -482,33 +482,12 @@ def investment_matrix():
 @enterprise_bp.route("/strategic/risk-assessment")
 @login_required
 def risk_assessment():
-    """The open gaps of the register by severity.
+    """The earlier address of the gaps by severity; the gap register is the one place for them.
 
-    The address and the Strategic planning card keep the older name; this page counts gaps, not risks
-    (the risks are on /strategic/risk-assessment), so its title and labels say gaps. Every figure is a
-    count of the register's own query and links to the rows it counts."""
-    try:
-        from app.services.gap_register_service import count_gaps, gap_register_query
-
-        org_id = current_org_id()
-        counts = {level: count_gaps(org_id, severity=level, closed=False) for level in _GAP_SEVERITIES}
-        counts["open"] = count_gaps(org_id, closed=False)
-        counts["unrated"] = counts["open"] - sum(counts[level] for level in _GAP_SEVERITIES)
-        counts["closed"] = count_gaps(org_id, closed=True)
-        rank = case({"low": 1, "medium": 2, "high": 3, "critical": 4}, value=effective_severity_expr(), else_=0)
-        gaps = (
-            gap_register_query(org_id, closed=False).order_by(rank.desc(), Gap.name, Gap.id)
-            .limit(_GAP_PAGE_SIZE).all()
-        )
-
-        return render_template("enterprise/risk_assessment.html", gaps=gaps, counts=counts)
-    except SQLAlchemyError as e:
-        current_app.logger.error(f"Database error loading risk assessment: {e}")
-        raise DatabaseError(
-            message=f"Failed to load risk assessment: {str(e)}",
-            user_message="Unable to load risk assessment data.",
-            recovery_action="Return to the dashboard and try again.",
-        )
+    A severity it knows is kept, so the register opens on the same list; anything else is dropped."""
+    severity = (request.args.get("severity") or "").strip().lower()
+    return redirect(url_for("enterprise.gap_analysis", severity=severity if severity in _GAP_SEVERITIES else None),
+                    code=301)
 
 
 @enterprise_bp.route("/strategic/technology-roadmap")
@@ -955,8 +934,11 @@ def gap_analysis():
         )
         # Every figure is a count query over the register; the list below is one page of the rows it counts.
         listed_count = query.order_by(None).count()
-        page_number = safe_int_arg("page", 1, minimum=1)
+        # a page past the end shows the last page, and a huge number never reaches the database as an offset
+        last_page = max(1, -(-listed_count // _GAP_PAGE_SIZE))
+        page_number = safe_int_arg("page", 1, minimum=1, maximum=last_page)
         gaps = query.order_by(order, Gap.id).limit(_GAP_PAGE_SIZE).offset((page_number - 1) * _GAP_PAGE_SIZE).all()
+        open_by_severity = {level: count_gaps(org_id, severity=level, closed=False) for level in _GAP_SEVERITIES}
         gap_counts = {
             "recorded": count_gaps(org_id),
             "critical": count_gaps(org_id, severity="critical"),
@@ -976,6 +958,7 @@ def gap_analysis():
             total_gap_count=total_gap_count,
             closed_gap_count=closed_gap_count,
             gap_counts=gap_counts,
+            open_by_severity=open_by_severity,
             listed_count=listed_count,
             page_number=page_number,
             page_size=_GAP_PAGE_SIZE,

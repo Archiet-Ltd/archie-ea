@@ -31,7 +31,7 @@ CLOSED = 3 + 1        # resolved, closed, completed, and the resolved critical g
 RECORDED = FILLER + OPEN_CRITICAL + HIGH + MEDIUM + LOW + CLOSED
 
 
-def _seed(org_id, noun, *, filler, critical, closed, high=HIGH, medium=MEDIUM, low=LOW, covered=True):
+def _seed(org_id, noun, *, filler, critical, closed, high=HIGH, medium=MEDIUM, low=LOW, covered=True, signals=False):
     from app import create_app, db
     from app.models.implementation_migration import Gap
     from app.models.risk import Risk, RiskStatus
@@ -67,6 +67,14 @@ def _seed(org_id, noun, *, filler, critical, closed, high=HIGH, medium=MEDIUM, l
             package = work_package_service.create_work_package(
                 organization_id=org_id, name="%s close the urgent gap" % noun, status="in_progress")
             work_package_service.link_gap(package.id, urgent.id, organization_id=org_id)
+        if signals:
+            from app.models.application_portfolio import ApplicationComponent
+            from app.models.business_capabilities import BusinessCapability
+
+            for label in ("Billing", "Onboarding"):
+                db.session.add(BusinessCapability(name="%s %s" % (label, noun), organization_id=org_id))
+            db.session.add(ApplicationComponent(name="Unmapped App %s" % noun, organization_id=org_id,
+                                                lifecycle_status="operational", description="Mapped to no capability."))
         for title, likelihood, impact in ((noun + " severe", 5, 5), (noun + " serious", 4, 4), (noun + " minor", 1, 1)):
             db.session.add(Risk(title=title, description="%s could happen." % title, likelihood=likelihood,
                                 impact=impact, status=RiskStatus("open"), owner="Owner",
@@ -131,7 +139,7 @@ def test_every_count_card_opens_the_rows_it_counts(browser, live_server, viewpor
     other = "Rival%s" % uuid.uuid4().hex[:6]
     mine = create_fresh_org("enterprise_architect")
     theirs = create_fresh_org("enterprise_architect")
-    _seed(mine["org_id"], noun, filler=FILLER, critical=OPEN_CRITICAL - 1, closed=3)
+    _seed(mine["org_id"], noun, filler=FILLER, critical=OPEN_CRITICAL - 1, closed=3, signals=True)
     # Their gaps: fewer, with a resolved critical one too, so a count across organisations is a different number.
     _seed(theirs["org_id"], other, filler=3, critical=4, closed=2, covered=False)
 
@@ -192,26 +200,52 @@ def test_every_count_card_opens_the_rows_it_counts(browser, live_server, viewpor
         page.wait_for_url(re.compile(r"severity=critical&status=open"), timeout=PAGE_TIMEOUT)
         assert _gap_rows(page) == OPEN_CRITICAL
 
-        # ---- The gap-severity page counts open gaps, says so, and every card opens its rows
-        page.goto(base + "/enterprise/strategic/risk-assessment", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        text = page.locator("body").inner_text()
-        assert "Total Gaps" not in text and "Risk Items" not in text and "High Risk" not in text, text[:600]
-        assert page.locator("h1").first.inner_text().strip() == "Open gaps by severity"
-        assert [_number(page, "gapsev-%s-value" % level) for level in ("critical", "high", "medium", "low")] == [
+        # ---- The earlier gap-severity address lands on the register, which counts open gaps by severity
+        old_address = base + "/enterprise/strategic/risk-assessment"
+        page.goto(old_address, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.url == register, page.url
+        assert _gap_rows(page) == 500
+        assert [_number(page, "gap-open-%s-value" % level) for level in ("critical", "high", "medium", "low")] == [
             OPEN_CRITICAL, HIGH, MEDIUM, LOW]
-        note = page.get_by_test_id("gapsev-note").inner_text()
-        assert "%d open gaps, %d with no severity rated yet" % (FILLER + OPEN_CRITICAL + HIGH + MEDIUM + LOW, FILLER) in note, note
-        assert "%d resolved gaps are not listed" % CLOSED in note, note
-        rows = page.locator('[data-testid="open-gap-row"]')
-        assert rows.count() == 500 and "resolved critical gap" not in page.locator("main").inner_text()
-        _frame(page, "gap-severity", width, theme)
+        assert "Total Gaps" not in page.locator("body").inner_text()
+        _frame(page, "old-address", width, theme)
         for level, count in (("critical", OPEN_CRITICAL), ("high", HIGH), ("medium", MEDIUM), ("low", LOW)):
-            page.goto(base + "/enterprise/strategic/risk-assessment", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-            _click_card(page, "gapsev-" + level, r"severity=%s&status=open" % level, count, rows=_gap_rows)
-        page.goto(base + "/enterprise/strategic/risk-assessment", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_test_id("gapsev-risks-link").click()
-        page.wait_for_url(re.compile(r"/strategic/risk-assessment$"), timeout=PAGE_TIMEOUT)
+            page.goto(register, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            _click_card(page, "gap-open-" + level, r"severity=%s&status=open" % level, count, rows=_gap_rows,
+                        shot="gaps-open-" + level if level == "high" else None, viewport=viewport, theme=theme)
+        page.goto(old_address + "?severity=critical", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.url == register + "?severity=critical", page.url
+        assert _gap_rows(page) == CRITICAL
+        assert "%d of %d" % (CRITICAL, RECORDED) in page.get_by_test_id("gap-severity-filter").inner_text()
+        page.goto(old_address + "?severity=bogus", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.url == register, page.url
+        # the real Risk assessment keeps its own figures
+        page.goto(base + "/strategic/risk-assessment", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.locator("h1").first.inner_text().strip().lower() == "risk assessment"
+        assert (_number(page, "assess-open-value"), _number(page, "assess-critical-value")) == (3, 2)
+
+        # ---- A page past the end shows the last page with its note; a huge number is not an offset
+        last_rows = RECORDED - 500
+        for number in (99, 10 ** 12):
+            page.goto("%s?page=%d" % (register, number), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            assert _gap_rows(page) == last_rows, number
+            assert "Showing gaps 501 to %d of %d" % (RECORDED, RECORDED) in page.get_by_test_id(
+                "gap-page-note").inner_text()
+            assert "No gaps recorded yet" not in page.locator("body").inner_text()
+            if number == 99:
+                _frame(page, "gaps-page-99", width, theme)
+
+        # ---- A filter with no rows says which filter, and offers the way back
+        page.goto(register + "?severity=high&status=closed", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        empty = page.get_by_test_id("gaps-filter-empty")
+        empty.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+        text = empty.inner_text()
+        assert "high severity, resolved" in text and "%d gaps" % RECORDED in text, text
+        assert "No gaps recorded yet" not in page.locator("body").inner_text()
+        _frame(page, "gaps-filter-empty", width, theme)
+        page.get_by_test_id("gaps-filter-empty-clear").click()
+        page.wait_for_url(re.compile(r"gap-analysis$"), timeout=PAGE_TIMEOUT)
+        assert _gap_rows(page) == 500
 
         # ---- Risk assessment: open, critical, high, medium risks each open the register's rows
         assessment = base + "/strategic/risk-assessment"
@@ -271,6 +305,19 @@ def test_every_count_card_opens_the_rows_it_counts(browser, live_server, viewpor
             assert held == (min(count, 500)), (key, count, held)
             if count > 500:
                 assert "of %d" % count in page.get_by_test_id("gap-page-note").inner_text()
+        # The Gap signals figure opens the page that lists those signals, with the same figure on it
+        page.goto(board, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        signals = _number(page, "gap-signals")
+        assert signals > 0
+        _frame(page, "board-signals", width, theme)
+        link = page.locator('a:has([data-testid="gap-signals"])')
+        assert link.count() == 1, "Gap signals is not a link on the board"
+        link.click()
+        page.wait_for_url(re.compile(r"/capability-roadmap"), timeout=PAGE_TIMEOUT)
+        page.wait_for_function(
+            "n => { const el = document.querySelector('[data-testid=\\"rdm-gap-signals\\"]');"
+            " return el && el.innerText.includes(': ' + n + ' signals'); }", arg=signals, timeout=PAGE_TIMEOUT)
+        _frame(page, "signals-landing", width, theme)
         assert other not in page.locator("body").inner_text()
     finally:
         context.close()

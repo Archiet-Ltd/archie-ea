@@ -374,23 +374,16 @@ def get_plateau_gaps(plateau_id: int, organization_id: int) -> List[Gap]:
 
 
 def get_gaps_not_addressed(organization_id: int) -> List[Gap]:
-    """Return gaps that have no work package addressing them.
+    """Return the open gaps that have no work package addressing them.
 
     A gap is "addressed" when at least one work package of the organisation in
     the one work package store is linked to it; the link is read through
     work_package_service (the one reader), not from the retired
-    gap_work_packages table.
+    gap_work_packages table. A closed gap needs no work, so it is not listed:
+    the list is `gap_register_query(closed=False, has_work_package=False)`, the
+    rows behind the change board's "No work planned" figure.
     """
-    from app.services import work_package_service
-
-    addressed = work_package_service.addressed_gap_ids(organization_id)
-    query = Gap.query.filter(
-        Gap.organization_id == organization_id,
-        Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-    )
-    if addressed:
-        query = query.filter(~Gap.id.in_(addressed))
-    return query.all()
+    return gap_register_query(organization_id, closed=False, has_work_package=False).all()
 
 
 def get_plateau_gap_rows(plateau_ids, organization_id: int) -> Dict[int, List[Dict[str, Any]]]:

@@ -99,19 +99,115 @@ def test_the_implementation_list_of_critical_gaps_holds_open_ones(db_session, ma
     assert client.get("/implementation/api/gaps?severity=critical").get_json()["total"] == 3
 
 
-def test_the_gap_severity_page_counts_open_gaps_and_names_them(db_session, make_org, client, login_as):
-    mine, theirs = _signed_in(db_session, make_org, client, login_as, "sev-page")
+def test_the_old_gap_severity_address_redirects_to_the_register(db_session, make_org, client, login_as):
+    mine, theirs = _signed_in(db_session, make_org, client, login_as, "sev-redirect")
+    _seed_gaps(db_session, mine, theirs)
+    register = "/enterprise/implementation/gap-analysis"
+    old = "/enterprise/strategic/risk-assessment"
+
+    plain = client.get(old)
+    assert plain.status_code == 301 and plain.headers["Location"].endswith(register)
+    for level in ("critical", "high", "medium", "low"):
+        mapped = client.get(old + "?severity=" + level)
+        assert mapped.status_code == 301 and mapped.headers["Location"].endswith(register + "?severity=" + level)
+    assert client.get(old + "?severity=Critical").headers["Location"].endswith(register + "?severity=critical")
+    dropped = client.get(old + "?severity=bogus")
+    assert dropped.status_code == 301 and dropped.headers["Location"].endswith(register)
+
+    landed = client.get(old, follow_redirects=True)
+    assert landed.status_code == 200 and "Open critical" in landed.get_data(as_text=True)
+
+
+def test_the_old_gap_severity_address_needs_a_sign_in(client):
+    response = client.get("/enterprise/strategic/risk-assessment")
+    assert response.status_code in (301, 302) and "gap-analysis" not in response.headers["Location"]
+
+
+def test_the_register_counts_open_gaps_by_severity_and_lists_those_rows(db_session, make_org, client, login_as):
+    mine, theirs = _signed_in(db_session, make_org, client, login_as, "sev-counts")
     _seed_gaps(db_session, mine, theirs)
     with mock.patch("app.routes.unified_enterprise_routes.render_template", return_value="ok") as render:
-        client.get("/enterprise/strategic/risk-assessment")
-    shown = render.call_args.kwargs
-    assert shown["counts"]["critical"] == 2 and shown["counts"]["high"] == 1
-    assert shown["counts"]["open"] == 3 and shown["counts"]["closed"] == 2
-    assert len(shown["gaps"]) == shown["counts"]["open"]
+        client.get("/enterprise/implementation/gap-analysis")
+    open_by_severity = render.call_args.kwargs["open_by_severity"]
+    assert open_by_severity == {"critical": 2, "high": 1, "medium": 0, "low": 0}
+    for level, figure in open_by_severity.items():
+        with mock.patch("app.routes.unified_enterprise_routes.render_template", return_value="ok") as render:
+            client.get("/enterprise/implementation/gap-analysis?severity=%s&status=open" % level)
+        assert render.call_args.kwargs["listed_count"] == figure, level
 
-    html = client.get("/enterprise/strategic/risk-assessment").get_data(as_text=True)
-    assert "Total Gaps" not in html and "Risk Items" not in html and "High Risk" not in html
-    assert "Open gaps by severity" in html
+
+def test_a_gap_page_past_the_end_shows_the_last_page_not_an_error(db_session, make_org, client, login_as):
+    mine, theirs = _signed_in(db_session, make_org, client, login_as, "page-end")
+    _seed_gaps(db_session, mine, theirs)
+    for number in ("99", str(10 ** 12)):
+        with mock.patch("app.routes.unified_enterprise_routes._GAP_PAGE_SIZE", 2), \
+                mock.patch("app.routes.unified_enterprise_routes.render_template", return_value="ok") as render:
+            response = client.get("/enterprise/implementation/gap-analysis?page=" + number)
+        shown = render.call_args.kwargs
+        assert response.status_code == 200
+        assert shown["page_number"] == 3 and len(shown["gaps"]) == 1, number
+
+    html = client.get("/enterprise/implementation/gap-analysis?page=99").get_data(as_text=True)
+    assert "No gaps recorded yet" not in html and "gap-row" in html
+
+
+def test_a_filter_with_no_rows_names_the_filter_and_offers_to_clear_it(db_session, make_org, client, login_as):
+    mine, theirs = _signed_in(db_session, make_org, client, login_as, "filter-empty")
+    _seed_gaps(db_session, mine, theirs)
+    html = client.get("/enterprise/implementation/gap-analysis?severity=low&status=in_progress").get_data(as_text=True)
+    assert "No gap matches this filter (low severity, in progress)" in html
+    assert "The register holds 5 gaps" in html and "gaps-filter-empty-clear" in html
+    assert "No gaps recorded yet" not in html
+
+    empty = make_org("filter-none")
+    from tests.test_work_package_writer import _user
+    login_as(client, _user(db_session, empty, "filternone", role="enterprise_architect"))
+    html = client.get("/enterprise/implementation/gap-analysis").get_data(as_text=True)
+    assert "No gaps recorded yet" in html and "gaps-filter-empty" not in html
+
+
+def test_gaps_with_no_work_package_are_the_open_ones_and_equal_the_boards_figure(
+    db_session, make_org, client, login_as
+):
+    from app.services import work_package_service
+    from app.services.gap_register_service import count_gaps, get_gaps_not_addressed
+
+    mine, theirs = _signed_in(db_session, make_org, client, login_as, "no-wp")
+    covered = [_gap(db_session, mine, priority="low", severity="low") for _ in range(4)]
+    open_bare = [_gap(db_session, mine, priority="low", severity="low") for _ in range(2)]
+    closed_bare = _gap(db_session, mine, priority="low", severity="low", resolution_status="completed")
+    _gap(db_session, theirs, priority="low", severity="low")
+    _gap(db_session, theirs, priority="low", severity="low", resolution_status="resolved")
+    for gap in covered:
+        package = work_package_service.create_work_package(organization_id=mine.id, name="Close %s" % gap.name)
+        work_package_service.link_gap(package.id, gap.id, organization_id=mine.id)
+
+    listed = get_gaps_not_addressed(mine.id)
+    assert {g.id for g in listed} == {g.id for g in open_bare}
+    assert closed_bare.id not in {g.id for g in listed}
+    assert len(listed) == count_gaps(mine.id, has_work_package=False, closed=False)
+    assert [g.id for g in get_gaps_not_addressed(theirs.id)] != []
+    assert len(get_gaps_not_addressed(theirs.id)) == count_gaps(theirs.id, has_work_package=False, closed=False) == 1
+
+    with mock.patch("app.modules.architecture.routes.adm_kanban_view_routes.render_template",
+                    return_value="ok") as render:
+        client.get("/adm-kanban/gap-analysis")
+    assert render.call_args.kwargs["unclosed_count"] == len(listed) == 2
+
+    html = client.get("/enterprise/implementation/gap-analysis").get_data(as_text=True)
+    section = html[html.index("gaps-not-addressed"):]
+    assert open_bare[0].name in section and open_bare[1].name in section
+    assert closed_bare.name not in section
+
+
+def test_the_boards_gap_signals_figure_opens_the_roadmap_that_counts_them(db_session, make_org, client, login_as):
+    mine, theirs = _signed_in(db_session, make_org, client, login_as, "signals-link")
+    with mock.patch("app.modules.capabilities.routes.roadmap_routes.compute_gap_signals", return_value=[1, 2, 3]):
+        html = client.get("/adm-kanban/gap-analysis").get_data(as_text=True)
+    assert 'href="/capability-roadmap"' in html and 'data-testid="gap-signals">3<' in html
+    with mock.patch("app.modules.capabilities.routes.roadmap_routes.compute_gap_signals", return_value=[]):
+        html = client.get("/adm-kanban/gap-analysis").get_data(as_text=True)
+    assert 'data-testid="gap-signals">0<' in html and 'href="/capability-roadmap"' not in html
 
 
 def test_the_board_counts_no_work_planned_among_open_gaps_only(db_session, make_org, client, login_as):
