@@ -102,6 +102,23 @@ def _second_org_architect(tag):
     return email
 
 
+def _sign_in_as(context, page, base, email):
+    """Replace the person signed in on this browser with another, and check who is signed in.
+
+    The first person's page is closed before the cookies are cleared: a page still loading would send its
+    responses back with the first person's cookies and the sign-in would be a no-op. The account menu says
+    whose session the next requests carry, so a 404 for the second person is a real cross-organisation answer.
+    """
+    page.close()
+    context.clear_cookies()
+    page = context.new_page()
+    _login(page, base, email)
+    page.goto(base + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert email in (page.locator("#user-menu-btn").get_attribute("aria-label") or ""), (
+        "expected %s to be signed in" % email)
+    return page
+
+
 def test_architect_corrects_and_removes_imported_elements(browser, live_server, seeded, tmp_path):
     tag = uuid.uuid4().hex[:6]
     file_path = tmp_path / "kinds.xml"
@@ -177,8 +194,7 @@ def test_other_organisation_cannot_edit_or_delete(browser, live_server, seeded, 
         url = _element_address(page, live_server, "Onboarding bundle %s" % tag)
         element_id = url.rstrip("/").split("/")[-1].split("?")[0]
         layer = url.split("/")[2]
-        context.clear_cookies()
-        _login(page, live_server, other)
+        page = _sign_in_as(context, page, live_server, other)
         edit = page.goto("%s/architecture/%s/Product/%s/edit?ae=1" % (live_server, layer, element_id),
                          wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert edit.status == 404
@@ -188,8 +204,7 @@ def test_other_organisation_cannot_edit_or_delete(browser, live_server, seeded, 
         assert resp.status == 404
         check = page.request.get("%s/architecture/%s/Product/%s/delete-check?ae=1" % (live_server, layer, element_id))
         assert check.status == 404
-        context.clear_cookies()
-        _login(page, live_server, seeded["emails"]["solution_architect"])
+        page = _sign_in_as(context, page, live_server, seeded["emails"]["solution_architect"])
         assert _element_address(page, live_server, "Onboarding bundle %s" % tag) == url
     finally:
         context.close()
