@@ -1,4 +1,6 @@
-{% macro impact_scenario_comparison_modal() %}
+{% import 'basecoat/index.html' as ui %}
+
+{% macro impact_scenario_comparison_modal(can_save=false, save_roles='architects', list_limit=200) %}
 <!-- Impact Analysis Scenario Comparison Modal -->
 <div 
     x-data="{
@@ -6,6 +8,15 @@
         scenarios: [],
         selectedScenarios: [],
         loading: false,
+        loadError: '',
+        carriedNotice: '',
+        goneCount: 0,
+        refusedCount: 0,
+        retryCount: 0,
+        goneItems: [],
+        listLimit: {{ list_limit | int }},
+        canSave: {{ 'true' if can_save else 'false' }},
+        saveRoles: '{{ save_roles | e }}',
         
         openScenarioModal() {
             this.loadScenarios();
@@ -27,14 +38,28 @@
             return typeof cost === 'number' && isFinite(cost) ? cost : null;
         },
 
+        // Why a scenario's Processes figure is 0, from the lists saved with it
+        processesReason(s) {
+            const r = s && s.analysis_result;
+            if (!r || !Array.isArray(r.impacted_processes) || r.impacted_processes.length > 0) return '';
+            const n = (Array.isArray(r.dependencies) ? r.dependencies.length : 0) + (Array.isArray(r.indirect_dependencies) ? r.indirect_dependencies.length : 0);
+            if (n === 0) return 'This change reaches no other element.';
+            return 'None of the ' + n + (n === 1 ? ' element' : ' elements') + ' reached is a business process.';
+        },
+
         countLabel(list) {
             const n = this.countOf(list);
             return n === null ? 'Not scored' : String(n);
         },
 
+        // The same formatter the page uses, so one figure reads the same on the screen and in this dialog
+        money(value) {
+            return (window.currencyManager && window.currencyManager.format) ? window.currencyManager.format(value) : value.toLocaleString();
+        },
+
         costLabel(s) {
             const cost = this.riskCost(s);
-            return cost === null ? 'Not recorded' : '$' + (cost / 1000).toFixed(0) + 'k';
+            return cost === null ? 'Not recorded' : this.money(cost);
         },
 
         // Every selected scenario needs a severity and a cost before one can be called the best.
@@ -45,14 +70,87 @@
                 && this.riskCost(s) !== null);
         },
         
-        loadScenarios() {
-            // Load scenarios from localStorage
-            const saved = localStorage.getItem('impactAnalysisScenarios');
-            if (saved) {
-                this.scenarios = JSON.parse(saved);
-            } else {
-                this.scenarios = [];
+        // Scenarios saved in this browser before they were kept for the organisation: an architect's
+        // visit moves them across (the server works out their figures again), anyone else is told.
+        carryAcross() {
+            const key = 'impactAnalysisScenarios';
+            let old = [];
+            try { old = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { old = []; }
+            if (!Array.isArray(old) || old.length === 0) { return Promise.resolve(); }
+            if (!this.canSave) {
+                this.carriedNotice = old.length + (old.length === 1 ? ' scenario was' : ' scenarios were') +
+                    ' saved in this browser before scenarios were shared. Ask ' + this.saveRoles + ' to open this dialog in this browser and move ' +
+                    (old.length === 1 ? 'it' : 'them') + ' across.';
+                return Promise.resolve();
             }
+            // Each scenario leaves browser storage as soon as it is saved, so leaving part-way
+            // never sends one twice. One whose element is not found stays until it is dismissed; one
+            // that could not be checked (the server or the network failed) stays and is tried again.
+            const savedNow = [];
+            const gone = [];
+            const refused = [];
+            const retry = [];
+            return old.reduce((chain, item) => chain.then(() =>
+                Platform.fetch.post('/strategic/api/scenarios', {
+                    name: item.name,
+                    element: { id: item.element && item.element.id },
+                    change_type: item.change_type,
+                    analysis_result: item.analysis_result || {}
+                }, { silent: true }).then(() => { savedNow.push(item); this.forgetCarried(item); }).catch(error => {
+                    const status = error && error.status;
+                    if (status === 404) { gone.push(item); } else if (status === 400) { refused.push(item); } else { retry.push(item); }
+                })
+            ), Promise.resolve()).then(() => {
+                const moved = savedNow.length;
+                this.refusedCount = refused.length;
+                this.goneCount = gone.length + refused.length;
+                this.retryCount = retry.length;
+                this.goneItems = gone.concat(refused);
+                this.carriedNotice = (moved ? moved + (moved === 1 ? ' scenario' : ' scenarios') + ' saved earlier in this browser ' + (moved === 1 ? 'was' : 'were') + ' moved to your organisation. ' : '') +
+                    (gone.length ? gone.length + (gone.length === 1 ? ' could not be moved (its element may no longer exist). ' : ' could not be moved (their elements may no longer exist). ') : '') +
+                    (refused.length ? refused.length + (refused.length === 1 ? ' was' : ' were') + ' refused by the server and cannot be moved as ' + (refused.length === 1 ? 'it is' : 'they are') + '. ' : '') +
+                    (retry.length ? retry.length + (retry.length === 1 ? ' scenario' : ' scenarios') + ' could not be checked right now and ' + (retry.length === 1 ? 'is' : 'are') + ' still in this browser.' : '');
+            });
+        },
+
+        // One carried scenario leaves browser storage the moment it has been saved.
+        forgetCarried(item) {
+            const key = 'impactAnalysisScenarios';
+            let rest = [];
+            try { rest = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { rest = []; }
+            if (!Array.isArray(rest)) { rest = []; }
+            const at = rest.findIndex(x => JSON.stringify(x) === JSON.stringify(item));
+            if (at > -1) { rest.splice(at, 1); }
+            if (rest.length) { localStorage.setItem(key, JSON.stringify(rest)); } else { localStorage.removeItem(key); }
+        },
+
+        // Dismiss clears only the scenarios whose element is not found; the ones still to be tried stay.
+        dismissUnmoved() {
+            this.goneItems.forEach(item => this.forgetCarried(item));
+            this.goneItems = [];
+            this.goneCount = 0;
+            this.refusedCount = 0;
+            if (this.retryCount === 0) { this.carriedNotice = ''; return; }
+            this.carriedNotice = this.retryCount + (this.retryCount === 1 ? ' scenario' : ' scenarios') + ' could not be checked right now and ' + (this.retryCount === 1 ? 'is' : 'are') + ' still in this browser.';
+        },
+
+        loadScenarios() {
+            // The scenarios the organisation has saved, the same for every colleague who signs in
+            this.loading = true;
+            this.loadError = '';
+            this.carriedNotice = '';
+            return this.carryAcross()
+                .then(() => Platform.fetch.get('/strategic/api/scenarios', null, { silent: true }))
+                .then(saved => {
+                    this.scenarios = Array.isArray(saved) ? saved : [];
+                })
+                .catch(() => {
+                    this.scenarios = [];
+                    this.loadError = 'The saved scenarios could not be loaded. Close this dialog and open it again.';
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
         },
         
         toggleScenario(scenarioId) {
@@ -87,7 +185,7 @@
             csv += 'Severity,' + comparison.map(s => s.analysis_result.severity).join(',') + '\\n';
             csv += 'Affected Capabilities,' + comparison.map(s => this.countLabel(s.analysis_result.impacted_capabilities)).join(',') + '\\n';
             csv += 'Affected Processes,' + comparison.map(s => this.countLabel(s.analysis_result.impacted_processes)).join(',') + '\\n';
-            csv += 'Financial Risk ($),' + comparison.map(s => this.riskCost(s) === null ? 'Not recorded' : this.riskCost(s)).join(',') + '\\n';
+            csv += 'Financial Risk (organisation currency),' + comparison.map(s => this.riskCost(s) === null ? 'Not recorded' : this.riskCost(s)).join(',') + '\\n';
             csv += 'Dependencies,' + comparison.map(s => this.countLabel(s.analysis_result.dependencies)).join(',') + '\\n';
             
             const blob = new Blob([csv], { type: 'text/csv' });
@@ -98,7 +196,7 @@
             a.click();
         },
         
-        getBestScenario() {
+        getBestScenarios() {
             const comparison = this.getComparisonData();
             if (!this.canRank()) return null;
             
@@ -120,7 +218,21 @@
             });
             
             scores.sort((a, b) => a.score - b.score);
-            return scores[0].scenario;
+            return scores.filter(x => Math.abs(x.score - scores[0].score) < 1e-9).map(x => x.scenario);
+        },
+
+        getBestScenario() {
+            const best = this.getBestScenarios();
+            return best ? best[0] : null;
+        },
+
+        recommendation() {
+            const best = this.getBestScenarios();
+            if (!best) return '';
+            const names = best.map(s => s.name);
+            if (names.length === 1) return names[0] + ' has the lowest combined risk score based on severity and financial impact.';
+            const listed = names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+            return listed + ' tie on the lowest combined risk score based on severity and financial impact.';
         },
         
         getSeverityColor(severity) {
@@ -199,6 +311,7 @@
                         <label class="block text-sm font-medium text-foreground/80 mb-3">
                             Select Scenarios to Compare (up to 3)
                         </label>
+                        <p x-show="scenarios.length >= listLimit" x-cloak data-testid="scenarios-capped" class="mb-3 text-sm text-muted-foreground" x-text="'Showing your ' + listLimit + ' most recent scenarios. Older ones are not listed.'"></p>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             <template x-for="scenario in scenarios" :key="scenario.id">
                                 <div
@@ -228,11 +341,18 @@
                             </template>
                         </div>
                         
-                        <div x-show="scenarios.length === 0" x-cloak class="text-center py-12 text-muted-foreground">
+                        <div x-show="scenarios.length === 0 && !loading && !loadError" x-cloak class="text-center py-12 text-muted-foreground">
                             <i data-lucide="inbox" class="h-16 w-16 mx-auto mb-3 text-muted-foreground/50"></i>
                             <p class="text-lg font-medium mb-1">No Saved Scenarios</p>
-                            <p class="text-sm">Run an analysis and save it to compare scenarios</p>
+                            <p class="text-sm" data-testid="empty-next-step" x-text="canSave ? 'Run an analysis and save it to compare scenarios' : 'Nothing has been saved yet. Ask ' + saveRoles + ' to run an analysis and save it; saved scenarios then appear here to compare.'"></p>
                         </div>
+                        <div x-show="loading" x-cloak role="status" data-testid="scenarios-loading" class="py-12 text-center text-sm text-muted-foreground">Loading the saved scenarios…</div>
+                        <div x-show="carriedNotice" x-cloak role="status" data-testid="carried-notice" class="mb-3 rounded-lg border bg-muted px-4 py-3 text-sm text-foreground" >
+                            <span x-text="carriedNotice"></span>
+                            {{ ui.button(text='Dismiss', variant='link', class='ml-2', attrs={'type': 'button', 'x-show': 'goneCount > 0', 'x-cloak': '', 'data-testid': 'dismiss-unmoved', '@click': 'dismissUnmoved()'}) }}
+                            {{ ui.button(text='Try again', variant='link', class='ml-2', attrs={'type': 'button', 'x-show': 'retryCount > 0', 'x-cloak': '', 'data-testid': 'try-moving-again', '@click': 'loadScenarios()'}) }}
+                        </div>
+                        <div x-show="loadError" x-cloak role="alert" class="py-12 text-center text-sm text-destructive" x-text="loadError"></div>
                     </div>
 
                     <!-- Comparison Table -->
@@ -297,7 +417,10 @@
                                     <tr>
                                         <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">Affected Processes</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'proc-' + scenarioId">
-                                            <td data-slot="table-cell" class="px-4 py-3 text-lg font-bold text-primary" x-text="countLabel(getScenario(scenarioId)?.analysis_result.impacted_processes)"></td>
+                                            <td data-slot="table-cell" class="px-4 py-3 text-lg font-bold text-primary" >
+                                                <span x-text="countLabel(getScenario(scenarioId)?.analysis_result.impacted_processes)"></span>
+                                                <span class="block text-xs font-normal text-muted-foreground" data-testid="compare-processes-reason" x-show="processesReason(getScenario(scenarioId))" x-text="processesReason(getScenario(scenarioId))"></span>
+                                            </td>
                                         </template>
                                     </tr>
                                     
@@ -330,10 +453,9 @@
                                 <i data-lucide="lightbulb" class="h-5 w-5 text-success"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-success-emphasis mb-1">Recommended Scenario</h4>
+                                <h4 class="font-semibold text-success-emphasis mb-1" data-testid="scenario-recommendation-heading" x-text="(getBestScenarios() || []).length > 1 ? 'Scenarios tie' : 'Recommended Scenario'"></h4>
                                 <p class="text-sm text-success-emphasis">
-                                    <span class="font-medium" x-text="getBestScenario()?.name"></span> 
-                                    has the lowest combined risk score based on severity and financial impact.
+                                    <span class="font-medium" data-testid="scenario-recommendation" x-text="recommendation()"></span>
                                 </p>
                             </div>
                         </div>

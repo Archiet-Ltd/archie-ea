@@ -408,9 +408,9 @@ def init_context_processors(app):
     def inject_site_registry():
         """The public navbar and footer read one registry. Handed over as a
         callable so only the pages that render the navbar or footer pay for it."""
-        from app.services.site_registry import site_registry
+        from app.services.site_registry import registry_entry, site_registry
 
-        return {"site_registry": site_registry}
+        return {"site_registry": site_registry, "registry_entry": registry_entry}
 
     @app.context_processor
     def inject_released_path():

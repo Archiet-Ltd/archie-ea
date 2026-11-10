@@ -38,8 +38,12 @@ def _model_figures(org_id: int) -> Dict[str, Any]:
     from app.models.archimate_core import ArchiMateRelationship
     from app.models.risk import Risk, RiskStatus
 
+    from app.modules.dashboard.services.overview_figures import _active_applications, left_out_applications
+
+    # the applications the application list counts: a duplicate, a decommissioned application and a
+    # repository nobody owns yet are left out, and the figures say so
     applications = db.session.execute(
-        db.select(ApplicationComponent).where(ApplicationComponent.organization_id == org_id)
+        _active_applications().where(ApplicationComponent.organization_id == org_id)
     ).scalars().all()
     costs = [get_run_cost_with_source(a)[0] for a in applications]
     costed = [c for c in costs if c is not None]
@@ -50,6 +54,8 @@ def _model_figures(org_id: int) -> Dict[str, Any]:
             db.select(db.func.count()).select_from(ArchiMateRelationship).where(
                 ArchiMateRelationship.organization_id == org_id)),
         "applications": len(applications),
+        "application_element_ids": sorted(a.archimate_element_id for a in applications if a.archimate_element_id),
+        "left_out": left_out_applications(org_id),
         "running_cost": float(sum(costed)) if costed else None,
         "costed_applications": len(costed),
         "open_risks": db.session.scalar(
@@ -114,6 +120,26 @@ def _risks_reached(org_id: int, element_id: int, reached_ids: List[int]) -> List
     return rows
 
 
+def _applications_note(changed_app, counted, left_out) -> str:
+    """Which applications the count covers, in words, and whether the changed element is one of them."""
+    if not changed_app:
+        lead = "The element is not an application."
+    elif counted:
+        lead = "The element is an application."
+    else:
+        lead = "The element is an application the application list does not count, so the count does not move."
+    parts = []
+    if left_out["decommissioned"]:
+        parts.append("%d decommissioned" % left_out["decommissioned"])
+    if left_out["duplicate"]:
+        parts.append("%d duplicate" % left_out["duplicate"])
+    if left_out["repository"]:
+        parts.append("%d repository not yet owned" % left_out["repository"])
+    if not parts:
+        return lead
+    return lead + " Counted as the application list counts them: " + ", ".join(parts) + " left out."
+
+
 def _figure(label: str, before: Any, after: Any, note: str, money: bool = False) -> Dict[str, Any]:
     """One line of the before and after table. A figure that cannot be worked out is None with the reason in note."""
     change = None
@@ -144,13 +170,14 @@ def simulate_change(element_id: int, change_type: str = "MODIFY") -> Dict[str, A
     before = _model_figures(org_id)
     touching = _relationships_touching(org_id, element_id)
     changed_app = analysis.get("changed_application")
+    counted_app = bool(changed_app) and element_id in before["application_element_ids"]
     risks = _risks_reached(org_id, element_id, reached_ids)
     removes = change_type == "RETIRE"
     swaps = change_type == "REPLACE"
 
     if removes:
         elements_after, rel_after = before["elements"] - 1, before["relationships"] - touching
-        apps_after = before["applications"] - (1 if changed_app else 0)
+        apps_after = before["applications"] - (1 if counted_app else 0)
         element_note = "The element is removed."
         rel_note = "%d link%s to the element go with it." % (touching, "" if touching == 1 else "s")
     elif swaps:
@@ -165,9 +192,12 @@ def simulate_change(element_id: int, change_type: str = "MODIFY") -> Dict[str, A
     own_cost = changed_app["annual_cost"] if changed_app else None
     if before["running_cost"] is None:
         cost_after, cost_note = None, "No application has a running cost recorded, so there is no total to change."
-    elif removes and changed_app and own_cost is not None:
+    elif removes and counted_app and own_cost is not None:
         cost_after = before["running_cost"] - own_cost
         cost_note = "The element's own yearly running cost leaves the total."
+    elif removes and changed_app and not counted_app:
+        cost_after = before["running_cost"]
+        cost_note = "The application is not one the application list counts, so the total does not move."
     elif removes and changed_app:
         cost_after = before["running_cost"]
         cost_note = "The application has no running cost recorded, so the total does not move."
@@ -178,6 +208,9 @@ def simulate_change(element_id: int, change_type: str = "MODIFY") -> Dict[str, A
         cost_after = before["running_cost"]
         cost_note = ("The element is not an application, so the running cost does not move." if not changed_app
                      else "A change of this kind does not move the recorded running cost.")
+
+    if any(before["left_out"].values()):
+        cost_note += " Applications the application list leaves out are not in this total."
 
     on_element = sum(1 for r in risks if r["about_changed_element"])
     if removes or swaps:
@@ -191,7 +224,7 @@ def simulate_change(element_id: int, change_type: str = "MODIFY") -> Dict[str, A
         _figure("Elements in the model", before["elements"], elements_after, element_note),
         _figure("Links between elements", before["relationships"], rel_after, rel_note),
         _figure("Applications", before["applications"], apps_after,
-                "The element is an application." if changed_app else "The element is not an application."),
+                _applications_note(changed_app, counted_app, before["left_out"])),
         _figure("Yearly running cost of all applications", before["running_cost"], cost_after, cost_note, money=True),
         _figure("Open risks touching the change", len(risks), len(risks), risk_note),
     ]
