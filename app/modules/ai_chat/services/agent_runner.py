@@ -706,8 +706,9 @@ class AgentRunner:
         from app.modules.ai_chat.services import model_defaults
 
         self._turn_id = str(_uuid.uuid4())
+        _budget = float(model_defaults.CHAT_TURN_BUDGET_SECONDS)
         self._turn_deadline = time.monotonic() + max(
-            10.0, float(model_defaults.CHAT_TURN_BUDGET_SECONDS) - max(0.0, float(waited_seconds or 0.0))
+            min(10.0, _budget), _budget - max(0.0, float(waited_seconds or 0.0))
         )
 
         self._context_struct = None
