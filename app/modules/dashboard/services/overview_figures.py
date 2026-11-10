@@ -343,7 +343,6 @@ def relationship_split(org_id, element_id):
 
 def _relationships(org_id, now):
     from app.models import ArchiMateElement as E
-    from app.models import ArchiMateRelationship as R
     from app.models.audit_log import AuditLog
 
     total = len(_relationship_pairs(org_id))
