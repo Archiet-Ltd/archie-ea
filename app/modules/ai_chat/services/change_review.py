@@ -28,7 +28,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
 from app.models.ai_chat_crud_approval import AIChatApprovalAuditLog, AIChatCRUDApproval, ApprovalStatus
@@ -394,8 +394,8 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
 
         schema = TOOL_SCHEMA_BY_NAME.get(approval.entity_type)
         if not add("The tool exists", schema is not None,
-                   "The assistant tool '%s' exists." % approval.entity_type if schema
-                   else "The assistant has no tool called '%s'." % approval.entity_type):
+                   "The assistant can make this kind of change." if schema
+                   else "The assistant cannot make this kind of change."):
             return checks, Target(False)
         problem = schema_problem(schema.get("parameters") or {}, payload) if schema else None
         if not add("The request is complete", problem is None,
@@ -681,7 +681,6 @@ def settle(service, approval: AIChatCRUDApproval, requester, budget: Optional[Re
     from app.modules.ai_chat.services.llm_model_router import LLMModelRouter, ReviewerChoice
 
     state = _state(approval)
-    approval_id = approval.id
     router = LLMModelRouter()
 
     # 1. Deterministic checks. A failed one declines the change with its reason; no model is called.
