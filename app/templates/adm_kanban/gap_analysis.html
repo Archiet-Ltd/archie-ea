@@ -19,11 +19,15 @@
             </div>
             <div class="text-center">
                 <div class="text-2xl font-bold {% if unclosed_count > 0 %}text-destructive{% else %}text-foreground{% endif %}" data-testid="gap-unclosed">{{ unclosed_count }}</div>
-                <div class="text-xs text-muted-foreground">Unclosed</div>
+                <div class="text-xs text-muted-foreground">No work planned</div>
             </div>
             <div class="text-center">
                 <div class="text-2xl font-bold {% if covered_count > 0 %}text-success{% else %}text-foreground{% endif %}" data-testid="gap-covered">{{ covered_count }}</div>
                 <div class="text-xs text-muted-foreground">Covered</div>
+            </div>
+            <div class="text-center" title="Resolved, closed or completed in the gap register">
+                <div class="text-2xl font-bold text-foreground" data-testid="gap-closed">{{ closed_count }}</div>
+                <div class="text-xs text-muted-foreground">Closed</div>
             </div>
             <div class="text-center" title="Found by checking the capability map; not recorded as gaps yet">
                 <div class="text-2xl font-bold text-foreground" data-testid="gap-signals">{{ computed_gap_count if computed_gap_count is not none else '—' }}</div>

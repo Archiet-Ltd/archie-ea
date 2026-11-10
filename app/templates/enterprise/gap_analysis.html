@@ -85,7 +85,7 @@
 {%- set wp_by_gap = work_packages_by_gap or {} -%}
 {%- set critical = gaps|selectattr('rated_severity', 'equalto', 'critical')|list|length -%}
 {%- set in_progress = gaps|selectattr('resolution_status', 'equalto', 'in_progress')|list|length -%}
-{%- set resolved = gaps|selectattr('resolution_status', 'equalto', 'resolved')|list|length -%}
+{%- set resolved = gaps|selectattr('is_closed')|list|length if severity_filter else closed_gap_count or 0 -%}
 {%- set recorded = gaps|length if severity_filter else [total_gap_count or 0, gaps|length]|max -%}
 {#- The second table lists the gaps the first shows with no work package, from the same links, so the two never disagree. -#}
 {%- set unaddressed = [] -%}

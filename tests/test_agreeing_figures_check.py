@@ -26,7 +26,7 @@ gate = _load_gate()
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
-CONCEPTS = ["motivation layer elements", "critical gaps"]
+CONCEPTS = ["motivation layer elements", "critical gaps", "closed gaps"]
 
 
 def _user(db_session, org):
@@ -40,7 +40,7 @@ def _user(db_session, org):
     return user
 
 
-def _seed(db_session, org, goals, strays, critical):
+def _seed(db_session, org, goals, strays, critical, closed=0):
     from app.models.archimate_core import ArchiMateElement
     from app.models.implementation_migration import Gap
 
@@ -53,8 +53,14 @@ def _seed(db_session, org, goals, strays, critical):
     for index in range(critical):
         db_session.add(Gap(name="Critical %d" % index, severity="critical", priority="medium",
                            organization_id=org.id))
-    # Critical by priority only: not a critical gap anywhere.
+    # Critical by priority only: a critical gap on every screen (the one rule of the gap register).
     db_session.add(Gap(name="Urgent", severity="high", priority="critical", organization_id=org.id))
+    # Closed by resolution status, with and without a work package: closed means resolved, not planned.
+    for index, status in enumerate(("resolved", "closed", "completed")[:closed]):
+        db_session.add(Gap(name="Closed %d" % index, severity="low", priority="low",
+                           resolution_status=status, organization_id=org.id))
+    db_session.add(Gap(name="Still open", severity="low", priority="low",
+                       resolution_status="identified", organization_id=org.id))
 
 
 def _observe(app, db_session, tenant_ctx, org, user):
@@ -71,11 +77,11 @@ def _observe(app, db_session, tenant_ctx, org, user):
 def test_layer_and_critical_gap_figures_agree_in_each_of_two_organisations(
         app, db_session, make_org, tenant_ctx):
     mine, theirs = make_org("figures-mine"), make_org("figures-theirs")
-    _seed(db_session, mine, goals=3, strays=2, critical=2)
-    _seed(db_session, theirs, goals=6, strays=1, critical=5)
+    _seed(db_session, mine, goals=3, strays=2, critical=2, closed=1)
+    _seed(db_session, theirs, goals=6, strays=1, critical=7, closed=3)
     mine_user, their_user = _user(db_session, mine), _user(db_session, theirs)
 
-    for org, user, goals, critical in ((mine, mine_user, 3, 2), (theirs, their_user, 6, 5)):
+    for org, user, goals, critical, closed in ((mine, mine_user, 3, 3, 1), (theirs, their_user, 6, 8, 3)):
         observations, findings, notes = _observe(app, db_session, tenant_ctx, org, user)
         assert findings == [], (findings, notes, observations)
         assert not any("no-evidence" in note for note in notes), notes
@@ -83,3 +89,6 @@ def test_layer_and_critical_gap_figures_agree_in_each_of_two_organisations(
         assert set(layer.values()) == {goals}, layer
         gaps = {name: count for name, count, _s, _u in observations["critical gaps"]}
         assert set(gaps.values()) == {critical}, gaps
+        shut = {name: count for name, count, _s, _u in observations["closed gaps"]}
+        assert set(shut.values()) == {closed}, shut
+        assert len(shut) == 3, shut

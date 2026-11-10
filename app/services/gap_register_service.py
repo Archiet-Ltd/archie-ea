@@ -52,6 +52,22 @@ def normalise_severity(value) -> Optional[str]:
     return cleaned
 
 
+_RESOLVED_GAP_STATUSES = ("resolved", "closed", "complete", "completed")
+
+
+def is_closed(gap) -> bool:
+    """A gap is closed when its resolution status says it was resolved, closed or completed.
+
+    The one meaning of "closed": every screen that counts closed or unclosed gaps reads this (or
+    `closed_gap_expr` in a query). Having a work package planned is not closing a gap."""
+    return (getattr(gap, "resolution_status", None) or "").strip().lower() in _RESOLVED_GAP_STATUSES
+
+
+def closed_gap_expr():
+    """`is_closed` as a SQL expression."""
+    return func.lower(func.trim(Gap.resolution_status)).in_(_RESOLVED_GAP_STATUSES)
+
+
 def effective_severity(gap) -> Optional[str]:
     """The one rating of a gap: critical when its severity or its priority says critical, else its severity.
 
@@ -414,9 +430,6 @@ def get_plateau_gap_rows(plateau_ids, organization_id: int) -> Dict[int, List[Di
     return out
 
 
-_RESOLVED_GAP_STATUSES = ("resolved", "closed", "complete", "completed")
-
-
 def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
     """Every open capability gap of the organisation, each with whether a work
     package addresses it. Two statements: the gaps, then their links read in bulk
@@ -429,10 +442,7 @@ def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
         .filter(
             Gap.organization_id == organization_id,
             Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-            db.or_(
-                Gap.resolution_status.is_(None),
-                Gap.resolution_status.notin_(_RESOLVED_GAP_STATUSES),
-            ),
+            ~db.func.coalesce(closed_gap_expr(), db.false()),
         )
         .all()
     )
@@ -440,15 +450,19 @@ def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
     return [(gap, gap.id in covered) for gap in gaps]
 
 
-def gap_register_query(organization_id: int, severity: Optional[str] = None):
+def gap_register_query(organization_id: int, severity: Optional[str] = None, closed: Optional[bool] = None):
     """The one query behind every count and list of the gap register: the organisation's gaps, plateau
-    transitions left out, optionally only those of one severity ("critical" is the critical-gap rule)."""
+    transitions left out, optionally only those of one severity ("critical" is the critical-gap rule) and
+    only the closed (True) or unclosed (False) ones."""
     query = Gap.query.filter(
         Gap.organization_id == organization_id,
         Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
     )
     if severity:
         query = query.filter(effective_severity_expr() == severity)
+    if closed is not None:
+        is_closed_ = db.func.coalesce(closed_gap_expr(), db.false())
+        query = query.filter(is_closed_ if closed else ~is_closed_)
     return query
 
 
@@ -468,6 +482,7 @@ def count_gaps(
     gap_type: Optional[str] = None,
     has_work_package: Optional[bool] = None,
     severity: Optional[str] = None,
+    closed: Optional[bool] = None,
 ) -> int:
     """Return the number of gaps in the one gap register for an organisation.
 
@@ -481,11 +496,14 @@ def count_gaps(
                          (gap_archimate_service.get_gaps_for_roadmap).
       severity:          only count gaps of this severity; "critical" is the
                          critical-gap count every screen shows (list_gaps).
+      closed:            True counts gaps whose resolution status is
+                         resolved, closed or completed (`is_closed`); False
+                         counts the others. None counts all.
       has_work_package:  True counts gaps with at least one work package
                          link in this organisation; False counts gaps with
                          none (get_gaps_not_addressed). None counts all.
     """
-    query = gap_register_query(organization_id, severity)
+    query = gap_register_query(organization_id, severity, closed)
     if gap_type:
         query = query.filter(Gap.gap_type == gap_type)
     if has_work_package is not None:

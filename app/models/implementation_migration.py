@@ -877,6 +877,13 @@ class Gap(TenantMixin, db.Model):
 
         return effective_severity(self)
 
+    @property
+    def is_closed(self):
+        """Whether the gap is closed, by the one meaning every screen counts."""
+        from app.services.gap_register_service import is_closed
+
+        return is_closed(self)
+
     def to_roadmap_dict(self) -> dict:
         """Convert to dictionary for roadmap API responses."""
         return {

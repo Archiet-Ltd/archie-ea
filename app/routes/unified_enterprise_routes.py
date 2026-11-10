@@ -923,6 +923,7 @@ def gap_analysis():
         query = gap_register_query(current_org_id(), severity_filter or None)
         gaps = query.order_by(order, Gap.id).limit(500).all()
         total_gap_count = count_gaps(current_org_id())
+        closed_gap_count = count_gaps(current_org_id(), closed=True)
         not_addressed_gaps = get_gaps_not_addressed(current_org_id())
         work_packages_by_gap = work_package_service.work_packages_for_gaps(
             [g.id for g in gaps], current_org_id())
@@ -931,6 +932,7 @@ def gap_analysis():
             "enterprise/gap_analysis.html", gaps=gaps,
             work_packages_by_gap=work_packages_by_gap,
             total_gap_count=total_gap_count,
+            closed_gap_count=closed_gap_count,
             severity_filter=severity_filter,
             not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",
