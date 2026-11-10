@@ -6,6 +6,7 @@ organisation's counts, and a read that found nothing in one is not reported for 
 
 from __future__ import annotations
 
+import html as html_module
 import re
 
 import pytest
@@ -146,3 +147,27 @@ def test_cancelling_from_the_billing_page_is_promised_only_while_payment_is_open
     _pages_with_payment(monkeypatch, app, True)
     opened = _words(client.get(url))
     assert "from the billing page" in opened
+
+
+def test_the_closed_billing_page_describes_only_the_plan_and_its_limits(signed_in):
+    from app.services import billing_plans
+
+    assert not billing_plans.payment_is_open()
+    html = signed_in.get("/admin/billing/").get_data(as_text=True)
+    description = re.search(r'<p[^>]*class="[^"]*text-muted-foreground[^"]*"[^>]*>\s*(Your organisation[^<]*)</p>', html)
+    assert description, "the page description is missing"
+    assert html_module.unescape(description.group(1)).strip() == "Your organisation's plan and its limits.", description.group(1)
+
+
+def test_no_text_in_the_application_calls_the_ai_settings_page_by_its_old_name():
+    """One name everywhere: the page, the menu entries and every error text that sends a person there."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[1] / "app"
+    hits = []
+    for path in root.rglob("*"):
+        if path.suffix in (".py", ".js", ".html") and path.is_file():
+            for number, line in enumerate(path.read_text(errors="ignore").splitlines(), 1):
+                if "API Settings" in line:
+                    hits.append("%s:%d" % (path.relative_to(root.parent), number))
+    assert not hits, hits

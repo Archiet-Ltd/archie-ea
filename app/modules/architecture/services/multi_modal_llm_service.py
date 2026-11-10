@@ -38,7 +38,7 @@ class MultiModalLLMService:
             raise AnswersPaused(resolved.reason)
         if not resolved.key:
             raise ValueError(
-                "%s API key not configured. Set %s_API_KEY or configure via API Settings."
+                "%s API key not configured. Set %s_API_KEY or configure via AI settings."
                 % (provider.title(), provider.upper())
             )
         return resolved

@@ -16,7 +16,7 @@
 <div class="space-y-6" data-testid="billing-page">
     {{ page_header(
         title='Billing & plan',
-        description='Your organisation\'s plan, its limits, payment and invoices.',
+        description=('Your organisation\'s plan, its limits, payment and invoices.' if payment_ready else 'Your organisation\'s plan and its limits.'),
         breadcrumbs=[{'label': 'Admin', 'href': url_for('admin.index')}, {'label': 'Billing'}]
     ) }}
 

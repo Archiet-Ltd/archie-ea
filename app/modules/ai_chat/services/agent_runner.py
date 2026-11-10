@@ -1690,7 +1690,7 @@ class AgentRunner:
         elif any(t in reason_l for t in ("no api key", "not configured", "no provider", "no keys")):
             msg = (
                 "AI features aren't configured yet — add an API key under "
-                "Admin → API Settings to enable the assistant."
+                "Admin → AI settings to enable the assistant."
             )
         elif any(t in reason_l for t in _QUOTA_PHRASES):
             msg = (
@@ -1700,7 +1700,7 @@ class AgentRunner:
         else:
             msg = (
                 "The AI request couldn't be completed. See the error detail below "
-                "or check Admin → API Settings."
+                "or check Admin → AI settings."
             )
         return {
             "response": msg,
