@@ -173,6 +173,7 @@ def test_the_record_says_the_pause_only_while_it_lasts(db_session, make_org, ten
 
 def test_a_row_from_before_automatic_review_does_not_promise_a_check(db_session, make_org, tenant_ctx, monkeypatch, client, login_as):
     from app import db
+    from app.modules.ai_chat.services import change_review
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService, create_approval_record
 
     org, other = make_org("rec-i"), make_org("rec-j")
@@ -189,8 +190,9 @@ def test_a_row_from_before_automatic_review_does_not_promise_a_check(db_session,
         _pause(org, user)
         db.session.commit()
         items = {i["id"]: i for i in AIChatApprovalService(user.id).get_approver_queue()["approvals"]}
-        assert items[old.id].get("pre_loop") is True and items[old.id]["held_by_pause"] is False
+        assert items[old.id].get("pre_loop") is True and "has_check_record" not in items[old.id]
         assert items[old.id]["settled_by_review"] is False and items[old.id]["can_approve"] is False
+        assert change_review.describe(_row(old.id))["waiting_reason"] is None, "its record promises nothing either"
         assert items[held_id]["held_by_pause"] is True and items[held_id].get("has_check_record") is True
         user.confirmed = True
         db.session.flush()

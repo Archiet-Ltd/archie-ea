@@ -583,6 +583,12 @@ def in_scope(approval: AIChatCRUDApproval) -> bool:
     return approval.operation_type in CHAT_CRUD_OPERATIONS and approval.entity_type in CHAT_CRUD_ENTITIES
 
 
+def is_before_the_loop(approval: AIChatCRUDApproval) -> bool:
+    """True for a record made before automatic review: no rubric version and no review event. Nothing
+    checks or reviews it until a person acts on it, so it never says it will be."""
+    return approval.rubric_version is None and _last_loop_event(approval) is None
+
+
 def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[Check], Target]:
     """The checks that cost nothing, in order; the list ends at the first one that fails."""
     from flask import g
@@ -1191,7 +1197,7 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
     else:
         label, tone = "In review", "caution"
     waiting_reason = saved["waiting_reason"] if approval.status == ApprovalStatus.PENDING else None
-    if approval.status == ApprovalStatus.PENDING and in_scope(approval):
+    if approval.status == ApprovalStatus.PENDING and in_scope(approval) and not is_before_the_loop(approval):
         # The pause sentence is read from the switch as it is now, never from what the last sweep recorded
         if _writes_paused(approval.organization_id):
             waiting_reason = WRITES_PAUSED_REASON

@@ -1655,10 +1655,7 @@ class AIChatApprovalService:
             recorded[approval.id] = bool(saved.get("rounds") or saved.get("checks"))
             # A row recorded before automatic review: no rubric version and no review event, and the sweep
             # leaves it alone, so nothing will check it until a person acts on it.
-            pre_loop[approval.id] = (
-                looped[approval.id] and approval.rubric_version is None
-                and change_review._last_loop_event(approval) is None
-            )
+            pre_loop[approval.id] = looped[approval.id] and change_review.is_before_the_loop(approval)
             connector = approval.entity_type == "connectors"
             own_outside_loop = not looped[approval.id] and approval.user_id == actor.id
             can_approve[approval.id] = not paused and not (connector and not is_admin) and not own_outside_loop
@@ -1710,7 +1707,7 @@ class AIChatApprovalService:
                     # is said only of a change that has a recorded check or review and is not held.
                     "settled_by_review": looped[approval.id] and recorded[approval.id] and not paused,
                     # A change in the loop while writes are paused waits for them to resume.
-                    "held_by_pause": paused and looped[approval.id] and not pre_loop[approval.id],
+                    "held_by_pause": paused and looped[approval.id],
                     # Approve is offered only where it acts for this person: not while writes are paused, not on
                     # a connector record unless they are an administrator, and not on their own record outside
                     # the loop.
