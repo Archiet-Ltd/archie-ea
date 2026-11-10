@@ -67,10 +67,12 @@ ANALYZE_SVGS = """() => {
 }"""
 
 GEOMETRY = """() => {
-  const cards = [...document.querySelectorAll('[data-slot="card"]')];
-  const gridBottom = Math.max(...cards.map(c => c.getBoundingClientRect().bottom));
   const rec = [...document.querySelectorAll('h3')].find(h => h.textContent.includes('AI-Powered Recommendations'))
       .closest('[data-block]').getBoundingClientRect();
+  /* The cards the recommendations follow: a card further down the page is not part of the grid above them. */
+  const cards = [...document.querySelectorAll('[data-slot="card"]')]
+      .filter(c => c.getBoundingClientRect().top < rec.top);
+  const gridBottom = Math.max(...cards.map(c => c.getBoundingClientRect().bottom));
   const histBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Recent Analyses'));
   const hist = histBtn ? histBtn.closest('[data-block]') : null;
   const histShown = !!hist && getComputedStyle(hist).display !== 'none' && hist.getBoundingClientRect().height > 0;
