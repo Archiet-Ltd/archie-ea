@@ -141,10 +141,11 @@ def test_an_application_with_no_mapped_capability_says_so_and_links_to_where_one
 
 def test_a_name_that_is_not_in_the_model_is_not_answered_with_a_guess(world, client, login_as):
     login_as(client, world["user_a"])
-    html = _ask(client, "Which capabilities does Nonexistent platform support?")["html"]
-    assert "Nothing is recorded under that name" in html
-    for capability in world["caps_a"]:
-        assert capability.name not in html
+    # A phrase that is no application of this organisation is not captured as one: the question
+    # goes on to the model, which has the tool that reads the mapping and answers honestly.
+    answer = _ask(client, "Which capabilities does Nonexistent platform support?")
+    assert answer["found"] is False
+    assert "html" not in answer
 
 
 def test_the_other_questions_still_go_where_they_went(world):

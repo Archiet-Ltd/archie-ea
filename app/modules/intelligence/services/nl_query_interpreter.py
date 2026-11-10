@@ -150,8 +150,21 @@ _CAPABILITY_OF_PATTERNS = [
 ]
 
 
-def _extract_application_for_capabilities(question: str) -> Optional[str]:
-    """The application a 'which capabilities does X support' question names, or None."""
+def _is_application_of(name: str, organization_id: int) -> bool:
+    """Whether *name* is, folded for case and spacing, the whole name of an application of the organisation."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.utils.duplicate_guard import find_duplicate_by_name
+
+    return find_duplicate_by_name(ApplicationComponent, name, organization_id=organization_id) is not None
+
+
+def _extract_application_for_capabilities(question: str, organization_id: Optional[int] = None) -> Optional[str]:
+    """The application a 'which capabilities does X support' question names, or None.
+
+    With an organisation, a phrase is taken as the application only when it is the exact
+    name of one of that organisation's applications; any other phrase ("we", "our
+    applications") is not an application and the question goes on to the model.
+    """
     text = (question or "").strip().rstrip("?.! ")
     for pattern in _CAPABILITY_OF_PATTERNS:
         found = pattern.search(text)
@@ -159,13 +172,15 @@ def _extract_application_for_capabilities(question: str) -> Optional[str]:
             name = found.group(1).strip().strip("'\"")
             if name.lower().endswith("'s"):
                 name = name[:-2]
+            if name and organization_id is not None and not _is_application_of(name, organization_id):
+                return None
             return name or None
     return None
 
 
-def _keyword_match(question: str) -> Optional[Dict[str, Any]]:
+def _keyword_match(question: str, organization_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
     lowered = question.lower()
-    application = _extract_application_for_capabilities(question)
+    application = _extract_application_for_capabilities(question, organization_id)
     if application:
         return {"entry_id": "capabilities_of_application", "params": {"service": application},
                 "confidence": 0.9, "method": "keyword"}
@@ -314,7 +329,7 @@ def _llm_match(question: str) -> Optional[Dict[str, Any]]:
     return {"entry_id": entry_id, "params": parsed.get("params") or {}, "confidence": 0.7, "method": "model"}
 
 
-def interpret(question: str) -> Dict[str, Any]:
+def interpret(question: str, organization_id: Optional[int] = None) -> Dict[str, Any]:
     """Interpret one plain-language question.
 
     Returns ``{"entry_id": str|None, "params": dict, "confidence": float,
@@ -322,7 +337,7 @@ def interpret(question: str) -> Dict[str, Any]:
     interpretation banner shows ``title``/``params`` before running
     anything, and the caller re-runs with corrected params on request.
     """
-    match = _keyword_match(question)
+    match = _keyword_match(question, organization_id)
     if match is None and _model_configured():
         match = _llm_match(question)
     if match is None:

@@ -73,7 +73,7 @@ def _page_for(citation: Dict[str, Any]) -> Optional[str]:
 def answer_catalogue_question(message: str, organization_id: int) -> Optional[Dict[str, Any]]:
     """The catalogue's answer to *message* with each citation as a page link, or
     ``None`` when the question is not one the catalogue answers."""
-    interpretation = interpret(message)
+    interpretation = interpret(message, organization_id)
     if not _keep(message, interpretation):
         return None
     entry_id = interpretation["entry_id"]

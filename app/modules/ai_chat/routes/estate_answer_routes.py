@@ -188,6 +188,10 @@ def estate_answer():
     # Read whole: cutting a long value short would save text the person did not write. The
     # description limit refuses anything this cap leaves too long.
     change = application_change.parse_change_request(message[:MAX_CHANGE_CHARS])
+    # Only a request whose subject is an application of this organisation is a change to
+    # one; a solution, a risk or a work package goes on to the model as it always did.
+    if change is not None and not application_change.names_an_application(change, current_org_id()):
+        change = None
     if change is not None:
         return _application_change_response(change, message, thread_id, keep)
     lens = answer_lens_question(message[:MAX_QUESTION_CHARS])

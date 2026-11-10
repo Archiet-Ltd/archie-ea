@@ -59,10 +59,10 @@ Solution state: get_solution_summary, get_completeness_score, update_solution_fi
 Portfolio: update_application_status (requires confirmation)
 Application details (description, version, category, business domain, technology stack, deployment
 status, owners): there is no tool for these. The person types "set <application>'s <field> to <value>"
-(for example: set Ifiok's description to Runs the tenant billing) and the chat shows the change for
+(for example: set Acme Ledger's description to Runs the monthly billing) and the chat shows the change for
 them to save. Tell them that; never send them to the application form to do it.
-Which capabilities an application supports: the person asks "which capabilities does <application>
-support?" and the chat answers from the model, citing each capability.
+Which capabilities an application supports: call get_application_capabilities with the application's
+name, whatever the person's wording; it reads the same mapping the application's page shows.
 Blueprint: generate_blueprint_narrative (requires confirmation)
 
 HOW TO OPERATE:
@@ -535,6 +535,16 @@ class AgentRunner:
             self._collect_answer_sources(result, sources)
             return
         entity_type = self._TOOL_ENTITY.get(tool_name)
+        if tool_name == "get_application_capabilities":
+            # Each capability is cited to its own fact sheet, as the keyword answer cites it.
+            for row in (result.get("result") if isinstance(result, dict) and result.get("success") else None) or []:
+                key = ("capability", row.get("id"))
+                if row.get("id") is None or not row.get("name") or len(sources) >= self.MAX_SOURCES:
+                    continue
+                if any((s["type"], s["id"]) == key for s in sources):
+                    continue
+                sources.append({"type": "capability", "id": row["id"], "name": row["name"], "url": row.get("url")})
+            return
         if not entity_type or not isinstance(result, dict) or not result.get("success"):
             return
         rows = result.get("result")

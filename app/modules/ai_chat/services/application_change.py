@@ -91,6 +91,17 @@ def may_edit_applications(user) -> bool:
     return bool(can(user, "edit", "application"))
 
 
+def names_an_application(request: Dict[str, str], organization_id: Optional[int]) -> bool:
+    """Whether the request's subject is an application of this organisation (or says
+    which of several it means), so the chat takes it as a change to an application."""
+    if not organization_id:
+        return False
+    from app.modules.intelligence.services.query_catalogue import _resolve_application
+
+    application, others = _resolve_application(int(organization_id), request["application"])
+    return application is not None or bool(others)
+
+
 def propose(request: Dict[str, str], user, organization_id: int) -> Dict[str, Any]:
     """What the chat shows for a change request: a preview, or why there is none.
 
@@ -136,7 +147,6 @@ def confirm(token: str, user, organization_id: int) -> Dict[str, Any]:
     from app import db
     from app.modules.applications.routes.update_routes import save_overview
     from app.modules.ai_chat.tools.executor import record_refused_tool_call
-    from app.modules.intelligence.services.query_catalogue import _resolve_application  # noqa: F401
     from app.models.application_portfolio import ApplicationComponent
 
     try:

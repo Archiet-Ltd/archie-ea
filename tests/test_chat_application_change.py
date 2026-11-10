@@ -148,7 +148,10 @@ def test_what_the_form_would_refuse_is_refused_in_words_before_it_is_shown(world
 
 def test_an_unknown_application_and_an_unchanged_value_say_so(world, client, login_as):
     login_as(client, world["editor"])
-    assert _ask(client, "set Nowhere platform's description to X")["change_state"] == "unknown"
+    # A subject that is no application of this organisation is not an application change: the
+    # request goes on to the model instead of being answered "I could not find an application".
+    nowhere = _ask(client, "set Nowhere platform's description to X")
+    assert nowhere["found"] is False and "change_state" not in nowhere
     same = _ask(client, f"set {world['name']}'s description to Old description a")
     assert same["change_state"] == "unchanged" and "already has that description" in same["html"]
 
