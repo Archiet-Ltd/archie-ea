@@ -24,7 +24,7 @@ FIRST_QUESTIONS = {
     'applications': len(APPLICATIONS),
     'questions': [
         {'element_id': 500 + a['id'], 'name': a['name'], 'question': f"What breaks if {a['name']} fails?",
-         'detail': f'{4 - n} relationships recorded'}
+         'detail': f'{5 - n} relationships recorded'}
         for n, a in enumerate(APPLICATIONS[:4])
     ],
 }

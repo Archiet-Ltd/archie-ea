@@ -184,12 +184,17 @@ def get_first_questions():
         return jsonify({"questions": [], "applications": 0})
     # How many applications are recorded tells the page, when there is no card to offer, whether to
     # say that none are or that their connections are not.
+    # Counted by name: an application and the element recorded for it are one application.
+    from app.utils.duplicate_guard import folded_column
+
     recorded = max(
         db.session.execute(
-            db.select(db.func.count(ApplicationComponent.id)).where(ApplicationComponent.organization_id == org_id)
+            db.select(db.func.count(db.distinct(folded_column(ApplicationComponent.name)))).where(
+                ApplicationComponent.organization_id == org_id
+            )
         ).scalar_one(),
         db.session.execute(
-            db.select(db.func.count(ArchiMateElement.id)).where(
+            db.select(db.func.count(db.distinct(folded_column(ArchiMateElement.name)))).where(
                 ArchiMateElement.organization_id == org_id,
                 ArchiMateElement.type.in_(("ApplicationComponent", "Application")),
             )
