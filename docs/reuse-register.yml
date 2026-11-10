@@ -1046,12 +1046,14 @@ entries:
     status: active
     canonical:
       path: app/modules/ai_chat/services/chat_figures.py
-      symbols: [FigureTable, violations_in, scan_written_numbers, resolve_references, render, records_block, revision_message]
+      symbols: [FigureTable, violations_in, scan_written_numbers, resolve_references, render, records_block, revision_message, name_spans, subject_bound, key_floor]
     reuse: >
       A figure in a chat answer is a [fig:Fn] reference to a declared tool figure that the engine renders. Declare
       figures under "figures" beside the tool in app/modules/ai_chat/tools/registry.py; find_uncited_claims is the one
       gate entry point and remove_violating_clauses the one clause remover. Do not add a text check that decides
       whether a number the model wrote is true, a deny-list of fields, or an allowance outside the six forms.
+      name_spans is the one matcher for a record's name in text (subject binding and the records block both call
+      it); a tool with a top-level figure declares its "subject" or "none".
     must_not_create:
       - id: second-written-number-scan
         regex: 'def\s+(unsupported_figures|figures_of|_figures_written_in|_stated_figures)\s*\('

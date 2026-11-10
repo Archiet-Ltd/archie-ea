@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import re
 
-import pytest
-
 from app.modules.ai_chat.services import chat_figures as cf
 from app.modules.ai_chat.services.ai_hallucination_detector import Grounding
 from app.modules.ai_chat.tests.test_answer_tool_and_citation_gate import (

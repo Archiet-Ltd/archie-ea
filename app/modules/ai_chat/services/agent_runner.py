@@ -2129,9 +2129,7 @@ class AgentRunner:
         from app.modules.intelligence.services import answer_envelope as envelope
 
         table = self._grounding.figure_table
-        org = self._grounding.organization_id
         question = self._question_text
-        enforce = mode == "enforce"
         draft = text
         violations, text, removed = self._clause_removal(draft, mode)
         first_draft = self._first_draft_figures if self._first_draft_figures is not None else violations
