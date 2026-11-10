@@ -891,6 +891,22 @@ def _held_for_pause(approval: AIChatCRUDApproval) -> bool:
     return last is not None and last.event == "paused" and last.reason == WRITES_PAUSED_REASON
 
 
+def record_refused_while_paused(service, approval: AIChatCRUDApproval, actor_user_id: int) -> None:
+    """A person's Approve was refused because writes are paused: one "paused" row on the record, however
+    many times they press it. The caller commits."""
+    if not _held_for_pause(approval):
+        status = approval.status.value if approval.status else ApprovalStatus.PENDING.value
+        service._audit(approval, event="paused", to_status=status, actor_user_id=actor_user_id, from_status=status,
+                       reason=WRITES_PAUSED_REASON)
+
+
+def record_resumed_after_pause(service, approval: AIChatCRUDApproval) -> None:
+    """Writes are on again and a record that was held for the pause is acted on: one "resumed" row.
+    The caller commits."""
+    if _held_for_pause(approval):
+        _event(service, approval, "resumed", "Changes by the assistant resumed for this workspace; the change goes on.")
+
+
 def count_failed_attempt(service, approval_id: int) -> Optional[Dict[str, Any]]:
     """A review that raised counts as one attempt to reach a reviewer, so it cannot repeat for ever.
 
@@ -1008,7 +1024,16 @@ def settle(
     state = _state(approval)
     router = LLMModelRouter()
 
-    # 1. Deterministic checks. A failed one declines the change with its reason; no model is called.
+    # 1. Writes paused for the organisation: hold every kind of change (the chat's own create, update, delete
+    # and link, a tool call, a person's Approve, the sweep), with no reviewer call, until they resume. This is
+    # the one settle path they all pass through, so it is the one place the switch is read.
+    held = _hold_if_paused(service, approval, state)
+    if held is not None:
+        return held
+    if _held_for_pause(approval):
+        _event(service, approval, "resumed", "Changes by the assistant resumed for this workspace; the change goes on.")
+
+    # 2. Deterministic checks. A failed one declines the change with its reason; no model is called.
     checks, target = run_checks(service, approval, requester)
     state["checks"] = [c.to_dict() for c in checks]
     if not state["rounds"]:
@@ -1019,16 +1044,7 @@ def settle(
     if failed is not None:
         return _decline(service, approval, state, [failed.reason])
 
-    # 1b. Writes paused for the organisation: hold every kind of change (the chat's own create, update, delete
-    # and link, a tool call, a person's Approve, the sweep), with no reviewer call, until they resume. This is
-    # the one settle path they all pass through, so it is the one place the switch is read.
-    held = _hold_if_paused(service, approval, state)
-    if held is not None:
-        return held
-    if _held_for_pause(approval):
-        _event(service, approval, "resumed", "Changes by the assistant resumed for this workspace; the change goes on.")
-
-    # 2. The reviewer: never the model that drafted. It stays the same across the rounds of one change.
+    # 3. The reviewer: never the model that drafted. It stays the same across the rounds of one change.
     drafter_provider, drafter_model = split_ref(approval.drafter_model)
     if approval.reviewer_model:
         provider, model = split_ref(approval.reviewer_model)
@@ -1043,7 +1059,7 @@ def settle(
 
     payload = _payload_of(approval)
 
-    # 3. Review, and revise up to twice.
+    # 4. Review, and revise up to twice.
     try:
         while True:
             rounds = state["rounds"]
@@ -1085,7 +1101,7 @@ def settle(
     except ReviewerUnavailable as exc:
         return _wait(service, approval, state, str(exc), counts=True)
 
-    # 4. Apply. Writes may have been paused while the reviews ran: read the switch once more, right before the
+    # 5. Apply. Writes may have been paused while the reviews ran: read the switch once more, right before the
     # write. The record keeps its passing review and is applied once, after they resume.
     held = _hold_if_paused(service, approval, state)
     if held is not None:
@@ -1175,8 +1191,12 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
     else:
         label, tone = "In review", "caution"
     waiting_reason = saved["waiting_reason"] if approval.status == ApprovalStatus.PENDING else None
-    if approval.status == ApprovalStatus.PENDING and in_scope(approval) and _writes_paused(approval.organization_id):
-        waiting_reason = WRITES_PAUSED_REASON  # true now, whatever the last sweep recorded
+    if approval.status == ApprovalStatus.PENDING and in_scope(approval):
+        # The pause sentence is read from the switch as it is now, never from what the last sweep recorded
+        if _writes_paused(approval.organization_id):
+            waiting_reason = WRITES_PAUSED_REASON
+        elif waiting_reason == WRITES_PAUSED_REASON:
+            waiting_reason = None
     drafter_provider, _ = split_ref(approval.drafter_model)
     reviewer_provider, _ = split_ref(approval.reviewer_model)
     same = bool(approval.drafter_model and approval.reviewer_model and drafter_provider == reviewer_provider)

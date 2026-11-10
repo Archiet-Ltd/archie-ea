@@ -174,7 +174,9 @@
     {% endcall %}
     {% call ui.card_footer(class='flex flex-wrap items-start gap-2 border-t') %}
       {% if item.held_by_pause %}
-      <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-held-{{ item.id }}">Changes by the assistant are paused for this workspace, so this change waits. It is checked, reviewed and applied once they resume. <a href="{{ url_for('unified_ai_chat.approval_inbox', approval=item.id) }}#record-{{ item.id }}" class="underline hover:no-underline">See how it was checked</a></p>
+      <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-held-{{ item.id }}">Changes by the assistant are paused for this workspace, so this change waits. It is checked, reviewed and applied once they resume.{% if item.has_check_record %} <a href="{{ url_for('unified_ai_chat.approval_inbox', approval=item.id) }}#record-{{ item.id }}" class="underline hover:no-underline">See how it was checked</a>{% endif %}</p>
+      {% elif item.pre_loop %}
+      <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-pre-loop-{{ item.id }}">This was recorded before changes by the assistant were checked and reviewed automatically, so nothing has checked it. A person approves or rejects it; when you approve it, it is checked and reviewed before it is applied.</p>
       {% elif item.settled_by_review %}
       <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-in-review-{{ item.id }}">This change is checked and reviewed automatically and is applied or declined without waiting for a person. <a href="{{ url_for('unified_ai_chat.approval_inbox', approval=item.id) }}#record-{{ item.id }}" class="underline hover:no-underline">See how it was checked</a></p>
       {% endif %}

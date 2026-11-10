@@ -935,12 +935,17 @@ class AIChatApprovalService:
             # switch is read here, before the claim: while writes are paused nothing is applied and the record
             # stays pending, to be approved after they resume.
             if not settled_by_review and change_review._writes_paused(approval.organization_id):
+                change_review.record_refused_while_paused(self, approval, actor.id)
+                db.session.commit()
                 return {
                     "success": False,
                     "code": "IN_REVIEW",
                     "error": "Not applied. Changes by the assistant are paused for this workspace, so this change "
                              "is held. Approve it again after they resume.",
                 }
+
+            if not settled_by_review:
+                change_review.record_resumed_after_pause(self, approval)
 
             # A GitHub proposal that cannot land yet (a part whose application is not
             # in the model, a link whose end is not) is refused here, before it is
@@ -1643,16 +1648,22 @@ class AIChatApprovalService:
             ).all()
         } if requester_ids else {}
         is_admin = actor.is_admin()
-        looped, recorded, can_approve, approve_note = {}, {}, {}, {}
+        looped, recorded, can_approve, approve_note, pre_loop = {}, {}, {}, {}, {}
         for approval in approvals:
             looped[approval.id] = change_review.in_scope(approval)
             saved = approval.review_reasons if isinstance(approval.review_reasons, dict) else {}
             recorded[approval.id] = bool(saved.get("rounds") or saved.get("checks"))
+            # A row recorded before automatic review: no rubric version and no review event, and the sweep
+            # leaves it alone, so nothing will check it until a person acts on it.
+            pre_loop[approval.id] = (
+                looped[approval.id] and approval.rubric_version is None
+                and change_review._last_loop_event(approval) is None
+            )
             connector = approval.entity_type == "connectors"
             own_outside_loop = not looped[approval.id] and approval.user_id == actor.id
             can_approve[approval.id] = not paused and not (connector and not is_admin) and not own_outside_loop
             approve_note[approval.id] = None
-            if can_approve[approval.id] or (paused and looped[approval.id]):
+            if can_approve[approval.id] or (paused and looped[approval.id] and not pre_loop[approval.id]):
                 continue
             if paused:
                 approve_note[approval.id] = (
@@ -1670,9 +1681,7 @@ class AIChatApprovalService:
             )
             for approval in approvals
         }
-        return {
-            "success": True,
-            "approvals": [
+        rows = [
                 {
                     "id": approval.id,
                     "operation_type": approval.operation_type,
@@ -1701,7 +1710,7 @@ class AIChatApprovalService:
                     # is said only of a change that has a recorded check or review and is not held.
                     "settled_by_review": looped[approval.id] and recorded[approval.id] and not paused,
                     # A change in the loop while writes are paused waits for them to resume.
-                    "held_by_pause": paused and looped[approval.id],
+                    "held_by_pause": paused and looped[approval.id] and not pre_loop[approval.id],
                     # Approve is offered only where it acts for this person: not while writes are paused, not on
                     # a connector record unless they are an administrator, and not on their own record outside
                     # the loop.
@@ -1713,8 +1722,15 @@ class AIChatApprovalService:
                     },
                 }
                 for approval in approvals
-            ],
-        }
+        ]
+        # Two facts are carried only by the rows they are true of, so every other row keeps its shape: a row
+        # recorded before automatic review (nothing has checked it), and a held row with a check on its record.
+        for row in rows:
+            if pre_loop[row["id"]]:
+                row["pre_loop"] = True
+            elif row["held_by_pause"] and recorded[row["id"]]:
+                row["has_check_record"] = True
+        return {"success": True, "approvals": rows}
 
     def get_pending_for_session(self, chat_session_id: Optional[str]) -> List[Dict[str, Any]]:
         """Pending approvals for this user within one chat session (ARCH-020).
