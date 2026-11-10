@@ -623,8 +623,8 @@ class RoadmapBuilderService:
             node_data = {
                 "label": gap.name,
                 "gapType": gap.gap_type,
-                "impactLevel": gap.impact_level,
-                "urgency": gap.urgency,
+                "impactLevel": getattr(gap, "impact_level", None),
+                "urgency": getattr(gap, "urgency", None),
                 "status": gap.resolution_status,
                 "gapId": gap.id,
             }
@@ -1020,9 +1020,9 @@ class RoadmapBuilderService:
         plateaus = ImplementationPlateau.query.all()
         current_plateau = next((p for p in plateaus if p.is_current()), None)
 
-        gaps = ImplementationGap.query.filter(
-            ImplementationGap.resolution_status.notin_(["resolved", "closed"])
-        ).count()
+        from app.services.gap_register_service import closed_gap_expr
+
+        gaps = ImplementationGap.query.filter(~db.func.coalesce(closed_gap_expr(), db.false())).count()
 
         # Calculate critical path
         critical_path_result = self.calculate_critical_path()

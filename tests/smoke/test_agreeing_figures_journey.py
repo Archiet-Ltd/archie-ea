@@ -234,7 +234,8 @@ def test_layer_risk_and_gap_figures_agree(browser, live_server, viewport, theme)
         board_closed = _number(page, "gap-closed")
         total, unplanned, covered = (_number(page, t) for t in ("gap-total", "gap-unclosed", "gap-covered"))
         assert board_closed == register_resolved == 2, (board_closed, register_resolved)
-        assert total == 11 and total == unplanned + covered, (total, unplanned, covered)
+        # open gaps are covered or have no work planned; the resolved ones are the Closed figure
+        assert total == 11 and total == unplanned + covered + board_closed, (total, unplanned, covered, board_closed)
         assert "Unclosed" not in page.locator("body").inner_text()
         _frame(page, "board-gaps", viewport["width"], theme)
     finally:

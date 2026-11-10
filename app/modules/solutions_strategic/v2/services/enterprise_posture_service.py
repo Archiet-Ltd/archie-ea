@@ -706,21 +706,16 @@ class EnterprisePostureService:
         from app.services.gap_register_service import closed_gap_expr
 
         _capability_gaps = Gap.query.filter(Gap.gap_kind != "plateau_transition")
-        open_gaps = _capability_gaps.filter(~db.func.coalesce(closed_gap_expr(), db.false())).count()
+        _not_closed = ~db.func.coalesce(closed_gap_expr(), db.false())
+        open_gaps = _capability_gaps.filter(_not_closed).count()
         total_gaps = _capability_gaps.count()
         overdue_gaps = _capability_gaps.filter(
-            db.or_(
-                Gap.resolution_status.is_(None),
-                db.func.lower(Gap.resolution_status).notin_(closed_states),
-            ),
+            _not_closed,
             Gap.target_resolution_date.isnot(None),
             Gap.target_resolution_date < today,
         ).count()
         unowned_gaps = _capability_gaps.filter(
-            db.or_(
-                Gap.resolution_status.is_(None),
-                db.func.lower(Gap.resolution_status).notin_(closed_states),
-            ),
+            _not_closed,
             db.or_(Gap.owner.is_(None), Gap.owner == ""),
         ).count()
 
