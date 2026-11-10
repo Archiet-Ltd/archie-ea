@@ -54,8 +54,16 @@ def _validate_overview(app, form):
             problem = owners.application_owner_edit_problem(
                 app, "business_owner", text, app.organization_id,
             )
+            alike = owners.users_named_alike(text, app.organization_id) if text else []
             if problem:
                 errors[key] = f"{label} {problem}"
+            elif alike:
+                # Never recorded as a person with no account: the person is asked which one.
+                errors[key] = (
+                    f"{label} matches more than one person: "
+                    + ", ".join(f"{owners.owner_label(u.first_name, u.last_name, u.email)} ({u.email})" for u in alike)
+                    + ". Type the email address of the one you mean."
+                )
             elif text != (app.business_owner or ""):
                 # A blank with no owner on record clears the text kept on the
                 # application. A name is recorded as that user's owner record,

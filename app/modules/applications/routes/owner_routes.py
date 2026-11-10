@@ -79,16 +79,19 @@ def add_owner(app_id: int):
 
     person_name = " ".join(str(data.get("person_name") or "").split())
     if person_name and user_id is None:
-        owner = set_named_person_owner(
-            app,
-            person_name,
-            ownership_type,
-            organization_id=org_id,
-            email=data.get("person_email"),
-            role=data.get("person_role"),
-            assigned_by=current_user.id,
-            replace=bool(data.get("replace")),
-        )
+        try:
+            owner = set_named_person_owner(
+                app,
+                person_name,
+                ownership_type,
+                organization_id=org_id,
+                email=data.get("person_email"),
+                role=data.get("person_role"),
+                assigned_by=current_user.id,
+                replace=bool(data.get("replace")),
+            )
+        except ValueError as problem:
+            return jsonify({"success": False, "error": str(problem)}), 400
         db.session.commit()
         return jsonify({"success": True, "owner": owner.to_dict()}), 201
 

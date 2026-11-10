@@ -142,12 +142,51 @@ def _applications_without_owner(organization_id: int, **_: Any) -> Dict[str, Any
     }
 
 
+def _owner_names_by_application(
+    organization_id: int, application_ids: List[int], ownership_types: Optional[tuple] = None,
+) -> Dict[int, List[str]]:
+    """{application id: the names of its recorded owners}: the one reader of who owns what
+    for the answers below. A user is named as the owner record names them; a person
+    recorded without an account is named as recorded; a user outside this organisation
+    is not named."""
+    from app.models.application_owner import ApplicationOwner
+    from app.models.user import User
+    from app.services.element_ownership_service import owner_label
+
+    if not application_ids:
+        return {}
+    query = db.session.query(ApplicationOwner).filter(
+        ApplicationOwner.organization_id == organization_id,
+        ApplicationOwner.application_id.in_(application_ids),
+    )
+    if ownership_types:
+        query = query.filter(ApplicationOwner.ownership_type.in_(ownership_types))
+    owner_rows = query.all()
+    user_ids = {row.user_id for row in owner_rows if row.user_id is not None}
+    users_by_id = {
+        u.id: u
+        for u in User.query.filter(
+            User.id.in_(user_ids or {-1}), User.organization_id == organization_id,
+        ).all()
+    }
+    names: Dict[int, List[str]] = {}
+    for row in owner_rows:
+        if row.user_id is None:
+            if row.person_name:
+                names.setdefault(row.application_id, []).append(row.person_name)
+            continue
+        user = users_by_id.get(row.user_id)
+        if user is not None:
+            names.setdefault(row.application_id, []).append(
+                owner_label(user.first_name, user.last_name, user.email))
+    return names
+
+
 def _business_continuity_criticality(
     organization_id: int, criticality: str = "Critical", **_: Any
 ) -> Dict[str, Any]:
     """"What would stop the business trading?" — the systems, suppliers
     and owners for a given criticality level."""
-    from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
 
     apps = ApplicationComponent.query.filter(
@@ -155,35 +194,7 @@ def _business_continuity_criticality(
         ApplicationComponent.business_criticality == criticality,
     ).all()
 
-    owners_by_app: Dict[int, List[str]] = {}
-    if apps:
-        owner_rows = (
-            db.session.query(ApplicationOwner)
-            .filter(
-                ApplicationOwner.organization_id == organization_id,
-                ApplicationOwner.application_id.in_([a.id for a in apps]),
-            )
-            .all()
-        )
-        if owner_rows:
-            from app.models.user import User
-
-            # Scoped to this organisation explicitly: a row's user_id is
-            # already drawn from an org-filtered ApplicationOwner row, but
-            # the tenant-scoping gate requires the predicate at every query
-            # site, not just transitively through a join.
-            owner_user_ids = {row.user_id for row in owner_rows}
-            users_by_id = {
-                u.id: u
-                for u in User.query.filter(
-                    User.id.in_(owner_user_ids),
-                    User.organization_id == organization_id,
-                ).all()
-            }
-            for row in owner_rows:
-                user = users_by_id.get(row.user_id)
-                name = user.email if user else "not recorded"
-                owners_by_app.setdefault(row.application_id, []).append(name)
+    owners_by_app = _owner_names_by_application(organization_id, [a.id for a in apps])
 
     rows = []
     citations: List[Dict[str, Any]] = []
@@ -337,9 +348,7 @@ def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
     application's recorded total cost of ownership; a missing cost reads as
     "not recorded", never a fabricated zero.
     """
-    from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
-    from app.services.element_ownership_service import owner_label
 
     apps = (
         ApplicationComponent.query.filter(
@@ -349,38 +358,8 @@ def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
         .all()
     )
 
-    owners_by_app: Dict[int, List[str]] = {}
-    if apps:
-        owner_rows = (
-            db.session.query(ApplicationOwner)
-            .filter(
-                ApplicationOwner.organization_id == organization_id,
-                ApplicationOwner.application_id.in_([a.id for a in apps]),
-                ApplicationOwner.ownership_type.in_(("primary", "business")),
-            )
-            .all()
-        )
-        if owner_rows:
-            from app.models.user import User
-
-            owner_user_ids = {row.user_id for row in owner_rows if row.user_id is not None}
-            users_by_id = {
-                u.id: u
-                for u in User.query.filter(
-                    User.id.in_(owner_user_ids or {-1}),
-                    User.organization_id == organization_id,
-                ).all()
-            }
-            for row in owner_rows:
-                if row.user_id is None and row.person_name:
-                    owners_by_app.setdefault(row.application_id, []).append(row.person_name)
-                    continue
-                user = users_by_id.get(row.user_id)
-                if user is None:
-                    continue
-                owners_by_app.setdefault(row.application_id, []).append(
-                    owner_label(user.first_name, user.last_name, user.email)
-                )
+    owners_by_app = _owner_names_by_application(
+        organization_id, [a.id for a in apps], ownership_types=("primary", "business"))
 
     rows = []
     citations: List[Dict[str, Any]] = []

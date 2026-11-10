@@ -189,26 +189,41 @@ def _element_key(element_type: str, element_id: int) -> dict:
     return {"element_type": element_type, "element_id": element_id}
 
 
-def resolve_user_by_name(name: str, organization_id: int):  # reuse-ok: the one name-to-user lookup; the owner backfill's copy was removed for it
-    """The one user in *organization_id* whose full name or email is *name*.
-
-    Full name first, then email, both exact and case-insensitive. A first name
-    alone, a last name alone or an ambiguous match resolves to nothing: an owner
-    is never guessed.
-    """
+def _match_users_by_name(name: str, organization_id: int):
+    """(the one user, the people it was ambiguous between): full name first, then email, both
+    exact and case-insensitive. Exactly one of the two is set, or neither when nobody matches."""
     from app.models.user import User
 
     wanted = (name or "").strip().lower()
     if not wanted:
-        return None
+        return None, []
+    ambiguous = []
     for match in (
         db.func.lower(db.func.concat(User.first_name, " ", User.last_name)),
         db.func.lower(User.email),
     ):
         users = User.query.filter(User.organization_id == organization_id).filter(match == wanted).all()
         if len(users) == 1:
-            return users[0]
-    return None
+            return users[0], []
+        if len(users) > 1 and not ambiguous:
+            ambiguous = users
+    return None, ambiguous
+
+
+def resolve_user_by_name(name: str, organization_id: int):  # reuse-ok: the one name-to-user lookup; the owner backfill's copy was removed for it
+    """The one user in *organization_id* whose full name or email is *name*.
+
+    Full name first, then email, both exact and case-insensitive. A first name
+    alone, a last name alone or an ambiguous match resolves to nothing: an owner
+    is never guessed. ``users_named_alike`` tells "nobody" from "more than one".
+    """
+    return _match_users_by_name(name, organization_id)[0]
+
+
+def users_named_alike(name: str, organization_id: int) -> list:
+    """The two or more users of *organization_id* a name matches when it names no single one,
+    else an empty list: how "nobody has that name" is told from "more than one person has it"."""
+    return _match_users_by_name(name, organization_id)[1]
 
 
 def owner_label(first_name: Optional[str], last_name: Optional[str], email: Optional[str] = None) -> str:
@@ -422,6 +437,8 @@ def set_named_person_owner(
     them. The application must belong to *organization_id*. The same person
     recorded twice as one type is one row.
     """
+    if any(v is not None and not isinstance(v, str) for v in (name, email, role)):
+        raise ValueError("The name, email address and role of a named owner must be text.")
     name = " ".join((name or "").split())
     if not name:
         raise ValueError("A named owner needs a name.")
