@@ -855,8 +855,12 @@ def _github_state(org_id: int) -> dict:
     cfg = _load_org_connector(org_id, connector_type="github")
     if cfg is None:
         return {"state": "not_connected", "organization": None, "has_token": False, "counts": {}, "job": None}
-    jobs = get_job_queue_service().list_jobs(org_id, limit=1, task=gh.FIRST_SYNC_TASK)
-    job = jobs[0] if jobs else None
+    # The latest read, whether the connect page started it or sign-up did.
+    from app.modules.account.services.onboarding_service import GITHUB_TASK as SIGNUP_TASK
+
+    queue = get_job_queue_service()
+    reads = queue.list_jobs(org_id, limit=1, task=gh.FIRST_SYNC_TASK) + queue.list_jobs(org_id, limit=1, task=SIGNUP_TASK)
+    job = max(reads, key=lambda j: j.id) if reads else None
     state = {
         None: "connected",
         JobStatus.PENDING.value: "waiting",
