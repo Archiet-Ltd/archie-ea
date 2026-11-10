@@ -151,6 +151,13 @@ def test_the_picker_comes_before_the_prioritised_actions(browser, server, demo, 
     try:
         page = _sign_in_as(context, server, DEMO_EMAIL)
         page.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        # the tab title and the breadcrumb name the screen as the sidebar does: Scenarios, under Changes
+        expect(page).to_have_title(re.compile(r"^Scenarios\b"))
+        crumbs = page.get_by_label("Breadcrumb").first
+        expect(crumbs).to_contain_text("Home")
+        expect(crumbs.get_by_role("link", name="Changes")).to_have_count(0)
+        assert re.sub(r"\s+", " ", crumbs.inner_text()).strip().endswith("Changes Scenarios"), crumbs.inner_text()
+        expect(crumbs.get_by_text("Scenarios", exact=True)).to_have_attribute("aria-current", "page")
         picker = page.get_by_role("heading", name="Select Element")
         actions = page.get_by_test_id("priority-actions")
         expect(actions).to_be_visible()
