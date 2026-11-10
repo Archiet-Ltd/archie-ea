@@ -176,13 +176,20 @@ _CREDENTIAL = "[CREDENTIAL_REDACTED]"
 REDACTED = _CREDENTIAL
 
 # A key is split into word parts (on _ - . spaces and camelCase), lower-cased, trailing digits dropped.
-# It names a secret when its last part is one of these words, or is "key" beside one of the qualifiers.
+# It names a secret when it is one of the closed names below: a last part that is a secret word (or its
+# plural), a one-word form such as accesstoken, "key" beside a qualifier, a name ending in password, passwd
+# or secret with no word break (PGPASSWORD), pwd, or pass as the whole key.
 _SECRET_LAST_PARTS = frozenset({
     "secret", "password", "passwd", "passphrase", "token", "authorization", "credential", "credentials",
-    "bearer",
+    "bearer", "pwd", "cookie", "secrets", "passwords", "passwds", "passphrases", "cookies",
 })
 _KEY_QUALIFIERS = frozenset({"api", "access", "secret", "private", "client", "signing", "encryption"})
-_SECRET_ONE_WORD = frozenset({"apikey", "accesskey", "secretkey", "privatekey", "clientkey", "signingkey"})
+_SECRET_ONE_WORD = frozenset({
+    "apikey", "accesskey", "secretkey", "privatekey", "clientkey", "signingkey",
+    "accesstoken", "clientsecret", "authtoken", "refreshtoken", "idtoken", "sessiontoken", "bearertoken",
+    "setcookie",
+})
+_NOT_A_SECRET_TOKEN = frozenset({"max", "count", "num", "limit"})
 _KEY_PARTS = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")
 
 
@@ -194,9 +201,14 @@ def is_secret_key(name: Any) -> bool:
     parts = [part for part in parts if part]
     if not parts:
         return False
-    if parts[-1] in _SECRET_LAST_PARTS or "".join(parts) in _SECRET_ONE_WORD:
+    joined = "".join(parts)
+    if parts[-1] == "token" and len(parts) > 1 and parts[-2] in _NOT_A_SECRET_TOKEN:
+        return False
+    if parts[-1] in _SECRET_LAST_PARTS or joined in _SECRET_ONE_WORD or joined.rstrip("s") in _SECRET_ONE_WORD:
         return True
-    return parts[-1] == "key" and len(parts) > 1 and parts[-2] in _KEY_QUALIFIERS
+    if parts == ["pass"] or re.search(r"(?:password|passwd|secret)s?$", joined):
+        return True
+    return parts[-1] in ("key", "keys") and len(parts) > 1 and parts[-2] in _KEY_QUALIFIERS
 
 
 _SECRET_SHAPES: List[Tuple[re.Pattern, str]] = [
@@ -210,8 +222,9 @@ _SECRET_SHAPES: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"\b(?i:bearer)[\s:]+(?=[A-Za-z0-9._~+/=\-]*(?:\d|[_~+/=]|\.[A-Za-z0-9]))[A-Za-z0-9._~+/=\-]{8,}"), _CREDENTIAL),
     (re.compile(r"(?i:basic)\s+(?=[A-Za-z0-9+/]*\d)[A-Za-z0-9+/]{12,}={0,2}"), _CREDENTIAL),
     # sk- keys: a long body with a digit; when a letter comes before it ("task-"), it must also mix cases
-    (re.compile(r"sk-ant-[A-Za-z0-9_\-]{8,}"), _CREDENTIAL),
+    (re.compile(r"sk-(?:ant|proj|svcacct|admin|or-v1)-[A-Za-z0-9_\-]{8,}"), _CREDENTIAL),
     (re.compile(r"(?<![A-Za-z])sk-(?=[A-Za-z0-9_\-]*\d)[A-Za-z0-9_\-]{20,}"), _CREDENTIAL),
+    (re.compile(r"(?<![A-Za-z])sk-(?=[A-Za-z0-9_\-]*\d{4})(?=[A-Za-z0-9_\-]*[A-Z])[A-Za-z0-9_\-]{12,}"), _CREDENTIAL),
     (re.compile(r"(?<=[A-Za-z])sk-(?=[A-Za-z0-9_\-]*\d)(?=[A-Za-z0-9_\-]*[A-Z])[A-Za-z0-9_\-]{20,}"), _CREDENTIAL),
     (re.compile(r"[sprk]k_(?:live|test)_[A-Za-z0-9]{8,}"), _CREDENTIAL),
     (re.compile(r"(?:AKIA|ASIA)[A-Z0-9]{16}(?![A-Z0-9])"), _CREDENTIAL),
@@ -228,13 +241,34 @@ _SECRET_SHAPES: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"(?<=://)([^\s:/@\"']+):[^\s/@\"']+(?=@)"), r"\1:" + _CREDENTIAL),
 ]
 
-# key = value / "key": "value" / \"key\": \"value\" / 'key': 'value'. The key is checked by is_secret_key.
-_KEYWORD_VALUE = re.compile(
-    r"(?P<head>(?<![A-Za-z0-9])(?P<key>[A-Za-z][A-Za-z0-9_.\-]*)(?:\\*[\"'])?[ \t]*[:=][ \t]*)"
-    r"(?:(?P<quote>\\*[\"'])(?P<quoted>(?:(?!(?P=quote)).)*)(?P=quote)"
-    r"|(?P<bare>[^\s\"',;\\}\])]+))"
+# A secret keyword form: <secret key name> then = or : (a line break may follow) or, for the long names,
+# only spaces. The key is a word, or "<word> key"; it is checked by is_secret_key, so only a closed list of
+# names ever has its value redacted. Any other word is skipped without consuming what follows it, so a
+# secret written inside the value of an ordinary key is still found.
+_KEYWORD_HEAD = re.compile(
+    r"(?<![A-Za-z0-9])(?P<key>[A-Za-z][A-Za-z0-9_.\-]*(?:[ _\-](?i:keys?))?)(?:\\*[\"'])?"
+    r"(?P<sep>[ \t]*[:=][ \t]*(?:\r?\n[ \t]*)?|[ \t]+)"
 )
-_CARD_NUMBER = re.compile(r"(?<![\d])\d(?:[ .\-]{0,2}\d){12,18}(?![\d])")
+_QUOTED_VALUE = re.compile(r"b?(?P<quote>\\*[\"'])(?P<quoted>(?:(?!(?P=quote)).)*)(?P=quote)")
+_BARE_VALUE = re.compile(r"[^\s\"',;&\\}\])]+")
+_PLACEHOLDER_VALUES = frozenset({
+    "required", "optional", "none", "null", "true", "false", "yes", "no", "n/a", "tbd", "unknown", "hidden",
+    "masked", "***",
+})
+_PROSE_KEYS = frozenset({"credential", "credentials", "authorization", "cookie", "cookies"})
+_NO_SPACE_FORM = frozenset({"pass", "pwd", "cookie", "cookies", "authorization"})
+_CARD_NUMBER = re.compile(
+    r"(?<![\d.])(?:\d{13,19}|\d{4}([ .\-])\d{4}\1\d{4}\1\d{4}(?:\1\d{3})?|\d{4}([ .\-])\d{6}\2\d{5})(?![\d]|\.\d)"
+)
+_ZERO_WIDTH = re.compile("[​‌‍⁠﻿]")
+_PROVIDER_RUN = re.compile(
+    r"(?<![A-Za-z0-9])((?:sk-|ghp_|gho_|ghu_|ghs_|ghr_|glpat-|AKIA|ASIA|AIza|xox[abeprs]-|github_pat_|whsec_|hf_)"
+    r"[A-Za-z0-9_\-]+)(?:\r?\n|\\n)([A-Za-z0-9_\-]{6,})"
+)
+_COOKIE_LINE = re.compile(r"(?i)\b((?:set-)?cookie\s*:[ \t]*)[^\r\n]+")
+_CURL_USER = re.compile(r"(\bcurl\b[^\n]*?\s(?:-u|--user)[ =]['\"]?)([^\s:'\"]+):[^\s'\"]+")
+_URL_QUERY_PAIR = re.compile(r"(?<=[?&;])(?P<key>[A-Za-z0-9_.\-]+)=(?P<value>[^&\s\"'#<>]+)")
+_SIGNATURE_KEYS = frozenset({"sig", "signature", "x-amz-signature", "x-amz-security-token"})
 
 
 def _luhn_ok(digits: str) -> bool:
@@ -255,25 +289,93 @@ def _scrub_cards(text: str) -> str:
     return _CARD_NUMBER.sub(replace, text)
 
 
-def _scrub_keyword_values(text: str) -> str:
-    def replace(match: "re.Match") -> str:
-        if not is_secret_key(match.group("key")):
-            return match.group(0)
-        quote = match.group("quote")
-        if quote is not None:
-            if len(match.group("quoted")) < 3 or match.group("quoted").startswith("["):
-                return match.group(0)
-            return match.group("head") + quote + REDACTED + quote
-        bare = match.group("bare")
-        # prose such as "password: required" is left alone; a value reads as a secret when it is long, or
-        # mixes in a digit or a symbol
-        if len(bare) < 8 and not (len(bare) >= 4 and re.search(r"[\d!@#$%^&*]", bare)):
-            return match.group(0)
-        if bare.startswith("[") or bare.lower() in ("none", "null", "true", "false"):
-            return match.group(0)
-        return match.group("head") + REDACTED
+def _glue_broken_keys(text: str) -> str:
+    """Remove zero-width characters, and join a provider-prefixed key that a line break split in two."""
+    text = _ZERO_WIDTH.sub("", text)
 
-    return _KEYWORD_VALUE.sub(replace, text)
+    def join(match: "re.Match") -> str:
+        glued = match.group(1) + match.group(2)
+        if len(glued) >= 16 and re.search(r"\d", glued):
+            return glued
+        return match.group(0)
+
+    while True:
+        joined = _PROVIDER_RUN.sub(join, text)
+        if joined == text:
+            return text
+        text = joined
+
+
+def _value_is_a_secret(key: str, value: str, spaced: bool, quoted: bool = False) -> bool:
+    plain = value.strip()
+    lowered = plain.lower()
+    if not plain or lowered in _PLACEHOLDER_VALUES or plain.startswith("[") or re.fullmatch(r"<[^<>]*>", plain):
+        return False
+    if plain.isdigit() and len(plain) <= 6:
+        return False
+    marked = bool(re.search(r"[\d!@#$%^&*]", plain))
+    if spaced or key.lower() in _PROSE_KEYS:
+        return marked and len(plain) >= 6 and not (quoted and re.search(r"\s", plain))
+    return quoted or len(plain) >= 8 or (len(plain) >= 4 and marked)
+
+
+def _structure_value_is_a_secret(key: Any, item: Any) -> bool:
+    """A value under a secret key: a placeholder word is not one, and neither is a sentence under a prose key."""
+    if not isinstance(item, str):
+        return True
+    plain = item.strip()
+    if plain.lower() in _PLACEHOLDER_VALUES or re.fullmatch(r"<[^<>]*>", plain) or plain.startswith("["):
+        return False
+    if plain.isdigit() and len(plain) <= 6:
+        return False
+    parts = [part.lower() for part in _KEY_PARTS.findall(str(key))]
+    if parts and parts[-1] in _PROSE_KEYS:
+        return bool(re.search(r"[\d!@#$%^&*]", plain)) and len(plain) >= 6 and not re.search(r"\s", plain)
+    return True
+
+
+def _scrub_keyword_values(text: str) -> str:
+    out: List[str] = []
+    pos = 0
+    scan = 0
+    while True:
+        head = _KEYWORD_HEAD.search(text, scan)
+        if head is None:
+            break
+        key = head.group("key")
+        scan = head.end("key")
+        if not is_secret_key(key):
+            continue
+        spaced = not re.search(r"[:=]", head.group("sep"))
+        if spaced and key.lower() in _NO_SPACE_FORM:
+            continue
+        start = head.end()
+        quoted = _QUOTED_VALUE.match(text, start)
+        if quoted is not None and not spaced:
+            inner = quoted.group("quoted")
+            if len(inner) >= 3 and _value_is_a_secret(key, inner, False, quoted=True):
+                out.append(text[pos:quoted.start("quoted")])
+                out.append(REDACTED)
+                pos = scan = quoted.end("quoted")
+            continue
+        bare = _BARE_VALUE.match(text, start)
+        if bare is None or not _value_is_a_secret(key, bare.group(0), spaced):
+            continue
+        out.append(text[pos:start])
+        out.append(REDACTED)
+        pos = scan = bare.end()
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def _scrub_url_queries(text: str) -> str:
+    def replace(match: "re.Match") -> str:
+        key = match.group("key")
+        if (is_secret_key(key) or key.lower() in _SIGNATURE_KEYS) and _value_is_a_secret(key, match.group("value"), False):
+            return key + "=" + REDACTED
+        return match.group(0)
+
+    return _URL_QUERY_PAIR.sub(replace, text)
 
 
 # Masks for personal data that the chat path applies (the reviewer must see names, numbers and dates).
@@ -281,8 +383,6 @@ _PII_PATTERNS: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", re.I), "[EMAIL_REDACTED]"),
     (re.compile(r"\b\+?[\d\s\-().]{7,15}\d\b"), "[PHONE_REDACTED]"),
 ]
-# kept under its old name: the personal-data masks of the chat path
-_SENSITIVE_PATTERNS = _PII_PATTERNS
 
 
 # OpenRouter data-policy setting sent with every request.
@@ -291,8 +391,12 @@ OPENROUTER_PUBLIC_POLICY = {"data_collection": "allow"}  # text a company publis
 
 
 def _scrub_text(text: str, mask_pii: bool) -> str:
+    text = _glue_broken_keys(text)
     for pattern, replacement in _SECRET_SHAPES:
         text = pattern.sub(replacement, text)
+    text = _COOKIE_LINE.sub(lambda m: m.group(1) + REDACTED, text)
+    text = _CURL_USER.sub(lambda m: m.group(1) + m.group(2) + ":" + REDACTED, text)
+    text = _scrub_url_queries(text)
     text = _scrub_keyword_values(text)
     text = _scrub_cards(text)
     if mask_pii:
@@ -301,17 +405,25 @@ def _scrub_text(text: str, mask_pii: bool) -> str:
     return text
 
 
+# {"name": "API_KEY", "value": ...}: the label names the secret, the value is the secret
+_LABEL_KEYS = ("name", "key", "header", "field", "variable")
+
+
 def _scrub_structure(value: Any, mask_pii: bool, depth: int = 0) -> Any:
     if depth > 40:
         return REDACTED
     if isinstance(value, dict):
         cleaned = {}
+        names_a_secret = any(
+            isinstance(value.get(label), str) and is_secret_key(value[label]) for label in _LABEL_KEYS
+        )
         for key, item in value.items():
-            if is_secret_key(key) and item is not None and not isinstance(item, bool):
+            if (is_secret_key(key) or (names_a_secret and key == "value")) and item is not None \
+                    and not isinstance(item, bool) and _structure_value_is_a_secret(key, item):
                 cleaned[key] = REDACTED
             else:
                 cleaned[key] = _scrub_structure(item, mask_pii, depth + 1)
-        return cleaned
+        return {(_scrub_text(k, mask_pii) if isinstance(k, str) else k): v for k, v in cleaned.items()}
     if isinstance(value, (list, tuple)):
         return [_scrub_structure(item, mask_pii, depth + 1) for item in value]
     if isinstance(value, int) and not isinstance(value, bool):
@@ -325,7 +437,7 @@ def _scrub_structure(value: Any, mask_pii: bool, depth: int = 0) -> Any:
             except ValueError:
                 inner = None
             if isinstance(inner, (dict, list)):
-                return json.dumps(_scrub_structure(inner, mask_pii, depth + 1), default=str)
+                return _scrub_text(json.dumps(_scrub_structure(inner, mask_pii, depth + 1), default=str), mask_pii)
         return _scrub_text(value, mask_pii)
     return value
 
@@ -333,10 +445,10 @@ def _scrub_structure(value: Any, mask_pii: bool, depth: int = 0) -> Any:
 def scrub_for_model(value: Any, mask_pii: bool = True) -> Any:
     """The one scrub for anything that leaves the server for a model.
 
-    A dict or list is walked first (a value whose key names a secret becomes ``[REDACTED]``, a string that
+    A dict or list is walked first (a value whose key names a secret becomes ``[CREDENTIAL_REDACTED]``, a string that
     holds JSON is walked too) and a string is scrubbed by shape. ``mask_pii`` also masks e-mail addresses
     and phone numbers: the chat path does, a reviewer that has to check names and figures does not.
-    Known limit: a key split across a line break is not recognised.
+    Known limits: base64 or hex encodings are not decoded, and a key split across two fields is not joined.
     """
     if isinstance(value, str):
         return _scrub_structure(value, mask_pii) if value.lstrip()[:1] in ("{", "[") else _scrub_text(value, mask_pii)
