@@ -162,8 +162,20 @@ def approval_inbox():
             impact = result.get("impact") if result.get("success") else {"error": True}
         except Exception:
             impact = {"error": True}
+    # The record of one reviewed change (checks, rounds, both models, every reason), read only, for the
+    # change the person opened from the assistant's answer or from the decided list.
+    record = None
+    record_missing = False
+    if focus_id:
+        found = service.get_review_record(focus_id)
+        if found.get("success"):
+            record = found["record"]
+        else:
+            record_missing = True
     return render_template(
         "ai_chat/approval_inbox.html",
+        record=record,
+        record_missing=record_missing,
         approvals=approvals,
         queue_error=None if queue.get("success") else "The approval inbox could not be loaded. Refresh the page to try again.",
         decisions=decisions,

@@ -14,9 +14,11 @@ NAME_RULE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 
 
 class DeepSeekStub:
-    def __init__(self, reply="The deepseek stub answers.", tool_script=None, usage=(1000, 500)):
+    def __init__(self, reply="The deepseek stub answers.", tool_script=None, usage=(1000, 500), respond=None):
         self.reply = reply
         self.tool_script = list(tool_script or [])  # each item: (tool_name, arguments dict), answered in turn
+        # Optional: respond(model, text, has_tools) -> the reply text for this request, or None for the default.
+        self.respond = respond
         self.usage = usage
         self.requests = []
         self.keys_seen = []  # every bearer token received, accepted or not
@@ -71,7 +73,9 @@ class DeepSeekStub:
                         "function": {"name": scripted[0], "arguments": json.dumps(scripted[1])}}]}
                     finish = "tool_calls"
                 else:
-                    message = {"role": "assistant", "content": owner.reply}
+                    text = " ".join(str(m.get("content")) for m in body.get("messages", []))
+                    custom = owner.respond(body.get("model"), text, bool(names)) if owner.respond else None
+                    message = {"role": "assistant", "content": owner.reply if custom is None else custom}
                     finish = "stop"
                 if body.get("stream"):
                     delta = dict(message)
