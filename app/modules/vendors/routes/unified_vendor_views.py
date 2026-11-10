@@ -104,48 +104,22 @@ unified_vendors_bp = Blueprint(
 @unified_vendors_bp.route("/integration")
 @login_required
 def integration_dashboard():
-    """Old address: Integration lives in the vendor mapping tool."""
-    return redirect(url_for("unified_vendors.vendor_mapping_tool"), code=301)
+    """Old address: Integration is the Mapping tab of Vendors."""
+    return redirect(url_for("unified_applications.vendors", tab="mapping"), code=301)
 
 
 @unified_vendors_bp.route("/integration/mapping")
 @login_required
 def vendor_mapping_tool():
-    """Application-to-vendor mapping tool - renders vendor applications portfolio."""
-    vendor = type("Vendor", (), {"id": 0, "name": "All Vendors"})()
-    try:
-        # Neither application_vendor_product_mappings nor vendor_products has an
-        # organization_id, so this listed every tenant's applications. The
-        # predicate belongs on application_components, which does carry one.
-        from flask import g as _g
-        _org = getattr(_g, "current_org_id", None)
-        _org_where = " WHERE ac.organization_id = :org" if _org is not None else ""
-        rows = db.session.execute(text(f"""
-            SELECT ac.id, ac.name, ac.vendor_name, vp.name AS product_name,
-                   m.role_type, ac.description, ac.deployment_status,
-                   ac.business_criticality, ac.business_owner
-            FROM application_vendor_product_mappings m
-            JOIN application_components ac ON ac.id = m.application_component_id
-            JOIN vendor_products vp ON vp.id = m.vendor_product_id{_org_where}
-            ORDER BY ac.vendor_name, ac.name
-        """), ({"org": _org} if _org is not None else {})).fetchall()
-        applications = [_app_portfolio_item(r) for r in rows]
-    except Exception:
-        applications = []
-    stats = _portfolio_stats(applications)
-    return render_template(
-        "vendors/vendor_applications_portfolio.html",
-        vendor=vendor,
-        stats=stats,
-        applications=applications,
-    )
+    """Old address: the application-to-vendor mapping is the Mapping tab of Vendors."""
+    return redirect(url_for("unified_applications.vendors", tab="mapping"), code=301)
 
 
 @unified_vendors_bp.route("/integration/patterns")
 @login_required
 def integration_patterns():
-    """Old address: Integration patterns are read in the vendor mapping tool."""
-    return redirect(url_for("unified_vendors.vendor_mapping_tool"), code=301)
+    """Old address: Integration patterns are read on the Mapping tab of Vendors."""
+    return redirect(url_for("unified_applications.vendors", tab="mapping"), code=301)
 
 
 # =============================================================================
@@ -278,28 +252,28 @@ def scenario_analyzer():
 @unified_vendors_bp.route("/data")
 @login_required
 def data_dashboard():
-    """Old address: Vendor data is cleaned on the duplicates page."""
-    return redirect(url_for("unified_duplicate.simple_dashboard"), code=301)
+    """Old address: Vendors has no separate data page; it opens the Vendors list."""
+    return redirect(url_for("unified_applications.vendors"), code=301)
 
 
 @unified_vendors_bp.route("/data/quality")
 @login_required
 def data_quality():
-    """Old address: Vendor data quality is the duplicates page."""
-    return redirect(url_for("unified_duplicate.simple_dashboard"), code=301)
+    """Old address: Vendors has no separate data page; it opens the Vendors list."""
+    return redirect(url_for("unified_applications.vendors"), code=301)
 
 
 @unified_vendors_bp.route("/data/duplicates")
 @login_required
 def duplicate_management():
-    """Duplicate vendor management - redirects to duplicate detection."""
-    return redirect(url_for("unified_duplicate.simple_dashboard"))
+    """Old address: the duplicates page lists applications, not vendors; opens the Vendors list."""
+    return redirect(url_for("unified_applications.vendors"), code=301)
 
 
 @unified_vendors_bp.route("/data/import", methods=["GET", "POST"])
 @login_required
 def vendor_import():
-    """Bulk vendor import - renders vendor list for GET, processes import for POST."""
+    """Bulk vendor import - GET redirects to the vendor list, POST processes the import."""
     if request.method == "GET":
         return redirect(url_for("unified_applications.vendors"), code=301)
     return import_vendors()
@@ -308,8 +282,8 @@ def vendor_import():
 @unified_vendors_bp.route("/data/reconciliation")
 @login_required
 def vendor_reconciliation():
-    """Old address: Reconciling vendors is merging duplicates."""
-    return redirect(url_for("unified_duplicate.simple_dashboard"), code=301)
+    """Old address: Vendors has no separate data page; it opens the Vendors list."""
+    return redirect(url_for("unified_applications.vendors"), code=301)
 
 
 # =============================================================================

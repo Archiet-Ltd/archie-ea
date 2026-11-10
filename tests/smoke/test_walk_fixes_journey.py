@@ -257,24 +257,54 @@ def test_industry_frameworks_print_no_none(browser, live_server, demo, scheme, w
 
 # --- old vendor addresses -------------------------------------------------------------------------
 
-VENDOR_ADDRESSES = [
-    "/vendors/data", "/vendors/data/import", "/vendors/data/quality", "/vendors/data/reconciliation",
-    "/vendors/import", "/vendors/integration", "/vendors/integration/patterns",
-    "/vendors/selection", "/vendors/selection/analysis", "/vendors/selection/discovery",
-    "/vendors/selection/requirements", "/vendors/technical", "/vendors/technical/comparison",
-    "/vendors/technical/scenarios",
-]
+VENDORS = "/applications/vendors"
+ANALYSIS = "/dashboard/vendor-analysis"
+
+# address -> (final path, final query, page heading, content this organisation must show)
+VENDOR_ADDRESSES = {
+    "/vendors/data": (VENDORS, "", "Vendors", "vendors"),
+    "/vendors/data/duplicates": (VENDORS, "", "Vendors", "vendors"),
+    "/vendors/data/import": (VENDORS, "", "Vendors", "vendors"),
+    "/vendors/data/quality": (VENDORS, "", "Vendors", "vendors"),
+    "/vendors/data/reconciliation": (VENDORS, "", "Vendors", "vendors"),
+    "/vendors/import": (VENDORS, "", "Vendors", "vendors"),
+    "/vendors/integration": (VENDORS, "tab=mapping", "Vendors", "mapping"),
+    "/vendors/integration/mapping": (VENDORS, "tab=mapping", "Vendors", "mapping"),
+    "/vendors/integration/patterns": (VENDORS, "tab=mapping", "Vendors", "mapping"),
+    "/vendors/selection": (ANALYSIS, "", "", "analysis"),
+    "/vendors/selection/analysis": (ANALYSIS, "", "", "analysis"),
+    "/vendors/selection/discovery": ("/applications/vendors/catalogue", "", "", "catalogue"),
+    "/vendors/selection/requirements": (ANALYSIS + "/new", "", "", "form"),
+    "/vendors/technical": ("/dashboards/vendor-capability-matrix", "", "", "matrix"),
+    "/vendors/technical/comparison": (ANALYSIS, "", "", "analysis"),
+    "/vendors/technical/scenarios": (ANALYSIS, "", "", "analysis"),
+}
 
 
 GUARDED = {"/vendors/import"}
 
 
-def test_old_vendor_addresses_land_on_the_page_their_name_promises(browser, live_server, demo):
+def _demo_vendor_name(app, org_id):
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+
+    with app.app_context():
+        row = db.session.execute(
+            db.select(ApplicationComponent.vendor_name)
+            .where(ApplicationComponent.organization_id == org_id, ApplicationComponent.vendor_name.isnot(None))
+            .limit(1)).first()
+        db.session.remove()
+    return row[0] if row else None
+
+
+def test_old_vendor_addresses_land_on_the_page_their_name_promises(browser, live_server, demo, app):
+    vendor_name = _demo_vendor_name(app, demo["org_id"])
+    assert vendor_name, "the demo organisation should name a vendor on a system"
     context = _context(browser, "light", 1440, 900)
     page = context.new_page()
     try:
         sign_in(page, live_server, demo["admin_email"])
-        for address in VENDOR_ADDRESSES:
+        for address, (want_path, want_query, heading, kind) in VENDOR_ADDRESSES.items():
             first = context.request.get(live_server + address, max_redirects=0)
             if address in GUARDED:
                 # Only a platform administrator may import; anyone else reads a refusal, never the list.
@@ -287,12 +317,25 @@ def test_old_vendor_addresses_land_on_the_page_their_name_promises(browser, live
             else:
                 assert first.status in (301, 302), (address, first.status)
             _goto(page, live_server, address)
-            landed = page.url[len(live_server):].split("?")[0]
-            assert landed.rstrip("/") != address, (address, landed)
-            assert landed.rstrip("/") not in ("/vendors", "/applications/vendors", "/dashboard/vendors") \
-                or address.endswith("import"), (address, landed)
-            text = page.locator("main").inner_text().strip()
-            assert text, (address, landed)
+            landed = page.url[len(live_server):]
+            path, _, query = landed.partition("?")
+            assert (path.rstrip("/"), query) == (want_path, want_query), (address, landed)
+            headings = [h.strip() for h in page.locator("main h1").all_inner_texts()]
+            title = headings[0] if headings else ""
+            assert title and title.lower() != "all vendors", (address, title)
+            if heading:
+                assert title == heading, (address, headings, page.url)
+            text = page.locator("main").inner_text()
+            assert "All Vendors" not in text and "Duplicate Detection" not in text, (address, title)
+            if kind == "vendors":
+                assert page.get_by_test_id("vendor-row").count() > 0, address
+                assert vendor_name in text, (address, vendor_name)
+            elif kind == "mapping":
+                assert page.get_by_test_id("mapping-answer").is_visible(), address
+                rows = page.get_by_test_id("mapping-row").count()
+                assert rows > 0 or re.search(r"Every one of your [1-9]\d* systems", text), (address, text[:300])
+            else:
+                assert len(text.strip()) > 80, (address, title)
             _shot(page, "vendor-" + address.strip("/").replace("/", "-"))
     finally:
         context.close()

@@ -69,6 +69,7 @@ def _answer(html):
 
 
 def test_both_vendor_pages_state_the_same_coverage_and_the_administrator_reads_cost(app, db_session, make_org):
+    """The Vendors list states the coverage and the administrator reads cost; the old second page now redirects."""
     mine, theirs = make_org("vend-a"), make_org("vend-b")
     tag = uuid.uuid4().hex[:6]
     _estate(db_session, mine, "mine" + tag)
