@@ -399,7 +399,7 @@
                                         </div>
                                         <form x-show="renamingId === scenario.id" x-cloak @submit.prevent="saveRename(scenario)" class="space-y-2">
                                             {{ ui.input(type='text', attrs={'x-model': 'renameText', 'data-testid': 'scenario-rename-input', 'aria-label': 'New name for the scenario', 'maxlength': '200'}) }}
-                                            <p class="text-sm text-destructive" role="alert" x-show="renameError" x-cloak x-text="renameError"></p>
+                                            <div class="text-sm text-destructive" role="alert" x-show="renameError" x-cloak x-text="renameError"></div>
                                             <div class="flex gap-2">
                                                 {{ ui.button(text='Save name', size='sm', type='submit', attrs={'data-testid': 'scenario-rename-save'}) }}
                                                 {{ ui.button(text='Cancel', variant='outline', size='sm', attrs={'type': 'button', '@click': 'renamingId = null'}) }}
@@ -416,7 +416,7 @@
                                 </div>
                             </template>
                         </div>
-                        <p x-show="manageError" x-cloak role="alert" class="mt-3 text-sm text-destructive" x-text="manageError"></p>
+                        <div x-show="manageError" x-cloak role="alert" class="mt-3 text-sm text-destructive" x-text="manageError"></div>
                         
                         <div x-show="scenarios.length === 0 && !loading && !loadError" x-cloak class="text-center py-12 text-muted-foreground">
                             <i data-lucide="inbox" class="h-16 w-16 mx-auto mb-3 text-muted-foreground/50"></i>

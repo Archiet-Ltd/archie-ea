@@ -6,7 +6,6 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal with context %}
 {% import 'basecoat/index.html' as ui %}
-{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}{{ 'Scenarios' if simulation else 'Architecture Impact Analysis' }}{% endblock %}
 
@@ -51,12 +50,19 @@
 
     {% if model_empty %}
     {# An empty model has nothing to try a change on, nor any action to prioritise: say so and offer the way to fill it. #}
-    <div class="rounded-lg border bg-card" data-testid="model-empty">
-        {{ empty_state(icon='database',
-            title='Your model has no elements yet',
-            description='There is nothing to try a change on until your model holds elements. Connect GitHub to read your repositories into it.' if may_connect_github else 'There is nothing to try a change on until your model holds elements. Ask an administrator of your organisation to connect GitHub or add elements.',
-            cta_text='Connect GitHub' if may_connect_github else None,
-            cta_href=url_for('m365_connector.github_connect') if may_connect_github else None) }}
+    <div class="style-vega rounded-lg border bg-card p-6" data-testid="model-empty">
+        {% call ui.empty() %}
+            {% call ui.empty_header() %}
+                {% call ui.empty_icon(variant='icon') %}<i data-lucide="database" aria-hidden="true"></i>{% endcall %}
+                {{ ui.empty_title(text='Your model has no elements yet') }}
+                {{ ui.empty_description(text=('There is nothing to try a change on until your model holds elements. Connect GitHub to read your repositories into it.' if may_connect_github else 'There is nothing to try a change on until your model holds elements. Ask an administrator of your organisation to connect GitHub or add elements.')) }}
+            {% endcall %}
+            {% if may_connect_github %}
+            {% call ui.empty_content() %}
+                {{ ui.button(text='Connect GitHub', href=url_for('m365_connector.github_connect')) }}
+            {% endcall %}
+            {% endif %}
+        {% endcall %}
     </div>
     {% endif %}
 
