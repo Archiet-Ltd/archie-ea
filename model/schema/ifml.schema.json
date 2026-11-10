@@ -62,7 +62,7 @@
           "type": ["object", "null"],
           "required": ["rule", "file", "line"],
           "additionalProperties": false,
-          "properties": {"rule": {"type": "string"}, "file": {"type": "string"}, "line": {"type": "integer"}}
+          "properties": {"rule": {"type": "string"}, "file": {"type": ["string", "null"]}, "line": {"type": ["integer", "null"]}}
         }
       }
     },

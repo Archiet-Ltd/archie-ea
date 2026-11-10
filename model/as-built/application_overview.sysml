@@ -5,7 +5,7 @@ package AsBuilt_application_overview {
     part 'app/application_mgmt/detail_overview_routes.py' : Module {
         :>> sourcePath = "app/application_mgmt/detail_overview_routes.py";
         port 'application_mgmt.update_overview' : HttpRoutePort {
-            :>> rule = "/applications/<int:id>/overview-update";
+            :>> rule = "/dashboard/applications/<int:id>/overview-update";
             :>> methods = "POST";
             :>> endpoint = "application_mgmt.update_overview";
             :>> handlerFile = "app/application_mgmt/detail_overview_routes.py";
@@ -21,12 +21,15 @@ package AsBuilt_application_overview {
     part 'app/modules/applications/routes/update_routes.py' : Module {
         :>> sourcePath = "app/modules/applications/routes/update_routes.py";
         port 'unified_applications.update_overview' : HttpRoutePort {
-            :>> rule = "/<int:id>/overview-update";
+            :>> rule = "/applications/<int:id>/overview-update";
             :>> methods = "POST";
             :>> endpoint = "unified_applications.update_overview";
             :>> handlerFile = "app/modules/applications/routes/update_routes.py";
             :>> handlerLine = "31";
         }
+    }
+    part 'app/templates/applications/edit.html' : Module {
+        :>> sourcePath = "app/templates/applications/edit.html";
     }
 
     part 'app/templates/applications/dashboard.html' : Screen {
@@ -56,5 +59,12 @@ package AsBuilt_application_overview {
         :>> sourceFile = "app/templates/applications/dashboard.html:320";
         :>> origin = "app/templates/applications/dashboard.html (free text)";
         :>> valueList = "";
+    }
+    part vocabulary_deployment_status_4 : VocabularySource {
+        :>> columnName = "deployment_status";
+        :>> sourceKind = "template-field";
+        :>> sourceFile = "app/templates/applications/edit.html:135";
+        :>> origin = "app/templates/applications/edit.html (written out in place)";
+        :>> valueList = "production,development,testing,staging,retired";
     }
 }

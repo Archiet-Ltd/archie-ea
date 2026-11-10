@@ -1,1 +1,1 @@
-{"slice":{"1":1,"2":1,"3":3,"4":5,"S":2},"note":"Findings on the slice at the line head. A count may fall and may not rise."}
+{"slice":{"1":1,"2":1,"3":4,"4":5,"S":2,"U":9},"note":"Findings on the slice at the line head. A count may fall and may not rise. 3 rose from 3 to 4 when check 3 began reading every reader of the field under app/: the create form's hand-written list (edit.html) was always there and was not read before. U counts route handlers the component inventory cannot place in a file (documentation and static routes of libraries)."}
