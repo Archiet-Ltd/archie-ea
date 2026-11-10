@@ -125,3 +125,24 @@ def test_one_name_for_the_organisations_ai_settings(signed_in, client):
     assert "API Settings" not in admin_home, admin_home
     assert "AI settings" in admin_home
     assert "API Settings" not in _words(client.get("/account/register"))
+
+
+def _pages_with_payment(monkeypatch, app, opened):
+    from app.services import legal_pages, public_pages
+
+    monkeypatch.setitem(app.config, legal_pages.LEGAL_PAGES_FLAG, True)
+    monkeypatch.setattr(public_pages, "_payment_open", lambda: opened)
+    if hasattr(public_pages._pages_by_url, "cache_clear"):
+        public_pages._pages_by_url.cache_clear()
+
+
+@pytest.mark.parametrize("url", ["/team-annual-onboarding", "/refund-policy"])
+def test_cancelling_from_the_billing_page_is_promised_only_while_payment_is_open(app, client, monkeypatch, url):
+    _pages_with_payment(monkeypatch, app, False)
+    closed = _words(client.get(url))
+    assert "from the billing page" not in closed, closed
+    assert "contacting us" in closed
+
+    _pages_with_payment(monkeypatch, app, True)
+    opened = _words(client.get(url))
+    assert "from the billing page" in opened
