@@ -8,6 +8,10 @@ document.addEventListener('alpine:init', function() {
             elements: [],
             pagination: { page: 1, pages: 0, per_page: 25, total: null, has_next: false, has_prev: false },
             loading: false,
+            // The first list request has not finished, or the layer on screen is not the layer last loaded:
+            // the figures that come from the list are being fetched, not missing.
+            elementsLoaded: false,
+            loadedLayer: null,
             loadError: null,   // referenced by x-show/x-text in the template; must exist to avoid Alpine ReferenceError
             searchQuery: '',
             typeFilter: '',
@@ -244,6 +248,7 @@ document.addEventListener('alpine:init', function() {
             },
 
             get relationshipHint() {
+                if (this.elementsPending) return 'Loading';
                 let metrics = this.relationshipMetrics;
                 if (!metrics.known) return 'Relationship data unavailable on this page';
                 return metrics.connected + ' of ' + metrics.known + ' measured on this page';
@@ -258,6 +263,7 @@ document.addEventListener('alpine:init', function() {
             },
 
             get documentationHint() {
+                if (this.elementsPending) return 'Loading';
                 if (!this.pageCount) return 'No page denominator available';
                 let documented = this.elements.filter(function(el) {
                     return !!(el.description && el.description.trim());
@@ -307,6 +313,10 @@ document.addEventListener('alpine:init', function() {
                 return this.pagination && typeof this.pagination.total === 'number'
                     ? this.pagination.total
                     : null;
+            },
+
+            get elementsPending() {
+                return !this.elementsLoaded || (this.loading && this.loadedLayer !== this.activeTab);
             },
 
             get layerTotalKnown() {
@@ -539,6 +549,7 @@ document.addEventListener('alpine:init', function() {
                     this.layerCounts[this.activeTab] = data.pagination && typeof data.pagination.total === 'number'
                         ? data.pagination.total
                         : null;
+                    this.loadedLayer = this.activeTab;
                 } catch (err) {
                     // The template already renders an error state + Retry button on
                     // `loadError` (dashboard.html); nothing ever set it until now.
@@ -551,6 +562,7 @@ document.addEventListener('alpine:init', function() {
                     if (window.Platform && Platform.toast) Platform.toast.error(this.loadError);
                 } finally {
                     this.loading = false;
+                    this.elementsLoaded = true;
                     this.$nextTick(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });
                 }
             },

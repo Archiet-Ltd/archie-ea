@@ -888,7 +888,7 @@ def _layer_architecture_query(layer, query_types):
 
     The one query the layer list and the layer tab count both read, so the
     number on a tab is the number of rows listed under it. Matches every
-    spelling of the layer (ARCH-010) and only the element types the layer
+    spelling of the layer and only the element types the layer
     holds. The model carries no archived or deleted state, so every row counts.
     """
     return ArchiMateElement.query.filter(
