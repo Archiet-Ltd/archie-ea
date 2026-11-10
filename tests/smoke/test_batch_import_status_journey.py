@@ -40,7 +40,7 @@ def _shot(page, tmp_path, name, dark=False):
     folder = pathlib.Path(os.environ.get("SMOKE_SCREENSHOT_DIR") or tmp_path)
     folder.mkdir(parents=True, exist_ok=True)
     page.evaluate("d => document.documentElement.classList.toggle('dark', d)", dark)
-    page.screenshot(path=str(folder / f"{name}-{page.viewport_size['width']}-{'dark' if dark else 'light'}.png"))
+    page.screenshot(full_page=True, path=str(folder / f"{name}-{page.viewport_size['width']}-{'dark' if dark else 'light'}.png"))
     page.evaluate("document.documentElement.classList.remove('dark')")
 
 
