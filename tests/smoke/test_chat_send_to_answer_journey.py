@@ -32,6 +32,17 @@ BUSY = "The assistant is busy right now. Wait a minute, then press Retry."
 PROVIDERS = ("ANTHROPIC", "AZURE", "CLAUDE", "GEMINI", "GOOGLE", "HUGGINGFACE", "NVIDIA", "OPENAI", "OPENROUTER")
 LATE_SECONDS = 40.0
 BUDGET_SECONDS = 60.0
+STALL_AFTER_SECONDS = 20.0
+PLAIN = "The assistant could not answer just now. Your question is saved; try again in a moment."
+LOOKUP_NONE = json.dumps({"id": "x", "object": "chat.completion", "created": 1, "model": "m", "choices": [
+    {"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": '{"entry_id": null, "params": {}}'}}],
+    "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}).encode()
+
+
+def _chunk(text):
+    body = {"id": "x", "object": "chat.completion.chunk", "created": 1, "model": "m",
+            "choices": [{"index": 0, "delta": {"role": "assistant", "content": text}, "finish_reason": None}]}
+    return ("data: " + json.dumps(body) + "\n\n").encode()
 
 
 class _Provider:
@@ -39,6 +50,9 @@ class _Provider:
 
     def __init__(self):
         self.mode = "hang"
+        # What the stored-answer lookup (a plain request) gets in the stream-only modes: "hang" leaves it
+        # waiting, "none" answers it at once with no match, which the server then keeps for next time.
+        self.lookup = "hang"
         self.calls = 0
         self._held = []
         self._sock = socket.socket()
@@ -58,10 +72,59 @@ class _Provider:
             self._held.append(conn)
             threading.Thread(target=self._reply, args=(conn, self.mode), daemon=True).start()
 
+    @staticmethod
+    def _read_request(conn):
+        """The whole request: its headers, then as many body bytes as Content-Length says."""
+        data = b""
+        while b"\r\n\r\n" not in data:
+            piece = conn.recv(65536)
+            if not piece:
+                return data
+            data += piece
+        head, _, body = data.partition(b"\r\n\r\n")
+        match = re.search(rb"content-length: *(\d+)", head, re.I)
+        wanted = int(match.group(1)) if match else 0
+        while len(body) < wanted:
+            piece = conn.recv(65536)
+            if not piece:
+                break
+            body += piece
+        return body
+
     def _reply(self, conn, mode):
         try:
             conn.settimeout(5)
-            conn.recv(65536)
+            request = self._read_request(conn)
+            streamed = b'"stream":true' in request.replace(b" ", b"")
+            if mode in ("keepalive", "stall"):
+                if streamed:
+                    conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n")
+                    if mode == "stall":
+                        time.sleep(STALL_AFTER_SECONDS)
+                        conn.sendall(_chunk("Partial "))
+                        time.sleep(LATE_SECONDS * 4)
+                    while self._open and mode == "keepalive":
+                        conn.sendall(b": keep-alive\n\n")
+                        time.sleep(1)
+                    return
+                if self.lookup == "none":
+                    conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s" % (len(LOOKUP_NONE), LOOKUP_NONE))
+                return
+            if mode == "bad":
+                body = b'{"error": {"message": "the request was malformed"}}'
+                conn.sendall(b"HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n"
+                             b"Content-Length: %d\r\n\r\n%s" % (len(body), body))
+                return
+            if mode == "answer" and not streamed and self.lookup == "none":
+                conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s" % (len(LOOKUP_NONE), LOOKUP_NONE))
+                return
+            if mode == "answer" and streamed:
+                conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n" + _chunk(ANSWER))
+                done = {"id": "x", "object": "chat.completion.chunk", "created": 1, "model": "m",
+                        "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}
+                conn.sendall(("data: " + json.dumps(done) + "\n\ndata: [DONE]\n\n").encode())
+                conn.close()  # the stream has no length: closing the connection is how it ends
+                return
             if mode == "hang":
                 return
             if mode == "late":
@@ -106,6 +169,7 @@ def provider_server(request, app, provider):
             env[name + "_API_KEY" + suffix] = ""
     env.update(
         LLM_API_KEY="", AZURE_OPENAI_API_KEY="", NVIDIA_API_KEY="platform-key-for-the-journey",
+        NVIDIA_API_KEY_SECONDARY="second-platform-key-for-the-journey",
         AI_PROVIDER_ORDER="nvidia", AI_PROVIDER_BASE_URL_NVIDIA=provider.url,
         AI_PROVIDER_BASE_URL_OPENAI=provider.url, OPENAI_BASE_URL=provider.url, PYTHON_DOTENV_DISABLED="1",
         NO_PROXY="127.0.0.1,localhost,::1", no_proxy="127.0.0.1,localhost,::1",
@@ -125,10 +189,18 @@ def shoot(page, name):
     page.set_viewport_size({"width": 1440, "height": 900})
 
 
-def _send(page, base):
+def _send(page, base, question=QUESTION, warm_lookup=None):
     open_chat(page, base)
+    if warm_lookup is not None:
+        # Ask the stored-answer lookup once while the provider answers it, so the next ask finds it kept.
+        behaviour = (warm_lookup.mode, warm_lookup.lookup)
+        warm_lookup.mode, warm_lookup.lookup = "answer", "none"
+        page.evaluate(
+            """async (q) => { await fetch('/ai-chat/estate-answer', {method: 'POST', headers: {'Content-Type': 'application/json',
+            'X-CSRFToken': window.csrfToken}, body: JSON.stringify({message: q, remember: false})}); }""", question)
+        warm_lookup.mode, warm_lookup.lookup = behaviour
     box = page.locator("#user-input")
-    box.fill(QUESTION)
+    box.fill(question)
     sent = time.monotonic()
     box.press("Enter")
     return sent
@@ -170,6 +242,44 @@ def test_a_question_ends_in_an_answer_or_a_failure_with_retry_within_a_minute_of
         retry.click()
         expect(page.locator("#messages-container .message-content", has_text=ANSWER).last).to_be_visible(timeout=30000)
     provider.mode = "hang"
+
+
+# Every provider behaviour the review tried that is not a plain hang, late answer or error: what the provider
+# does with the streamed turn, what the stored-answer lookup gets, whether that lookup was kept from before,
+# and the sentence the person reads on the failure card.
+CASES = {
+    "keepalive-bytes-only": ("keepalive", "hang", False, BUSY),
+    "one-token-then-silence-lookup-not-kept": ("stall", "hang", False, BUSY),
+    "one-token-then-silence-lookup-kept": ("stall", "none", True, BUSY),
+    "not-retryable-error": ("bad", "hang", False, PLAIN),
+}
+
+
+@pytest.mark.parametrize("case", list(CASES))
+def test_a_provider_that_trickles_stalls_or_refuses_still_ends_in_a_failure_card_with_retry_by_the_minute(
+    page, provider_server, provider, case
+):
+    mode, lookup, warm, sentence = CASES[case]
+    org = create_fresh_org("platform_admin", org_admin=True, platform_role="Administrator")
+    sign_in(page, provider_server, org["emails"]["platform_admin"])
+    provider.mode, provider.lookup = mode, lookup
+    sent = _send(page, provider_server, question="Write two sentences on %s for staff." % case.replace("-", " "),
+                 warm_lookup=provider if warm else None)
+    kind, seconds = _result(page, sent)
+    print("SEND_TO_RESULT %s %s %.1f" % (case, kind, seconds))
+    assert kind == "failure", (case, kind)
+    assert seconds < BUDGET_SECONDS, (case, seconds)
+    card = page.locator('#messages-container [role="alert"]').last
+    text = card.inner_text()
+    assert sentence in text, text
+    assert "error detail" not in text and "Admin" not in text and "API Settings" not in text, text
+    retry = card.get_by_role("button", name="Retry")
+    expect(retry).to_be_visible()
+    shoot(page, "failure-" + case)
+    provider.mode, provider.lookup = "answer", "hang"
+    retry.click()
+    expect(page.locator("#messages-container .message-content", has_text=ANSWER).last).to_be_visible(timeout=30000)
+    provider.mode, provider.lookup = "hang", "hang"
 
 
 # Colours as the browser resolves them, laid over what is behind them, then WCAG relative luminance.
