@@ -30,7 +30,7 @@ the strategy is actually being carried out.
 streams are at risk, lay out drivers and goals in a motivation model, and capture the business model
 on one canvas.
 
-Tracing capability ownership and goals to what realises them is planned, with objectives and key results and their measured results to follow.
+[Coming soon](#coming-soon): Entelim traces capability ownership and goals to what realises them, and ties objectives and key results to their measured results, so leaders see whether the strategy is being carried out.
 
 Delivered today by: [Business Model Canvas](/modules/business-model-canvas),
 [Value Streams at Risk](/use-cases/value-streams-at-risk).
@@ -71,7 +71,7 @@ packages, and prove the outcome when it lands.
 **Today:** record gaps, programmes and work packages on one roadmap, in the same model as the estate
 they change, and ask the AI chat what any programme touches.
 
-Stage evidence and gate conformance are planned, with benefits tracked to measured outcomes to follow.
+[Coming soon](#coming-soon): Entelim checks stage evidence and gate conformance and ties benefits to measured outcomes, so a programme is judged on what it delivered.
 
 Delivered today by: [Roadmaps](/modules/roadmaps), [Programme Tracking](/use-cases/programme-tracking).
 
@@ -84,7 +84,7 @@ capabilities and outcomes it pays for.
 recommendation, costs and benefits with payback and net present value, and the risks, linked to the
 work it funds.
 
-Next comes one home for every cost, totalled in your reporting currency, with financial what-if and budget-constrained portfolio optimisation to follow.
+[Coming soon](#coming-soon): Entelim gives every cost one home, totalled in your reporting currency, with financial what-if and budget-constrained portfolio optimisation, so a funding decision rests on figures everyone shares.
 
 Delivered today by: [Business Case](/modules/business-case).
 
@@ -108,7 +108,7 @@ design solutions against your standards, and keep the model healthy.
 spreadsheet, work on it in the composer, browse every view in the diagram library, open any element
 to see everything it connects to, and record architecture decisions.
 
-Re-importing a model will keep identities through renames, with model health findings and design-to-delivery traceability to follow.
+[Coming soon](#coming-soon): Entelim keeps identities through renames when you re-import a model, and reports model health and design-to-delivery traceability, so the model stays trustworthy as it changes.
 
 Delivered today by: [Architecture Model](/modules/architecture-model),
 [Diagrams and Composer](/modules/diagrams), [Industry Reference Frameworks](/modules/industry-apqc).
@@ -128,7 +128,7 @@ looks after it.
 **Today:** keep an enterprise data model, trace lineage, assign stewards and declare the system of
 record for each master data domain.
 
-Lineage across every hop, with sensitivity carried forward to every consumer, is planned, with data quality rules and trends to follow.
+[Coming soon](#coming-soon): Entelim follows lineage across every hop and carries sensitivity forward to every consumer, with data quality rules and trends, so you see who depends on data and how good it is.
 
 <h3 id="people-and-organisation-management">People and Organisation Management</h3>
 
@@ -146,8 +146,7 @@ Delivered today by: [Org Chart and RACI](/modules/org-chart).
 Bring the live state of the business into the model (services, incidents, changes, service levels
 and telemetry) so the company brain reflects what is happening now, not what was drawn last quarter.
 
-This is where the company brain goes live. Service mapping and reconciliation with your configuration records
-are planned, with incidents, changes, telemetry and service levels on the model to follow.
+This is where the company brain goes live. [Coming soon](#coming-soon): Entelim maps services and reconciles them with your configuration records, and puts incidents, changes, telemetry and service levels on the model.
 
 ## Stay in control
 
@@ -160,7 +159,7 @@ on an element, and measure exposure against your appetite.
 
 **Today:** keep one risk register and ask the AI chat which risks sit on the path to any system.
 
-Risk will propagate through every dependency, with appetite, key risk indicators and scenario-based resilience tests to follow.
+[Coming soon](#coming-soon): Entelim propagates risk through every dependency, with appetite, key risk indicators and scenario-based resilience tests, so a risk's real reach is measured, not guessed.
 
 Delivered today by: [Risk Register](/modules/risk-register).
 
@@ -180,7 +179,7 @@ complete evidence without a scramble.
 waivers, define governance gates, monitor policy, handle data subject requests and query, export and
 verify the audit log.
 
-A control library with evidence that proves each control operates is planned.
+[Coming soon](#coming-soon): Entelim keeps a control library with evidence that proves each control operates, so an auditor sees proof rather than a promise.
 
 Delivered today by: [Architecture Review Board](/modules/arb),
 [Compliance Frameworks](/modules/compliance-frameworks).
@@ -202,7 +201,7 @@ the last day to cancel.
 applications each one supplies, and keep contracts, licences, renewals and spend in one procurement
 workspace tied to those applications.
 
-Renewal alerts that show the last day to cancel are planned, followed by licence usage that is measured rather than typed.
+[Coming soon](#coming-soon): Entelim alerts you to renewals with the last day to cancel, and measures licence usage rather than relying on what was typed, so you stop paying for what nobody uses.
 
 Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurement).
 
@@ -222,7 +221,7 @@ and manage what AI costs you.
 passes one permission check, and anything it proposes to change waits in your approvals queue until a
 person approves it.
 
-Your own AI system register, with a proposed EU AI Act risk class for each system, is planned, with AI usage and cost by provider to follow.
+[Coming soon](#coming-soon): Entelim keeps your own AI system register, with a proposed EU AI Act risk class for each system and AI usage and cost by provider, so you know which AI you run and what it costs.
 
 ## Get answers before you need them
 
@@ -237,7 +236,7 @@ does not know. Then let the platform raise what matters before you ask.
 is changing it and which risks reach it. Every answer lists the records it came from and how each
 connection was derived, and you can see the model as it stood on any past date.
 
-Sharing an answer with a link is planned, and the platform will start raising insights without being asked, with forecasts and recommendations tracked to outcomes to follow.
+[Coming soon](#coming-soon): Entelim shares an answer with a link, raises insights without being asked, and tracks forecasts and recommendations to outcomes, so answers reach people who never open the chat.
 
 Delivered today by: [AI Chat](/modules/ai-chat), [Digital Twin](/modules/digital-twin),
 [What breaks if this fails, and who gets called](/use-cases/what-breaks-and-who-gets-called).
@@ -254,8 +253,7 @@ Delivered today by: [AI Chat](/modules/ai-chat), [Digital Twin](/modules/digital
 Branch the model, change it, and see what happens to cost, risk, resilience and capacity before you
 commit money.
 
-Scenario branches with every assumption visible are planned, with portfolio and roadmap
-optimisation to follow. Until then, the impact question shows exactly what one failure would break.
+[Coming soon](#coming-soon): Entelim branches the model with every assumption visible and optimises portfolios and roadmaps across the branches, so options are compared before money is committed. Today, the impact question shows exactly what one failure would break.
 
 <h3 id="agentic-automation">Agentic Automation</h3>
 
@@ -266,7 +264,7 @@ delegate, act on it, with one permission check, one approval queue and a full au
 Both read the same model, with read-only access scoped to your organisation, and anything either
 proposes to change waits in your approvals queue.
 
-Multi-step agent workflows are planned.
+[Coming soon](#coming-soon): Entelim runs multi-step agent workflows over the same governed model, with anything they propose to change waiting in your approvals queue.
 
 Delivered today by: [AI Chat](/modules/ai-chat),
 [Connect your AI assistant](/connectors/ai-assistants).
@@ -282,7 +280,7 @@ work.
 
 **Today:** every answer lives in your chat history, and diagrams and the audit trail export now.
 
-Sharing an answer with a link is planned, with comments and reviews to follow.
+[Coming soon](#coming-soon): Entelim shares an answer with a link, with comments and reviews on it, so a conclusion is discussed where it was reached.
 
 <h3 id="integration-and-interoperability">Integration and Interoperability</h3>
 
@@ -294,8 +292,7 @@ owners it finds; import ArchiMate Open Exchange, Archi and spreadsheet files; pu
 ServiceNow; connect your own AI assistant; and send signed event notifications to Slack, Microsoft
 Teams or any webhook.
 
-A token-secured public API with developer kits is planned, and more connectors that write
-through one approval queue, such as your identity provider, are planned.
+[Coming soon](#coming-soon): Entelim offers a token-secured public API with developer kits, and more connectors that write through one approval queue, such as your identity provider, so other systems can read and change the model under the same controls.
 
 Delivered today by: [Connectors](/connectors),
 [Architecture Model](/modules/architecture-model) (file import),

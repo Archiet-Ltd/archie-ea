@@ -18,11 +18,12 @@ TIMELINE = re.compile(
     re.I,
 )
 
-# A quarter, or a published roadmap, offered as when something will exist. A roadmap the product builds for a
-# customer's own estate is not a timetable and is not matched.
+# A quarter, a published roadmap, or an order of delivery ("is planned", "to follow", "next comes"), offered as when
+# something will exist. A roadmap the product builds for a customer's own estate is not a timetable and is not matched.
 TIMETABLE = re.compile(
     r"\b(?:has|have|with|in) a quarter\b|\bquarter on\b|\bq[1-4]\b"
-    r"|\b(?:published|public|product) roadmap\b",
+    r"|\b(?:published|public|product) roadmap\b"
+    r"|\b(?:is|are|will be) planned\b|\bto follow\b(?! up)|\bnext comes\b|\bcoming next\b",
     re.I,
 )
 
