@@ -177,7 +177,7 @@ def get_first_questions():
     from app.middleware.tenant_context import current_org_id
     from app.models import ArchiMateElement
     from app.models.application_portfolio import ApplicationComponent
-    from app.modules.dashboard.services.overview_figures import relationship_ends
+    from app.modules.dashboard.services.overview_figures import element_each_name_means, relationship_ends
 
     org_id = current_org_id()
     if org_id is None:
@@ -185,7 +185,7 @@ def get_first_questions():
     # How many applications are recorded tells the page, when there is no card to offer, whether to
     # say that none are or that their connections are not.
     # Counted by name: an application and the element recorded for it are one application.
-    from app.utils.duplicate_guard import folded_column
+    from app.utils.duplicate_guard import folded_column, normalize_name
 
     recorded = max(
         db.session.execute(
@@ -210,27 +210,17 @@ def get_first_questions():
             ArchiMateElement.id.in_(list(ends)),
         )
     ).all()
-    # An application is recorded once as its own element (ApplicationComponent.archimate_element_id).
-    # A second element with the same name is the same application seen twice, so it is offered once:
-    # the application's own element first, then the one with more relationships, then the one
-    # recorded first (the overview breaks a tie the same way).
-    own = set(
-        db.session.execute(
-            db.select(ApplicationComponent.archimate_element_id).where(
-                ApplicationComponent.organization_id == org_id,
-                ApplicationComponent.archimate_element_id.in_([row.id for row in named]),
-            )
-        ).scalars()
-    )
-    best = {}
-    for row in named:
-        if not row.name:
-            continue
-        rank = (row.id not in own, -ends[row.id], row.id)
-        key = " ".join(row.name.split()).lower()
-        if key not in best or rank < best[key][0]:
-            best[key] = (rank, row)
-    chosen = sorted((row for _, row in best.values()), key=lambda row: (-ends[row.id], row.id))
+    # An application and a second element with its name are one application seen twice, so it is
+    # offered once: the element its name means by the rule every surface shares.
+    # Every element carrying such a name is weighed, of any type, as a typed question weighs them.
+    names = {normalize_name(row.name) for row in named if row.name}
+    sharing = db.session.execute(
+        db.select(ArchiMateElement.id, ArchiMateElement.name).where(
+            ArchiMateElement.organization_id == org_id, folded_column(ArchiMateElement.name).in_(names)
+        )
+    ).all()
+    meant = set(element_each_name_means(org_id, sharing, ends).values())
+    chosen = sorted((row for row in sharing if row.id in meant), key=lambda row: (-ends[row.id], row.id))
     return jsonify(
         {
             "applications": recorded,

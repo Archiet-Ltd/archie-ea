@@ -55,7 +55,7 @@ def test_the_empty_tenant_gets_an_onboarding_path_not_a_blank_panel():
     assert "/import" in js, "the empty state must offer to import a portfolio"
 
 
-def test_the_denominator_is_shown():
+def test_a_card_shows_its_own_figure_and_the_line_under_the_cards_says_how_they_were_chosen():
     """A card says what it is a question about and the figure behind it.
 
     The cards now come from the organisation's recorded relationships (the old list of open findings is gone),

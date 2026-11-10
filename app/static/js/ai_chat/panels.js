@@ -455,11 +455,19 @@
             const offered = await Platform.fetch.get('/ai-chat/first-questions', {}, { silent: true });
             const linked = Array.isArray(offered && offered.questions) ? offered.questions : [];
             const questions = linked.slice(0, 4);
-            const general = [
+            /* The general questions fit the organisation's own kind: a startup is asked what to write
+               down first, a larger company how it governs and rationalises what it already holds. */
+            const startup = host.getAttribute('data-company-kind') !== 'enterprise';
+            const general = startup ? [
                 { question: 'What should a startup write down about its software first?', detail: '' },
                 { question: 'Which architecture decisions are worth recording early?', detail: '' },
                 { question: 'When does a monolith stop being enough?', detail: '' },
                 { question: 'What should a first architecture review cover?', detail: '' }
+            ] : [
+                { question: 'How should we decide which applications to retire or consolidate?', detail: '' },
+                { question: 'Which architecture decisions should go to a review board?', detail: '' },
+                { question: 'When does a monolith stop being enough?', detail: '' },
+                { question: 'What should an architecture review cover?', detail: '' }
             ];
             if (questions.length > 0) {
                 general.forEach((item) => {
@@ -474,7 +482,7 @@
                 /* Applications are recorded and how they connect is not: the questions that need no links,
                    and the two ways to record the connections. */
                 done('<div data-linkless-next-step></div>' +
-                    '<div class="mt-6 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(general) + '</div>' +
+                    '<div class="mt-4 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(general) + '</div>' +
                     '<p class="mt-3 text-center text-xs text-muted-foreground" data-linkless-note>General questions to start with. ' +
                     'Your applications are recorded, but not how they connect. Once they are connected, these become questions about them.</p>');
                 const linklessSteps = document.getElementById('linkless-next-step');
@@ -486,7 +494,7 @@
                 /* A startup with nothing recorded: the next step first, then four questions that need no records. */
                 const startupQuestions = general;
                 done('<div data-startup-next-step></div>' +
-                    '<div class="mt-6 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(startupQuestions) + '</div>' +
+                    '<div class="mt-4 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(startupQuestions) + '</div>' +
                     '<p class="mt-3 text-center text-xs text-muted-foreground">General questions to start with. Once your applications are in, these become questions about them.</p>');
                 host.querySelector('[data-startup-next-step]').appendChild(startupSteps.content.cloneNode(true));
                 lockWhileLoading(host.querySelector('[data-sample-form]'));
@@ -510,7 +518,7 @@
                           '<i data-lucide="plus-circle" class="h-3 w-3" aria-hidden="true"></i>Design a solution</button>' +
                       '</div>' +
                     '</div>' +
-                    '<div class="mt-6 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(general) + '</div>' +
+                    '<div class="mt-4 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(general) + '</div>' +
                     '<p class="mt-3 text-center text-xs text-muted-foreground">General questions to start with. Once your applications are in, these become questions about them.</p>'
                 );
                 host._items = general;
