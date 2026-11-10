@@ -147,7 +147,7 @@
                                caption='Capability gap signals', testid='gap-signals-table', row_testid='gap-signal-row',
                                server_pagination=true) %}
       {% call signal_cell(class='max-w-[360px]') %}
-        <a href="{{ url_for('business_capability_management.capability_detail', capability_id=signal.capability_id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="gap-signal-link-{{ signal.capability_id }}">{{ signal.name or 'Untitled capability' }}</a>
+        <a href="{{ url_for('enterprise_crud.capability_fact_sheet', capability_id=signal.capability_id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="gap-signal-link-{{ signal.capability_id }}">{{ signal.name or 'Untitled capability' }}</a>
       {% endcall %}
       {% call signal_cell() %}{{ signal.gap_details|join('; ') if signal.gap_details else (signal.primary_gap or 'unclassified')|capitalize }}{% endcall %}
       {% call signal_cell(class='hidden md:table-cell whitespace-nowrap', attrs={'data-sort': signal.priority or ''}) %}{{ (signal.priority or 'unrated')|capitalize }}{% endcall %}

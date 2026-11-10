@@ -331,7 +331,7 @@ def test_every_count_card_opens_the_rows_it_counts(browser, live_server, viewpor
         assert noun in first_name, first_name
         _frame(page, "signals-landing", width, theme)
         first.click()
-        page.wait_for_url(re.compile(r"/capabilities/detail/\d+"), timeout=PAGE_TIMEOUT)
+        page.wait_for_url(re.compile(r"/capabilities/\d+/fact-sheet"), timeout=PAGE_TIMEOUT)
         assert first_name in page.locator("body").inner_text(), page.locator("body").inner_text()[:300]
         page.go_back(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert other not in page.locator("body").inner_text()

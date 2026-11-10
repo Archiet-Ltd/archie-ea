@@ -384,3 +384,4 @@ def test_the_workflow_step_reports_the_work_packages_it_wrote(app, db_session, m
     assert out["roadmap_items_created"] == len(out["work_package_ids"]) == 3
     assert {r.name for r in rows} == {i["name"] for i in items}
     assert {r.organization_id for r in rows} == {mine.id}
+    assert UnifiedWorkPackage.query.filter(UnifiedWorkPackage.organization_id == theirs.id).count() == 0
