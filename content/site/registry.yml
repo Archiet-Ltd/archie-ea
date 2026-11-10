@@ -112,8 +112,8 @@ product:
                      blurb: "Try a change on a copy of your model and compare the scenarios you save."}}
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
          blurb: "Coming soon: discover the software and tools you actually pay for and use."}
-      - {label: Bring your SysML models, icon: route, href: /modules/sysml-to-archimate,
-         blurb: "Early access: bring SysML models into your enterprise model as ArchiMate."}
+      - {label: Bring your SysML models, icon: code, href: /modules/sysml-to-archimate,
+         blurb: "Early access: see what an engineering change reaches across the business."}
 
 solutions:
   label: Solutions

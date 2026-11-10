@@ -10,6 +10,7 @@ Screenshots of the walk go to SYSML_WALK_DIR when it is set, otherwise to a temp
 
 import os
 import pathlib
+import re
 import tempfile
 import uuid
 
@@ -49,9 +50,18 @@ def _counts(app):
 def _forget(app, email):
     from app import db
     from app.models.product_inquiry import ProductInquiry
+    from app.models.public_visitor_event import PublicVisitorEvent
 
     with app.app_context():
         ProductInquiry.query.filter_by(email=email, offer=OFFER).delete()
+        # the sign-up's event carries no email, so the one this run added is the newest of its kind
+        newest = (
+            PublicVisitorEvent.query.filter_by(event_type="offer_enquiry_submitted", offer=OFFER)
+            .order_by(PublicVisitorEvent.id.desc())
+            .first()
+        )
+        if newest is not None:
+            db.session.delete(newest)
         db.session.commit()
 
 
@@ -157,9 +167,24 @@ def test_the_page_is_readable_in_both_themes_and_widths(browser, site_url, schem
     if scheme == "dark":
         # the site's own theme switch
         page.evaluate("() => Alpine.store('theme').toggle()")
-        expect(page.locator("html")).to_have_class(__import__("re").compile(r"\bdark\b"))
+        expect(page.locator("html")).to_have_class(re.compile(r"\bdark\b"))
     expect(page.locator("h1").first).to_contain_text("SysML")
     overflow = page.evaluate("() => document.documentElement.scrollWidth - document.documentElement.clientWidth")
     assert overflow <= 1
+    reading = page.evaluate(
+        """() => {
+            const width = document.documentElement.clientWidth;
+            const paragraphs = Array.from(document.querySelectorAll('main p')).filter(p => p.innerText.trim().length > 40);
+            const sizes = paragraphs.map(p => parseFloat(getComputedStyle(p).fontSize));
+            const wide = paragraphs.filter(p => p.getBoundingClientRect().right > width + 1).length;
+            const clipped = Array.from(document.querySelectorAll('main h1, main h2, main p, main li, main a'))
+                .filter(e => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX !== 'visible').length;
+            return {count: paragraphs.length, minSize: Math.min(...sizes), wide, clipped};
+        }"""
+    )
+    assert reading["count"] > 0
+    assert reading["minSize"] >= 14
+    assert reading["wide"] == 0
+    assert reading["clipped"] == 0
     _shot(page, f"sysml-{scheme}-{viewport['width']}")
     context.close()

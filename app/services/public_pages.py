@@ -602,8 +602,15 @@ class PublicPage:
         return (
             self.url in HELD_PAGE_URLS
             or (state is not None and state != "on_main")
-            or self.wave_closed
+            or (self.wave_closed and not self.is_early_access_page)
         )
+
+    @property
+    def is_early_access_page(self) -> bool:
+        """True for a page that is itself the early-access page: it says on the page that the capability is not
+        yet available and offers a waiting list. Such a page is a demand test and search is how demand arrives,
+        so the wave switch does not hold it; its own ``state`` still decides whether it is ready."""
+        return self.front_matter.get("wave") == "EA" and self.cta == "waiting_list"
 
     @property
     def wave_closed(self) -> bool:
@@ -632,6 +639,20 @@ class PublicPage:
         if isinstance(explicit, str) and explicit.strip():
             return explicit.strip()
         return _first_paragraph_summary(self.body_html)
+
+    def enquiry_source(self, raw: str | None) -> str:
+        """The slug of the waiting-list module page a visitor came from to this enquiry page, or "" when
+        ``raw`` names no such page. Only an offer page (``cta: inquiry``) takes a source."""
+        if self.cta != "inquiry" or not raw:
+            return ""
+        origin = load_page("module", slug=raw)
+        return origin.slug if origin is not None and origin.cta == "waiting_list" else ""
+
+    def enquiry_offer(self, source: str = "") -> str:
+        """The ``offer`` stored for an enquiry on this page: its own offer, followed by the page the visitor
+        came from when there is one, so the row names both."""
+        offer = str(self.front_matter.get("offer") or "")
+        return f"{offer}:{source}"[:50] if source else offer
 
     @property
     def feature_interest_offer(self) -> str:
@@ -2138,7 +2159,7 @@ def build_landing(page: PublicPage) -> Landing | None:
         primary_action = ("Tell us you need this", "#feature-interest")
         # A page for something not built yet never points at pricing: its
         # second action is a conversation, not a plan.
-        secondary_action = ("Talk to us", "/contact")
+        secondary_action = ("Talk to us", f"/contact?from={page.slug}")
     else:
         primary_action = ("Start free", url_for("account.register"))
         secondary_action = ("See pricing", "/pricing")

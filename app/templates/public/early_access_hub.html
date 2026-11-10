@@ -18,11 +18,8 @@
     <h1>Coming to Entelim</h1>
     <p>Pick a part of Entelim to join its waiting list.</p>
     <ul>
-      {% for g in groups %}
-      <li><a href="{{ url_for('early_access.page', slug=g.slug) }}">{{ g.title }}</a>{% if g.blurb %}: {{ g.blurb }}{% endif %}</li>
-      {% endfor %}
-      {% for p in pages %}
-      <li><a href="{{ p.href }}">{{ p.title }}</a>{% if p.blurb %}: {{ p.blurb }}{% endif %}</li>
+      {% for e in entries %}
+      <li><a href="{{ e.href }}">{{ e.title }}</a>{% if e.blurb %}: {{ e.blurb }}{% endif %}</li>
       {% endfor %}
     </ul>
   </article>

@@ -51,7 +51,9 @@
     {% endif %}
     <form method="POST" action="{{ url_for('main.product_inquiry_submit') }}" class="space-y-4" data-testid="offer-inquiry-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="offer" value="{{ page.front_matter.get('offer', '') }}">
+      {% set source = page.enquiry_source(request.args.get('from') or request.form.get('source')) %}
+      <input type="hidden" name="offer" value="{{ page.enquiry_offer(source) }}">
+      <input type="hidden" name="source" value="{{ source }}">
       <input type="hidden" name="family" value="{{ page.family }}">
       <input type="hidden" name="slug" value="{{ page.slug }}">
       <div>

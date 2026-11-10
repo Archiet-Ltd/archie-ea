@@ -43,7 +43,7 @@ def coming_groups() -> list[dict]:
             continue
         info = doc["groups"].get(code)
         if has_page(info) and info["title"] not in seen:
-            seen[info["title"]] = {"slug": code_slug(code), "title": info["title"], "blurb": info["blurb"]}
+            seen[info["title"]] = {"code": code, "slug": code_slug(code), "title": info["title"], "blurb": info["blurb"]}
     return [seen[k] for k in sorted(seen)]
 
 
@@ -53,14 +53,24 @@ def coming_pages() -> list[dict]:
     Each carries the menu's own label and address and its one-line description without the menu's lead-in words."""
     from app.services.site_registry import site_registry
 
-    taken = {g["title"] for g in coming_groups()}
+    rules = wave_map()["rules"]
+    taken = {g["code"] for g in coming_groups()}
     pages = []
     for item in site_registry()["product"]["coming_soon"]["items"]:
-        if item["label"] in taken:
+        # one capability, one row: the menu item and the group name it by the screen's route, not by its title
+        screen = (item.get("signed_in") or {}).get("href")
+        if screen in rules and rules[screen][1] in taken:
             continue
         blurb = re.sub(r"^(Coming soon|Early access):\s*", "", item.get("blurb") or "")
         pages.append({"href": item["href"], "title": item["label"], "blurb": blurb})
     return sorted(pages, key=lambda p: p["title"])
+
+
+def coming_entries() -> list[dict]:
+    """Every capability the hub lists, once, in one alphabetical list, each with its address, title and blurb."""
+    entries = [{"href": url_for("early_access.page", slug=g["slug"]), "title": g["title"], "blurb": g["blurb"]} for g in coming_groups()]
+    entries += coming_pages()
+    return sorted(entries, key=lambda e: e["title"].lower())
 
 
 def _page(slug: str, *, thanks: bool = False, error: str | None = None, title: str | None = None, blurb: str | None = None):
@@ -152,7 +162,7 @@ def simulations():
 
 @early_access_bp.route("/early-access")
 def hub():
-    return render_template("public/early_access_hub.html", groups=coming_groups(), pages=coming_pages())
+    return render_template("public/early_access_hub.html", entries=coming_entries())
 
 
 @early_access_bp.route("/early-access/<slug>")
