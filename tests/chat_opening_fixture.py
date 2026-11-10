@@ -1,9 +1,9 @@
 """What the chat's opening screen needs from the server, and how a test reaches its options.
 
-The opening screen asks the organisation's records for applications and builds its four questions from
-them ("What breaks if <application> fails?"). The loopback servers in the chat tests answer that request
-with a seeded organisation's applications in the shape the applications list returns, so the questions
-name real records instead of an empty portfolio. The options sheet is where the assistant, scope and model
+The opening screen asks which applications the organisation has recorded relationships for and offers a
+question about each ("What breaks if <application> fails?"). The loopback servers in the chat tests answer
+that request with a seeded organisation's linked applications, so the questions name real records instead
+of an empty portfolio. The options sheet is where the assistant, scope and model
 selectors live; opening and closing it is what a person does, so the tests do the same.
 """
 from playwright.sync_api import expect
@@ -17,6 +17,17 @@ APPLICATIONS = [
     {'id': 35, 'name': 'Fixture Archive', 'description': 'Document archive', 'lifecycle_status': 'retired', 'capability_count': 0},
 ]
 APPLICATIONS_PATH = '/applications/api/list'
+FIRST_QUESTIONS_PATH = '/ai-chat/first-questions'
+# What the first-questions route returns for that organisation: the applications it has recorded
+# relationships for, most connected first, each with its own figure.
+FIRST_QUESTIONS = {
+    'applications': len(APPLICATIONS),
+    'questions': [
+        {'element_id': 500 + a['id'], 'name': a['name'], 'question': f"What breaks if {a['name']} fails?",
+         'detail': f'{4 - n} relationships recorded'}
+        for n, a in enumerate(APPLICATIONS[:4])
+    ],
+}
 
 
 def open_chat_options(page):
