@@ -230,3 +230,85 @@ def test_saving_a_key_opened_from_sign_up_keeps_the_way_back(signed_in):
     assert "/account/welcome?step=4" in page
     alone = signed_in.post("/admin/api-settings", data={**form, "key_label": "other-key"}, follow_redirects=True)
     assert "ai-settings-back-to-signup" not in alone.get_data(as_text=True)
+
+
+def _seal_with_another_master_key(monkeypatch):
+    """The server's master key is now one that did not seal any saved organisation key."""
+    from cryptography.fernet import Fernet
+
+    from app.modules.codegen.services import credential_encryption as encryption
+
+    monkeypatch.setitem(encryption.current_app.config, "ORG_ENCRYPTION_MASTER_KEY", Fernet.generate_key().decode())
+
+
+def _the_token_a_read_would_use(org_id):
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    return OrgCredentialVault().retrieve(org_id, "github", "api_token")
+
+
+@pytest.fixture
+def two_organisations_with_saved_tokens(db_session, org_a, org_b, people, acme, connect, tenant_ctx):
+    """Both organisations saved a token before the server's key changed."""
+    connect(org_a, token="placeholder-old-token-a")
+    connect(org_b, token="placeholder-old-token-b")
+    db_session.commit()
+    return org_a, org_b
+
+
+def test_saving_a_new_token_on_the_connect_page_replaces_details_that_cannot_be_opened(
+    two_organisations_with_saved_tokens, signed_in, monkeypatch, tenant_ctx
+):
+    from app.models.connector_config import OrgConnectorCredential
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    org_a, org_b = two_organisations_with_saved_tokens
+    org_a_id, org_b_id = org_a.id, org_b.id
+    _seal_with_another_master_key(monkeypatch)
+    posted = signed_in.post("/admin/connectors/github", data={"organization": "acme", "api_token": "placeholder-new-token-a"})
+    assert posted.status_code in (302, 303), (posted.status_code, re.findall(r"<title>[^<]*|<h1[^>]*>[^<]*|<p[^>]*>[^<]{10,}", posted.get_data(as_text=True))[:4])
+    shown = _words(signed_in.get(posted.headers["Location"], follow_redirects=False))
+    assert "Internal Server Error" not in shown
+    with tenant_ctx(org_a_id):
+        assert _the_token_a_read_would_use(org_a_id) == "placeholder-new-token-a"
+    # The other organisation's saved details are untouched: still sealed, still not opened by this change.
+    with tenant_ctx(org_b_id):
+        rows = OrgConnectorCredential.query.filter_by(organization_id=org_b_id, connector_type="github").count()
+        assert rows == 1
+        with pytest.raises(Exception, match="encryption key"):
+            OrgCredentialVault().retrieve(org_b_id, "github", "api_token")
+
+
+def test_saving_a_new_token_in_sign_up_replaces_details_that_cannot_be_opened(
+    two_organisations_with_saved_tokens, signed_in, monkeypatch, tenant_ctx
+):
+    org_a, _org_b = two_organisations_with_saved_tokens
+    org_a_id = org_a.id
+    _seal_with_another_master_key(monkeypatch)
+    posted = signed_in.post("/account/welcome/github", json={"organization": "acme", "token": "placeholder-new-token-a"})
+    assert posted.status_code == 200, posted.get_data(as_text=True)[:300]
+    assert posted.get_json()["ok"] is True
+    with tenant_ctx(org_a_id):
+        assert _the_token_a_read_would_use(org_a_id) == "placeholder-new-token-a"
+
+
+def test_new_details_that_cannot_be_sealed_either_give_the_plain_sentence_and_keep_the_form(
+    two_organisations_with_saved_tokens, signed_in, monkeypatch
+):
+    from app.modules.codegen.services import credential_encryption as encryption
+
+    _seal_with_another_master_key(monkeypatch)
+    monkeypatch.setattr(encryption, "replace_unopenable_org_key", lambda org_id: (_ for _ in ()).throw(encryption.CredentialUnreadable(encryption.WRONG_MASTER_KEY)))
+    in_sign_up = signed_in.post("/account/welcome/github", json={"organization": "acme", "token": "placeholder-new-token-a"})
+    assert 400 <= in_sign_up.status_code < 500, in_sign_up.status_code
+    assert in_sign_up.get_json()["message"] == encryption.WRONG_MASTER_KEY
+    on_the_page = signed_in.post("/admin/connectors/github", data={"organization": "acme", "api_token": "placeholder-new-token-a"})
+    assert on_the_page.status_code in (302, 303)
+    shown = _words(signed_in.get(on_the_page.headers["Location"]))
+    assert "The saved access details cannot be opened on this server" in shown
+
+
+def test_the_sentence_a_person_reads_starts_with_a_capital():
+    from app.modules.codegen.services.credential_encryption import WRONG_MASTER_KEY
+
+    assert WRONG_MASTER_KEY[0].isupper()

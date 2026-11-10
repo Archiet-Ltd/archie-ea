@@ -1688,6 +1688,28 @@ class ConnectRefused(ValueError):
     """The connection was not saved; the message says why, in words a person can act on."""
 
 
+def _store_token(org_id, token) -> None:
+    """Seal the new token in the vault. Saved details this server cannot open are replaced by the new
+    ones rather than opened; only when the new ones cannot be sealed either is the person told, in the
+    one plain sentence the read path uses."""
+    from app.modules.codegen.services.credential_encryption import (
+        CredentialUnreadable,
+        replace_unopenable_org_key,
+    )
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    vault = OrgCredentialVault()
+    try:
+        try:
+            vault.store(org_id=org_id, connector_type="github", credential_type="api_token", value=token)
+        except CredentialUnreadable:
+            replace_unopenable_org_key(org_id)
+            vault.store(org_id=org_id, connector_type="github", credential_type="api_token", value=token)
+    except CredentialUnreadable as exc:
+        db.session.rollback()
+        raise ConnectRefused(str(exc)) from None
+
+
 def connect_and_start(org_id, organization, token, *, task=None, extra=None) -> int:
     """Store the read-only token in the organisation's vault, save the connection and queue the
     first read. Returns the connector id. The one place a GitHub connection is made, for the
@@ -1735,7 +1757,7 @@ def connect_and_start(org_id, organization, token, *, task=None, extra=None) -> 
         delegated=True,
     )
     if token:
-        OrgCredentialVault().store(org_id=org_id, connector_type="github", credential_type="api_token", value=token)
+        _store_token(org_id, token)
     db.session.commit()
     get_job_queue_service().create_job(
         "GitHub: read repositories",

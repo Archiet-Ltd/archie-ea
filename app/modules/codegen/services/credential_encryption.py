@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 WRONG_MASTER_KEY = (
-    "the saved access details cannot be opened on this server, because its encryption key is not the one "
+    "The saved access details cannot be opened on this server, because its encryption key is not the one "
     "they were saved with. The person who runs this installation can fix the server's key; "
     "once that is done, give the access details again."
 )
@@ -268,3 +268,29 @@ def rotate_org_encryption_key(org_id: int) -> tuple[Fernet, Fernet | None, int]:
 
     new_fernet = Fernet(raw_new)
     return new_fernet, old_fernet, new_version
+
+
+def replace_unopenable_org_key(org_id: int) -> int:
+    """Give an organisation a new key sealed with this server's master key, in place of one it cannot open.
+
+    Used only when new access details are being saved: the old ones cannot be read either way, and the
+    new ones must not wait on them. Raises ``CredentialUnreadable`` with the plain sentence when the
+    master key cannot seal a key at all. The caller commits. Returns the new key version.
+    """
+    from app.extensions import db
+    from app.models.connector_config import OrganizationEncryptionKey
+
+    try:
+        master = _get_master_fernet()
+        sealed = master.encrypt(Fernet.generate_key())
+    except Exception:
+        logger.error("Organisation %s key could not be replaced: the master key cannot seal", org_id)
+        raise CredentialUnreadable(WRONG_MASTER_KEY) from None
+    record = OrganizationEncryptionKey.query.filter_by(organization_id=org_id).with_for_update().first()
+    if record is None:
+        raise CredentialUnreadable(WRONG_MASTER_KEY)
+    record.encrypted_key = sealed
+    record.previous_encrypted_key = None
+    record.key_version = (record.key_version or 0) + 1
+    db.session.flush()
+    return record.key_version

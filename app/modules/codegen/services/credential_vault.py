@@ -179,7 +179,9 @@ class OrgCredentialVault:
             credential_type=credential_type,
         ).first()
         if existing:
+            # sealed with the current key, so the row names the current version
             existing.encrypted_value = encrypted
+            existing.key_version = get_org_key_version(resolved) or existing.key_version
             existing.updated_at = _now()
         else:
             version = get_org_key_version(resolved)
