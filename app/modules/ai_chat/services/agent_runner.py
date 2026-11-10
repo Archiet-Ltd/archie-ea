@@ -486,6 +486,21 @@ class AgentRunner:
         name unlinked in that case - still verifiable, since the id travels with
         it.
         """
+        from flask import current_app, has_request_context
+
+        # The streaming turn runs on a worker thread with an application context and no
+        # request; a link is built against the application's own routes either way, so a
+        # record cited in a streamed answer links to its page and not to a stand-in.
+        try:
+            if has_request_context():
+                return AgentRunner._build_source_url(entity_type, row)
+            with current_app.test_request_context("/"):
+                return AgentRunner._build_source_url(entity_type, row)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _build_source_url(entity_type: str, row: dict):
         from flask import url_for
 
         try:

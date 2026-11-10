@@ -89,3 +89,18 @@ def test_the_replay_runs_all_seventy_eight_runs_with_nothing_lost_and_nothing_wr
         assert row["true_figures_lost"] == 0 and row["wrong_figures_shown"] == 0, (behaviour, row)
     assert report["summary"]["compliant"]["fallback_rate"] == 0.0, "a compliant model is never sent back"
     assert report["failed"] == []
+
+
+def test_the_judge_scores_four_items_and_needs_no_failure_on_a_and_b():
+    runs = [{"id": 1, "delivered": "answer one"}, {"id": 2, "delivered": "answer two"}]
+    asks = {1: "first question", 2: "second question"}
+    perfect = lambda prompt: '{"A": true, "B": true, "C": true, "D": true}'  # noqa: E731
+    result = gold_replay.judge_answers(runs, asks, perfect)
+    assert result["ok"] and result["failures"] == {"A": 0, "B": 0, "C": 0, "D": 0}
+    one_misread = lambda prompt: '{"A": false, "B": true, "C": true, "D": true}'  # noqa: E731
+    assert not gold_replay.judge_answers(runs, asks, one_misread)["ok"]
+    unreadable = lambda prompt: "no json here"  # noqa: E731
+    assert gold_replay.judge_answers(runs, asks, unreadable)["failures"]["A"] == 2
+    prompt = gold_replay.judge_prompt("What breaks?", "Orders Hub has 13.")
+    for item in gold_replay.JUDGE_ITEMS.values():
+        assert item in prompt

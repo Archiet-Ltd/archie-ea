@@ -420,3 +420,90 @@ def test_wrong_counts_are_removed_whatever_the_clock_says(app, db_session, make_
         assert not re.search(r"(?<![\w.])%s(?![\w])" % count, body), count
     assert "Clk Mid [ref:%d]" % mid.id in result["response"]
     assert "2 connections downstream" in result["response"], "the true count comes back from the records"
+
+
+# --------------------------------------------------------------------------- #
+# A record cited in a streamed answer links to its own page                    #
+# --------------------------------------------------------------------------- #
+
+
+def test_a_record_cited_in_a_streamed_answer_links_to_its_own_page(app, db_session, make_org):
+    """The streaming turn has an application context and no request: the link is still the
+    record's page, never a stand-in the browser has to guess."""
+    from flask import has_request_context
+
+    org = make_org("fig-link")
+    row = _applications(db_session, org.id, 1, "Link")[0]
+    db_session.commit()
+    assert not has_request_context()
+    url = AgentRunner._source_url("application", {"id": row.id, "name": row.name})
+    assert url and url.endswith("/%d" % row.id), url
+    assert AgentRunner._source_url("capability", {"id": 4})
+
+
+# --------------------------------------------------------------------------- #
+# Evidence: the envelope, the event and the audit record                       #
+# --------------------------------------------------------------------------- #
+
+
+def test_each_figure_in_the_envelope_names_its_source_and_where_it_sits_in_the_delivered_text(
+    app, db_session, make_org, monkeypatch
+):
+    org = make_org("fig-envelope")
+    user = _user(db_session, org.id)
+    root, mid, leaf = _estate(db_session, org.id, "Env")
+
+    def says(messages):
+        return {"text": "Env Root [ref:%d] has [fig:%s]." % (root.id, _key_in(messages, "total"))}
+
+    result, *_ = _run_turn(app, monkeypatch, [_call_answer(root.id), says], user=user,
+                           message="what breaks if Env Root fails?")
+    figures = result["figures"]
+    assert len(figures) == 1
+    figure = figures[0]
+    assert result["response"][figure["start"]:figure["end"]] == "2 connections downstream" == figure["reads"]
+    assert (figure["tool"], figure["field"], figure["kind"], figure["value"]) == (
+        "answer", "result.summary.total", "count", 2)
+    assert str(figure["record_id"]) == str(root.id) and figure["concept"] == "impact-answer"
+    assert figure["as_of"], "the answer's own computed-at travels with the figure"
+    check = result["figure_check"]
+    assert check["mode"] == "enforce" and check["prompt_version"] == "figures-v1"
+    assert check["references"] == {"written": 1, "resolved": 1, "unresolved": 0}
+
+
+def test_every_figure_offset_in_a_fallback_answer_points_at_its_own_text(app, db_session, make_org, monkeypatch):
+    org = make_org("fig-offsets")
+    user = _user(db_session, org.id)
+    root, mid, leaf = _estate(db_session, org.id, "Off")
+    wrong = "Off Root [ref:%d] reaches 2 connections downstream, and [fig:F1] too." % root.id
+    result, *_ = _run_turn(app, monkeypatch, [_call_answer(root.id), {"text": wrong}, {"text": wrong}], user=user,
+                           message="what breaks if Off Root fails?")
+    assert result["figures"], "the records block figures are in the envelope"
+    for figure in result["figures"]:
+        assert result["response"][figure["start"]:figure["end"]] == figure["reads"], figure
+
+
+def test_the_turn_logs_one_figure_event_and_keeps_the_spans_for_the_run_record(
+    app, db_session, make_org, monkeypatch, caplog
+):
+    import logging
+
+    org = make_org("fig-event")
+    user = _user(db_session, org.id)
+    _applications(db_session, org.id, 3, "Iota")
+    db_session.commit()
+    wrong = {"text": "You have 999 applications."}
+    with caplog.at_level(logging.INFO):
+        result, _e, runner, _seen = _run_turn(app, monkeypatch, [wrong, wrong], user=user,
+                                              message="How many applications do we have?")
+    events = [r for r in caplog.records if r.getMessage().startswith("chat.figure_check ")]
+    assert len(events) == 1
+    event = events[0].figure_event
+    assert event["organization_id"] == org.id and event["prompt_version"] == "figures-v1"
+    assert event["mode"] == "enforce" and event["revision_ran"] is True and event["fallback"] is True
+    assert event["written_number_violations"] == 1 and event["first_draft_violations"] == {"written_number": 1}
+    assert "annotation_tokens" in event and "conversation_id" in event
+    assert "999" not in events[0].getMessage(), "the violating span never reaches the application log"
+    audit = runner._figure_audit["violations"]
+    assert audit[0]["span"] == "999" and audit[0]["before"] == "You have"
+    assert result["response"].startswith(NOT_CONFIRMED)

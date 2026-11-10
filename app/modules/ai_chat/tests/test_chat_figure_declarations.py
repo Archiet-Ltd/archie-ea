@@ -249,3 +249,41 @@ def test_an_organisation_stamp_is_the_organisation_the_tool_ran_for(app, db_sess
     key = _fields(ga)["result.summary.total"]["key"]
     assert [v["reason"] for v in cf.violations_in("Stamp Root [ref:1] has [fig:%s]." % key, ga.figure_table, org_b.id)
             if v["reason"] != cf.REASON_WRITTEN] == [cf.REASON_OTHER_ORG]
+
+
+# --------------------------------------------------------------------------- #
+# Coverage of the declarations, and the connector                              #
+# --------------------------------------------------------------------------- #
+
+RENDERED_FROM_SEEDED_DATA = {
+    "answer", "simulate_impact", "find_applications", "query_capability_gaps",
+    "get_investment_priorities", "get_completeness_score", "get_solution_summary",
+}
+
+
+def test_every_tool_that_declares_a_figure_is_rendered_from_seeded_data_by_a_test_here():
+    declaring = {s["name"] for s in TOOL_SCHEMAS if (s["figures"] or {}).get("fields")}
+    assert declaring == RENDERED_FROM_SEEDED_DATA, (
+        "a tool that declares a figure needs a test that renders every declared field: " + str(declaring ^ RENDERED_FROM_SEEDED_DATA))
+
+
+def test_the_connector_figures_carry_the_text_each_figure_reads_as(app, db_session, make_org):
+    from app.modules.intelligence.services.answer_envelope import connector_figures
+
+    org = make_org("decl-connector")
+    user = _user(db_session, org.id)
+    root, _mid, _leaf = _estate(db_session, org.id, "Con")
+    out = _call(app, user, org.id, "answer", {"question": "impact", "element_id": root.id})
+    figures = connector_figures("answer", out, org.id)
+    assert [f["reads"] for f in figures] == ["2 connections downstream"]
+    assert figures[0]["value"] == 2 and figures[0]["field"] == "result.summary.total"
+    assert "start" not in figures[0], "no offsets: the client writes its own prose"
+    assert connector_figures("create_solution", {"success": True, "result": {"id": 3}}, org.id) == []
+
+
+def test_the_connector_tells_the_clients_assistant_to_quote_the_text_each_figure_reads_as():
+    from app.modules.ai_chat.tools.route_read_tools import connector_tools
+
+    by_name = {t["name"]: t for t in connector_tools()}
+    assert "quote that text, never your own digits" in by_name["answer"]["description"]
+    assert registry.FIGURE_TOOL_NOTE not in by_name["get_genome_slice"]["description"], "it declares no figure"

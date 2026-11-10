@@ -361,6 +361,65 @@ def summarise(runs: List[Run]) -> Dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
+# The judge                                                                    #
+# --------------------------------------------------------------------------- #
+
+JUDGE_ITEMS = {
+    "A": "Every figure reads as what it is, for the record it sits with.",
+    "B": "No quantity is stated in words without a figure (one, all, none, most, twice, half).",
+    "C": "The answer answers the question.",
+    "D": "It reads naturally: no doubled words and no stranded fragment.",
+}
+
+
+def judge_prompt(question: str, delivered: str) -> str:
+    items = "\n".join("%s. %s" % (key, text) for key, text in JUDGE_ITEMS.items())
+    return (
+        "You score one answer from an enterprise architecture assistant. Reply with only a JSON object "
+        'whose keys are "A", "B", "C" and "D" and whose values are true when the item holds.\n'
+        "Question: %s\nAnswer:\n%s\nItems:\n%s" % (question, delivered, items)
+    )
+
+
+def judge_answers(runs: List[Run], questions: Dict[int, str], ask_model) -> Dict[str, Any]:
+    """Score each delivered answer on items A to D with *ask_model(prompt) -> text*; the failures per
+    item and the share that passes. Items A and B must have no failure; C and D must reach 90%."""
+    failures = {key: 0 for key in JUDGE_ITEMS}
+    judged = 0
+    for run in runs:
+        reply = ask_model(judge_prompt(questions[run["id"]], run["delivered"]))
+        try:
+            verdict = json.loads(reply[reply.index("{"):reply.rindex("}") + 1])
+        except ValueError:
+            verdict = {}
+        judged += 1
+        for key in JUDGE_ITEMS:
+            if verdict.get(key) is not True:
+                failures[key] += 1
+    share = {key: (1 - failures[key] / judged) if judged else None for key in JUDGE_ITEMS}
+    ok = bool(judged) and failures["A"] == 0 and failures["B"] == 0 and share["C"] >= 0.9 and share["D"] >= 0.9
+    return {"judged": judged, "failures": failures, "pass_share": share, "ok": ok}
+
+
+def router_ask_model(answering_provider: str = ""):
+    """An *ask_model* that goes through the existing model router, on a provider family other than
+    the one that answered. Raises when no other provider is configured."""
+    from app.modules.ai_chat.services.llm_model_router import LLMModelRouter, TaskComplexity
+    from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+    router = LLMModelRouter()
+    provider, model = router.select_model("gap_analysis", TaskComplexity.SIMPLE)
+    if provider == answering_provider:
+        raise RuntimeError("the judge needs a provider family other than the answering model's")
+
+    def ask(prompt: str) -> str:
+        text, _ = LLMService._call_llm_with_failover(prompt=prompt, model=model, provider=provider)
+        return text
+
+    return ask
+
+
+# --------------------------------------------------------------------------- #
 # Command line                                                                 #
 # --------------------------------------------------------------------------- #
 
@@ -396,6 +455,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--set", default="figures")
     parser.add_argument("--only", type=int, nargs="*", default=None, help="question ids")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--judge", action="store_true", help="also score each delivered answer on items A to D")
+    parser.add_argument("--answering-provider", default="", help="the provider family that answered")
     args = parser.parse_args(argv)
 
     from app import create_app, db
@@ -411,6 +472,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             _remove(db, estates)
     summary = summarise(runs)
     failed = [r for r in runs if r["lost"] or r["wrong"]]
+    judged = None
+    if args.judge:
+        judged = judge_answers(runs, {q["id"]: q["ask"] for q in document["questions"]},
+                               router_ask_model(args.answering_provider))
+        print("judge: %s" % json.dumps(judged))
+        if not judged["ok"]:
+            failed = failed or [Run(id=0, behaviour="judge", lost=[], wrong=["judge items failed"], delivered="")]
     if args.json:
         print(json.dumps({"summary": summary, "failed": failed,
                           "fell_back": [[r["id"], r["behaviour"]] for r in runs if r["fallback"]]},
