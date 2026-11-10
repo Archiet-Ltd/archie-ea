@@ -672,6 +672,11 @@ def get_solution_stakeholders(solution_id):
 def create_solution_stakeholder(solution_id):
     """Add a stakeholder (Phase A — Motivation layer)."""
     Solution.query.get_or_404(solution_id)
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
     from app.models.solution_sad_models import SolutionStakeholderSAD
     data = request.get_json() or {}
     err_response, err_status = _validate_entity(data, ["name"])
@@ -703,6 +708,11 @@ def delete_solution_stakeholder(solution_id, row_id):
     # The solution is tenant-fenced: a solution id from another organisation is a 404,
     # so its stakeholder rows are never reached through the URL.
     require_entity(Solution, solution_id, description="Solution not found")
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
     row = SolutionStakeholderSAD.query.filter_by(id=row_id, solution_id=solution_id).first_or_404()
     db.session.delete(row)
     db.session.commit()

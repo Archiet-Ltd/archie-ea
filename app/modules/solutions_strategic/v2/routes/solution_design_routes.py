@@ -11922,6 +11922,11 @@ def api_raci_matrix(solution_id):
 def api_set_raci(solution_id):
     """FRAG-030: Set RACI assignment."""
     require_entity(Solution, solution_id, description="Solution not found")
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
     try:
         from app.services.raci_service import set_raci_assignment
         data = request.get_json()

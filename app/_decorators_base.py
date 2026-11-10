@@ -510,6 +510,10 @@ def require_roles(*allowed_roles):
                 )
                 abort(403)
 
+            # The route's own role check admitted the person; the write guard reads this note.
+            from app.core.auth.permissions import note_route_granted_write
+
+            note_route_granted_write()
             return f(*args, **kwargs)
 
         # R2-5 (PR 428 round 3): only when "admin" is among the roles this

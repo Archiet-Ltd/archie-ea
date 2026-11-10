@@ -1612,14 +1612,13 @@ def generate_archimate_from_description():
 # ============================================================================
 
 def _refuse_unless_can_write():
-    """403 for a caller without write permission, else None.
+    """403 for a caller who may not change the model, else None.
 
-    Same predicate every non-AI write route uses (``Permission.GENERAL``); a
-    Viewer carries permissions=0 and fails it.
+    The one write rule (``may_write``), the same the write guard and the assistant ask.
     """
-    from app.models.user import Permission
+    from app.core.auth.permissions import may_write
 
-    if not current_user.can(Permission.GENERAL):
+    if not may_write(current_user):
         return jsonify({"success": False, "error": "You do not have permission to modify workspaces."}), 403
     return None
 

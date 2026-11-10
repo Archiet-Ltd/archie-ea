@@ -18,6 +18,7 @@ from flask_login import current_user, login_required
 from flask_wtf.csrf import CSRFError, validate_csrf
 
 from app import db
+from app.core.auth.decorators import require_permission
 from app.decorators import audit_log
 from . import unified_applications_bp
 from ._helpers import _verify_app_in_org
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 @unified_applications_bp.route("/<int:id>/overview-update", methods=["POST"])
 @login_required
+@require_permission("edit", "application")
 @audit_log("update_application_overview")
 def update_overview(id):
     """Unified save for Overview: updates app metadata and vendor classifications atomically."""

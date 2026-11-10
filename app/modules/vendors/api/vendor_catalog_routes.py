@@ -12,6 +12,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required
 from werkzeug.exceptions import HTTPException
 
+from app._bootstrap.write_access import commit_unless_read_only
 from app.decorators import audit_log
 from app.extensions import db
 from app.models.business_capabilities import BusinessCapability
@@ -457,7 +458,7 @@ def score_vendor(vendor_id):
                 "strategic_fit_score": None if vo.strategic_fit_score is None else round(vo.strategic_fit_score, 1),
                 "implementation_score": None if vo.implementation_score is None else round(vo.implementation_score, 1),
             })
-        db.session.commit()
+        commit_unless_read_only()
         return jsonify({"success": True, "vendor": vendor.name, "scores": results, "total": len(results)})
     except HTTPException:
         # Let get_or_404 (e.g. unknown vendor) surface as its real status
@@ -488,20 +489,18 @@ def rank_vendors():
 
         svc = VendorScoringService()
         ranked = svc.rank_vendors(options)
-        db.session.commit()
-        return jsonify({
-            "success": True,
-            "ranking": [
-                {
-                    "rank": vo.ranking,
-                    "vendor_option_id": vo.id,
-                    "vendor_name": vo.vendor_name,
-                    "total_score": None if vo.total_score is None else round(vo.total_score, 1),
-                }
-                for vo in ranked
-            ],
-            "total": len(ranked),
-        })
+        # Built before the commit: for a reader who may not write, the ranks are shown, not stored.
+        ranking = [
+            {
+                "rank": vo.ranking,
+                "vendor_option_id": vo.id,
+                "vendor_name": vo.vendor_name,
+                "total_score": None if vo.total_score is None else round(vo.total_score, 1),
+            }
+            for vo in ranked
+        ]
+        commit_unless_read_only()
+        return jsonify({"success": True, "ranking": ranking, "total": len(ranking)})
     except Exception as e:
         logger.error(f"Error ranking vendors: {e}")
         return jsonify({"success": False, "error": str(e)}), 500

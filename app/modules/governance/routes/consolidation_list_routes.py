@@ -19,6 +19,7 @@ from flask import Blueprint, jsonify, render_template, request
 from flask_login import login_required
 from sqlalchemy import or_
 
+from app._bootstrap.write_access import commit_unless_read_only
 from app.decorators import audit_log
 from app.services.application_cost_accessor import set_annual_cost
 
@@ -213,7 +214,7 @@ def get_entries():
                     else:
                         ed["time_action"] = None
                         ed["time_score"] = None
-                db.session.commit()
+                commit_unless_read_only()
         except HTTPException:
             raise
         except Exception as e:

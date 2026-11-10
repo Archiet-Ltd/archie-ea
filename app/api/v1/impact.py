@@ -141,6 +141,7 @@ def analyze_impact():
                 element_id=element_id,
                 change_type=change_type,
                 scenario=scenario,
+                record=False,
             )
             result = _normalise_element_result(raw)
 

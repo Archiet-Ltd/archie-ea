@@ -1024,3 +1024,23 @@ entries:
     known_exceptions:
       - path: app/services/adm_requirement_service.py
         reason: links an ADM requirement to a solution, a different concept with the same verb
+
+  - id: may-change-the-model
+    concept: Whether a person may change the model (the write guard, the AI chat and routes that ask the write rule themselves)
+    status: active
+    canonical:
+      path: app/core/auth/permissions.py
+      symbols: [may_write, can, can_change_model]
+    reuse: >
+      Ask may_write(user) for "may this person change the model", or may_write(user, object_type=..., action=...) for
+      one kind of record; it reads the permission matrix through can(). The write guard in app/_bootstrap/write_access.py
+      and user_can_write in the AI tool executor both call it. A route that must give its own answer calls
+      refuse_read_only() after its own lookup; a read that saves a derived figure calls commit_unless_read_only().
+      Do not write a second answer from Permission.GENERAL, a role name or a persona.
+    must_not_create:
+      - id: second-write-answer
+        regex: 'def\s+(may_write|user_can_write|can_write_model)\s*\('
+        reason: one rule answers whether a person may change the model
+    known_exceptions:
+      - path: app/modules/ai_chat/tools/executor.py
+        reason: user_can_write loads the acting user by id and calls may_write; it holds no rule of its own

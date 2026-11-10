@@ -182,7 +182,18 @@ def test_a_sample_of_real_api_writes_by_a_viewer_is_refused_and_changes_nothing(
 
     statuses = _real_requests(client, login_as, viewer, routes)
 
-    leaking = sorted(f"{m} {rule} -> {code}" for (m, rule), code in statuses.items() if code != 403)
+    # A route shown only to platform administrators answers everyone else "not found", which also
+    # refuses the write and does not reveal that the route exists.
+    hidden = {
+        (m, rule)
+        for m, rule, endpoint in routes
+        if getattr(app.view_functions[endpoint], "answers_non_platform_admins", False)
+    }
+    leaking = sorted(
+        f"{m} {rule} -> {code}"
+        for (m, rule), code in statuses.items()
+        if code != 403 and not ((m, rule) in hidden and code == 404)
+    )
     assert not leaking, f"{len(leaking)} of {len(routes)} sampled write routes did not refuse a Viewer:\n" + "\n".join(leaking)
     assert _table_counts(db_session) == before
 
