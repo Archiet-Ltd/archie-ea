@@ -372,6 +372,9 @@ def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
                 ).all()
             }
             for row in owner_rows:
+                if row.user_id is None and row.person_name:
+                    owners_by_app.setdefault(row.application_id, []).append(row.person_name)
+                    continue
                 user = users_by_id.get(row.user_id)
                 if user is None:
                     continue

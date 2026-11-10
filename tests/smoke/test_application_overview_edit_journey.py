@@ -225,7 +225,7 @@ def _seed_owned(org_id, owner_name):
     return ident
 
 
-def test_an_owner_nobody_matches_is_refused_and_a_real_person_is_saved(page, live_server):
+def test_an_owner_nobody_matches_is_recorded_and_a_real_person_replaces_it(page, live_server):
     org = fresh_org.create_fresh_org(ARCHITECT, org_admin=False)
     app_id = _seed_owned(org["org_id"], "Olive Owner")
     url = "%s/applications/%d" % (live_server, app_id)
@@ -239,24 +239,17 @@ def test_an_owner_nobody_matches_is_refused_and_a_real_person_is_saved(page, liv
     page.keyboard.type("Nobody Atall")
     _save(page)
 
-    error = page.locator("#edit-businessOwner-error")
-    assert "no one in this organisation is called" in error.inner_text()
-    assert "Application updated" not in page.locator("body").inner_text()
-    assert page.locator("#edit-businessOwner").input_value() == "Nobody Atall", "typing was lost"
-    _shot(page, "owner-refused-light-1440")
-    _phone_dark(page)
-    page.locator("#edit-businessOwner-error").scroll_into_view_if_needed()
-    assert page.locator("#edit-businessOwner-error").is_visible()
-    _shot(page, "owner-refused-dark-390")
-    page.set_viewport_size({"width": 1440, "height": 900})
-    assert _stored(app_id)["business_owner"] == "Olive Owner"
-
-    # Cancel lands on the view page, which still names the owner on record.
-    page.get_by_role("link", name="Cancel").first.click()
-    page.wait_for_load_state("networkidle")
-    assert "edit=1" not in page.url
+    # Someone outside the workspace is a recorded owner, shown by name on the page.
+    assert "edit=1" not in page.url, page.url
+    assert page.locator("#edit-businessOwner-error").count() == 0
     body = page.locator("main").inner_text()
-    assert "Olive Owner" in body and "Nobody Atall" not in body, body
+    assert "Nobody Atall" in body and "No account in this workspace" in body, body
+    assert "No owner recorded" not in body
+    _shot(page, "owner-named-person-light-1440")
+    _phone_dark(page)
+    _shot(page, "owner-named-person-dark-390")
+    page.set_viewport_size({"width": 1440, "height": 900})
+    assert _stored(app_id)["business_owner"] == "Nobody Atall"
 
     # A name that matches a person in the organisation changes the owner.
     page.goto(url + "?edit=1&tab=overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)

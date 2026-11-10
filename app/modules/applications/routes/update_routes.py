@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 
 _USER_COUNT_MAX = 10_000_000
 
+# Not a column: a business owner name that matches no user, recorded as a named
+# person without an account when the values are saved.
+NAMED_BUSINESS_OWNER = "named_business_owner"
+
 
 def _validate_overview(app, form):
     """Return (values to save, {form key: error in words}) for the posted fields."""
@@ -54,8 +58,13 @@ def _validate_overview(app, form):
                 errors[key] = f"{label} {problem}"
             elif text != (app.business_owner or ""):
                 # A blank with no owner on record clears the text kept on the
-                # application; a name is recorded as an owner or kept as text.
-                values["business_owner" if text else "legacy_business_owner"] = text or None
+                # application. A name is recorded as that user's owner record,
+                # or, when it matches no user, as a named person without an
+                # account: an owner is never left as text only.
+                if text and owners.resolve_user_by_name(text, app.organization_id) is None:
+                    values[NAMED_BUSINESS_OWNER] = text
+                else:
+                    values["business_owner" if text else "legacy_business_owner"] = text or None
         else:
             values[column] = text or None
 
@@ -100,6 +109,34 @@ _OVERVIEW_CRITICALITIES = {
 }
 
 
+def save_overview_values(app, values, user_id):
+    """Write validated Overview values to the application and commit.
+
+    The one writer of the Overview fields: the edit form's route and the AI
+    chat both call it with the values ``_validate_overview`` returned.
+    """
+    from app.services import element_ownership_service as owners
+
+    for column, value in values.items():  # request-field-writes-ok: columns come from the fixed field table in _validate_overview, never from the request
+        if column == NAMED_BUSINESS_OWNER:
+            owners.set_named_person_owner(
+                app, value, "business", organization_id=app.organization_id, assigned_by=user_id,
+            )
+        else:
+            setattr(app, column, value)
+    app.updated_by = user_id
+    db.session.commit()
+
+
+def save_overview(app, form, user_id):
+    """Validate *form* for *app* and save it. Returns ``{form key: error}``, empty when saved."""
+    values, errors = _validate_overview(app, form)
+    if errors:
+        return errors
+    save_overview_values(app, values, user_id)
+    return {}
+
+
 @unified_applications_bp.route("/<int:id>/overview-update", methods=["POST"])
 @login_required
 @require_permission("edit", "application")
@@ -126,10 +163,7 @@ def update_overview(id):
         )
 
     try:
-        for column, value in values.items():  # request-field-writes-ok: columns come from the fixed field table in _validate_overview, never from the request
-            setattr(app, column, value)
-        app.updated_by = current_user.id
-        db.session.commit()
+        save_overview_values(app, values, current_user.id)
     except Exception:
         db.session.rollback()
         logger.exception("Overview save failed for application %s", id)
