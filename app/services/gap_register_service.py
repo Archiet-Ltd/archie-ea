@@ -78,12 +78,14 @@ def severity_order_expr():
 
 
 def priority_filter_clause(priority):
-    """The filter for a gap list asked for one priority. 'critical' means critical by the one rule, so a gap
-    whose severity says critical is listed with one whose priority does; any other word is the stored priority
-    of a gap the rule does not rate critical, so a gap is listed under exactly one level."""
-    if (priority or "").strip().lower() == "critical":
-        return effective_severity_expr() == "critical"
-    return and_(Gap.priority == priority, effective_severity_expr() != "critical")
+    """The filter for a gap list asked for one level. Every level is the gap's rating by the one rule
+    (`effective_severity_expr`), so a gap is listed under exactly one level and the four levels plus
+    'unrated' (no rating at all) add up to every gap. A NULL rating matches only 'unrated'."""
+    level = (priority or "").strip().lower()
+    rating = func.lower(func.trim(effective_severity_expr()))
+    if level == "unrated":
+        return rating.is_(None)
+    return func.coalesce(rating, "") == level
 
 
 def get_unified_gap_register(
@@ -467,7 +469,7 @@ def gap_register_query(organization_id: int, severity: Optional[str] = None):
         Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
     )
     if severity:
-        query = query.filter(effective_severity_expr() == severity)
+        query = query.filter(priority_filter_clause(severity))
     return query
 
 

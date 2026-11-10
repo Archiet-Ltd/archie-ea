@@ -1347,7 +1347,7 @@ def generate_report():
 
         # Calculate gaps by priority
         for gap in gaps:
-            priority = gap.priority or "medium"
+            priority = gap_register_service.effective_severity(gap) or gap.priority or "medium"
             report_data["summary"]["gaps_by_priority"][priority] = (
                 report_data["summary"]["gaps_by_priority"].get(priority, 0) + 1
             )

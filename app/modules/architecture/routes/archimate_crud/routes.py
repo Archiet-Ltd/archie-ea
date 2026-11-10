@@ -1627,7 +1627,12 @@ def _resolve_element(model_class, element_type, element_id, any_type=False):
     itself is the answer only when no record holds it. filter_by always emits SQL, so the organisation
     filter applies even when the row is already in the session (Query.get would skip it)."""
     if model_class is None:
-        return None, False
+        # A type with no record table of its own: the number can only be an element's.
+        element_query = ArchiMateElement.query.filter_by(id=element_id)
+        if not any_type:
+            element_query = element_query.filter_by(type=element_type)
+        element = element_query.first()
+        return (element, True) if element is not None else (None, False)
     if request.args.get("ae") != "1":
         record = model_class.query.filter_by(id=element_id).first()
         if record is not None:

@@ -28,6 +28,7 @@ Helpers (3):
 """
 
 from app.services.archimate_backbone import sync_archimate_element
+from app.services.gap_register_service import effective_severity
 from datetime import datetime
 
 from flask import current_app, jsonify, request
@@ -2111,19 +2112,20 @@ def api_roadmap_ai_generate():
 
         preview = []
         for gap in gaps:
-            timeframe_days = PRIORITY_TIMEFRAMES.get(gap.priority or "medium", 365)
+            rating = effective_severity(gap) or gap.priority or "medium"
+            timeframe_days = PRIORITY_TIMEFRAMES.get(rating, 365)
             start_offset = (
-                0 if gap.priority == "critical"
-                else 30 if gap.priority == "high"
+                0 if rating == "critical"
+                else 30 if rating == "high"
                 else 60
             )
             estimated_start = today + timedelta(days=start_offset)
             target_resolution = today + timedelta(days=start_offset + timeframe_days)
 
             # Plateau assignment: critical/high → Plateau 1, medium → Plateau 2, low → Plateau 3
-            if gap.priority in ("critical", "high"):
+            if rating in ("critical", "high"):
                 suggested_plateau = "Plateau 1 — Immediate"
-            elif gap.priority == "medium":
+            elif rating == "medium":
                 suggested_plateau = "Plateau 2 — Near Term"
             else:
                 suggested_plateau = "Plateau 3 — Long Term"
