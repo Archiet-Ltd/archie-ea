@@ -351,9 +351,20 @@ document.addEventListener('alpine:init', function() {
                 this.loadElements();
             },
 
+            // The type a page such as the Products list opens on is the page itself, not a filter a person set.
+            pageType() {
+                return (window.__APP_CONFIG__ && window.__APP_CONFIG__.initialElementType) || '';
+            },
+
+            pageTypePlural() {
+                let name = this.formatTypeName(this.pageType());
+                if (!name) return '';
+                return /(s|x|ch|sh)$/i.test(name) ? name + 'es' : name.replace(/([^aeiou])y$/i, '$1ie') + 's';
+            },
+
             hasActiveFilters() {
                 return !!(
-                    this.searchQuery || this.typeFilter || this.sourceFilter ||
+                    this.searchQuery || (this.typeFilter && this.typeFilter !== this.pageType()) || this.sourceFilter ||
                     this.viewpointKey !== 'basic' || this.filterScope ||
                     this.filterBuildingBlock || this.filterPlateau ||
                     this.filterHasRels || this.cardFilter

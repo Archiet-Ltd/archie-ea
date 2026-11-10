@@ -305,6 +305,35 @@ def test_links_land_on_pages_with_content(view, live_server, demo):
     assert page.locator("body").inner_text().strip()
     assert "/archimate/composer" in page.url
     assert page.locator("text=Calibrated Sensor Service").count() >= 1
+    # A long name stays inside its box on one line, clear of the type label, and its full text is the hover text.
+    page.wait_for_selector("[joint-selector='nameLabel']", timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(1500)
+    long_name = "Calibrated sensors with a certificate for every batch"
+    boxes = page.evaluate("""(wanted) => {
+        const out = [];
+        for (const g of document.querySelectorAll('.joint-element')) {
+            const name = g.querySelector('[joint-selector="nameLabel"]');
+            const type = g.querySelector('[joint-selector="typeLabel"]');
+            if (!name || !type) continue;
+            const shown = name.textContent.replace(/\\u00a0/g, ' ').replace(/\\u2026/g, '').trim();
+            if (shown.length < 12 || !wanted.startsWith(shown.slice(0, 12))) continue;
+            const n = name.getBoundingClientRect(), t = type.getBoundingClientRect();
+            const box = g.querySelector('[joint-selector="body"]').getBoundingClientRect();
+            out.push({nameBottom: n.bottom, typeTop: t.top, typeText: type.textContent.trim(), inside: n.right <= box.right + 1,
+                      lines: name.querySelectorAll('tspan').length});
+        }
+        return out;
+    }""", long_name)
+    assert boxes, "the long-named element is not in the diagram"
+    for box in boxes:
+        assert box["nameBottom"] <= box["typeTop"] + 1, box
+        assert box["inside"] and box["lines"] <= 1 and box["typeText"], box
+    # A link can lie across the box, so the pointer's arrival is sent to the box itself.
+    page.locator(".joint-element", has=page.locator("[joint-selector='nameLabel']", has_text="Calibrated sensors with")
+                 ).first.locator("[joint-selector='body']").dispatch_event("mouseover")
+    titles = page.evaluate("() => [...document.querySelectorAll('.joint-element > title')].map(t => t.textContent)")
+    assert long_name in titles, titles
+    _shot(page, "composer-long-name", scheme, width)
 
     page.goto(product_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     decision = page.locator("[data-testid='linked-decision-link']").first
@@ -374,9 +403,10 @@ def test_export_is_one_file_with_every_section(view, live_server, demo):
     assert body["product"]["name"] == PRODUCT and body["decisions"] and body["diagrams"]
 
 
-def test_an_organisation_with_no_products_gets_an_explained_empty_list(browser, live_server):
+@pytest.mark.parametrize("width,height,scheme", [(1440, 900, "light"), (390, 844, "dark")], ids=["1440-light", "390-dark"])
+def test_an_organisation_with_no_products_gets_an_explained_empty_list(browser, live_server, width, height, scheme):
     fresh = create_fresh_org("enterprise_architect", org_admin=True)
-    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context = browser.new_context(viewport={"width": width, "height": height}, color_scheme=scheme)
     context.set_default_timeout(PAGE_TIMEOUT)
     page = context.new_page()
     sign_in(page, live_server, fresh["emails"]["enterprise_architect"])
@@ -385,8 +415,49 @@ def test_an_organisation_with_no_products_gets_an_explained_empty_list(browser, 
     page.wait_for_load_state("networkidle")
     text = page.locator("main").inner_text()
     assert "Calibrated Sensor Service" not in text
-    # The list says why it is empty: nothing matches, and how to get back to the whole layer.
-    assert "No elements match these filters" in text
-    assert "Clear the filters to return to the full business layer." in text
-    _shot(page, "products-list-empty", "light", 1440)
+    # Nothing was filtered by the person, so the list says there are no Products yet and how to add one.
+    assert "No Products yet" in text, text
+    assert "Add the first Product" in text, text
+    assert "No elements match these filters" not in text, text
+    assert page.locator("[data-testid='architecture-true-empty-state']").is_visible()
+    assert not page.locator("[data-testid='architecture-filtered-empty-state']").is_visible()
+    assert page.locator("[data-testid='architecture-true-empty-state'] button", has_text="Create element").is_visible()
+    # The filtered sentence appears only once a person sets a filter that matches nothing.
+    page.locator("#architecture-search, [data-testid='filter-search']").first.fill("zzz no such thing")
+    page.wait_for_selector("[data-testid='architecture-filtered-empty-state']", state="visible", timeout=PAGE_TIMEOUT)
+    assert "No elements match these filters" in page.locator("main").inner_text()
+    assert not page.locator("[data-testid='architecture-true-empty-state']").is_visible()
+    _shot(page, "products-list-empty", scheme, width)
+    context.close()
+
+
+def test_a_document_link_downloads_the_file_and_another_organisation_cannot_open_it(view, live_server, demo, browser):
+    page, scheme, width = view
+    page.goto("%s/architecture/business/Product/%d?ae=1" % (live_server, demo["product_id"]),
+              wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.wait_for_selector("[data-testid='linked-documents']", timeout=PAGE_TIMEOUT)
+    link = page.locator("[data-testid='linked-document-link']").first
+    assert "calibration-ledger-design.pdf" in link.inner_text()
+    assert "for Calibration Ledger" in page.locator("[data-testid='linked-documents']").inner_text()
+    href = link.get_attribute("href")
+    _shot(page, "document-link", scheme, width, "[data-testid='linked-documents']")
+    with page.expect_download(timeout=PAGE_TIMEOUT) as taken:
+        link.click()
+    download = taken.value
+    # Every download carries the organisation name in front of the file name.
+    assert download.suggested_filename.endswith("calibration-ledger-design.pdf")
+    with open(download.path(), "rb") as handle:
+        assert handle.read().startswith(b"%PDF-")
+    assert "database error" not in page.locator("body").inner_text().lower()
+
+    # Signed in as a person of another organisation, the same address answers 404 and gives no file.
+    fresh = create_fresh_org("enterprise_architect", org_admin=True)
+    context = browser.new_context(viewport={"width": width, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    other = context.new_page()
+    sign_in(other, live_server, fresh["emails"]["enterprise_architect"])
+    response = other.request.get(live_server + href)
+    assert response.status == 404, response.status
+    assert b"%PDF" not in response.body()
+    assert "attachment" not in response.headers.get("content-disposition", "")
     context.close()

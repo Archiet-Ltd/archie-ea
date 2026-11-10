@@ -237,8 +237,8 @@
 
     <div x-cloak x-show="!loading && !loadError && visibleElements.length === 0 && !hasActiveFilters()" class="px-6 py-14 text-center" data-testid="architecture-true-empty-state" role="status">
         <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted"><i data-lucide="layers" class="h-7 w-7 text-muted-foreground" aria-hidden="true"></i></div>
-        <h3 class="mt-4 font-semibold text-foreground">No {{ selected_layer.short_name|lower }} elements yet</h3>
-        <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Create the first element to begin this layer of the enterprise repository.</p>
+        <h3 class="mt-4 font-semibold text-foreground" x-text="pageType() ? 'No ' + pageTypePlural() + ' yet' : 'No {{ selected_layer.short_name|lower }} elements yet'">No {{ selected_layer.short_name|lower }} elements yet</h3>
+        <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground" x-text="pageType() ? 'Add the first ' + formatTypeName(pageType()) + ' to start listing what you offer.' : 'Create the first element to begin this layer of the enterprise repository.'">Create the first element to begin this layer of the enterprise repository.</p>
         <button type="button" @click="openCreateModal()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-5 items-center" aria-label="Create element in {{ selected_layer.title }}">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Create element
         </button>
