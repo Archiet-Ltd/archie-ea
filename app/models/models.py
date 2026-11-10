@@ -739,30 +739,34 @@ class Requirement(TenantMixin, db.Model):
     source_table = db.Column(db.String(64), nullable=True)
     source_id = db.Column(db.Integer, nullable=True)
 
-    # WSJF components — SAFe: score = CoD / Job Size (TPM-006)
-    business_value = db.Column(db.Integer, default=1)
-    time_criticality = db.Column(db.Integer, default=1)
-    risk_reduction = db.Column(db.Integer, default=1)
-    job_size = db.Column(db.Integer, default=1)
+    # WSJF components — SAFe: score = CoD / Job Size. Empty until a person records them.
+    business_value = db.Column(db.Integer)
+    time_criticality = db.Column(db.Integer)
+    risk_reduction = db.Column(db.Integer)
+    job_size = db.Column(db.Integer)
 
-    # RICE components (TPM-006)
-    reach = db.Column(db.Integer, default=0)
-    impact = db.Column(db.Integer, default=1)   # 1=minimal … 5=massive
-    confidence = db.Column(db.Integer, default=100)  # percentage
+    # RICE components. Empty until a person records them.
+    reach = db.Column(db.Integer)
+    impact = db.Column(db.Integer)   # 1=minimal … 5=massive
+    confidence = db.Column(db.Integer)  # percentage
 
     @property
     def wsjf_score(self):
-        cod = (self.business_value or 1) + (self.time_criticality or 1) + (self.risk_reduction or 1)
-        return round(cod / max(self.job_size or 1, 1), 2)
+        """None until all four WSJF inputs are recorded: a missing input is not worth 1."""
+        from app.services.wsjf_service import compute_wsjf_score
+
+        parts = (self.business_value, self.time_criticality, self.risk_reduction, self.job_size)
+        if any(part is None for part in parts) or self.job_size < 1:
+            return None
+        return compute_wsjf_score(*parts)
 
     @property
     def rice_score(self):
-        sp = self.story_points or 1
-        return round(
-            ((self.reach or 0) * (self.impact or 1) * ((self.confidence or 100) / 100))
-            / max(sp, 1),
-            2,
-        )
+        """None until reach, impact, confidence and story points are all recorded."""
+        parts = (self.reach, self.impact, self.confidence, self.story_points)
+        if any(part is None for part in parts) or self.story_points < 1:
+            return None
+        return round((self.reach * self.impact * (self.confidence / 100)) / self.story_points, 2)
 
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())

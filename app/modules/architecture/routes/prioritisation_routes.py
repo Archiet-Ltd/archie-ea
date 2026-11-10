@@ -1,4 +1,4 @@
-"""Prioritisation routes — MoSCoW / WSJF / RICE backlog (TPM-006)."""
+"""Prioritisation routes — MoSCoW / WSJF / RICE backlog."""
 import logging
 
 from flask import Blueprint, jsonify, render_template, request
@@ -47,6 +47,20 @@ def patch_moscow(req_id: int):
     return jsonify(result), 200
 
 
+_WSJF_INPUTS = (
+    ("business_value", "business value"), ("time_criticality", "time criticality"),
+    ("risk_reduction", "risk reduction"), ("job_size", "job size"),
+)
+_RICE_INPUTS = (
+    ("reach", "reach"), ("impact", "impact"), ("confidence", "confidence"), ("story_points", "story points"),
+)
+
+
+def _missing_inputs(data: dict, inputs) -> str:
+    """The inputs a save left out, in words: a missing input is never stored as a stand-in value."""
+    return ", ".join(label for key, label in inputs if data.get(key) in (None, ""))
+
+
 @prioritisation_bp.route("/api/backlog/<int:req_id>/wsjf", methods=["PATCH"])
 @login_required
 def patch_wsjf(req_id: int):
@@ -54,13 +68,18 @@ def patch_wsjf(req_id: int):
     if not may_change_model_element(current_user, "edit"):
         return jsonify({"error": "Your role can view the backlog but not change it."}), 403
     data = request.get_json(force=True) or {}
+    if data.get("clear") is True:
+        return jsonify(prioritisation_service.clear_wsjf_components(req_id)), 200
+    missing = _missing_inputs(data, _WSJF_INPUTS)
+    if missing:
+        return jsonify({"error": "Record " + missing + " to save a WSJF score."}), 400
     try:
         result = prioritisation_service.set_wsjf_components(
             req_id,
-            business_value=int(data.get("business_value", 1)),
-            time_criticality=int(data.get("time_criticality", 1)),
-            risk_reduction=int(data.get("risk_reduction", 1)),
-            job_size=int(data.get("job_size", 1)),
+            business_value=int(data["business_value"]),
+            time_criticality=int(data["time_criticality"]),
+            risk_reduction=int(data["risk_reduction"]),
+            job_size=int(data["job_size"]),
         )
     except (ValueError, TypeError) as exc:
         return jsonify({"error": str(exc)}), 400
@@ -74,12 +93,18 @@ def patch_rice(req_id: int):
     if not may_change_model_element(current_user, "edit"):
         return jsonify({"error": "Your role can view the backlog but not change it."}), 403
     data = request.get_json(force=True) or {}
+    if data.get("clear") is True:
+        return jsonify(prioritisation_service.clear_rice_components(req_id)), 200
+    missing = _missing_inputs(data, _RICE_INPUTS)
+    if missing:
+        return jsonify({"error": "Record " + missing + " to save a RICE score."}), 400
     try:
         result = prioritisation_service.set_rice_components(
             req_id,
-            reach=int(data.get("reach", 0)),
-            impact=int(data.get("impact", 1)),
-            confidence=int(data.get("confidence", 100)),
+            reach=int(data["reach"]),
+            impact=int(data["impact"]),
+            confidence=int(data["confidence"]),
+            story_points=int(data["story_points"]),
         )
     except (ValueError, TypeError) as exc:
         return jsonify({"error": str(exc)}), 400

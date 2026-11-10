@@ -408,9 +408,9 @@ def init_context_processors(app):
     def inject_site_registry():
         """The public navbar and footer read one registry. Handed over as a
         callable so only the pages that render the navbar or footer pay for it."""
-        from app.services.site_registry import site_registry
+        from app.services.site_registry import registry_entry, site_registry
 
-        return {"site_registry": site_registry}
+        return {"site_registry": site_registry, "registry_entry": registry_entry}
 
     @app.context_processor
     def inject_released_path():
@@ -690,6 +690,34 @@ def init_context_processors(app):
 
         return may_open_procurement(_matrix_user)
 
+    def _template_procurement_role_names():
+        from app.decorators.requires_role import procurement_role_names
+
+        return procurement_role_names()
+
+    app.jinja_env.globals["procurement_role_names"] = _template_procurement_role_names
+
+    def _template_may_open_role_page(member=None):
+        """True when the role page of ``member`` (the signed-in person when omitted) opens for the signed-in person.
+
+        The page asks for the Administrator permission, authority in the active organisation, and
+        a member of that organisation to edit; an administrator invited into another organisation
+        fails the first or the second and would meet a 403, and a member of another organisation
+        is a 404.
+        """
+        from flask import g as _g
+
+        from app.middleware.tenant_decorators import is_active_org_admin
+        from app.models import Permission
+
+        member = member if member is not None else _matrix_user
+        return bool(
+            _matrix_user.is_authenticated
+            and _matrix_user.can(Permission.ADMINISTER)
+            and is_active_org_admin()
+            and member.organization_id == getattr(_g, "current_org_id", None)
+        )
+
     def _template_home_url():
         """The signed-in person's own home: the administration home only for an administrator."""
         from flask import url_for as _flask_url_for
@@ -733,6 +761,7 @@ def init_context_processors(app):
     app.jinja_env.globals["is_platform_administrator"] = _template_is_platform_administrator
     app.jinja_env.globals["may_open_procurement"] = _template_may_open_procurement
     app.jinja_env.globals["may_see_licence_pages"] = _template_may_see_licence_pages
+    app.jinja_env.globals["may_open_role_page"] = _template_may_open_role_page
     app.jinja_env.globals["home_url"] = _template_home_url
 
     from app.modules.business_model_canvas.box_meta import canvas_box_meta

@@ -7,7 +7,7 @@
 {% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/badge.html' import badge %}
-{% from 'components/provenance.html' import result_footer %}
+{% from 'components/provenance.html' import result_footer, explained_value %}
 {% from 'components/skeleton.html' import skeleton_list, skeleton_table %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from 'components/input.html' import input, label, textarea %}
@@ -122,7 +122,11 @@
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Domains{% endcall %}
+        {% if domain_count %}
         {% call card_title(class='tabular-nums') %}{{ domain_count }}{% endcall %}
+        {% else %}
+        <div data-testid="roadmap-domains-basis">{{ explained_value(domain_basis) }}</div>
+        {% endif %}
       {% endcall %}
     {% endcall %}
   </div>

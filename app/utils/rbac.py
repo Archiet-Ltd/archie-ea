@@ -37,6 +37,15 @@ logger = logging.getLogger(__name__)
 _ROLE_HIERARCHY = ["viewer", "architect", "org_admin", "super_admin"]
 
 
+# The enterprise roles that hold the "architect" level, with the title a person reads for each.
+_ARCHITECT_LEVEL_TITLES = {
+    "solution_architect": "solution architects",
+    "enterprise_architect": "enterprise architects",
+    "arb_member": "ARB members",
+    "portfolio_manager": "portfolio managers",
+}
+
+
 def _get_user_role(user):
     """Map the current *user* to a role name in ``_ROLE_HIERARCHY``.
 
@@ -81,13 +90,7 @@ def _get_user_role(user):
         pass
 
     er = (getattr(user, "enterprise_role", "") or "").lower()
-    _ARCHITECT_ROLES = {
-        "solution_architect",
-        "enterprise_architect",
-        "arb_member",
-        "portfolio_manager",
-    }
-    if er in _ARCHITECT_ROLES:
+    if er in _ARCHITECT_LEVEL_TITLES:
         return "architect"
 
     return "viewer"
@@ -111,6 +114,37 @@ def require_login():
         return wrapper
 
     return decorator
+
+
+def _level_needed(roles):
+    """The lowest level in ``_ROLE_HIERARCHY`` that satisfies any of *roles* (0 when none is a known role)."""
+    known = [_ROLE_HIERARCHY.index(r) for r in roles if r in _ROLE_HIERARCHY]
+    return min(known) if known else 0
+
+
+def who_holds_role(*roles):
+    """Who ``require_role(*roles)`` lets in, in words any reader understands.
+
+    Built from the same level test and the same architect-level roles as the check itself, so
+    a refusal that names them cannot drift from the people actually allowed.
+    """
+    level = _level_needed(roles)
+    titles = []
+    if level <= _ROLE_HIERARCHY.index("architect"):
+        titles += list(_ARCHITECT_LEVEL_TITLES.values())
+    if level <= _ROLE_HIERARCHY.index("org_admin"):
+        titles.append("organisation administrators")
+    titles.append("platform administrators")
+    return titles[0] if len(titles) == 1 else ", ".join(titles[:-1]) + " and " + titles[-1]
+
+
+def user_has_role(user, *roles):
+    """True when *user* holds one of *roles* (or higher): the same test ``require_role`` applies."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    role = _get_user_role(user)
+    level = _ROLE_HIERARCHY.index(role) if role in _ROLE_HIERARCHY else 0
+    return level >= _level_needed(roles)
 
 
 def require_role(*roles):
@@ -141,11 +175,7 @@ def require_role(*roles):
 
             user_role = _get_user_role(current_user)
             user_level = _ROLE_HIERARCHY.index(user_role) if user_role in _ROLE_HIERARCHY else 0
-
-            # Build the minimum required level from the supplied roles.
-            required_level = min(
-                _ROLE_HIERARCHY.index(r) for r in roles if r in _ROLE_HIERARCHY
-            ) if any(r in _ROLE_HIERARCHY for r in roles) else 0
+            required_level = _level_needed(roles)
 
             if user_level < required_level:
                 logger.warning(

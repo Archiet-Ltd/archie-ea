@@ -142,3 +142,53 @@ def test_a_simulation_without_an_organisation_is_refused(app):
     with mock.patch.object(simulation_service, "current_org_id", return_value=None):
         with pytest.raises(simulation_service.ElementNotInModel):
             simulation_service.simulate_change(1, "RETIRE")
+
+
+def _application(db_session, org, name, cost, lifecycle=None):
+    from app.models import ArchiMateElement
+    from app.models.application_portfolio import ApplicationComponent
+
+    element = ArchiMateElement(name=name, type="ApplicationComponent", layer="application", organization_id=org)
+    db_session.add(element)
+    db_session.flush()
+    row = ApplicationComponent(name=name, organization_id=org, archimate_element_id=element.id,
+                               total_cost_of_ownership=cost, lifecycle_status=lifecycle)
+    db_session.add(row)
+    db_session.flush()
+    return element
+
+
+def test_the_simulation_counts_the_applications_and_cost_the_application_list_counts(
+        client, login_as, db_session, make_org):
+    from app.modules.dashboard.services.overview_figures import _active_applications
+    from app.models.application_portfolio import ApplicationComponent as A
+
+    org = make_org("sim-count")
+    user = _user(db_session, org)
+    tag = uuid.uuid4().hex[:6]
+    kept = _application(db_session, org.id, "Kept %s" % tag, 1000.0, "3. Production")
+    _application(db_session, org.id, "Other %s" % tag, 500.0, "3. Production")
+    _application(db_session, org.id, "Gone %s" % tag, 7000.0, "5. Decommissioned")
+    listed = db_session.execute(_active_applications().where(A.organization_id == org.id)).scalars().all()
+    response = _post(client, login_as, user, kept.id, "RETIRE")
+    assert response.status_code == 200, response.get_data(as_text=True)[:300]
+    figures = {f["label"]: f for f in response.get_json()["simulation"]["figures"]}
+    apps = figures["Applications"]
+    assert apps["before"] == len(listed) == 2 and apps["after"] == 1
+    assert "1 decommissioned" in apps["note"]
+    cost = figures["Yearly running cost of all applications"]
+    assert cost["before"] == 1500.0 and cost["after"] == 500.0
+    assert "not in this total" in cost["note"]
+
+
+def test_retiring_a_decommissioned_application_does_not_move_the_count_or_cost(
+        client, login_as, db_session, make_org):
+    org = make_org("sim-gone")
+    user = _user(db_session, org)
+    tag = uuid.uuid4().hex[:6]
+    _application(db_session, org.id, "Live %s" % tag, 1000.0, "3. Production")
+    gone = _application(db_session, org.id, "Gone %s" % tag, 7000.0, "5. Decommissioned")
+    figures = {f["label"]: f for f in _post(client, login_as, user, gone.id, "RETIRE").get_json()["simulation"]["figures"]}
+    assert figures["Applications"]["before"] == figures["Applications"]["after"] == 1
+    assert figures["Yearly running cost of all applications"]["before"] == 1000.0
+    assert figures["Yearly running cost of all applications"]["after"] == 1000.0

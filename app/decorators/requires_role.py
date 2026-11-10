@@ -147,6 +147,17 @@ def requires_admin(f):
     return requires_role([ROLE_PLATFORM_ADMIN])(f)
 
 
+PROCUREMENT_ROLES = ("procurement", "portfolio_manager")
+
+
+def procurement_role_names():
+    """The display names of the roles that may open the procurement pages, as one phrase."""
+    from app.models.user import ROLE_DISPLAY_NAMES
+
+    names = [ROLE_DISPLAY_NAMES.get(r, r) for r in PROCUREMENT_ROLES]
+    return " and ".join(names)
+
+
 def may_open_procurement(user):
     """True when ``user`` may open the procurement pages: the roles
     ``requires_procurement`` admits, and platform authority."""
@@ -154,10 +165,7 @@ def may_open_procurement(user):
 
     if not getattr(user, "is_authenticated", False):
         return False
-    return bool(is_platform_admin(user)) or get_user_role(user) in (
-        "procurement",
-        "portfolio_manager",
-    )
+    return bool(is_platform_admin(user)) or get_user_role(user) in PROCUREMENT_ROLES
 
 
 def may_open_spend(user):
@@ -243,7 +251,7 @@ def requires_procurement(f):
     Shorthand decorator for procurement routes.
     Allows procurement role and portfolio_manager (read-only context).
     """
-    return requires_role(["procurement", "portfolio_manager"])(f)
+    return requires_role(list(PROCUREMENT_ROLES))(f)
 
 
 def requires_procurement_or_finance(f):
@@ -255,7 +263,7 @@ def requires_procurement_or_finance(f):
     page to it, which the authorisation matrix caught as a real mismatch
     (POLICY only names the two pages finance's own sidebar links to).
     """
-    return requires_role(["procurement", "portfolio_manager", "finance"])(f)
+    return requires_role([*PROCUREMENT_ROLES, "finance"])(f)
 
 
 def requires_application_owner(f):

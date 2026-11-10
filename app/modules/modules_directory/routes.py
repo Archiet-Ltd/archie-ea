@@ -22,6 +22,7 @@ destination was requested with a logged-in client:
 
 from flask import current_app, render_template, url_for
 from flask_login import current_user, login_required
+from app.decorators.requires_role import PROCUREMENT_ROLES
 
 from app.utils.role_access import (
     _ZONE_TITLES,
@@ -73,7 +74,6 @@ _SECTION_BY_ENDPOINT_PREFIX = {
 # is also granted to personas (compliance, finance) whose pages are a different
 # set, so the section alone offered them pages that answer 403. Mirrors
 # requires_procurement / requires_procurement_or_finance (decorators/requires_role.py).
-_PROCUREMENT_ROLES = {"procurement", "portfolio_manager"}
 _PROCUREMENT_OR_FINANCE_ENDPOINTS = {"procurement.licenses_list", "procurement.spend_analytics"}
 
 
@@ -96,7 +96,7 @@ def _link_visible(endpoint: str, requires: str | None = None) -> bool:
     if endpoint in _NOT_RENDERED or is_hidden_not_ready(endpoint):
         return False
     if endpoint.startswith("procurement.") and not getattr(current_user, "is_platform_admin", False):
-        roles = set(_PROCUREMENT_ROLES)
+        roles = set(PROCUREMENT_ROLES)
         if endpoint in _PROCUREMENT_OR_FINANCE_ENDPOINTS:
             roles.add("finance")
         if get_user_role(current_user) not in roles:
