@@ -798,20 +798,24 @@ def application_edit(id):
                 is_valid, validated_status, error = validate_string(
                     deployment_status, max_length=50, field_name="deployment_status"
                 )
-                from app.services.application_status import APPLICATION_STATUS_VALUES
+                from app.services.application_status import (
+                    APPLICATION_STATUS_VALUES,
+                    match_status,
+                    same_status,
+                )
 
                 if not is_valid:
                     validation_errors.append(error)
                 elif (
-                    validated_status != (app.deployment_status or "")
-                    and validated_status not in APPLICATION_STATUS_VALUES
+                    not same_status(validated_status, app.deployment_status)
+                    and match_status(validated_status) is None
                 ):
                     validation_errors.append(
                         "Deployment Status must be one of: "
                         + ", ".join(APPLICATION_STATUS_VALUES) + "."
                     )
-                else:
-                    app.deployment_status = validated_status
+                elif not same_status(validated_status, app.deployment_status):
+                    app.deployment_status = match_status(validated_status) or validated_status
 
             # Validate business_purpose
             business_purpose = request.form.get("business_purpose")

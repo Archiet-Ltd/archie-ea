@@ -194,19 +194,26 @@ def resolve_user_by_name(name: str, organization_id: int):  # reuse-ok: the one 
     alone, a last name alone or an ambiguous match resolves to nothing: an owner
     is never guessed.
     """
+    return _users_named(name, organization_id)[0]
+
+
+def _users_named(name, organization_id):
+    """(the one user, how many people share the name): (None, 0) none, (None, n) several."""
     from app.models.user import User
 
     wanted = (name or "").strip().lower()
     if not wanted:
-        return None
+        return None, 0
+    most = 0
     for match in (
         db.func.lower(db.func.concat(User.first_name, " ", User.last_name)),
         db.func.lower(User.email),
     ):
         users = User.query.filter(User.organization_id == organization_id).filter(match == wanted).all()
         if len(users) == 1:
-            return users[0]
-    return None
+            return users[0], 1
+        most = max(most, len(users))
+    return None, most
 
 
 def owner_label(first_name: Optional[str], last_name: Optional[str], email: Optional[str] = None) -> str:
@@ -372,7 +379,13 @@ def application_owner_edit_problem(application, field: str, text: Optional[str],
             "has an owner on record, so it cannot be cleared here. "
             "Type another person's full name or email to change it."
         )
-    if resolve_user_by_name(text, organization_id) is None:
+    found, sharing = _users_named(text, organization_id)
+    if found is None and sharing > 1:
+        return (
+            f"has an owner on record, and {sharing} people in this organisation are called "
+            f"\u201c{text}\u201d. Type the email of the one you mean."
+        )
+    if found is None:
         return (
             "has an owner on record, and no one in this organisation is called "
             f"\u201c{text}\u201d. Type a person's full name or email as it appears in Users."

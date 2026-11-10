@@ -324,7 +324,7 @@
           {{ edit_row('Category', 'application_category', app.application_category) }}
           {% set status_now = form_values['deployment_status'] if 'deployment_status' in form_values else app.deployment_status %}
           {% call form_group(id='edit-deployment_status', label='Deployment Status', error=form_errors.get('deployment_status')) %}
-            {% call native_select(id='edit-deployment_status', name='deployment_status', size='sm', class='w-full', selected=status_now, options=[('', 'Not set')] + status_options(status_now or app.deployment_status)) %}{% endcall %}
+            {% call native_select(id='edit-deployment_status', name='deployment_status', size='sm', class='w-full', selected=(match_status(status_now) or status_now), options=[('', 'Not set')] + status_options(status_now or app.deployment_status)) %}{% endcall %}
           {% endcall %}
           {{ detail_row('Lifecycle Status', app.lifecycle_status | replace('_',' ') | title if app.lifecycle_status else none) }}
           {{ detail_row('Architecture Domain', app.architecture_domain) }}

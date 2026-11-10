@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from app.services.application_status import APPLICATION_STATUS_VALUES, OLD_STATUS_WORDS
+
 
 class FieldType(Enum):
     """Supported field data types"""
@@ -52,15 +54,8 @@ LIFECYCLE_STATUS_VALUES = [
     "retired",
 ]
 
-DEPLOYMENT_STATUS_VALUES = [
-    "planned",
-    "development",
-    "testing",
-    "staging",
-    "production",
-    "deprecated",
-    "retired",
-]
+# The one list of deployment statuses: app/services/application_status.py.
+DEPLOYMENT_STATUS_VALUES = list(APPLICATION_STATUS_VALUES)
 
 COMPONENT_TYPE_VALUES = [
     "Web Application",
@@ -183,17 +178,8 @@ DEPLOYMENT_STATUS_ALIASES: Dict[str, str] = {
     "preprod": "staging",
     "pre-prod": "staging",
     "pre-production": "staging",
-    "deprecated": "deprecated",
-    "legacy": "deprecated",
-    "sunset": "deprecated",
-    "decommissioned": "retired",
-    "eol": "retired",
-    "end-of-life": "retired",
-    "removed": "retired",
-    "inactive": "retired",
-    "planned": "planned",
-    "proposed": "planned",
-    "pending": "planned",
+    # Older words (planned, deprecated, retired ...) mean a value on the one list.
+    **OLD_STATUS_WORDS,
 }
 
 COMPONENT_TYPE_ALIASES: Dict[str, str] = {
