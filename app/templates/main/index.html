@@ -220,7 +220,8 @@
         <p class="public-card-body">What does it mean, what happens next, and what should we do?</p>
         <ul class="public-card-body mt-6 space-y-2">
           <li><a href="/features#enterprise-intelligence" class="public-link text-foreground">Enterprise Intelligence</a></li>
-          <li><a href="/modules/scenario-modelling" class="public-link text-foreground">Scenarios (coming soon)</a></li>
+          {% set scenarios = registry_entry("Scenarios") %}
+          {% if scenarios %}<li><a href="{{ scenarios.href }}" class="public-link text-foreground">Scenarios{% if scenarios.coming_soon %} (coming soon){% endif %}</a></li>{% endif %}
           <li><a href="/features#agentic-automation" class="public-link text-foreground">Agentic Automation</a></li>
         </ul>
       </div>

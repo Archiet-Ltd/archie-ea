@@ -101,7 +101,7 @@ def _context(browser, width=1440, dark=False):
 
 
 def test_named_addresses_land_on_a_page_with_a_next_step(browser, server, request):
-    # With the switch off, /simulations is the simulation screen itself (tests/smoke/test_acc7sim_journey.py);
+    # With the switch off, /simulations is the simulation screen itself (tests/smoke/test_simulation_journey.py);
     # under the first release it is still the waiting list.
     switch_off = not request.node.callspec.params["server"]
     named = NAMED[:2] if switch_off else NAMED

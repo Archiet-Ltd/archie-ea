@@ -752,6 +752,9 @@ def public_module(slug):
     closed = _wave_closed_response(page)
     if closed is not None:
         return closed
+    # a module whose screen is released opens that screen for a signed-in person, as the menus do
+    if page.front_matter.get("signed_in_redirect") and current_user.is_authenticated:
+        return redirect(page.front_matter["signed_in_redirect"], code=302)
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
@@ -1085,6 +1088,12 @@ def public_site_page(slug):
         connectors = sorted(
             (p for p in feed if p.family == "connector"), key=lambda p: p.title.lower()
         )
+        import dataclasses
+
+        from app.services.site_registry import open_signed_in_links, signed_in_target
+
+        page = dataclasses.replace(page, body_html=open_signed_in_links(page.body_html))
+        modules = [dataclasses.replace(m, url=signed_in_target(m.url)) for m in modules]
         hub_groups = [
             group for group in (
                 {"label": "Every module", "pages": modules},

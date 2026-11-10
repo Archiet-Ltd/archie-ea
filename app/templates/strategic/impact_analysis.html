@@ -7,14 +7,14 @@
 {% from 'components/modal.html' import modal with context %}
 {% import 'basecoat/index.html' as ui %}
 
-{% block title %}{{ 'Simulations' if simulation else 'Architecture Impact Analysis' }}{% endblock %}
+{% block title %}{{ 'Scenarios' if simulation else 'Architecture Impact Analysis' }}{% endblock %}
 
 {% block breadcrumb %}
 {% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
 {{ breadcrumb_nav(items=[
     {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Strategy Layer', 'href': url_for('archimate_crud.dashboard') + '#strategy'},
-    {'text': 'Simulations' if simulation else 'Impact Analysis', 'current': true}
+    {'text': 'Changes'} if simulation else {'text': 'Strategy Layer', 'href': url_for('archimate_crud.dashboard') + '#strategy'},
+    {'text': 'Scenarios' if simulation else 'Impact Analysis', 'current': true}
 ]) }}
 {% endblock %}
 
@@ -24,7 +24,7 @@
     <div class="flex flex-col space-y-2">
         <div class="flex flex-wrap items-center justify-between gap-3">
             {{ page_header(
-        title='Simulations' if simulation else 'Impact Analysis',
+        title='Scenarios' if simulation else 'Impact Analysis',
         description='Try a change on a copy of your model and see what it would do to your counts, costs and risks. Your real model is not changed.' if simulation else 'Analyze the ripple effects of changes across the enterprise architecture.'
     ) }}
             <div class="flex flex-wrap items-center gap-3">
@@ -187,6 +187,7 @@
                         <span class="text-2xl font-bold"
                             x-text="analysisResult?.impacted_processes?.length || 0"></span>
                         <span class="text-xs text-muted-foreground uppercase">Processes</span>
+                        <span class="mt-1 text-xs text-muted-foreground normal-case" data-testid="processes-reason" x-show="processesReason()" x-text="processesReason()"></span>
                     </div>
                     <div class="rounded-lg border p-3 flex flex-col items-center text-center">
                         <span class="text-2xl font-bold font-mono tracking-tight" data-testid="tco-at-risk"
@@ -380,6 +381,7 @@
                 
                 <!-- Save Scenario -->
                 <div class="pt-4 border-t">
+                    {% if can_save_scenario %}
                     <button type="button"
                         @click="saveScenario()" data-testid="save-scenario"
                         class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-success hover:bg-success/90 text-primary-foreground font-medium rounded-lg transition-colors"
@@ -387,6 +389,9 @@
                         <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i>
                         Save Scenario for Comparison
                     </button>
+                    {% else %}
+                    <p class="text-sm text-muted-foreground" data-testid="save-scenario-not-allowed">Only {{ save_scenario_roles }} can save a scenario for the organisation. You can still compare the scenarios they have saved.</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -587,6 +592,15 @@
             costAtRiskText() {
                 const cost = this.analysisResult ? this.analysisResult.estimated_risk_cost : null;
                 return (cost === null || cost === undefined) ? 'Not worked out' : this.money(cost);
+            },
+
+            /* Why the Processes figure is 0, from the same result the figure is counted from. */
+            processesReason() {
+                const r = this.analysisResult;
+                if (!r || (r.impacted_processes || []).length > 0) return '';
+                const n = r.total_affected || 0;
+                if (n === 0) return 'This change reaches no other element.';
+                return 'None of the ' + n + (n === 1 ? ' element' : ' elements') + ' reached is a business process.';
             },
 
             figureValue(figure, value) {
@@ -801,14 +815,13 @@
                     /* Map backend response shape to template fields */
                     const direct = raw.direct_dependencies || [];
                     const indirect = raw.indirect_dependencies || [];
-                    const allDeps = direct.concat(indirect);
                     const self = this;
 
                     this.analysisResult = {
                         severity: raw.risk_level || 'LOW',
                         summary: this._buildSummary(raw, direct, indirect),
-                        impacted_capabilities: allDeps.filter(d => this.typeHas(d, 'capability') || this.typeHas(d, 'business')),
-                        impacted_processes: allDeps.filter(d => this.typeHas(d, 'process') || this.typeHas(d, 'service')),
+                        impacted_capabilities: raw.impacted_capabilities || [],
+                        impacted_processes: raw.impacted_processes || [],
                         estimated_risk_cost: (raw.estimated_financial_risk === null || raw.estimated_financial_risk === undefined) ? null : raw.estimated_financial_risk,
                         dependencies: direct.map(function(d, i) { return self.dependencyRow(d, i, 'Level ' + d.level + ' dependency'); }),
                         indirect_dependencies: indirect.map(function(d, i) { return self.dependencyRow(d, i, 'Level ' + d.level + ' (transitive)'); }),
@@ -949,30 +962,29 @@
                 }, 50);
             },
 
-            confirmSaveScenario() {
+            async confirmSaveScenario() {
                 const scenarioName = (this.scenarioName || '').trim();
                 if (!scenarioName) {
                     this.scenarioNameError = 'Give the scenario a name so you can find it when you compare.';
                     return;
                 }
 
-                const scenario = {
-                    id: 'scenario-' + Date.now(),
-                    name: scenarioName,
-                    element: this.selectedElement,
-                    change_type: this.changeType,
-                    change_label: this.changeLabel(),
-                    analysis_result: this.analysisResult,
-                    created_at: new Date().toISOString()
-                };
-
-                const saved = localStorage.getItem('impactAnalysisScenarios');
-                const scenarios = saved ? JSON.parse(saved) : [];
-                scenarios.push(scenario);
-                localStorage.setItem('impactAnalysisScenarios', JSON.stringify(scenarios));
+                /* The footer is drawn from the result; the saved scenario keeps the figures, not the markup. */
+                const { footer_html, ...figures } = this.analysisResult;
+                try {
+                    await Platform.fetch.post('/strategic/api/scenarios', {
+                        name: scenarioName,
+                        element: { id: this.selectedElement.id, name: this.selectedElement.name },
+                        change_type: this.changeType,
+                        analysis_result: figures
+                    }, { silent: true });
+                } catch (error) {
+                    this.scenarioNameError = (error && error.message) || 'The scenario could not be saved. Try again in a moment.';
+                    return;
+                }
 
                 Platform.modal.close('save-scenario-dialog');
-                Platform.toast.success('Scenario saved. Use Compare Scenarios to review.');
+                Platform.toast.success('Scenario saved for your organisation. Use Compare Scenarios to review.');
             }
         };
     }
@@ -983,7 +995,7 @@
 {% from 'components/llm_recommendations.html' import llm_recommendations with context %}
 {% from 'components/impact_scenario_comparison_modal.html' import impact_scenario_comparison_modal %}
 
-{{ impact_scenario_comparison_modal() }}
+{{ impact_scenario_comparison_modal(can_save=can_save_scenario, save_roles=save_scenario_roles, list_limit=scenario_list_limit) }}
 
 {# The card sits outside the space-y-8 wrapper above, so it carries that wrapper's gap itself. #}
 <div class="mt-8">
