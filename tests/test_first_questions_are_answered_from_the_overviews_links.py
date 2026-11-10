@@ -374,13 +374,14 @@ def test_a_card_opens_the_answer_about_the_element_it_names_when_two_share_the_n
     assert typed["found"]
 
 
-def test_one_application_recorded_twice_is_offered_once_as_its_own_element(
+def test_one_application_recorded_twice_is_offered_once_as_the_element_with_more_relationships_and_on_a_tie_its_own(
     db_session, org_a, org_b, approved, people, login_as, client, tenant_ctx
 ):
     from tests.test_connector_approval_flow import _make_admin
 
     db_session.commit()
     with tenant_ctx(org_b.id):
+        # The copy has two relationships and the application's own element one: the copy is the one the name means.
         copy = _app(db_session, org_b.id, "Orders Twin")
         own = _app(db_session, org_b.id, "Orders Twin", own=True)
         hub = _app(db_session, org_b.id, "Orders Hub")
@@ -388,17 +389,27 @@ def test_one_application_recorded_twice_is_offered_once_as_its_own_element(
         _link(db_session, org_b.id, copy, hub)
         _link(db_session, org_b.id, copy, extra)
         _link(db_session, org_b.id, own, hub)
-        own_id = own.id
+        copy_id = copy.id
+        # Level on relationships, the application's own element is the one the name means.
+        tied_copy = _app(db_session, org_b.id, "Billing Twin")
+        tied_own = _app(db_session, org_b.id, "Billing Twin", own=True)
+        _link(db_session, org_b.id, tied_copy, hub)
+        _link(db_session, org_b.id, tied_own, extra)
+        tied_own_id = tied_own.id
         admin_b = _make_admin(db_session, org_b.id, "FounderB")
         db_session.commit()
     with tenant_ctx(org_a.id):
         _link(db_session, org_a.id, _app(db_session, org_a.id, "Orders Twin"), _app(db_session, org_a.id, "Orders Other Peer"))
         db_session.commit()
     login_as(client, admin_b)
-    cards = [q for q in client.get("/ai-chat/first-questions").get_json()["questions"] if q["name"] == "Orders Twin"]
+    offered = client.get("/ai-chat/first-questions").get_json()["questions"]
+    cards = [q for q in offered if q["name"] == "Orders Twin"]
     assert len(cards) == 1, cards
-    assert cards[0]["element_id"] == own_id
-    assert cards[0]["detail"] == "1 relationship recorded"
+    assert cards[0]["element_id"] == copy_id
+    assert cards[0]["detail"] == "2 relationships recorded"
+    tied = [q for q in offered if q["name"] == "Billing Twin"]
+    assert len(tied) == 1 and tied[0]["element_id"] == tied_own_id, tied
+    assert tied[0]["detail"] == "1 relationship recorded"
 
 
 def test_an_organisation_with_applications_and_no_links_is_told_how_many_applications_it_has(
