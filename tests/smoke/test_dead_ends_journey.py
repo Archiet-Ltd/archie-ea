@@ -246,3 +246,78 @@ def test_tech_debt_panel_for_an_organisation_with_no_applications_says_why_and_w
             assert page.locator("main").inner_text().strip()
         finally:
             context.close()
+
+
+SUPPORT_JOURNEY_VALUES = (
+    ("Supported", "good"),
+    ("Unsupported", "Unsupported by the vendor"),
+    ("none", "none"),
+    ("Not supported", "Unsupported by the vendor"),
+    ("End of support", "Unsupported by the vendor"),
+    ("TBC", "TBC"),
+)
+
+
+def test_tech_debt_panel_reads_each_recorded_support_value_as_what_it_is(
+    browser, live_server, tmp_path_factory
+):
+    """An architect imports applications with free-text support values, opens Tech Debt and reads
+    each row: only a known supported value is good standing; the rest are shown as what they are."""
+    org = create_fresh_org("enterprise_architect", org_admin=True)
+    other = create_fresh_org("enterprise_architect", org_admin=True)
+    tag = org["suffix"]
+    walk = _walk_dir(tmp_path_factory)
+    os.makedirs(walk, exist_ok=True)
+    rows = [
+        {"name": "Support %s %s" % (value, tag), "end_of_life_date": "2040-01-01", "version": "10.2",
+         "support_level": value}
+        for value, _ in SUPPORT_JOURNEY_VALUES
+    ]
+    rows.append({"name": "Support blank %s" % tag, "end_of_life_date": "2040-01-01", "version": "10.2"})
+    other_context = browser.new_context()
+    try:
+        other_page = other_context.new_page()
+        sign_in(other_page, live_server, other["emails"]["enterprise_architect"])
+        other_page.goto(live_server + "/architecture/elements", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        status, payload = api(other_page, "POST", "/applications/import-manual", {
+            "applications": [{"name": "Other org TBC %s" % tag, "end_of_life_date": "2040-01-01",
+                              "version": "10.2", "support_level": "TBC"}]})
+        assert status == 200, (status, payload)
+    finally:
+        other_context.close()
+    for scheme, width, height in VIEWPORTS:
+        context = browser.new_context(viewport={"width": width, "height": height}, color_scheme=scheme)
+        page = context.new_page()
+        try:
+            sign_in(page, live_server, org["emails"]["enterprise_architect"])
+            page.goto(live_server + "/architecture/elements", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            if scheme == "light":
+                status, payload = api(page, "POST", "/applications/import-manual", {"applications": rows})
+                assert status == 200, (status, payload)
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+            page.get_by_role("button", name="Tech Debt Analysis").click()
+            page.get_by_text("Technology Debt Scores").wait_for(timeout=PAGE_TIMEOUT)
+            page.get_by_text("Showing 7 of 7 applications analysed").wait_for(timeout=PAGE_TIMEOUT)
+            debt = page.locator("table.dense-table", has_text="Debt Score")
+
+            def row_text(value):
+                row = debt.locator("tr", has_text="Support %s %s" % (value, tag))
+                assert row.count() == 1, (value, " ".join(debt.inner_text().split())[:1200])
+                return row.inner_text()
+
+            good = row_text("Supported")
+            assert "0%" in good and "all in good standing" in good, good
+            for value, said in SUPPORT_JOURNEY_VALUES[1:]:
+                text = row_text(value)
+                assert "good standing" not in text, (value, text)
+                if said == "Unsupported by the vendor":
+                    assert said in text and "80%" in text, (value, text)
+                else:
+                    assert "support status not recognised (recorded as “%s”)" % said in text, (value, text)
+            blank = row_text("blank")
+            assert "good standing" not in blank and "support status not recorded" in blank, blank
+            assert "Other org TBC" not in debt.inner_text()
+            debt.screenshot(path=os.path.join(walk, "%s%d-tech-debt-support.png" % (scheme, width)))
+        finally:
+            context.close()
