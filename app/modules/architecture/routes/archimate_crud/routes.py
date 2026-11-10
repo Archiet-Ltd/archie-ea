@@ -1107,7 +1107,7 @@ def api_layer_elements(layer):
                     )
                     for (ae_id_hit,) in rel_rows:
                         rel_count_by_ae_id[ae_id_hit] = rel_count_by_ae_id.get(ae_id_hit, 0) + 1
-                # F-08(a), Capgemini dry-run: the edit modal's typedFieldDefaults()
+                # The edit modal's typedFieldDefaults()
                 # (dashboard.js) reads source[name] for each of this type's
                 # configured fields (goal_type, driver_type, category, ...) —
                 # this dict never had any of them, so every typed field looked
@@ -1195,7 +1195,7 @@ def api_layer_elements(layer):
                     "rel_count": _rel_count,
                 }
                 ae_dict["architecture_state"] = ae_dict["plateau"] or ""
-                # F-08(a): the F-04 dedup fix means every MIRRORED element
+                # The duplicate-listing fix means every MIRRORED element
                 # (the overwhelming majority — anything created through
                 # the normal form) is now listed from here, not from the
                 # dedicated-table branch above. Without this lookup, this
