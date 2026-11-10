@@ -707,7 +707,7 @@ def test_the_review_screen_names_what_the_read_already_put_in_the_model(
     html = " ".join(signed_in.get("/admin/connectors/github/review").get_data(as_text=True).split())
     assert "Nothing is in your model until you approve it" not in html
     assert "Nothing is waiting for review." in html
-    assert "already in your model: 8 applications, 3 parts, 9 links" in html
+    assert "already in your model: 8 applications, 3 parts, 1 technology, 9 links" in html
 
     admin_b = _make_admin(db_session, org_b.id, "Other")
     db_session.commit()

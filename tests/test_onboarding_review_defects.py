@@ -10,6 +10,7 @@ import html as html_module
 import re
 
 import pytest
+from sqlalchemy import text
 
 from tests.test_github_builds_the_model import (  # noqa: F401  (fixtures)
     acme,
@@ -37,8 +38,8 @@ def _state(monkeypatch, **state):
     monkeypatch.setattr(connector_routes, "_github_state", lambda org_id: {"counts": {}, "job": None, **state})
 
 
-def test_the_status_count_is_the_number_the_review_page_adds_up(db_session, org_a, org_b, people, first_sync, monkeypatch, tenant_ctx):
-    """One count of what is in the model: the approvals made are 23, the model holds 8 + 3 + 9."""
+def test_the_status_count_is_every_row_the_read_put_in_the_model(db_session, org_a, org_b, people, first_sync, monkeypatch, tenant_ctx, signed_in):
+    """One count of what is in the model: 12 elements (the technology among them) and 9 relationships."""
     from app.connectors import github as gh
     from app.modules.account.services import onboarding_service as onboarding
 
@@ -46,9 +47,25 @@ def test_the_status_count_is_the_number_the_review_page_adds_up(db_session, org_
     monkeypatch.setattr(gh, "run_first_sync", lambda org_id, connector_id: {"success": True, "repositories": 16})
     result = onboarding.run_github_import(org_a_id, connector_id, admin_id)
     counts = gh.model_counts(org_a_id)
-    assert (counts["applications"], counts["components"], counts["relationships"]) == (8, 3, 9)
-    assert result["added"] == 8 + 3 + 9, result
-    assert gh.model_counts(org_b_id) == {"applications": 0, "components": 0, "relationships": 0}
+    assert counts == {"applications": 8, "components": 3, "technologies": 1, "relationships": 9}, counts
+    assert result["added"] == 8 + 3 + 1 + 9, result
+    rows = db_session.execute(
+        text(
+            "SELECT (SELECT count(*) FROM archimate_elements WHERE organization_id = :o AND source_kind = 'connector') "
+            "+ (SELECT count(*) FROM archimate_relationships WHERE organization_id = :o AND source_kind = 'connector')"
+        ),
+        {"o": org_a_id},
+    ).scalar()
+    assert result["added"] == rows
+    assert gh.model_counts(org_b_id) == {"applications": 0, "components": 0, "technologies": 0, "relationships": 0}
+
+
+def test_the_review_page_names_every_kind_of_row_the_read_added(signed_in, first_sync):
+    assert signed_in.post("/admin/connectors/github/review/approve-all").status_code in (302, 303)
+    text = _words(signed_in.get("/admin/connectors/github/review"))
+    found = re.search(r"already in your model: ([^.]*)\.", text)
+    assert found, text[-600:]
+    assert found.group(1) == "8 applications, 3 parts, 1 technology, 9 links", found.group(1)
 
 
 def test_a_connected_organisation_whose_read_found_nothing_is_told_so(signed_in, monkeypatch):

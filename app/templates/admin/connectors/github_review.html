@@ -35,6 +35,7 @@
 {% set already_parts = [] %}
 {% if added.get('applications') %}{% set _ = already_parts.append(added.applications ~ (' application' if added.applications == 1 else ' applications')) %}{% endif %}
 {% if added.get('components') %}{% set _ = already_parts.append(added.components ~ (' part' if added.components == 1 else ' parts')) %}{% endif %}
+{% if added.get('technologies') %}{% set _ = already_parts.append(added.technologies ~ (' technology' if added.technologies == 1 else ' technologies')) %}{% endif %}
 {% if added.get('relationships') %}{% set _ = already_parts.append(added.relationships ~ (' link' if added.relationships == 1 else ' links')) %}{% endif %}
 {% set already = already_parts|join(', ') %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">

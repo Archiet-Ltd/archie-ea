@@ -1742,7 +1742,8 @@ def pending_total(org_id) -> int:
 
 
 def model_counts(org_id) -> Dict[str, int]:
-    """What the connector has put in the organisation's model so far."""
+    """What the connector has put in the organisation's model so far: every element and every
+    relationship it wrote, so the sum is the number of rows added."""
     from app.models import ArchiMateElement, ArchiMateRelationship
 
     by_type = dict(
@@ -1756,6 +1757,8 @@ def model_counts(org_id) -> Dict[str, int]:
         "applications": by_type.get("Application", 0),
         # a component is an application-kind element that is not itself an Application
         "components": sum(n for kind, n in by_type.items() if is_application_kind(kind) and kind != "Application"),
+        # everything else the connector put in the model: the technology its compose files run on
+        "technologies": sum(n for kind, n in by_type.items() if not is_application_kind(kind)),
         "relationships": ArchiMateRelationship.query.filter_by(organization_id=org_id, source_kind="connector").count(),
     }
 
