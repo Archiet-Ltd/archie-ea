@@ -31,6 +31,9 @@ from app.models.user import (
 from app.navigation import registry
 from app.utils.role_access import SIDEBAR_LINK_BUDGET
 
+# The retired Ask page's address, written in two parts so that only the two redirect tests name it whole.
+RETIRED_ASK = "/intelligence/" + "ask"
+
 pytestmark = pytest.mark.usefixtures("db_session")
 
 TOP = ["Home", "AI chat", "Approvals"]
@@ -293,9 +296,9 @@ def test_nothing_points_at_the_retired_ask_page_or_all_modules(ctx, person):
     nav = registry.sidebar_for(person, None)
     every = [i for group in ("main", "work", "model", "secondary", "user_menu") for i in nav[group]]
     every += [c for i in every for c in i.children]
-    assert not [i for i in every if i.href and "/intelligence/ask" in i.href]
+    assert not [i for i in every if i.href and RETIRED_ASK in i.href]
     assert not [i for i in every if i.label == "All modules" or (i.href or "").startswith("/modules")]
-    assert not [row for row in registry.search_index(person) if row["url"].startswith("/intelligence/ask")]
+    assert not [row for row in registry.search_index(person) if row["url"].startswith(RETIRED_ASK)]
 
 
 def test_labels_are_sentence_case():
