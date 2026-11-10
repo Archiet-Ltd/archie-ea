@@ -8,7 +8,9 @@ browser from pressing Enter to the answer or the failure card, then Retry is pre
 well again and the answer appears.
 """
 
+import json
 import os
+import re
 import socket
 import threading
 import time
@@ -19,6 +21,7 @@ from playwright.sync_api import expect
 from tests.smoke.chat_ask import open_chat
 from tests.smoke.conftest import PAGE_TIMEOUT, boot_live_server
 from tests.smoke.fresh_org import create_fresh_org, sign_in
+from tests.smoke.intelligence_graph import seed_impact_graph
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -56,8 +59,6 @@ class _Provider:
             threading.Thread(target=self._reply, args=(conn, self.mode), daemon=True).start()
 
     def _reply(self, conn, mode):
-        import json
-
         try:
             conn.settimeout(5)
             conn.recv(65536)
@@ -169,3 +170,72 @@ def test_a_question_ends_in_an_answer_or_a_failure_with_retry_within_a_minute_of
         retry.click()
         expect(page.locator("#messages-container .message-content", has_text=ANSWER).last).to_be_visible(timeout=30000)
     provider.mode = "hang"
+
+
+# Colours as the browser resolves them, laid over what is behind them, then WCAG relative luminance.
+CONTRAST_SCRIPT = """
+(el) => {
+  const parse = (c) => { const m = c.match(/[\\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 }; };
+  const behind = (node) => {
+    let layers = [];
+    for (let n = node; n; n = n.parentElement) {
+      const c = parse(getComputedStyle(n).backgroundColor);
+      if (c.a > 0) { layers.push(c); if (c.a >= 1) break; }
+    }
+    let base = { r: 255, g: 255, b: 255 };
+    for (const c of layers.reverse()) base = { r: c.r * c.a + base.r * (1 - c.a), g: c.g * c.a + base.g * (1 - c.a), b: c.b * c.a + base.b * (1 - c.a) };
+    return base;
+  };
+  const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+  const ratio = (node) => {
+    const fg = parse(getComputedStyle(node).color), bg = behind(node);
+    const f = { r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a) };
+    const a = lum(f), b = lum(bg);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  const first = (sel) => el.querySelector(sel);
+  return { body: ratio(first('p')), link: ratio(first('a')), code: ratio(first('code')) };
+}
+"""
+
+
+@pytest.mark.parametrize("width,height", [(1440, 900), (390, 844)])
+def test_a_written_answer_reads_at_aa_contrast_in_dark_mode(page, live_server, width, height):
+    org = create_fresh_org("platform_admin", org_admin=True, platform_role="Administrator")
+    graph = seed_impact_graph(org["org_id"])
+    sign_in(page, live_server, org["emails"]["platform_admin"])
+    page.goto("%s/intelligence/answers/element/%s" % (live_server, graph["service"]), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.wait_for_url(re.compile(r".*/intelligence/answers/[0-9a-f]{32}"), timeout=PAGE_TIMEOUT)
+    address = re.search(r"/intelligence/answers/([0-9a-f]{32})", page.url).group(1)
+    text = (
+        "The service runs from `docker-compose.yml` and its answer is kept at `/intelligence/answers/%s`.\n\n"
+        "It is recorded [ref:%s]." % (address, graph["service"])
+    )
+    stream = "".join("data: %s\n\n" % json.dumps(e) for e in (
+        {"type": "token", "text": text},
+        {"type": "done", "response": text, "sources": [], "actions_taken": [], "pending_approvals": []},
+    ))
+    page.route("**/ai-chat/estate-answer", lambda r: r.fulfill(status=200, content_type="application/json", body='{"found": false}'))
+    page.route("**/ai-chat/message/stream", lambda r: r.fulfill(status=200, content_type="text/event-stream", body=stream))
+    page.set_viewport_size({"width": width, "height": height})
+    open_chat(page, live_server)
+    page.evaluate("() => document.documentElement.classList.add('dark')")
+    page.fill("#user-input", "What does the service depend on?")
+    page.press("#user-input", "Enter")
+    message = page.locator("#messages-container .message-content").last
+    expect(message).to_contain_text("It is recorded", timeout=PAGE_TIMEOUT)
+    # A person who switches to dark mode with the answer on screen sees the same: measure after the switch.
+    page.evaluate("() => document.documentElement.classList.remove('dark')")
+    light = message.evaluate(CONTRAST_SCRIPT)
+    page.evaluate("() => document.documentElement.classList.add('dark')")
+    page.wait_for_timeout(100)
+    immediately = message.evaluate(CONTRAST_SCRIPT)
+    page.wait_for_timeout(1500)
+    ratios = message.evaluate(CONTRAST_SCRIPT)
+    print("CONTRAST light %s immediately-after-switch %s" % (light, immediately))
+    print("CONTRAST %dx%d dark %s" % (width, height, ratios))
+    if SHOTS:
+        os.makedirs(SHOTS, exist_ok=True)
+        page.screenshot(path=os.path.join(SHOTS, "cited-%d-dark.png" % width), full_page=True)
+    for name, value in ratios.items():
+        assert value >= 4.5, (name, ratios)
