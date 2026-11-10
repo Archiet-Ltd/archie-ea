@@ -706,6 +706,23 @@ def test_data_entity_page_authorisation(archetype, page, live_server, seeded, se
     assert actual == ALLOWED, "%s could not reach %s: expected ALLOWED" % (archetype, path)
 
 
+CAPABILITY_CHOICES_PATH = "/architecture/api/capability-choices?q=a"
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_capability_choices_are_listed_to_every_signed_in_archetype(archetype, page, live_server, seeded):
+    """The capability picker on the Create form reads this list; every persona that can open the form can read it."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.get(live_server + CAPABILITY_CHOICES_PATH)
+    assert response.status == 200, "%s could not read the capability choices: %s" % (archetype, response.status)
+    assert isinstance(response.json(), list)
+
+
+def test_capability_choices_reject_anonymous(page, live_server):
+    response = page.request.get(live_server + CAPABILITY_CHOICES_PATH, max_redirects=0)
+    assert response.status in (301, 302, 401, 403), "capability choices were served without signing in"
+
+
 def test_data_entity_page_rejects_anonymous(page, live_server, seeded_data_entity):
     path = "/architecture/data-entities/%d" % seeded_data_entity
     response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -740,6 +757,10 @@ def seeded_processes(seeded):
         with app.app_context():
             BusinessProcess.query.filter(BusinessProcess.id.in_([ids["own"], ids["foreign"]])).delete(
                 synchronize_session=False)
+            # Creating the processes wrote audit rows naming this organisation; they are this fixture's own
+            # rows, removed by its organisation id so the organisation can then be deleted.
+            db.session.execute(db.text("DELETE FROM soc2_audit_log WHERE organization_id = :org"),
+                               {"org": ids["other_org"]})
             Organization.query.filter_by(id=ids["other_org"]).delete(synchronize_session=False)
             db.session.commit()
 
@@ -2064,3 +2085,53 @@ def test_decision_tables_reject_anonymous(page, live_server):
         live_server + "/architecture/decision-tables/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT
     )
     assert "/account/login" in page.url or (response is not None and response.status >= 400)
+
+
+# Every write on the roadmap API is refused to a read-only account before the handler reads the body.
+ROADMAP_WRITE_PATHS = [
+    ("POST", "/api/roadmap/plateaus"),
+    ("POST", "/api/roadmap/work-packages"),
+    ("PUT", "/api/roadmap/work-packages/1"),
+    ("DELETE", "/api/roadmap/work-packages/1"),
+    ("POST", "/api/roadmap/deliverables"),
+    ("PUT", "/api/roadmap/deliverables/1"),
+    ("DELETE", "/api/roadmap/deliverables/1"),
+    ("POST", "/api/roadmap/gaps"),
+    ("POST", "/api/roadmap/automation/generate-work-packages"),
+    ("POST", "/api/roadmap/sync/capabilities"),
+    ("POST", "/api/roadmap/archimate/generate-roadmap"),
+]
+
+
+@pytest.fixture(scope="module")
+def roadmap_viewer(seeded):
+    """A Viewer-role account whose persona is Viewer too, so no persona grants it model editing."""
+    import uuid
+
+    from app import create_app, db
+    from app.models.user import Role, User
+
+    app = create_app("testing")
+    with app.app_context():
+        Role.insert_roles()
+        user = User(
+            email="smoke.roadmap.viewer.%s@example.com" % uuid.uuid4().hex[:8],
+            first_name="Smoke", last_name="Viewer",
+            organization_id=seeded["ids"]["org"], enterprise_role="viewer", confirmed=True,
+        )
+        user.role = Role.query.filter_by(name="Viewer").one()
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.commit()
+        return user.email
+
+
+@pytest.mark.parametrize("method,path", ROADMAP_WRITE_PATHS)
+def test_roadmap_write_routes_refuse_a_read_only_account(method, path, page, live_server, roadmap_viewer):
+    _login(page, live_server, roadmap_viewer)
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.fetch(
+        live_server + path, method=method, data={}, headers={"X-CSRFToken": csrf_token}, max_redirects=0
+    )
+    assert response.status == 403, "a Viewer reached %s %s: %s" % (method, path, response.status)

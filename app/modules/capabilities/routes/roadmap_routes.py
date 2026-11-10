@@ -741,6 +741,8 @@ def api_roadmap_create_gap():
         return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Gap, Plateau
+        from app.modules.architecture.services.gap_archimate_service import apply_rating_rule
+        from app.services.gap_register_service import normalise_priority
 
         data = request.get_json() or {}
         if not data.get("name"):
@@ -751,10 +753,10 @@ def api_roadmap_create_gap():
         if gap_type not in valid_gap_types:
             gap_type = "custom"
 
-        valid_priorities = ["critical", "high", "medium", "low"]
-        priority = data.get("priority", "medium")
-        if priority not in valid_priorities:
-            priority = "medium"
+        try:
+            priority = normalise_priority(data.get("priority")) or "medium"
+        except ValueError as error:
+            return jsonify({"success": False, "error": str(error)}), 400
 
         plateau_id = data.get("plateau_id")
         if plateau_id:
@@ -767,6 +769,8 @@ def api_roadmap_create_gap():
             description=data.get("description", ""),
             gap_type=gap_type,
             priority=priority,
+            # The register counts and lists by severity, so a gap marked Critical is critical there too.
+            severity=apply_rating_rule(None, None, {"priority": priority}).get("severity") or "medium",
             resolution_status="identified",
         )
         if plateau_id:
@@ -783,6 +787,7 @@ def api_roadmap_create_gap():
                 "description": gap.description,
                 "gap_type": gap.gap_type,
                 "priority": gap.priority,
+                "severity": gap.rated_severity,
                 "resolution_status": gap.resolution_status,
                 "target_plateau_id": gap.target_plateau_id,
             },
@@ -1107,7 +1112,9 @@ def api_roadmap_get_gap(gap_id):
     try:
         from app.models.implementation_migration import Gap
 
-        gap = Gap.query.get(gap_id)
+        # A query, not .get(): .get() answers from the session's identity map
+        # without SQL, which would skip the organisation filter on a cache hit.
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             return jsonify({"success": False, "error": "Gap not found"}), 404
 
@@ -1142,7 +1149,11 @@ def api_roadmap_update_gap(gap_id):
         from app.services.gap_archimate_service import gap_archimate_service
 
         data = request.get_json()
-        gap = gap_archimate_service.update_gap(gap_id, data)
+        try:
+            gap = gap_archimate_service.update_gap(gap_id, data)
+        except ValueError as error:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(error)}), 400
 
         if not gap:
             return jsonify({"success": False, "error": "Gap not found"}), 404
@@ -1401,7 +1412,7 @@ def _resolve_roadmap_gap_id(raw_gap_id):
 
     # A plain integer is a stored Gap: the original path, unchanged.
     try:
-        return_gap = Gap.query.get(int(raw_gap_id))
+        return_gap = Gap.query.filter_by(id=int(raw_gap_id)).first()
     except (TypeError, ValueError):
         return_gap = None
     else:
@@ -1577,18 +1588,14 @@ def api_roadmap_create_standalone_work_package():
 
         db.session.commit()
 
-        return jsonify({
-            "success": True,
-            "work_package": {
-                "id": wp.id,
-                "name": wp.name,
-                "description": wp.description,
-                "status": wp.status,
-                "priority": wp.priority,
-                "start_date": wp.start_date.date().isoformat() if wp.start_date else None,
-                "target_date": wp.end_date.date().isoformat() if wp.end_date else None,
-            },
-        }), 201
+        from app.services import result_footer_service
+
+        org_id = current_organization_id()
+        # The same row the list draws (linked gaps, footer), so the new package reads like its neighbours.
+        wp_dict = work_package_service.to_roadmap_dict(wp, org_id)
+        wp_dict["footer_html"] = result_footer_service.render_footer(
+            result_footer_service.work_package_footer(wp, name_shown=True))
+        return jsonify({"success": True, "work_package": wp_dict}), 201
 
     except Exception as e:
         db.session.rollback()
@@ -2432,7 +2439,7 @@ def api_roadmap_gaps_not_addressed():
                 "id": g.id,
                 "name": g.name,
                 "description": g.description,
-                "severity": g.severity,
+                "severity": g.rated_severity,
                 "priority": g.priority,
                 "resolution_status": g.resolution_status,
                 "gap_type": g.gap_type,

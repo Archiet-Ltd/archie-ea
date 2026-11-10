@@ -138,7 +138,7 @@ class RoadmapAutomationEngine:
 
     def _generate_from_gap(self, gap_id: int, options: GenerationOptions) -> List[Dict[str, Any]]:
         """Generate work packages from implementation gap"""
-        gap = ImplementationGap.query.get_or_404(gap_id)
+        gap = ImplementationGap.query.filter_by(id=gap_id).first_or_404()
 
         work_packages = []
 

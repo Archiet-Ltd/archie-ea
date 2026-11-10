@@ -183,7 +183,7 @@ class RoadmapGenerator:
                     "gap_id": gap.id,
                     "gap_name": gap.name,
                     "priority": gap.priority,
-                    "severity": gap.severity,
+                    "severity": gap.rated_severity,
                     "estimated_work_packages": estimated_wps,
                     "estimated_hours": estimated_hours,
                     "estimated_duration_weeks": estimated_hours // 40,
@@ -391,7 +391,7 @@ class RoadmapGenerator:
 
         # Adjust based on severity
         severity_adjustment = {"critical": 2, "high": 1, "medium": 0, "low": -1}
-        adjustment = severity_adjustment.get(gap.severity, 0)
+        adjustment = severity_adjustment.get(gap.rated_severity, 0)
 
         # Adjust based on description length (proxy for complexity)
         if gap.description and len(gap.description) > 500:

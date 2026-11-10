@@ -34,6 +34,7 @@ from flask_login import current_user, login_required  # dead-code-ok
 from app.middleware.tenant_context import current_org_id
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import case, or_  # dead-code-ok
+from app.services.gap_register_service import effective_severity_expr
 from sqlalchemy.exc import SQLAlchemyError
 
 from .. import db
@@ -481,8 +482,18 @@ def investment_matrix():
 @enterprise_bp.route("/strategic/risk-assessment")
 @login_required
 def risk_assessment():
-    """The earlier address of the risk assessment; the one assessment lives at /strategic and counts risks."""
-    return redirect(url_for("strategic.risk_assessment"), code=301)
+    """Risk Assessment"""
+    try:
+        gaps = Gap.query.filter(Gap.gap_kind != "plateau_transition").limit(500).all()
+
+        return render_template("enterprise/risk_assessment.html", gaps=gaps)
+    except SQLAlchemyError as e:
+        current_app.logger.error(f"Database error loading risk assessment: {e}")
+        raise DatabaseError(
+            message=f"Failed to load risk assessment: {str(e)}",
+            user_message="Unable to load risk assessment data.",
+            recovery_action="Return to the dashboard and try again.",
+        )
 
 
 @enterprise_bp.route("/strategic/technology-roadmap")
@@ -877,7 +888,7 @@ _GAP_SORT_COLUMNS = {
     "name": Gap.name,
     "gap_type": Gap.gap_type,
     # critical sorts above high, not alphabetically; an unrecorded severity ranks below low
-    "severity": case({"low": 1, "medium": 2, "high": 3, "critical": 4}, value=Gap.severity, else_=0),
+    "severity": case({"low": 1, "medium": 2, "high": 3, "critical": 4}, value=effective_severity_expr(), else_=0),
     "priority": Gap.priority,
     "resolution_status": Gap.resolution_status,
     "impact": Gap.impact,
@@ -903,22 +914,15 @@ def gap_analysis():
     column = _GAP_SORT_COLUMNS.get(sort_key, Gap.name)
     order = column.desc() if direction == "desc" else column.asc()
     try:
-        from app.services.gap_register_service import (
-            count_critical_gaps,
-            count_gaps,
-            get_gaps_not_addressed,
-        )
+        from app.services.gap_register_service import count_gaps, gap_register_query, get_gaps_not_addressed
 
         # ?severity=high lists only the gaps of that severity (the links on Architecture Intelligence)
         severity_filter = (request.args.get("severity") or "").strip().lower()
         if severity_filter not in _GAP_SEVERITIES:
             severity_filter = ""
-        query = Gap.query.filter(Gap.gap_kind != "plateau_transition")
-        if severity_filter:
-            query = query.filter(Gap.severity == severity_filter)
+        query = gap_register_query(current_org_id(), severity_filter or None)
         gaps = query.order_by(order, Gap.id).limit(500).all()
         total_gap_count = count_gaps(current_org_id())
-        critical_gap_count = count_critical_gaps(current_org_id())
         not_addressed_gaps = get_gaps_not_addressed(current_org_id())
         work_packages_by_gap = work_package_service.work_packages_for_gaps(
             [g.id for g in gaps], current_org_id())
@@ -927,7 +931,6 @@ def gap_analysis():
             "enterprise/gap_analysis.html", gaps=gaps,
             work_packages_by_gap=work_packages_by_gap,
             total_gap_count=total_gap_count,
-            critical_gap_count=critical_gap_count,
             severity_filter=severity_filter,
             not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",
@@ -953,7 +956,6 @@ def ai_architecture_analysis():
     """AI Architecture Analysis — displays architectural intelligence dashboard"""
     try:
         from app.models.ai_recommendations import AIRecommendation
-        from app.models.implementation_migration import Gap
         from app.models.application_portfolio import ApplicationComponent
 
         # Fetch recent AI recommendations
@@ -964,13 +966,9 @@ def ai_architecture_analysis():
         )
 
         # Count gaps by severity
-        _cap_gaps = Gap.query.filter(Gap.gap_kind != "plateau_transition")
-        gaps_by_severity = {
-            "critical": _cap_gaps.filter_by(severity="critical").count(),
-            "high": _cap_gaps.filter_by(severity="high").count(),
-            "medium": _cap_gaps.filter_by(severity="medium").count(),
-            "low": _cap_gaps.filter_by(severity="low").count(),
-        }
+        from app.services.gap_register_service import count_gaps as _count_gaps
+
+        gaps_by_severity = {level: _count_gaps(current_org_id(), severity=level) for level in _GAP_SEVERITIES}
 
         # Applications needing review: the ones marked for review and the ones in their sunset stage, which
         # the recommendations ask a person to plan the retirement of

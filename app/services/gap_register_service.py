@@ -16,6 +16,8 @@ Contract (docs/adm_phases_d_a_g_e_f_h_tasks.json OA-001):
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy import case, func
+
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
 from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION, Plateau
@@ -23,6 +25,46 @@ from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION
 log = logging.getLogger(__name__)
 
 _ROADMAP_GAP_TYPES = frozenset({"roadmap", "modernization", "retirement", "migration"})
+
+
+GAP_PRIORITIES = ("critical", "high", "medium", "low")
+
+
+def normalise_priority(value) -> Optional[str]:
+    """A priority as it is stored: trimmed and lower case. None when nothing was given; ValueError when the
+    words are not one of the four priorities."""
+    if value is None or not str(value).strip():
+        return None
+    cleaned = str(value).strip().lower()
+    if cleaned not in GAP_PRIORITIES:
+        raise ValueError("Priority must be one of: %s." % ", ".join(GAP_PRIORITIES))
+    return cleaned
+
+
+def normalise_severity(value) -> Optional[str]:
+    """A severity as it is stored: trimmed and lower case. None when nothing was given; ValueError when the
+    words are not one of the four severities."""
+    if value is None or not str(value).strip():
+        return None
+    cleaned = str(value).strip().lower()
+    if cleaned not in GAP_PRIORITIES:
+        raise ValueError("Severity must be one of: %s." % ", ".join(GAP_PRIORITIES))
+    return cleaned
+
+
+def effective_severity(gap) -> Optional[str]:
+    """The one rating of a gap: critical when its severity or its priority says critical, else its severity.
+
+    Every screen, count, sort and filter reads this (or `effective_severity_expr` in a query), never the
+    severity column directly."""
+    if (getattr(gap, "priority", None) or "").strip().lower() == "critical":
+        return "critical"
+    return getattr(gap, "severity", None)
+
+
+def effective_severity_expr():
+    """`effective_severity` as a SQL expression, for filters, grouping and ordering."""
+    return case((func.lower(func.trim(Gap.priority)) == "critical", "critical"), else_=Gap.severity)
 
 
 def get_unified_gap_register(
@@ -80,7 +122,7 @@ def get_unified_gap_register(
     try:
         q = db.session.query(Gap).filter(Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION)
         if severity:
-            q = q.filter(Gap.severity == severity)
+            q = q.filter(effective_severity_expr() == severity)
         if status:
             q = q.filter(Gap.resolution_status == status)
         if adm_phase:
@@ -91,7 +133,7 @@ def get_unified_gap_register(
                 "gap_source": "implementation",
                 "gap_id": row.id,
                 "title": getattr(row, "title", None) or f"IMPL-GAP-{row.id}",
-                "severity": row.severity,
+                "severity": effective_severity(row),
                 "status": row.resolution_status,
                 "adm_phase": getattr(row, "togaf_phase", None) or "D",
                 "description": row.description,
@@ -110,14 +152,14 @@ def get_unified_gap_register(
             Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION
         )
         if severity:
-            q = q.filter(Gap.severity == severity)
+            q = q.filter(effective_severity_expr() == severity)
         rows = q.limit(limit).all()
         for row in rows:
             results.append({
                 "gap_source": "roadmap",
                 "gap_id": row.id,
                 "title": getattr(row, "title", None) or f"ROAD-GAP-{row.id}",
-                "severity": row.severity,
+                "severity": effective_severity(row),
                 "status": row.resolution_status,
                 "adm_phase": "E",
                 "description": row.description,
@@ -136,6 +178,8 @@ def gap_summary_by_phase() -> Dict[str, Any]:
         Dict with keys matching each gap_source; each value is a dict of
         severity → count.  All values come from DB columns; none fabricated.
     """
+    # One labelled expression, so the grouped column and the selected column are the same one.
+    rating = effective_severity_expr().label("rating")
     summary: Dict[str, Any] = {
         "capability": {},
         "implementation": {},
@@ -160,9 +204,9 @@ def gap_summary_by_phase() -> Dict[str, Any]:
 
     try:
         rows = (
-            db.session.query(Gap.severity, db.func.count(Gap.id))
+            db.session.query(rating, db.func.count(Gap.id))
             .filter(Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION)
-            .group_by(Gap.severity)
+            .group_by(rating)
             .all()
         )
         for sev, cnt in rows:
@@ -173,12 +217,12 @@ def gap_summary_by_phase() -> Dict[str, Any]:
 
     try:
         rows = (
-            db.session.query(Gap.severity, db.func.count(Gap.id))
+            db.session.query(rating, db.func.count(Gap.id))
             .filter(
                 Gap.gap_type.in_(_ROADMAP_GAP_TYPES),
                 Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION
             )
-            .group_by(Gap.severity)
+            .group_by(rating)
             .all()
         )
         for sev, cnt in rows:
@@ -396,29 +440,34 @@ def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
     return [(gap, gap.id in covered) for gap in gaps]
 
 
-def critical_gaps_query(organization_id: int):
-    """The gaps rated critical on the gap itself (its severity), in the one gap register.
-
-    Plateau-transition gaps are not capability shortfalls and are left out, as in
-    ``count_gaps``. Every screen that says how many critical gaps there are, or
-    lists them, reads this query so they cannot disagree.
-    """
-    return Gap.query.filter(
+def gap_register_query(organization_id: int, severity: Optional[str] = None):
+    """The one query behind every count and list of the gap register: the organisation's gaps, plateau
+    transitions left out, optionally only those of one severity ("critical" is the critical-gap rule)."""
+    query = Gap.query.filter(
         Gap.organization_id == organization_id,
         Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-        db.func.lower(Gap.severity) == "critical",
     )
+    if severity:
+        query = query.filter(effective_severity_expr() == severity)
+    return query
 
 
-def count_critical_gaps(organization_id: int) -> int:
-    """Return how many gaps in the register are rated critical."""
-    return critical_gaps_query(organization_id).count()
+def list_gaps(
+    organization_id: int, severity: Optional[str] = None, limit: Optional[int] = None
+) -> List[Gap]:
+    """Return the register's gaps, newest first, optionally one severity and the first `limit`.
+    The list for the `count_gaps(organization_id, severity=...)` total."""
+    query = gap_register_query(organization_id, severity).order_by(Gap.created_at.desc(), Gap.id.desc())
+    if limit:
+        query = query.limit(limit)
+    return query.all()
 
 
 def count_gaps(
     organization_id: int,
     gap_type: Optional[str] = None,
     has_work_package: Optional[bool] = None,
+    severity: Optional[str] = None,
 ) -> int:
     """Return the number of gaps in the one gap register for an organisation.
 
@@ -430,14 +479,13 @@ def count_gaps(
     the count of the population listed:
       gap_type:          only count gaps with this gap_type value
                          (gap_archimate_service.get_gaps_for_roadmap).
+      severity:          only count gaps of this severity; "critical" is the
+                         critical-gap count every screen shows (list_gaps).
       has_work_package:  True counts gaps with at least one work package
                          link in this organisation; False counts gaps with
                          none (get_gaps_not_addressed). None counts all.
     """
-    query = Gap.query.filter(
-        Gap.organization_id == organization_id,
-        Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-    )
+    query = gap_register_query(organization_id, severity)
     if gap_type:
         query = query.filter(Gap.gap_type == gap_type)
     if has_work_package is not None:

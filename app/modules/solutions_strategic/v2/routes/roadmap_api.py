@@ -17,6 +17,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func, text
 
 from app import db
+from app.core.auth.permissions import can_change_model
 from app.decorators import audit_log
 from app.utils.api_helpers import api_error
 from app.models.implementation_migration import (
@@ -69,6 +70,17 @@ def _deliverable_or_404(deliverable_id):
 
 # Create blueprint
 roadmap_bp = Blueprint("roadmap_api", __name__, url_prefix="/api/roadmap")
+
+
+@roadmap_bp.before_request
+def _only_editors_write():
+    """Every POST, PUT, PATCH and DELETE on the roadmap needs a role that may change the model, so a route
+    added later is covered too. Reading stays open to every signed-in role."""
+    if request.method in ("POST", "PUT", "PATCH", "DELETE") and current_user.is_authenticated:
+        if not can_change_model(current_user):
+            return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
+    return None
+
 
 # Initialize services
 automation_engine = RoadmapAutomationEngine()
@@ -1074,11 +1086,18 @@ def create_gap():
         description: Unauthorized
     """
     try:
+        from app.modules.architecture.services.gap_archimate_service import apply_rating_rule
+        from app.services.gap_register_service import normalise_priority
+
         validation_error = validate_json_data(["name", "gap_type"])
         if validation_error:
             return validation_error
 
         data = request.get_json()
+        try:
+            priority = normalise_priority(data.get("priority")) or "medium"
+        except ValueError as error:
+            return jsonify({"success": False, "error": str(error)}), 400
 
         # Gap has no 'impact_assessment' (only a short 'impact' enum) and no
         # 'created_by' — the old kwargs crashed every call. Fold the free-text
@@ -1091,7 +1110,8 @@ def create_gap():
             name=data["name"],
             description=_desc,
             gap_type=data["gap_type"],
-            priority=data.get("priority", "medium"),
+            priority=priority,
+            severity=apply_rating_rule(None, None, {"priority": priority}).get("severity") or "medium",
             current_state_ref=data.get("current_state", ""),
             target_state_ref=data.get("target_state", ""),
         )
