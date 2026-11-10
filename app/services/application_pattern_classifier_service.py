@@ -95,11 +95,13 @@ def _call_generate_from_prompt_in_app_context(app, prompt: str, org_id, timeout=
 
     with app.app_context():
         g.current_org_id = org_id
+        # A caller with no budget gets exactly the call it always had: same arguments, same retries.
+        extra = {} if timeout is None else {"time_limit": timeout}
         return LLMService.generate_from_prompt(
             prompt,
             use_cache=True,
             timeout=LLM_CLASSIFY_TIMEOUT_SECONDS if timeout is None else timeout,
-            time_limit=timeout,
+            **extra,
         )
 
 
@@ -209,7 +211,7 @@ def _rule_based_classify(app: ApplicationComponent) -> tuple:
     return "unknown", 0.40, ["no_signal"]  # fabricated-ok: designed confidence weight for the no-signal classifier fallthrough
 
 
-# Per-request ceiling set by classify_applications(llm_timeout_seconds=...).
+# What is left of the request budget, set around each batch by _classify_batches.
 _llm_timeout_override: contextvars.ContextVar = contextvars.ContextVar(
     "llm_classify_timeout_override", default=None
 )
@@ -275,7 +277,7 @@ def _llm_classify_batch(apps: List[ApplicationComponent]) -> List[Dict]:
             else min(timeout_seconds, LLM_CLASSIFY_TIMEOUT_SECONDS)
         )
         future = _llm_classify_executor.submit(
-            _call_generate_from_prompt_in_app_context, app, prompt, org_id, limit
+            _call_generate_from_prompt_in_app_context, app, prompt, org_id, timeout_seconds
         )
         future.add_done_callback(_log_orphaned_future_exception)
         try:
@@ -361,7 +363,6 @@ class ApplicationPatternClassifierService:
         batch_size: int = 50,
         use_llm: bool = True,
         time_budget_seconds: Optional[float] = None,
-        llm_timeout_seconds: Optional[float] = None,
     ) -> List[Dict]:
         """
         Classify applications and persist arch_pattern to the database.
@@ -384,11 +385,7 @@ class ApplicationPatternClassifierService:
 
         self.llm_truncated = False
         self.unfinished_note = None
-        token = _llm_timeout_override.set(llm_timeout_seconds)
-        try:
-            return self._classify_batches(apps, batch_size, use_llm, time_budget_seconds)
-        finally:
-            _llm_timeout_override.reset(token)
+        return self._classify_batches(apps, batch_size, use_llm, time_budget_seconds)
 
     def _classify_batches(self, apps, batch_size, use_llm, time_budget_seconds) -> List[Dict]:
         results: List[Dict] = []
@@ -406,7 +403,6 @@ class ApplicationPatternClassifierService:
         # and every record says which engine produced it.
         llm_answered = False
         rules_count = 0
-        base_limit = _llm_timeout_override.get()
         for batch_start in range(0, len(apps), batch_size):
             batch = apps[batch_start: batch_start + batch_size]
 
@@ -420,7 +416,7 @@ class ApplicationPatternClassifierService:
                 # Each call gets only what is left of the one request budget.
                 if deadline is not None:
                     left = max(0.1, deadline - time.monotonic())
-                    token = _llm_timeout_override.set(left if base_limit is None else min(base_limit, left))
+                    token = _llm_timeout_override.set(left)
                 else:
                     token = None
                 try:
@@ -441,6 +437,8 @@ class ApplicationPatternClassifierService:
                     pattern = id_map[app.id]["arch_pattern"]
                     confidence = id_map[app.id]["confidence"]
                     source = id_map[app.id].get("source", "llm")
+                    if source != "llm":
+                        rules_count += 1
                 else:
                     pattern, confidence, _ = _rule_based_classify(app)
                     source = "rules"
@@ -475,7 +473,6 @@ class ApplicationPatternClassifierService:
         self,
         batch_size: int = 50,
         time_budget_seconds: Optional[float] = None,
-        llm_timeout_seconds: Optional[float] = None,
     ) -> Dict:
         """
         Classify the full application portfolio in batches.
@@ -489,7 +486,6 @@ class ApplicationPatternClassifierService:
             app_ids=None,
             batch_size=batch_size,
             time_budget_seconds=time_budget_seconds,
-            llm_timeout_seconds=llm_timeout_seconds,
         )
 
         by_pattern: Dict[str, int] = {}

@@ -101,12 +101,16 @@ def _debt_basis(result):
     return used, missing, unreadable
 
 
-def _gaps_sentence(missing, unreadable):
+def _gaps_sentence(missing, unreadable, support_text=None):
     parts = []
     if missing:
         parts.append("%s not recorded" % _plain_list(missing))
     if unreadable:
-        parts.append("%s could not be read" % _plain_list(unreadable))
+        others = [name for name in unreadable if not (name == "support status" and support_text)]
+        if others:
+            parts.append("%s could not be read" % _plain_list(others))
+        if support_text and "support status" in unreadable:
+            parts.append("support status not recognised (recorded as \u201c%s\u201d)" % support_text)
     return "; ".join(parts)
 
 
@@ -130,12 +134,13 @@ def _debt_row(app_id, app_name, result):
         row["detail"] = row["reason"]
         return row
     used, missing, unreadable = _debt_basis(result)
+    support_text = result.get("unrecognised_support_status")
     row.update(scored_from=used, missing=missing, unreadable=unreadable)
     if not used:
         if not unreadable:
             row["reason"] = "Not rated: no " + ", ".join(_DEBT_INPUTS) + " recorded"
         else:
-            row["reason"] = "Not rated: " + _gaps_sentence(missing, unreadable) + ". Record or correct them to get a score."
+            row["reason"] = "Not rated: " + _gaps_sentence(missing, unreadable, support_text) + ". Record or correct them to get a score."
         row["detail"] = row["reason"]
         return row
     debt_score = result.get("debt_score", 0)
@@ -151,7 +156,7 @@ def _debt_row(app_id, app_name, result):
         row["detail"] = "%s. Scored from the %s only; %s. Record the rest for a full score." % (
             lead,
             _plain_list(used),
-            _gaps_sentence(missing, unreadable),
+            _gaps_sentence(missing, unreadable, support_text),
         )
     return row
 

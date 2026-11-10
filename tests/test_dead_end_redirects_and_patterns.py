@@ -56,7 +56,7 @@ def test_old_address_without_a_query_adds_none(app, db_session, make_org):
     assert _location(client, "/dashboard/impact-analysis").endswith("/enterprise/analysis/impact-analysis")
 
 
-def test_patterns_answer_within_five_seconds_behind_a_slow_provider(
+def test_patterns_a_one_second_budget_gives_a_plain_504_behind_a_stuck_provider(
     app, db_session, make_org, monkeypatch
 ):
     from app.api import sa_phase_c_routes
@@ -90,26 +90,44 @@ def test_patterns_one_budget_covers_the_whole_request_and_keeps_finished_batches
     from app.api import sa_phase_c_routes
     from app.modules.ai_chat.services import llm_service_impl as llm_impl
 
+    import json
+    import threading
+    import types
+
+    from app.services import application_pattern_classifier_service as classifier
+
     monkeypatch.setattr(sa_phase_c_routes, "PATTERNS_REQUEST_BUDGET_SECONDS", 2.0)
     client, _org, apps = _make_logged_in_client(app, db_session, make_org, "budgetpat", app_count=60)
     calls = []
+    # An injected clock: the first model call "takes" 1.5 of the 2.0 second budget.
+    now = [1000.0]
+    monkeypatch.setattr(
+        classifier, "time", types.SimpleNamespace(monotonic=lambda: now[0], sleep=time.sleep)
+    )
+    release_slow_call = threading.Event()
+    slow_call_finished = threading.Event()
 
     def _first_fast_then_slow(prompt, *args, **kwargs):
         calls.append(kwargs.get("time_limit"))
         if len(calls) > 1:
-            time.sleep(8.0)
+            release_slow_call.wait(30)
+            slow_call_finished.set()
             return "[]"
+        now[0] += 1.5
         ids = [int(i) for i in re.findall(r"- ID (\d+):", prompt)]
-        import json
-
         return json.dumps([{"id": i, "arch_pattern": "saas", "confidence": 0.9, "reasoning": "x"} for i in ids])
 
     monkeypatch.setattr(llm_impl.LLMService, "generate_from_prompt", staticmethod(_first_fast_then_slow))
-    started = time.monotonic()
-    response = client.get("/api/ea-workflows/sa/application-patterns")
-    elapsed = time.monotonic() - started
+    try:
+        response = client.get("/api/ea-workflows/sa/application-patterns")
+        # Was `elapsed < 4.0` on a wall clock. Same property, no clock: the answer came back
+        # while the slow second call was still running, so the request did not wait for it,
+        # and that call was given exactly what the injected clock says was left of the budget.
+        assert not slow_call_finished.is_set()
+    finally:
+        release_slow_call.set()
     assert response.status_code == 200, response.get_data(as_text=True)[:300]
-    assert elapsed < 4.0, elapsed
+    assert calls[0] == pytest.approx(2.0) and calls[1] == pytest.approx(0.5), calls
     patterns = response.get_json()["patterns"]
     assert patterns["classified"] == 60
     assert patterns["by_source"]["llm"] == 50
@@ -277,3 +295,122 @@ def test_debt_scores_error_names_no_exception(app, db_session, make_org, monkeyp
     assert response.status_code == 500
     assert "secret internal detail" not in response.get_data(as_text=True)
     assert "detail" not in response.get_json()
+
+
+def _answer_every_id(prompt):
+    import json
+    import re
+
+    ids = [int(i) for i in re.findall(r"- ID (\d+):", prompt)]
+    return json.dumps([{"id": i, "arch_pattern": "saas", "confidence": 0.9, "reasoning": "x"} for i in ids])
+
+
+def test_patterns_address_passes_the_shipped_twenty_second_budget_to_the_provider(
+    app, db_session, make_org, monkeypatch
+):
+    from app.api import sa_phase_c_routes
+    from app.modules.ai_chat.services import llm_service_impl as llm_impl
+
+    assert sa_phase_c_routes.PATTERNS_REQUEST_BUDGET_SECONDS == 20
+    client, _org, _apps = _make_logged_in_client(app, db_session, make_org, "shipbudget", app_count=2)
+    calls = []
+
+    def _record(prompt, *args, **kwargs):
+        calls.append(kwargs.get("time_limit"))
+        return _answer_every_id(prompt)
+
+    monkeypatch.setattr(llm_impl.LLMService, "generate_from_prompt", staticmethod(_record))
+    assert client.get("/api/ea-workflows/sa/application-patterns").status_code == 200
+    assert len(calls) == 1 and 19.0 < calls[0] <= 20.0, calls
+
+
+def test_a_caller_with_no_budget_makes_the_provider_call_it_always_made(
+    app, db_session, make_org, monkeypatch
+):
+    from app.modules.ai_chat.services import llm_service_impl as llm_impl
+    from app.services.application_pattern_classifier_service import ApplicationPatternClassifierService
+
+    client, _org, _apps = _make_logged_in_client(app, db_session, make_org, "nobudget", app_count=2)
+    seen = []
+
+    def _record(prompt, *args, **kwargs):
+        seen.append((args, kwargs))
+        return _answer_every_id(prompt)
+
+    monkeypatch.setattr(llm_impl.LLMService, "generate_from_prompt", staticmethod(_record))
+    with client.application.test_request_context():
+        from flask import g
+
+        g.current_org_id = _org.id
+        result = ApplicationPatternClassifierService().classify_portfolio()
+    assert result["by_source"] == {"llm": 2}
+    assert seen == [((), {"use_cache": True, "timeout": 60})], seen
+
+
+def test_patterns_note_counts_a_batch_that_errored_as_rules(app, db_session, make_org, monkeypatch):
+    """120 applications: the first batch errors, the second answers, the third is slow."""
+    from app.api import sa_phase_c_routes
+    from app.modules.ai_chat.services import llm_service_impl as llm_impl
+
+    monkeypatch.setattr(sa_phase_c_routes, "PATTERNS_REQUEST_BUDGET_SECONDS", 2.0)
+    client, _org, _apps = _make_logged_in_client(app, db_session, make_org, "errbatch", app_count=120)
+    calls = []
+
+    def _error_answer_slow(prompt, *args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            return "this is not json"
+        if len(calls) == 2:
+            return _answer_every_id(prompt)
+        time.sleep(6.0)
+        return "[]"
+
+    monkeypatch.setattr(llm_impl.LLMService, "generate_from_prompt", staticmethod(_error_answer_slow))
+    response = client.get("/api/ea-workflows/sa/application-patterns")
+    assert response.status_code == 200, response.get_data(as_text=True)[:300]
+    patterns = response.get_json()["patterns"]
+    assert patterns["by_source"]["llm"] == 50
+    assert patterns["by_source"]["rules"] + patterns["by_source"].get("rule_fallback", 0) == 70
+    assert "70 applications" in patterns["note"], patterns["note"]
+
+
+SUPPORT_VALUES = [
+    ("supported", "good"), ("  Supported ", "good"), ("BASIC", "good"),
+    ("unsupported", 80), ("Not supported", 80), ("End of support", 80), ("expired", 80),
+    ("limited", 60),
+    ("none", "unrecognised"), ("unknown", "unrecognised"), ("TBC", "unrecognised"),
+    ("   ", "blank"), ("", "blank"),
+]
+
+
+def test_debt_panel_calls_support_good_only_for_a_known_supported_value(app, db_session, make_org):
+    from datetime import date
+
+    from app.models.application_portfolio import ApplicationComponent
+
+    client, org, _apps = _make_logged_in_client(app, db_session, make_org, "supval", app_count=0)
+    other = make_org("supval-other")
+    future = date(2040, 1, 1)
+    db_session.add(ApplicationComponent(name="Other org TBC", organization_id=other.id,
+                                        end_of_life_date=future, version="10.2", support_level="TBC"))
+    for index, (value, _expected) in enumerate(SUPPORT_VALUES):
+        db_session.add(ApplicationComponent(name="Support case %d" % index, organization_id=org.id,
+                                            end_of_life_date=future, version="10.2", support_level=value))
+    db_session.flush()
+
+    rows = {r["app_name"]: r for r in client.get("/api/ea/phase-d/debt-scores").get_json()["scores"]}
+    assert "Other org TBC" not in rows
+    for index, (value, expected) in enumerate(SUPPORT_VALUES):
+        row = rows["Support case %d" % index]
+        if expected == "good":
+            assert row["debt_score"] == 0 and "all in good standing" in row["detail"], (value, row)
+        elif isinstance(expected, int):
+            assert row["debt_score"] == expected, (value, row)
+            assert "good standing" not in row["detail"], (value, row)
+        else:
+            assert "good standing" not in row["detail"], (value, row)
+            assert "support status" not in row["scored_from"], (value, row)
+            if expected == "unrecognised":
+                assert "support status not recognised (recorded as “%s”)" % value in row["detail"], (value, row)
+            else:
+                assert "support status not recorded" in row["detail"], (value, row)
