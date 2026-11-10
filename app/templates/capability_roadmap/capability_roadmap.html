@@ -203,7 +203,7 @@
         <div class="flex items-center gap-3">
           {% if can_change_model() %}
           <template x-if="selectedGapIds.length > 0">
-            {% call button(text='Generate roadmap', variant='outline', icon='sparkles', on_click='openAiGenerateModal()', attrs_dict={'x-show': 'selectedGapIds.length > 0'}) %}<span x-text="selectedGapIds.length"></span> gaps{% endcall %}
+            {% call button(text='Generate roadmap', variant='outline', icon='sparkles', on_click='openAiGenerateModal()', attrs_dict={'x-show': 'selectedGapIds.length > 0'}) %}<span class="ml-1" x-text="selectedGapIds.length"></span>&nbsp;gaps{% endcall %}
           </template>
           {% call button(text='Add Work Package', variant='default', icon='plus', on_click='openCreateWorkPackageModal(null)') %}{% endcall %}
           {% else %}
@@ -493,9 +493,8 @@
 </div>
 
 {# Roadmap preview dialog: the pattern library's dialog, driven by the roadmap store #}
-<div id="rdm-ai-generate-modal">
-{% call dialog(title='Roadmap preview', description='Each gap is placed in a plateau by its severity. Nothing is saved until you click Confirm & Create.', open_expr='$store.rdm.aiOpen', close_expr='$store.rdm.aiOpen = false', title_expr="'Roadmap preview'") %}
-<div class="max-h-96 overflow-y-auto">
+<div id="rdm-ai-generate-modal" x-data>
+{% call dialog(title='Roadmap preview', description='Each gap is placed in a plateau by its severity. Nothing is saved until you click Confirm & Create.', open_expr='$store.rdm.aiOpen', close_expr='$store.rdm.aiOpen = false', title_expr="'Roadmap preview'", start_hidden=false) %}
 <div x-data="rdmAiModalForm()" x-init="initFromGlobal()">
   <template x-if="isLoading">
     <div class="flex items-center justify-center py-10">
@@ -507,7 +506,7 @@
     <p class="text-center text-sm text-muted-foreground py-6">No preview available. Select gaps and try again.</p>
   </template>
   <template x-if="!isLoading && preview.length > 0">
-    <div class="space-y-3">
+    <div class="max-h-80 space-y-3 overflow-y-auto">
       <template x-for="item in preview" :key="item.gap_id">
         {% call card(class='bg-muted/30') %}
           <div class="flex items-start justify-between p-4">
@@ -545,7 +544,6 @@
     {% call button(text='Discard', variant='outline', on_click="$store.rdm.aiOpen = false") %}{% endcall %}
     {% call button(text='Confirm & Create', variant='default', attrs_dict={':disabled': 'isConfirming || preview.length === 0', '@click': 'confirmAiGeneration()'}) %}{% endcall %}
   </div>
-</div>
 </div>
 {% endcall %}
 </div>
