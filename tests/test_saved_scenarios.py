@@ -334,8 +334,8 @@ def test_the_export_is_a_table_that_quotes_every_cell_and_neutralises_a_formula(
     assert rows[0][1] == '\'=HYPERLINK("http://x"),"a, b"'
     assert all(line.startswith('"') and line.endswith('"') for line in text.splitlines())
     by_metric = {r[0]: r[1:] for r in rows}
-    assert by_metric["Elements in the model"][0].endswith("(change -1)")
-    assert by_metric["Elements in the model"][1].endswith("(change 0)")
+    assert by_metric["Elements in the model"][0].endswith("(Down 1)")
+    assert by_metric["Elements in the model"][1].endswith("(No change)")
     assert by_metric["Elements in the model"][0] != by_metric["Elements in the model"][1]
 
 

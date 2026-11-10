@@ -6,6 +6,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal with context %}
 {% import 'basecoat/index.html' as ui %}
+{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}{{ 'Scenarios' if simulation else 'Architecture Impact Analysis' }}{% endblock %}
 
@@ -48,8 +49,16 @@
         </div>
     </div>
 
-    {# Strategic actions: the one shared prioritised action list #}
-    {% include 'components/priority_actions.html' %}
+    {% if model_empty %}
+    {# An empty model has nothing to try a change on, nor any action to prioritise: say so and offer the way to fill it. #}
+    <div class="rounded-lg border bg-card" data-testid="model-empty">
+        {{ empty_state(icon='database',
+            title='Your model has no elements yet',
+            description='There is nothing to try a change on until your model holds elements. Connect GitHub to read your repositories into it.' if may_connect_github else 'There is nothing to try a change on until your model holds elements. Ask an administrator of your organisation to connect GitHub or add elements.',
+            cta_text='Connect GitHub' if may_connect_github else None,
+            cta_href=url_for('m365_connector.github_connect') if may_connect_github else None) }}
+    </div>
+    {% endif %}
 
     <!-- Main Grid -->
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -397,6 +406,11 @@
         </div>
     </div>
 
+    {# Below the picker: a person starts a run first and reads the queue of other work after it. #}
+    {% if not model_empty %}
+    {% include 'components/priority_actions.html' %}
+    {% endif %}
+
     {# Naming a scenario to save: the library dialog, not the browser's own prompt. #}
     {% call modal(id='save-scenario-dialog', title='Save scenario', description='Name this scenario so you can find it when you compare scenarios.', size='sm') %}
         <form @submit.prevent="confirmSaveScenario()" class="style-vega space-y-4" data-testid="save-scenario-form">
@@ -518,6 +532,7 @@
             searchNote: '',
             searchError: '',
             emptyMessage: '',
+            modelEmpty: {{ 'true' if model_empty else 'false' }},
             otherLayers: [],
             selectedElement: null,
             changeType: 'MODIFY',
@@ -752,7 +767,9 @@
                     if (rows.length >= IMPACT_PICKER_LIMIT) {
                         this.searchNote = 'Showing the first ' + IMPACT_PICKER_LIMIT + ' matches. Type more of the name to narrow the list.';
                     }
-                    if (rows.length === 0) {
+                    if (rows.length === 0 && this.modelEmpty) {
+                        this.emptyMessage = 'Your model has no elements yet, so there is nothing to find.';
+                    } else if (rows.length === 0) {
                         await this.explainNoMatch(text, layer, seq);
                     }
                 } catch (e) {

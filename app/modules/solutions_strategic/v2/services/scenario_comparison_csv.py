@@ -28,11 +28,13 @@ def _number(value: Any, money: bool) -> str:
 
 
 def figure_text(figure: Dict[str, Any]) -> str:
-    """One figure of a run as the dialog draws it: the figure now, after the change, and the change."""
+    """One figure of a run as the dialog draws it: the figure now, after the change, and the change worded as the screen words it."""
     money = bool(figure.get("money"))
     text = "%s to %s" % (_number(figure.get("before"), money), _number(figure.get("after"), money))
     change = figure.get("change")
-    return text + (" (change %s)" % _number(change, money) if change is not None else "")
+    if change is None:
+        return text
+    return text + (" (No change)" if change == 0 else " (%s %s)" % ("Up" if change > 0 else "Down", _number(abs(change), money)))
 
 
 def figure_labels(scenarios: List[Dict[str, Any]]) -> List[str]:

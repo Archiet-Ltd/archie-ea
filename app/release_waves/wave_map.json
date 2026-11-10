@@ -3459,6 +3459,8 @@
 "/strategic/api/risks/<x>/details":["X","BP:strategic_risks_hardened","unplanned",null,null],
 "/strategic/api/risks/statuses":["X","BP:strategic_risks_hardened","unplanned",null,null],
 "/strategic/api/scenarios":["W3","PG-SIM","override",null,null],
+"/strategic/api/scenarios/<x>":["W3","PG-SIM","override",null,null],
+"/strategic/api/scenarios/export.csv":["W3","PG-SIM","override",null,null],
 "/strategic/api/simulations":["W3","PG-SIM","override",null,null],
 "/strategic/api/submit-review":["X","BP:strategic","unplanned",null,null],
 "/strategic/api/technology-analysis":["X","BP:strategic","unplanned",null,null],
