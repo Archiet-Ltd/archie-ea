@@ -27,6 +27,11 @@ FIG_REF = re.compile(r"\[fig:\s*([^\]\s]*)\s*\]", re.IGNORECASE)
 _FIG_KEY = re.compile(r"^F\d+$")
 _RAW_FIG = re.compile(r"\[fig:", re.IGNORECASE)
 REF = re.compile(r"\[ref:([^\]\s]+)\]", re.IGNORECASE)
+_KEY_IN_INPUT = re.compile(r"\[fig:\s*F(\d+)\s*\]|[\"']fig[\"']\s*:\s*[\"']F(\d+)[\"']", re.IGNORECASE)
+# Room each earlier answer of a conversation leaves in the key sequence: a turn holds far fewer
+# figures than this (the annotation budget stops at 300), and an answer is delivered as text with
+# no key in it, so the turn count is what tells a later turn where the earlier keys stopped.
+KEYS_PER_TURN = 1000
 
 ANNOTATION_TOKEN_BUDGET = 3000
 ANNOTATION_TOKENS_PER_FIGURE = 10
@@ -124,6 +129,9 @@ class FigureTable:
         self.organization_id = organization_id
         self.entries: List[Dict[str, Any]] = []
         self.names: set = set()
+        # id -> name of every record a declared row list or subject returned this turn (the
+        # records a sentence can cite or name; labels, layers and categories are not records).
+        self.record_names: Dict[str, str] = {}
         self.calls = 0
         self.annotation_tokens = 0
         self._sequence = 0
@@ -134,6 +142,16 @@ class FigureTable:
         return _escape_fig_tokens(copy.deepcopy(result))
 
     # -- reading ----------------------------------------------------------- #
+
+    def start_above(self, highest: int) -> None:
+        """The next key is one more than *highest*, so no key of this turn repeats a key the
+        model was given before (a key it copies from an earlier answer is unknown here)."""
+        self._sequence = max(self._sequence, int(highest))
+
+    def owners_of_name(self, name: str) -> set:
+        """Ids of the records this turn returned under *name* (ignoring case)."""
+        wanted = name.strip().lower()
+        return {i for i, n in self.record_names.items() if n.strip().lower() == wanted}
 
     def get(self, key: str) -> Optional[Dict[str, Any]]:
         key = str(key).upper()
@@ -194,6 +212,15 @@ class FigureTable:
                 if field_name:
                     self._collect_names(result, field_name)
         subject = self._subject_of(declaration.get("subject"), result)
+        if subject and subject.get("id") is not None:
+            self.record_names[str(subject["id"])] = subject["name"]
+        for row in rows.values():
+            if row.get("id_field") and row.get("name_field"):
+                ids = _leaves(result, _tokens(row["path"] + "." + row["id_field"]))
+                for parent, key, item in ids:
+                    name = item.get(row["name_field"]) if isinstance(item, dict) else None
+                    if parent.get(key) is not None and isinstance(name, str) and name.strip():
+                        self.record_names[str(parent[key])] = name.strip()
         for field in declaration.get("fields", []):
             when = field.get("when") or {}
             if any(_get(result, path) != wanted for path, wanted in when.items()):
@@ -232,8 +259,8 @@ class FigureTable:
 
     @staticmethod
     def _subject_of(spec, result) -> Optional[Dict[str, Any]]:
-        if not spec:
-            return None
+        if not isinstance(spec, dict):
+            return None  # absent, or declared "none"
         if spec.get("map"):
             mapping = _get(result, spec["map"])
             if isinstance(mapping, dict):
@@ -366,6 +393,72 @@ def unit_at(text: str, units: List[Tuple[int, int]], position: int) -> Tuple[int
 # --------------------------------------------------------------------------- #
 
 
+def key_floor(history, user_message: str = "") -> int:
+    """The highest key number a turn must start above: the highest key found anywhere in the
+    input the model receives (the earlier turns, any tool results they carry, the person's own
+    messages), and never less than the room the earlier answers of the conversation took."""
+    texts = [str(user_message or "")]
+    answers = 0
+    for entry in history or []:
+        content = (entry or {}).get("content")
+        if content is None:
+            continue
+        texts.append(content if isinstance(content, str) else str(content))
+        if (entry or {}).get("role") == "assistant":
+            answers += 1
+    highest = 0
+    for text in texts:
+        for match in _KEY_IN_INPUT.finditer(text):
+            highest = max(highest, int(match.group(1) or match.group(2)))
+    return max(highest, answers * KEYS_PER_TURN)
+
+
+def label_position(sentence: str, label) -> int:
+    """Where the row label sits in *sentence* (ignoring case), or -1: the one row-label match."""
+    label = (label or "").strip().lower()
+    return sentence.lower().find(label) if label else -1
+
+
+def records_in(sentence: str, table: FigureTable) -> List[Tuple[int, str]]:
+    """``(position, record id)`` for each record *sentence* cites (its ``[ref:<id>]``) or names
+    (a whole name a tool returned this turn, by the one name matcher), in text order. A name two
+    records share belongs to the one the sentence cites, else to each of them."""
+    cited = [(m.start(), m.group(1)) for m in REF.finditer(sentence)]
+    cited_ids = {i for _p, i in cited}
+    hits = list(cited)
+    by_name: Dict[str, set] = {}
+    for ident, name in table.record_names.items():
+        by_name.setdefault(name.strip().lower(), set()).add(ident)
+    for start, _end, matched in name_spans(sentence, table.record_names.values()):
+        owners = by_name.get(matched.strip().lower(), set())
+        owners = (owners & cited_ids) or owners
+        hits.extend((start, ident) for ident in sorted(owners))
+    return sorted(hits, key=lambda hit: hit[0])
+
+
+def subject_bound(sentence: str, entry: Dict[str, Any], table: FigureTable) -> bool:
+    """A subject's top-level figure renders only in a sentence that cites or names its subject
+    and cites or names no other record. A doubtful name (one two records share, with no
+    citation to tell them apart) counts against it."""
+    subject = str(entry["record_id"])
+    cited = {m.group(1) for m in REF.finditer(sentence)}
+    if cited - {subject}:
+        return False
+    by_name: Dict[str, set] = {}
+    for ident, name in table.record_names.items():
+        by_name.setdefault(name.strip().lower(), set()).add(ident)
+    found = False
+    for _s, _e, matched in name_spans(sentence, table.record_names.values()):
+        owners = by_name.get(matched.strip().lower(), set())
+        if owners == {subject}:
+            found = True
+        elif subject in cited and subject in owners:
+            found = True
+        else:
+            return False
+    return subject in cited or found
+
+
 def resolve_references(text: str, table: FigureTable, turn_org) -> List[Dict[str, Any]]:
     """The references in *text* that cannot be shown, each with its reason:
     unknown_reference, other_organisation, or unbound (a row figure outside a sentence
@@ -389,9 +482,12 @@ def resolve_references(text: str, table: FigureTable, turn_org) -> List[Dict[str
                 cited = {m.group(1) for m in REF.finditer(sentence)}
                 bound = str(entry["record_id"]) in cited
             else:
-                label = (entry.get("label") or "").strip().lower()
-                bound = bool(label) and label in sentence.lower()
+                bound = label_position(sentence, entry.get("label")) >= 0
             if not bound:
+                problems.append({**base, "reason": REASON_UNBOUND, "entry": entry})
+        elif entry.get("record_id") is not None and entry["scope"] != "public":
+            a, b = unit_at(text, units, match.start())
+            if not subject_bound(text[a:b], entry, table):
                 problems.append({**base, "reason": REASON_UNBOUND, "entry": entry})
     stripped = FIG_REF.sub("", text)
     if _RAW_FIG.search(stripped):
@@ -445,13 +541,24 @@ def names_file_entries() -> Tuple[str, ...]:
 
 
 @functools.lru_cache(maxsize=64)
-def _name_pattern(turn_names: Tuple[str, ...]):
-    names = sorted(set(turn_names) | set(names_file_entries()), key=lambda s: (-len(s), s.lower()))
-    names = [n for n in names if _DIGIT.search(n) or _NUMBER_WORD.search(n)]
-    if not names:
+def _whole_name_pattern(names: Tuple[str, ...]):
+    """The one name matcher (form 4): whole words, ignoring case, longest name first."""
+    ordered = sorted({n for n in names if n and n.strip()}, key=lambda s: (-len(s), s.lower()))
+    if not ordered:
         return None
-    parts = [r"\s+".join(re.escape(piece) for piece in n.split()) for n in names]
+    parts = [r"\s+".join(re.escape(piece) for piece in n.split()) for n in ordered]
     return re.compile(r"(?<![\w])(?:" + "|".join(parts) + r")(?![\w])", re.IGNORECASE)
+
+
+def name_spans(text: str, names: Iterable[str]) -> List[Tuple[int, int, str]]:
+    """``(start, end, matched text)`` of each whole name of *names* in *text*, none inside another."""
+    pattern = _whole_name_pattern(tuple(sorted(set(names))))
+    return [(m.start(), m.end(), m.group(0)) for m in pattern.finditer(text)] if pattern else []
+
+
+def _name_pattern(turn_names: Tuple[str, ...]):
+    names = set(turn_names) | set(names_file_entries())
+    return _whole_name_pattern(tuple(sorted(n for n in names if _DIGIT.search(n) or _NUMBER_WORD.search(n))))
 
 
 def _blank(text: str, spans: Iterable[Tuple[int, int]]) -> str:
@@ -767,49 +874,73 @@ def envelope_figure(entry: Dict[str, Any], shown: str, start: int, end: int) -> 
 def records_block(table: FigureTable, removed: List[str], shown_keys: Iterable[str],
                   tools_called: int = 1):
     """``(text, figures)``: "What the records show:" and one line for each record a removed
-    clause cited, with its declared figures from every call of the turn, then each call's
-    top-level figures (on its subject's line, else on "Your organisation"). Figures already
-    shown in the answer are left out; ``("", [])`` when nothing is left to show. *figures*
-    are ``(entry, phrase, start, end)`` with offsets inside the text. The organisation
-    summary's figures are listed only when no tool ran."""
+    clause cites or names, and for each labelled row whose label a removed clause holds, in the
+    order they first appear, each with its declared figures from every call of the turn; then
+    each call's top-level figures (on its subject's line, else on "Your organisation"). The
+    organisation summary's figures join the "Your organisation" line when no tool ran, and when
+    a tool ran and a removed clause cites or names no record and holds no row label. Figures
+    already shown in the answer are left out; ``("", [])`` when nothing is left to show.
+    *figures* are ``(entry, phrase, start, end)`` with offsets inside the text."""
     shown = set(shown_keys)
-    removed_text = "\n".join(removed)
-    cited_ids = {m.group(1) for m in REF.finditer(removed_text)}
-    lines: List[Tuple[str, List[Dict[str, Any]]]] = []
-    index: Dict[str, int] = {}
+    order: List[str] = []
+    clause_without_record = False
+    labels = [e for e in table.entries if e["row"] and e.get("record_id") is None and e.get("label")]
+    for clause in removed:
+        hits: List[Tuple[int, str]] = [(p, "id:%s" % i) for p, i in records_in(clause, table)]
+        for entry in labels:
+            at = label_position(clause, entry["label"])
+            if at >= 0:
+                hits.append((at, "label:%s" % entry["label"].lower()))
+        if not hits:
+            clause_without_record = True
+        for _p, identity in sorted(hits, key=lambda hit: hit[0]):
+            if identity not in order:
+                order.append(identity)
+    organisation_too = not tools_called or clause_without_record
+    heading_of: Dict[str, str] = {}
+    buckets: Dict[str, List[Dict[str, Any]]] = {}
+    top_level: List[str] = []
 
     def add(entry: Dict[str, Any], identity: str, heading: str) -> None:
         if entry["key"] in shown:
             return
-        if identity not in index:
-            index[identity] = len(lines)
-            lines.append((heading, []))
-        bucket = lines[index[identity]][1]
+        heading_of.setdefault(identity, heading)
+        bucket = buckets.setdefault(identity, [])
         if all(e["rendered"] != entry["rendered"] for e in bucket):
             bucket.append(entry)
 
+    def record_heading(entry: Dict[str, Any]) -> str:
+        return "%s [ref:%s]" % (entry.get("record_name") or "Record", entry["record_id"])
+
     for entry in table.entries:
-        if entry["tool"] == "organisation_summary" and tools_called:
-            continue
-        if entry["row"]:
+        if entry["tool"] == "organisation_summary":
+            if organisation_too:
+                add(entry, "org", "Your organisation")
+                if "org" not in top_level:
+                    top_level.append("org")
+        elif entry["row"]:
             if entry.get("record_id") is not None:
-                if str(entry["record_id"]) in cited_ids:
-                    add(entry, "id:%s" % entry["record_id"],
-                        "%s [ref:%s]" % (entry.get("record_name") or "Record", entry["record_id"]))
-            elif entry.get("label") and entry["label"].lower() in removed_text.lower():
+                if "id:%s" % entry["record_id"] in order:
+                    add(entry, "id:%s" % entry["record_id"], record_heading(entry))
+            elif entry.get("label") and "label:%s" % entry["label"].lower() in order:
                 add(entry, "label:%s" % entry["label"].lower(), entry["label"])
         elif entry.get("record_id") is not None:
-            add(entry, "id:%s" % entry["record_id"],
-                "%s [ref:%s]" % (entry.get("record_name") or "Record", entry["record_id"]))
+            identity = "id:%s" % entry["record_id"]
+            add(entry, identity, record_heading(entry))
+            if identity not in top_level:
+                top_level.append(identity)
         else:
             add(entry, "org", "Your organisation")
+            if "org" not in top_level:
+                top_level.append("org")
     parts = [RECORDS_HEADING]
     figures = []
     length = len(RECORDS_HEADING)
-    for heading, entries in lines:
+    for identity in order + [i for i in top_level if i not in order]:
+        entries = buckets.get(identity) or []
         if not entries:
             continue
-        prefix = "\n- %s: " % heading
+        prefix = "\n- %s: " % heading_of[identity]
         parts.append(prefix)
         length += len(prefix)
         for i, entry in enumerate(entries):
@@ -856,7 +987,12 @@ def revision_message(violations: List[Dict[str, Any]], table: FigureTable, quest
             lines.append("[fig:%s] cannot be used here." % item["key"])
         elif reason == REASON_UNBOUND:
             entry = item["entry"]
-            if entry.get("record_id") is not None:
+            if entry.get("record_id") is not None and not entry.get("row"):
+                lines.append(
+                    "[fig:%s] belongs to %s [ref:%s]. Put it in a sentence that cites or names that record "
+                    "and no other record." % (item["key"], entry.get("record_name") or "a record",
+                                              entry["record_id"]))
+            elif entry.get("record_id") is not None:
                 lines.append(
                     "[fig:%s] belongs to %s [ref:%s]. Put it in a sentence that cites that record, or use the "
                     "figure of the record you named." % (item["key"], entry.get("record_name") or "a record",

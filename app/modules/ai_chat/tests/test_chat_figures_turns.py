@@ -166,19 +166,19 @@ def test_one_revision_is_sent_with_each_violation_named(app, db_session, make_or
     org = make_org("fig-revise")
     user = _user(db_session, org.id)
     root, mid, leaf = _estate(db_session, org.id, "Rev")
-    wrong = "Rev Mid [ref:%d] is hit, 14 in all, and [fig:F99] too." % mid.id
-    right = lambda messages: {"text": "Rev Mid [ref:%d] is hit, [fig:%s] in all." % (mid.id, _key_in(messages, "total"))}  # noqa: E731
+    wrong = "Rev Root [ref:%d] is hit, 14 in all, and [fig:F99] too." % root.id
+    right = lambda messages: {"text": "Rev Root [ref:%d] is hit, [fig:%s] in all." % (root.id, _key_in(messages, "total"))}  # noqa: E731
     script = [_call_answer(root.id), {"text": wrong}, right]
 
     result, _e, _r, seen = _run_turn(app, monkeypatch, script, user=user, message="what breaks if Rev Root fails?")
 
     sent = str(seen[2][-1]["content"])
     assert sent.startswith("Your answer cannot be shown as written. Fix each point and send the whole answer again:")
-    assert '"14" in "Rev Mid [ref:%d] is hit, 14 in all, and [fig:F99] too." is written as text.' % mid.id in sent
+    assert '"14" in "Rev Root [ref:%d] is hit, 14 in all, and [fig:F99] too." is written as text.' % root.id in sent
     assert "Use its reference from the tool results, or leave it out." in sent
     assert "[fig:F99] does not exist in this turn." in sent
     assert len(seen) == 3, "exactly one revision"
-    assert result["response"] == "Rev Mid [ref:%d] is hit, 2 connections downstream in all." % mid.id
+    assert result["response"] == "Rev Root [ref:%d] is hit, 2 connections downstream in all." % root.id
     assert result["figure_check"]["revision_ran"] is True and result["figure_check"]["revision_fixed"] is True
     assert result["figure_check"]["first_draft_violations"] == {"written_number": 1, "unknown_reference": 1}
 

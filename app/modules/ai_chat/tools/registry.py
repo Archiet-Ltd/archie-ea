@@ -24,8 +24,9 @@ import re
 #            "id_field": <record id field>, "name_field": <record name field>} or, for a row
 #            that is not a record, {"path": ..., "label_field": <field>}
 #   names    the keys whose string values are names of records
-#   subject  optional: {"map": <key of a dict of id -> {"name"}>} the record a
-#            call's top-level figures describe
+#   subject  required when a field is top-level (its path has no "[]"): the record the call's
+#            top-level figures describe, {"map": <key of a dict of id -> {"name"}>} or
+#            {"id_path": ..., "name_path": ...}, or "none" when they describe no one record
 #
 # A field: path (relative to the whole tool result; "a.b" for a key, "rows[].c"
 # for a key inside a list), kind, reads, reads_null, label, concept, and the keys
@@ -311,6 +312,7 @@ TOOL_SCHEMAS = [
             ],
             "rows": [{"path": "result[]", "id_field": "id", "name_field": "name"}],
             "names": ["name"],
+            "subject": "none",
         },
         "record_types_written": [],
         "description": (
@@ -361,6 +363,7 @@ TOOL_SCHEMAS = [
             ],
             "rows": [{"path": "result[]", "id_field": "id", "name_field": "name"}],
             "names": ["name"],
+            "subject": "none",
         },
         "record_types_written": [],
         "description": (
@@ -1027,6 +1030,7 @@ TOOL_SCHEMAS = [
             ],
             "rows": [],
             "names": [],
+            "subject": "none",
         },
         "record_types_written": [],
         "description": (
@@ -1548,6 +1552,7 @@ TOOL_SCHEMAS = [
             ],
             "rows": [{"path": "result.ranked[]", "label_field": "capability_name"}],
             "names": ["capability_name"],
+            "subject": "none",
         },
         "record_types_written": [],
         "description": (
@@ -2388,6 +2393,7 @@ ORGANISATION_SUMMARY_FIGURES = {
     ],
     "rows": [],
     "names": [],
+    "subject": "none",
 }
 
 
@@ -2398,6 +2404,15 @@ def figure_declaration_problems(declaration) -> list:
         return ["figures is not a dict"]
     problems = []
     row_paths = {r.get("path") for r in declaration.get("rows", [])}
+    subject = declaration.get("subject")
+    if any("[]" not in str(f.get("path")) for f in declaration.get("fields", [])):
+        if subject != "none" and not (
+            isinstance(subject, dict)
+            and (subject.get("map") or (subject.get("id_path") and subject.get("name_path")))
+        ):
+            problems.append("top-level figures need a subject (the record they describe) or \"none\"")
+    elif subject is not None and subject != "none" and not isinstance(subject, dict):
+        problems.append("subject is a record path or \"none\"")
     for row in declaration.get("rows", []):
         if not str(row.get("path", "")).endswith("[]"):
             problems.append("row list path %r does not end in []" % row.get("path"))

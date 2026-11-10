@@ -769,6 +769,9 @@ class AgentRunner:
         # on record. The figure table is new for every run and is stamped with
         # the organisation the turn runs for.
         self._grounding = Grounding(self._turn_org())
+        # Keys never repeat in a conversation: this turn's first key is above every key the
+        # model was given before, so a key copied from an earlier answer is unknown here.
+        self._grounding.figure_table.start_above(chat_figures.key_floor(history, user_message))
         # Build system prompt with live domain context (the organisation summary's
         # figures enter this turn's table as it is built)
         system_prompt = self._build_system_prompt(domain, context, persona, user_message=user_message)
