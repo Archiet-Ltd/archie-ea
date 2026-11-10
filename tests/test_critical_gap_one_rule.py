@@ -395,3 +395,32 @@ def test_another_organisations_gap_answers_not_found_on_its_edit_page_and_save(d
         db.text("SELECT name, priority, severity FROM gaps WHERE id = :id"), {"id": foreign_id}
     ).one()
     assert kept[1:] == ("medium", "medium") and kept[0] != "Taken"
+
+
+def test_gap_lists_filter_and_order_by_the_rule_not_by_the_priority_word(db_session, make_org, client, login_as):
+    from app.modules.architecture.services.gap_archimate_service import GapArchiMateService
+    from tests.test_work_package_writer import _user
+
+    org, other = make_org("rule-lists"), make_org("rule-lists-other")
+    user = _user(db_session, org, "rulelists", role="enterprise_architect")
+    by_severity = _gap(db_session, org, priority="high", severity="critical")
+    by_priority = _gap(db_session, org, priority="critical", severity="medium")
+    plain_low = _gap(db_session, org, priority="low", severity="low")
+    plain_medium = _gap(db_session, org, priority="medium", severity="medium")
+    _gap(db_session, other, priority="critical", severity="critical")
+    login_as(client, user)
+
+    def page_listing(**args):
+        with mock.patch("app.implementation_planning.routes.render_template", return_value="ok") as render:
+            client.get("/implementation/gaps", query_string=args)
+        return [g.id for g in render.call_args.kwargs["gaps"].items]
+
+    assert set(page_listing(priority="critical")) == {by_severity.id, by_priority.id}
+    assert set(page_listing()[:2]) == {by_severity.id, by_priority.id}
+    assert page_listing()[2:] == [plain_medium.id, plain_low.id]
+
+    roadmap = GapArchiMateService()
+    mine = {by_severity.id, by_priority.id, plain_low.id, plain_medium.id}
+    assert {g.id for g in roadmap.get_gaps_for_roadmap({"priority": "critical"})} & mine == {by_severity.id, by_priority.id}
+    ordered = [g.id for g in roadmap.get_gaps_for_roadmap() if g.id in mine]
+    assert set(ordered[:2]) == {by_severity.id, by_priority.id} and ordered[2:] == [plain_medium.id, plain_low.id]
