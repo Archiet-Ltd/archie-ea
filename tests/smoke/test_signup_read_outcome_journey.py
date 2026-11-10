@@ -33,20 +33,21 @@ def _install():
     import requests
 
     original = requests.Session.request
-    mode = %r
 
     def dispatch(self, method=None, url=None, *args, **kwargs):
         if not (isinstance(url, str) and url.startswith("https://api.github.com/")):
             return original(self, method, url, *args, **kwargs)
+        # the account "ghost" does not exist; the account "quiet" exists and holds no repositories
+        account = url.split("api.github.com/", 1)[1]
         answer = requests.Response()
         answer.url = url
         answer.headers["Content-Type"] = "application/json"
-        if mode == "missing":
+        if "ghost" in account:
             answer.status_code = 404
             body = {"message": "Not Found"}
         else:
             answer.status_code = 200
-            body = {"type": "Organization", "login": "acme"} if url.rstrip("/").endswith("/users/acme") else []
+            body = {"type": "Organization", "login": "quiet"} if account.rstrip("/").endswith("users/quiet") else []
         answer._content = json.dumps(body).encode()
         return answer
 
@@ -57,29 +58,20 @@ _install()
 '''
 
 
-def _server(request, app, tmp_path_factory, mode):
-    folder = tmp_path_factory.mktemp("github_" + mode)
-    (folder / "sitecustomize.py").write_text(_ANSWERS % mode)
+@pytest.fixture(scope="module")
+def server(request, app, tmp_path_factory):
+    folder = tmp_path_factory.mktemp("github_peer")
+    (folder / "sitecustomize.py").write_text(_ANSWERS)
     path = os.pathsep.join(p for p in (str(folder), os.environ.get("PYTHONPATH", "")) if p)
     return boot_live_server(
         request, None, app, extra_env={"PYTHONPATH": path, "ALLOW_EXTERNAL_API_CALLS": "true"}
     )
 
 
-@pytest.fixture(scope="module")
-def server_missing(request, app, tmp_path_factory):
-    return _server(request, app, tmp_path_factory, "missing")
-
-
-@pytest.fixture(scope="module")
-def server_empty(request, app, tmp_path_factory):
-    return _server(request, app, tmp_path_factory, "empty")
-
-
-def _give_github_and_wait(page, base, people, expected):
+def _give_github_and_wait(page, base, people, account, expected):
     """Sign up, give GitHub, and wait on the sources step until the sign-up line reports the read's end."""
     sign_up(page, base, people)
-    page.get_by_label("GitHub organisation").fill("acme")
+    page.get_by_label("GitHub organisation").fill(account)
     page.get_by_label("Read-only token").fill(TOKEN)
     page.get_by_role("button", name="Connect GitHub").click()
     status = page.get_by_test_id("signup-status-github")
@@ -106,14 +98,14 @@ def _the_link_lands_on_content(page, name, heading):
     assert len(page.locator("main").inner_text().strip()) > 40
 
 
-def test_a_read_that_failed_at_sign_up_is_called_failed_on_the_review_page(browser, server_missing, people):
-    base = str(server_missing)
+def test_a_read_that_failed_at_sign_up_is_called_failed_on_the_review_page(browser, server, people):
+    base = str(server)
     context, page = new_page(browser)
     try:
-        line = _give_github_and_wait(page, base, people, r"GitHub could not be read")
+        line = _give_github_and_wait(page, base, people, "ghost", r"GitHub could not be read")
         assert "HTTP 404" in line, line
         review = _open_review_from_the_connect_page(page, base)
-        expect(review).to_contain_text("could not finish: GitHub could not find the account acme")
+        expect(review).to_contain_text("could not finish: GitHub could not find the account ghost")
         expect(review).to_contain_text("HTTP 404")
         expect(review).not_to_contain_text("GitHub is connected; read your repositories again")
         shoot(page, "review-after-failed-read")
@@ -122,11 +114,11 @@ def test_a_read_that_failed_at_sign_up_is_called_failed_on_the_review_page(brows
         context.close()
 
 
-def test_a_read_that_found_nothing_at_sign_up_is_called_empty_on_the_review_page(browser, server_empty, people):
-    base = str(server_empty)
+def test_a_read_that_found_nothing_at_sign_up_is_called_empty_on_the_review_page(browser, server, people):
+    base = str(server)
     context, page = new_page(browser)
     try:
-        line = _give_github_and_wait(page, base, people, r"Read 0 repositories")
+        line = _give_github_and_wait(page, base, people, "quiet", r"Read 0 repositories")
         assert "Read 0 repositories" in line, line
         review = _open_review_from_the_connect_page(page, base)
         expect(review).to_contain_text("The last read found no repositories")
@@ -134,5 +126,22 @@ def test_a_read_that_found_nothing_at_sign_up_is_called_empty_on_the_review_page
         expect(review).not_to_contain_text("GitHub is connected; read your repositories again")
         shoot(page, "review-after-empty-read")
         _the_link_lands_on_content(page, "Check the GitHub page", "GitHub")
+    finally:
+        context.close()
+
+
+def test_the_annual_team_page_says_how_to_cancel_while_payment_is_closed(browser, server):
+    base = str(server)
+    context, page = new_page(browser)
+    try:
+        page.goto(base + "/team-annual-onboarding", wait_until="domcontentloaded")
+        renewal = page.get_by_text("What happens at renewal?").locator("xpath=following::p[1]")
+        expect(renewal).to_contain_text("cancels before then, by contacting us")
+        expect(page.locator("main")).not_to_contain_text("from the billing page")
+        shoot(page, "team-annual-closed")
+        # The way to cancel it names lands on a page with content.
+        renewal.get_by_role("link", name="contacting us").click()
+        page.wait_for_url("**/contact")
+        assert len(page.locator("main").inner_text().strip()) > 40
     finally:
         context.close()
