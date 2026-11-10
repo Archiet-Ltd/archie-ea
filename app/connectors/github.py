@@ -337,15 +337,23 @@ def origin_ref(repository, commit, file=None, path=None, detail=None) -> str:
     return json.dumps(body, sort_keys=True)
 
 
-def stamp_origin(row, *, repository, commit, file=None, path=None, detail=None) -> None:
-    """Record on an element or relationship where it came from: the repository, the
-    commit it was read at and the file that shows it (the provenance origin columns)."""
-    row.source_kind = "connector"
-    row.source_ref = origin_ref(repository, commit, file, path, detail)
+def origin_fields(repository, commit, file=None, path=None, detail=None) -> Dict[str, Any]:
+    """The origin columns of an element or relationship read from a repository: the repository, the
+    commit it was read at and the file that shows it."""
     short = f" @ {commit[:7]}" if commit else ""
     where = f"{file}" if file else ""
-    row.source_label = f"GitHub {repository}{short}" + (f" ({where})" if where else "")
-    row.source_recorded_at = datetime.utcnow()
+    return {
+        "source_kind": "connector",
+        "source_ref": origin_ref(repository, commit, file, path, detail),
+        "source_label": f"GitHub {repository}{short}" + (f" ({where})" if where else ""),
+        "source_recorded_at": datetime.utcnow(),
+    }
+
+
+def stamp_origin(row, *, repository, commit, file=None, path=None, detail=None) -> None:
+    """Record on an element or relationship where it came from (the provenance origin columns)."""
+    for column, value in origin_fields(repository, commit, file, path, detail).items():
+        setattr(row, column, value)
 
 
 def _element_for_repository(org_id, repository, path=None):
@@ -431,9 +439,14 @@ def _execute_classification(approval, payload, data_service) -> Dict[str, Any]:
         return _create_component(approval, payload)
     if data_service is None:
         return {"success": False, "error": "No application writer is available"}
-    result = data_service.create_application(
-        {"name": payload.get("name"), "description": payload.get("description") or ""}
-    )
+    from app.services.archimate_backbone import new_elements_originate_from
+
+    with new_elements_originate_from(
+        origin_fields(payload.get("repository"), payload.get("commit"), payload.get("evidence_file"), payload.get("path"))
+    ):
+        result = data_service.create_application(
+            {"name": payload.get("name"), "description": payload.get("description") or ""}
+        )
     if result.get("success"):
         _finish_application(org_id, result.get("application_id"), payload, approval.approved_by_id)
     return result
@@ -577,13 +590,9 @@ def _create_component(approval, payload) -> Dict[str, Any]:
         name=payload.get("name") or "",
         description=payload.get("description") or None,
         organization_id=org_id,
-    )
-    stamp_origin(
-        element,
-        repository=payload.get("repository"),
-        commit=payload.get("commit"),
-        file=payload.get("evidence_file"),
-        path=payload.get("path"),
+        origin=origin_fields(
+            payload.get("repository"), payload.get("commit"), payload.get("evidence_file"), payload.get("path")
+        ),
     )
     CrosswalkService.write_link(SOURCE_SYSTEM, _identity(payload.get("repository"), payload.get("path")), element.id, org_id=org_id)
     _write_facts(element, _facts_from_payload(payload))
@@ -634,7 +643,7 @@ def _execute_relationship(approval, payload) -> Dict[str, Any]:
     return {"success": True, "relationship_id": link.id}
 
 
-def _technology_element(org_id, name, element_type):
+def _technology_element(org_id, name, element_type, origin=None):
     """The element of this organisation that is the technology called *name*: an existing one of
     that name in the technology layer, else a new one."""
     from sqlalchemy import func
@@ -654,7 +663,7 @@ def _technology_element(org_id, name, element_type):
     if existing is not None and not getattr(existing, "deleted_at", None):
         return existing, False
     element = create_backbone_element(
-        element_type=element_type, layer="Technology", name=name, organization_id=org_id
+        element_type=element_type, layer="Technology", name=name, organization_id=org_id, origin=origin
     )
     return element, True
 
@@ -672,12 +681,11 @@ def _execute_technology(approval, payload) -> Dict[str, Any]:
     name = payload.get("technology")
     if not name or not payload.get("file") or not payload.get("line") or not payload.get("image"):
         return {"success": False, "error": "A technology link needs its technology, file, line and image."}
-    technology, created = _technology_element(org_id, name, payload.get("element_type") or "SystemSoftware")
     detail = payload.get("detail") or payload.get("summary") or ""
-    if created:
-        stamp_origin(
-            technology, repository=payload.get("from"), commit=payload.get("commit"), file=payload.get("file"), detail=detail
-        )
+    technology, created = _technology_element(
+        org_id, name, payload.get("element_type") or "SystemSoftware",
+        origin=origin_fields(payload.get("from"), payload.get("commit"), payload.get("file"), detail=detail),
+    )
     existing = ArchiMateRelationship.query.filter_by(
         organization_id=org_id, source_id=technology.id, target_id=application.id, type="Serving"
     ).first()

@@ -504,11 +504,41 @@ def _bars(inserts, today, days):
     ]
 
 
+def _without_applications_counted_as_elements(inserts, org_id):
+    """The added records with each application counted once, and no owner counted as a record.
+
+    An application is stored as an inventory row and as the model element it is linked to, and both
+    are written as one action, so the two history records are one record added. The element's record
+    is kept (it names where the record came from); the inventory row's is dropped.
+    """
+    from app.models.application_portfolio import ApplicationComponent as A
+
+    # who owns an application is a fact about it, written with it; it is not a second record added
+    inserts = [c for c in inserts if c.table_name not in ("application_owners", "application_ownership")]
+    rows = [c for c in inserts if c.table_name == "application_component"]
+    if not rows:
+        return inserts
+    element_of = dict(
+        db.session.execute(
+            db.select(A.id, A.archimate_element_id).where(
+                A.organization_id == org_id, A.id.in_({c.record_id for c in rows})
+            )
+        ).all()
+    )
+    element_ids = {c.record_id for c in inserts if c.table_name == "archimate_elements"}
+    return [
+        c for c in inserts
+        if c.table_name != "application_component" or element_of.get(c.record_id) not in element_ids
+    ]
+
+
 def _activity(changes, now, org_id):
     if changes is None:
         return None
     today = now.date()
-    inserts = [c for c in changes if c.action == "insert" and c.valid_from]
+    inserts = _without_applications_counted_as_elements(
+        [c for c in changes if c.action == "insert" and c.valid_from], org_id
+    )
     ranges = {}
     for key, label, days in RANGES:
         rows = _bars(inserts, today, days)
