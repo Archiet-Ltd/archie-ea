@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from app.services.application_status import APPLICATION_STATUS_VALUES, OLD_STATUS_WORDS
+from app.services.application_status import (
+    APPLICATION_STATUS_VALUES,
+    OLD_STATUS_WORDS,
+    STATUS_SYNONYMS,
+)
 
 
 class FieldType(Enum):
@@ -159,25 +163,7 @@ LIFECYCLE_STATUS_ALIASES: Dict[str, str] = {
 }
 
 DEPLOYMENT_STATUS_ALIASES: Dict[str, str] = {
-    "prod": "production",
-    "live": "production",
-    "operational": "production",
-    "running": "production",
-    "active": "production",
-    "done": "production",
-    "dev": "development",
-    "developing": "development",
-    "in dev": "development",
-    "under development": "development",
-    "test": "testing",
-    "qa": "testing",
-    "uat": "testing",
-    "in test": "testing",
-    "in testing": "testing",
-    "stage": "staging",
-    "preprod": "staging",
-    "pre-prod": "staging",
-    "pre-production": "staging",
+    **STATUS_SYNONYMS,
     # Older words (planned, deprecated, retired ...) mean a value on the one list.
     **OLD_STATUS_WORDS,
 }

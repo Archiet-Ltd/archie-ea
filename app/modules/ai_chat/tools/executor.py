@@ -901,9 +901,10 @@ class ToolExecutor:
     # ------------------------------------------------------------------ #
 
     def _tool_update_application_status(self, args: dict) -> dict:
-        from app.services.application_status import APPLICATION_STATUS_VALUES
+        from app.services.application_status import APPLICATION_STATUS_VALUES, match_status
 
-        if args.get("new_status") not in APPLICATION_STATUS_VALUES:
+        args = {**args, "new_status": match_status(args.get("new_status"))}
+        if args["new_status"] is None:
             return {
                 "success": False,
                 "error": "Status must be one of: " + ", ".join(APPLICATION_STATUS_VALUES) + ".",

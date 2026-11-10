@@ -401,7 +401,16 @@ def application_quick_update(id):
         if "component_type" in data:
             app.component_type = data["component_type"]
         if "deployment_status" in data:
-            app.deployment_status = data["deployment_status"]
+            from app.services.application_status import same_status, status_for_write
+
+            stored_status, status_refusal = status_for_write(data["deployment_status"])
+            if same_status(data["deployment_status"], app.deployment_status):
+                status_refusal = None
+                stored_status = None
+            if status_refusal:
+                return jsonify({"success": False, "error": status_refusal}), 400
+            if stored_status:
+                app.deployment_status = stored_status
         if "business_criticality" in data:
             # Convert numeric criticality back to text
             crit_map = {

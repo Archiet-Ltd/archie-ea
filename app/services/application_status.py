@@ -38,6 +38,35 @@ OLD_STATUS_WORDS = {
 }
 
 
+# Words the batch import also reads as a value on the list (keys lower case).
+STATUS_SYNONYMS = {
+    "prod": "production",
+    "live": "production",
+    "operational": "production",
+    "running": "production",
+    "active": "production",
+    "done": "production",
+    "dev": "development",
+    "developing": "development",
+    "in dev": "development",
+    "under development": "development",
+    "test": "testing",
+    "qa": "testing",
+    "uat": "testing",
+    "in test": "testing",
+    "in testing": "testing",
+    "stage": "staging",
+    "preprod": "staging",
+    "pre-prod": "staging",
+    "pre-production": "staging",
+}
+
+
+def words_for_status(status):
+    """A list value and every older word that now means it, all lower case."""
+    return (status,) + tuple(word for word, mean in OLD_STATUS_WORDS.items() if mean == status)
+
+
 def match_status(value):
     """The list value a stored or typed status is, ignoring case and padding; else None."""
     word = str(value or "").strip().lower()
@@ -72,3 +101,21 @@ def status_options(current=None):
     if current and str(current).strip() and match_status(current) is None:
         options.append((current, current))
     return options
+
+
+def status_for_write(value):
+    """What to store for a status a person typed or a file held: (stored, refusal).
+
+    A value on the list, an older word for one, or a word the import preview maps
+    (any case, any padding) is stored in the list's form. A blank stores nothing
+    (None), as the import preview maps a blank. Anything else is refused in words.
+    """
+    word = " ".join(str(value or "").split()).lower()
+    if not word:
+        return None, None
+    stored = canonical_status(word) or STATUS_SYNONYMS.get(word)
+    if stored:
+        return stored, None
+    return None, (
+        f"Status '{str(value).strip()}' is not one of: " + ", ".join(APPLICATION_STATUS_VALUES)
+    )

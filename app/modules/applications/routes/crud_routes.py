@@ -192,6 +192,12 @@ def application_create():
     )
     if not is_valid:
         validation_errors.append(error)
+    else:
+        from app.services.application_status import status_for_write
+
+        validated_status, status_refusal = status_for_write(validated_status)
+        if status_refusal:
+            validation_errors.append(status_refusal)
 
     business_owner = data.get("business_owner")
     is_valid, validated_owner, error = validate_string(

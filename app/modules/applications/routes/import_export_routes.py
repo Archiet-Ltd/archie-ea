@@ -43,6 +43,7 @@ from app.models.application_portfolio import (
 )
 from app.models.audit_log import AuditLog
 from app.services.ai_import_service import get_ai_import_service
+from app.services.application_status import status_for_write
 from app.utils.file_validation import (
     InvalidFileTypeError,
     get_allowed_extensions_display,
@@ -1065,6 +1066,14 @@ def _lifecycle_value(raw):
     )
 
 
+def _status_value(raw):
+    """The list's form of a status cell (None when blank), or a refusal in words."""
+    stored, refusal = status_for_write(raw)
+    if refusal:
+        raise _RowRefused(refusal)
+    return stored
+
+
 def _check_lengths(obj, header_by_field):
     """Refuse a row whose text is longer than its column, naming the spreadsheet column."""
     for column in obj.__table__.columns:
@@ -1457,6 +1466,16 @@ def application_import():
                                 row, "Lifecycle Status", "lifecycle_status", "Lifecycle"
                             )
                         )
+                        row_status = _status_value(
+                            get_csv_field(
+                                row,
+                                "Status",
+                                "deployment_status",
+                                "Deployment Status",
+                                "App Status",
+                                "Application Status",
+                            )
+                        )
                         if existing_app and import_mode == "update":
                             # Update existing record with flexible column matching
                             _set_if_present(existing_app, "component_type", _clean(
@@ -1485,16 +1504,7 @@ def application_import():
                                 )
                             ))
                             _set_if_present(existing_app, "version", _clean(get_csv_field(row, "Version")))
-                            _set_if_present(existing_app, "deployment_status", _clean(
-                                get_csv_field(
-                                    row,
-                                    "Status",
-                                    "deployment_status",
-                                    "Deployment Status",
-                                    "App Status",
-                                    "Application Status",
-                                )
-                            ))
+                            _set_if_present(existing_app, "deployment_status", row_status)
                             _set_if_present(existing_app, "business_domain", _clean(
                                 get_csv_field(
                                     row, "Business Domain", "business_domain", "Domain"
@@ -1622,17 +1632,7 @@ def application_import():
                                     )
                                 ),
                                 version=_clean(get_csv_field(row, "Version")),
-                                deployment_status=_clean(
-                                    get_csv_field(
-                                        row,
-                                        "Status",
-                                        "deployment_status",
-                                        "Deployment Status",
-                                        "App Status",
-                                        "Application Status",
-                                    )
-                                )
-                                or "planned",
+                                deployment_status=row_status,
                                 business_domain=_clean(
                                     get_csv_field(
                                         row, "Business Domain", "business_domain", "Domain"
@@ -2023,6 +2023,10 @@ def application_import():
                 # Check if application exists (case-insensitive match, using prefetched data)
                 existing_app = _existing_app_by_name_json.get(name_lower)
 
+                row_status, status_refusal = status_for_write(item.get("deployment_status"))
+                if status_refusal:
+                    raise ValueError(f"Record {index}: {status_refusal}")
+
                 if existing_app and import_mode == "skip":
                     skipped += 1
                     processed_names.add(name_lower)  # Track that we've seen this name
@@ -2035,7 +2039,7 @@ def application_import():
                     ))
                     _set_if_present(existing_app, "technology_stack", _clean(item.get("technology_stack")))
                     _set_if_present(existing_app, "version", _clean(item.get("version")))
-                    _set_if_present(existing_app, "deployment_status", _clean(item.get("deployment_status")))
+                    _set_if_present(existing_app, "deployment_status", row_status)
                     _set_if_present(existing_app, "business_domain", _clean(item.get("business_domain")))
                     _set_if_present(existing_app, "business_owner", _clean(item.get("business_owner")))
                     _set_if_present(existing_app, "development_team", _clean(item.get("development_team")))
@@ -2069,8 +2073,7 @@ def application_import():
                         application_category=_clean(item.get("application_category")),
                         technology_stack=_clean(item.get("technology_stack")),
                         version=_clean(item.get("version")),
-                        deployment_status=_clean(item.get("deployment_status"))
-                        or "planned",
+                        deployment_status=row_status,
                         business_domain=_clean(item.get("business_domain")),
                         business_owner=_clean(item.get("business_owner")),
                         development_team=_clean(item.get("development_team")),
@@ -2425,6 +2428,12 @@ def application_import():
                                 return value
                     return None
 
+                row_status, status_refusal = status_for_write(
+                    get_field("Application Status", "Status", "deployment_status")
+                )
+                if status_refusal:
+                    raise ValueError(f"Row {row_idx}: {status_refusal}")
+
                 if existing_app and import_mode == "skip":
                     skipped += 1
                     processed_names.add(name_lower)
@@ -2438,11 +2447,7 @@ def application_import():
                     _set_if_present(existing_app, "business_criticality", _clean(
                         get_field("Business Criticality", "business_criticality")
                     ))
-                    _set_if_present(existing_app, "deployment_status", _clean(
-                            get_field(
-                                "Application Status", "Status", "deployment_status"
-                            )
-                        ))
+                    _set_if_present(existing_app, "deployment_status", row_status)
                     _set_if_present(existing_app, "lifecycle_status", _clean(
                         get_field("Lifecycle Status", "lifecycle_status")
                     ))
@@ -2494,12 +2499,7 @@ def application_import():
                         business_criticality=_clean(
                             get_field("Business Criticality", "business_criticality")
                         ),
-                        deployment_status=_clean(
-                            get_field(
-                                "Application Status", "Status", "deployment_status"
-                            )
-                        )
-                        or "planned",
+                        deployment_status=row_status,
                         lifecycle_status=_clean(
                             get_field("Lifecycle Status", "lifecycle_status")
                         ),

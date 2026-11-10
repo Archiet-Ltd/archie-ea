@@ -634,6 +634,26 @@ class BatchApprovalService:
             from app.config.abacus_field_mapping import normalize_lifecycle_status
 
             new_app.lifecycle_status = normalize_lifecycle_status(source["lifecycle_status"])
+        status_cell = next(
+            (value for key, value in source.items() if str(key).strip() == "deployment_status"),
+            None,
+        )
+        if status_cell is not None:
+            # The status the import preview said it mapped: same normaliser, same
+            # fallback for a word it cannot map. A blank stays unset.
+            from app.services.application_status import status_for_write
+            from app.services.import_validation.validation_schemas import (
+                APPLICATION_COMPONENT_SCHEMA,
+            )
+            from app.services.import_validation.value_normalizer import ValueNormalizer
+
+            schema = APPLICATION_COMPONENT_SCHEMA["deployment_status"]
+            mapped, _note = ValueNormalizer.normalize_value(
+                status_cell, "deployment_status", schema
+            )
+            if mapped is None and not ValueNormalizer.is_null_value(status_cell):
+                mapped = schema.default_value
+            new_app.deployment_status = status_for_write(mapped)[0]
         if "criticality" in source:
             new_app.criticality = source["criticality"]
         if "business_domain" in source:
