@@ -63,22 +63,6 @@ def test_the_overview_after_a_sign_up_read_agrees_with_sign_up_and_counts_one_ad
         added = _wait_for_the_read(page, base)
         assert added == 21, added
 
-        # Step 4: the way to the AI settings page and back, kept after a key is saved.
-        page.goto(base + "/account/welcome?step=4", wait_until="domcontentloaded")
-        page.get_by_test_id("signup-api-settings-link").click()
-        page.wait_for_url("**/admin/api-settings?from=signup")
-        expect(page.get_by_test_id("ai-settings-back-to-signup")).to_be_visible()
-        page.locator("#api_key").fill("sk-journey-own-key-0002")
-        page.locator("#submit").click()
-        expect(page.locator("#main-content").get_by_text("saved successfully")).to_be_visible()
-        assert "from=signup" in page.url, page.url
-        back = page.get_by_test_id("ai-settings-back-to-signup")
-        expect(back).to_be_visible()
-        shoot(page, "ai-settings-after-save")
-        back.click()
-        page.wait_for_url("**/account/welcome?step=4")
-        expect(page.get_by_role("heading", name="Your AI provider")).to_be_visible()
-
         # The Overview says what sign-up said, and none of it by hand.
         total, connected, by_hand = _figures(page, base)
         assert (total, connected, by_hand) == (added, added, 0), (total, connected, by_hand)
@@ -95,6 +79,22 @@ def test_the_overview_after_a_sign_up_read_agrees_with_sign_up_and_counts_one_ad
         total, connected, by_hand = _figures(page, base)
         assert (total, connected, by_hand) == (added + 1, added, 1), (total, connected, by_hand)
         shoot(page, "overview-after-one-by-hand")
+
+        # Step 4: the way to the AI settings page and back, kept after a key is saved.
+        page.goto(base + "/account/welcome?step=4", wait_until="domcontentloaded")
+        page.get_by_test_id("signup-api-settings-link").click()
+        page.wait_for_url("**/admin/api-settings?from=signup")
+        expect(page.get_by_test_id("ai-settings-back-to-signup")).to_be_visible()
+        page.locator("#api_key").fill("sk-journey-own-key-0002")
+        page.locator("#submit").click()
+        expect(page.locator("#main-content").get_by_text("saved successfully")).to_be_visible()
+        assert "from=signup" in page.url, page.url
+        back = page.get_by_test_id("ai-settings-back-to-signup")
+        expect(back).to_be_visible()
+        shoot(page, "ai-settings-after-save")
+        back.click()
+        page.wait_for_url("**/account/welcome?step=4")
+        expect(page.get_by_role("heading", name="Your AI provider")).to_be_visible()
     finally:
         context.close()
 

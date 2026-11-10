@@ -352,8 +352,11 @@ def origin_fields(repository, commit, file=None, path=None, detail=None) -> Dict
 
 def stamp_origin(row, *, repository, commit, file=None, path=None, detail=None) -> None:
     """Record on an element or relationship where it came from (the provenance origin columns)."""
-    for column, value in origin_fields(repository, commit, file, path, detail).items():
-        setattr(row, column, value)
+    origin = origin_fields(repository, commit, file, path, detail)
+    row.source_kind = origin["source_kind"]
+    row.source_ref = origin["source_ref"]
+    row.source_label = origin["source_label"]
+    row.source_recorded_at = origin["source_recorded_at"]
 
 
 def _element_for_repository(org_id, repository, path=None):
