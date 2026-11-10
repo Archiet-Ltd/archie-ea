@@ -409,8 +409,9 @@ GROUP_BLURBS: dict = {
 }
 
 
-# The one groups that answer a page with no entry of its own, so they always have a page.
-ALWAYS_PAGE = ("PG-EA",)
+# The one groups that answer a page with no entry of its own, so they always have a page, and the group whose
+# address opens for a signed-in person at wave 1 while a visitor is still offered the waiting list.
+ALWAYS_PAGE = ("PG-EA", "PG-REC")
 # Groups that are not capabilities a customer buys: no early-access page, however their addresses are closed.
 NO_PAGE_GROUPS = ("infra", "PG-PUB", "PG-OPS", "PG-RT", "PG-RTP", "PG-NEW")
 GENERIC_TITLES = ("this page", "this capability", "capability", "page", "not available")
