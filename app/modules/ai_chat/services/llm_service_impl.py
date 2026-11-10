@@ -168,6 +168,45 @@ _cache_expiry_fallback = {}  # cache-tenancy-ok: expiry times for the prompt-has
 
 # ENT-040: field patterns that must be scrubbed before prompt transmission.
 # Keys are human-readable labels; values are (pattern, replacement) tuples.
+_SECRET_SHAPES: List[Tuple[re.Pattern, str]] = [
+    # A secret is recognised by its own shape, with or without a keyword beside it and inside JSON text.
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:.*?-----END [A-Z ]*PRIVATE KEY-----|[A-Za-z0-9+/=\\\s]*)",
+                re.S), "[CREDENTIAL_REDACTED]"),
+    (re.compile(r"\beyJ[A-Za-z0-9_\-]{5,}\.[A-Za-z0-9_\-]{5,}\.[A-Za-z0-9_\-]*"), "[CREDENTIAL_REDACTED]"),
+    (re.compile(r"\b(?i:bearer)\s+[A-Za-z0-9._~+/=\-]{8,}"), "[CREDENTIAL_REDACTED]"),
+    (re.compile(r"\bsk-[A-Za-z0-9_\-]{12,}"), "[CREDENTIAL_REDACTED]"),
+    (re.compile(r"\b[sr]k_(?:live|test)_[A-Za-z0-9]{8,}"), "[CREDENTIAL_REDACTED]"),
+    (re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"), "[CREDENTIAL_REDACTED]"),
+    (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}"), "[CREDENTIAL_REDACTED]"),
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"), "[CREDENTIAL_REDACTED]"),
+    (re.compile(r"\bxox[abprs]-[A-Za-z0-9\-]{10,}"), "[CREDENTIAL_REDACTED]"),
+    (re.compile(r"\bAIza[0-9A-Za-z_\-]{30,}"), "[CREDENTIAL_REDACTED]"),
+]
+# `"api_key": "value"` as the loop's own JSON writes it: the value goes, the quotes and the key stay.
+_JSON_SECRET = re.compile(
+    r'("[A-Za-z_\-]*(?i:password|passwd|secret|api[_-]?key|token)[A-Za-z_\-]*"\s*:\s*)"[^"]{4,}"'
+)
+_CARD_NUMBER = re.compile(r"(?<![\d])(?:\d[ \-]?){12,18}\d(?![\d])")
+
+
+def _luhn_ok(digits: str) -> bool:
+    total = 0
+    for index, char in enumerate(reversed(digits)):
+        n = int(char)
+        if index % 2:
+            n = n * 2 - 9 if n > 4 else n * 2
+        total += n
+    return total % 10 == 0
+
+
+def _scrub_cards(text: str) -> str:
+    def replace(match: "re.Match") -> str:
+        digits = re.sub(r"\D", "", match.group(0))
+        return "[CARD_REDACTED]" if 13 <= len(digits) <= 19 and _luhn_ok(digits) else match.group(0)
+
+    return _CARD_NUMBER.sub(replace, text)
+
+
 _SENSITIVE_PATTERNS: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", re.I), "[EMAIL_REDACTED]"),
     (re.compile(r"\b\+?[\d\s\-().]{7,15}\d\b"), "[PHONE_REDACTED]"),
@@ -197,6 +236,10 @@ OPENROUTER_PUBLIC_POLICY = {"data_collection": "allow"}  # text a company publis
 
 def _scrub_prompt(prompt: str) -> str:
     """Replace known sensitive patterns in a prompt string before LLM transmission (ENT-040)."""
+    for pattern, replacement in _SECRET_SHAPES:
+        prompt = pattern.sub(replacement, prompt)
+    prompt = _JSON_SECRET.sub(r'\1"[CREDENTIAL_REDACTED]"', prompt)
+    prompt = _scrub_cards(prompt)
     for pattern, replacement in _SENSITIVE_PATTERNS:
         prompt = pattern.sub(replacement, prompt)
     return prompt

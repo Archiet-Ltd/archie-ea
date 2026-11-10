@@ -28,7 +28,7 @@
 
 {% block content %}
 <div class="p-6 space-y-6">
-{{ page_shell(title='Approvals', subtitle='Changes proposed through the AI chat, for you to approve or reject',
+{{ page_shell(title='Approvals', subtitle='Changes the AI chat makes are checked and reviewed automatically; other records wait here for a person',
               breadcrumb=[('Home', url_for('dashboard.overview')), ('AI chat', url_for('unified_ai_chat.index')), ('Approvals', none)]) }}
 
 {#- The record of one reviewed change, read only: what was asked, what was decided, who drafted and who reviewed,
@@ -173,11 +173,18 @@
       {% endif %}
     {% endcall %}
     {% call ui.card_footer(class='flex items-start gap-2 border-t') %}
+      {% if item.settled_by_review %}
+      <p class="text-sm text-muted-foreground" data-testid="approval-in-review-{{ item.id }}">This change is checked and reviewed automatically and is applied or declined without waiting for a person. <a href="{{ url_for('unified_ai_chat.approval_inbox', approval=item.id) }}#record-{{ item.id }}" class="underline hover:no-underline">See how it was checked</a></p>
+      {% endif %}
+      {% if item.can_approve %}
       <form method="post" action="{{ url_for('unified_ai_chat.approve_pending_approval', approval_id=item.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="from_inbox" value="1">
         {% call ui.button(type='submit', size='sm') %}{{ lucide('check') }}Approve{% endcall %}
       </form>
+      {% else %}
+      <p class="text-sm text-muted-foreground" data-testid="approval-own-request-{{ item.id }}">You asked for this, so another person with write permission approves it.</p>
+      {% endif %}
       <details class="flex-1">
         <summary role="button" class="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground select-none">{{ lucide('x') }}Reject</summary>
         <form method="post" action="{{ url_for('unified_ai_chat.reject_pending_approval', approval_id=item.id) }}" class="mt-3 space-y-2">
@@ -197,13 +204,13 @@
 {#- Nothing waiting and nothing decided: one empty state for the whole page. -#}
 {% call ui.card() %}
   {{ _empty('inbox', 'No approvals yet',
-            'When someone asks the AI chat to change your architecture, the proposal waits here for a second person to approve or reject it. Decisions are kept here too.',
+            'When someone asks the AI chat to change your architecture, the change is checked and reviewed automatically, and how each one was checked is kept under Recently decided. Records outside that review wait here for a person to approve or reject them.',
             'approval-inbox-empty', _open_chat) }}
 {% endcall %}
 {% else %}
 {% call ui.card() %}
   {{ _empty('inbox', 'No pending approvals waiting for your review',
-            'When someone asks the AI chat to change your architecture, the proposal waits here for a second person to approve or reject it.',
+            'Changes the AI chat makes are checked and reviewed automatically, so they do not wait here. Records outside that review wait here for a person to approve or reject them.',
             'approval-inbox-empty', _open_chat) }}
 {% endcall %}
 {% endif %}

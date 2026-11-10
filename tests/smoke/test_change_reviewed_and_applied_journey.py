@@ -158,7 +158,7 @@ def _ask(page, base, stub, tool_args, question):
 
 
 @pytest.mark.parametrize("width", [1440, 390])
-def test_the_one_person_in_a_workspace_gets_ifiok_moved_to_production_with_its_review_on_record(
+def test_the_one_person_in_a_workspace_gets_an_application_moved_to_production_with_its_review_on_record(
     browser, deepseek_server, stub, shots, width
 ):
     base = deepseek_server

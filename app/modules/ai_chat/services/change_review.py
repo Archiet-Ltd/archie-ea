@@ -73,6 +73,7 @@ CHARTER_REFUSED_REASON = (
     "You can make it yourself on its own page."
 )
 ACCOUNT_OFF_REASON = "The account that asked for this change has been switched off, so the change was not made."
+MOVED_REASON = "The person who asked for this change is no longer in the workspace."
 WRITES_PAUSED_REASON = (
     "Changes by the assistant are paused for this workspace. This one is made, after it is checked and "
     "reviewed, when they resume."
@@ -695,6 +696,12 @@ def _duplicate_of(service, approval: AIChatCRUDApproval, payload: Any) -> Option
             AIChatCRUDApproval.operation_type == approval.operation_type,
             AIChatCRUDApproval.entity_type == approval.entity_type,
             AIChatCRUDApproval.id < approval.id,
+            # A row from before the loop (no rubric version, no review events) is never a repeat.
+            db.or_(
+                AIChatCRUDApproval.rubric_version.isnot(None),
+                db.exists().where(db.and_(AIChatApprovalAuditLog.approval_id == AIChatCRUDApproval.id,
+                                          AIChatApprovalAuditLog.event.in_(LOOP_EVENTS))),
+            ),
             db.or_(
                 AIChatCRUDApproval.status == ApprovalStatus.PENDING,
                 db.and_(AIChatCRUDApproval.status == ApprovalStatus.APPROVED,
@@ -986,9 +993,10 @@ def settle(
     if failed is not None:
         return _decline(service, approval, state, [failed.reason])
 
-    # 1b. Writes paused for the organisation: hold the change, with no reviewer call, until they resume. The
-    # assistant's tools are refused while paused, so a review now would cost a call and end in a decline.
-    if approval.operation_type == "tool_use" and _writes_paused(approval.organization_id):
+    # 1b. Writes paused for the organisation: hold every kind of change (the chat's own create, update, delete
+    # and link, a tool call, a person's Approve, the sweep), with no reviewer call, until they resume. This is
+    # the one settle path they all pass through, so it is the one place the switch is read.
+    if _writes_paused(approval.organization_id):
         return _wait(service, approval, state, WRITES_PAUSED_REASON, counts=False)
 
     # 2. The reviewer: never the model that drafted. It stays the same across the rounds of one change.
@@ -1204,7 +1212,15 @@ def sweep_organisation(organization_id: int, budget: Optional[ReviewBudget] = No
         if row is None or row.user_id is None:
             continue
         db.session.expire_all()
-        outcome = AIChatApprovalService(row.user_id).settle_after_review(approval_id, budget=budget)
+        from app.models.user import User
+
+        requester = User.query.filter_by(id=row.user_id, organization_id=organization_id).first()
+        if requester is None:
+            # The person who asked now belongs to another workspace (or none): the change is declined, not
+            # retried by every sweep. Only this organisation's record is touched.
+            outcome = decline(AIChatApprovalService(row.user_id), row, MOVED_REASON)
+        else:
+            outcome = AIChatApprovalService(row.user_id).settle_after_review(approval_id, budget=budget)
         counts[outcome.get("state") if outcome.get("state") in counts else "in_review"] += 1
         if budget.used >= budget.limit:
             break

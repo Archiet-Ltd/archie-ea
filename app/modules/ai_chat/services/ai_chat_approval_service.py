@@ -58,7 +58,7 @@ class AIChatApprovalError(ValueError):
 
 
 class SelfApprovalError(AIChatApprovalError):
-    """The requester attempted to approve their own queued operation that the review loop does not settle (V-01)."""
+    """The requester attempted to approve their own queued operation that the review loop does not settle."""
 
 
 class MissingApproverError(AIChatApprovalError):
@@ -708,11 +708,13 @@ class AIChatApprovalService:
                 return {**change_review.verdict(approval, "in_review", approval.summary, []), "settles": False}
             runner = self if approval.user_id == self.user_id else AIChatApprovalService(approval.user_id)
             requester, requester_error = runner._acting_user()
+            if requester is not None and requester.organization_id != approval.organization_id:
+                requester, requester_error = None, {"code": "MOVED"}
             if requester_error:
                 return change_review.decline(
                     runner, approval,
                     change_review.ACCOUNT_OFF_REASON if requester_error.get("code") == "ACCOUNT_OFF"
-                    else "The person who asked for this change is no longer in the workspace.",
+                    else change_review.MOVED_REASON,
                 )
             return change_review.settle(
                 runner, approval, requester, budget, approved_by, self if approved_by else None)
@@ -1598,6 +1600,8 @@ class AIChatApprovalService:
         Overdue-not-expired: includes overdue rows (no expires_at filter — being
         overdue must never make an item disappear from the queue).
         """
+        from app.modules.ai_chat.services import change_review
+
         actor, actor_error = self._acting_user(require_general=True)
         if actor_error:
             return actor_error
@@ -1651,6 +1655,11 @@ class AIChatApprovalService:
                     # these are present; without them the badge is always dead.
                     "source_table": getattr(approval, "source_table", None),
                     "source_id": getattr(approval, "source_id", None),
+                    # The loop decides this change by itself (checked, reviewed, then applied or declined).
+                    "settled_by_review": change_review.in_scope(approval),
+                    # Approve is offered only where it will act: a change the loop settles, or a record
+                    # someone else asked for. A person's own record outside the loop is refused.
+                    "can_approve": change_review.in_scope(approval) or approval.user_id != actor.id,
                     "requester": {
                         "id": approval.user_id,
                         "display_name": words[approval.id]["requester"],
