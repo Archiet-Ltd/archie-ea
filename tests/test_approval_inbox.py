@@ -152,6 +152,10 @@ def test_approval_inbox_approve_action(app, approval_inbox_setup, login_as, tena
             return {"success": True, "id": 9001}
 
     monkeypatch.setattr(svc_mod, "AIDataInteractionService", _FakeDataService)
+    # A person's Approve goes through the review, so a reviewer that passes the change stands in.
+    from tests.test_change_review import PASS_ALL, FakeReviewer
+
+    FakeReviewer([PASS_ALL]).install(monkeypatch)
 
     resp = client.post(f"/ai-chat/approvals/{setup['approval_id']}/approve")
     assert resp.status_code == 200

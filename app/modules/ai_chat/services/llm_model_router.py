@@ -458,7 +458,7 @@ class LLMModelRouter:
 
         # The same scrub every other outgoing prompt goes through: a key or a card number the person's words
         # or the change carry never reaches the model.
-        prompt = _scrub_prompt(prompt)
+        prompt = _scrub_prompt(prompt, mask_pii=False)
 
         # The organisation's own AI budget applies to a review as to any other call.
         try:

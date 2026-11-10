@@ -80,7 +80,7 @@ WRITES_PAUSED_REASON = (
 )
 # What the record shows once a change has been through the loop. A record from before the loop has none of
 # these and a NULL rubric version, and is left alone by the sweep until its own brief moves it in.
-LOOP_EVENTS = ("checked", "reviewed", "revised", "waiting", "paused", "applied", "declined")
+LOOP_EVENTS = ("checked", "reviewed", "revised", "waiting", "paused", "resumed", "applied", "declined")
 
 # What this review settles: the assistant's tool calls and the chat's own create/update/delete/link of the
 # organisation's records. Other writers of the same record (connectors, detectors, imports) are folded in
@@ -865,7 +865,30 @@ def _writes_paused(organization_id: int) -> bool:
     """True while the organisation's stop-all-writes switch is on (the one the tool executor reads)."""
     from app.models.agent_oversight_state import AgentOversightState
 
-    return bool(AgentOversightState.get_for_org(organization_id).is_paused())
+    # Read from the database every time, never from an object this session already holds: a person can press
+    # the switch while a review is running, and the next read must see it.
+    return bool(db.session.execute(
+        db.select(AgentOversightState.writes_paused).where(AgentOversightState.organization_id == organization_id)
+    ).scalar())
+
+
+def _hold_if_paused(service, approval: AIChatCRUDApproval, state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The verdict that holds the change while writes are paused, else None. Read again at every step that
+    takes time or writes: before each review round, before each revision and just before the change is applied."""
+    if _writes_paused(approval.organization_id):
+        return _wait(service, approval, state, WRITES_PAUSED_REASON, counts=False)
+    return None
+
+
+def _last_loop_event(approval: AIChatCRUDApproval) -> Optional[AIChatApprovalAuditLog]:
+    return (AIChatApprovalAuditLog.query.filter_by(approval_id=approval.id)
+            .filter(AIChatApprovalAuditLog.event.in_(LOOP_EVENTS))
+            .order_by(AIChatApprovalAuditLog.id.desc()).first())
+
+
+def _held_for_pause(approval: AIChatCRUDApproval) -> bool:
+    last = _last_loop_event(approval)
+    return last is not None and last.event == "paused" and last.reason == WRITES_PAUSED_REASON
 
 
 def count_failed_attempt(service, approval_id: int) -> Optional[Dict[str, Any]]:
@@ -952,7 +975,10 @@ def _wait(service, approval: AIChatCRUDApproval, state: Dict[str, Any], why: str
     """Leave the change in review for the next sweep, or decline it when no reviewer has been reachable."""
     if counts and _count_waits(approval) + 1 >= MAX_WAITS:
         return _decline(service, approval, state, [NO_REVIEWER_REASON])
-    _event(service, approval, "waiting" if counts else "paused", why)
+    # A change held by the pause is recorded once when it is held (and once when it is released), not once
+    # for every sweep that finds it still held.
+    if counts or why != WRITES_PAUSED_REASON or not _held_for_pause(approval):
+        _event(service, approval, "waiting" if counts else "paused", why)
     state["waiting_reason"] = why
     _save(approval, state)
     return verdict(approval, "in_review", approval.summary, [why])
@@ -996,8 +1022,11 @@ def settle(
     # 1b. Writes paused for the organisation: hold every kind of change (the chat's own create, update, delete
     # and link, a tool call, a person's Approve, the sweep), with no reviewer call, until they resume. This is
     # the one settle path they all pass through, so it is the one place the switch is read.
-    if _writes_paused(approval.organization_id):
-        return _wait(service, approval, state, WRITES_PAUSED_REASON, counts=False)
+    held = _hold_if_paused(service, approval, state)
+    if held is not None:
+        return held
+    if _held_for_pause(approval):
+        _event(service, approval, "resumed", "Changes by the assistant resumed for this workspace; the change goes on.")
 
     # 2. The reviewer: never the model that drafted. It stays the same across the rounds of one change.
     drafter_provider, drafter_model = split_ref(approval.drafter_model)
@@ -1019,6 +1048,9 @@ def settle(
         while True:
             rounds = state["rounds"]
             if rounds and not rounds[-1]["passed"] and not rounds[-1].get("revised"):
+                held = _hold_if_paused(service, approval, state)
+                if held is not None:
+                    return held
                 outcome = _revise(service, router, approval, state, payload, budget)
                 if outcome is not None:
                     return outcome
@@ -1032,6 +1064,9 @@ def settle(
                 return _decline(service, approval, state, _failed_reasons(state["rounds"][-1]))
             if state["rounds"] and state["rounds"][-1]["passed"]:
                 break
+            held = _hold_if_paused(service, approval, state)
+            if held is not None:
+                return held
             number = len(state["rounds"]) + 1
             reply = _ask(router, choice, build_review_prompt(approval, payload, target, checks, state["rounds"]), budget)
             results = parse_review(reply)
@@ -1050,7 +1085,12 @@ def settle(
     except ReviewerUnavailable as exc:
         return _wait(service, approval, state, str(exc), counts=True)
 
-    # 4. Apply. The before-snapshot is stored first, so the change can be undone.
+    # 4. Apply. Writes may have been paused while the reviews ran: read the switch once more, right before the
+    # write. The record keeps its passing review and is applied once, after they resume.
+    held = _hold_if_paused(service, approval, state)
+    if held is not None:
+        return held
+    # The before-snapshot is stored first, so the change can be undone.
     approval.before_snapshot = target.before or {"kind": "unrecorded"}
     _save(approval, state)
     return _apply(approver_service or service, approval, state, approved_by)

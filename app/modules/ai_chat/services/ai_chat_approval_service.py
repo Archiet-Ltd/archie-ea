@@ -620,6 +620,8 @@ class AIChatApprovalService:
 
             # The server checks the change, has a model other than the drafter review it, and
             # applies or declines it now, in this turn.
+            from app.modules.ai_chat.services import change_review
+
             verdict = self.settle_after_review(approval_id)
             state = verdict.get("state")
             base = {
@@ -647,6 +649,12 @@ class AIChatApprovalService:
                     f"It is waiting for review on its record (change {approval_id}); "
                     f"type 'reject {approval_id}' to cancel it."
                 )
+            elif change_review.WRITES_PAUSED_REASON in (verdict.get("reasons") or []):
+                wait = (
+                    f"This change is held because changes by the assistant are paused for this workspace. "
+                    f"It is made when they resume, after it is checked and reviewed (change {approval_id}); "
+                    f"type 'reject {approval_id}' to cancel it."
+                )
             else:
                 wait = (
                     f"No independent reviewer could be reached just now. I'll keep trying and the result "
@@ -664,7 +672,7 @@ class AIChatApprovalService:
 
         except Exception as e:
             db.session.rollback()
-            self.logger.error(f"Failed to create approval: {e}")
+            self.logger.error(f"Failed to create approval: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": f"Failed to create approval: {str(e)}",
@@ -922,6 +930,17 @@ class AIChatApprovalService:
 
             if settled_here:
                 return self._settle_on_person_approval(approval, actor)
+
+            # A record the loop does not settle is applied by the person's Approve alone, so the stop-all-writes
+            # switch is read here, before the claim: while writes are paused nothing is applied and the record
+            # stays pending, to be approved after they resume.
+            if not settled_by_review and change_review._writes_paused(approval.organization_id):
+                return {
+                    "success": False,
+                    "code": "IN_REVIEW",
+                    "error": "Not applied. Changes by the assistant are paused for this workspace, so this change "
+                             "is held. Approve it again after they resume.",
+                }
 
             # A GitHub proposal that cannot land yet (a part whose application is not
             # in the model, a link whose end is not) is refused here, before it is
@@ -1610,6 +1629,7 @@ class AIChatApprovalService:
             .order_by(AIChatCRUDApproval.created_at.desc())
             .all()
         )
+        paused = change_review._writes_paused(actor.organization_id)
         payloads = {approval.id: json.loads(approval.operation_payload) for approval in approvals}
         requester_ids = {approval.user_id for approval in approvals} | {
             p.get("requested_by") for p in payloads.values() if isinstance(p, dict)
@@ -1622,6 +1642,28 @@ class AIChatApprovalService:
                 User.id.in_(requester_ids),
             ).all()
         } if requester_ids else {}
+        is_admin = actor.is_admin()
+        looped, recorded, can_approve, approve_note = {}, {}, {}, {}
+        for approval in approvals:
+            looped[approval.id] = change_review.in_scope(approval)
+            saved = approval.review_reasons if isinstance(approval.review_reasons, dict) else {}
+            recorded[approval.id] = bool(saved.get("rounds") or saved.get("checks"))
+            connector = approval.entity_type == "connectors"
+            own_outside_loop = not looped[approval.id] and approval.user_id == actor.id
+            can_approve[approval.id] = not paused and not (connector and not is_admin) and not own_outside_loop
+            approve_note[approval.id] = None
+            if can_approve[approval.id] or (paused and looped[approval.id]):
+                continue
+            if paused:
+                approve_note[approval.id] = (
+                    "Changes by the assistant are paused for this workspace, so this cannot be approved until "
+                    "they resume.")
+            elif connector and not is_admin:
+                approve_note[approval.id] = "Connector changes are approved by an administrator."
+            else:
+                approve_note[approval.id] = (
+                    "You asked for this, so another %s approves it." % (
+                        "administrator" if connector else "person with write permission"))
         words = {
             approval.id: card_words(
                 approval, payloads[approval.id] if isinstance(payloads[approval.id], dict) else {}, people
@@ -1655,11 +1697,16 @@ class AIChatApprovalService:
                     # these are present; without them the badge is always dead.
                     "source_table": getattr(approval, "source_table", None),
                     "source_id": getattr(approval, "source_id", None),
-                    # The loop decides this change by itself (checked, reviewed, then applied or declined).
-                    "settled_by_review": change_review.in_scope(approval),
-                    # Approve is offered only where it will act: a change the loop settles, or a record
-                    # someone else asked for. A person's own record outside the loop is refused.
-                    "can_approve": change_review.in_scope(approval) or approval.user_id != actor.id,
+                    # The loop decides this change by itself (checked, reviewed, then applied or declined). That
+                    # is said only of a change that has a recorded check or review and is not held.
+                    "settled_by_review": looped[approval.id] and recorded[approval.id] and not paused,
+                    # A change in the loop while writes are paused waits for them to resume.
+                    "held_by_pause": paused and looped[approval.id],
+                    # Approve is offered only where it acts for this person: not while writes are paused, not on
+                    # a connector record unless they are an administrator, and not on their own record outside
+                    # the loop.
+                    "can_approve": can_approve[approval.id],
+                    "approve_note": approve_note[approval.id],
                     "requester": {
                         "id": approval.user_id,
                         "display_name": words[approval.id]["requester"],
