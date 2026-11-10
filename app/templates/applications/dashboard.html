@@ -189,11 +189,11 @@
    Metric Cards (app detail) or Portfolio Stats (portfolio dashboard)
 ───────────────────────────────────────────────────────────────────────────── #}
 {% if metric_cards is defined and metric_cards %}
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
   {% for card_data in metric_cards %}
   <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-4">
     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ card_data.label }}</p>
-    <p class="mt-1 text-2xl font-bold text-foreground">{{ card_data.value }}</p>
+    <p class="mt-1 text-xl font-bold text-foreground break-words">{{ card_data.value }}</p>
     {% if card_data.delta %}
     <p class="mt-1 text-xs text-muted-foreground truncate" title="{{ card_data.delta }}">{{ card_data.delta }}</p>
     {% endif %}
