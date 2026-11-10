@@ -446,3 +446,81 @@ def test_seeded_product_diagrams_place_no_two_boxes_on_top_of_each_other(app, db
                 apart_across = abs(a.position_x - b.position_x) >= 180
                 apart_down = abs(a.position_y - b.position_y) >= 130
                 assert apart_across or apart_down, (one.name, a.position_x, a.position_y, b.position_x, b.position_y)
+
+
+def _document(db_session, org, tmp_path, label):
+    """An application of the organisation with one real file on disk and its document record."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.miscellaneous import ArchitectureDocument
+
+    application = ApplicationComponent(organization_id=org.id, name=f"Ledger {label}")
+    db_session.add(application)
+    db_session.flush()
+    path = tmp_path / f"{label}.pdf"
+    path.write_bytes(f"%PDF-1.4 content of {label}".encode())
+    document = ArchitectureDocument(
+        application_id=application.id, filename=f"{label}.pdf", file_path=str(path), mime_type="application/pdf",
+        file_size=path.stat().st_size)
+    db_session.add(document)
+    db_session.flush()
+    return application, document
+
+
+def _download_url(application, document):
+    from flask import current_app, url_for
+
+    with current_app.test_request_context():
+        return url_for("application_mgmt.api_download_architecture_document", id=application.id, doc_id=document.id)
+
+
+def test_a_document_link_downloads_the_file_of_the_signed_in_organisation(
+        app, db_session, make_org, client, login_as, tmp_path):
+    mine = make_org("doc-a")
+    application, document = _document(db_session, mine, tmp_path, "own-design")
+    response = _get(client, login_as, _user(db_session, mine), _download_url(application, document))
+    assert response.status_code == 200
+    assert response.data == b"%PDF-1.4 content of own-design"
+    assert "own-design.pdf" in response.headers["Content-Disposition"]
+
+
+def test_a_document_of_another_organisation_answers_404_and_downloads_nothing(
+        app, db_session, make_org, client, login_as, tmp_path):
+    mine, theirs = make_org("doc-a"), make_org("doc-b")
+    own_application, own_document = _document(db_session, mine, tmp_path, "own-design")
+    foreign_application, foreign_document = _document(db_session, theirs, tmp_path, "foreign-design")
+    user = _user(db_session, mine)
+    login_as(client, user)
+    for url in (
+        _download_url(foreign_application, foreign_document),
+        # the foreign document under the caller's own application, and the caller's under the foreign one
+        _download_url(own_application, foreign_document),
+        _download_url(foreign_application, own_document),
+        _download_url(own_application, type("Missing", (), {"id": 2**40})),
+    ):
+        response = client.get(url)
+        assert response.status_code == 404, url
+        assert b"foreign-design" not in response.data
+        assert "attachment" not in response.headers.get("Content-Disposition", "")
+
+
+def test_the_product_page_document_link_points_at_a_download_that_works(
+        app, db_session, make_org, client, login_as, tmp_path):
+    mine = make_org("doc-a")
+    one = _estate(db_session, mine, "d")
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.miscellaneous import ArchitectureDocument
+
+    application = ApplicationComponent(organization_id=mine.id, name="Order Desk d", archimate_element_id=one["app"].id)
+    db_session.add(application)
+    db_session.flush()
+    path = tmp_path / "desk.pdf"
+    path.write_bytes(b"%PDF-1.4 desk")
+    document = ArchitectureDocument(application_id=application.id, filename="desk.pdf", file_path=str(path),
+                                    mime_type="application/pdf")
+    db_session.add(document)
+    db_session.flush()
+    user = _user(db_session, mine)
+    html = _get(client, login_as, user, _product_url(one["product"])).get_data(as_text=True)
+    href = _download_url(application, document)
+    assert href in html
+    assert client.get(href).data == b"%PDF-1.4 desk"

@@ -1211,7 +1211,38 @@ def _seed_products(org_id) -> dict:
         if not existing:
             created += 1
     db.session.flush()
+    created += _seed_product_document(org_id)
     return {"product_elements_created": created}
+
+
+_PRODUCT_DOCUMENT = "calibration-ledger-design.pdf"
+
+
+def _seed_product_document(org_id) -> int:
+    """One real design document, file and record, on the Calibration Ledger application. Idempotent."""
+    import os
+    from flask import current_app
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.miscellaneous import ArchitectureDocument
+
+    application = db.session.query(ApplicationComponent).filter_by(
+        organization_id=org_id, name="Calibration Ledger").first()
+    if application is None or db.session.query(ArchitectureDocument).filter_by(
+            application_id=application.id, filename=_PRODUCT_DOCUMENT).first():
+        return 0
+    folder = os.path.abspath(os.path.join(
+        current_app.config.get("UPLOAD_FOLDER", "uploads"), "architecture_docs", str(application.id)))
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, _PRODUCT_DOCUMENT)
+    body = (b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+            b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n")
+    with open(path, "wb") as handle:
+        handle.write(body)
+    db.session.add(ArchitectureDocument(
+        application_id=application.id, filename=_PRODUCT_DOCUMENT, document_type="Design Document",
+        description="How the calibration ledger records and certifies each measurement.", version="1.0",
+        file_path=path, file_size=len(body), mime_type="application/pdf"))
+    return 1
 
 
 # ── capabilities with maturity ─────────────────────────────────────────────

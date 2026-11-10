@@ -8,7 +8,7 @@
 A Product is an ArchiMate 3.2 element. Until now its page was the generic element page, which lists direct
 connections only. The organisation wants one page per Product that shows everything that makes it up, by
 ArchiMate layer, with its diagrams, decisions, repositories, owners, cost, gaps and risks. Several Products sit
-under one organisation (the Product is the element; there is no product table and no second organisation level).
+under one organisation (the Product is the element; the mapped `Product` table holds a Product's own record, and there is no second organisation level).
 
 ## Decision
 
