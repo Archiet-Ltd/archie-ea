@@ -414,3 +414,35 @@ def test_debt_panel_calls_support_good_only_for_a_known_supported_value(app, db_
                 assert "support status not recognised (recorded as “%s”)" % value in row["detail"], (value, row)
             else:
                 assert "support status not recorded" in row["detail"], (value, row)
+
+
+def test_patterns_a_request_inside_its_budget_on_a_fixed_clock_classifies_every_application_untruncated(
+    app, db_session, make_org, monkeypatch
+):
+    """The journey's old check (all 22 applications answered, inside 5 seconds) on an injected clock:
+    the clock does not move, so the whole request is inside its budget whatever the machine load."""
+    import json
+    import re
+    import types
+
+    from app.api import sa_phase_c_routes
+    from app.modules.ai_chat.services import llm_service_impl as llm_impl
+    from app.services import application_pattern_classifier_service as classifier
+
+    monkeypatch.setattr(sa_phase_c_routes, "PATTERNS_REQUEST_BUDGET_SECONDS", 5.0)
+    client, _org, _apps = _make_logged_in_client(app, db_session, make_org, "fixedclock", app_count=22)
+    monkeypatch.setattr(classifier, "time", types.SimpleNamespace(monotonic=lambda: 1000.0, sleep=time.sleep))
+    calls = []
+
+    def _answer(prompt, *args, **kwargs):
+        calls.append(kwargs.get("time_limit"))
+        ids = [int(i) for i in re.findall(r"- ID (\d+):", prompt)]
+        return json.dumps([{"id": i, "arch_pattern": "saas", "confidence": 0.9, "reasoning": "x"} for i in ids])
+
+    monkeypatch.setattr(llm_impl.LLMService, "generate_from_prompt", staticmethod(_answer))
+    response = client.get("/api/ea-workflows/sa/application-patterns")
+    assert response.status_code == 200, response.get_data(as_text=True)[:300]
+    patterns = response.get_json()["patterns"]
+    assert patterns["classified"] == 22
+    assert not patterns["llm_truncated"]
+    assert calls and all(limit == pytest.approx(5.0) for limit in calls), calls

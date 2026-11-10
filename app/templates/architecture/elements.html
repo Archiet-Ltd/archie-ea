@@ -109,7 +109,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 transition-transform" :class="debtOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
         </button>
         <div x-show="debtOpen" x-cloak x-transition class="mt-3">
-            <div class="rounded-lg border border-border bg-card overflow-hidden">
+            <div class="rounded-lg border border-border bg-card overflow-x-auto">
                 <div class="bg-muted/20 px-5 py-2 border-b border-border flex items-center justify-between">
                     <span class="text-xs font-medium text-muted-foreground">Phase D — Technology Debt Scores</span>
                     <span x-show="debtSummary.total_elements" x-cloak class="text-xs text-muted-foreground" x-text="'Showing ' + (debtShowAll ? debtScores.length : Math.min(20, debtScores.length)) + ' of ' + (debtSummary.total_elements || 0) + ' applications analysed'"></span>
@@ -141,16 +141,17 @@
                             <tr class="hover:bg-muted/30">
                                 <td class="px-4 py-2 font-medium text-foreground" >
                                     <span x-text="item.app_name || item.name || item.element_name || 'Unnamed'"></span>
-                                    <span class="block text-xs font-normal text-muted-foreground lg:hidden" data-testid="debt-detail-compact" x-text="item.detail || item.reason"></span>
+                                    <span class="block text-xs font-normal text-muted-foreground break-all lg:hidden" data-testid="debt-detail-compact" :title="item.detail_full || item.detail || item.reason" :aria-label="item.detail_full || item.detail || item.reason" x-text="item.detail || item.reason"></span>
                                 </td>
                                 <td class="px-4 py-2 text-muted-foreground capitalize" x-text="item.layer || 'application'"></td>
                                 <td class="px-4 py-2 text-center">
                                     <span x-show="item.debt_score === null" x-cloak class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-muted text-muted-foreground">Not rated</span>
                                     <span x-show="item.debt_score !== null" class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold"
-                                          :class="Platform.figure.num(item.debt_score) >= 70 ? 'bg-destructive/10 text-destructive-emphasis' : Platform.figure.num(item.debt_score) >= 40 ? 'bg-warning/10 text-warning-emphasis' : 'bg-success/10 text-success-emphasis'"
+                                          :data-partly-scored="(item.missing || []).length + (item.unreadable || []).length > 0 ? 'true' : 'false'"
+                                          :class="(item.missing || []).length + (item.unreadable || []).length > 0 ? 'border border-border text-foreground' : Platform.figure.num(item.debt_score) >= 70 ? 'bg-destructive/10 text-destructive-emphasis' : Platform.figure.num(item.debt_score) >= 40 ? 'bg-warning/10 text-warning-emphasis' : 'bg-success/10 text-success-emphasis'"
                                           x-text="Platform.figure.percent(item.debt_score)"></span>
                                 </td>
-                                <td class="px-4 py-2 text-xs text-muted-foreground hidden lg:table-cell" data-testid="debt-detail" x-text="item.detail || item.reason"></td>
+                                <td class="px-4 py-2 text-xs text-muted-foreground break-all hidden lg:table-cell" data-testid="debt-detail" :title="item.detail_full || item.detail || item.reason" :aria-label="item.detail_full || item.detail || item.reason" x-text="item.detail || item.reason"></td>
                             </tr>
                         </template>
                     </tbody>

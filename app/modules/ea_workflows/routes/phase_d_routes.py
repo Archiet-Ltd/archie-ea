@@ -101,8 +101,19 @@ def _debt_basis(result):
     return used, missing, unreadable
 
 
-def _gaps_sentence(missing, unreadable, support_text=None):
+_SUPPORT_TEXT_SHOWN = 24
+
+
+def _shown_support_text(support_text):
+    """The recorded support text as quoted on a row: long values are cut with an ellipsis."""
+    if support_text and len(support_text) > _SUPPORT_TEXT_SHOWN:
+        return support_text[:_SUPPORT_TEXT_SHOWN] + "\u2026"
+    return support_text
+
+
+def _gaps_sentence(missing, unreadable, support_text=None, shorten=True):
     parts = []
+    quoted = _shown_support_text(support_text) if shorten else support_text
     if missing:
         parts.append("%s not recorded" % _plain_list(missing))
     if unreadable:
@@ -110,7 +121,7 @@ def _gaps_sentence(missing, unreadable, support_text=None):
         if others:
             parts.append("%s could not be read" % _plain_list(others))
         if support_text and "support status" in unreadable:
-            parts.append("support status not recognised (recorded as \u201c%s\u201d)" % support_text)
+            parts.append("support status not recognised (recorded as \u201c%s\u201d)" % quoted)
     return "; ".join(parts)
 
 
@@ -127,6 +138,7 @@ def _debt_row(app_id, app_name, result):
         "unreadable": [],
         "reason": None,
         "detail": None,
+        "detail_full": None,
     }
     if not result or result.get("missing_data") is None:
         # The scorer failed or found nothing: say so, not that nothing was recorded.
@@ -141,6 +153,7 @@ def _debt_row(app_id, app_name, result):
             row["reason"] = "Not rated: no " + ", ".join(_DEBT_INPUTS) + " recorded"
         else:
             row["reason"] = "Not rated: " + _gaps_sentence(missing, unreadable, support_text) + ". Record or correct them to get a score."
+            row["detail_full"] = "Not rated: " + _gaps_sentence(missing, unreadable, support_text, shorten=False) + ". Record or correct them to get a score."
         row["detail"] = row["reason"]
         return row
     debt_score = result.get("debt_score", 0)
@@ -153,10 +166,10 @@ def _debt_row(app_id, app_name, result):
         )
     else:
         lead = ", ".join(factors) or "No debt factors found in the recorded inputs"
-        row["detail"] = "%s. Scored from the %s only; %s. Record the rest for a full score." % (
-            lead,
-            _plain_list(used),
-            _gaps_sentence(missing, unreadable, support_text),
+        template = "%s. Scored from the %s only; %s. Record the rest for a full score."
+        row["detail"] = template % (lead, _plain_list(used), _gaps_sentence(missing, unreadable, support_text))
+        row["detail_full"] = template % (
+            lead, _plain_list(used), _gaps_sentence(missing, unreadable, support_text, shorten=False)
         )
     return row
 

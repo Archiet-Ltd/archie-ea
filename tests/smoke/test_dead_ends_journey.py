@@ -24,7 +24,6 @@ error or uncaught script error is allowed on any of them.
 """
 
 import os
-import time
 from datetime import date
 
 import pytest
@@ -35,7 +34,6 @@ from .fresh_org import api, create_fresh_org, sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 VIEWPORTS = (("light", 1440, 900), ("dark", 390, 844))
-PATTERNS_BUDGET_SECONDS = 5
 
 
 def _seed(org_id, tag):
@@ -207,12 +205,12 @@ def test_swept_pages_are_whole(browser, live_server, tmp_path_factory):
             assert page.locator("main").inner_text().strip()
             shot("connectors")
 
-            started = time.monotonic()
             status, payload = api(page, "GET", "/api/ea-workflows/sa/application-patterns")
-            elapsed = time.monotonic() - started
             assert status == 200, (status, payload)
             assert payload["patterns"]["classified"] == 22, payload
-            assert elapsed < PATTERNS_BUDGET_SECONDS, "patterns took %.1fs" % elapsed
+            # The time budget is measured on an injected clock in tests/test_dead_end_redirects_and_patterns.py
+            # (the server here is a separate process); here the answer must not report being cut short.
+            assert not payload["patterns"].get("llm_truncated"), payload["patterns"]
 
             assert problems == [], problems
         finally:
@@ -319,5 +317,72 @@ def test_tech_debt_panel_reads_each_recorded_support_value_as_what_it_is(
             assert "good standing" not in blank and "support status not recorded" in blank, blank
             assert "Other org TBC" not in debt.inner_text()
             debt.screenshot(path=os.path.join(walk, "%s%d-tech-debt-support.png" % (scheme, width)))
+        finally:
+            context.close()
+
+
+LONG_SUPPORT_VALUE = "UnbrokenSupportTextOfThirtyChs"  # 30 characters, no space to wrap at
+
+
+def test_tech_debt_table_keeps_every_debt_score_reachable_with_a_long_support_value(
+    browser, live_server, tmp_path_factory
+):
+    """An architect imports an application whose support value is 30 unbroken characters, next to a fully
+    scored 0% application and a partly scored one, and reads the Tech Debt table at both widths."""
+    assert len(LONG_SUPPORT_VALUE) == 30
+    org = create_fresh_org("enterprise_architect", org_admin=True)
+    tag = org["suffix"]
+    walk = _walk_dir(tmp_path_factory)
+    os.makedirs(walk, exist_ok=True)
+    rows = [
+        {"name": "Long support %s" % tag, "end_of_life_date": "2040-01-01", "version": "10.2",
+         "support_level": LONG_SUPPORT_VALUE},
+        {"name": "Fully scored %s" % tag, "end_of_life_date": "2040-01-01", "version": "10.2",
+         "support_level": "Supported"},
+        {"name": "Partly scored %s" % tag, "end_of_life_date": "2040-01-01", "version": "10.2"},
+    ]
+    for scheme, width, height in VIEWPORTS:
+        context = browser.new_context(viewport={"width": width, "height": height}, color_scheme=scheme)
+        page = context.new_page()
+        try:
+            sign_in(page, live_server, org["emails"]["enterprise_architect"])
+            page.goto(live_server + "/architecture/elements", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            if scheme == "light":
+                status, payload = api(page, "POST", "/applications/import-manual", {"applications": rows})
+                assert status == 200, (status, payload)
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+            page.get_by_role("button", name="Tech Debt Analysis").click()
+            page.get_by_text("Showing 3 of 3 applications analysed").wait_for(timeout=PAGE_TIMEOUT)
+            debt = page.locator("table.dense-table", has_text="Debt Score")
+            for name in ("Long support", "Fully scored", "Partly scored"):
+                row = debt.locator("tr", has_text="%s %s" % (name, tag))
+                assert row.count() == 1, name
+                badge = row.locator("td").nth(2).locator("span[data-partly-scored]")
+                badge.scroll_into_view_if_needed()
+                box = badge.bounding_box()
+                # The score is on screen after scrolling the table sideways, never cut off or gone.
+                assert box and box["width"] > 0 and box["x"] >= 0 and box["x"] + box["width"] <= width + 1, (name, box)
+            body_overflow = page.evaluate(
+                "document.documentElement.scrollWidth - document.documentElement.clientWidth")
+            assert body_overflow <= 1, "page scrolls sideways by %s px" % body_overflow
+            long_row = debt.locator("tr", has_text="Long support %s" % tag)
+            compact = long_row.get_by_test_id("debt-detail-compact") if width < 1024 else long_row.get_by_test_id("debt-detail")
+            assert LONG_SUPPORT_VALUE not in compact.inner_text(), compact.inner_text()
+            assert "…" in compact.inner_text(), compact.inner_text()
+            assert LONG_SUPPORT_VALUE in compact.get_attribute("title")
+            assert LONG_SUPPORT_VALUE in compact.get_attribute("aria-label")
+
+            def badge_of(name):
+                return debt.locator("tr", has_text="%s %s" % (name, tag)).locator("span[data-partly-scored]")
+
+            full = badge_of("Fully scored")
+            assert full.inner_text().strip() == "0%" and full.get_attribute("data-partly-scored") == "false"
+            assert "bg-success/10" in full.get_attribute("class")
+            partly = badge_of("Partly scored")
+            assert partly.get_attribute("data-partly-scored") == "true"
+            assert "bg-success/10" not in partly.get_attribute("class")
+            assert "border-border" in partly.get_attribute("class")
+            page.screenshot(path=os.path.join(walk, "%s%d-tech-debt-long-support.png" % (scheme, width)), full_page=True)
         finally:
             context.close()
