@@ -119,6 +119,11 @@ def test_a_number_the_user_typed_is_not_a_figure():
     assert _figures(_gate(text, question_text="Do 14 connections depend on it?")) == []
 
 
+def test_a_figure_only_the_injected_context_carries_is_not_a_returned_figure():
+    grounding = _grounded(IMPACT_13, context={"applications": 14})
+    assert _figures(_gate("The change touches 14 connections in the estate.", grounding)) == ["14"]
+
+
 def test_an_answer_with_no_tool_result_and_no_estate_question_is_not_checked():
     assert find_uncited_claims("TOGAF has 10 phases in the cycle.", Grounding()) == []
 

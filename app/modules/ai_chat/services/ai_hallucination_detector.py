@@ -437,8 +437,8 @@ class Grounding:
         # completeness. Nodes a slice dropped to fit its budget are not here.
         self.genome_nodes: Dict[str, dict] = {}
         self.genome_slices: List[dict] = []
-        # Every number a tool result of this turn (or the injected context)
-        # carried: the figures an answer may state.
+        # Every number a tool result of this turn carried: the figures an
+        # answer may state. The injected context adds only its stated counts (see unsupported_figures).
         self.figures: set = set()
 
     def add_context(self, value) -> None:
@@ -446,11 +446,9 @@ class Grounding:
         is parsed for names and ids, a string is kept as keyed text."""
         if isinstance(value, str):
             self.context_text += " " + " ".join(_words(value)) + " "
-            self.figures |= _numbers_in(value)
             return
         if value is None:
             return
-        self.figures |= _numbers_in(value)
         facts = _facts_of({"success": True, "result": value})
         self.context_names.update(facts.names)
         self.context_counts.update(facts.counts)
@@ -474,6 +472,8 @@ class Grounding:
             return
         self._add_genome_slice(result.get("result"))
         facts = _facts_of(result)
+        # The count of the rows a result returned is a figure it states.
+        self.figures |= {float(n) for n in facts.counts | facts.row_counts}
         self.results.append(facts)
         self.names.update(facts.names)
         self.refs.update(facts.refs)
@@ -925,8 +925,8 @@ _SCALES = {"k": 1e3, "thousand": 1e3, "m": 1e6, "million": 1e6, "bn": 1e9, "bill
 
 
 def _numbers_in(value) -> set:
-    """Every number *value* carries: numeric leaves, the length of each list,
-    and the numbers written in its text (thousands separators removed)."""
+    """Every number *value* carries: numeric leaves and the numbers written in
+    its text (thousands separators removed)."""
     found: set = set()
 
     def visit(node) -> None:
@@ -944,7 +944,6 @@ def _numbers_in(value) -> set:
             for item in node.values():
                 visit(item)
         elif isinstance(node, (list, tuple)):
-            found.add(float(len(node)))
             for item in node:
                 visit(item)
 
@@ -996,8 +995,10 @@ def _stated_figures(sentence: str, keys) -> List[tuple]:
 
 def unsupported_figures(sentence: str, grounding: Grounding, keys, question_numbers: set) -> List[str]:
     """The figures *sentence* states that no tool result of this turn (nor the
-    injected context, nor the user's own question) carries."""
-    known = grounding.figures | question_numbers
+    user's own question, nor a count the injected context states) carries."""
+    # The counts the injected context states (its total_* and *_count keys) are
+    # quoted figures too; its other numbers are not.
+    known = grounding.figures | question_numbers | {float(n) for n in grounding.context_counts}
     missing: List[str] = []
     for text, value, tolerance, percent in _stated_figures(sentence, keys):
         if any(
