@@ -509,7 +509,7 @@
                 '<div class="grid grid-cols-1 gap-3 md:grid-cols-2">' + rows + '</div>' +
                 '<p class="mt-3 text-center text-xs text-muted-foreground">' +
                   (linked.length < 4
-                    ? 'Questions about your connected applications, then general ones. More appear as you record links.'
+                    ? 'Linked applications first, then general questions.'
                     : 'Questions about your most connected applications') + '</p>'
             );
 

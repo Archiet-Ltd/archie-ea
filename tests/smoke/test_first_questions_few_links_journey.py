@@ -29,10 +29,13 @@ UNLINKED = ("Auth Gateway", "Reporting Job")
 def _seed(app, org_id, names, links):
     from app import db
     from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.models.application_portfolio import ApplicationComponent
 
     with app.app_context():
         ids = {}
         for name in names:
+            # The application list the chat once filled its cards from holds each one too.
+            db.session.add(ApplicationComponent(name=name, organization_id=org_id))
             element = ArchiMateElement(name=name, type="ApplicationComponent", layer="Application", organization_id=org_id)
             db.session.add(element)
             db.session.flush()
@@ -71,6 +74,7 @@ def shoot(page, name):
     for width, height, theme in ((1440, 900, "light"), (390, 844, "dark")):
         page.set_viewport_size({"width": width, "height": height})
         page.evaluate("(t) => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
+        page.wait_for_timeout(500)  # let the colour transition finish
         page.screenshot(path=os.path.join(SHOTS, "%s-%d-%s.png" % (name, width, theme)), full_page=True)
     page.evaluate("() => document.documentElement.classList.remove('dark')")
     page.set_viewport_size({"width": 1440, "height": 900})
