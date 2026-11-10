@@ -154,13 +154,100 @@ def test_debt_scores_carry_factors_and_mark_applications_without_data_not_rated(
     assert "Other org ledger" not in rows
 
     assert rows["Old ledger"]["debt_score"] == 100
-    assert rows["Old ledger"]["factors"] == ["End of life has passed", "Old major version"]
+    assert rows["Old ledger"]["factors"] == [
+        "End of life has passed",
+        "Major version 3 (version 7 or lower counts as old)",
+    ]
 
     assert rows["Bare record"]["debt_score"] is None
     assert rows["Bare record"]["factors"] == []
     assert "no end-of-life date, version, support status recorded" in rows["Bare record"]["reason"]
     assert body["summary"]["not_rated"] == 1
     assert body["summary"]["critical"] == 1
+
+
+def test_debt_rows_say_which_inputs_they_were_scored_from(app, db_session, make_org):
+    from datetime import date
+
+    from app.models.application_portfolio import ApplicationComponent
+
+    client, org, _apps = _make_logged_in_client(app, db_session, make_org, "debtpart", app_count=0)
+    other = make_org("debtpart-other")
+    future = date(2040, 1, 1)
+    db_session.add_all(
+        [
+            ApplicationComponent(name="All three", organization_id=org.id, end_of_life_date=future,
+                                 version="10.2", support_level="supported"),
+            ApplicationComponent(name="Only date", organization_id=org.id, end_of_life_date=future),
+            ApplicationComponent(name="Only version", organization_id=org.id, version="10.2"),
+            ApplicationComponent(name="Only support", organization_id=org.id, support_level="basic"),
+            ApplicationComponent(name="Date and version", organization_id=org.id, end_of_life_date=future,
+                                 version="10.2"),
+            ApplicationComponent(name="Unreadable only", organization_id=org.id, version="R12"),
+            ApplicationComponent(name="Unreadable with date", organization_id=org.id,
+                                 end_of_life_date=future, version="R12"),
+            ApplicationComponent(name="Two point oh", organization_id=org.id, end_of_life_date=future,
+                                 version="2.0", support_level="supported"),
+            ApplicationComponent(name="Nothing", organization_id=org.id),
+            ApplicationComponent(name="Other org only date", organization_id=other.id, end_of_life_date=future),
+        ]
+    )
+    db_session.flush()
+
+    response = client.get("/api/ea/phase-d/debt-scores")
+    assert response.status_code == 200
+    rows = {row["app_name"]: row for row in response.get_json()["scores"]}
+    assert "Other org only date" not in rows
+
+    full = rows["All three"]
+    assert full["debt_score"] == 0
+    assert "all in good standing" in full["detail"]
+    assert full["missing"] == [] and full["unreadable"] == []
+
+    for name, said, not_said in [
+        ("Only date", "Scored from the end-of-life date only; version and support status not recorded", "all in good standing"),
+        ("Only version", "Scored from the version only; end-of-life date and support status not recorded", "all in good standing"),
+        ("Only support", "Scored from the support status only; end-of-life date and version not recorded", "all in good standing"),
+        ("Date and version", "Scored from the end-of-life date and version only; support status not recorded", "all in good standing"),
+        ("Unreadable with date", "Scored from the end-of-life date only; support status not recorded; version could not be read", "all in good standing"),
+    ]:
+        row = rows[name]
+        assert row["debt_score"] == 0, name
+        assert said in row["detail"], (name, row["detail"])
+        assert not_said not in row["detail"], (name, row["detail"])
+
+    unreadable = rows["Unreadable only"]
+    assert unreadable["debt_score"] is None
+    assert "version could not be read" in unreadable["reason"]
+    assert "end-of-life date and support status not recorded" in unreadable["reason"]
+
+    assert rows["Nothing"]["debt_score"] is None
+    assert rows["Nothing"]["reason"] == "Not rated: no end-of-life date, version, support status recorded"
+
+    old = rows["Two point oh"]
+    assert old["debt_score"] == 60
+    assert "Old major version" not in old["detail"]
+    assert "Major version 2 (version 7 or lower counts as old)" in old["detail"]
+
+
+def test_debt_row_for_a_scorer_failure_says_the_score_could_not_be_worked_out(
+    app, db_session, make_org, monkeypatch
+):
+    from datetime import date
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.services.technology_roadmap_service import TechnologyRoadmapService
+
+    client, org, _apps = _make_logged_in_client(app, db_session, make_org, "debtfail", app_count=0)
+    db_session.add(ApplicationComponent(name="Fully recorded", organization_id=org.id,
+                                        end_of_life_date=date(2040, 1, 1), version="10.2",
+                                        support_level="supported"))
+    db_session.flush()
+    monkeypatch.setattr(TechnologyRoadmapService, "score_technology_debt", lambda self, app_id: {})
+    row = client.get("/api/ea/phase-d/debt-scores").get_json()["scores"][0]
+    assert row["debt_score"] is None
+    assert "could not be worked out" in row["reason"]
+    assert "recorded" not in row["reason"]
 
 
 def test_debt_scores_error_names_no_exception(app, db_session, make_org, monkeypatch):

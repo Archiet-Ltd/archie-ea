@@ -683,7 +683,9 @@ class TechnologyRoadmapService:
         Returns a dict with keys:
             app_id, app_name, debt_score, risk_tier,
             eol_score, version_score, support_status_score,
-            missing_data (names of the inputs the application has no value for)
+            missing_data (names of the inputs the application has no value for),
+            unreadable_data (names of the inputs that have a value the scorer cannot read),
+            major_version (the major version number the version score was taken from, or None)
 
         Returns {} when the application is not found.
 
@@ -734,13 +736,15 @@ class TechnologyRoadmapService:
             except AttributeError:
                 version_str = ""
             version_score = 0
+            major_version = None
+            version_unreadable = False
             if version_str:
                 try:
-                    major = int(str(version_str).split(".")[0])
-                    if major <= 7:
+                    major_version = int(str(version_str).split(".")[0])
+                    if major_version <= 7:
                         version_score = 60
                 except (ValueError, IndexError):
-                    pass
+                    version_unreadable = True
 
             # -- Support status score ------------------------------------
             # support_status is the test-facing attribute; support_level is the DB column.
@@ -775,6 +779,8 @@ class TechnologyRoadmapService:
                 "eol_score": eol_score,
                 "version_score": version_score,
                 "support_status_score": support_status_score,
+                "major_version": major_version,
+                "unreadable_data": ["version"] if version_unreadable else [],
                 "missing_data": [
                     label
                     for label, present in (

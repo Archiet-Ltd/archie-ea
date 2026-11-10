@@ -118,7 +118,15 @@
                     <span class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span> Loading debt scores...
                 </div>
                 <div x-show="debtError" x-cloak class="p-4 text-sm text-destructive-emphasis" x-text="debtError"></div>
-                <div x-show="debtLoaded && debtScores.length === 0 && !debtError" x-cloak class="p-6 text-center text-sm text-muted-foreground">No debt scores available.</div>
+                <div x-show="debtLoaded && debtScores.length === 0 && !debtError" x-cloak data-testid="debt-empty">
+                    {% call ui.empty(attrs={'role': 'status'}) %}
+                        {% call ui.empty_header() %}
+                            {{ ui.empty_title(level=3, text='No applications to score yet') }}
+                            {{ ui.empty_description(text='Tech debt is scored for each application from its end-of-life date, version and support status. This organisation has no applications yet, so there is nothing to score.') }}
+                        {% endcall %}
+                        {% call ui.empty_content() %}{% call ui.button(href='/applications/') %}Add or import applications{% endcall %}{% endcall %}
+                    {% endcall %}
+                </div>
                 <table class="dense-table" x-show="debtLoaded && debtScores.length > 0" x-cloak class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-border">
@@ -133,7 +141,7 @@
                             <tr class="hover:bg-muted/30">
                                 <td class="px-4 py-2 font-medium text-foreground" >
                                     <span x-text="item.app_name || item.name || item.element_name || 'Unnamed'"></span>
-                                    <span x-show="item.debt_score === null" x-cloak class="block text-xs font-normal text-muted-foreground lg:hidden" x-text="item.reason"></span>
+                                    <span class="block text-xs font-normal text-muted-foreground lg:hidden" data-testid="debt-detail-compact" x-text="item.detail || item.reason"></span>
                                 </td>
                                 <td class="px-4 py-2 text-muted-foreground capitalize" x-text="item.layer || 'application'"></td>
                                 <td class="px-4 py-2 text-center">
@@ -142,7 +150,7 @@
                                           :class="Platform.figure.num(item.debt_score) >= 70 ? 'bg-destructive/10 text-destructive-emphasis' : Platform.figure.num(item.debt_score) >= 40 ? 'bg-warning/10 text-warning-emphasis' : 'bg-success/10 text-success-emphasis'"
                                           x-text="Platform.figure.percent(item.debt_score)"></span>
                                 </td>
-                                <td class="px-4 py-2 text-xs text-muted-foreground hidden lg:table-cell" x-text="item.debt_score === null ? item.reason : ((item.factors || []).join(', ') || 'No debt factors: end of life, version and support status are all in good standing')"></td>
+                                <td class="px-4 py-2 text-xs text-muted-foreground hidden lg:table-cell" data-testid="debt-detail" x-text="item.detail || item.reason"></td>
                             </tr>
                         </template>
                     </tbody>
