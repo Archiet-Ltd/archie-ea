@@ -437,15 +437,20 @@ class Grounding:
         # completeness. Nodes a slice dropped to fit its budget are not here.
         self.genome_nodes: Dict[str, dict] = {}
         self.genome_slices: List[dict] = []
+        # Every number a tool result of this turn (or the injected context)
+        # carried: the figures an answer may state.
+        self.figures: set = set()
 
     def add_context(self, value) -> None:
         """Structured context the system injected (live data blocks): a dict
         is parsed for names and ids, a string is kept as keyed text."""
         if isinstance(value, str):
             self.context_text += " " + " ".join(_words(value)) + " "
+            self.figures |= _numbers_in(value)
             return
         if value is None:
             return
+        self.figures |= _numbers_in(value)
         facts = _facts_of({"success": True, "result": value})
         self.context_names.update(facts.names)
         self.context_counts.update(facts.counts)
@@ -457,6 +462,7 @@ class Grounding:
         if not (isinstance(result, dict) and result.get("success")):
             return
         self.tool_results += 1
+        self.figures |= _numbers_in(result)
         if mutates:
             # Only the record the write itself created or changed is a
             # receipt; a name found anywhere else in the result is not.
@@ -868,12 +874,210 @@ def _clarification_exempt(sentence, tool_keys, context_keys, org_keys, question_
     return all(m["key"] in question_names for m in mentions)
 
 
+# --------------------------------------------------------------------------- #
+# Figures                                                                      #
+# --------------------------------------------------------------------------- #
+#
+# A figure an answer states (an integer or decimal of two or more digits, a
+# percentage, a money amount) must also appear in a tool result of this turn,
+# after thousands separators are removed and the tool's number is rounded to
+# the precision the answer shows. Not figures: years, dates and times, version
+# numbers, numbers inside a record's own name or a standard's name (ISO 27001),
+# identifiers glued to letters, a [ref:] marker or a link, and numbers the user
+# typed in the question.
+
+FIGURE_REASON = "figure no tool returned this turn: "
+FIGURES_NOT_CONFIRMED = (
+    "I could not confirm one or more figures in this answer from the records I "
+    "read, so I left them out."
+)
+_ANY_NUMBER = re.compile(r"(?<![\w.])\d[\d,]*(?:\.\d+)?")
+_MONTHS = (
+    r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|"
+    r"sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+)
+_NOT_FIGURE_SPANS = re.compile(
+    "|".join([
+        r"\[ref:[^\]\s]+\]",
+        r"\]\([^)]*\)",
+        r"(?:https?://|www\.)\S+",
+        r"\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?Z?)?",
+        r"\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b",
+        r"\b\d{1,2}:\d{2}(?::\d{2})?(?:\s?[ap]\.?m\.?)?",
+        r"\b\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?" + _MONTHS + r"\b(?:,?\s+\d{4})?",
+        r"\b" + _MONTHS + r"\.?\s+\d{1,2}(?:st|nd|rd|th)?\b(?:,?\s+\d{4})?",
+        r"\b(?:19|20)\d{2}\s*[-\u2013/]\s*(?:\d{4}|\d{2})\b",
+        r"\bv?\d+(?:\.\d+){2,}\b",
+        r"\b(?:version|release|rev|revision|build)\s+v?\d+(?:\.\d+)*",
+        r"\b(?:iso(?:\s*/\s*iec)?|iec|rfc|nist|sp|soc|pci|dss|cve|tls|ssl|http|port|ports|"
+        r"article|articles|section|sections|clause|annex)\s*[-/]?\s*\d+(?:[.:]\d+)*",
+    ]),
+    re.IGNORECASE,
+)
+_LIST_NUMBER = re.compile(r"^\s*[-*#>|]*\s*\d{1,3}[.)]\s")
+_FIGURE = re.compile(
+    r"(?<![\w.])(?<![A-Za-z]-)(?P<cur>[$\u20ac\u00a3]\s?)?"
+    r"(?P<num>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)"
+    r"(?P<suf>\s?%|(?:k|m|bn)(?![\w])|\s(?:million|billion|thousand)\b)?(?![\w])",
+    re.IGNORECASE,
+)
+_SCALES = {"k": 1e3, "thousand": 1e3, "m": 1e6, "million": 1e6, "bn": 1e9, "billion": 1e9}
+
+
+def _numbers_in(value) -> set:
+    """Every number *value* carries: numeric leaves, the length of each list,
+    and the numbers written in its text (thousands separators removed)."""
+    found: set = set()
+
+    def visit(node) -> None:
+        if isinstance(node, bool):
+            return
+        if isinstance(node, (int, float)):
+            found.add(float(node))
+        elif isinstance(node, str):
+            for token in _ANY_NUMBER.findall(node):
+                try:
+                    found.add(float(token.replace(",", "")))
+                except ValueError:
+                    pass
+        elif isinstance(node, dict):
+            for item in node.values():
+                visit(item)
+        elif isinstance(node, (list, tuple)):
+            found.add(float(len(node)))
+            for item in node:
+                visit(item)
+
+    visit(value)
+    return found
+
+
+def _name_keys(grounding: Grounding, org_names: Optional[set]):
+    """The record-name keys the citation gate looks for: (returned by a tool or
+    written by a write of this turn, carried by the context, the organisation's)."""
+    tool_keys = set(grounding.names) | set(grounding.receipt_names)
+    tool_keys.discard("")
+    context_keys = set(grounding.context_names)
+    org_keys = set(org_names or ())
+    for key in list(org_keys):
+        # An organisation name the context text carries is context-grounded.
+        if grounding.context_text and (" " + key + " ") in grounding.context_text:
+            context_keys.add(key)
+    return tool_keys, context_keys, org_keys
+
+
+def _stated_figures(sentence: str, keys) -> List[tuple]:
+    """``(text, value, tolerance, is_percent)`` of each figure *sentence* states,
+    after dates, versions, standards, links and record names are set aside."""
+    text = _LIST_NUMBER.sub(" ", sentence)
+    mask = [False] * len(text)
+    for match in _NOT_FIGURE_SPANS.finditer(text):
+        mask[match.start():match.end()] = [True] * (match.end() - match.start())
+    for mention in _mentions(text, keys[0], keys[1], keys[2], list(REF_MARKER.finditer(text))):
+        mask[mention["start"]:mention["end"]] = [True] * (mention["end"] - mention["start"])
+    text = "".join(" " if hidden else ch for ch, hidden in zip(text, mask))
+    out: List[tuple] = []
+    for match in _FIGURE.finditer(text):
+        num = match.group("num")
+        currency = bool(match.group("cur"))
+        suffix = (match.group("suf") or "").strip().lower()
+        percent = suffix == "%"
+        digits = len(re.sub(r"\D", "", num))
+        if not (currency or suffix or digits >= 2):
+            continue
+        if not (currency or suffix) and "," not in num and "." not in num and _year(num):
+            continue
+        scale = _SCALES.get(suffix, 1.0)
+        decimals = len(num.split(".")[1]) if "." in num else 0
+        value = float(num.replace(",", "")) * scale
+        out.append((match.group(0).strip(), value, 0.5 * 10 ** -decimals * scale, percent))
+    return out
+
+
+def unsupported_figures(sentence: str, grounding: Grounding, keys, question_numbers: set) -> List[str]:
+    """The figures *sentence* states that no tool result of this turn (nor the
+    injected context, nor the user's own question) carries."""
+    known = grounding.figures | question_numbers
+    missing: List[str] = []
+    for text, value, tolerance, percent in _stated_figures(sentence, keys):
+        if any(
+            abs(n - value) <= tolerance + 1e-9 or (percent and abs(n * 100 - value) <= tolerance + 1e-9)
+            for n in known
+        ):
+            continue
+        if text not in missing:
+            missing.append(text)
+    return missing
+
+
+def figures_of(uncited: List[Dict]) -> List[str]:
+    """The unsupported figures the gate named, in order, without repeats."""
+    out: List[str] = []
+    for claim in uncited:
+        for reason in claim.get("unsupported", []):
+            if reason.startswith(FIGURE_REASON) and reason[len(FIGURE_REASON):] not in out:
+                out.append(reason[len(FIGURE_REASON):])
+    return out
+
+
+def only_figures(uncited: List[Dict]) -> bool:
+    """True when every reason the gate gave is an unsupported figure."""
+    return bool(uncited) and all(
+        reason.startswith(FIGURE_REASON)
+        for claim in uncited for reason in claim.get("unsupported", [])
+    )
+
+
+def remove_unsupported_figures(
+    response_text: str,
+    grounding: Grounding,
+    org_names: Optional[set] = None,
+    question_text: str = "",
+) -> Dict:
+    """``{"text", "removed"}``: *response_text* without the statements that state
+    an unsupported figure, and a plain line saying a figure could not be
+    confirmed. It only removes; it never adds or rewrites a fact."""
+    keys = _name_keys(grounding, org_names)
+    question_numbers = _numbers_in(question_text)
+    removed: List[str] = []
+    out_lines: List[str] = []
+    for line in (response_text or "").split("\n"):
+        parts = re.split(r"((?<=[.!?])\s+)", line)
+        pieces = parts[0::2]
+        keep = [True] * len(pieces)
+        for i, piece in enumerate(pieces):
+            statement = piece.strip(" \t-*#>|")
+            if len(statement) < 8 or statement.endswith("?") or not keep[i]:
+                continue
+            found = unsupported_figures(piece, grounding, keys, question_numbers)
+            if not found:
+                continue
+            removed.extend(f for f in found if f not in removed)
+            keep[i] = False
+            # A marker placed after the full stop belongs to the sentence before it.
+            if i + 1 < len(pieces) and pieces[i + 1].strip() and not REF_MARKER.sub(
+                "", pieces[i + 1]
+            ).strip(" .,;"):
+                keep[i + 1] = False
+        if all(keep):
+            out_lines.append(line)
+            continue
+        rebuilt = " ".join(p.strip() for p, k in zip(pieces, keep) if k)
+        if re.search(r"[A-Za-z0-9]", rebuilt):
+            out_lines.append(line[: len(line) - len(line.lstrip())] + rebuilt)
+    text = re.sub(r"\n{3,}", "\n\n", "\n".join(out_lines)).strip()
+    if removed:
+        text = (text + "\n\n" if text else "") + FIGURES_NOT_CONFIRMED
+    return {"text": text, "removed": removed}
+
+
 def find_uncited_claims(
     response_text: str,
     grounding: Grounding,
     org_names: Optional[set] = None,
     estate_question: bool = False,
     question_names: Optional[set] = None,
+    question_text: str = "",
 ) -> List[Dict]:
     """Sentences of *response_text* that state a fact about the estate which a
     tool result of this turn does not support. An empty list means the answer
@@ -893,17 +1097,12 @@ def find_uncited_claims(
                 "unsupported": ["no record was read for an estate question"],
             }]
 
-    tool_keys = set(grounding.names) | set(grounding.receipt_names)
-    tool_keys.discard("")
-    context_keys = set(grounding.context_names)
-    org_keys = set(org_names or ())
-    for key in list(org_keys):
-        # An organisation name the context text carries is context-grounded.
-        if grounding.context_text and (" " + key + " ") in grounding.context_text:
-            context_keys.add(key)
+    keys = _name_keys(grounding, org_names)
+    tool_keys, context_keys, org_keys = keys
     zero_rows = bool(estate_question and grounding.tool_results > 0
                      and grounding.rows_returned == 0)
 
+    question_numbers = _numbers_in(question_text)
     uncited: List[Dict] = []
     for sentence in statements:
         if _clarification_exempt(sentence, tool_keys, context_keys, org_keys, question_names):
@@ -912,6 +1111,9 @@ def find_uncited_claims(
             sentence, grounding, tool_keys, context_keys, org_keys,
             question_names, estate_question, zero_rows,
         )
+        if grounding.tool_results > 0:
+            for figure in unsupported_figures(sentence, grounding, keys, question_numbers):
+                missing.append(FIGURE_REASON + figure)
         if missing:
             uncited.append({"claim": sentence[:300], "unsupported": missing})
     return uncited

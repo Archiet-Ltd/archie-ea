@@ -18,8 +18,11 @@ import logging
 from typing import Callable, Optional
 from app.modules.ai_chat.services.ai_hallucination_detector import (
     Grounding,
+    figures_of,
     find_uncited_claims,
+    only_figures,
     organisation_names_in_text,
+    remove_unsupported_figures,
 )
 from app.modules.intelligence.services.answer_envelope import (
     as_whole_number,
@@ -330,9 +333,11 @@ class AgentRunner:
         self._context_text = ""
         self._estate_question = None
         self._nudged = False
+        self._revised = False
         self._gate_cache = None
         self._context_struct = None
         self._question_names = set()
+        self._question_text = ""
         self._gate_mode_now = self._gate_mode()
         # Tokens of the model call in flight, held back until the gate has
         # judged the text so a refused answer is never partly shown.
@@ -725,6 +730,8 @@ class AgentRunner:
             except Exception:
                 logger.warning("AgentRunner: question name lookup failed", exc_info=True)
         self._nudged = False
+        self._revised = False
+        self._question_text = user_message or ""
         self._gate_cache = None
 
         # Get provider, model, and first available API key
@@ -895,6 +902,29 @@ class AgentRunner:
                             "Before replying, call the answer tool for this question "
                             "and reply only from the rows it returns, citing each "
                             "record with [ref:<id>]."
+                        ),
+                    })
+                    continue
+                if (
+                    self._gate_mode_now == "enforce"
+                    and not self._revised
+                    and iteration < MAX_ITERATIONS - 1
+                    and figures_of(self._find_uncited(final_text))
+                ):
+                    # The answer states a figure no tool returned this turn: it
+                    # goes back once with the reason. If the figure is still
+                    # unsupported, the gate removes it (see _apply_citation_gate).
+                    self._revised = True
+                    self._release_held_tokens(False)
+                    messages.append({"role": "assistant", "content": final_text or "(no answer)"})
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "Your answer states "
+                            + ", ".join(figures_of(self._find_uncited(final_text)))
+                            + ", which no tool returned in this turn. Reply again "
+                            "using only figures the tools returned, or say that the "
+                            "figure cannot be confirmed. Keep the [ref:<id>] markers."
                         ),
                     })
                     continue
@@ -1847,6 +1877,7 @@ class AgentRunner:
                 org_names=org_names,
                 estate_question=bool(self._estate_question),
                 question_names=self._question_names,
+                question_text=self._question_text,
             )
         except Exception:
             logger.warning("AgentRunner: citation gate failed", exc_info=True)
@@ -1908,6 +1939,23 @@ class AgentRunner:
             self._withheld_claims = uncited
         else:
             self._would_withhold = uncited
+        if enforce and only_figures(uncited):
+            # Only figures are unsupported: they are taken out and the answer
+            # says so; the rest of the answer stands.
+            from app.middleware.tenant_context import current_org_id
+
+            trimmed = remove_unsupported_figures(
+                text, self._grounding,
+                org_names=organisation_names_in_text(text, current_org_id()),
+                question_text=self._question_text,
+            )
+            result["response"] = trimmed["text"]
+            result["citation_gate"].update({"refused": False, "figures_removed": len(trimmed["removed"])})
+            result.pop("genome_answer", None)
+            logger.warning(
+                "AgentRunner: citation gate removed %d unsupported figure(s)", len(trimmed["removed"]),
+            )
+            return
         if enforce:
             logger.warning(
                 "AgentRunner: citation gate refused an answer (%d uncited claim(s))",
