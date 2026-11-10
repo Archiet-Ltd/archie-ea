@@ -24,6 +24,7 @@ from app.models.implementation_migration import (  # dead-code-ok
     WorkPackage,
 )
 from app.services.archimate.gap_resolution_service import GapResolutionService
+from app.services.gap_register_service import priority_filter_clause, severity_order_expr
 from app.services.llm_service import LLMService
 
 
@@ -230,9 +231,9 @@ class RoadmapGenerator:
             query = query.filter(Gap.architecture_id == architecture_id)
 
         if priority_filter:
-            query = query.filter(Gap.priority == priority_filter)
+            query = query.filter(priority_filter_clause(priority_filter))
 
-        return query.order_by(Gap.priority.desc(), Gap.created_at.asc()).all()
+        return query.order_by(severity_order_expr(), Gap.created_at.asc()).all()
 
     def _sort_gaps_by_priority(self, gaps: List[Gap]) -> List[Gap]:
         """Sort gaps by priority for sequencing."""

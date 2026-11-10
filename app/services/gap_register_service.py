@@ -67,6 +67,24 @@ def effective_severity_expr():
     return case((func.lower(func.trim(Gap.priority)) == "critical", "critical"), else_=Gap.severity)
 
 
+def severity_order_expr():
+    """Gaps ordered most serious first, by `effective_severity_expr`. Order by this, never by the priority
+    or severity text: sorted as words, 'medium' comes before 'critical'."""
+    return case(
+        {"critical": 0, "high": 1, "medium": 2, "low": 3},
+        value=effective_severity_expr(),
+        else_=4,
+    )
+
+
+def priority_filter_clause(priority):
+    """The filter for a gap list asked for one priority. 'critical' means critical by the one rule, so a gap
+    whose severity says critical is listed with one whose priority does; any other word is the stored priority."""
+    if (priority or "").strip().lower() == "critical":
+        return effective_severity_expr() == "critical"
+    return Gap.priority == priority
+
+
 def get_unified_gap_register(
     adm_phase: str = None,
     severity: str = None,

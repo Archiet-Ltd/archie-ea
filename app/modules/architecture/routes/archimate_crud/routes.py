@@ -1618,6 +1618,37 @@ def create_element(layer, element_type):
     )
 
 
+def _resolve_element(model_class, element_type, element_id, any_type=False):
+    """The one place that says which row an address means. Returns (row, held_as_element).
+
+    A record page is addressed by the record's own number, or by its element's number (the links the
+    solution and agent pages build). The two number spaces overlap, so ?ae=1 says the number is an element's.
+    Whichever way it arrives, the record behind the element is the answer when one exists; the element
+    itself is the answer only when no record holds it. filter_by always emits SQL, so the organisation
+    filter applies even when the row is already in the session (Query.get would skip it)."""
+    if model_class is None:
+        return None, False
+    if request.args.get("ae") != "1":
+        record = model_class.query.filter_by(id=element_id).first()
+        if record is not None:
+            return record, False
+    element_query = ArchiMateElement.query.filter_by(id=element_id)
+    if not any_type:
+        element_query = element_query.filter_by(type=element_type)
+    element = element_query.first()
+    if element is None:
+        if request.args.get("ae") == "1" and hasattr(model_class, "archimate_element_id"):  # model-safety-ok: polymorphic ArchiMate elements
+            record = model_class.query.filter_by(archimate_element_id=element_id).first()
+            if record is not None:
+                return record, False
+        return None, False
+    if hasattr(model_class, "archimate_element_id"):  # model-safety-ok: polymorphic ArchiMate elements
+        record = model_class.query.filter_by(archimate_element_id=element.id).first()
+        if record is not None:
+            return record, False
+    return element, True
+
+
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/<int:element_id>")
 @login_required
 def detail_element(layer, element_type, element_id):
@@ -1628,21 +1659,10 @@ def detail_element(layer, element_type, element_id):
         abort(404)
     model_class = MODEL_REGISTRY.get(element_type)
 
-    # filter_by always emits SQL, so the tenant filter applies even when the row
-    # is already in the session identity map (Query.get would skip it).
-    element = None
-    # ?ae=1 means the id is an archimate_elements id, which is what a connection row carries; without it
-    # the id is the dedicated table's own id, which is what the lists carry. The two number spaces overlap,
-    # so a connection must say which one it holds or it can open another element's page.
-    if model_class and request.args.get("ae") == "1":
-        if hasattr(model_class, "archimate_element_id"):  # model-safety-ok: polymorphic ArchiMate elements
-            element = model_class.query.filter_by(archimate_element_id=element_id).first()
-    elif model_class:
-        element = model_class.query.filter_by(id=element_id).first()
-
-    # Fall back to archimate_elements table (native ArchiMate elements)
+    element, _from_ae = _resolve_element(model_class, element_type, element_id, any_type=True)
     if element is None:
-        element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
+        abort(404)
+    if _from_ae:
         model_class = ArchiMateElement
 
     # Get relationships
@@ -1907,33 +1927,14 @@ def update_element(layer, element_type, element_id):
         flash(f"Element type {element_type} is not yet supported", "warning")
         return redirect(url_for("archimate_crud.dashboard"))
 
-    # ?ae=1 says the id is an architecture element's id (a record held only as an
-    # element); without it the id is the record's own. The two number spaces
-    # overlap, so a caller holding an element id must say so or it changes the
-    # record that happens to carry the same number.
-    element = None
-    _from_ae = False
-    if request.args.get("ae") != "1":
-        element = model_class.query.filter_by(id=element_id).first()
-    # Fall back to archimate_elements for elements stored there directly
-    if element is None:
-        element = ArchiMateElement.query.filter_by(id=element_id, type=element_type).first()
-        _from_ae = True
-    if element is not None and element_type == "Gap" and _from_ae:
-        # A gap is edited as the gap row, inside this organisation. An element that is not
-        # a gap, or a gap element with no gap row, is not a gap to edit.
-        element = (
-            Gap.query.filter_by(archimate_element_id=element.id).first()
-            if element.type == "Gap" else None
-        )
-        _from_ae = False
+    element, _from_ae = _resolve_element(model_class, element_type, element_id)
     if element is None:
         if request.is_json:
             return jsonify({"success": False, "error": "Element not found"}), 404
         from flask import abort
         abort(404)
 
-    if request.method == "POST" and element_type == "Gap":
+    if request.method == "POST" and isinstance(element, Gap):
         return _save_gap_edit(layer, element)
 
     if request.method == "POST":
@@ -2027,9 +2028,13 @@ def update_element(layer, element_type, element_id):
 
 
 def _id_scope(element):
-    """The query that says which number space an address's id is in: an element held with no record of its
-    own is addressed by the element's id, which overlaps the records' ids, so its address says so."""
-    return {"ae": 1} if isinstance(element, ArchiMateElement) else {}
+    """The query that says which number space an address's id is in. A record is always addressed by its own
+    number, with no query. An element held with no record keeps the address it was opened by: opened with
+    ?ae=1 it lands with ?ae=1 (the number may also be a record's), opened without, it lands without, because
+    no record of that number existed or the page would have opened the record."""
+    if isinstance(element, ArchiMateElement) and request.args.get("ae") == "1":
+        return {"ae": 1}
+    return {}
 
 
 def _editing_element_payload(element, element_type, layer):
@@ -2052,7 +2057,7 @@ def _editing_element_payload(element, element_type, layer):
         value = getattr(element, field, None)
         if value is not None:
             payload[field] = value.isoformat() if isinstance(value, (date, datetime)) else value
-    if element_type == "Gap":
+    if isinstance(element, Gap):
         payload["priority"] = _gap_rating(element)
     payload["architecture_state"] = _architecture_state(element)
     payload["saveable_fields"] = _saveable_fields(element, element_type)
@@ -2144,15 +2149,7 @@ def delete_element(layer, element_type, element_id):
         flash(f"Element type {element_type} is not yet supported", "warning")
         return redirect(url_for("archimate_crud.dashboard"))
 
-    # ?ae=1 says the id is an architecture element's id (a record held only as an
-    # element); without it the id is the record's own. The two number spaces
-    # overlap, so a caller holding an element id must say so or it deletes the
-    # record that happens to carry the same number.
-    element = None
-    _from_ae = False
-    if request.args.get("ae") != "1":
-        element = model_class.query.filter_by(id=element_id).first()
-    # Fall back to archimate_elements for elements stored there directly
+    element, _from_ae = _resolve_element(model_class, element_type, element_id)
     if element is None:
         element = ArchiMateElement.query.filter_by(id=element_id, type=element_type).first()
         _from_ae = True

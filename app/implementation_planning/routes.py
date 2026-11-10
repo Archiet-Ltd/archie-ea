@@ -789,14 +789,14 @@ def gaps_list():
             query = query.filter(ImplementationGap.gap_type == gap_type)
 
         if priority:
-            query = query.filter(ImplementationGap.priority == priority)
+            query = query.filter(gap_register_service.priority_filter_clause(priority))
 
         if status:
             query = query.filter(ImplementationGap.resolution_status == status)
 
         # Order by priority and creation date
         query = query.order_by(
-            ImplementationGap.priority.desc(), ImplementationGap.created_at.desc()
+            gap_register_service.severity_order_expr(), ImplementationGap.created_at.desc()
         )
 
         # Paginate
