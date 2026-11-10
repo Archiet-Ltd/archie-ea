@@ -158,7 +158,7 @@ def test_the_card_the_answer_and_the_overview_give_one_relationship_figure_for_e
     db_session, org_a, org_b, approved, people, login_as, client, tenant_ctx
 ):
     """A card counts relationships; an answer counts the elements they reach. The answer states
-    the card's figure, from the overview's own reader, and says what it counts."""
+    the card's figure, from the overview's own reader, and says what it is made of."""
     from app.modules.dashboard.services.overview_figures import relationship_ends
 
     db_session.commit()
@@ -173,7 +173,7 @@ def test_the_card_the_answer_and_the_overview_give_one_relationship_figure_for_e
     for name, count in by_name.items():
         login_as(client, people.admin)
         html = _ask(client, name)
-        stated = re.search(r"has (\d+) relationships? recorded, the figure your overview gives", html)
+        stated = re.search(r"has (\d+) relationships? recorded:", html)
         assert stated, name
         assert int(stated.group(1)) == count, (name, stated.group(1), count)
     for question in offered:
@@ -224,3 +224,196 @@ def test_more_than_the_shown_limit_of_connections_says_how_many_are_cut_off_when
     html = _ask(client, "Hub Of Many")
     assert "data-depends-on" in html
     assert "Showing %d of %d" % (SHOWN_LIMIT, SHOWN_LIMIT + 3) in html
+
+
+def _sentence(html):
+    """The figures sentence of an answer, as text, or None."""
+    found = re.search(r"<span data-recorded-links>(.*?)</span>", html, re.S)
+    return " ".join(found.group(1).split()) if found else None
+
+
+def _split_by_hand(org_id, element_id):
+    """From the stored relationships, with no help from the product: (total, from it, to it, other elements)."""
+    from app.models import ArchiMateRelationship as R
+
+    rows = R.query.filter(R.organization_id == org_id, (R.source_id == element_id) | (R.target_id == element_id)).all()
+    from_it = [r for r in rows if r.source_id == element_id]
+    to_it = [r for r in rows if r.source_id != element_id]
+    others = {r.target_id if r.source_id == element_id else r.source_id for r in rows} - {element_id}
+    return len(rows), len(from_it), len(to_it), len(others)
+
+
+def _plural(n, one, many):
+    return "%d %s" % (n, one if n == 1 else many)
+
+
+def test_the_sentence_under_the_figures_is_true_for_one_connection_and_four_relationships(
+    db_session, org_a, org_b, approved, people, login_as, client, tenant_ctx
+):
+    """Customer Portal has four relationships and one thing that depends on it. The sentence says how
+    the four divide, in numbers read from the stored links, whatever the answer lists above it."""
+    from app.models import ArchiMateElement as E
+    from app.models import ArchiMateRelationship as R
+
+    db_session.commit()
+
+    def make(org_id, name):
+        element = E(name=name, type="ApplicationComponent", layer="Application", organization_id=org_id)
+        db_session.add(element)
+        db_session.flush()
+        return element
+
+    with tenant_ctx(org_a.id):
+        portal = make(org_a.id, "Customer Portal Fanin")
+        feeders = [make(org_a.id, "Feeder %d" % i) for i in range(3)]
+        billing = make(org_a.id, "Billing Fanout")
+        for feeder in feeders:
+            db_session.add(R(type="Serving", source_id=feeder.id, target_id=portal.id, organization_id=org_a.id))
+        db_session.add(R(type="Serving", source_id=portal.id, target_id=billing.id, organization_id=org_a.id))
+        portal_id = portal.id
+        db_session.commit()
+    with tenant_ctx(org_b.id):
+        # the same name in another organisation, with a different shape, must not change the sentence
+        theirs = make(org_b.id, "Customer Portal Fanin")
+        for i in range(2):
+            db_session.add(R(type="Serving", source_id=theirs.id, target_id=make(org_b.id, "Theirs %d" % i).id, organization_id=org_b.id))
+        db_session.commit()
+    login_as(client, people.admin)
+    html = _ask(client, "Customer Portal Fanin")
+    assert "1 connection in your records" in html
+    assert _sentence(html) == (
+        "Customer Portal Fanin has 4 relationships recorded: 1 leads from it and 3 lead to it, reaching 4 other elements."
+    ), _sentence(html)
+    assert "your overview gives" not in html and "also count the systems" not in html
+    assert _split_by_hand(org_a.id, portal_id) == (4, 1, 3, 4)
+
+
+def test_the_sentence_agrees_with_the_stored_links_for_every_linked_application(
+    db_session, org_a, org_b, approved, people, login_as, client, tenant_ctx
+):
+    from app.modules.dashboard.services.overview_figures import relationship_ends
+
+    db_session.commit()
+    with tenant_ctx(org_a.id):
+        ends = relationship_ends(org_a.id)
+        linked = [(a.id, a.name) for a in _applications(org_a.id) if ends.get(a.id)]
+        expected = {name: _split_by_hand(org_a.id, element_id) for element_id, name in linked}
+    assert linked
+    for name, (total, from_it, to_it, others) in expected.items():
+        login_as(client, people.admin)
+        said = _sentence(_ask(client, name))
+        assert said == "%s has %s recorded: %d %s from it and %d %s to it, reaching %s." % (
+            name,
+            _plural(total, "relationship", "relationships"),
+            from_it,
+            "leads" if from_it == 1 else "lead",
+            to_it,
+            "leads" if to_it == 1 else "lead",
+            _plural(others, "other element", "other elements"),
+        ), (name, said)
+
+
+def _app(db_session, org_id, name, *, own=False):
+    from app.models import ArchiMateElement as E
+    from app.models.application_portfolio import ApplicationComponent
+
+    element = E(name=name, type="ApplicationComponent", layer="Application", organization_id=org_id)
+    db_session.add(element)
+    db_session.flush()
+    if own:
+        db_session.add(ApplicationComponent(name=name, organization_id=org_id, archimate_element_id=element.id))
+    return element
+
+
+def _link(db_session, org_id, source, target):
+    from app.models import ArchiMateRelationship as R
+
+    db_session.add(R(type="Serving", source_id=source.id, target_id=target.id, organization_id=org_id))
+
+
+def test_a_card_opens_the_answer_about_the_element_it_names_when_two_share_the_name(
+    db_session, org_a, org_b, approved, people, login_as, client, tenant_ctx
+):
+    """Two elements named Stock, the older with no link. The card names the linked one and the answer
+    is about that one. Another organisation's Stock, with links of its own, is never reached."""
+    from tests.test_connector_approval_flow import _make_admin
+
+    db_session.commit()
+    with tenant_ctx(org_b.id):
+        older = _app(db_session, org_b.id, "Stock Twin")
+        newer = _app(db_session, org_b.id, "Stock Twin")
+        carts = _app(db_session, org_b.id, "Carts Peer")
+        _link(db_session, org_b.id, newer, carts)
+        older_id, newer_id = older.id, newer.id
+        admin_b = _make_admin(db_session, org_b.id, "FounderB")
+        db_session.commit()
+    with tenant_ctx(org_a.id):
+        theirs = _app(db_session, org_a.id, "Stock Twin")
+        _link(db_session, org_a.id, theirs, _app(db_session, org_a.id, "Org A Peer Of Stock"))
+        theirs_id = theirs.id
+        db_session.commit()
+    assert older_id < newer_id
+    login_as(client, admin_b)
+    cards = [q for q in client.get("/ai-chat/first-questions").get_json()["questions"] if q["name"] == "Stock Twin"]
+    assert [c["element_id"] for c in cards] == [newer_id]
+    assert cards[0]["detail"] == "1 relationship recorded"
+    reply = client.post(
+        "/ai-chat/estate-answer", json={"message": cards[0]["question"], "element_id": cards[0]["element_id"], "remember": False}
+    ).get_json()
+    assert "Carts Peer" in reply["html"]
+    assert "Nothing is recorded as connected" not in reply["html"]
+    assert "Org A Peer Of Stock" not in reply["html"]
+    assert _sentence(reply["html"]).startswith("Stock Twin has 1 relationship recorded: 1 leads from it and 0 lead to it")
+    # another organisation's element id is not honoured: the answer stays within this organisation
+    foreign = client.post(
+        "/ai-chat/estate-answer", json={"message": cards[0]["question"], "element_id": theirs_id, "remember": False}
+    ).get_json()
+    assert "Org A Peer Of Stock" not in foreign["html"]
+    # the question typed by hand, with no card, is still answered by name
+    typed = client.post("/ai-chat/estate-answer", json={"message": cards[0]["question"], "remember": False}).get_json()
+    assert typed["found"]
+
+
+def test_one_application_recorded_twice_is_offered_once_as_its_own_element(
+    db_session, org_a, org_b, approved, people, login_as, client, tenant_ctx
+):
+    from tests.test_connector_approval_flow import _make_admin
+
+    db_session.commit()
+    with tenant_ctx(org_b.id):
+        copy = _app(db_session, org_b.id, "Orders Twin")
+        own = _app(db_session, org_b.id, "Orders Twin", own=True)
+        hub = _app(db_session, org_b.id, "Orders Hub")
+        extra = _app(db_session, org_b.id, "Orders Extra")
+        _link(db_session, org_b.id, copy, hub)
+        _link(db_session, org_b.id, copy, extra)
+        _link(db_session, org_b.id, own, hub)
+        own_id = own.id
+        admin_b = _make_admin(db_session, org_b.id, "FounderB")
+        db_session.commit()
+    with tenant_ctx(org_a.id):
+        _link(db_session, org_a.id, _app(db_session, org_a.id, "Orders Twin"), _app(db_session, org_a.id, "Orders Other Peer"))
+        db_session.commit()
+    login_as(client, admin_b)
+    cards = [q for q in client.get("/ai-chat/first-questions").get_json()["questions"] if q["name"] == "Orders Twin"]
+    assert len(cards) == 1, cards
+    assert cards[0]["element_id"] == own_id
+    assert cards[0]["detail"] == "1 relationship recorded"
+
+
+def test_an_organisation_with_applications_and_no_links_is_told_how_many_applications_it_has(
+    db_session, org_a, org_b, approved, people, login_as, client, tenant_ctx
+):
+    from tests.test_connector_approval_flow import _make_admin
+
+    db_session.commit()
+    with tenant_ctx(org_b.id):
+        # org_b has applications and no link between any of them
+        for name in ("Lone One", "Lone Two", "Lone Three"):
+            _app(db_session, org_b.id, name)
+        admin_b = _make_admin(db_session, org_b.id, "FounderB")
+        db_session.commit()
+    login_as(client, admin_b)
+    assert client.get("/ai-chat/first-questions").get_json() == {"questions": [], "applications": 3}
+    login_as(client, people.admin)
+    assert client.get("/ai-chat/first-questions").get_json()["applications"] >= 3

@@ -406,7 +406,7 @@
         const question = it.question;
         const detail = ArchieChat.render.escapeForHtml((it.detail || '').slice(0, 120));
         return '<button type="button" class="js-briefing-item group h-auto w-full rounded-lg border ' +
-                 'border-border bg-background p-4 text-left transition-colors hover:border-primary ' +
+                 'border-border bg-background p-3 text-left sm:p-4 transition-colors hover:border-primary ' +
                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" ' +
                  'data-index="' + i + '" data-question="' + ArchieChat.render.escapeForHtml(question) + '" data-testid="first-question-suggestion">' +
                  '<span class="flex items-start justify-between gap-3">' +
@@ -420,23 +420,21 @@
     }).join('');
 
     /* ── Opening screen: this tenant's portfolio, not 21 generic buttons ─────
-       Uses /ai-chat/recommendations, which the page already called into a
-       sidebar tab nobody opens.
+       Uses /ai-chat/first-questions: the applications this organisation has recorded relationships for,
+       each a question with a cited answer.
 
        Every state is designed, because each is a real state a real customer is
        in on a real day:
 
          loading      the most prominent element now depends on a network call
-         failed       the endpoint answers 500 with EMPTY ARRAYS, so "no items"
-                      and "outage" are the same payload unless status is checked
-         empty        day one, zero applications — the moment the product has to
-                      be most persuasive, so the empty state IS the onboarding
+         failed       a failed read is told apart from an empty portfolio, with a Retry
+         empty        day one, zero applications: the empty state IS the onboarding
                       path rather than a blank panel
-         populated    with the denominator, because "3 items" out of an unstated
-                      total is an editorial claim the user cannot audit
+         not linked   applications are recorded, how they connect is not: general
+                      questions, and the two ways to record the connections
+         populated    cards carry their own figure, so the count is auditable
 
-       Nothing here invents a number. A count that was not returned renders as
-       an em dash, never as 0.                                              */
+       Nothing here invents a number.                                        */
     async function loadPortfolioBriefing() {
         const host = document.getElementById('portfolio-briefing');
         if (!host) return;
@@ -471,11 +469,24 @@
             const shown = questions.slice(0, 4);
 
             const startupSteps = document.getElementById('startup-first-steps');
+            const applications = Number(offered && offered.applications) || 0;
+            if (shown.length === 0 && applications > 0) {
+                /* Applications are recorded and how they connect is not: the questions that need no links,
+                   and the two ways to record the connections. */
+                done('<div data-linkless-next-step></div>' +
+                    '<div class="mt-6 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(general) + '</div>' +
+                    '<p class="mt-3 text-center text-xs text-muted-foreground" data-linkless-note>General questions to start with. ' +
+                    'Your applications are recorded, but not how they connect. Once they are connected, these become questions about them.</p>');
+                const linklessSteps = document.getElementById('linkless-next-step');
+                if (linklessSteps) host.querySelector('[data-linkless-next-step]').appendChild(linklessSteps.content.cloneNode(true));
+                host._items = general;
+                return;
+            }
             if (shown.length === 0 && startupSteps) {
                 /* A startup with nothing recorded: the next step first, then four questions that need no records. */
                 const startupQuestions = general;
                 done('<div data-startup-next-step></div>' +
-                    '<div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">' + cardRows(startupQuestions) + '</div>' +
+                    '<div class="mt-6 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(startupQuestions) + '</div>' +
                     '<p class="mt-3 text-center text-xs text-muted-foreground">General questions to start with. Once your applications are in, these become questions about them.</p>');
                 host.querySelector('[data-startup-next-step]').appendChild(startupSteps.content.cloneNode(true));
                 lockWhileLoading(host.querySelector('[data-sample-form]'));
@@ -498,15 +509,18 @@
                           'hover:bg-accent transition-colors">' +
                           '<i data-lucide="plus-circle" class="h-3 w-3" aria-hidden="true"></i>Design a solution</button>' +
                       '</div>' +
-                    '</div>'
+                    '</div>' +
+                    '<div class="mt-6 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(general) + '</div>' +
+                    '<p class="mt-3 text-center text-xs text-muted-foreground">General questions to start with. Once your applications are in, these become questions about them.</p>'
                 );
+                host._items = general;
                 return;
             }
 
             const rows = cardRows(shown);
 
             done(
-                '<div class="grid grid-cols-1 gap-3 md:grid-cols-2">' + rows + '</div>' +
+                '<div class="grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + rows + '</div>' +
                 '<p class="mt-3 text-center text-xs text-muted-foreground">' +
                   (linked.length < 4
                     ? 'Linked applications first, then general questions.'
@@ -556,6 +570,11 @@
         /* Ask about the finding in the user's own terms; the assistant then
            looks it up rather than being handed a conclusion to agree with. */
         input.value = picked.question;
+        /* A card names one element: the answer is about that element, not about whichever shares its name. */
+        if (picked.element_id) {
+            input.dataset.elementId = String(picked.element_id);
+            input.dataset.elementQuestion = picked.question;
+        }
         form.requestSubmit();
     });
 

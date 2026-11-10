@@ -35,7 +35,7 @@
     {% set heading = 'What breaks if ' ~ name_of(answer.params.element_id) ~ ' fails' %}
 {% endif %}
 {% set total = answer.summary.total %}
-<div class="space-y-3" data-answer-cards data-question="{{ question }}" data-answer-address="{{ answer.address }}" data-answer-kind="{{ kind }}">
+<div class="space-y-3" data-answer-cards data-question="{{ question }}"{% if answer.params.element_id %} data-element-id="{{ answer.params.element_id }}"{% endif %} data-answer-address="{{ answer.address }}" data-answer-kind="{{ kind }}">
     {% call card() %}
         {% call card_header() %}
             {% call card_title(class='text-base') %}{{ heading }}{% endcall %}
@@ -44,7 +44,7 @@
                 {% if total %}<span data-source-summary>{{ total }} connection{{ '' if total == 1 else 's' }} in your records{% if sources.sentence %}{% if sources.shown != total %}; of the first {{ sources.shown }} shown, {% else %}: {% endif %}{{ sources.sentence }}{% endif %}.</span>
                 {% elif upstream %}<span data-source-summary>Nothing is recorded as depending on {{ name_of(answer.params.element_id) }}. It is itself connected to others: {{ upstream.summary.total }} other element{{ '' if upstream.summary.total == 1 else 's' }}.</span>
                 {% else %}Nothing is recorded as connected to this yet.{% endif %}
-                {% if (total or upstream) and recorded_links is not none %}<span data-recorded-links>{{ name_of(answer.params.element_id) }} has {{ recorded_links }} relationship{{ '' if recorded_links == 1 else 's' }} recorded, the figure your overview gives; {% if upstream %}they lead to the {{ upstream.summary.total }} other element{{ '' if upstream.summary.total == 1 else 's' }} named below{% else %}the connections above also count the systems reached through them{% endif %}.</span>{% endif %}
+                {% if (total or upstream) and recorded_links is not none %}<span data-recorded-links>{{ name_of(answer.params.element_id) }} has {{ recorded_links.total }} relationship{{ '' if recorded_links.total == 1 else 's' }} recorded: {{ recorded_links.from_it }} {{ 'leads' if recorded_links.from_it == 1 else 'lead' }} from it and {{ recorded_links.to_it }} {{ 'leads' if recorded_links.to_it == 1 else 'lead' }} to it, reaching {{ recorded_links.reached }} other element{{ '' if recorded_links.reached == 1 else 's' }}.</span>{% endif %}
             {% endcall %}
         {% endcall %}
         {% if kind not in ('risk_propagation', 'set_impact') and answer.rows %}

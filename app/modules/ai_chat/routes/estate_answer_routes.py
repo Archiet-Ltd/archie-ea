@@ -152,15 +152,16 @@ def _what_it_depends_on(answer):
 
 
 def _recorded_links(answer):
-    """How many recorded relationships touch the element asked about, counted by the reader the
-    overview's "most connected" line and the chat's first questions use. ``None`` when the
-    question names no single element."""
-    from app.modules.dashboard.services.overview_figures import relationship_ends
+    """The recorded relationships touching the element asked about (the total is the figure the
+    overview's "most connected" line and the chat's first questions use), with how many lead from it,
+    how many lead to it and how many other elements they reach. ``None`` when the question names no
+    single element."""
+    from app.modules.dashboard.services.overview_figures import relationship_split
 
     element_id = (answer.get("params") or {}).get("element_id")
     if answer.get("question_kind") != envelope.KIND_IMPACT or not element_id:
         return None
-    return relationship_ends(int(current_org_id())).get(int(element_id), 0)
+    return relationship_split(int(current_org_id()), int(element_id))
 
 
 @unified_ai_chat_bp.route("/estate-answer", methods=["POST"])
@@ -202,7 +203,11 @@ def estate_answer():
             }
         )
     try:
-        record = answer_estate_question(message[:MAX_QUESTION_CHARS], user_id=current_user.id)
+        record = answer_estate_question(
+            message[:MAX_QUESTION_CHARS],
+            user_id=current_user.id,
+            element_id=body.get("element_id") if isinstance(body.get("element_id"), int) else None,
+        )
     except envelope.AnswerNotAskable:
         record = None
     if record is None:

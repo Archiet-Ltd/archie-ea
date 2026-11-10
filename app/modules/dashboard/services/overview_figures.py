@@ -18,7 +18,7 @@ import re
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app import db
 
@@ -238,20 +238,44 @@ def _sourced_share(org_id):
     }
 
 
+def _relationship_pairs(org_id, element_id=None):
+    """The (source, target) of each recorded relationship of the organisation, or only those
+    touching *element_id*. The one place relationships are read for these counts."""
+    from app.models import ArchiMateRelationship as R
+
+    query = db.select(R.source_id, R.target_id).where(R.organization_id == org_id)
+    if element_id is not None:
+        query = query.where(or_(R.source_id == element_id, R.target_id == element_id))
+    return db.session.execute(query).all()
+
+
 def relationship_ends(org_id):
     """How many recorded relationships touch each element of the organisation (an element at
     both ends of one relationship counts it once). The one count the overview's "most
     connected" line and the chat's first questions both read."""
-    from app.models import ArchiMateRelationship as R
-
     ends = Counter()
-    for source_id, target_id in db.session.execute(
-        db.select(R.source_id, R.target_id).where(R.organization_id == org_id)
-    ):
+    for source_id, target_id in _relationship_pairs(org_id):
         ends[source_id] += 1
         if target_id != source_id:
             ends[target_id] += 1
     return ends
+
+
+def relationship_split(org_id, element_id):
+    """What makes up one element's count in ``relationship_ends``: how many relationships lead
+    from it, how many lead to it (one that does both counts once, as leading from it), and how
+    many different other elements they reach. ``total`` is always ``from_it + to_it``."""
+    from_it = to_it = 0
+    reached = set()
+    for source_id, target_id in _relationship_pairs(org_id, element_id):
+        if source_id == element_id:
+            from_it += 1
+            if target_id != element_id:
+                reached.add(target_id)
+        else:
+            to_it += 1
+            reached.add(source_id)
+    return {"total": from_it + to_it, "from_it": from_it, "to_it": to_it, "reached": len(reached)}
 
 
 def _relationships(org_id, now):

@@ -121,6 +121,20 @@
                             </div>
                         </template>
                         {% endif %}
+                        {# The next step for an organisation whose applications are recorded but not how they connect. panels.js shows it then. #}
+                        <template id="linkless-next-step">
+                            <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center" data-testid="linkless-next-step">
+                                {% if linkless_next_steps.connect %}
+                                {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='chat-linkless-connect') }}
+                                {% endif %}
+                                {% if linkless_next_steps.record %}
+                                {{ button(text='Record how they connect', href=url_for('archimate.composer_page'), variant='outline' if linkless_next_steps.connect else 'default', testid='chat-linkless-record') }}
+                                {% endif %}
+                                {% if not linkless_next_steps.connect and not linkless_next_steps.record %}
+                                <p class="text-sm text-muted-foreground">Ask an administrator to connect a source, or to record how your applications connect.</p>
+                                {% endif %}
+                            </div>
+                        </template>
                         <div id="portfolio-briefing" aria-live="polite" aria-busy="true" data-testid="first-questions">
                             <p class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                                 <i data-lucide="loader-2" class="h-3.5 w-3.5 animate-spin" aria-hidden="true"></i>Reading your portfolio…

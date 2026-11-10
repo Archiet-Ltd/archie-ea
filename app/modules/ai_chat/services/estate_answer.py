@@ -45,9 +45,12 @@ def named_element_ids(message: str, organization_id: int) -> list:
     return ordered
 
 
-def answer_estate_question(message: str, *, user_id: Optional[int] = None):
+def answer_estate_question(message: str, *, user_id: Optional[int] = None, element_id: Optional[int] = None):
     """The stored answer to *message*, or ``None`` when it is not a question
-    about an element of the active organisation."""
+    about an element of the active organisation. A card that offered the question
+    passes the id of the element it named: when the organisation holds that element and
+    its name is in the question, that element is the one answered, whatever else shares
+    the name."""
     organization_id = current_org_id()
     kind = envelope.classify_estate_question(message)
     if kind is None or organization_id is None:
@@ -55,6 +58,8 @@ def answer_estate_question(message: str, *, user_id: Optional[int] = None):
     element_ids = named_element_ids(message, organization_id)
     if not element_ids:
         return None
+    if element_id in element_ids:
+        element_ids = [element_id] + [other for other in element_ids if other != element_id]
     # The dashboard's first answer follows worked-out connections three steps out;
     # the chat asks the same question the same way.
     params = {"include_derived": True, "max_depth": 3}

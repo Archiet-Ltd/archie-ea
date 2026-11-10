@@ -176,14 +176,28 @@ def get_first_questions():
     from app import db
     from app.middleware.tenant_context import current_org_id
     from app.models import ArchiMateElement
+    from app.models.application_portfolio import ApplicationComponent
     from app.modules.dashboard.services.overview_figures import relationship_ends
 
     org_id = current_org_id()
     if org_id is None:
-        return jsonify({"questions": []})
+        return jsonify({"questions": [], "applications": 0})
+    # How many applications are recorded tells the page, when there is no card to offer, whether to
+    # say that none are or that their connections are not.
+    recorded = max(
+        db.session.execute(
+            db.select(db.func.count(ApplicationComponent.id)).where(ApplicationComponent.organization_id == org_id)
+        ).scalar_one(),
+        db.session.execute(
+            db.select(db.func.count(ArchiMateElement.id)).where(
+                ArchiMateElement.organization_id == org_id,
+                ArchiMateElement.type.in_(("ApplicationComponent", "Application")),
+            )
+        ).scalar_one(),
+    )
     ends = relationship_ends(org_id)
     if not ends:
-        return jsonify({"questions": []})
+        return jsonify({"questions": [], "applications": recorded})
     named = db.session.execute(
         db.select(ArchiMateElement.id, ArchiMateElement.name).where(
             ArchiMateElement.organization_id == org_id,
@@ -191,18 +205,38 @@ def get_first_questions():
             ArchiMateElement.id.in_(list(ends)),
         )
     ).all()
-    # The overview breaks a tie the same way: the element recorded first.
-    named.sort(key=lambda row: (-ends[row.id], row.id))
+    # An application is recorded once as its own element (ApplicationComponent.archimate_element_id).
+    # A second element with the same name is the same application seen twice, so it is offered once:
+    # the application's own element first, then the one with more relationships, then the one
+    # recorded first (the overview breaks a tie the same way).
+    own = set(
+        db.session.execute(
+            db.select(ApplicationComponent.archimate_element_id).where(
+                ApplicationComponent.organization_id == org_id,
+                ApplicationComponent.archimate_element_id.in_([row.id for row in named]),
+            )
+        ).scalars()
+    )
+    best = {}
+    for row in named:
+        if not row.name:
+            continue
+        rank = (row.id not in own, -ends[row.id], row.id)
+        key = " ".join(row.name.split()).lower()
+        if key not in best or rank < best[key][0]:
+            best[key] = (rank, row)
+    chosen = sorted((row for _, row in best.values()), key=lambda row: (-ends[row.id], row.id))
     return jsonify(
         {
+            "applications": recorded,
             "questions": [
                 {
+                    "element_id": row.id,
                     "name": row.name,
                     "question": "What breaks if %s fails?" % row.name,
                     "detail": "%d relationship%s recorded" % (ends[row.id], "" if ends[row.id] == 1 else "s"),
                 }
-                for row in named
-                if row.name
+                for row in chosen
             ][:4]
         }
     )

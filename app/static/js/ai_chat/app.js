@@ -54,7 +54,7 @@
             say('Working them out…');
             try {
                 await ArchieChat.transport.recomputeConnections();
-                const again = await ArchieChat.transport.askEstate(holder.getAttribute('data-question') || '', { remember: false });
+                const again = await ArchieChat.transport.askEstate(holder.getAttribute('data-question') || '', { remember: false, elementId: Number(holder.getAttribute('data-element-id')) || undefined });
                 if (again.found && window.DOMPurify) {
                     const fresh = document.createElement('div');
                     fresh.innerHTML = ArchieChat.render.sanitiseAnswerHtml(again.html);
@@ -354,9 +354,18 @@
         _submitTurn().finally(() => _setSendingUI(false));
     });
 
+    /* A first-question card names the element it asks about by id. The id travels with the question it
+       was set for, so a question the person edited, or typed, is answered by name as before. */
+    const _askedElement = new Map();
+
     async function _submitTurn() {
         const message = userInput.value.trim();
         if (!message) return;
+        if (userInput.dataset.elementId && userInput.dataset.elementQuestion === message) {
+            _askedElement.set(message, Number(userInput.dataset.elementId));
+        }
+        delete userInput.dataset.elementId;
+        delete userInput.dataset.elementQuestion;
         _setSendingUI(true);
 
         // Clear input
@@ -413,7 +422,7 @@
         // A question that names something in the organisation's records is answered
         // from those records, as cited cards, before any model is asked.
         try {
-            const estate = await ArchieChat.transport.askEstate(message);
+            const estate = await ArchieChat.transport.askEstate(message, { elementId: _askedElement.get(message) });
             if (estate.found) {
                 // The answer is kept in the conversation like any other: remember the
                 // thread it went to and refresh the history rail.
