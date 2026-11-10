@@ -18,6 +18,14 @@ TIMELINE = re.compile(
     re.I,
 )
 
+# A quarter, or a published roadmap, offered as when something will exist. A roadmap the product builds for a
+# customer's own estate is not a timetable and is not matched.
+TIMETABLE = re.compile(
+    r"\b(?:has|have|with|in) a quarter\b|\bquarter on\b|\bq[1-4]\b"
+    r"|\b(?:published|public|product) roadmap\b",
+    re.I,
+)
+
 
 def _text(html):
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
@@ -71,6 +79,39 @@ def test_the_early_access_notices_in_templates_do_not_promise_a_day(app):
             if line.lstrip().startswith("{#"):
                 continue
             found = TIMELINE.search(line)
+            if found:
+                problems.append("%s: %s" % (path.name, found.group(0)))
+    assert not problems, "\n".join(problems)
+
+
+def test_the_home_page_and_the_features_page_promise_no_timetable(app, _schema):
+    client = app.test_client()
+    problems = []
+    for path in ("/", "/features"):
+        response = client.get(path)
+        assert response.status_code == 200, path
+        text = _text(response.get_data(as_text=True))
+        assert "Coming soon" in text or path == "/", path
+        found = TIMETABLE.search(text)
+        if found:
+            problems.append("%s: %s" % (path, found.group(0)))
+    assert not problems, "\n".join(problems)
+
+
+def test_no_published_content_page_or_public_template_promises_a_timetable(app):
+    from pathlib import Path
+
+    problems = []
+    for path in sorted(CONTENT_ROOT.rglob("*.md")):
+        found = TIMETABLE.search(_front_matter_split(path.read_text(encoding="utf-8")))
+        if found:
+            problems.append("%s: %s" % (path.relative_to(CONTENT_ROOT), found.group(0)))
+    templates = Path(app.root_path) / "templates"
+    for path in sorted(list((templates / "public").rglob("*.html")) + [templates / "main" / "index.html"]):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.lstrip().startswith("{#"):
+                continue
+            found = TIMETABLE.search(line)
             if found:
                 problems.append("%s: %s" % (path.name, found.group(0)))
     assert not problems, "\n".join(problems)

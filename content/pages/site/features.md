@@ -313,7 +313,7 @@ For certifications and what we do and do not claim today, see [Security](/securi
 
 ---
 
-Every capability above is in the product today or has a quarter on the published roadmap. See [how
+Capabilities that are not open to everyone yet are listed under Coming soon below, each with a waiting list. See [how
 it's priced](/pricing) or [try it](/account/register).
 
 <h2 id="coming-soon">Coming soon</h2>
