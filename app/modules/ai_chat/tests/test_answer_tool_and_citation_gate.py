@@ -34,8 +34,8 @@ from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME, TOOL_SCHEMAS
 
 @pytest.fixture(autouse=True)
 def _enforce_mode(monkeypatch):
-    """The shipped default is monitor ("log") mode; the refusal tests below
-    exercise "enforce". The mode tests at the end set their own."""
+    """The refusal tests below exercise "enforce" (the shipped default). The
+    mode tests at the end set their own."""
     monkeypatch.setattr(AgentRunner, "_gate_mode", staticmethod(lambda: "enforce"))
 
 
@@ -1676,18 +1676,24 @@ def test_a_gate_exception_never_breaks_the_answer_in_log_or_off_mode(mode, monke
 
 
 def test_the_default_mode_is_log_and_unknown_values_fall_back_to_it(monkeypatch):
+    """The shipped default is now "enforce" (the test keeps its name): nothing
+    set, or a value that is not a mode, enforces; "log" and "off" are chosen."""
     monkeypatch.undo()
+    monkeypatch.delenv("ASSISTANT_CITATION_GATE_MODE", raising=False)
     from flask import Flask
 
     app = Flask(__name__)
     with app.app_context():
-        assert AgentRunner._gate_mode() == "log"
-        app.config["ASSISTANT_CITATION_GATE_MODE"] = "ENFORCE"
         assert AgentRunner._gate_mode() == "enforce"
-        app.config["ASSISTANT_CITATION_GATE_MODE"] = "banana"
+        app.config["ASSISTANT_CITATION_GATE_MODE"] = "LOG"
         assert AgentRunner._gate_mode() == "log"
+        app.config["ASSISTANT_CITATION_GATE_MODE"] = "banana"
+        assert AgentRunner._gate_mode() == "enforce"
         app.config["ASSISTANT_CITATION_GATE_MODE"] = "off"
         assert AgentRunner._gate_mode() == "off"
+    from config import Config
+
+    assert Config.ASSISTANT_CITATION_GATE_MODE == "enforce"
 
 
 def test_log_mode_turn_streams_the_answer_unchanged_and_never_nudges(

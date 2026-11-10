@@ -349,9 +349,10 @@ class AgentRunner:
 
     @staticmethod
     def _gate_mode() -> str:
-        """ASSISTANT_CITATION_GATE_MODE: "log" (default: the answer is shown
-        unchanged and an answer the gate would refuse is logged), "enforce"
-        (the answer is replaced by "Not recorded") or "off". One place."""
+        """ASSISTANT_CITATION_GATE_MODE: "enforce" (default: an answer the gate
+        refuses is replaced by "Not recorded", and an unsupported figure is sent
+        back once, then taken out), "log" (the answer is shown unchanged and an
+        answer the gate would refuse is logged) or "off". One place."""
         import os
 
         value = None
@@ -363,9 +364,9 @@ class AgentRunner:
         except Exception:  # pragma: no cover - no application at all
             value = None
         if value is None:
-            value = os.environ.get("ASSISTANT_CITATION_GATE_MODE", "log")
-        value = str(value or "log").strip().lower()
-        return value if value in AgentRunner.GATE_MODES else "log"
+            value = os.environ.get("ASSISTANT_CITATION_GATE_MODE", "enforce")
+        value = str(value or "enforce").strip().lower()
+        return value if value in AgentRunner.GATE_MODES else "enforce"
 
     def _emit_token(self, text: str) -> None:
         """Stream a token, or hold it while the citation gate has not yet seen

@@ -131,10 +131,11 @@ class Config:
     ]
 
     APP_NAME = os.environ.get("APP_NAME", "Entelim")
-    # The assistant's citation gate: "log" (default; answers are shown
-    # unchanged and an answer the gate would refuse is logged), "enforce"
-    # (the answer is replaced by "Not recorded") or "off".
-    ASSISTANT_CITATION_GATE_MODE = os.environ.get("ASSISTANT_CITATION_GATE_MODE", "log")
+    # The assistant's citation gate: "enforce" (default; an answer the gate
+    # refuses is replaced by "Not recorded", an unsupported figure is taken out),
+    # "log" (answers are shown unchanged and what the gate would refuse is
+    # logged) or "off".
+    ASSISTANT_CITATION_GATE_MODE = os.environ.get("ASSISTANT_CITATION_GATE_MODE", "enforce")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     if not SECRET_KEY:
         import secrets
