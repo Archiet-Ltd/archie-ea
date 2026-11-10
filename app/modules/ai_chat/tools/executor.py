@@ -1103,10 +1103,15 @@ class ToolExecutor:
         total = q.count()
         apps = q.limit(limit).all()
         owner_fields = self._application_owner_fields(apps)
+        from app.services.application_cost_accessor import get_annual_cost_with_source
+
         rows = [
             {
                 "id": a.id,
                 "name": a.name,
+                # The annual cost the application's own page shows (one accessor);
+                # None when none is recorded.
+                "annual_cost": get_annual_cost_with_source(a)[0],
                 # Never "status" — the ambiguity was the defect (ARCH-013).
                 # lifecycle_status matches /applications/api/list and the
                 # Applications UI exactly; deployment_status is a distinct

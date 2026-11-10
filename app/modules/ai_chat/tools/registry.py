@@ -11,6 +11,33 @@ Tools always accept names (not IDs) — the EntityResolver converts them.
 
 import re
 
+# Figures. A figure reaches a person only as the engine's rendering of a value a
+# declared field returned in that turn. Every tool declares its figures under a
+# "figures" key beside its definition (an empty dict for a tool that returns
+# none), and the organisation summary is declared as ORGANISATION_SUMMARY_FIGURES.
+# A field that is not declared is not a figure: it cannot be referenced,
+# rendered or shown, and it supports nothing.
+#
+# A tool's "figures" holds:
+#   fields   the declared figures (below)
+#   rows     the row lists whose items carry figures: {"path": "result[]",
+#            "id": <record id field>, "name": <record name field>} or, for a row
+#            that is not a record, {"path": ..., "label_field": <field>}
+#   names    the keys whose string values are names of records
+#   subject  optional: {"map": <key of a dict of id -> {"name"}>} the record a
+#            call's top-level figures describe
+#
+# A field: path (relative to the whole tool result; "a.b" for a key, "rows[].c"
+# for a key inside a list), kind, reads, reads_null, label, concept, and the keys
+# its kind needs. "reads" is a phrase with {value}; a count gives
+# {"one": ..., "other": ...}. "when" ({key: value} read at the result root)
+# limits a field to one kind of answer. "scope": "public" marks a figure of
+# Entelim's public catalogue.
+FIGURE_KINDS = (
+    "count", "money", "score", "percent", "ratio", "duration", "date", "datetime",
+    "year", "month", "rank",
+)
+
 TOOL_SCHEMAS = [
     {
         "name": "create_solution",
@@ -19,6 +46,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["Solution"],
         "description": (
             "Create a new architectural solution in the repository. "
@@ -69,6 +97,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["SolutionCapabilityMapping"],
         "description": (
             "Link a business capability to a solution to show what capabilities "
@@ -107,6 +136,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["ApplicationCapabilityMapping"],
         "description": (
             "Map an application to a business capability it supports. "
@@ -141,6 +171,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["ArchiMateElement"],
         "description": (
             "Create a new ArchiMate element and optionally attach it to a solution. "
@@ -192,6 +223,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["ApplicationComponent"],
         "description": (
             "Update the deployment/lifecycle status of an application. "
@@ -230,6 +262,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["ARBReviewItem"],
         "description": (
             "Submit a solution for Architecture Review Board (ARB) governance review. "
@@ -258,6 +291,27 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {
+            "fields": [
+                {"path": "total", "kind": "count",
+                 "reads": {"one": "{value} capability at or below the maturity searched",
+                           "other": "{value} capabilities at or below the maturity searched"},
+                 "reads_null": "the number of matching capabilities was not determined",
+                 "label": "Capabilities matching", "concept": "capability-maturity"},
+                {"path": "result[].current_maturity", "kind": "score", "out_of": 5,
+                 "reads": "a current maturity of {value}", "reads_null": "no current maturity recorded",
+                 "label": "Current maturity", "concept": "capability-maturity"},
+                {"path": "result[].target_maturity", "kind": "score", "out_of": 5,
+                 "reads": "a target maturity of {value}", "reads_null": "no target maturity recorded",
+                 "label": "Target maturity", "concept": "capability-maturity"},
+                {"path": "result[].supporting_apps", "kind": "count",
+                 "reads": {"one": "{value} supporting application", "other": "{value} supporting applications"},
+                 "reads_null": "no supporting application count recorded",
+                 "label": "Supporting applications", "concept": "applications-list"},
+            ],
+            "rows": [{"path": "result[]", "id": "id", "name": "name"}],
+            "names": ["name"],
+        },
         "record_types_written": [],
         "description": (
             "Find business capabilities with no supporting applications, "
@@ -294,6 +348,20 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {
+            "fields": [
+                {"path": "total", "kind": "count",
+                 "reads": {"one": "{value} application matches this search",
+                           "other": "{value} applications match this search"},
+                 "reads_null": "the number of matching applications was not determined",
+                 "label": "Applications matching", "concept": "applications-list"},
+                {"path": "result[].annual_cost", "kind": "money", "currency": "organisation",
+                 "reads": "an annual cost of {value}", "reads_null": "no annual cost recorded",
+                 "label": "Annual cost", "concept": "application.cost"},
+            ],
+            "rows": [{"path": "result[]", "id": "id", "name": "name"}],
+            "names": ["name"],
+        },
         "record_types_written": [],
         "description": (
             "Search for applications by name, lifecycle status, capability or ownership. "
@@ -352,6 +420,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["SolutionDriver"],
         "description": (
             "Add a business driver to a solution (ArchiMate Motivation layer). "
@@ -381,6 +450,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["SolutionGoal"],
         "description": (
             "Add a goal to a solution (ArchiMate Motivation layer). "
@@ -405,6 +475,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["SolutionConstraint"],
         "description": (
             "Add a constraint to a solution (ArchiMate Motivation layer). "
@@ -433,6 +504,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["SolutionRequirement"],
         "description": (
             "Add a functional or non-functional requirement to a solution. "
@@ -460,6 +532,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["RiskRegisterEntry"],
         "description": (
             "Add a risk to a solution risk register. "
@@ -485,6 +558,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["SolutionRecommendation"],
         "description": (
             "Add a Phase E solution option/recommendation. "
@@ -511,6 +585,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["SolutionRecommendation"],
         "description": (
             "Mark one solution option as the architect's recommended choice. "
@@ -533,6 +608,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["SolutionApplicationLink"],
         "description": (
             "Link an existing application from the catalog to a solution. "
@@ -560,6 +636,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["SolutionVendorProductLink"],
         "description": (
             "Link a vendor product from the catalog to a solution (Phase E). "
@@ -581,6 +658,7 @@ TOOL_SCHEMAS = [
         "route": "ArchiMateInferenceEngine.repair",
         "fenced_fields": [],
         "risk_class": "write",
+        "figures": {},
        "mutates": True, # Real write, not read-only despite the "diagnose"-adjacent name:
         "record_types_written": ["ArchiMateElement", "ArchiMateRelationship"],
         # _tool_run_inference_engine (tools/executor.py) defaults dry_run to
@@ -617,6 +695,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": ["narrative"],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["BlueprintNarrative"],
         "description": (
             "Generate an AI narrative for a specific blueprint section. "
@@ -644,6 +723,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["ArchiMateRelationship"],
         "description": (
             "Create a typed ArchiMate relationship between two existing elements. "
@@ -672,6 +752,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Show missing elements in an ArchiMate element's chain without repairing. "
@@ -693,6 +774,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Explain why an ArchiMate element exists by tracing its upstream provenance chain. "
@@ -714,6 +796,17 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {
+            "fields": [
+                {"path": "result.summary.total", "kind": "count",
+                 "reads": {"one": "{value} connection downstream", "other": "{value} connections downstream"},
+                 "reads_null": "no downstream connections were counted", "label": "Connections downstream",
+                 "concept": "impact-answer"},
+            ],
+            "rows": [],
+            "names": ["name"],
+            "subject": {"map": "result.subject_elements"},
+        },
         "record_types_written": [],
         "description": (
             "Show what depends on an ArchiMate element, by name: the canonical impact "
@@ -738,6 +831,30 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {
+            "fields": [
+                {"path": "result.summary.total", "kind": "count", "when": {"result.question_kind": "impact"},
+                 "reads": {"one": "{value} connection downstream", "other": "{value} connections downstream"},
+                 "reads_null": "no downstream connections were counted", "label": "Connections downstream",
+                 "concept": "impact-answer"},
+                {"path": "result.summary.total", "kind": "count", "when": {"result.question_kind": "set_impact"},
+                 "reads": {"one": "{value} connection downstream of these records",
+                           "other": "{value} connections downstream of these records"},
+                 "reads_null": "no downstream connections were counted", "label": "Connections downstream",
+                 "concept": "impact-answer"},
+                {"path": "result.summary.total", "kind": "count", "when": {"result.question_kind": "risk_propagation"},
+                 "reads": {"one": "{value} risk reaching it", "other": "{value} risks reaching it"},
+                 "reads_null": "no risks were counted", "label": "Risks reaching it",
+                 "concept": "impact-answer"},
+                {"path": "result.summary.total", "kind": "count", "when": {"result.question_kind": "data_flow"},
+                 "reads": {"one": "{value} data flow", "other": "{value} data flows"},
+                 "reads_null": "no data flows were counted", "label": "Data flows",
+                 "concept": "impact-answer"},
+            ],
+            "rows": [],
+            "names": ["name"],
+            "subject": {"map": "result.subject_elements"},
+        },
         "record_types_written": [],
         "description": (
             "Answer a question about the estate through the canonical answer service: "
@@ -797,6 +914,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Read one domain of the organisation's model as citeable facts: 'business' "
@@ -862,6 +980,24 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {
+            "fields": [
+                {"path": "result.maturity_level", "kind": "score", "out_of": 5,
+                 "reads": "a maturity of {value}", "reads_null": "no maturity recorded",
+                 "label": "Maturity", "concept": "capability-maturity"},
+                {"path": "result.applications_count", "kind": "count",
+                 "reads": {"one": "{value} application in the solution", "other": "{value} applications in the solution"},
+                 "reads_null": "no application count recorded",
+                 "label": "Applications", "concept": "applications-list"},
+                {"path": "result.risks_count", "kind": "count",
+                 "reads": {"one": "{value} risk on the solution", "other": "{value} risks on the solution"},
+                 "reads_null": "no risk count recorded",
+                 "label": "Risks", "concept": "solution.risks"},
+            ],
+            "rows": [],
+            "names": ["name"],
+            "subject": {"id": "result.id", "name": "result.name"},
+        },
         "record_types_written": [],
         "description": (
             "Read the current state of a solution: maturity score, linked entity counts, "
@@ -883,6 +1019,15 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {
+            "fields": [
+                {"path": "result.overall_pct", "kind": "percent",
+                 "reads": "{value} blueprint completeness", "reads_null": "no completeness recorded",
+                 "label": "Blueprint completeness", "concept": "blueprint-completeness"},
+            ],
+            "rows": [],
+            "names": [],
+        },
         "record_types_written": [],
         "description": (
             "Get the blueprint completeness score with dimension breakdown "
@@ -904,6 +1049,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["Solution"],
         "description": (
             "Update solution metadata: owner, business_sponsor, technical_lead, or description. "
@@ -929,6 +1075,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["Solution"],
         "description": (
             "Advance the solution's TOGAF ADM phase (A through H). "
@@ -958,6 +1105,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Semantic search over the business capability catalog to find which ones "
@@ -991,6 +1139,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Find all applications already mapped to a specific business "
@@ -1017,6 +1166,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
 "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Find technical capabilities from the ACM (Application Capability Model) taxonomy "
@@ -1059,6 +1209,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Search ArchiMate elements by name, layer, or type. Read-only. "
@@ -1088,6 +1239,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Verify that a solution's generated artifacts trace back to ArchiMate sources. "
@@ -1113,6 +1265,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Generate autonomous TIME (Tolerate/Invest/Migrate/Eliminate) rationalization proposals "
@@ -1142,6 +1295,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Build a multi-step architecture execution plan for a goal. "
@@ -1174,6 +1328,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "external_action",
         "mutates": True,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Check configured infrastructure endpoints for reachability. "
@@ -1204,6 +1359,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": ["candidates"],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Parse SQL DDL or OpenAPI 3.x JSON/YAML and infer ArchiMate DataObject elements. "
@@ -1241,6 +1397,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Validate a solution's architecture against the SAP RISE clean-core extension model. "
@@ -1285,6 +1442,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "propose",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Propose the vendor products the user says the organisation uses (for example 'we use Okta, "
@@ -1321,6 +1479,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "propose",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Propose a change to the enterprise genome (the ArchiMate model) as a "
@@ -1365,6 +1524,31 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {
+            "fields": [
+                {"path": "result.ranked[].investment_priority_score", "kind": "score", "out_of": 100,
+                 "reads": "a priority score of {value}", "reads_null": "no priority score recorded",
+                 "label": "Priority score", "concept": "investment-priority"},
+                {"path": "result.split.critical", "kind": "count",
+                 "reads": {"one": "{value} critical investment", "other": "{value} critical investments"},
+                 "reads_null": "the critical investments were not counted",
+                 "label": "Critical investments", "concept": "investment-priority"},
+                {"path": "result.split.high", "kind": "count",
+                 "reads": {"one": "{value} high-priority investment", "other": "{value} high-priority investments"},
+                 "reads_null": "the high-priority investments were not counted",
+                 "label": "High-priority investments", "concept": "investment-priority"},
+                {"path": "result.split.medium", "kind": "count",
+                 "reads": {"one": "{value} medium-priority investment", "other": "{value} medium-priority investments"},
+                 "reads_null": "the medium-priority investments were not counted",
+                 "label": "Medium-priority investments", "concept": "investment-priority"},
+                {"path": "result.split.low", "kind": "count",
+                 "reads": {"one": "{value} low-priority investment", "other": "{value} low-priority investments"},
+                 "reads_null": "the low-priority investments were not counted",
+                 "label": "Low-priority investments", "concept": "investment-priority"},
+            ],
+            "rows": [{"path": "result.ranked[]", "label_field": "capability_name"}],
+            "names": ["capability_name"],
+        },
         "record_types_written": [],
         "description": (
             "CTO view: the ranked capability investment priorities for this "
@@ -1394,6 +1578,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "CTO/CIO one-call executive summary: portfolio health and stats, "
@@ -1416,6 +1601,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Read a solution's Architecture Review Board status: each review "
@@ -1444,6 +1630,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["ArchitectureDecisionRecord"],
         "description": (
             "Author an Architecture Decision Record (ADR) for a solution — the "
@@ -1506,6 +1693,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["BusinessCapability"],
         "description": (
             "Record a maturity assessment against a business capability: set its "
@@ -1548,6 +1736,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["ApplicationRationalizationScore"],
         "description": (
             "Compute and PERSIST an application's TIME (Tolerate/Invest/Migrate/"
@@ -1579,6 +1768,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["BusinessCapability"],
         "description": (
             "Resolve a duplicate business capability by MERGING one into another "
@@ -1623,6 +1813,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["VendorOrganization"],
         "description": (
             "Register a new vendor organization in the shared vendor catalogue — the "
@@ -1673,6 +1864,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": ["terms", "parties", "dates", "obligations"],
         "risk_class": "external_action",
         "mutates": True,
+        "figures": {},
         "record_types_written": [],
         "description": (
             "Extract structured contract terms from pasted contract / MSA text — the "
@@ -1707,6 +1899,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["ApplicationComponent"],
         "description": (
             "Set the lifecycle stage of a SET of applications in one governed "
@@ -1770,6 +1963,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["VendorContract"],
         "description": (
             "Create a PROCUREMENT (commercial) vendor contract — the "
@@ -1832,6 +2026,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["Programme"],
         "description": (
             "Create a canonical business-first Transformation Programme — the "
@@ -1903,6 +2098,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "figures": {},
         "record_types_written": ["LicenseEntitlement"],
         "description": (
             "Create or update a licence entitlement under a procurement contract "
@@ -1974,6 +2170,7 @@ def _route_read_tool(name, route, description, parameters):
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "figures": {},
         "record_types_written": [],
         "description": description,
         "parameters": parameters,
@@ -2144,6 +2341,88 @@ TOOL_SCHEMAS.extend([
     ),
 ])
 
+ORGANISATION_SUMMARY_FIGURES = {
+    "fields": [
+        {"path": "portfolio_summary.total_applications", "kind": "count",
+         "reads": {"one": "{value} application", "other": "{value} applications"},
+         "reads_null": "no application count recorded", "label": "Applications",
+         "concept": "applications-list"},
+        {"path": "portfolio_summary.total_capabilities", "kind": "count",
+         "reads": {"one": "{value} capability", "other": "{value} capabilities"},
+         "reads_null": "no capability count recorded", "label": "Capabilities",
+         "concept": "capability-maturity"},
+        {"path": "portfolio_summary.mapped_capabilities", "kind": "count",
+         "reads": {"one": "{value} capability supported by an application",
+                   "other": "{value} capabilities supported by an application"},
+         "reads_null": "no count of supported capabilities recorded",
+         "label": "Capabilities supported", "concept": "capability-maturity"},
+        {"path": "portfolio_summary.capability_gaps", "kind": "count",
+         "reads": {"one": "{value} capability with no application", "other": "{value} capabilities with no application"},
+         "reads_null": "no count of unsupported capabilities recorded",
+         "label": "Capabilities without an application", "concept": "capability-maturity"},
+        {"path": "portfolio_summary.coverage_percent", "kind": "percent", "decimals": 1,
+         "reads": "{value} capability coverage", "reads_null": "no capability coverage recorded",
+         "label": "Capability coverage", "concept": "capability-maturity"},
+        {"path": "portfolio_summary.total_vendors", "kind": "count", "scope": "public",
+         "reads": {"one": "{value} vendor in Entelim's public catalogue",
+                   "other": "{value} vendors in Entelim's public catalogue"},
+         "reads_null": "no vendor count recorded", "label": "Vendors in the public catalogue",
+         "concept": "vendor-catalogue"},
+    ],
+    "rows": [],
+    "names": [],
+}
+
+
+def figure_declaration_problems(declaration) -> list:
+    """What is wrong with one ``figures`` declaration; empty when it is sound.
+    Run over every registered tool by the registry test."""
+    if not isinstance(declaration, dict):
+        return ["figures is not a dict"]
+    problems = []
+    row_paths = {r.get("path") for r in declaration.get("rows", [])}
+    for row in declaration.get("rows", []):
+        if not str(row.get("path", "")).endswith("[]"):
+            problems.append("row list path %r does not end in []" % row.get("path"))
+        if not (row.get("label_field") or (row.get("id") and row.get("name"))):
+            problems.append("row list %r needs id and name, or a label_field" % row.get("path"))
+    for field in declaration.get("fields", []):
+        where = field.get("path", "?")
+        for key in ("path", "kind", "reads", "reads_null", "label", "concept"):
+            if not field.get(key):
+                problems.append("%s: missing %s" % (where, key))
+        kind = field.get("kind")
+        if kind not in FIGURE_KINDS:
+            problems.append("%s: unknown kind %r" % (where, kind))
+        reads = field.get("reads")
+        if kind == "count" and not (isinstance(reads, dict) and reads.get("one") and reads.get("other")):
+            problems.append("%s: a count gives a singular and a plural phrase" % where)
+        phrases = list(reads.values()) if isinstance(reads, dict) else [reads]
+        if not all(isinstance(p, str) and "{value}" in p for p in phrases):
+            problems.append("%s: reads must hold {value}" % where)
+        if kind == "money" and not (field.get("currency_field") or field.get("currency") == "organisation"):
+            problems.append("%s: money has no currency source" % where)
+        if kind == "score" and not (field.get("out_of") or field.get("out_of_field")):
+            problems.append("%s: a score has no scale" % where)
+        if kind == "duration" and not field.get("unit"):
+            problems.append("%s: a duration has no unit" % where)
+        if kind == "rank" and not field.get("of_field"):
+            problems.append("%s: a rank has no of_field" % where)
+        if "[]" in str(field.get("path")):
+            prefix = str(field["path"]).split("[]")[0] + "[]"
+            if prefix not in row_paths:
+                problems.append("%s: no declared row list %s" % (where, prefix))
+        window = field.get("window")
+        if window is not None and not (window.get("field") and window.get("start_field") and window.get("phrases")):
+            problems.append("%s: a window names its field, start field and phrases" % where)
+    return problems
+
+
+def tools_without_figures(schemas=None) -> list:
+    """Names of the tools that carry no ``figures`` key at all."""
+    return [s["name"] for s in (TOOL_SCHEMAS if schemas is None else schemas) if "figures" not in s]
+
+
 # Index by name for O(1) lookup
 TOOL_SCHEMA_BY_NAME = {s["name"]: s for s in TOOL_SCHEMAS}
 
@@ -2220,6 +2499,7 @@ def _archimate_element_schemas() -> list:
             "risk_class": "write",
             "mutates": True,
             "record_types_written": ["ArchiMateElement"],
+            "figures": {},
             # 'approve', not 'auto'. These write typed elements into the model
             # of record, and REQUIRE_AI_APPROVAL exists so an operator decides
             # whether AI-proposed writes reach it unreviewed.
