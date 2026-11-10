@@ -193,7 +193,9 @@ def _walk(page, name, size):
         os.makedirs(WALK, exist_ok=True)
         page.screenshot(path=os.path.join(WALK, "figures-%s-%s.png" % (name, size)), full_page=True)
         # The answer scrolls inside the page: its own picture shows all of it.
-        page.locator("#messages-container").screenshot(path=os.path.join(WALK, "figures-%s-%s-answer.png" % (name, size)))
+        if page.locator("#messages-container").count():
+            page.locator("#messages-container").screenshot(
+                path=os.path.join(WALK, "figures-%s-%s-answer.png" % (name, size)))
 
 
 def _open(browser, server, org, viewport):
