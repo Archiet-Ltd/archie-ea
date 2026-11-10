@@ -397,6 +397,22 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
                    "The assistant can make this kind of change." if schema
                    else "The assistant cannot make this kind of change."):
             return checks, Target(False)
+        if approval.persona:
+            # The same charter rule the tool executor applies before it runs a tool, decided here
+            # first so a refused change never reaches the reviewing model.
+            from app.models.agent_charter import AgentCharter
+
+            try:
+                permitted = AgentCharter.tool_allowed(approval.persona, approval.entity_type, org_id)
+            except Exception:  # noqa: BLE001 - a charter that cannot be read refuses, as the executor does
+                db.session.rollback()
+                permitted = False
+            who = approval.persona.replace("_", " ")
+            if not add("The assistant's charter allows it", permitted,
+                       "The %s charter allows this kind of change." % who if permitted
+                       else "The %s charter does not allow this kind of change. Ask an administrator to "
+                            "amend the charter, or use a role whose scope covers it." % who):
+                return checks, Target(False)
         problem = schema_problem(schema.get("parameters") or {}, payload) if schema else None
         if not add("The request is complete", problem is None,
                    "Every required detail is given and has the right kind of value." if problem is None
