@@ -917,6 +917,55 @@
      "B": "It has 21 connections downstream because many applications are served by it."
     }
    }
+  },
+  {
+   "id": 27,
+   "ask": "Which breaks more if it fails, Orders Hub or Billing?",
+   "turn": "two impact calls in one turn",
+   "plan": [
+    {
+     "tool": "answer",
+     "args": {
+      "question": "impact",
+      "element_id": "@e:Orders Hub"
+     }
+    },
+    {
+     "tool": "answer",
+     "args": {
+      "question": "impact",
+      "element_id": "@e:Billing"
+     }
+    }
+   ],
+   "compliant": "Orders Hub {ref:e:Orders Hub} has {fig:answer:summary.total:Orders Hub}. Billing {ref:e:Billing} has {fig:answer:summary.total:Billing}.",
+   "expected": {
+    "A": [
+     "13 connections downstream",
+     "4 connections downstream"
+    ],
+    "B": [
+     "21 connections downstream",
+     "9 connections downstream"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "21",
+     "9"
+    ],
+    "B": [
+     "13",
+     "4"
+    ]
+   },
+   "adversarial": {
+    "kind": "top_level_swap",
+    "text": {
+     "A": "Billing {ref:e:Billing} has {fig:answer:summary.total:Orders Hub}. Orders Hub {ref:e:Orders Hub} has {fig:answer:summary.total:Billing}.",
+     "B": "Billing {ref:e:Billing} has {fig:answer:summary.total:Orders Hub}. Orders Hub {ref:e:Orders Hub} has {fig:answer:summary.total:Billing}."
+    }
+   }
   }
  ]
 }

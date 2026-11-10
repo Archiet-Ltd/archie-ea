@@ -398,3 +398,28 @@ def test_a_removed_clause_naming_a_record_adds_no_organisation_summary_line(make
     labelled = _with_summary(org.id, ("tiers", {"success": True, "tiers": [{"tier": "High", "count": 5}]}, TIERS))
     assert "Your organisation" not in _block(labelled, ["High is crowded."]), "a row label counts as a record"
     assert "- Your organisation: 20 applications" in _block(grounding, ["Roughly 70."], tools_called=0)
+
+
+# --------------------------------------------------------------------------- #
+# A record named without its marker (the commonest draft that breaks the contract) #
+# --------------------------------------------------------------------------- #
+
+
+def test_a_sentence_naming_a_record_without_its_marker_is_taken_out_and_its_figures_come_back(
+    app, db_session, make_org, monkeypatch
+):
+    org_a, org_b = make_org("unmarked-a"), make_org("unmarked-b")
+    user = _user(db_session, org_a.id)
+    root, _mid, _leaf = _estate(db_session, org_a.id, "Turn")
+    _estate(db_session, org_b.id, "Turn")
+    draft = {"text": "Turn Root sits under the whole chain. It matters."}
+
+    result, _e, runner, seen = _run_turn(
+        app, monkeypatch, [_call_answer(root.id), draft], user=user, message="What breaks if Turn Root fails?")
+
+    assert len(seen) == 2, "no revision: the draft holds no figure violation"
+    assert not result["response"].startswith("Not recorded"), "the answer is not refused whole"
+    assert "Turn Root sits under" not in result["response"]
+    assert "It matters." in result["response"]
+    assert "- Turn Root [ref:%d]: 2 connections downstream" % root.id in result["response"]
+    assert result["response"].count(cf.PLAIN_LINE) == 1

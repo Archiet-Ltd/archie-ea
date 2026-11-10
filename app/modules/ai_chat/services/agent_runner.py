@@ -15,6 +15,7 @@ Tools marked 'approve' tier are queued for user confirmation — not executed.
 from app.modules.ai_chat.tools.executor import ToolCall
 import json
 import logging
+import re
 import time
 from typing import Callable, Optional
 from app.modules.ai_chat.services import chat_figures
@@ -2048,6 +2049,12 @@ class AgentRunner:
         enforce = mode == "enforce"
         figure_claims = figure_claims_of(uncited)
         other_claims = [claim for claim in uncited if claim not in figure_claims]
+        if enforce and other_claims:
+            # A sentence that names a record without its marker, and that the figure check takes
+            # out anyway, never reaches the person, so it cannot refuse the rest of the answer:
+            # the records block restores the true figures it held (see _deliver_figures).
+            removed = self._clause_removal(text, mode)[2]
+            other_claims = [c for c in other_claims if not self._inside_removed(c.get("claim", ""), removed)]
         if mode != "off":
             # Counts only: the result is spread into the stream's done event, and
             # the claims withheld must not reach the browser. They go to the run
@@ -2077,6 +2084,44 @@ class AgentRunner:
         if uncited and not enforce and mode != "off":
             self._log_would_refuse(uncited)
 
+    def _clause_removal(self, text: str, mode: str):
+        """``(violations, text, removed)``: the figure violations of the draft *text*, the text
+        with each clause that cannot be shown taken out, and what was taken out (the whole
+        statement, item or row, as written). The one clause remover."""
+        table = self._grounding.figure_table
+        org = self._grounding.organization_id
+        question = self._question_text
+        violations = chat_figures.violations_in(text, table, org, question)
+        blocked = {chat_figures.REASON_UNKNOWN, chat_figures.REASON_OTHER_ORG, chat_figures.REASON_UNBOUND}
+        if mode == "enforce":
+            blocked.add(chat_figures.REASON_WRITTEN)
+
+        def bad(fragment: str) -> bool:
+            if mode == "enforce" and chat_figures.names_record_without_citing(fragment, table):
+                # Enforce mode never lets a record be named without its marker: the clause is
+                # taken out, and the records block restores the figures of the record it named.
+                return True
+            return any(
+                v["reason"] in blocked
+                for v in chat_figures.violations_in(fragment, table, org, question)
+            )
+
+        removed: list = []
+        if any(v["reason"] in blocked for v in violations) or mode == "enforce":
+            cleaned = remove_violating_clauses(text, bad)
+            if cleaned["removed"]:
+                text, removed = cleaned["text"], cleaned["removed"]
+        return violations, text, removed
+
+    @staticmethod
+    def _inside_removed(claim: str, removed: list) -> bool:
+        """True when the sentence *claim* sits inside one of the *removed* statements."""
+        def norm(value: str) -> str:
+            return re.sub(r"\s+", " ", re.sub(r"\[(?:fig|ref):[^\]]*\]", "", value or "")).strip(" \t-*#>|.").lower()
+
+        wanted = norm(claim)[:200]
+        return bool(wanted) and any(wanted in norm(r) for r in removed)
+
     def _deliver_figures(self, result: dict, text: str, mode: str) -> None:
         """Resolve the references in *text* and show each as its declared phrase; take out
         the clauses that cannot be shown; when something was taken out, add the plain line,
@@ -2088,22 +2133,8 @@ class AgentRunner:
         question = self._question_text
         enforce = mode == "enforce"
         draft = text
-        violations = chat_figures.violations_in(draft, table, org, question)
+        violations, text, removed = self._clause_removal(draft, mode)
         first_draft = self._first_draft_figures if self._first_draft_figures is not None else violations
-        blocked = {chat_figures.REASON_UNKNOWN, chat_figures.REASON_OTHER_ORG, chat_figures.REASON_UNBOUND}
-        if enforce:
-            blocked.add(chat_figures.REASON_WRITTEN)
-
-        def bad(fragment: str) -> bool:
-            return any(
-                v["reason"] in blocked
-                for v in chat_figures.violations_in(fragment, table, org, question)
-            )
-
-        removed: list = []
-        if any(v["reason"] in blocked for v in violations):
-            cleaned = remove_violating_clauses(text, bad)
-            text, removed = cleaned["text"], cleaned["removed"]
         rendered, figures = chat_figures.render(text, table) if text.strip() else ("", [])
         block_lines = 0
         if removed:

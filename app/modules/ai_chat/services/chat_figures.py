@@ -436,6 +436,17 @@ def records_in(sentence: str, table: FigureTable) -> List[Tuple[int, str]]:
     return sorted(hits, key=lambda hit: hit[0])
 
 
+def names_record_without_citing(sentence: str, table: FigureTable) -> bool:
+    """True when *sentence* names a record this turn returned (the one name matcher) and cites
+    none of the records that name belongs to."""
+    cited = {m.group(1) for m in REF.finditer(sentence)}
+    by_name: Dict[str, set] = {}
+    for ident, name in table.record_names.items():
+        by_name.setdefault(name.strip().lower(), set()).add(ident)
+    return any(not (by_name.get(matched.strip().lower(), set()) & cited)
+               for _s, _e, matched in name_spans(sentence, table.record_names.values()))
+
+
 def subject_bound(sentence: str, entry: Dict[str, Any], table: FigureTable) -> bool:
     """A subject's top-level figure renders only in a sentence that cites or names its subject
     and cites or names no other record. A doubtful name (one two records share, with no

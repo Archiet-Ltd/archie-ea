@@ -2,13 +2,18 @@
 
     python -m app.modules.intelligence.services.gold_replay --set figures
 
-runs every question of ``tests/gold/figures`` in enforce mode under three scripted
-behaviours of the model and exits 0 only when no true figure was lost and no wrong figure
-was shown, in all of them:
+runs every question of ``tests/gold/figures`` in enforce mode under four scripted
+behaviours of the model, plus one stale-key run, and exits 0 only when no true figure was lost
+and no wrong figure was shown, in all of them:
 
   compliant    writes the references, as the contract asks.
   ignores      writes each reference's own text (true digits) instead, cites the same
                records, and does the same again after the revision.
+  ignores_uncited
+               writes each reference's own text (true digits), names each record as the tool
+               returned it, writes no [ref:], and does the same again after the revision.
+  stale_key    (one run, question 26, after a real first turn on question 3) calls the tool
+               again but writes the key it used in the first turn for the count, and repeats it.
   adversarial  per question: the true count plus one, or the other organisation's value; a
                figure of another row; an unknown key; the scale written out; a sum; or a
                figure with no tool call.
@@ -17,7 +22,9 @@ The scripted models call the real tools of the real runner against two real orga
 (A, and B with the same names and different figures). A wrong figure is shown when the
 delivered text holds a digit or number word outside the envelope's rendered figures and
 the allowed forms (an independent re-scan below), a rendered figure that is not a true
-figure of A, or anything on the question's forbidden list. A true figure is lost when an
+figure of A, a rendered figure whose value is not the gold value of the record its own sentence
+names (or of the organisation, when it names none), or anything on the question's forbidden
+list. A true figure is lost when an
 expected rendering is missing from the delivered text, in prose or in the records block.
 """
 
@@ -32,7 +39,8 @@ import sys
 from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock
 
-BEHAVIOURS = ("compliant", "ignores", "adversarial")
+BEHAVIOURS = ("compliant", "ignores", "adversarial", "ignores_uncited")
+STALE_KEY = "stale_key"
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), *([os.pardir] * 4)))
 _NUMBER_WORDS = (
     "zero two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen "
@@ -99,6 +107,8 @@ class ScriptedModel:
         self.question, self.behaviour, self.variant, self.ids = question, behaviour, variant, ids
         self.issued = 0
         self.calls = 0
+        self.stale_key: Optional[str] = None
+        self.history_seen: List[str] = []
 
     def _template(self, value):
         return value[self.variant] if isinstance(value, dict) else value
@@ -128,9 +138,20 @@ class ScriptedModel:
 
         def fig(match):
             entry = self._lookup(table, match.group(1))
+            if self.stale_key and match.group(1).startswith("answer:summary.total"):
+                return "[fig:%s]" % self.stale_key
             return entry["rendered"] if as_text else "[fig:%s]" % entry["key"]
 
-        text = re.sub(r"\{ref:([ea]):([^}]+)\}", ref, template)
+        def named(match):
+            # Names the record as the tool returned it and writes no [ref:].
+            name = match.group(2)
+            before = template[:match.start()].rstrip()
+            return "" if before.lower().endswith(name.lower()) else name
+
+        if self.behaviour == "ignores_uncited":
+            text = re.sub(r"\s?\{ref:([ea]):([^}]+)\}", lambda m: (" " + named(m)) if named(m) else "", template)
+        else:
+            text = re.sub(r"\{ref:([ea]):([^}]+)\}", ref, template)
         return re.sub(r"\{fig:([^}]+)\}", fig, text)
 
     def next(self, runner, messages) -> Dict[str, Any]:
@@ -149,7 +170,8 @@ class ScriptedModel:
             return {"text": self._resolve(self._template(question["adversarial"]["text"]), table, False),
                     "tool_calls": []}
         template = self._template(question["compliant"])
-        return {"text": self._resolve(template, table, self.behaviour == "ignores"), "tool_calls": []}
+        return {"text": self._resolve(template, table, self.behaviour in ("ignores", "ignores_uncited")),
+                "tool_calls": []}
 
 
 # --------------------------------------------------------------------------- #
@@ -214,8 +236,69 @@ class Run(dict):
     """The outcome of one question under one behaviour."""
 
 
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def _unit_around(text: str, position: int) -> str:
+    """The table row, list item or sentence of *text* that holds *position*."""
+    offset = 0
+    for line in text.split("\n"):
+        end = offset + len(line)
+        if offset <= position <= end:
+            if line.lstrip().startswith(("|", "-", "*")) or re.match(r"\s*\d{1,3}[.)]\s", line):
+                return line
+            cursor = offset
+            for match in _SENTENCE_END.finditer(line):
+                stop = offset + match.start()
+                if position <= stop:
+                    return text[cursor:stop]
+                cursor = offset + match.end()
+            return text[cursor:end]
+        offset = end + 1
+    return text
+
+
+def named_in(unit: str, names: List[str]) -> List[str]:
+    """The record names *unit* holds: whole words, ignoring case, longest name first, none inside another."""
+    ordered = sorted(set(names), key=lambda n: (-len(n), n.lower()))
+    if not ordered:
+        return []
+    pattern = re.compile(r"(?<![\w])(?:" + "|".join(r"\s+".join(re.escape(p) for p in n.split()) for n in ordered)
+                         + r")(?![\w])", re.IGNORECASE)
+    return [m.group(0).lower() for m in pattern.finditer(unit)]
+
+
+def record_mismatches(delivered: str, figures: List[Dict[str, Any]], names: List[str],
+                      truth: Dict[str, Any]) -> List[str]:
+    """Rendered figures whose value is not the gold value of the record the sentence names (the
+    record in brackets after the figure, in a sentence that names several), or, in a sentence that
+    names no record, of the organisation. Written apart from the engine's binding on purpose."""
+    wrong: List[str] = []
+    for figure in figures:
+        reads = figure["reads"]
+        bracket = re.search(r" \(([^()]*)\)$", reads)
+        phrase = reads[:bracket.start()] if bracket else reads
+        if phrase in truth["org"]:
+            continue
+        unit = _unit_around(delivered, figure["start"])
+        found = sorted(set(named_in(unit, names)))
+        if bracket:
+            compared = bracket.group(1).lower()
+        elif len(found) == 1:
+            compared = found[0]
+        elif not found:
+            wrong.append("no record named beside: %s" % phrase)
+            continue
+        else:
+            wrong.append("several records named, none chosen, beside: %s" % phrase)
+            continue
+        if phrase not in truth["by_record"].get(compared, set()):
+            wrong.append("%s is not a figure of %s" % (phrase, compared))
+    return wrong
+
+
 def score(question: Dict[str, Any], behaviour: str, variant: str, result: Dict[str, Any], names: List[str],
-          truth: Dict[str, set], model: ScriptedModel) -> Run:
+          truth: Dict[str, Any], model: ScriptedModel) -> Run:
     delivered = result.get("response") or ""
     figures = result.get("figures") or []
     expected_key = "expected_adversarial" if behaviour == "adversarial" and "expected_adversarial" in question \
@@ -227,8 +310,9 @@ def score(question: Dict[str, Any], behaviour: str, variant: str, result: Dict[s
     other = "B" if variant == "A" else "A"
     for figure in figures:
         reads = re.sub(r" \([^()]*\)$", "", figure["reads"])
-        if reads not in truth[variant] and not any(reads.startswith(p) for p in ()):
-            wrong.append(("other organisation: %s" if reads in truth[other] else "not a true figure: %s") % reads)
+        if reads not in truth[variant]["all"]:
+            wrong.append(("other organisation: %s" if reads in truth[other]["all"] else "not a true figure: %s") % reads)
+    wrong += record_mismatches(delivered, figures, names, truth[variant])
     wrong += ["forbidden: %s" % hit for hit in _forbidden_hits(delivered, question["forbidden"][variant])]
     check = result.get("figure_check") or {}
     return Run(
@@ -249,8 +333,10 @@ def _names_of(estates: Estates, variant: str) -> List[str]:
         name for name, _ in estates.fixture.VARIANTS[variant]["investments"]]
 
 
-def _truth_phrases(app, estates: Estates, variant: str) -> set:
-    """Every figure phrase the real tools give for *variant*, read without any model."""
+def _truth_phrases(app, estates: Estates, variant: str) -> Dict[str, Any]:
+    """Every figure the real tools give for *variant*, read without any model: all the phrases
+    (``all``), the phrases of each record or row label (``by_record``, keyed by lower-case name) and
+    the phrases that belong to no record (``org``)."""
     from flask import g
 
     from app.modules.ai_chat.services.ai_hallucination_detector import Grounding
@@ -270,13 +356,20 @@ def _truth_phrases(app, estates: Estates, variant: str) -> set:
         for name, arguments in calls:
             out = ToolExecutor(user_id).execute(ToolCall(id="truth", name=name, arguments=arguments))
             grounding.model_view(name, out, TOOL_SCHEMA_BY_NAME[name]["figures"], org_id)
-        phrases |= {e["rendered"] for e in grounding.figure_table.entries}
         context = _summary_context(app, org_id)
         from app.modules.ai_chat.tools.registry import ORGANISATION_SUMMARY_FIGURES
 
         grounding.figure_table.declare_summary(context, ORGANISATION_SUMMARY_FIGURES, org_id)
-        phrases |= {e["rendered"] for e in grounding.figure_table.entries}
-    return phrases
+        by_record: Dict[str, set] = {}
+        org: set = set()
+        for entry in grounding.figure_table.entries:
+            phrases.add(entry["rendered"])
+            owner = entry.get("record_name") or entry.get("label")
+            if owner:
+                by_record.setdefault(owner.lower(), set()).add(entry["rendered"])
+            else:
+                org.add(entry["rendered"])
+    return {"all": phrases, "by_record": by_record, "org": org}
 
 
 def _summary_context(app, org_id) -> Dict[str, Any]:
@@ -288,10 +381,42 @@ def _summary_context(app, org_id) -> Dict[str, Any]:
     return MultiDomainChatService().get_domain_context("general", {}).get("context", {})
 
 
-def run_set(app, estates: Estates, document: Dict[str, Any], behaviours=BEHAVIOURS, only=None) -> List[Run]:
-    """Run each question of *document* under each behaviour, as organisation A's person."""
+def _gold_history(question: Dict[str, Any], estates: Estates, variant: str):
+    if not question.get("history"):
+        return None
+    expected = estates.fixture.EXPECTED[variant]
+    return [{"role": h["role"], "content": re.sub(
+        r"\{expected:(\w+)\}", lambda m: str(expected[m.group(1)]), h["content"])} for h in question["history"]]
+
+
+def _answer(app, estates: Estates, question: Dict[str, Any], model: ScriptedModel, history, variant: str):
+    """One turn of the real runner with *model* scripted; returns ``(result, runner, messages seen)``."""
     from flask import g
 
+    from app.modules.ai_chat.services.agent_runner import AgentRunner
+
+    seen: List[List[Dict[str, Any]]] = []
+
+    def fake(self, provider, model_name, api_key, system_prompt, messages, tools, stream=False,
+             base_url=None, _model=model):
+        seen.append([dict(m) for m in messages])
+        reply = _model.next(self, messages)
+        raw = MagicMock()
+        raw.content = []
+        return {"text": reply["text"], "tool_calls": reply["tool_calls"], "raw": raw}
+
+    AgentRunner._call_llm = fake
+    runner = AgentRunner(user_id=estates.user[variant])
+    with app.test_request_context("/"):
+        g.current_org_id = estates.org[variant]
+        result = runner.run(user_message=question["ask"], domain="general", context={}, history=history)
+    return result, runner, seen
+
+
+def run_set(app, estates: Estates, document: Dict[str, Any], behaviours=BEHAVIOURS, only=None,
+            stale_key_run: bool = True) -> List[Run]:
+    """Run each question of *document* under each behaviour, as organisation A's person, then the
+    one stale-key run (a real turn on question 3, then question 26 with the first turn's key)."""
     from app.modules.ai_chat.services.agent_runner import AgentRunner
     from app.modules.ai_chat.services.llm_service_impl import LLMService
     from app.modules.ai_chat.tools.executor import ToolExecutor
@@ -310,43 +435,55 @@ def run_set(app, estates: Estates, document: Dict[str, Any], behaviours=BEHAVIOU
         estates.fixture.VARIANTS[estates.variant_of(self._get_organization_id())])
     try:
         truth = {v: _truth_phrases(app, estates, v) for v in ("A", "B")}
+        by_id = {q["id"]: q for q in document["questions"]}
         for question in document["questions"]:
             if only and question["id"] not in only:
                 continue
             for behaviour in behaviours:
                 model = ScriptedModel(question, behaviour, variant, estates.ids[variant])
-
-                def fake(self, provider, model_name, api_key, system_prompt, messages, tools, stream=False,
-                         base_url=None, _model=model):
-                    reply = _model.next(self, messages)
-                    raw = MagicMock()
-                    raw.content = []
-                    return {"text": reply["text"], "tool_calls": reply["tool_calls"], "raw": raw}
-
-                AgentRunner._call_llm = fake
-                history = None
-                if question.get("history"):
-                    expected = estates.fixture.EXPECTED[variant]
-                    history = [{"role": h["role"], "content": re.sub(
-                        r"\{expected:(\w+)\}", lambda m: str(expected[m.group(1)]), h["content"])}
-                        for h in question["history"]]
-                runner = AgentRunner(user_id=estates.user[variant])
-                with app.test_request_context("/"):
-                    g.current_org_id = estates.org[variant]
-                    result = runner.run(user_message=question["ask"], domain="general", context={}, history=history)
+                result, runner, _seen = _answer(app, estates, question, model,
+                                                _gold_history(question, estates, variant), variant)
                 run = score(question, behaviour, variant, result, names, truth, model)
                 run["withheld"] = [c.get("unsupported") for c in runner._withheld_claims]
                 runs.append(run)
+        if stale_key_run and 3 in by_id and 26 in by_id and (not only or 26 in only):
+            runs.append(_stale_key(app, estates, by_id[3], by_id[26], names, truth, variant))
     finally:
         (AgentRunner._gate_mode, AgentRunner._call_llm, LLMService._get_configured_provider,
          LLMService._get_all_api_keys, ToolExecutor._tool_get_investment_priorities) = saved
     return runs
 
 
+def _stale_key(app, estates: Estates, first: Dict[str, Any], follow_up: Dict[str, Any], names: List[str],
+               truth: Dict[str, Any], variant: str) -> Run:
+    """Question 3 answered with references; then question 26, in which the model calls the tool
+    again and writes the key it used in the first turn, and writes it again after the revision."""
+    one = ScriptedModel(first, "compliant", variant, estates.ids[variant])
+    result_one, runner_one, _ = _answer(app, estates, first, one, None, variant)
+    old = next(e["key"] for e in runner_one._grounding.figure_table.entries
+               if e["tool"] == "answer" and e["field"].endswith("summary.total"))
+    two = ScriptedModel(follow_up, "compliant", variant, estates.ids[variant])
+    two.stale_key = old
+    history = [{"role": "user", "content": first["ask"]},
+               {"role": "assistant", "content": result_one["response"]}]
+    result, runner, seen = _answer(app, estates, follow_up, two, history, variant)
+    run = score(follow_up, STALE_KEY, variant, result, names, truth, two)
+    sent = " ".join(str(m.get("content")) for call in seen for m in call[:2])
+    if "[fig:" in sent:
+        run["wrong"].append("history sent to the model held a key: %s" % sent[:80])
+    if any(f["key"] == old for f in result.get("figures") or []):
+        run["wrong"].append("the first turn's key %s rendered in the second turn" % old)
+    if "[fig:" in (result.get("response") or ""):
+        run["wrong"].append("a raw key reached the person")
+    run["stale_key"] = old
+    run["withheld"] = [c.get("unsupported") for c in runner._withheld_claims]
+    return run
+
+
 def summarise(runs: List[Run]) -> Dict[str, Any]:
     """Counts per behaviour: runs, true figures lost, wrong figures shown, fallback and revision rates."""
     out: Dict[str, Any] = {}
-    for behaviour in BEHAVIOURS:
+    for behaviour in BEHAVIOURS + (STALE_KEY,):
         mine = [r for r in runs if r["behaviour"] == behaviour]
         if not mine:
             continue
