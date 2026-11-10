@@ -373,6 +373,17 @@ def _types_for_layer(layer: str) -> list:
 # The most elements one viewpoint answer carries.
 VIEWPOINT_ELEMENT_LIMIT = 500
 
+# The most elements a viewpoint opens on. Past this many a drawing cannot keep its
+# names readable on one screen, so a whole-model opening answers with one count per
+# layer instead, and a single layer opens on its most connected elements.
+VIEWPOINT_OPENING_LIMIT = 40
+
+LAYER_TITLES = {
+    "motivation": "Motivation", "strategy": "Strategy", "business": "Business",
+    "application": "Application", "technology": "Technology",
+    "implementation": "Implementation & Migration",
+}
+
 
 def _omitted_note(omitted: int, layer, type_filtered: bool):
     """One plain sentence for why a viewpoint shows fewer elements than the store holds."""
@@ -385,6 +396,60 @@ def _omitted_note(omitted: int, layer, type_filtered: bool):
     if type_filtered:
         return "%s of other types %s not shown" % (count, verb)
     return "%s beyond the first %d %s not shown" % (count, VIEWPOINT_ELEMENT_LIMIT, verb)
+
+
+def _most_connected(query, org_id):
+    """Order an element query by how many relationships each element has, most first,
+    so a capped answer keeps the elements a person can follow rather than an arbitrary slice."""
+    from app import db as _db
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    ends = _db.union_all(
+        _db.select(ArchiMateRelationship.source_id.label("element_id")).where(
+            ArchiMateRelationship.organization_id == org_id),
+        _db.select(ArchiMateRelationship.target_id.label("element_id")).where(
+            ArchiMateRelationship.organization_id == org_id),
+    ).subquery()
+    degree = (
+        _db.select(ends.c.element_id, _db.func.count().label("n"))
+        .group_by(ends.c.element_id)
+        .subquery()
+    )
+    return (
+        query.outerjoin(degree, degree.c.element_id == ArchiMateElement.id)
+        .order_by(_db.func.coalesce(degree.c.n, 0).desc(), ArchiMateElement.id)
+    )
+
+
+def _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, org_id):
+    """The opening for a model too large to draw readably: one count per layer."""
+    from app import db as _db
+    from app.models.archimate_core import ArchiMateElement
+
+    query = _db.select(_db.func.lower(ArchiMateElement.type), _db.func.count()).group_by(
+        _db.func.lower(ArchiMateElement.type)).where(ArchiMateElement.organization_id == org_id)
+    if allowed_types:
+        query = query.where(ArchiMateElement.type.in_(allowed_types))
+    counts = {}
+    for type_name, n in _db.session.execute(query).all():
+        key = LAYER_TYPE_TO_LAYER.get(type_name or "", "other")
+        counts[key] = counts.get(key, 0) + n
+    order = [k for k in vp.get('layer_order', layers or []) if k in counts]
+    order += [k for k in LAYER_TITLES if k in counts and k not in order]
+    order += [k for k in counts if k not in order]
+    return {
+        'viewpoint_id': viewpoint_id,
+        'viewpoint_name': vp['name'],
+        'layer_order': vp.get('layer_order', layers or ['business']),
+        'groups': {},
+        'elements': [],
+        'relationships': [],
+        'total': 0,
+        'overview': [
+            {'layer': k, 'title': LAYER_TITLES.get(k, k.title()), 'count': counts[k]} for k in order
+        ],
+        'store_total': matching,
+    }
 
 
 def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = None) -> dict:
@@ -456,6 +521,7 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
     serialised = []
     relationships_out = []
     store_total = None
+    layer_total = None
 
     try:
         from app.models.archimate_core import ArchiMateElement
@@ -485,13 +551,19 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             # bare .query is already scoped to g.current_org_id by the
             # do_orm_execute listener (app/middleware/tenant_isolation.py) --
             # no manual organization_id predicate needed or wanted here.
+            from app import db as _db
             query = ArchiMateElement.query
             if allowed_types:
                 query = query.filter(ArchiMateElement.type.in_(allowed_types))
             if layer_type_names is not None:
-                from app import db as _db
                 query = query.filter(_db.func.lower(ArchiMateElement.type).in_(layer_type_names))
-            elements = query.limit(VIEWPOINT_ELEMENT_LIMIT).all()
+            matching = query.count()
+            if layer is None and matching > VIEWPOINT_OPENING_LIMIT:
+                return _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, _current_org_id())
+            cap = VIEWPOINT_OPENING_LIMIT if layer is not None else VIEWPOINT_ELEMENT_LIMIT
+            cap = min(cap, VIEWPOINT_ELEMENT_LIMIT)
+            elements = _most_connected(query, org_id=_current_org_id()).limit(cap).all()
+            layer_total = matching
             element_ids = [e.id for e in elements]
             # What the rest of the product counts for this organisation (the
             # dashboard's element figure reads the same rows), so a viewpoint
@@ -645,6 +717,12 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
         'relationships': relationships_out,
         'total': len(serialised),
     }
+    if layer_total is not None and layer_total > len(serialised) and layer is not None:
+        result['layer_total'] = layer_total
+        result['layer_omitted_note'] = (
+            "the %d most connected of %d %s elements are shown"
+            % (len(serialised), layer_total, LAYER_TITLES.get(layer, layer).lower())
+        )
     if store_total is not None:
         result['store_total'] = store_total
         result['omitted'] = store_total - len(serialised)
