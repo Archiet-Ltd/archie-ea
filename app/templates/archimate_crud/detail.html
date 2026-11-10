@@ -446,7 +446,7 @@ function archimateDetail() {
                     }
                 );
                 if (data.success) {
-                    window.location.href = '{{ url_for("archimate_crud.list_elements", layer=layer, element_type=element_type) }}';
+                    window.location.href = {{ after_delete_url | tojson }};
                 } else {
                     Platform.toast.error('Error: ' + (data.error || 'Unknown error'));
                 }

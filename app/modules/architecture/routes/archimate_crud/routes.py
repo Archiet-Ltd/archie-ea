@@ -1669,6 +1669,9 @@ def detail_element(layer, element_type, element_id):
         abort(404)
     if _from_ae:
         model_class = ArchiMateElement
+        # An address that names no type ("element", from a search hit) or a type with no record table:
+        # the page, its chip and its Edit and Delete speak the element's own ArchiMate type.
+        element_type = element.type or element_type
 
     # Get relationships
     relationships = _get_element_relationships(element, element_id)
@@ -1768,6 +1771,12 @@ def detail_element(layer, element_type, element_id):
         layer=layer,
         element_type=element_type,
         element=element,
+        # Where Delete lands: the type's list, or the Model page for a type with no list of its own.
+        after_delete_url=(
+            url_for("archimate_crud.list_elements", layer=layer, element_type=element_type)
+            if MODEL_REGISTRY.get(element_type) is not None
+            else url_for("archimate_crud.dashboard")
+        ),
         relationships=relationships,
         source_ae_id=ae_id,
         page=page,
@@ -1928,10 +1937,8 @@ def update_element(layer, element_type, element_id):
     """Update an element"""
     model_class = MODEL_REGISTRY.get(element_type)
 
-    if not model_class:
-        flash(f"Element type {element_type} is not yet supported", "warning")
-        return redirect(url_for("archimate_crud.dashboard"))
-
+    # A type with no record table is an element held by id: _resolve_element answers 404 for another
+    # organisation's element or one of another type.
     element, _from_ae = _resolve_element(model_class, element_type, element_id)
     if element is None:
         if request.is_json:
@@ -2146,14 +2153,6 @@ def delete_element(layer, element_type, element_id):
     """Delete an element"""
     model_class = MODEL_REGISTRY.get(element_type)
 
-    if not model_class:
-        if request.is_json:
-            return jsonify(
-                {"success": False, "error": "Element type not supported"}
-            ), 400
-        flash(f"Element type {element_type} is not yet supported", "warning")
-        return redirect(url_for("archimate_crud.dashboard"))
-
     element, _from_ae = _resolve_element(model_class, element_type, element_id)
     if element is None:
         element = ArchiMateElement.query.filter_by(id=element_id, type=element_type).first()
@@ -2230,6 +2229,9 @@ def delete_element(layer, element_type, element_id):
             )
 
         flash(f"{element_type} deleted successfully", "success")
+        if model_class is None:
+            # A type with no list of its own: land on the Model page, which has content.
+            return redirect(url_for("archimate_crud.dashboard"))
         return redirect(
             url_for(
                 "archimate_crud.list_elements", layer=layer, element_type=element_type
