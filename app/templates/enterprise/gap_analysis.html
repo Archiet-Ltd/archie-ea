@@ -83,10 +83,11 @@
 {% block content %}
 {%- set gaps = gaps|default([]) -%}
 {%- set wp_by_gap = work_packages_by_gap or {} -%}
-{%- set critical = gaps|selectattr('rated_severity', 'equalto', 'critical')|list|length -%}
-{%- set in_progress = gaps|selectattr('resolution_status', 'equalto', 'in_progress')|list|length -%}
-{%- set resolved = gaps|selectattr('is_closed')|list|length if severity_filter else closed_gap_count or 0 -%}
-{%- set recorded = gaps|length if severity_filter else [total_gap_count or 0, gaps|length]|max -%}
+{%- set counts = gap_counts or {} -%}
+{%- set critical = counts.critical or 0 -%}
+{%- set in_progress = counts.in_progress or 0 -%}
+{%- set resolved = counts.resolved or 0 -%}
+{%- set recorded = counts.recorded or 0 -%}
 {#- The second table lists the gaps the first shows with no work package, from the same links, so the two never disagree. -#}
 {%- set unaddressed = [] -%}
 {%- for g in gaps %}{% if not wp_by_gap.get(g.id) %}{% set _ = unaddressed.append(g) %}{% endif %}{% endfor -%}
@@ -110,19 +111,29 @@
               breadcrumb=[('Home', url_for('main.index')), ('Enterprise architecture', url_for('enterprise.enterprise_dashboard')), ('Gap analysis', none)],
               actions_caller=_new_gap) }}
 
-{% if severity_filter %}
+{% if severity_filter or status_filter or work_filter %}
 <p class="flex flex-wrap items-center gap-2 text-sm" data-testid="gap-severity-filter">
-  <span class="text-muted-foreground">Showing only</span> {{ state_badge(severity_filter) }} <span class="text-muted-foreground">severity gaps ({{ gaps|length }} of {{ total_gap_count or gaps|length }}).</span>
+  <span class="text-muted-foreground">Showing only</span>
+  {% if severity_filter %}{{ state_badge(severity_filter) }} <span class="text-muted-foreground">severity</span>{% endif %}
+  <span class="text-muted-foreground">{% if status_filter == 'open' %}open {% elif status_filter == 'closed' %}resolved {% elif status_filter == 'in_progress' %}in progress {% endif %}{% if work_filter == 'covered' %}gaps with a work package{% elif work_filter == 'none' %}gaps with no work package{% else %}gaps{% endif %} ({{ listed_count }} of {{ recorded }}).</span>
   <a href="{{ url_for('enterprise.gap_analysis') }}" class="font-medium text-primary hover:underline" data-testid="gap-severity-filter-clear">Show all gaps</a>
 </p>
 {% endif %}
-{% if gaps %}
+{% if gaps or (recorded and (severity_filter or status_filter or work_filter)) %}
 {{ stat_cards([
-    {'label': 'Recorded gaps', 'value': recorded, 'icon': 'target', 'sentence': 'Gaps recorded between the current and target architecture', 'testid': 'gap-stat-recorded'},
-    {'label': 'Critical', 'value': critical, 'icon': 'triangle-alert', 'sentence': ('Rated critical on the gap itself' if critical else ('None of the gaps shown is rated critical' if severity_filter else 'No gap is rated critical')), 'testid': 'gap-stat-critical'},
-    {'label': 'In progress', 'value': in_progress, 'icon': 'loader', 'sentence': ('Being closed by work under way' if in_progress else 'No gap is being worked on yet'), 'testid': 'gap-stat-in-progress'},
-    {'label': 'Resolved', 'value': resolved, 'icon': 'circle-check', 'sentence': ('Closed by delivered work' if resolved else 'No gap has been closed yet'), 'testid': 'gap-stat-resolved'},
+    {'label': 'Recorded gaps', 'value': recorded, 'icon': 'target', 'sentence': 'Gaps recorded between the current and target architecture', 'href': (url_for('enterprise.gap_analysis') if recorded else none), 'testid': 'gap-stat-recorded'},
+    {'label': 'Critical', 'value': critical, 'icon': 'triangle-alert', 'sentence': (('Rated critical on severity or priority; ' ~ counts.critical_open ~ ' still open' if counts.critical_open != critical else 'Rated critical on severity or priority, all still open') if critical else 'No gap is rated critical'), 'href': (url_for('enterprise.gap_analysis', severity='critical') if critical else none), 'testid': 'gap-stat-critical'},
+    {'label': 'In progress', 'value': in_progress, 'icon': 'loader', 'sentence': ('Being closed by work under way' if in_progress else 'No gap is being worked on yet'), 'href': (url_for('enterprise.gap_analysis', status='in_progress') if in_progress else none), 'testid': 'gap-stat-in-progress'},
+    {'label': 'Resolved', 'value': resolved, 'icon': 'circle-check', 'sentence': ('Resolved, closed or completed by any means' if resolved else 'No gap has been closed yet'), 'href': (url_for('enterprise.gap_analysis', status='closed') if resolved else none), 'testid': 'gap-stat-resolved'},
 ]) }}
+{% if listed_count > gaps|length %}
+{%- set first_shown = (page_number - 1) * page_size + 1 -%}
+<p class="flex flex-wrap items-center gap-3 text-sm text-muted-foreground" data-testid="gap-page-note">
+  <span>Showing gaps {{ first_shown }} to {{ first_shown + gaps|length - 1 }} of {{ listed_count }}.</span>
+  {% if page_number > 1 %}<a href="{{ url_for('enterprise.gap_analysis', severity=severity_filter or none, status=status_filter or none, work=work_filter or none, sort=current_sort, dir=current_dir, page=page_number - 1) }}" class="font-medium text-primary hover:underline" data-testid="gap-page-previous">Previous gaps</a>{% endif %}
+  {% if first_shown + gaps|length - 1 < listed_count %}<a href="{{ url_for('enterprise.gap_analysis', severity=severity_filter or none, status=status_filter or none, work=work_filter or none, sort=current_sort, dir=current_dir, page=page_number + 1) }}" class="font-medium text-primary hover:underline" data-testid="gap-page-next">Next gaps</a>{% endif %}
+</p>
+{% endif %}
 
 {%- set columns = [{'label': 'Gap', 'sortable': true}] -%}
 {%- if show.type %}{% set _ = columns.append({'label': 'Type', 'sortable': true, 'class': 'hidden lg:table-cell'}) %}{% endif -%}

@@ -13,22 +13,16 @@
 
     {# -- Header --------------------------------------------------------- #}
     {% macro _ps_actions() %}
-            <div class="text-center">
-                <div class="text-2xl font-bold text-foreground" data-testid="gap-total">{{ recorded_count }}</div>
-                <div class="text-xs text-muted-foreground">Recorded gaps</div>
-            </div>
-            <div class="text-center">
-                <div class="text-2xl font-bold {% if unclosed_count > 0 %}text-destructive{% else %}text-foreground{% endif %}" data-testid="gap-unclosed">{{ unclosed_count }}</div>
-                <div class="text-xs text-muted-foreground">No work planned</div>
-            </div>
-            <div class="text-center">
-                <div class="text-2xl font-bold {% if covered_count > 0 %}text-success{% else %}text-foreground{% endif %}" data-testid="gap-covered">{{ covered_count }}</div>
-                <div class="text-xs text-muted-foreground">Covered</div>
-            </div>
-            <div class="text-center" title="Resolved, closed or completed in the gap register">
-                <div class="text-2xl font-bold text-foreground" data-testid="gap-closed">{{ closed_count }}</div>
-                <div class="text-xs text-muted-foreground">Closed</div>
-            </div>
+            {% macro _count(testid, value, label, href, tone='text-foreground', title=none) %}
+            {% if value and href %}<a href="{{ href }}" class="block rounded-md text-center outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"{% if title %} title="{{ title }}"{% endif %}>{% else %}<div class="text-center"{% if title %} title="{{ title }}"{% endif %}>{% endif %}
+                <div class="text-2xl font-bold {{ tone }}" data-testid="{{ testid }}">{{ value }}</div>
+                <div class="text-xs text-muted-foreground">{{ label }}</div>
+            {% if value and href %}</a>{% else %}</div>{% endif %}
+            {% endmacro %}
+            {{ _count('gap-total', recorded_count, 'Recorded gaps', url_for('enterprise.gap_analysis')) }}
+            {{ _count('gap-unclosed', unclosed_count, 'No work planned', url_for('enterprise.gap_analysis', status='open', work='none'), 'text-destructive' if unclosed_count > 0 else 'text-foreground', 'Open gaps with no work package') }}
+            {{ _count('gap-covered', covered_count, 'Covered', url_for('enterprise.gap_analysis', status='open', work='covered'), 'text-success' if covered_count > 0 else 'text-foreground', 'Open gaps with a work package') }}
+            {{ _count('gap-closed', closed_count, 'Closed', url_for('enterprise.gap_analysis', status='closed'), 'text-foreground', 'Resolved, closed or completed in the gap register') }}
             <div class="text-center" title="Found by checking the capability map; not recorded as gaps yet">
                 <div class="text-2xl font-bold text-foreground" data-testid="gap-signals">{{ computed_gap_count if computed_gap_count is not none else '—' }}</div>
                 <div class="text-xs text-muted-foreground">Gap signals, not recorded</div>

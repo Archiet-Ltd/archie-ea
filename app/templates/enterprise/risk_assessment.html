@@ -1,16 +1,16 @@
 {# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/figures.html' import stat_cards %}
 
-{% block title %}Risk Assessment{% endblock %}
+{% block title %}Open gaps by severity{% endblock %}
 
 {% block breadcrumb %}
 {% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
 {{ breadcrumb_nav(items=[
     {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
     {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Risk Assessment', 'current': true}
+    {'text': 'Open gaps by severity', 'current': true}
 ]) }}
 {% endblock %}
 
@@ -25,35 +25,41 @@
 <div class="flex flex-col space-y-8 animate-in fade-in duration-500">
     <!-- Header -->
     {{ page_header(
-        title='Risk Assessment',
-        description='Assess and mitigate risks across the architecture portfolio.'
+        title='Open gaps by severity',
+        description='The gaps in the register that are still open, ranked by how severe they are.'
     ) }}
 
-    <!-- Risk Summary -->
-    <div class="grid gap-4 md:grid-cols-4">
-        {{ metrics_card(title='Total Gaps', value=gaps|length|default(0), icon='target') }}
-        {{ metrics_card(title='High Risk', value=gaps|selectattr('rated_severity', 'in', ['high', 'critical'])|list|length|default(0), icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
-        {{ metrics_card(title='Medium Risk', value=gaps|selectattr('rated_severity', 'equalto', 'medium')|list|length|default(0), icon='alert-circle', icon_class='!text-warning', value_class='text-warning') }}
-        {{ metrics_card(title='Low Risk', value=gaps|selectattr('rated_severity', 'equalto', 'low')|list|length|default(0), icon='info', icon_class='!text-success', value_class='text-success') }}
-    </div>
+    <!-- Gap summary: each figure counts the open gaps of that severity and opens them in the gap register -->
+    {{ stat_cards([
+        {'label': 'Critical gaps', 'value': counts.critical, 'icon': 'triangle-alert', 'sentence': ('Open gaps rated critical on severity or priority' if counts.critical else 'No open gap is critical'), 'href': (url_for('enterprise.gap_analysis', severity='critical', status='open') if counts.critical else none), 'testid': 'gapsev-critical'},
+        {'label': 'High gaps', 'value': counts.high, 'icon': 'circle-alert', 'sentence': ('Open gaps rated high' if counts.high else 'No open gap is high'), 'href': (url_for('enterprise.gap_analysis', severity='high', status='open') if counts.high else none), 'testid': 'gapsev-high'},
+        {'label': 'Medium gaps', 'value': counts.medium, 'icon': 'info', 'sentence': ('Open gaps rated medium' if counts.medium else 'No open gap is medium'), 'href': (url_for('enterprise.gap_analysis', severity='medium', status='open') if counts.medium else none), 'testid': 'gapsev-medium'},
+        {'label': 'Low gaps', 'value': counts.low, 'icon': 'circle-check', 'sentence': ('Open gaps rated low' if counts.low else 'No open gap is low'), 'href': (url_for('enterprise.gap_analysis', severity='low', status='open') if counts.low else none), 'testid': 'gapsev-low'},
+    ]) }}
+    <p class="text-sm text-muted-foreground" data-testid="gapsev-note">
+        {{ counts.open }} open {{ 'gap' if counts.open == 1 else 'gaps' }}{% if counts.unrated %}, {{ counts.unrated }} with no severity rated yet{% endif %};
+        {{ counts.closed }} resolved {{ 'gap is' if counts.closed == 1 else 'gaps are' }} not listed.
+        {% if counts.open or counts.closed %}<a href="{{ url_for('enterprise.gap_analysis') }}" class="text-primary hover:underline" data-testid="gapsev-register-link">See every gap in the gap register</a>.{% endif %}
+        The risks themselves are on the <a href="{{ url_for('strategic.risk_assessment') }}" class="text-primary hover:underline" data-testid="gapsev-risks-link">Risk assessment page</a>.
+    </p>
 
     <!-- Gaps Table -->
     <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="p-6">
-            <h3 class="font-semibold mb-4">Risk Items</h3>
+            <h3 class="font-semibold mb-4">Open gaps</h3>
             <div class="overflow-x-auto">
                 <table class="dense-table w-full">
                     <thead>
                         <tr class="border-b">
                             <th class="text-left p-3 font-medium">Gap</th>
-                            <th class="text-left p-3 font-medium">Risk Level</th>
+                            <th class="text-left p-3 font-medium">Severity</th>
                             <th class="text-left p-3 font-medium">Status</th>
                             <th class="text-left p-3 font-medium">Owner</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y">
                         {% for gap in gaps|default([]) %}
-                        <tr class="border-b hover:bg-muted/50">
+                        <tr class="border-b hover:bg-muted/50" data-testid="open-gap-row">
                             <td class="p-3">
                                 <div class="font-medium">
                                     {% set _h = row_href('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ gap.name|default('Unnamed gap') }}</a>{% else %}{{ gap.name|default('Unnamed gap') }}{% endif %}
@@ -65,15 +71,15 @@
                                     {% if (gap.rated_severity or '')|lower in ['high', 'critical'] %}bg-destructive/20 text-destructive-emphasis
                                     {% elif (gap.rated_severity or '')|lower == 'medium' %}bg-warning/20 text-warning-emphasis
                                     {% else %}bg-success/20 text-success-emphasis{% endif %}">
-                                    {{ gap.rated_severity|default('—', true)|title }}
+                                    {{ gap.rated_severity|default('Not rated', true)|title }}
                                 </span>
                             </td>
-                            <td class="p-3">{{ gap.resolution_status|default('—', true) }}</td>
-                            <td class="p-3 text-sm text-muted-foreground">{{ gap.owner|default('—', true) }}</td>
+                            <td class="p-3">{{ (gap.resolution_status or 'identified')|replace('_', ' ')|capitalize }}</td>
+                            <td class="p-3 text-sm text-muted-foreground">{{ gap.owner|default('No owner recorded', true) }}</td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="4" class="p-6 text-center text-muted-foreground">No risk items found</td>
+                            <td colspan="4" class="p-6 text-center text-muted-foreground">No open gaps</td>
                         </tr>
                         {% endfor %}
                     </tbody>

@@ -111,7 +111,7 @@ def implementation_dashboard():
         )
 
         # Get critical gaps
-        critical_gaps = gap_register_service.list_gaps(_org_id(), severity="critical", limit=5)
+        critical_gaps = gap_register_service.list_gaps(_org_id(), severity="critical", limit=5, closed=False)
 
         # Get capability implementation summary
         # Maps Capability -> List of Work Packages via Application mapping
@@ -908,8 +908,9 @@ def api_gaps():
         total = None
         if severity:
             # The register's own list and count, so this list and every critical-gap figure are one rule.
-            gaps = gap_register_service.list_gaps(_org_id(), severity=severity, limit=limit)
-            total = gap_register_service.count_gaps(_org_id(), severity=severity)
+            only_open = False if request.args.get("open") else None
+            gaps = gap_register_service.list_gaps(_org_id(), severity=severity, limit=limit, closed=only_open)
+            total = gap_register_service.count_gaps(_org_id(), severity=severity, closed=only_open)
         else:
             query = ImplementationGap.query
             priority = request.args.get("priority")

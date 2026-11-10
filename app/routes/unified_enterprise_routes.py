@@ -482,11 +482,26 @@ def investment_matrix():
 @enterprise_bp.route("/strategic/risk-assessment")
 @login_required
 def risk_assessment():
-    """Risk Assessment"""
-    try:
-        gaps = Gap.query.filter(Gap.gap_kind != "plateau_transition").limit(500).all()
+    """The open gaps of the register by severity.
 
-        return render_template("enterprise/risk_assessment.html", gaps=gaps)
+    The address and the Strategic planning card keep the older name; this page counts gaps, not risks
+    (the risks are on /strategic/risk-assessment), so its title and labels say gaps. Every figure is a
+    count of the register's own query and links to the rows it counts."""
+    try:
+        from app.services.gap_register_service import count_gaps, gap_register_query
+
+        org_id = current_org_id()
+        counts = {level: count_gaps(org_id, severity=level, closed=False) for level in _GAP_SEVERITIES}
+        counts["open"] = count_gaps(org_id, closed=False)
+        counts["unrated"] = counts["open"] - sum(counts[level] for level in _GAP_SEVERITIES)
+        counts["closed"] = count_gaps(org_id, closed=True)
+        rank = case({"low": 1, "medium": 2, "high": 3, "critical": 4}, value=effective_severity_expr(), else_=0)
+        gaps = (
+            gap_register_query(org_id, closed=False).order_by(rank.desc(), Gap.name, Gap.id)
+            .limit(_GAP_PAGE_SIZE).all()
+        )
+
+        return render_template("enterprise/risk_assessment.html", gaps=gaps, counts=counts)
     except SQLAlchemyError as e:
         current_app.logger.error(f"Database error loading risk assessment: {e}")
         raise DatabaseError(
@@ -895,6 +910,10 @@ _GAP_SORT_COLUMNS = {
 }
 
 
+_GAP_STATUS_FILTERS = ("open", "closed", "in_progress")
+_GAP_PAGE_SIZE = 500
+
+
 @enterprise_bp.route("/implementation/gap-analysis")
 @login_required
 def gap_analysis():
@@ -916,15 +935,38 @@ def gap_analysis():
     try:
         from app.services.gap_register_service import count_gaps, gap_register_query, get_gaps_not_addressed
 
-        # ?severity=high lists only the gaps of that severity (the links on Architecture Intelligence)
+        # ?severity=high lists only the gaps of that severity (the links on Architecture Intelligence);
+        # ?status=open|closed|in_progress and ?work=covered|none list the gaps a count card counts.
         severity_filter = (request.args.get("severity") or "").strip().lower()
         if severity_filter not in _GAP_SEVERITIES:
             severity_filter = ""
-        query = gap_register_query(current_org_id(), severity_filter or None)
-        gaps = query.order_by(order, Gap.id).limit(500).all()
-        total_gap_count = count_gaps(current_org_id())
-        closed_gap_count = count_gaps(current_org_id(), closed=True)
-        not_addressed_gaps = get_gaps_not_addressed(current_org_id())
+        status_filter = (request.args.get("status") or "").strip().lower()
+        if status_filter not in _GAP_STATUS_FILTERS:
+            status_filter = ""
+        work_filter = (request.args.get("work") or "").strip().lower()
+        if work_filter not in ("covered", "none"):
+            work_filter = ""
+        org_id = current_org_id()
+        query = gap_register_query(
+            org_id, severity_filter or None,
+            closed={"open": False, "closed": True}.get(status_filter),
+            in_progress=status_filter == "in_progress",
+            has_work_package={"covered": True, "none": False}.get(work_filter),
+        )
+        # Every figure is a count query over the register; the list below is one page of the rows it counts.
+        listed_count = query.order_by(None).count()
+        page_number = safe_int_arg("page", 1, minimum=1)
+        gaps = query.order_by(order, Gap.id).limit(_GAP_PAGE_SIZE).offset((page_number - 1) * _GAP_PAGE_SIZE).all()
+        gap_counts = {
+            "recorded": count_gaps(org_id),
+            "critical": count_gaps(org_id, severity="critical"),
+            "critical_open": count_gaps(org_id, severity="critical", closed=False),
+            "in_progress": count_gaps(org_id, in_progress=True),
+            "resolved": count_gaps(org_id, closed=True),
+        }
+        total_gap_count = gap_counts["recorded"]
+        closed_gap_count = gap_counts["resolved"]
+        not_addressed_gaps = get_gaps_not_addressed(org_id)
         work_packages_by_gap = work_package_service.work_packages_for_gaps(
             [g.id for g in gaps], current_org_id())
 
@@ -933,7 +975,13 @@ def gap_analysis():
             work_packages_by_gap=work_packages_by_gap,
             total_gap_count=total_gap_count,
             closed_gap_count=closed_gap_count,
+            gap_counts=gap_counts,
+            listed_count=listed_count,
+            page_number=page_number,
+            page_size=_GAP_PAGE_SIZE,
             severity_filter=severity_filter,
+            status_filter=status_filter,
+            work_filter=work_filter,
             not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",
             current_dir=direction if direction in ("asc", "desc") else "asc",
@@ -970,7 +1018,9 @@ def ai_architecture_analysis():
         # Count gaps by severity
         from app.services.gap_register_service import count_gaps as _count_gaps
 
-        gaps_by_severity = {level: _count_gaps(current_org_id(), severity=level) for level in _GAP_SEVERITIES}
+        # open gaps only: a resolved gap is not an open one, whatever its severity
+        gaps_by_severity = {
+            level: _count_gaps(current_org_id(), severity=level, closed=False) for level in _GAP_SEVERITIES}
 
         # Applications needing review: the ones marked for review and the ones in their sunset stage, which
         # the recommendations ask a person to plan the retirement of
@@ -1005,7 +1055,7 @@ def ai_architecture_analysis():
                 _active_applications().where(ApplicationComponent.organization_id == current_org_id()).subquery()
             )
         ).scalar_one()
-        total_gaps = count_gaps(current_org_id())
+        total_gaps = count_gaps(current_org_id(), closed=False)
 
         from app.services.priority_action_service import limit_for, prioritised_actions
 

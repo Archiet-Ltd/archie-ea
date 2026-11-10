@@ -569,11 +569,24 @@ def risk_register():
     )
     ctx = _prefetch_risk_context(risks)
     risk_rows = [serialize_risk_row(r, ctx) for r in risks]
+    # ?show=open|mitigated|critical|high|medium|low lists the risks a count card counts: the open risks, the
+    # mitigated ones, or the open risks of one level (the figures of risk_service.level_counts)
+    show = (request.args.get("show") or "").strip().lower()
+    if show == "open":
+        listed_rows = [r for r in risk_rows if r["status"] == "open"]
+    elif show == "mitigated":
+        listed_rows = [r for r in risk_rows if r["status"] == "mitigated"]
+    elif show in ("critical", "high", "medium", "low"):
+        listed_rows = [r for r in risk_rows if r["status"] == "open" and r["risk_level"] == show]
+    else:
+        show, listed_rows = "", risk_rows
     ranked = risk_service.ranked_risks()
     return render_template(
         "governance/risk_register.html",
         risks=risks,
-        risk_rows=risk_rows,
+        show=show,
+        listed_rows=listed_rows,
+        risk_rows=listed_rows,
         grid=heat_data.get("grid", []),
         total=len(risks),
         current_sort=sort_key if sort_key in _RISK_SORT_COLUMNS else "id",

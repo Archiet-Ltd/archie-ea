@@ -22,10 +22,10 @@
                   actions_caller=_risk_actions) }}
 
     {{ stat_cards([
-        {'label': 'Open risks', 'value': counts.open, 'icon': 'shield', 'sentence': 'Still to be treated, as in the risk register', 'testid': 'assess-open'},
-        {'label': 'Critical risks', 'value': counts.critical, 'icon': 'triangle-alert', 'sentence': ('Immediate mitigation required' if counts.critical else 'No open risk is critical'), 'testid': 'assess-critical'},
-        {'label': 'High risks', 'value': counts.high, 'icon': 'circle-alert', 'sentence': ('Elevated risk requiring active treatment' if counts.high else 'No open risk is high'), 'testid': 'assess-high'},
-        {'label': 'Medium risks', 'value': counts.medium, 'icon': 'info', 'sentence': ('Monitor and plan mitigations' if counts.medium else 'No open risk is medium'), 'testid': 'assess-medium'},
+        {'label': 'Open risks', 'value': counts.open, 'icon': 'shield', 'sentence': 'Still to be treated, as in the risk register', 'href': (url_for('risk.risk_register', show='open') if counts.open else none), 'testid': 'assess-open'},
+        {'label': 'Critical risks', 'value': counts.critical, 'icon': 'triangle-alert', 'sentence': ('Immediate mitigation required' if counts.critical else 'No open risk is critical'), 'href': (url_for('risk.risk_register', show='critical') if counts.critical else none), 'testid': 'assess-critical'},
+        {'label': 'High risks', 'value': counts.high, 'icon': 'circle-alert', 'sentence': ('Elevated risk requiring active treatment' if counts.high else 'No open risk is high'), 'href': (url_for('risk.risk_register', show='high') if counts.high else none), 'testid': 'assess-high'},
+        {'label': 'Medium risks', 'value': counts.medium, 'icon': 'info', 'sentence': ('Monitor and plan mitigations' if counts.medium else 'No open risk is medium'), 'href': (url_for('risk.risk_register', show='medium') if counts.medium else none), 'testid': 'assess-medium'},
     ]) }}
 
     {% if closed_count and risk_rows %}

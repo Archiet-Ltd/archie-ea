@@ -615,9 +615,9 @@ class RoadmapBuilderService:
         """Generate gap nodes."""
         nodes = []
 
-        gaps = ImplementationGap.query.filter(
-            ImplementationGap.resolution_status.notin_(["resolved", "closed"])
-        ).all()
+        from app.services.gap_register_service import closed_gap_expr
+
+        gaps = ImplementationGap.query.filter(~db.func.coalesce(closed_gap_expr(), db.false())).all()
 
         for idx, gap in enumerate(gaps):
             node_data = {

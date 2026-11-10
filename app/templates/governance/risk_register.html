@@ -67,24 +67,39 @@
     {# Open and Critical are the one open-risk count the route passes in (risk_service.level_counts):
        a closed or mitigated risk is not current exposure, and the risk assessment shows the same figures. #}
     {% set _mit = risks | selectattr('status.value', 'equalto', 'mitigated') | list | length %}
+    {% macro _count_card(href, testid=none, title=none) -%}
+    {%- set inner = caller() -%}
+    {%- if href -%}<a href="{{ href }}" class="block rounded-lg border border-border bg-card p-4 outline-none hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50"{% if testid %} data-testid="{{ testid }}"{% endif %}>{{ inner }}</a>
+    {%- else -%}<div class="rounded-lg border border-border bg-card p-4"{% if testid %} data-testid="{{ testid }}"{% endif %}>{{ inner }}</div>{%- endif -%}
+    {%- endmacro %}
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="rounded-lg border border-border bg-card p-4">
+        {% call _count_card(url_for('risk.risk_register') if total else none, 'register-card-total') %}
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground">{{ total if total is not none else '—' }}</div>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground" data-testid="register-total">{{ total if total is not none else 'Not available' }}</div>
+            <div class="text-xs text-muted-foreground">Every risk, whatever its status</div>
+        {% endcall %}
+        {% call _count_card(url_for('risk.risk_register', show='open') if counts.open else none, 'register-card-open') %}
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Open</div>
             <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground" data-testid="register-open">{{ counts.open }}</div>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground" title="Open critical risks only -- a closed or mitigated critical does not count as current exposure">Critical</div>
+            <div class="text-xs text-muted-foreground">Still to be treated</div>
+        {% endcall %}
+        {% call _count_card(url_for('risk.risk_register', show='critical') if counts.critical else none, 'register-card-critical') %}
+            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Critical</div>
             <div class="mt-1 text-2xl font-semibold tabular-nums text-destructive-emphasis" data-testid="register-critical">{{ counts.critical }}</div>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
+            <div class="text-xs text-muted-foreground">Open risks at the critical level; a closed or mitigated one is not current exposure</div>
+        {% endcall %}
+        {% call _count_card(url_for('risk.risk_register', show='mitigated') if _mit else none, 'register-card-mitigated') %}
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mitigated</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-success-emphasis">{{ _mit }}</div>
-        </div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-success-emphasis" data-testid="register-mitigated">{{ _mit }}</div>
+            <div class="text-xs text-muted-foreground">Risks marked mitigated</div>
+        {% endcall %}
     </div>
+    {% if show %}
+    <p class="flex flex-wrap items-center gap-2 text-sm" data-testid="register-filter-note">
+        <span class="text-muted-foreground">Showing only {{ 'the open risks' if show == 'open' else 'the mitigated risks' if show == 'mitigated' else 'the open risks at the ' ~ show ~ ' level' }} ({{ risk_rows|length }} of {{ total }}).</span>
+        <a href="{{ url_for('risk.risk_register') }}" class="font-medium text-primary hover:underline" data-testid="register-filter-clear">Show every risk</a>
+    </p>
+    {% endif %}
 
     {# Ranked list: exposure comes from the one impact answer, see risk_service.ranked_risks. #}
     {% if ranked is defined and ranked %}
@@ -137,7 +152,7 @@
     {% endif %}
 
     <div class="rounded-lg border border-border bg-card p-4">
-        <h2 class="text-sm font-semibold text-foreground mb-3">All risks</h2>
+        <h2 class="text-sm font-semibold text-foreground mb-3">{{ 'Risks' if show else 'All risks' }}</h2>
 
         {# Migrated onto the shared data_table component (components/data_table.html)
            instead of a hand-rolled <table class="dense-table"> — it already had search, sort, a

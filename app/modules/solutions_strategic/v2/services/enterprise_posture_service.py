@@ -699,19 +699,14 @@ class EnterprisePostureService:
             WorkPackage.completed_date.is_(None),
         ).count()
 
-        # Gap.resolution_status is a free-form string; count what is explicitly
-        # closed rather than guessing at the open vocabulary, so an unfamiliar
-        # status is treated as open (visible) rather than silently resolved.
-        closed_states = ("resolved", "closed", "complete", "completed")
+        # An open gap is one that is not closed: the register's own meaning (`is_closed`), so an unfamiliar
+        # status is open (visible) rather than silently resolved.
         # D3: exclude interface-register plateau-transition gaps -- this
         # posture metric answers "capability gaps", not interface gaps.
+        from app.services.gap_register_service import closed_gap_expr
+
         _capability_gaps = Gap.query.filter(Gap.gap_kind != "plateau_transition")
-        open_gaps = _capability_gaps.filter(
-            db.or_(
-                Gap.resolution_status.is_(None),
-                db.func.lower(Gap.resolution_status).notin_(closed_states),
-            )
-        ).count()
+        open_gaps = _capability_gaps.filter(~db.func.coalesce(closed_gap_expr(), db.false())).count()
         total_gaps = _capability_gaps.count()
         overdue_gaps = _capability_gaps.filter(
             db.or_(
