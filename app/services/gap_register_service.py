@@ -16,7 +16,7 @@ Contract (docs/adm_phases_d_a_g_e_f_h_tasks.json OA-001):
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, case, func
+from sqlalchemy import case, func
 
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
