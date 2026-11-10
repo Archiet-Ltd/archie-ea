@@ -37,6 +37,20 @@ def test_old_address_lands_on_the_live_page_with_the_query_unchanged(
     assert location.endswith(target + "?" + query), location
 
 
+@pytest.mark.parametrize(
+    "path",
+    ["/", "/account/login", "/dashboard/impact-analysis", "/dashboard/portfolio/gap-analysis", "/no-such-page"],
+)
+def test_a_raw_invalid_byte_in_the_query_is_a_bad_request_on_every_route(app, db_session, make_org, path):
+    client, _org, _apps = _make_logged_in_client(app, db_session, make_org, "rawbyte", app_count=0)
+    signed_in = client.get(path, environ_overrides={"QUERY_STRING": "a=\xff&ref=\xfe"})
+    assert signed_in.status_code == 400, (path, signed_in.status_code)
+    anonymous = app.test_client().get(path, environ_overrides={"QUERY_STRING": "a=\xff"})
+    assert anonymous.status_code == 400, (path, anonymous.status_code)
+    # the same bytes as a browser sends them are still an ordinary request
+    assert client.get(path + "?a=%FF").status_code != 400
+
+
 def test_old_address_without_a_query_adds_none(app, db_session, make_org):
     client, _org, _apps = _make_logged_in_client(app, db_session, make_org, "redirq", app_count=0)
     assert _location(client, "/dashboard/impact-analysis").endswith("/enterprise/analysis/impact-analysis")

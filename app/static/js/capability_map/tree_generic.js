@@ -113,9 +113,7 @@ document.addEventListener('alpine:init', () => {
             const flatten = (node, parentPath) => {
                 const safeName = (node.name || '').replace(/\//g, '|');
                 const path = parentPath ? `${parentPath}/${safeName}` : safeName;
-                if (parentPath) {
-                    links.push(path);
-                }
+                links.push(path);  // every capability is drawn and counted, the top level included
                 if (node.id) {
                     nodeByName[safeName] = node;
                 }
@@ -129,12 +127,6 @@ document.addEventListener('alpine:init', () => {
 
             for (const root of pruned.children) {
                 flatten(root, '');
-            }
-
-            if (links.length === 0 && pruned.children.length > 0) {
-                for (const root of pruned.children) {
-                    links.push((root.name || '').replace(/\//g, '|'));
-                }
             }
 
             this.visibleCount = links.length;
