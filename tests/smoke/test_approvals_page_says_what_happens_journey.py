@@ -39,6 +39,26 @@ def _out_of_loop_record(org_id, user_id, summary):
         return out
 
 
+def _pre_loop_record(org_id, user_id, application_name):
+    """A change recorded before automatic review: no rubric version, no review event, never swept."""
+    from app import db
+
+    app = _app_context()
+    with app.app_context():
+        from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
+
+        row = create_approval_record(
+            organization_id=org_id, operation_type="tool_use", entity_type="update_application_status",
+            original_command="old request",
+            operation_payload={"application_name": application_name, "new_status": "production",
+                               "rationale": "Asked for before automatic review"},
+            summary="Old change to %s" % application_name, user_id=user_id)
+        db.session.commit()
+        out = row.id
+        db.session.remove()
+        return out
+
+
 def _record_checks(approval_id):
     """Give a waiting change the checks the server records first, as a change that has been looked at once has."""
     from app import db
@@ -65,11 +85,12 @@ def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_s
     email = "founder.%s@example.com" % uuid.uuid4().hex[:8]
     name = "Atlas %s" % uuid.uuid4().hex[:6]
     checked_name = "Borealis %s" % uuid.uuid4().hex[:6]
+    old_name = "Cirrus %s" % uuid.uuid4().hex[:6]
     context = _context(browser, width, theme)
     page = context.new_page()
     try:
         _sign_up(page, base, email)
-        ws = _workspace_of(email, [name, checked_name])
+        ws = _workspace_of(email, [name, checked_name, old_name])
 
         page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         body = page.locator("main").inner_text()
@@ -84,6 +105,7 @@ def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_s
         colleague = _second_person(ws["org_id"], switched_off=False)
         own_id = _out_of_loop_record(ws["org_id"], ws["user_id"], "Charter change asked for by the founder")
         theirs_id = _out_of_loop_record(ws["org_id"], colleague, "Charter change asked for by a colleague")
+        pre_loop_id = _pre_loop_record(ws["org_id"], colleague, old_name)
 
         page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         # While writes are paused every change in the loop waits, and says so; none claims a settlement and
@@ -95,6 +117,19 @@ def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_s
             expect(card.get_by_test_id("approval-held-%d" % approval_id)).to_contain_text("once they resume")
             expect(card.get_by_test_id("approval-in-review-%d" % approval_id)).to_have_count(0)
             expect(card.get_by_role("button", name="Approve")).to_have_count(0)
+        # Only the change with a check on record offers the link to how it was checked.
+        expect(page.get_by_test_id("approval-card-%d" % checked_id).get_by_role("link", name="See how it was checked")).to_have_count(1)
+        expect(page.get_by_test_id("approval-card-%d" % older_id).get_by_role("link", name="See how it was checked")).to_have_count(0)
+        # A row recorded before automatic review says nothing has checked it; it does not promise a check or
+        # a review, and it has no link to a check that was never made.
+        pre = page.get_by_test_id("approval-card-%d" % pre_loop_id)
+        expect(pre).to_be_visible()
+        expect(pre.get_by_test_id("approval-pre-loop-%d" % pre_loop_id)).to_contain_text("recorded before changes by the assistant were checked")
+        expect(pre.get_by_test_id("approval-pre-loop-%d" % pre_loop_id)).to_contain_text("nothing has checked it")
+        expect(pre.get_by_test_id("approval-held-%d" % pre_loop_id)).to_have_count(0)
+        expect(pre.get_by_role("link", name="See how it was checked")).to_have_count(0)
+        expect(pre.get_by_role("button", name="Approve")).to_have_count(0)
+        _shot(page, shots, "approvals-pre-loop-paused", theme)
         own = page.get_by_test_id("approval-card-%d" % own_id)
         expect(own).to_be_visible()
         expect(own.get_by_role("button", name="Approve")).to_have_count(0)
@@ -121,6 +156,18 @@ def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_s
         checked = page.get_by_test_id("approval-card-%d" % checked_id)
         expect(checked.get_by_test_id("approval-in-review-%d" % checked_id)).to_contain_text(
             "applied or declined without waiting")
+        # Outside a pause the person's own record has no Approve and says another person approves it; a
+        # colleague's record of the same kind has Approve.
+        own = page.get_by_test_id("approval-card-%d" % own_id)
+        expect(own).to_be_visible()
+        expect(own.get_by_role("button", name="Approve")).to_have_count(0)
+        expect(own.get_by_test_id("approval-own-request-%d" % own_id)).to_contain_text("another person")
+        theirs = page.get_by_test_id("approval-card-%d" % theirs_id)
+        expect(theirs.get_by_role("button", name="Approve")).to_have_count(1)
+        _shot(page, shots, "approvals-own-and-colleague", theme)
+        pre = page.get_by_test_id("approval-card-%d" % pre_loop_id)
+        expect(pre.get_by_test_id("approval-pre-loop-%d" % pre_loop_id)).to_contain_text("nothing has checked it")
+        expect(pre.get_by_test_id("approval-in-review-%d" % pre_loop_id)).to_have_count(0)
         older = page.get_by_test_id("approval-card-%d" % older_id)
         expect(older.get_by_test_id("approval-in-review-%d" % older_id)).to_have_count(0)
         expect(older.get_by_test_id("approval-held-%d" % older_id)).to_have_count(0)
@@ -137,6 +184,10 @@ def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_s
         checked.get_by_role("link", name="See how it was checked").click()
         page.wait_for_url(re.compile(r"approval=%d" % checked_id), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("review-record-checks")).to_contain_text("The application was found in this workspace")
+        # After resume the record no longer says writes are paused, whatever the last sweep recorded.
+        expect(page.get_by_test_id("review-record-waiting")).to_have_count(0)
+        assert "paused" not in page.get_by_test_id("review-record-verdict").locator("xpath=ancestor::*[1]").inner_text()
+        _shot(page, shots, "resumed-record", theme)
 
         # The person's Approve goes through the review and the change is applied once.
         page.goto(base + "/ai-chat/approvals/inbox?approval=%d" % older_id, wait_until="domcontentloaded",
