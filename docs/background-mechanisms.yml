@@ -114,6 +114,15 @@ mechanisms:
   disposition: keep
   tenant_context: request's organisation, captured before the thread starts and re-set inside it
 - kind: thread
+  file: app/modules/ai_chat/services/agent_runner.py
+  entry: AgentRunner._read_within_turn
+  purpose: Runs one provider read so the turn's wall clock can end it; the waiting thread gives up on it at
+    the deadline and the read is dropped
+  class: request-helper
+  disposition: keep
+  tenant_context: 'none: the read holds only the provider call; the organisation is resolved and the
+    provider guard run on the turn thread before it starts'
+- kind: thread
   file: app/modules/architecture/routes/archimate_routes.py
   entry: _run_archimate_llm_generation
   purpose: Runs model generation on a single-worker pool with a timeout

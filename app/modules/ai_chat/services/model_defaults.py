@@ -120,7 +120,7 @@ MISTRAL_CHAT_URL = "https://api.mistral.ai/v1/chat/completions"
 # before it, so the reply has time to reach the screen and the person sees a result within the budget.
 PROVIDER_FIRST_TOKEN_SECONDS = 25.0
 CHAT_TURN_BUDGET_SECONDS = 60.0
-CHAT_TURN_MARGIN_SECONDS = 6.0
+CHAT_TURN_MARGIN_SECONDS = 8.0
 
 
 def is_free_model(provider: str, model: str = "") -> bool:

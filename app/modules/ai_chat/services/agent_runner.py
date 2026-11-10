@@ -1315,7 +1315,7 @@ class AgentRunner:
         if reason is not None:
             read.abandoned = True
             if closer is not None:
-                threading.Thread(target=_quietly, args=(closer,), daemon=True).start()
+                _quietly(closer)
             raise TimeoutError(reason)
         if read.error is not None:
             raise read.error
