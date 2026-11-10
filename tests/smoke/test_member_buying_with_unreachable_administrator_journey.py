@@ -126,6 +126,8 @@ def test_a_member_whose_administrator_has_no_name_sees_the_address_once(browser,
             assert people["gone_a"] not in body and people["member_a"] not in body
             reach = page.get_by_role("link", name="Email " + address)
             expect(reach).to_have_attribute("href", "mailto:" + address)
+            box = reach.bounding_box()
+            assert box["x"] >= 0 and box["x"] + box["width"] <= width, "the email button runs off the screen"
             _shot(page, "member-buy-nameless-admin", width, scheme)
         finally:
             context.close()
