@@ -116,13 +116,15 @@
     }
 
     /* Names and addresses the model wrote between backticks are code, not text with backticks in it:
-       a stray backtick is removed, and an answer address becomes a link to that answer. */
+       no backtick is drawn around them, a stray one is removed, and an answer address becomes a link to that answer. */
     function tidyAnswerMarkup(html) {
         var holder = document.createElement('div');
         holder.innerHTML = html;
         holder.querySelectorAll('code').forEach(function (c) {
             var t = c.textContent.replace(/^[\s`]+|[\s`]+$/g, '');
             c.textContent = t;
+            // The answer style draws a backtick before and after code; a name reads as a name.
+            if (!c.closest('pre')) c.classList.add('not-prose', 'font-mono', 'font-semibold', 'break-all');
             if (/^\/intelligence\/answers\/[0-9a-f]{16,}$/i.test(t) && !c.closest('a')) {
                 var a = document.createElement('a');
                 a.setAttribute('href', t);

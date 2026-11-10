@@ -188,6 +188,13 @@ def test_a_cited_answer_shows_no_backticks_or_reference_text_and_its_links_open_
     expect(message).to_contain_text("The service is recorded", timeout=PAGE_TIMEOUT)
     shown = message.inner_text()
     assert "`" not in shown and "[ref:" not in shown, shown
+    # What the page draws, not only the text: the answer style can add a backtick around code.
+    drawn = message.evaluate(
+        """el => Array.from(el.querySelectorAll('code')).map(c => [
+            getComputedStyle(c, '::before').content, getComputedStyle(c, '::after').content])"""
+    )
+    assert drawn, "no names were shown as code"
+    assert all("`" not in before and "`" not in after for before, after in drawn), drawn
     assert "docker-compose.yml" in shown and "Archiet-Ltd/archie-ea" in shown
     links = message.locator("a")
     hrefs = [links.nth(i).get_attribute("href") for i in range(links.count())]
