@@ -448,49 +448,32 @@
         };
 
         try {
-            const persona = state.currentPersona || '';
-            const data = await Platform.fetch.get('/ai-chat/recommendations', { persona: persona }, { silent: true });
-            // Platform.fetch.get throws on non-ok responses, so we only reach here on success.
-
-            const alerts = Array.isArray(data.alerts) ? data.alerts : [];
-
-            /* A card is a question about one application in this organisation's own records, because
-               only a question that names a recorded element is answered from the records with its
-               sources. Findings that name an application come first; the rest of the four are the
-               organisation's other applications. Generic programme advice is not a question about
-               the records and never becomes a card. */
-            const named = alerts.filter((it) => it.entity_name);
-            const seen = new Set(named.map((it) => it.entity_name));
-            const questions = named.map((it) => ({
-                question: 'What breaks if ' + it.entity_name + ' fails?',
-                detail: it.description || it.detail || ''
-            }));
-            if (questions.length < 4) {
-                try {
-                    const list = await Platform.fetch.get('/applications/api/list',
-                        { per_page: 12, sort: 'relevance' }, { silent: true });
-                    const apps = Array.isArray(list) ? list : (list && (list.applications || list.items)) || [];
-                    apps.forEach((a) => {
-                        if (questions.length < 4 && a && a.name && !a.unpromoted_import && !seen.has(a.name)) {
-                            seen.add(a.name);
-                            questions.push({ question: 'What breaks if ' + a.name + ' fails?', detail: '' });
-                        }
-                    });
-                } catch (listErr) {
-                    /* swallow-ok: the cards are a convenience; the findings above still stand and the box below still works */
-                }
+            /* A card is a question about one application in this organisation's own records, and only an
+               application with recorded relationships has an answer that cites where its links were read
+               from, most connected first (the server chooses them, through the overview's own reader). An
+               organisation with fewer than four such applications is offered fewer application questions and
+               general ones for the rest: never a question whose answer is that nothing is recorded. */
+            /* Platform.fetch.get throws on a non-ok response, so an outage reaches the error below. */
+            const offered = await Platform.fetch.get('/ai-chat/first-questions', {}, { silent: true });
+            const linked = Array.isArray(offered && offered.questions) ? offered.questions : [];
+            const questions = linked.slice(0, 4);
+            const general = [
+                { question: 'What should a startup write down about its software first?', detail: '' },
+                { question: 'Which architecture decisions are worth recording early?', detail: '' },
+                { question: 'When does a monolith stop being enough?', detail: '' },
+                { question: 'What should a first architecture review cover?', detail: '' }
+            ];
+            if (questions.length > 0) {
+                general.forEach((item) => {
+                    if (questions.length < 4) questions.push(item);
+                });
             }
             const shown = questions.slice(0, 4);
 
             const startupSteps = document.getElementById('startup-first-steps');
             if (shown.length === 0 && startupSteps) {
                 /* A startup with nothing recorded: the next step first, then four questions that need no records. */
-                const startupQuestions = [
-                    { question: 'What should a startup write down about its software first?', detail: '' },
-                    { question: 'Which architecture decisions are worth recording early?', detail: '' },
-                    { question: 'When does a monolith stop being enough?', detail: '' },
-                    { question: 'What should a first architecture review cover?', detail: '' }
-                ];
+                const startupQuestions = general;
                 done('<div data-startup-next-step></div>' +
                     '<div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">' + cardRows(startupQuestions) + '</div>' +
                     '<p class="mt-3 text-center text-xs text-muted-foreground">General questions to start with. Once your applications are in, these become questions about them.</p>');
@@ -520,20 +503,14 @@
                 return;
             }
 
-            const total = (data.summary && typeof data.summary.total === 'number')
-                ? data.summary.total : null;
-            const scope = total === null
-                ? named.length + (named.length === 1 ? ' item' : ' items')
-                : named.length + ' of ' + total + ' open finding' + (total === 1 ? '' : 's');
-
             const rows = cardRows(shown);
 
             done(
                 '<div class="grid grid-cols-1 gap-3 md:grid-cols-2">' + rows + '</div>' +
                 '<p class="mt-3 text-center text-xs text-muted-foreground">' +
-                  (named.length
-                    ? 'Questions from your own records: ' + ArchieChat.render.escapeForHtml(scope) + ', ranked by impact'
-                    : 'Questions about the applications in your records') + '</p>'
+                  (linked.length < 4
+                    ? 'Linked applications first, then general questions.'
+                    : 'Questions about your most connected applications') + '</p>'
             );
 
             host._items = shown;

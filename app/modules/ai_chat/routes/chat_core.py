@@ -299,6 +299,15 @@ def get_available_models():
         )
 
 
+def _waited_seconds(data) -> float:
+    """Seconds the person has already waited for this question, as the browser measured them from the send
+    (the stored-answer lookup comes first). The turn's budget is what is left of one minute."""
+    value = data.get("waited_seconds") if isinstance(data, dict) else None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0.0
+    return min(max(float(value), 0.0), 600.0)
+
+
 def _load_history(thread_id, user_id):
     """Prior turns of *thread_id*, oldest first, or [] when there are none.
 
@@ -408,6 +417,10 @@ def send_message():
     if isinstance(data, dict) and "thread_id" in data:
         data = dict(data)
         data.pop("thread_id", None)
+    waited_seconds = _waited_seconds(data)
+    if isinstance(data, dict) and "waited_seconds" in data:
+        data = dict(data)
+        data.pop("waited_seconds", None)
 
     # T-031: marshmallow schema validation
     _schema = ChatMessageSchema()
@@ -637,6 +650,7 @@ def send_message():
             persona=persona,
             requested_model=requested_model,
             history=_load_history(incoming_thread_id, current_user.id),
+            waited_seconds=waited_seconds,
         )
 
         # ENH-018: Populate junction tables if agent result includes design_output
@@ -865,6 +879,10 @@ def send_message_stream():
     if isinstance(data, dict) and "thread_id" in data:
         data = dict(data)
         data.pop("thread_id", None)
+    waited_seconds = _waited_seconds(data)
+    if isinstance(data, dict) and "waited_seconds" in data:
+        data = dict(data)
+        data.pop("waited_seconds", None)
 
     _schema = ChatMessageSchema()
     _validated, _err = _load_and_validate(_schema, data)
@@ -994,6 +1012,7 @@ def send_message_stream():
                     requested_model=requested_model or None,
                     stream_mode=True,
                     history=history_for_thread,
+                    waited_seconds=waited_seconds,
                 )
                 # Persist this turn (thread-backed history rail). Always on;
                 # never breaks the stream. thread_id rides back on the done event.

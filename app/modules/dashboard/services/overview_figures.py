@@ -238,6 +238,22 @@ def _sourced_share(org_id):
     }
 
 
+def relationship_ends(org_id):
+    """How many recorded relationships touch each element of the organisation (an element at
+    both ends of one relationship counts it once). The one count the overview's "most
+    connected" line and the chat's first questions both read."""
+    from app.models import ArchiMateRelationship as R
+
+    ends = Counter()
+    for source_id, target_id in db.session.execute(
+        db.select(R.source_id, R.target_id).where(R.organization_id == org_id)
+    ):
+        ends[source_id] += 1
+        if target_id != source_id:
+            ends[target_id] += 1
+    return ends
+
+
 def _relationships(org_id, now):
     from app.models import ArchiMateElement as E
     from app.models import ArchiMateRelationship as R
@@ -255,13 +271,7 @@ def _relationships(org_id, now):
             AuditLog.created_at >= since,
         )
     ).scalar_one()
-    ends = Counter()
-    for source_id, target_id in db.session.execute(
-        db.select(R.source_id, R.target_id).where(R.organization_id == org_id)
-    ):
-        ends[source_id] += 1
-        if target_id != source_id:
-            ends[target_id] += 1
+    ends = relationship_ends(org_id)
     top = None
     if ends:
         element_id, count = max(ends.items(), key=lambda item: (item[1], -item[0]))

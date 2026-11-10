@@ -92,11 +92,72 @@
        where the payload is model output or extracted document content.
        Falls back to escaped plain text if DOMPurify is unavailable - degraded
        formatting is an acceptable outcome; unsanitised HTML is not. */
-    function renderMarkdown(text) {
+    function renderMarkdown(text, sources) {
         if (window.DOMPurify && window.marked) {
-            return DOMPurify.sanitize(marked.parse(text == null ? '' : String(text)));
+            var raw = referencesAsLinks(text == null ? '' : String(text), sources);
+            return externalLinksInNewTab(tidyAnswerMarkup(DOMPurify.sanitize(marked.parse(raw))));
         }
         return escapeForHtml(text);
+    }
+
+    /* The model marks each record it relied on as [ref:<id>]. A reader sees a link, not the marker:
+       to the record's page when the turn's sources name it, otherwise to the stored answer (an
+       address) or the answer about that element (a number). */
+    function referencesAsLinks(text, sources) {
+        return text.replace(/\[ref:([^\]\s]+)\]/gi, function (_all, id) {
+            var found = (Array.isArray(sources) ? sources : []).filter(function (s) { return s && String(s.id) === id && s.url; })[0];
+            var url = found ? found.url
+                : /^[0-9a-f]{16,}$/i.test(id) ? '/intelligence/answers/' + id
+                : /^\d+$/.test(id) ? '/intelligence/answers/element/' + id
+                : '';
+            if (!url) return '';
+            return '[' + (found && found.name ? String(found.name).replace(/[\[\]]/g, '') : 'View the record') + '](' + url + ')';
+        });
+    }
+
+    /* Names and addresses the model wrote between backticks are code, not text with backticks in it:
+       no backtick is drawn around them, a stray one is removed, and an answer address becomes a link to that answer. */
+    function tidyAnswerMarkup(html) {
+        var holder = document.createElement('div');
+        holder.innerHTML = html;
+        holder.querySelectorAll('code').forEach(function (c) {
+            var t = c.textContent.replace(/^[\s`]+|[\s`]+$/g, '');
+            c.textContent = t;
+            // The answer style draws a backtick before and after code; a name reads as a name.
+            if (!c.closest('pre')) c.classList.add('not-prose', 'font-mono', 'font-semibold', 'break-all');
+            if (/^\/intelligence\/answers\/[0-9a-f]{16,}$/i.test(t) && !c.closest('a')) {
+                var a = document.createElement('a');
+                a.setAttribute('href', t);
+                a.className = 'underline hover:no-underline';
+                c.parentNode.insertBefore(a, c);
+                a.appendChild(c);
+            }
+        });
+        var walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
+        var node;
+        while ((node = walker.nextNode())) {
+            if (node.nodeValue.indexOf('`') !== -1 && !(node.parentNode.closest && node.parentNode.closest('pre'))) {
+                node.nodeValue = node.nodeValue.replace(/`/g, '');
+            }
+        }
+        return holder.innerHTML;
+    }
+
+    /* A link in an answer that leaves this site (a file on GitHub, a source page) opens in
+       a new tab, marked noopener noreferrer, so reading a citation never replaces the
+       conversation. Links within the product stay where they are. */
+    function externalLinksInNewTab(html) {
+        var holder = document.createElement('div');
+        holder.innerHTML = html;
+        holder.querySelectorAll('a[href]').forEach(function (a) {
+            var url;
+            try { url = new URL(a.getAttribute('href'), window.location.href); } catch (e) { return; }
+            if ((url.protocol === 'http:' || url.protocol === 'https:') && url.origin !== window.location.origin) {
+                a.setAttribute('target', '_blank');
+                a.setAttribute('rel', 'noopener noreferrer');
+            }
+        });
+        return holder.innerHTML;
     }
 
     /* Records the answer was actually built from.
@@ -427,8 +488,11 @@
        survives a copy edit to agent_runner.py's fallback strings. */
     /* The way to the provider settings is a secondary link for an administrator
        only; the page sets window.chatIsAdmin from the same check the sidebar uses. */
-    function adminProviderLink() {
+    function adminProviderLink(ownKeyOnly) {
         if (!window.chatIsAdmin) return '';
+        /* A failed reply points to the keys only when the organisation has its own key to look at;
+           on the built-in AI there is nothing there to fix. */
+        if (ownKeyOnly && !window.chatOwnKeyAdmin) return '';
         return '<a href="/admin/api-settings" data-testid="chat-provider-settings-link" class="mt-1 inline-flex items-center gap-1 underline hover:no-underline">Check the AI provider settings</a>';
     }
 
@@ -439,7 +503,7 @@
                    '<i data-lucide="alert-circle" class="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true"></i>' +
                    '<div class="flex-1">' +
                      '<div class="font-medium">This reply could not be completed as requested.</div>' +
-                     adminProviderLink() +
+                     adminProviderLink(true) +
                    '</div>' +
                  '</div>' +
                '</div>';
@@ -526,7 +590,7 @@
         var bubble = isAi
             ? '<div class="rounded-xl ' + (isAiError ? 'bg-destructive/10 text-destructive-emphasis' : 'bg-muted/50') + ' p-4 text-sm prose max-w-3xl">' +
                 renderMetaBadge(metadata) +
-                '<div class="message-content">' + renderMarkdown(text) + '</div>' +
+                '<div class="message-content">' + renderMarkdown(text, metadata.sources) + '</div>' +
                 renderAnswerFooter(metadata) +
               '</div>'
             : '<div class="rounded-xl bg-primary text-primary-foreground p-4 text-sm max-w-3xl">' +
@@ -618,7 +682,7 @@
             '<div class="flex items-start gap-2">' +
               '<i data-lucide="alert-circle" class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"></i>' +
               '<div class="flex-1"><p>' + escapeForHtml(message) + '</p>' +
-                (o.adminLink ? adminProviderLink() : '') +
+                (o.ownKeyLink ? adminProviderLink(true) : o.adminLink ? adminProviderLink() : '') +
               '</div>' +
               (onRetry ? '<button type="button" class="js-retry inline-flex items-center rounded-md border border-input bg-background px-3 py-1 text-xs font-medium hover:bg-accent">Retry</button>' : '') +
             '</div>';
@@ -700,7 +764,7 @@
     function applyGenomeAnswer(el, html) {
         var body = el.querySelector('.message-content');
         if (!body || !window.DOMPurify) return false;
-        body.innerHTML = DOMPurify.sanitize(html);
+        body.innerHTML = externalLinksInNewTab(DOMPurify.sanitize(html));
         el.setAttribute('data-testid', 'genome-answer');
         return true;
     }
@@ -709,7 +773,7 @@
         if (!el) return null;
         meta = meta || {};
         var body = el.querySelector('.message-content');
-        if (body) body.innerHTML = renderMarkdown(text);
+        if (body) body.innerHTML = renderMarkdown(text, meta.sources);
         if (meta.genomeHtml) applyGenomeAnswer(el, meta.genomeHtml);
         var caret = el.querySelector('.stream-caret');
         if (caret) caret.remove();

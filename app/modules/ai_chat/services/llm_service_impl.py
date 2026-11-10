@@ -137,7 +137,7 @@ class AnswersPaused(ValueError):
         super().__init__(PAUSED_MESSAGE if not detail else "%s (%s)" % (PAUSED_MESSAGE, detail))
 
 # from .llm_validator import LLMValidator  # Temporarily disabled
-from app.services.core.retry_handler import retry_on_transient_error
+from app.services.core.retry_handler import one_attempt, retry_on_transient_error
 from app.services.llm_cost_tracker import LLMCostTracker
 from app.utils.tracing import traced_model_call
 from app.services.llm_model_router import LLMModelRouter, TaskComplexity
@@ -2025,9 +2025,14 @@ Output clean, executable test code."""
         timeout: Optional[float] = None,
         public_input: bool = False,
         max_tokens: Optional[int] = None,
+        time_limit: Optional[float] = None,
     ) -> str:
         """
         Generic method to generate content from any prompt with caching.
+
+        ``time_limit`` is the most seconds the whole call may take. With it, each provider is tried once
+        (no retries), each attempt is cut to the time left, and no further provider is tried once the time
+        is spent; the call then raises. Without it the call behaves as it always did.
 
         ``public_input=True`` marks a prompt that carries only public text (a company's own website):
         it is answered through the public-input chain (free providers first, Gemini Flash last) and is
@@ -2063,15 +2068,29 @@ Output clean, executable test code."""
                 return cached_response
 
         # Call LLM if not cached
-        response, interaction = LLMService._call_llm(
-            prompt=prompt,
-            model=model,
-            provider=provider,
-            pipeline_stage_id=pipeline_stage_id,
-            expected_schema=expected_schema,
-            job_id=job_id,
-            timeout=timeout,
-        )
+        if time_limit is None:
+            response, interaction = LLMService._call_llm(
+                prompt=prompt,
+                model=model,
+                provider=provider,
+                pipeline_stage_id=pipeline_stage_id,
+                expected_schema=expected_schema,
+                job_id=job_id,
+                timeout=timeout,
+            )
+        else:
+            deadline = time.monotonic() + max(0.0, float(time_limit))
+            with one_attempt():
+                response, interaction = LLMService._call_llm(
+                    prompt=prompt,
+                    model=model,
+                    provider=provider,
+                    pipeline_stage_id=pipeline_stage_id,
+                    expected_schema=expected_schema,
+                    job_id=job_id,
+                    timeout=timeout,
+                    deadline=deadline,
+                )
 
         # Cache the response
         if use_cache:
@@ -2431,6 +2450,11 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             _already_tried = []
         _already_tried = list(_already_tried) + [provider]
 
+        if deadline is not None and not public_input:
+            if time.monotonic() >= deadline:
+                raise TimeoutError("The time allowed for this call is spent.")
+            timeout = LLMService._within(timeout, deadline)
+
         # Get all available API keys
         api_keys = LLMService._get_all_api_keys(provider)
         
@@ -2455,6 +2479,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         
         # Try each API key in sequence
         for idx, api_key in enumerate(api_keys):
+            if deadline is not None and not public_input and idx:
+                if time.monotonic() >= deadline:
+                    break  # the caller's time is spent: no further key is tried
+                timeout = LLMService._within(timeout, deadline)
             try:
                 logger.info(f"Trying API key #{idx + 1} for {provider}...")
                 
@@ -2621,6 +2649,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             # Skip providers we've already tried in this call chain to prevent infinite loops
             if fallback_provider in _already_tried:
                 continue
+            if deadline is not None and not public_input and time.monotonic() >= deadline:
+                break  # the caller's time is spent: no further provider is asked
             fallback_keys = LLMService._get_all_api_keys(fallback_provider)
             if not fallback_keys:
                 continue
@@ -2702,6 +2732,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         timeout: Optional[float] = None,
         prompt_version: Optional[str] = None,
         retention_setting: Optional[str] = None,
+        deadline: Optional[float] = None,
     ) -> Tuple[str, LLMInteraction]:
         """
         Internal method to call LLM API and track the interaction.
@@ -2768,6 +2799,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 organization_id=organization_id,
                 prompt_version=prompt_version,
                 retention_setting=retention_setting,
+                deadline=deadline,
             )
         except RuntimeError as e:
             # All API keys failed
@@ -2784,6 +2816,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 or "api usage" in error_str
             )
             
+            if is_credit_error and deadline is not None and time.monotonic() >= deadline:
+                is_credit_error = False  # the caller's time is spent: report the failure, ask nobody else
+
             if is_credit_error:
                 logger.warning(f"🔄 Attempting cross-provider fallback after all {provider} keys failed...")
                 try:
@@ -2809,6 +2844,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                         timeout=timeout,
                         prompt_version=prompt_version,
                         retention_setting=retention_setting,
+                        deadline=deadline,
                     )
                 except ValueError as fallback_error:
                     logger.error(f"❌ No alternative provider available: {fallback_error}")
