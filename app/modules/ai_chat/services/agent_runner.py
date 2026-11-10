@@ -780,11 +780,6 @@ class AgentRunner:
         from app.modules.ai_chat.services import model_defaults
 
         self._turn_id = str(_uuid.uuid4())
-        self._already_done = {
-            self._change_key(item.get("tool"), item.get("arguments"))
-            for item in (already_done or [])
-            if isinstance(item, dict)
-        }
         self._recorded = []
         if retry:
             from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
@@ -792,6 +787,13 @@ class AgentRunner:
             self._recorded = AIChatApprovalService(self.user_id).recorded_changes(
                 [self.chat_session_id, "chat_user_%s" % self.user_id]
             )
+        # Changes a caller in this process says an earlier try already made are matched the same way.
+        self._recorded += [
+            {"approval_id": None, "tool": item["tool"], "arguments": item.get("arguments") or {}, "summary": "",
+             "applied": True}
+            for item in (already_done or [])
+            if isinstance(item, dict) and isinstance(item.get("tool"), str)
+        ]
         _budget = float(model_defaults.CHAT_TURN_BUDGET_SECONDS) - float(model_defaults.CHAT_TURN_MARGIN_SECONDS)
         self._turn_deadline = time.monotonic() + max(
             min(10.0, _budget), _budget - max(0.0, float(waited_seconds or 0.0))
@@ -1062,18 +1064,7 @@ class AgentRunner:
                 )
                 schema = TOOL_SCHEMA_BY_NAME.get(tc.name, {})
 
-                if (
-                    tc.name in offered_tools
-                    and tc.name in _MUTATING_TOOLS
-                    and self._change_key(tc.name, tc.arguments) in self._already_done
-                ):
-                    # An earlier try of this question made this change before it stopped: a retry reports
-                    # it as done and does not make it again.
-                    result = {
-                        "success": True,
-                        "message": "This change was already made before the retry; it was not made again.",
-                    }
-                elif tc.name in offered_tools and tc.name in _MUTATING_TOOLS and self._recorded_match(tc):
+                if tc.name in offered_tools and tc.name in _MUTATING_TOOLS and self._recorded_match(tc):
                     # An earlier try recorded this change for this conversation: it is not recorded again.
                     recorded = self._recorded_match(tc)
                     result = {
@@ -1882,11 +1873,6 @@ class AgentRunner:
             if AIChatApprovalService.same_change(tc.name, tc.arguments, change["tool"], change["arguments"]):
                 return change
         return None
-
-    @staticmethod
-    def _change_key(tool, arguments) -> tuple:
-        """One change, named by the tool and its arguments, comparable between a try and its retry."""
-        return (str(tool or ""), json.dumps(arguments or {}, sort_keys=True, default=str))
 
     def _stopped(self, reason: str, busy: bool, actions_taken: list, required_actions: list,
                  pending_approvals: list, sources: list) -> dict:
