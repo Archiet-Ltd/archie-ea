@@ -31,7 +31,7 @@ NEXT_STEP = "Ask me to list the records behind this question to see the exact fi
 SIZES = [("1440", {"width": 1440, "height": 900}), ("390", {"width": 390, "height": 844})]
 
 # What the peer says; set by each test before it asks: the plan for each question asked.
-SCRIPT = {"plan": {}, "seen": []}
+SCRIPT = {"plan": {}, "seen": [], "stale": None, "remembered": None}
 
 
 def _find_figure(text, field, name=None):
@@ -87,10 +87,17 @@ class _Provider(BaseHTTPRequestHandler):
             if spec.startswith("summary:"):
                 found = re.search(r'\[fig:(F\d+)\] reads "(%s[^"]*)"' % spec[len("summary:"):], system)
                 key, reads = found.group(1), found.group(2)
+            elif "#" in spec:
+                # "total#1": the figure of that name in the second tool result of the turn.
+                field, _, nth = spec.partition("#")
+                got = _find_figure(tool_results[int(nth)], field)
+                key, reads = got["fig"], got["reads"]
             else:
                 field, _, name = spec.partition(":")
                 got = next((_find_figure(r, field, name or None) for r in tool_results if r), None)
                 key, reads = got["fig"], got["reads"]
+            if SCRIPT.get("stale") and spec == SCRIPT["stale"]:
+                return "[fig:%s]" % SCRIPT["remembered"]
             return reads if as_text else "[fig:%s]" % key
 
         return re.sub(r"\{fig:([^}]+)\}", figure, template)
@@ -105,17 +112,26 @@ class _Provider(BaseHTTPRequestHandler):
         entry = next(v for q, v in plan.items() if q in str(messages[index].get("content")))
         later = messages[index + 1:]
         revising = any(m.get("role") == "user" for m in later)
-        if entry.get("tool") and not any(m.get("role") == "tool" for m in later):
+        tools = entry.get("tools") or ([entry["tool"]] if entry.get("tool") else [])
+        done = sum(1 for m in later if m.get("role") == "tool")
+        if done < len(tools):
             SCRIPT["seen"].append("lookup")
-            name, arguments = entry["tool"]
+            name, arguments = tools[done]
             return {"role": "assistant", "content": None, "tool_calls": [{
-                "id": "call_1", "type": "function", "function": {"name": name, "arguments": json.dumps(arguments)}}]}
+                "id": "call_%d" % (done + 1), "type": "function",
+                "function": {"name": name, "arguments": json.dumps(arguments)}}]}
         SCRIPT["seen"].append("revision" if revising else "draft")
         mode = entry.get("mode", "right")
         if mode == "corrects":
             mode = "right" if revising else "wrong"
+        if entry.get("stale"):
+            SCRIPT["stale"] = entry["stale"]
+        else:
+            SCRIPT["stale"] = None
         if mode == "right":
             text = self._text(entry["right"], messages, False)
+            if entry.get("remember"):
+                SCRIPT["remembered"] = re.search(r"\[fig:(F\d+)\]", text).group(1)
         elif mode == "ignores":
             text = self._text(entry["right"], messages, True)
         else:
@@ -176,6 +192,8 @@ def _walk(page, name, size):
     if WALK:
         os.makedirs(WALK, exist_ok=True)
         page.screenshot(path=os.path.join(WALK, "figures-%s-%s.png" % (name, size)), full_page=True)
+        # The answer scrolls inside the page: its own picture shows all of it.
+        page.locator("#messages-container").screenshot(path=os.path.join(WALK, "figures-%s-%s-answer.png" % (name, size)))
 
 
 def _open(browser, server, org, viewport):
@@ -201,7 +219,12 @@ def _no_raw_tokens(text):
 
 
 def _plan(**asked):
-    SCRIPT.update(plan=asked, seen=[])
+    SCRIPT.update(plan=asked, seen=[], stale=None, remembered=None)
+
+
+def _more_plan(**asked):
+    """Add questions to the plan of a conversation that is already open."""
+    SCRIPT["plan"].update(asked)
 
 
 # --------------------------------------------------------------------------- #
@@ -518,5 +541,171 @@ def test_when_nothing_is_left_the_person_reads_the_plain_line_the_records_and_th
         landing = page.locator("body").inner_text()
         assert "Orders Hub" in landing and "13" in landing, "the record link lands on a page with content"
         _walk(page, "j7-nothing-left", name)
+    finally:
+        context.close()
+
+
+# --------------------------------------------------------------------------- #
+# J8 to J11: a subject's figure binds to its own record; earlier turns' keys    #
+# never render; a clause taken out leaves the records it named on the page      #
+# --------------------------------------------------------------------------- #
+
+
+def _line_with(text, name):
+    return [line for line in text.split("\n") if name in line]
+
+
+def _landing(context, server, href):
+    """The text of the page *href* opens, in a new tab of the signed-in context."""
+    tab = context.new_page()
+    try:
+        tab.goto(href if href.startswith("http") else server + href, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        return tab.locator("body").inner_text()
+    finally:
+        tab.close()
+
+
+@pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
+def test_a_cto_asks_which_of_two_services_breaks_more_and_each_count_shows_beside_its_own_service(
+    browser, server, name, viewport
+):
+    """J8. The model looks both up and writes each count beside the other service."""
+    org = _estate("enterprise_architect", "A")
+    _estate("enterprise_architect", "B")
+    hub, billing = org["ids"]["elements"]["Orders Hub"], org["ids"]["elements"]["Billing"]
+    # Worded without the cues that send a question about a named element to the catalogue answer
+    # (which never reaches the model): the gold question's own wording would be answered there.
+    ask = "Orders Hub or Billing: which one would hurt us more to lose?"
+    _plan(**{ask: {
+        "tools": [("answer", {"question": "impact", "element_id": hub}),
+                  ("answer", {"question": "impact", "element_id": billing})],
+        "right": "Billing [ref:%d] has {fig:total#0}. Orders Hub [ref:%d] has {fig:total#1}." % (billing, hub),
+    }})
+    context, page, reply = _open(browser, server, org, viewport)
+    try:
+        _ask(page, ask)
+        expect(reply).to_contain_text(NEXT_STEP, timeout=PAGE_TIMEOUT * 2)
+        text = reply.inner_text()
+        _no_raw_tokens(text)
+        assert SCRIPT["seen"] == ["lookup", "lookup", "draft", "revision"], SCRIPT["seen"]
+        assert NOT_CONFIRMED in text and "What the records show:" in text
+        hub_line, billing_line = _line_with(text, "13 connections"), _line_with(text, "4 connections")
+        assert len(hub_line) == 1 and "Orders Hub" in hub_line[0] and "Billing" not in hub_line[0], text
+        assert len(billing_line) == 1 and "Billing" in billing_line[0] and "Orders Hub" not in billing_line[0], text
+        assert "21 connections" not in text and "9 connections" not in text, "the other organisation's counts"
+        _walk(page, "j8-swapped-counts", name)
+        for service, count in (("Orders Hub", "13"), ("Billing", "4")):
+            link = reply.get_by_role("link", name=service).first
+            expect(link).to_be_visible()
+            landing = _landing(context, server, link.get_attribute("href"))
+            assert service in landing and re.search(r"\b%s\b" % count, landing), (service, landing[:400])
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
+def test_a_ctos_follow_up_shows_the_figure_read_again_never_one_left_over_from_the_last_answer(
+    browser, server, name, viewport
+):
+    """J9. The follow-up writes the key it used in the first answer."""
+    org = _estate("enterprise_architect", "A")
+    hub = org["ids"]["elements"]["Orders Hub"]
+    first, second = "Tell me how exposed Orders Hub is.", "Why is that so high?"
+    lookup = ("answer", {"question": "impact", "element_id": hub})
+    _plan(**{
+        first: {"tool": lookup, "right": "Orders Hub [ref:%d] has {fig:total}, so a failure there reaches them all." % hub,
+                "remember": True},
+        second: {"tool": lookup, "right": "Orders Hub [ref:%d] has {fig:total} because many applications use it." % hub,
+                 "stale": "total"},
+    })
+    context, page, reply = _open(browser, server, org, viewport)
+    try:
+        _ask(page, first)
+        expect(reply).to_contain_text("13 connections downstream", timeout=PAGE_TIMEOUT * 2)
+        assert SCRIPT["remembered"], "the first answer used a key"
+        _ask(page, second)
+        expect(reply).to_contain_text(NEXT_STEP, timeout=PAGE_TIMEOUT * 2)
+        text = reply.inner_text()
+        _no_raw_tokens(text)
+        later = text[text.rindex(NOT_CONFIRMED):]
+        assert "What the records show:" in later and "13 connections downstream" in later, later
+        assert SCRIPT["seen"][-3:] == ["lookup", "draft", "revision"], SCRIPT["seen"]
+        _walk(page, "j9-follow-up", name)
+        link = reply.get_by_role("link", name="Orders Hub").last
+        expect(link).to_be_visible()
+        landing = _landing(context, server, link.get_attribute("href"))
+        assert "Orders Hub" in landing and re.search(r"\b13\b", landing), landing[:400]
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
+def test_a_cto_asks_what_a_service_costs_and_a_model_that_names_it_without_linking_it_still_leaves_the_cost(
+    browser, server, name, viewport
+):
+    """J10. The model names the record, writes no link, and writes the digits itself."""
+    org = _estate("enterprise_architect", "A")
+    app_id = org["ids"]["applications"]["Field Service Management"]
+    ask = "What does Field Service Management cost?"
+    _plan(**{ask: {
+        "tool": ("find_applications", {"limit": 50}),
+        "right": "Field Service Management has {fig:annual_cost:Field Service Management}.",
+        "mode": "ignores",
+    }})
+    context, page, reply = _open(browser, server, org, viewport)
+    try:
+        _ask(page, ask)
+        expect(reply).to_contain_text(NEXT_STEP, timeout=PAGE_TIMEOUT * 2)
+        text = reply.inner_text()
+        _no_raw_tokens(text)
+        assert SCRIPT["seen"] == ["lookup", "draft", "revision"], SCRIPT["seen"]
+        assert NOT_CONFIRMED in text and "What the records show:" in text and "Not recorded" not in text
+        line = _line_with(text, "an annual cost of")
+        assert len(line) == 1 and "Field Service Management" in line[0] and "£110,000" in line[0], text
+        for other in ("£470,000", "£250,000", "£90,000"):
+            assert other not in text, "another row's cost"
+        _walk(page, "j10-named-not-linked", name)
+        link = reply.get_by_role("link", name="Field Service Management").first
+        expect(link).to_be_visible()
+        assert str(app_id) in link.get_attribute("href")
+        link.click()
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        page.get_by_text("Cost", exact=True).first.click()
+        expect(page.locator("body")).to_contain_text("110,000", timeout=PAGE_TIMEOUT)
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
+def test_a_ctos_application_count_stays_on_the_page_when_the_model_writes_a_count_as_text_in_a_turn_that_looked_something_up(
+    browser, server, name, viewport
+):
+    """J11. The model writes 999 applications, and Orders Hub's count as a reference."""
+    org = _estate("enterprise_architect", "A")
+    _estate("enterprise_architect", "B")
+    hub = org["ids"]["elements"]["Orders Hub"]
+    ask = "How many applications do we have, and how exposed is Orders Hub?"
+    _plan(**{ask: {
+        "tool": ("answer", {"question": "impact", "element_id": hub}),
+        "right": "You have 999 applications. Orders Hub [ref:%d] has {fig:total}." % hub,
+    }})
+    context, page, reply = _open(browser, server, org, viewport)
+    try:
+        _ask(page, ask)
+        expect(reply).to_contain_text(NEXT_STEP, timeout=PAGE_TIMEOUT * 2)
+        text = reply.inner_text()
+        _no_raw_tokens(text)
+        assert "999" not in text, text
+        assert SCRIPT["seen"] == ["lookup", "draft", "revision"], SCRIPT["seen"]
+        hub_line = _line_with(text, "13 connections downstream")
+        assert hub_line and "Orders Hub" in hub_line[0], text
+        organisation = _line_with(text, "Your organisation")
+        assert len(organisation) == 1 and "20 applications" in organisation[0], text
+        assert "17 applications" not in text and "21 connections" not in text, "the other organisation's figures"
+        _walk(page, "j11-organisation-line", name)
+        link = reply.get_by_role("link", name="Orders Hub").first
+        expect(link).to_be_visible()
+        landing = _landing(context, server, link.get_attribute("href"))
+        assert "Orders Hub" in landing and re.search(r"\b13\b", landing), landing[:400]
     finally:
         context.close()
