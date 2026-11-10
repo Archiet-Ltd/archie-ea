@@ -1,8 +1,8 @@
 """Journey: an architect imports a model file, then corrects and removes what it brought in.
 
 A person imports a small Open Exchange file (a Goal, a Product, a Technology Service and an Application
-Component), finds each element through search, opens it, edits its name, saves and sees the new name after a
-reload, then deletes one and finds it gone from its page, from search and from the elements list. A second
+Component), opens each element at its model address, edits its name, saves and sees the new name after a
+reload, then deletes one and finds it gone from its page, from the search service and from the model lookup. A second
 organisation's architect cannot edit or delete the first one's imported element. An import of a file whose
 element looks like one already stored says so, and nothing is merged on its own.
 """
@@ -133,8 +133,14 @@ def test_architect_corrects_and_removes_imported_elements(browser, live_server, 
             page.wait_for_url(lambda u: "/edit" not in u, timeout=PAGE_TIMEOUT)
             page.reload(wait_until="networkidle")
             expect(page.locator("h1").first).to_contain_text(new_name)
-            assert "Not recorded" not in page.locator("[data-testid='kpi-updated']").inner_text() or \
-                "Element recorded at" not in page.inner_text("body")
+            assert "Not recorded" not in page.locator("[data-testid='kpi-updated']").inner_text()
+            # The record's raw column names are kept to the platform administrator's Technical details panel.
+            shown = page.evaluate(
+                "() => { const c = document.body.cloneNode(true);"
+                " c.querySelectorAll(\"[data-testid='technical-details']\").forEach(e => e.remove());"
+                " return c.innerText; }"
+            )
+            assert "Element recorded at" not in shown
             assert "0001" not in page.inner_text("body") and "Inferred from" not in page.inner_text("body")
             assert _element_address(page, live_server, new_name) == address
 
