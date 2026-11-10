@@ -265,6 +265,7 @@ def impact_analysis():
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+        **_model_state(),
     )
 
 
@@ -317,6 +318,18 @@ def api_impact_analysis():
         return jsonify({"error": "An internal error occurred"}), 500
 
 
+def _model_state():
+    """Whether the caller's model has any element at all, and whether they may open the GitHub connection page."""
+    from app.middleware.tenant_context import current_org_id
+    from app.models import ArchiMateElement
+    from app.utils.role_access import may_connect_github
+
+    return {
+        "model_empty": ArchiMateElement.query.count() == 0,
+        "may_connect_github": may_connect_github(current_user, current_org_id()),
+    }
+
+
 def simulations_page():
     """The simulations page: the impact analysis screen in its "try it on a copy" form."""
     from app.middleware.tenant_context import current_org_id
@@ -330,6 +343,7 @@ def simulations_page():
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+        **_model_state(),
     )
 
 
