@@ -228,9 +228,8 @@
 
     <!-- Create/Edit Modal -->
     {% call modal(id='archimate-form-modal', title='', labelledby='archimate-form-modal-title', size='lg') %}
-        <div class="flex items-center justify-between mb-4" data-modal-header>
+        <div class="flex items-center justify-between mb-4 pr-8" data-modal-header>
             <h2 id="archimate-form-modal-title" class="text-xl font-bold" x-text="editingElement ? 'Edit Element' : 'Create Element'"></h2>
-            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': "Platform.modal.close('archimate-form-modal')"}) }}
         </div>
         <div x-cloak x-show="formError" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="formError"></div>
         <form @submit.prevent="submitForm()" class="space-y-4">
@@ -257,6 +256,10 @@
                                 {# The options are drawn after the select, so each says whether it is the stored value. #}
                                 <option :value="opt.value" :selected="String(formData[fld.name] ?? '') === opt.value" x-text="opt.label"></option>
                             </template>
+                            {# A stored value the options do not list is shown, selected, so it does not read as empty. #}
+                            <template x-if="String(formData[fld.name] ?? '') !== '' && !fld.options.some(o => o.value === String(formData[fld.name]))">
+                                <option :value="String(formData[fld.name])" selected x-text="String(formData[fld.name])"></option>
+                            </template>
                         {% endcall %}
                     </template>
                     <template x-if="fld.type === 'textarea'">
@@ -279,7 +282,7 @@
 
     <!-- Generate with AI Modal -->
     {% call modal(id='ai-generate-modal', labelledby='ai-generate-modal-title', size='lg', attrs={'data-testid': 'ai-generate-modal'}) %}
-        <div class="flex items-center justify-between mb-4" data-modal-header>
+        <div class="flex items-center justify-between mb-4 pr-8" data-modal-header>
             <h2 id="ai-generate-modal-title" class="text-base font-semibold text-foreground">Generate Element with AI</h2>
             {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': "Platform.modal.close('ai-generate-modal')"}) }}
         </div>

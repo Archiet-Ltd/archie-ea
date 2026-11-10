@@ -365,9 +365,9 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         description='A point of access where application services are made available',
         fields=[
             ElementField(name='interface_type', label='Interface Type', field_type='select',
-                options=[FieldOption('ui','User Interface'), FieldOption('api','API'),
-                         FieldOption('file','File'), FieldOption('database','Database'),
-                         FieldOption('message','Message Queue')], grid_column=1),
+                options=[FieldOption(v, v) for v in (
+                    'REST', 'SOAP', 'GraphQL', 'gRPC', 'Message Queue', 'Event Stream',
+                    'File Transfer', 'Database', 'WebSocket', 'RPC')], grid_column=1),
         ]
     ),
     'DataObject': ElementTypeConfig(
