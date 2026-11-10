@@ -1759,17 +1759,17 @@ def remove_technology_cost(element_id):
 
 
 def _description_origin(ae_row):
-    """Where an element's description came from, in words, from the element's provenance record."""
+    """Where this element and its first description came from, in words, from the element's provenance record."""
     kind = (getattr(ae_row, "source_kind", None) or "").strip().lower()
     label = (getattr(ae_row, "source_label", None) or "").strip()
     if kind == "import":
-        return "Imported from %s." % label if label else "Imported from a model file."
+        return "This element was imported from %s." % (label or "a model file")
     if kind == "connector":
-        return "Brought in by %s." % label if label else "Brought in by a connected tool."
+        return "This element was brought in by %s." % (label or "a connected tool")
     if kind == "derived":
-        return "Worked out from the rest of the model, not written by a person."
+        return "This element was worked out from the rest of the model, not entered by a person."
     if kind == "sample":
-        return "Sample data."
+        return "This element is sample data."
     return ""
 
 

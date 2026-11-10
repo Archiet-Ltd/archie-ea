@@ -122,7 +122,7 @@ def test_description_says_where_it_came_from_from_the_provenance_record(app, db_
     typed = _goal_row(db_session, org, "Faster onboarding for new customers")
     login_as(client, user)
     page = client.get("/architecture/motivation/element/%d?ae=1" % imported.id).get_data(as_text=True)
-    assert 'data-testid="element-description-origin"' in page and "Imported from model.xml." in page
+    assert 'data-testid="element-description-origin"' in page and "This element was imported from model.xml." in page
     login_as(client, user)
     page = client.get("/architecture/motivation/element/%d?ae=1" % typed.id).get_data(as_text=True)
     assert 'data-testid="element-description-origin"' not in page

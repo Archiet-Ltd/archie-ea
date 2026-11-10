@@ -143,7 +143,7 @@ def test_imported_element_keeps_what_the_form_offers(browser, live_server, seede
         # The person's own words are shown as their description, and the page says where they came from.
         expect(page.locator("[data-testid='element-description']")).to_contain_text(
             "Inferred from customer interviews in March")
-        expect(page.locator("[data-testid='element-description-origin']")).to_contain_text("Imported from")
+        expect(page.locator("[data-testid='element-description-origin']")).to_contain_text("This element was imported from")
         _shot(page, "imported-after")
         # What the form offered was stored: open it again.
         _open_edit_from_page(page)
