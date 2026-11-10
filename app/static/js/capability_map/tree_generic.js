@@ -163,6 +163,8 @@ document.addEventListener('alpine:init', () => {
                     ]
                 });
 
+                // The chart carries its own <style>; the page policy admits it only with the page nonce.
+                plot.querySelectorAll('style').forEach(el => el.setAttribute('nonce', container.dataset.cspNonce || ''));
                 container.innerHTML = '';
                 container.appendChild(plot);
 
