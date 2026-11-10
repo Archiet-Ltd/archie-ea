@@ -106,6 +106,8 @@ def test_same_org_reviewer_executes_once_and_receives_allowlisted_queue(
                 "status": "pending",
                 "source_table": None,
                 "source_id": None,
+                "settled_by_review": True,
+                "can_approve": True,
                 "requester": {"id": requester.id, "display_name": "Requester Reviewer"},
             }
         ]

@@ -401,7 +401,8 @@ def test_approval_inbox_empty_state(app, db_session, make_org, login_as):
     # that says why and points at the next step (the AI chat).
     assert 'data-testid="approval-inbox-empty"' in html
     assert "No approvals yet" in html
-    assert "waits here for a second person to approve or reject it" in html
+    assert "checked and reviewed automatically" in html
+    assert "second person" not in html
 
 
 def test_approval_inbox_source_table_display(app, db_session, make_org, tenant_ctx, login_as):
