@@ -16,7 +16,7 @@ Contract (docs/adm_phases_d_a_g_e_f_h_tasks.json OA-001):
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import case, func
+from sqlalchemy import and_, case, func
 
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
@@ -79,10 +79,11 @@ def severity_order_expr():
 
 def priority_filter_clause(priority):
     """The filter for a gap list asked for one priority. 'critical' means critical by the one rule, so a gap
-    whose severity says critical is listed with one whose priority does; any other word is the stored priority."""
+    whose severity says critical is listed with one whose priority does; any other word is the stored priority
+    of a gap the rule does not rate critical, so a gap is listed under exactly one level."""
     if (priority or "").strip().lower() == "critical":
         return effective_severity_expr() == "critical"
-    return Gap.priority == priority
+    return and_(Gap.priority == priority, effective_severity_expr() != "critical")
 
 
 def get_unified_gap_register(

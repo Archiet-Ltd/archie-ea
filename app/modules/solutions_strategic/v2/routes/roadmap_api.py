@@ -1008,7 +1008,9 @@ def get_gaps():
 
         query = ImplementationGap.query
         if priority:
-            query = query.filter(ImplementationGap.priority == priority)
+            from app.services.gap_register_service import priority_filter_clause
+
+            query = query.filter(priority_filter_clause(priority))
         if gap_type:
             query = query.filter(ImplementationGap.gap_type == gap_type)
 

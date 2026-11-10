@@ -914,7 +914,7 @@ def api_gaps():
             query = ImplementationGap.query
             priority = request.args.get("priority")
             if priority:
-                query = query.filter_by(priority=priority)
+                query = query.filter(gap_register_service.priority_filter_clause(priority))
             query = query.order_by(ImplementationGap.created_at.desc())
             total = query.order_by(None).count()
             if limit:

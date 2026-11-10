@@ -24,7 +24,7 @@ from app.models.implementation_migration import (  # dead-code-ok
     WorkPackage,
 )
 from app.services.archimate.gap_resolution_service import GapResolutionService
-from app.services.gap_register_service import priority_filter_clause, severity_order_expr
+from app.services.gap_register_service import effective_severity, priority_filter_clause, severity_order_expr
 from app.services.llm_service import LLMService
 
 
@@ -236,9 +236,9 @@ class RoadmapGenerator:
         return query.order_by(severity_order_expr(), Gap.created_at.asc()).all()
 
     def _sort_gaps_by_priority(self, gaps: List[Gap]) -> List[Gap]:
-        """Sort gaps by priority for sequencing."""
+        """Sort gaps by their one rating for sequencing."""
         priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        return sorted(gaps, key=lambda g: (priority_order.get(g.priority, 4), g.id))
+        return sorted(gaps, key=lambda g: (priority_order.get(effective_severity(g), 4), g.id))
 
     def _create_timeline(
         self, work_packages: List[WorkPackage], timeline_months: int

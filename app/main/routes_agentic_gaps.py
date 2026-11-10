@@ -23,6 +23,7 @@ from app.services.archimate.agentic_gap_implementation_service import (
 # Import main blueprint - use relative import to avoid circular dependency
 from .views import main
 from app.utils.pagination import safe_int_arg
+from app.services.gap_register_service import effective_severity
 
 logger = logging.getLogger(__name__)
 
@@ -720,7 +721,7 @@ def get_reuse_candidates(gap_id):
                 "capability_id": gap.source_capability_id,
                 "capability_name": gap.name,
                 "gap_type": gap.gap_type,
-                "severity": gap.priority,
+                "severity": effective_severity(gap) or gap.priority,
                 "gap_description": gap.description,
             }
 
@@ -807,7 +808,7 @@ def get_reuse_recommendation():
                 "capability_id": gap.source_capability_id,
                 "capability_name": gap.name,
                 "gap_type": gap.gap_type,
-                "severity": gap.priority,
+                "severity": effective_severity(gap) or gap.priority,
                 "gap_description": gap.description,
             }
 
