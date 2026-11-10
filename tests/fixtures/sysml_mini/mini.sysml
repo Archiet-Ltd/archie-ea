@@ -67,3 +67,27 @@ package Mini {
         objective { verify REQ_M2; }
     }
 }
+
+package AsBuilt_mini {
+    doc /* What a generator would write for the small model: the handler it found and a reader of a field's list. */
+    private import EntelimVocabulary::*;
+
+    part 'till.py' : Module {
+        :>> sourcePath = "till.py";
+        port 'till.sell' : HttpRoutePort {
+            :>> rule = "/shop/till/sell";
+            :>> methods = "POST";
+            :>> endpoint = "till.sell";
+            :>> handlerFile = "till.py";
+            :>> handlerLine = "3";
+        }
+    }
+
+    part vocabulary_status_1 : VocabularySource {
+        :>> columnName = "status";
+        :>> sourceKind = "form-select";
+        :>> sourceFile = "forms.py:9";
+        :>> origin = "forms.py (written out in place)";
+        :>> valueList = "open,closed";
+    }
+}

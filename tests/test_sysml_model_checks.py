@@ -499,9 +499,18 @@ def test_the_parsed_model_is_read_back_with_the_counts_it_holds():
     cases = model.cases()
     assert {c["testName"]: c["verifies"] for c in cases.values()} == {
         "test_totals_every_sale": ["Mini::REQ_M1"], "test_refuses_a_sale_with_no_price": ["Mini::REQ_M2"]}
-    assert len(model.parts()) == 1 and model.allocations() == [("Mini::totalSales", "Mini::tillModule")]
+    assert len(model.parts()) == 3 and model.allocations() == [("Mini::totalSales", "Mini::tillModule")]
     assert list(model.functions()) == ["Mini::totalSales"]
     mc.require_readable(model)
+
+
+def test_the_routes_and_the_readers_of_a_list_are_split_out_of_the_parsed_model_with_what_the_model_holds():
+    model = sysml_model.load(FIXTURES / "mini.jsonl")
+    authored, built = mc.split_routes(model)
+    assert authored == [{"endpoint": "till.sell", "rule": "/till/sell"}]
+    assert built == [{"endpoint": "till.sell", "rule": "/shop/till/sell", "methods": "POST", "file": "till.py", "line": "3"}]
+    assert mc.vocabulary_sources(model) == [{"column": "status", "sourceKind": "form-select", "sourceFile": "forms.py:9",
+                                             "origin": "forms.py (written out in place)", "values": "open,closed"}]
 
 
 def test_a_reader_that_returns_nothing_stops_with_a_plain_message_and_is_never_a_pass():

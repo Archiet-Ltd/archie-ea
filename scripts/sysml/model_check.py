@@ -381,7 +381,7 @@ def cmd_matrix(a) -> int:
 
 
 FIXTURE = REPO / "tests" / "fixtures" / "sysml_mini" / "mini.sysml"
-FIXTURE_COUNTS = {"requirements": 4, "satisfy links": 2, "verification cases": 2, "parts": 1}
+FIXTURE_COUNTS = {"requirements": 4, "satisfy links": 2, "verification cases": 2, "parts": 3}
 
 
 def cmd_selfcheck(a) -> int:
