@@ -99,6 +99,7 @@ def _call_generate_from_prompt_in_app_context(app, prompt: str, org_id, timeout=
             prompt,
             use_cache=True,
             timeout=LLM_CLASSIFY_TIMEOUT_SECONDS if timeout is None else timeout,
+            time_limit=timeout,
         )
 
 
@@ -351,6 +352,8 @@ class ApplicationPatternClassifierService:
         # True when a time budget stopped LLM classification partway; the
         # remaining apps were classified by rules and labelled as such.
         self.llm_truncated = False
+        # Plain line for the apps the AI provider did not reach in time; None when all were.
+        self.unfinished_note = None
 
     def classify_applications(
         self,
@@ -380,6 +383,7 @@ class ApplicationPatternClassifierService:
         apps: List[ApplicationComponent] = query.all()
 
         self.llm_truncated = False
+        self.unfinished_note = None
         token = _llm_timeout_override.set(llm_timeout_seconds)
         try:
             return self._classify_batches(apps, batch_size, use_llm, time_budget_seconds)
@@ -400,19 +404,37 @@ class ApplicationPatternClassifierService:
         # The optional wall-clock budget stops issuing LLM calls once spent;
         # remaining apps get the service's documented deterministic fallback,
         # and every record says which engine produced it.
+        llm_answered = False
+        rules_count = 0
+        base_limit = _llm_timeout_override.get()
         for batch_start in range(0, len(apps), batch_size):
             batch = apps[batch_start: batch_start + batch_size]
 
-            llm_this_batch = use_llm
+            llm_this_batch = use_llm and not self.llm_truncated
             if llm_this_batch and deadline is not None and time.monotonic() > deadline:
                 llm_this_batch = False
                 self.llm_truncated = True
 
+            id_map = {}
             if llm_this_batch:
-                classified = _llm_classify_batch(batch)
-                id_map = {r["id"]: r for r in classified}
-            else:
-                id_map = {}
+                # Each call gets only what is left of the one request budget.
+                if deadline is not None:
+                    left = max(0.1, deadline - time.monotonic())
+                    token = _llm_timeout_override.set(left if base_limit is None else min(base_limit, left))
+                else:
+                    token = None
+                try:
+                    classified = _llm_classify_batch(batch)
+                    id_map = {r["id"]: r for r in classified}
+                    llm_answered = True
+                except LLMClassificationTimeoutError:
+                    if not llm_answered:
+                        raise  # nothing finished: an explicit error, never made-up answers
+                    # Keep the batches that finished; the rest are labelled as rules-based.
+                    self.llm_truncated = True
+                finally:
+                    if token is not None:
+                        _llm_timeout_override.reset(token)
 
             for app in batch:
                 if app.id in id_map:
@@ -422,6 +444,7 @@ class ApplicationPatternClassifierService:
                 else:
                     pattern, confidence, _ = _rule_based_classify(app)
                     source = "rules"
+                    rules_count += 1
 
                 # Persist
                 app.arch_pattern = pattern
@@ -432,6 +455,13 @@ class ApplicationPatternClassifierService:
                     "confidence": round(confidence, 4),
                     "source": source,
                 })
+
+        if self.llm_truncated and rules_count:
+            self.unfinished_note = (
+                "The AI provider did not answer for %d applications in time, so their patterns come "
+                "from the built-in rules instead. Try again to have the AI classify them."
+                % rules_count
+            )
 
         try:
             db.session.commit()
@@ -485,5 +515,6 @@ class ApplicationPatternClassifierService:
             "by_pattern": by_pattern,
             "by_source": by_source,
             "llm_truncated": self.llm_truncated,
+            "note": self.unfinished_note,
             "confidence_distribution": confidence_distribution,
         }

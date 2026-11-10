@@ -45,8 +45,10 @@ def test_old_address_without_a_query_adds_none(app, db_session, make_org):
 def test_patterns_answer_within_five_seconds_behind_a_slow_provider(
     app, db_session, make_org, monkeypatch
 ):
+    from app.api import sa_phase_c_routes
     from app.modules.ai_chat.services import llm_service_impl as llm_impl
 
+    monkeypatch.setattr(sa_phase_c_routes, "PATTERNS_REQUEST_BUDGET_SECONDS", 1.0)
     client, _org, _apps = _make_logged_in_client(app, db_session, make_org, "slowpat", app_count=2)
 
     def _slow(prompt, *args, **kwargs):
@@ -62,6 +64,67 @@ def test_patterns_answer_within_five_seconds_behind_a_slow_provider(
     body = response.get_json()
     assert "did not answer in time" in body["error"]
     assert "detail" not in body
+
+
+def test_patterns_one_budget_covers_the_whole_request_and_keeps_finished_batches(
+    app, db_session, make_org, monkeypatch
+):
+    """Two batches, the second one slow: the answer arrives inside the one budget with the
+    finished batch kept and a plain line for the apps that were not reached."""
+    import re
+
+    from app.api import sa_phase_c_routes
+    from app.modules.ai_chat.services import llm_service_impl as llm_impl
+
+    monkeypatch.setattr(sa_phase_c_routes, "PATTERNS_REQUEST_BUDGET_SECONDS", 2.0)
+    client, _org, apps = _make_logged_in_client(app, db_session, make_org, "budgetpat", app_count=60)
+    calls = []
+
+    def _first_fast_then_slow(prompt, *args, **kwargs):
+        calls.append(kwargs.get("time_limit"))
+        if len(calls) > 1:
+            time.sleep(8.0)
+            return "[]"
+        ids = [int(i) for i in re.findall(r"- ID (\d+):", prompt)]
+        import json
+
+        return json.dumps([{"id": i, "arch_pattern": "saas", "confidence": 0.9, "reasoning": "x"} for i in ids])
+
+    monkeypatch.setattr(llm_impl.LLMService, "generate_from_prompt", staticmethod(_first_fast_then_slow))
+    started = time.monotonic()
+    response = client.get("/api/ea-workflows/sa/application-patterns")
+    elapsed = time.monotonic() - started
+    assert response.status_code == 200, response.get_data(as_text=True)[:300]
+    assert elapsed < 4.0, elapsed
+    patterns = response.get_json()["patterns"]
+    assert patterns["classified"] == 60
+    assert patterns["by_source"]["llm"] == 50
+    assert patterns["by_source"]["rules"] == 10
+    assert patterns["llm_truncated"] is True
+    assert "10 applications" in patterns["note"] and "rules" in patterns["note"]
+    # every model call carries what is left of the one budget, never more
+    assert all(limit is not None and limit <= 2.0 for limit in calls), calls
+
+
+def test_patterns_a_provider_slower_than_the_old_per_call_bound_still_answers(
+    app, db_session, make_org, monkeypatch
+):
+    import json
+    import re
+
+    from app.modules.ai_chat.services import llm_service_impl as llm_impl
+
+    client, _org, _apps = _make_logged_in_client(app, db_session, make_org, "fivesec", app_count=2)
+
+    def _five_seconds(prompt, *args, **kwargs):
+        time.sleep(5.0)
+        ids = [int(i) for i in re.findall(r"- ID (\d+):", prompt)]
+        return json.dumps([{"id": i, "arch_pattern": "saas", "confidence": 0.9, "reasoning": "x"} for i in ids])
+
+    monkeypatch.setattr(llm_impl.LLMService, "generate_from_prompt", staticmethod(_five_seconds))
+    response = client.get("/api/ea-workflows/sa/application-patterns")
+    assert response.status_code == 200, response.get_data(as_text=True)[:300]
+    assert response.get_json()["patterns"]["by_source"]["llm"] == 2
 
 
 def test_debt_scores_carry_factors_and_mark_applications_without_data_not_rated(
