@@ -17,11 +17,17 @@ from .test_ai_chat_journey import _login
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 PLAIN = "The assistant could not answer just now. Your question is saved; try again in a moment."
+# A missing provider is not a failure to retry: the person reads that the assistant is not set up.
+NOT_SET_UP_MEMBER = "The assistant is not set up yet. Ask an administrator of your organisation to add an AI provider."
+NOT_SET_UP_ADMIN = "The assistant is not set up yet. Add an AI provider in Settings to start getting answers."
 SIZES = [("1440", {"width": 1440, "height": 900}), ("390", {"width": 390, "height": 844})]
 FAILURES = {
     "provider-not-configured": (503, {"error": "service_unavailable", "message": "AI feature 'chat' is not available. LLM provider must be configured.", "feature": "chat"}),
     "provider-error": (500, {"error": "Failed to process message. Please try again.", "error_type": "unknown"}),
 }
+
+
+EXPECTED_MEMBER_TEXT = {"provider-not-configured": NOT_SET_UP_MEMBER, "provider-error": PLAIN}
 
 
 def _assert_role(email, expected, admin):
@@ -61,10 +67,14 @@ def test_non_administrator_gets_a_plain_message_and_a_working_retry(browser, liv
     ctx, page, card = _ask_while_failing(browser, live_server, email, viewport, failure)
     try:
         text = card.inner_text()
-        assert PLAIN in text, text
+        assert EXPECTED_MEMBER_TEXT[failure] in text, text
         assert "API Settings" not in text and "Admin" not in text, text
         assert "API Settings" not in page.locator("#messages-container").inner_text()
         assert page.locator('[data-testid="chat-provider-settings-link"]').count() == 0
+        if failure == "provider-not-configured":
+            # A retry could only reproduce a missing provider, so the card offers none.
+            assert card.get_by_role("button", name="Retry").count() == 0
+            return
         retry = card.get_by_role("button", name="Retry")
         assert retry.is_visible()
         with page.expect_request(lambda r: "/ai-chat/message" in r.url and r.method == "POST", timeout=PAGE_TIMEOUT):
@@ -79,8 +89,8 @@ def test_administrator_also_gets_a_provider_settings_link_that_lands_on_content(
     _assert_role(email, "platform_admin", admin=True)
     ctx, page, card = _ask_while_failing(browser, live_server, email, viewport, "provider-not-configured")
     try:
-        assert PLAIN in card.inner_text()
-        assert card.get_by_role("button", name="Retry").is_visible()
+        assert NOT_SET_UP_ADMIN in card.inner_text()
+        assert card.get_by_role("button", name="Retry").count() == 0
         link = card.get_by_role("link", name="Check the AI provider settings")
         assert link.is_visible()
         link.click()
@@ -116,9 +126,10 @@ def test_no_customer_visible_string_sends_a_person_to_api_settings():
 
 def test_every_failure_route_answers_with_the_plain_sentence():
     from app.modules.ai_chat.services.agent_runner import AgentRunner
-    from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
+    from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE, FEATURE_INTROS
 
     assert ASSISTANT_UNAVAILABLE == PLAIN
     runner = AgentRunner.__new__(AgentRunner)
-    for reason in ("no api key", "boom"):
-        assert runner._fallback(reason)["response"] == PLAIN
+    assert runner._fallback("boom")["response"] == PLAIN
+    # A missing provider reads the "not set up" sentence, with no settings words in the text.
+    assert runner._fallback("no api key")["response"] == FEATURE_INTROS["chat"]

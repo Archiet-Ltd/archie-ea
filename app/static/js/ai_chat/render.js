@@ -121,10 +121,12 @@
         var holder = document.createElement('div');
         holder.innerHTML = html;
         holder.querySelectorAll('code').forEach(function (c) {
+            // A fenced block is shown exactly as written: its indentation and backticks are the code.
+            if (c.closest('pre')) return;
             var t = c.textContent.replace(/^[\s`]+|[\s`]+$/g, '');
             c.textContent = t;
             // The answer style draws a backtick before and after code; a name reads as a name.
-            if (!c.closest('pre')) c.classList.add('not-prose', 'font-mono', 'font-semibold', 'break-all');
+            c.classList.add('not-prose', 'font-mono', 'font-semibold', 'break-all');
             if (/^\/intelligence\/answers\/[0-9a-f]{16,}$/i.test(t) && !c.closest('a')) {
                 var a = document.createElement('a');
                 a.setAttribute('href', t);

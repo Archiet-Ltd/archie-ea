@@ -386,7 +386,7 @@
     /* The network half of a turn, separated from _submitTurn so the error
        card's Retry can run it again without echoing the user's message into
        the transcript a second time. */
-    async function _deliverTurn(message, timestamp) {
+    async function _deliverTurn(message, timestamp, completed) {
         // Show loading indicator
         const loadingId = 'loading-' + Date.now();
         const loadingDiv = document.createElement('div');
@@ -440,8 +440,12 @@
         }
 
         const startTime = performance.now();
-        // Shared payload. thread_id keeps multi-turn chats in one conversation.
-        const _payload = JSON.stringify({
+        // Changes an earlier try of this question already made: a retry does not make them again.
+        const _completed = completed || [];
+        // thread_id keeps multi-turn chats in one conversation. waited_seconds is read when each request is
+        // built, so the plain request that follows a dropped stream carries the time already spent and does
+        // not start a second minute.
+        const _buildPayload = () => JSON.stringify({
             message: message,
             domain: state.currentDomain,
             element_id: selectedElementIdInput.value || null,
@@ -449,9 +453,11 @@
             persona: state.currentPersona || null,
             model: document.getElementById('model-selector')?.value || null,
             thread_id: window.__threadId || null,
-            // What the stored-answer lookup took: the turn gets the rest of the minute.
+            // Since the send: the stored-answer lookup, and any stream that dropped, took part of the minute.
             waited_seconds: (performance.now() - _sentAt) / 1000,
+            completed_actions: _completed,
         });
+        const _payload = _buildPayload();
 
         // Stream the reply token-by-token (like ChatGPT). If streaming can't be
         // established, fall through to the non-streaming request below.
@@ -503,7 +509,7 @@
         }
 
         try {
-            const response = await ArchieChat.transport.sendMessage(_payload);
+            const response = await ArchieChat.transport.sendMessage(_buildPayload());
 
             const data = await response.json();
             // Remember the conversation this turn was saved to, and refresh the
@@ -685,9 +691,9 @@
             : 'The assistant is not set up yet. Ask an administrator of your organisation to add an AI provider.';
     }
 
-    function _retryTurn(message, timestamp) {
+    function _retryTurn(message, timestamp, completed) {
         _setSendingUI(true);
-        _deliverTurn(message, timestamp).finally(() => _setSendingUI(false));
+        _deliverTurn(message, timestamp, completed).finally(() => _setSendingUI(false));
     }
 
     // Stream an AI reply via SSE. Renders tokens live into a bubble; returns true
@@ -746,9 +752,20 @@
                     if (result.error && !result.paused) {
                         /* A failed turn is a failure card with Retry, not a bubble in the assistant's voice. */
                         let _msg = '';
-                        try { _msg = JSON.parse(payload).message; } catch (_) { /* swallow-ok: the payload is built here from JSON.stringify; if it cannot be read the failure card still shows, without a Retry that re-asks */ }
-                        appendError(result.text || 'The assistant is busy right now. Wait a minute, then press Retry.',
-                            _msg ? () => _retryTurn(_msg, timestamp) : null, { ownKeyLink: true });
+                        let _before = [];
+                        try { const _sent = JSON.parse(payload); _msg = _sent.message; _before = _sent.completed_actions || []; } catch (_) { /* swallow-ok: the payload is built here from JSON.stringify; if it cannot be read the failure card still shows, without a Retry that re-asks */ }
+                        /* A change this try made before it stopped is told to the person and is not made again
+                           by Retry: it is sent back with the question and the server leaves it alone. */
+                        const _made = (result.actions || []).filter(a => a.mutates);
+                        const _kept = _before.concat(
+                            _made.concat(result.pendingApprovals || []).map(a => ({ tool: a.tool, arguments: a.arguments || {} }))
+                        );
+                        const _madeNote = _made.length
+                            ? ' Already done, and not repeated on Retry: ' + _made.map(a => a.message || a.tool).join('; ') + '.'
+                            : '';
+                        appendError((result.text || 'The assistant is busy right now. Wait a minute, then press Retry.') + _madeNote,
+                            _msg && !result.notSetUp ? () => _retryTurn(_msg, timestamp, _kept) : null,
+                            result.notSetUp ? { adminLink: true } : { ownKeyLink: true });
                         return;
                     }
                     if (!wrap) wrap = beginStreamedMessage();
