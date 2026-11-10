@@ -895,6 +895,100 @@ def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, *
     }
 
 
+def capability_citation(capability_id: int, name: str, source_line: Optional[str] = None) -> Dict[str, Any]:
+    """A citation to a business capability a person can open (its fact sheet)."""
+    citation = {
+        "type": "capability",
+        "id": capability_id,
+        "name": name,
+        "target": f"/enterprise/capabilities/{capability_id}/fact-sheet",
+    }
+    if source_line:
+        citation["source_line"] = source_line
+    return citation
+
+
+def _resolve_application(organization_id: int, name: Optional[str]):
+    """(application, others): the one application of *organization_id* a name
+    names, else ``None`` and the applications it was ambiguous between.
+
+    An exact name (any case) wins; otherwise a name contained in exactly one
+    application's name. Never a guess between several.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+
+    wanted = " ".join((name or "").split())
+    if not wanted:
+        return None, []
+    base = ApplicationComponent.query.filter(ApplicationComponent.organization_id == organization_id)
+    exact = base.filter(db.func.lower(ApplicationComponent.name) == wanted.lower()).all()
+    if len(exact) == 1:
+        return exact[0], []
+    found = exact or base.filter(ApplicationComponent.name.ilike(f"%{wanted}%")).order_by(ApplicationComponent.name).all()
+    if len(found) == 1:
+        return found[0], []
+    return None, found[:5]
+
+
+def _capabilities_of_application(organization_id: int, service: Optional[str] = None, **_: Any) -> Dict[str, Any]:
+    """"Which capabilities does <application> support?" -- read at question time
+    from the same mapping store, through the same reader, as the application
+    page's Mapped Capabilities, so the two always agree. Each capability is cited
+    to its own fact sheet; an application with none says so and points to where
+    one is mapped."""
+    from app.services.application_capabilities import application_capability_links
+
+    application, others = _resolve_application(organization_id, service)
+    if application is None:
+        if others:
+            return {
+                "answer": f"which capabilities '{service}' supports",
+                "matched": False, "rows": [], "total": 0, "citations": [],
+                "reason": "more than one application is called like '%s': %s" % (
+                    service, ", ".join(a.name for a in others)),
+                "next_step": "Ask again with the full name of one of them.",
+            }
+        return {
+            "answer": f"which capabilities '{service}' supports" if service else "which capabilities an application supports",
+            "service": service, "matched": False, "rows": [], "total": 0, "citations": [],
+            "reason": ("nothing recorded matches '%s'" % service) if service else "no application was named",
+            "next_step": "Ask again with the name of an application in your model.",
+        }
+
+    rows, citations = [], []
+    for mapping, capability in application_capability_links(application.id, organization_id):
+        # A unified capability points at its business capability by source_id.
+        raw_id = capability.source_id if capability.__class__.__name__ == "UnifiedCapability" else capability.id
+        try:
+            capability_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        support = (getattr(mapping, "support_level", None) or "").replace("_", " ").capitalize()
+        coverage = getattr(mapping, "coverage_percentage", None)
+        line = " · ".join(part for part in (
+            f"{support} support" if support else "", f"{coverage}% coverage" if coverage is not None else "") if part) or None
+        rows.append({
+            "id": capability_id, "name": capability.name, "support_level": support or None,
+            "coverage_percentage": coverage, "source_table": "application_capability_mapping",
+            "truth_class": TRUTH_CLASS_DRAWN,
+        })
+        citations.append(capability_citation(capability_id, capability.name, line))
+
+    result = {
+        "answer": f"the capabilities {application.name} supports",
+        "service": application.name, "application_id": application.id,
+        "rows": rows, "total": len(rows), "citations": citations,
+        "reason": None if rows else f"{application.name} has no capability mapped to it yet",
+    }
+    if not rows:
+        from flask import url_for
+
+        result["next_step"] = "Map a capability to it on its Capabilities tab."
+        result["next_label"] = f"Open {application.name}"
+        result["next_url"] = url_for("unified_applications.application_detail", id=application.id, tab="capabilities")
+    return result
+
+
 # What each plain question about the company asks for: the profile fields that answer it, in the order shown.
 PROFILE_TOPICS = {
     "products": ("What do we sell?", "what the company sells",
@@ -1048,6 +1142,13 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         description="The yearly loss worked out for a risk with the Open FAIR method: a most likely figure and a 90 per cent range, with who entered the factors and when.",
         params=["risk"],
         run=_risk_cost,
+    ),
+    "capabilities_of_application": CatalogueEntry(
+        id="capabilities_of_application",
+        title="Which capabilities does an application support?",
+        description="The business capabilities mapped to a named application, read from the same mapping the application page shows, each cited to its fact sheet.",
+        params=["service"],
+        run=_capabilities_of_application,
     ),
     "what_breaks_if_fails": CatalogueEntry(
         id="what_breaks_if_fails",

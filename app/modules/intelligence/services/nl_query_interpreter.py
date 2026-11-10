@@ -141,8 +141,34 @@ def _profile_topic(lowered: str) -> str:
     return "overview"
 
 
+# "Which capabilities does <application> support?" and its everyday variants. The
+# application is the phrase the question names; the entry resolves it.
+_CAPABILITY_OF_PATTERNS = [
+    re.compile(r"\b(?:which|what)\s+(?:business\s+|enterprise\s+)?capabilit(?:y|ies)\s+(?:does|do|did)\s+(?:the\s+|our\s+)?(.+?)\s+(?:support|supports|cover|covers|provide|provides|enable|enables|deliver|delivers)\b", re.I),
+    re.compile(r"\b(?:which|what)\s+(?:business\s+|enterprise\s+)?capabilit(?:y|ies)\s+(?:is|are)\s+(?:the\s+|our\s+)?(.+?)\s+(?:mapped|linked|assigned)\s+to\b", re.I),
+    re.compile(r"\b(?:list|show)\s+(?:me\s+)?(?:the\s+)?capabilit(?:y|ies)\s+(?:that\s+|which\s+)?(?:the\s+|our\s+)?(.+?)\s+(?:supports?|covers?|is mapped to|is linked to)\b", re.I),
+]
+
+
+def _extract_application_for_capabilities(question: str) -> Optional[str]:
+    """The application a 'which capabilities does X support' question names, or None."""
+    text = (question or "").strip().rstrip("?.! ")
+    for pattern in _CAPABILITY_OF_PATTERNS:
+        found = pattern.search(text)
+        if found:
+            name = found.group(1).strip().strip("'\"")
+            if name.lower().endswith("'s"):
+                name = name[:-2]
+            return name or None
+    return None
+
+
 def _keyword_match(question: str) -> Optional[Dict[str, Any]]:
     lowered = question.lower()
+    application = _extract_application_for_capabilities(question)
+    if application:
+        return {"entry_id": "capabilities_of_application", "params": {"service": application},
+                "confidence": 0.9, "method": "keyword"}
     for keywords, entry_id, params in _KEYWORD_RULES:
         if any(kw in lowered for kw in keywords):
             resolved = dict(params)

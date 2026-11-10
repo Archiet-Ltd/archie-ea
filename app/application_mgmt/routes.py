@@ -1914,61 +1914,10 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     capabilities = []
     capability_mappings = []
     try:
-        from app.models.application_capability import ApplicationCapabilityMapping
-        # tenant-scoping-ok: filtered by application_component_id == id below,
-        # and app_obj (id) is an org-scoped ApplicationComponent load.
-        cap_pairs = (
-            db.session.query(ApplicationCapabilityMapping, BusinessCapability)
-            .join(
-                BusinessCapability,
-                ApplicationCapabilityMapping.business_capability_id == BusinessCapability.id,
-            )
-            .filter(ApplicationCapabilityMapping.application_component_id == id)
-            .all()
-        )
-        capabilities = [cap for _, cap in cap_pairs]
-        capability_mappings = cap_pairs  # Keep (mapping, cap) pairs for table
+        from app.services.application_capabilities import application_capability_links
 
-        # DEF-003 follow-up (3 Sep 2026): the "Map Capability" modal's create
-        # handler (application_capability_mapping_create,
-        # detail_layer_routes.py) writes UnifiedApplicationCapabilityMapping —
-        # the canonical store per ADR-0008 — but this display only ever read
-        # the legacy ApplicationCapabilityMapping table above. A capability
-        # mapped through the modal therefore persisted correctly (confirmed
-        # in the DB) yet never appeared here: silent, not a crash. Rather than
-        # migrate the legacy rows into the unified table (a locked, checksum-
-        # verified data operation matching project_capabilities.py's rigor
-        # that this fix does not attempt), the display unions both sources,
-        # de-duplicated by the underlying BusinessCapability identity so an
-        # already-legacy-linked capability cannot render twice.
-        from app.models.unified_application_capability_mapping import (
-            UnifiedApplicationCapabilityMapping,
-        )
-        from app.models.unified_capability import UnifiedCapability
-
-        legacy_capability_ids = {cap.id for cap in capabilities}
-        unified_pairs = (
-            db.session.query(UnifiedApplicationCapabilityMapping, UnifiedCapability)
-            .join(
-                UnifiedCapability,
-                UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
-            )
-            .filter(
-                UnifiedApplicationCapabilityMapping.application_component_id == id,
-                UnifiedCapability.source_table == "business_capability",
-            )
-            .all()
-        )
-        for u_mapping, u_cap in unified_pairs:
-            try:
-                source_bc_id = int(u_cap.source_id)
-            except (TypeError, ValueError):
-                continue
-            if source_bc_id in legacy_capability_ids:
-                continue
-            legacy_capability_ids.add(source_bc_id)
-            capability_mappings.append((u_mapping, u_cap))
-            capabilities.append(u_cap)
+        capability_mappings = application_capability_links(app_obj.id, app_obj.organization_id)
+        capabilities = [cap for _, cap in capability_mappings]
     except Exception:
         logger.exception("Could not load capability mappings for application %s", app_obj.id)
         db.session.rollback()
