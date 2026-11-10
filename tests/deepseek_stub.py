@@ -53,7 +53,7 @@ class DeepSeekStub:
                     owner.keys_seen.append(token)
                 if token not in owner.accepted:
                     return self._json(401, {"error": {"message": "invalid key"}})
-                if body.get("model") not in SERVED_MODELS:
+                if str(body.get("model")).startswith("deepseek") and body.get("model") not in SERVED_MODELS:
                     return self._json(400, {"error": {"message": "Model Not Exist"}})
                 names = [t.get("function", {}).get("name", "") for t in body.get("tools") or []]
                 bad = [n for n in names if not NAME_RULE.match(n)]

@@ -48,12 +48,12 @@ class TestIsAllowedForOrg:
         from app.models.model_provider import ModelProvider
 
         db_session.add(ModelProvider(
-            provider="deepseek", model_version="deepseek-flash",
+            provider="deepseek", model_version="deepseek-chat",
             organization_id=None, is_platform_default=True, is_allowed=False,
         ))
         db_session.flush()
 
-        assert ModelProvider.is_allowed_for_org("deepseek", "deepseek-flash", None) is False
+        assert ModelProvider.is_allowed_for_org("deepseek", "deepseek-chat", None) is False
 
     def test_org_override_allows_blocked_platform(self, db_session, make_org):
         """Org override can re-allow what platform default blocks."""
@@ -61,16 +61,16 @@ class TestIsAllowedForOrg:
 
         org = make_org("override")
         db_session.add(ModelProvider(
-            provider="deepseek", model_version="deepseek-flash",
+            provider="deepseek", model_version="deepseek-chat",
             organization_id=None, is_platform_default=True, is_allowed=False,
         ))
         db_session.add(ModelProvider(
-            provider="deepseek", model_version="deepseek-flash",
+            provider="deepseek", model_version="deepseek-chat",
             organization_id=org.id, is_platform_default=False, is_allowed=True,
         ))
         db_session.flush()
 
-        assert ModelProvider.is_allowed_for_org("deepseek", "deepseek-flash", org.id) is True
+        assert ModelProvider.is_allowed_for_org("deepseek", "deepseek-chat", org.id) is True
 
     def test_org_override_blocks_allowed_platform(self, db_session, make_org):
         """Org override can block what platform default allows."""
@@ -312,13 +312,13 @@ class TestFallbackBypassPrevention:
 
         org = make_org("fallback-test")
 
-        # Block openai/gpt-4o and deepseek/deepseek-flash for this org
+        # Block openai/gpt-4o and deepseek/deepseek-chat for this org
         db_session.add(ModelProvider(
             provider="openai", model_version="gpt-4o",
             organization_id=org.id, is_platform_default=False, is_allowed=False,
         ))
         db_session.add(ModelProvider(
-            provider="deepseek", model_version="deepseek-flash",
+            provider="deepseek", model_version="deepseek-chat",
             organization_id=None, is_platform_default=True, is_allowed=False,
         ))
         db_session.flush()
@@ -373,7 +373,7 @@ class TestFallbackBypassPrevention:
 
         org = make_org("normalized-model-block")
         db_session.add(ModelProvider(
-            provider="deepseek", model_version="deepseek-flash",
+            provider="deepseek", model_version="deepseek-chat",
             organization_id=org.id, is_platform_default=False, is_allowed=False,
         ))
         db_session.flush()
