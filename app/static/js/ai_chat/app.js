@@ -403,12 +403,17 @@
                     <div class="w-2 h-2 bg-primary rounded-full animate-bounce" style="animation-delay: 150ms"></div>
                     <div class="w-2 h-2 bg-primary rounded-full animate-bounce" style="animation-delay: 300ms"></div>
                 </div>
-                <span class="text-muted-foreground">Thinking...</span>
+                <span class="text-muted-foreground" role="status" data-testid="chat-waiting-note">Thinking...</span>
             </div>
         `;
         messagesContainer.appendChild(loadingDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         lucide.createIcons();
+        // After ten seconds say what is happening, in plain words.
+        setTimeout(function () {
+            const note = document.querySelector('#' + loadingId + ' [data-testid="chat-waiting-note"]');
+            if (note) note.textContent = 'Still working: asking the AI. This usually takes under a minute.';
+        }, 10000);
 
         // A question that names something in the organisation's records is answered
         // from those records, as cited cards, before any model is asked.
@@ -735,6 +740,14 @@
                 },
                 onDone: async (result) => {
                     dropLoading();
+                    if (result.error && !result.paused) {
+                        /* A failed turn is a failure card with Retry, not a bubble in the assistant's voice. */
+                        let _msg = '';
+                        try { _msg = JSON.parse(payload).message; } catch (_) { /* swallow-ok: the payload is built here from JSON.stringify; if it cannot be read the failure card still shows, without a Retry that re-asks */ }
+                        appendError(result.text || 'The assistant is busy right now. Wait a minute, then press Retry.',
+                            _msg ? () => _retryTurn(_msg, timestamp) : null, { ownKeyLink: true });
+                        return;
+                    }
                     if (!wrap) wrap = beginStreamedMessage();
                     const meta = {
                         domain: result.domain || state.currentDomain,
