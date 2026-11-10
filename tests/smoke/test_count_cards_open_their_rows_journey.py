@@ -320,7 +320,19 @@ def test_every_count_card_opens_the_rows_it_counts(browser, live_server, viewpor
         page.wait_for_function("el => /: [0-9]+ signals/.test(el.innerText)", arg=landed.element_handle(),
                                timeout=PAGE_TIMEOUT)
         assert "Detected: %d signals" % signals in landed.inner_text(), landed.inner_text()
+        # the page lists each signal the figure counts, one row for each, and each row opens its capability
+        listed = page.locator('[data-testid="gap-signal-row"]')
+        listed.first.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+        assert listed.count() == signals, (signals, listed.count())
+        assert "#gap-signals" in page.url, page.url
+        first = listed.first.locator("a").first
+        first_name = first.inner_text().strip()
+        assert noun in first_name, first_name
         _frame(page, "signals-landing", width, theme)
+        first.click()
+        page.wait_for_url(re.compile(r"/capabilities/detail/\d+"), timeout=PAGE_TIMEOUT)
+        assert first_name in page.locator("body").inner_text(), page.locator("body").inner_text()[:300]
+        page.go_back(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert other not in page.locator("body").inner_text()
     finally:
         context.close()

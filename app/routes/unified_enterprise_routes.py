@@ -484,10 +484,12 @@ def investment_matrix():
 def risk_assessment():
     """The earlier address of the gaps by severity; the gap register is the one place for them.
 
-    A severity it knows is kept, so the register opens on the same list; anything else is dropped."""
+    A severity it knows is kept, so the register opens on the open gaps of that severity (the page this
+    address was always a count of); anything else is dropped."""
     severity = (request.args.get("severity") or "").strip().lower()
-    return redirect(url_for("enterprise.gap_analysis", severity=severity if severity in _GAP_SEVERITIES else None),
-                    code=301)
+    if severity not in _GAP_SEVERITIES:
+        return redirect(url_for("enterprise.gap_analysis"), code=301)
+    return redirect(url_for("enterprise.gap_analysis", severity=severity, status="open"), code=301)
 
 
 @enterprise_bp.route("/strategic/technology-roadmap")
@@ -948,7 +950,8 @@ def gap_analysis():
         }
         total_gap_count = gap_counts["recorded"]
         closed_gap_count = gap_counts["resolved"]
-        not_addressed_gaps = get_gaps_not_addressed(org_id)
+        # the open gaps with no work package, whole register: the board's "No work planned" figure and rows
+        not_addressed_gaps = sorted(get_gaps_not_addressed(org_id), key=lambda g: ((g.name or "").lower(), g.id))
         work_packages_by_gap = work_package_service.work_packages_for_gaps(
             [g.id for g in gaps], current_org_id())
 

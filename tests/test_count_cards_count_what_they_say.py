@@ -109,8 +109,10 @@ def test_the_old_gap_severity_address_redirects_to_the_register(db_session, make
     assert plain.status_code == 301 and plain.headers["Location"].endswith(register)
     for level in ("critical", "high", "medium", "low"):
         mapped = client.get(old + "?severity=" + level)
-        assert mapped.status_code == 301 and mapped.headers["Location"].endswith(register + "?severity=" + level)
-    assert client.get(old + "?severity=Critical").headers["Location"].endswith(register + "?severity=critical")
+        assert mapped.status_code == 301 and mapped.headers["Location"].endswith(
+            register + "?severity=" + level + "&status=open")
+    assert client.get(old + "?severity=Critical").headers["Location"].endswith(
+        register + "?severity=critical&status=open")
     dropped = client.get(old + "?severity=bogus")
     assert dropped.status_code == 301 and dropped.headers["Location"].endswith(register)
 
@@ -204,7 +206,7 @@ def test_the_boards_gap_signals_figure_opens_the_roadmap_that_counts_them(db_ses
     mine, theirs = _signed_in(db_session, make_org, client, login_as, "signals-link")
     with mock.patch("app.modules.capabilities.routes.roadmap_routes.compute_gap_signals", return_value=[1, 2, 3]):
         html = client.get("/adm-kanban/gap-analysis").get_data(as_text=True)
-    assert 'href="/capability-roadmap"' in html and 'data-testid="gap-signals">3<' in html
+    assert 'href="/capability-roadmap#gap-signals"' in html and 'data-testid="gap-signals">3<' in html
     with mock.patch("app.modules.capabilities.routes.roadmap_routes.compute_gap_signals", return_value=[]):
         html = client.get("/adm-kanban/gap-analysis").get_data(as_text=True)
     assert 'data-testid="gap-signals">0<' in html and 'href="/capability-roadmap"' not in html
@@ -300,3 +302,85 @@ def test_a_risk_count_card_opens_the_register_rows_it_counts(db_session, make_or
     with mock.patch("app.modules.architecture.routes.risk_routes.render_template", return_value="ok") as render:
         client.get("/risks/")
     assert len(render.call_args.kwargs["risk_rows"]) == 5
+
+
+def test_the_old_gap_severity_address_lists_the_open_gaps_its_figure_counted(db_session, make_org, client, login_as):
+    mine, theirs = _signed_in(db_session, make_org, client, login_as, "sev-open-rows")
+    _seed_gaps(db_session, mine, theirs)
+    with mock.patch("app.routes.unified_enterprise_routes.render_template", return_value="ok") as render:
+        client.get("/enterprise/strategic/risk-assessment?severity=critical", follow_redirects=True)
+    shown = render.call_args.kwargs
+    assert shown["open_by_severity"]["critical"] == 2
+    assert shown["listed_count"] == len(shown["gaps"]) == 2
+    assert all(g.resolution_status != "resolved" for g in shown["gaps"])
+
+
+def test_a_second_organisations_person_reaches_only_their_own_gaps_through_the_old_address(
+        db_session, make_org, client, login_as):
+    from tests.test_work_package_writer import _user
+
+    mine, theirs = make_org("old-a"), make_org("old-b")
+    _seed_gaps(db_session, mine, theirs)
+    mine_names = {g.name for g in _all_gaps(mine)}
+    their_names = {g.name for g in _all_gaps(theirs)}
+    visitor = _user(db_session, theirs, "oldb", role="enterprise_architect")
+    login_as(client, visitor)
+    with mock.patch("app.routes.unified_enterprise_routes.render_template", return_value="ok") as render:
+        response = client.get("/enterprise/strategic/risk-assessment?severity=critical", follow_redirects=True)
+    assert response.status_code == 200
+    shown = render.call_args.kwargs
+    listed = {g.name for g in shown["gaps"]}
+    assert listed and listed <= their_names and not (listed & mine_names)
+    # their critical gaps: one identified, one in progress (open), one resolved
+    assert shown["listed_count"] == shown["open_by_severity"]["critical"] == 2
+
+
+def _all_gaps(org):
+    from app.models.implementation_migration import Gap
+
+    return Gap.query.filter(Gap.organization_id == org.id).all()
+
+
+def test_the_not_addressed_section_lists_every_such_gap_not_the_pages_rows(db_session, make_org, client, login_as):
+    from app.services import work_package_service
+
+    mine, theirs = _signed_in(db_session, make_org, client, login_as, "not-addr")
+    covered = [_gap(db_session, mine, priority="low", severity="low") for _ in range(6)]
+    bare = [_gap(db_session, mine, priority="low", severity="low") for _ in range(3)]
+    _gap(db_session, theirs, priority="low", severity="low")
+    for gap in covered:
+        wp = work_package_service.create_work_package(organization_id=mine.id, name="Close %s" % gap.name)
+        work_package_service.link_gap(wp.id, gap.id, organization_id=mine.id)
+    db_session.flush()
+    with mock.patch("app.routes.unified_enterprise_routes._GAP_PAGE_SIZE", 4, create=True), \
+            mock.patch("app.routes.unified_enterprise_routes.render_template", return_value="ok") as render:
+        client.get("/enterprise/implementation/gap-analysis?page=2")
+    shown = render.call_args.kwargs
+    assert {g.id for g in shown["not_addressed_gaps"]} == {g.id for g in bare}
+    assert len(shown["gaps"]) < shown["listed_count"] == 9
+    assert [g.name for g in shown["not_addressed_gaps"]] == sorted(g.name for g in bare)
+
+
+def test_the_workflow_step_reports_the_work_packages_it_wrote(app, db_session, make_org):
+    from types import SimpleNamespace
+
+    from flask import g
+    from flask_login import login_user
+
+    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.modules.solutions_strategic.v2.services.ea_workflow_engine import EAWorkflowEngine
+    from tests.test_work_package_writer import _user
+
+    mine, theirs = make_org("engine"), make_org("engine-other")
+    person = _user(db_session, mine, "engine", role="enterprise_architect")
+    engine = EAWorkflowEngine()
+    instance = SimpleNamespace(instance_code="WF-T", context={})
+    items = [{"name": "Close %d %s" % (i, uuid.uuid4().hex[:6])} for i in range(3)]
+    with app.test_request_context("/"):
+        login_user(person)
+        g.current_org_id = mine.id
+        out = engine._handle_roadmap_creation(instance, {}, {"approved_items": items})
+        rows = UnifiedWorkPackage.query.filter(UnifiedWorkPackage.id.in_(out["work_package_ids"])).all()
+    assert out["roadmap_items_created"] == len(out["work_package_ids"]) == 3
+    assert {r.name for r in rows} == {i["name"] for i in items}
+    assert {r.organization_id for r in rows} == {mine.id}

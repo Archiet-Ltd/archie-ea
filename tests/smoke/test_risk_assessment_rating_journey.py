@@ -88,6 +88,17 @@ def test_the_old_address_lands_on_the_register_whose_counts_follow_its_ratings(b
             "priority_only": "critical", "severity_only": "critical", "high": "high", "medium": "medium", "low": "low",
         }, register
 
+        # what a person reads in each row's Severity cell (the narrow layout's line under the name) is the severity
+        # that was recorded, not only the attribute the link carries
+        seeded = {"priority_only": "critical", "severity_only": "critical", "high": "high", "medium": "medium",
+                  "low": "low"}
+        for key, name in names.items():
+            row = page.locator('[data-testid="gap-row"]').filter(has=page.get_by_role("link", name=name, exact=True))
+            expect(row).to_have_count(1)
+            shown = row.inner_text().replace(name, "").lower()
+            assert seeded[key] in shown, (key, shown)
+            assert register[key] == seeded[key], (key, register[key])
+
         page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.url == live_server + REGISTER, page.url
         expect(page.get_by_text(names["low"], exact=True)).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -99,12 +110,15 @@ def test_the_old_address_lands_on_the_register_whose_counts_follow_its_ratings(b
             link = page.get_by_role("link", name=name, exact=True)
             expect(link).to_have_count(1)
             assert link.get_attribute("data-severity") == register[key]
+            row = page.locator('[data-testid="gap-row"]').filter(has=link)
+            shown = row.inner_text().replace(name, "").lower()
+            assert seeded[key] in shown, (key, shown)
         expect(page.get_by_text(other)).to_have_count(0)
         _frame(page, "risk-assessment", viewport)
 
         for level in ("critical", "high"):
             page.goto("%s%s?severity=%s" % (live_server, PATH, level), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-            assert page.url == "%s%s?severity=%s" % (live_server, REGISTER, level), page.url
+            assert page.url == "%s%s?severity=%s&status=open" % (live_server, REGISTER, level), page.url
             listed = page.locator('[data-testid="gap-row"]')
             expect(listed).to_have_count(int(tiles[level]), timeout=PAGE_TIMEOUT)
             expect(page.get_by_text(other)).to_have_count(0)

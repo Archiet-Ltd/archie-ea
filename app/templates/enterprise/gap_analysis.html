@@ -88,15 +88,18 @@
 {%- set in_progress = counts.in_progress or 0 -%}
 {%- set resolved = counts.resolved or 0 -%}
 {%- set recorded = counts.recorded or 0 -%}
-{#- The second table lists the gaps the first shows with no work package, from the same links, so the two never disagree. -#}
+{#- The page's own rows with no work package, for the facts said once below. -#}
 {%- set unaddressed = [] -%}
 {%- for g in gaps %}{% if not wp_by_gap.get(g.id) and not g.is_closed %}{% set _ = unaddressed.append(g) %}{% endif %}{% endfor -%}
+{#- Unfiltered, the register is split by the whole register, not by the page in view, so every page splits alike. -#}
+{%- set whole_register = not (severity_filter or status_filter or work_filter) -%}
+{%- set mostly_covered = ((listed_count - not_addressed_gaps|length) * 2 > listed_count) if whole_register else ((gaps|length - unaddressed|length) * 2 > gaps|length) -%}
 {#- A fact that is the same on every row is said once, not repeated in a column. -#}
 {%- set types = gaps|map(attribute='gap_type')|map('default', '', true)|unique|list -%}
 {%- set sevs = gaps|map(attribute='rated_severity')|map('default', '', true)|unique|list -%}
 {%- set statuses = gaps|map(attribute='resolution_status')|map('default', 'identified', true)|unique|list -%}
 {%- set impacts = gaps|map(attribute='impact')|map('default', '', true)|unique|list -%}
-{%- set show = {'type': types|length > 1, 'severity': sevs|length > 1 or (sevs[0]|lower) in ['critical', 'high'], 'status': statuses|length > 1, 'impact': impacts|length > 1, 'work': (gaps|length - unaddressed|length) * 2 > gaps|length} -%}
+{%- set show = {'type': types|length > 1, 'severity': sevs|length > 1 or (sevs[0]|lower) in ['critical', 'high'], 'status': statuses|length > 1, 'impact': impacts|length > 1, 'work': mostly_covered} -%}
 {%- set facts = [] -%}
 {%- if gaps and not show.status %}{% set _ = facts.append('every gap is ' ~ statuses[0]|replace('_', ' ')|lower) %}{% endif -%}
 {%- if gaps and not show.severity %}{% set _ = facts.append(('every gap is rated ' ~ sevs[0]|lower) if sevs[0] else 'no gap has a severity yet') %}{% endif -%}
@@ -158,13 +161,16 @@
   <p class="text-sm text-muted-foreground">No gap matches this filter ({{ parts|join(', ') }}). The register holds {{ recorded }} {{ 'gap' if recorded == 1 else 'gaps' }}.</p>
   <div class="mt-4 flex justify-center">{{ ui.button(text='Show all gaps', variant='outline', size='sm', href=url_for('enterprise.gap_analysis'), attrs={'data-testid': 'gaps-filter-empty-clear'}) }}</div>
 </div>
-{% elif show.work and unaddressed %}
+{% elif show.work and whole_register and not_addressed_gaps %}
 {#- Two sections: the register, and the gaps nothing covers yet. -#}
 {% call section('Recorded gaps', description=(facts_line or 'Open a gap to classify it, or convert it into a work package that closes it'), testid='gaps-section') %}
   {{ _gaps_table(gaps, wp_by_gap, columns, show, dupes) }}
 {% endcall %}
+{%- set na_total = not_addressed_gaps|length -%}
+{%- set na_shown = not_addressed_gaps[:page_size] -%}
 {% call section('Gaps with no work package', description='Each stays an open risk in the move to the target architecture until a work package covers it', testid='gaps-not-addressed') %}
-{% call(gap) list_table(rows=unaddressed, columns=([{'label': 'Gap', 'sortable': true}] + ([{'label': 'Severity', 'sortable': true}] if show.severity else []) + ([('Status', '')] if show.status else [])),
+<p class="text-sm text-muted-foreground" data-testid="gaps-not-addressed-total">{% if na_total > na_shown|length %}Showing gaps 1 to {{ na_shown|length }} of {{ na_total }} with no work package.{% else %}{{ na_total }} {{ 'gap has' if na_total == 1 else 'gaps have' }} no work package.{% endif %}</p>
+{% call(gap) list_table(rows=na_shown, columns=([{'label': 'Gap', 'sortable': true}] + ([{'label': 'Severity', 'sortable': true}] if show.severity else []) + ([('Status', '')] if show.status else [])),
                         caption='Gaps with no work package', testid='gaps-not-addressed-table', row_testid='not-addressed-gap-row',
                         search_placeholder='Filter gaps...', empty_message='Every gap has a work package.') %}
   {% call table_cell(class='max-w-[420px]') %}
