@@ -36,7 +36,10 @@ def _decision_status(result):
         "NOT_FOUND": 404,
         "FORBIDDEN": 403,
         "APPROVAL_DENIED": 403,
+        "ACCOUNT_OFF": 403,
         "CONFLICT": 409,
+        "DECLINED": 409,
+        "IN_REVIEW": 409,
     }.get(result.get("code"), 400)
 
 

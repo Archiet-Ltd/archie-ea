@@ -118,16 +118,21 @@ def queue_ai_write(operation_type: str, entity_type: str, payload: dict, summary
             500,
         )
 
+    # The change's real outcome. The server checks and reviews it in this same request, so by now it has
+    # been applied or declined unless no reviewer could be reached yet (then it is still waiting, 202).
+    outcome = queued.get("status") or "pending_approval"
+    status_code = {"applied": 200, "declined": 422}.get(outcome, 202)
     return (
         jsonify(
             {
-                "status": "pending_approval",
+                "status": outcome,
                 "message": queued["message"],
                 "approval_id": queued["approval_id"],
+                "record_url": queued.get("record_url"),
                 "action": request.endpoint,
                 "payload": payload,
                 "ai_originated": True,
             }
         ),
-        202,
+        status_code,
     )

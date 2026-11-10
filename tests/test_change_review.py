@@ -131,15 +131,15 @@ def test_a_person_alone_in_a_workspace_gets_the_change_applied_in_the_same_turn(
 
     org = make_org("solo")
     founder = _user(db_session, org.id)
-    ifiok = _application(db_session, org.id, "Ifiok %s" % uuid.uuid4().hex[:6], "development")
+    atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "development")
     reviewer = FakeReviewer([PASS_ALL]).install(monkeypatch)
 
     with tenant_ctx(org.id):
-        approval_id, verdict = _ask_for_status(founder, ifiok.name, "production")
+        approval_id, verdict = _ask_for_status(founder, atlas.name, "production")
         assert verdict["state"] == "applied", verdict
         assert verdict["message"].startswith("Applied: ")
         assert verdict["record_url"].endswith("approval=%d" % approval_id)
-        assert _status_of(ifiok.id) == "production"
+        assert _status_of(atlas.id) == "production"
 
         row = _row(approval_id)
         assert row.status == ApprovalStatus.APPROVED
@@ -167,7 +167,7 @@ def test_a_person_alone_in_a_workspace_gets_the_change_applied_in_the_same_turn(
 
     # The reviewer read the drafter's request and this organisation's application, and nothing else.
     assert reviewer.selected_for == [("deepseek", "deepseek-chat")]
-    assert ifiok.name in reviewer.review_prompts[0][1]
+    assert atlas.name in reviewer.review_prompts[0][1]
 
 
 def test_the_record_page_reads_rounds_models_and_reasons(db_session, make_org, tenant_ctx, monkeypatch):
@@ -175,10 +175,10 @@ def test_the_record_page_reads_rounds_models_and_reasons(db_session, make_org, t
 
     org = make_org("record")
     founder = _user(db_session, org.id)
-    ifiok = _application(db_session, org.id, "Ifiok %s" % uuid.uuid4().hex[:6], "development")
+    atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "development")
     FakeReviewer([PASS_ALL]).install(monkeypatch)
     with tenant_ctx(org.id):
-        approval_id, _verdict = _ask_for_status(founder, ifiok.name, "production")
+        approval_id, _verdict = _ask_for_status(founder, atlas.name, "production")
         record = AIChatApprovalService(founder.id).get_review_record(approval_id)["record"]
     assert record["verdict"] == "Applied"
     assert record["drafter"] == "deepseek-chat (DeepSeek)"
@@ -227,17 +227,17 @@ def test_a_declined_change_leaves_the_data_unchanged_and_names_the_reasons(
 def test_a_revision_is_reviewed_again_and_applied_when_it_passes(db_session, make_org, tenant_ctx, monkeypatch):
     org = make_org("revise")
     founder = _user(db_session, org.id)
-    ifiok = _application(db_session, org.id, "Ifiok %s" % uuid.uuid4().hex[:6], "development")
-    revised = {"application_name": ifiok.name, "new_status": "production", "rationale": "The founder asked for it"}
+    atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "development")
+    revised = {"application_name": atlas.name, "new_status": "production", "rationale": "The founder asked for it"}
     FakeReviewer(
         [_fail(1, "The person asked for production, the change sets testing."), PASS_ALL],
-        revisions=[{"arguments": revised, "summary": "Move %s to production." % ifiok.name}],
+        revisions=[{"arguments": revised, "summary": "Move %s to production." % atlas.name}],
     ).install(monkeypatch)
     with tenant_ctx(org.id):
-        approval_id, verdict = _ask_for_status(founder, ifiok.name, "testing")
+        approval_id, verdict = _ask_for_status(founder, atlas.name, "testing")
         assert verdict["state"] == "applied", verdict
         assert verdict["rounds"] == 2
-        assert _status_of(ifiok.id) == "production"
+        assert _status_of(atlas.id) == "production"
         names = [e.event for e in _events(approval_id)]
         assert names.count("reviewed") == 2 and names.count("revised") == 1
 
@@ -245,20 +245,20 @@ def test_a_revision_is_reviewed_again_and_applied_when_it_passes(db_session, mak
 def test_after_three_failed_reviews_the_change_is_declined(db_session, make_org, tenant_ctx, monkeypatch):
     org = make_org("three")
     founder = _user(db_session, org.id)
-    ifiok = _application(db_session, org.id, "Ifiok %s" % uuid.uuid4().hex[:6], "development")
+    atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "development")
 
     def draft(status):
-        return {"arguments": {"application_name": ifiok.name, "new_status": status, "rationale": "r"}, "summary": status}
+        return {"arguments": {"application_name": atlas.name, "new_status": status, "rationale": "r"}, "summary": status}
 
     reviewer = FakeReviewer(
         [_fail(2, "Invented."), _fail(2, "Still invented."), _fail(2, "Invented again.")],
         revisions=[draft("testing"), draft("design")],
     ).install(monkeypatch)
     with tenant_ctx(org.id):
-        approval_id, verdict = _ask_for_status(founder, ifiok.name, "production")
+        approval_id, verdict = _ask_for_status(founder, atlas.name, "production")
         assert verdict["state"] == "declined"
         assert "Invented again." in verdict["message"]
-        assert _status_of(ifiok.id) == "development"
+        assert _status_of(atlas.id) == "development"
         assert _row(approval_id).review_rounds == 3
     assert len(reviewer.review_prompts) == 3 and len(reviewer.revision_prompts) == 2
 
@@ -266,11 +266,11 @@ def test_after_three_failed_reviews_the_change_is_declined(db_session, make_org,
 def test_a_change_no_model_drafted_gets_one_review_and_no_revision(db_session, make_org, tenant_ctx, monkeypatch):
     org = make_org("form")
     founder = _user(db_session, org.id)
-    ifiok = _application(db_session, org.id, "Ifiok %s" % uuid.uuid4().hex[:6], "development")
+    atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "development")
     reviewer = FakeReviewer([_fail(6, "The summary does not say what changes.")],
                             choice=("deepseek", "deepseek-reasoner", False)).install(monkeypatch)
     with tenant_ctx(org.id):
-        _approval_id, verdict = _ask_for_status(founder, ifiok.name, "production", drafter=None)
+        _approval_id, verdict = _ask_for_status(founder, atlas.name, "production", drafter=None)
     assert verdict["state"] == "declined"
     assert reviewer.selected_for == [("", "")]
     assert reviewer.revision_prompts == []
@@ -290,10 +290,10 @@ def test_a_failed_check_declines_with_its_reason_and_calls_no_model(db_session, 
 def test_a_value_the_field_already_holds_is_declined_by_the_checks(db_session, make_org, tenant_ctx, monkeypatch):
     org = make_org("same")
     founder = _user(db_session, org.id)
-    ifiok = _application(db_session, org.id, "Ifiok %s" % uuid.uuid4().hex[:6], "production")
+    atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "production")
     reviewer = FakeReviewer([PASS_ALL]).install(monkeypatch)
     with tenant_ctx(org.id):
-        _approval_id, verdict = _ask_for_status(founder, ifiok.name, "production")
+        _approval_id, verdict = _ask_for_status(founder, atlas.name, "production")
     assert verdict["state"] == "declined"
     assert "is already production" in verdict["message"]
     assert reviewer.review_prompts == []
@@ -302,13 +302,13 @@ def test_a_value_the_field_already_holds_is_declined_by_the_checks(db_session, m
 def test_a_requester_whose_role_cannot_write_is_declined(db_session, make_org, tenant_ctx, monkeypatch):
     org = make_org("viewer")
     viewer = _user(db_session, org.id, role_name="Viewer")
-    ifiok = _application(db_session, org.id, "Ifiok %s" % uuid.uuid4().hex[:6], "development")
+    atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "development")
     reviewer = FakeReviewer([PASS_ALL]).install(monkeypatch)
     with tenant_ctx(org.id):
-        _approval_id, verdict = _ask_for_status(viewer, ifiok.name, "production")
+        _approval_id, verdict = _ask_for_status(viewer, atlas.name, "production")
         assert verdict["state"] == "declined"
         assert "no longer has a role that can make changes" in verdict["message"]
-        assert _status_of(ifiok.id) == "development"
+        assert _status_of(atlas.id) == "development"
     assert reviewer.review_prompts == []
 
 
@@ -320,10 +320,10 @@ def test_with_no_reviewer_the_change_waits_then_is_declined_after_twelve_attempt
 
     org = make_org("wait")
     founder = _user(db_session, org.id)
-    ifiok = _application(db_session, org.id, "Ifiok %s" % uuid.uuid4().hex[:6], "development")
+    atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "development")
     FakeReviewer([], choice=None).install(monkeypatch)
     with tenant_ctx(org.id):
-        approval_id, verdict = _ask_for_status(founder, ifiok.name, "production")
+        approval_id, verdict = _ask_for_status(founder, atlas.name, "production")
         assert verdict["state"] == "in_review"
         service = AIChatApprovalService(founder.id)
         for _ in range(MAX_WAITS - 2):
@@ -331,7 +331,7 @@ def test_with_no_reviewer_the_change_waits_then_is_declined_after_twelve_attempt
         final = service.settle_after_review(approval_id)
         assert final["state"] == "declined"
         assert final["reasons"] == [NO_REVIEWER_REASON]
-        assert _status_of(ifiok.id) == "development"
+        assert _status_of(atlas.id) == "development"
 
 
 def test_the_sweep_settles_a_quiet_change_of_its_own_organisation_only(db_session, make_org, tenant_ctx, monkeypatch):
@@ -341,8 +341,8 @@ def test_the_sweep_settles_a_quiet_change_of_its_own_organisation_only(db_sessio
 
     org_a, org_b = make_org("sweep-a"), make_org("sweep-b")
     user_a, user_b = _user(db_session, org_a.id), _user(db_session, org_b.id)
-    app_a = _application(db_session, org_a.id, "Ifiok A %s" % uuid.uuid4().hex[:6], "development")
-    app_b = _application(db_session, org_b.id, "Ifiok B %s" % uuid.uuid4().hex[:6], "development")
+    app_a = _application(db_session, org_a.id, "Atlas A %s" % uuid.uuid4().hex[:6], "development")
+    app_b = _application(db_session, org_b.id, "Atlas B %s" % uuid.uuid4().hex[:6], "development")
     FakeReviewer([], choice=None).install(monkeypatch)
     ids = {}
     for org, user, app_obj in ((org_a, user_a, app_a), (org_b, user_b, app_b)):
@@ -484,15 +484,15 @@ def test_the_real_router_reviews_a_deepseek_chat_draft_with_deepseek_reasoner(
         monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
         org = make_org("real-router")
         founder = _user(db_session, org.id)
-        ifiok = _application(db_session, org.id, "Ifiok %s" % uuid.uuid4().hex[:6], "development")
+        atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "development")
         with tenant_ctx(org.id):
-            approval_id, verdict = _ask_for_status(founder, ifiok.name, "production")
+            approval_id, verdict = _ask_for_status(founder, atlas.name, "production")
             assert verdict["state"] == "applied", verdict
-            assert _status_of(ifiok.id) == "production"
+            assert _status_of(atlas.id) == "production"
             row = _row(approval_id)
             assert (row.drafter_model, row.reviewer_model) == ("deepseek/deepseek-chat", "deepseek/deepseek-reasoner")
     finally:
         stub.close()
     assert [r["model"] for r in stub.requests] == ["deepseek-reasoner"]
-    assert ifiok.name in stub.requests[0]["text"]
+    assert atlas.name in stub.requests[0]["text"]
     assert spend == [("deepseek", "deepseek-reasoner")], "the platform's spend ledger records the review"

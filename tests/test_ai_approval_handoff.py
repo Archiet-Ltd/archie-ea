@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from tests.test_change_review import PASS_ALL, FakeReviewer
+
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
@@ -113,6 +115,8 @@ def test_same_org_reviewer_executes_once_and_receives_allowlisted_queue(
         assert mismatch["code"] == "FORBIDDEN"
         assert calls == []
 
+        # An approve is a request to settle the change: it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         result = AIChatApprovalService(reviewer.id).approve_and_execute(approval_id, reviewer.id)
         assert result["success"] is True
         assert calls == [(reviewer.id, {"name": "Handoff"})]
@@ -266,6 +270,8 @@ def test_audit_failure_after_claim_cannot_reopen_or_dispatch_an_approval(
 
         monkeypatch.setattr(AIChatApprovalService, "_audit", fail_only_the_post_claim_audit)
 
+        # An approve is a request to settle the change: it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         first = AIChatApprovalService(reviewer.id).approve_and_execute(approval_id, reviewer.id)
         replay = AIChatApprovalService(second_reviewer.id).approve_and_execute(
             approval_id, second_reviewer.id

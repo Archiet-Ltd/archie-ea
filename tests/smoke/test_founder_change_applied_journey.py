@@ -153,7 +153,7 @@ def test_a_founder_who_signed_up_gets_an_application_moved_to_production(
     browser, deepseek_server, stub, shots, width, theme
 ):
     base = deepseek_server
-    name = "Ifiok %s" % uuid.uuid4().hex[:6]
+    name = "Atlas %s" % uuid.uuid4().hex[:6]
     email = "founder.%s@example.com" % uuid.uuid4().hex[:8]
     context = _context(browser, width, theme)
     page = context.new_page()
@@ -205,7 +205,8 @@ def test_a_founder_asking_for_a_board_submission_is_declined_plainly_with_no_rev
                         "Submit the Payments rebuild to the architecture review board.")
         text = verdicts.inner_text()
         assert "Declined:" in text, text
-        assert "cto founder charter does not allow this kind of change" in text, text
+        assert "Your assistant is not set up to make this kind of change" in text, text
+        assert "charter" not in text.lower() and "submit_for_arb_review" not in text, text
         assert "Applied:" not in text
         _shot(page, shots, "founder-board-submission-declined", theme)
 
@@ -213,7 +214,7 @@ def test_a_founder_asking_for_a_board_submission_is_declined_plainly_with_no_rev
         page.wait_for_url(re.compile(r"/ai-chat/approvals/inbox\?approval=\d+"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("review-record-verdict")).to_have_text("Declined")
         expect(page.get_by_test_id("review-record-reasons")).to_contain_text(
-            "cto founder charter does not allow this kind of change")
+            "Your assistant is not set up to make this kind of change")
         assert len(_reviews(stub)) == reviews_before, "a charter refusal calls no reviewing model"
     finally:
         context.close()

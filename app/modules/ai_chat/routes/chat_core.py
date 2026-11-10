@@ -1626,7 +1626,10 @@ def approve_tool_action(approval_id: int):
         "NOT_FOUND": 404,
         "FORBIDDEN": 403,
         "APPROVAL_DENIED": 403,
+        "ACCOUNT_OFF": 403,
         "CONFLICT": 409,
+        "DECLINED": 409,
+        "IN_REVIEW": 409,
     }.get(result.get("code"), 200 if result.get("success") else 400)
     return jsonify({
         "success": result.get("success", False),
@@ -1647,7 +1650,10 @@ def reject_tool_action(approval_id: int):
         "NOT_FOUND": 404,
         "FORBIDDEN": 403,
         "APPROVAL_DENIED": 403,
+        "ACCOUNT_OFF": 403,
         "CONFLICT": 409,
+        "DECLINED": 409,
+        "IN_REVIEW": 409,
     }.get(result.get("code"), 200 if result.get("success") else 400)
     return jsonify({
         "success": result.get("success", False),

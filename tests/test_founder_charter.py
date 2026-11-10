@@ -57,13 +57,13 @@ def test_a_founder_status_change_is_applied_in_the_same_turn_and_names_both_mode
     db_session, make_org, tenant_ctx, monkeypatch
 ):
     org, founder = _founder_workspace(db_session, make_org, "founder")
-    ifiok = _application(db_session, org.id, "Ifiok %s" % uuid.uuid4().hex[:6], "development")
+    atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "development")
     reviewer = FakeReviewer([PASS_ALL]).install(monkeypatch)
     with tenant_ctx(org.id):
-        approval_id, verdict = _ask(founder, "cto_founder", "update_application_status", _status_args(ifiok.name))
+        approval_id, verdict = _ask(founder, "cto_founder", "update_application_status", _status_args(atlas.name))
         assert verdict["state"] == "applied", verdict
         assert verdict["message"].startswith("Applied: ")
-        assert _status_of(ifiok.id) == "production"
+        assert _status_of(atlas.id) == "production"
         row = _row(approval_id)
         assert row.persona == "cto_founder"
         assert row.drafter_model == "deepseek/deepseek-chat"
@@ -80,7 +80,8 @@ def test_a_charter_refused_change_is_declined_with_the_reason_and_no_reviewer_is
     with tenant_ctx(org.id):
         approval_id, verdict = _ask(founder, "cto_founder", "submit_for_arb_review", {"solution_name": "Anything"})
         assert verdict["state"] == "declined", verdict
-        assert "cto founder charter does not allow this kind of change" in verdict["message"]
+        assert "Your assistant is not set up to make this kind of change" in verdict["message"]
+        assert "charter" not in verdict["message"].lower() and "submit_for_arb_review" not in verdict["message"]
         assert _row(approval_id).reviewer_model is None
         assert [e.event for e in _events(approval_id)][:2] == ["created", "checked"]
     assert reviewer.selected_for == [] and reviewer.review_prompts == [] and reviewer.revision_prompts == []
@@ -92,13 +93,14 @@ def test_the_executive_briefing_charter_still_refuses_writes_before_any_review(
     org = make_org("cto")
     _seed_charters([org.id])
     cto = _user(db_session, org.id)
-    ifiok = _application(db_session, org.id, "Ifiok %s" % uuid.uuid4().hex[:6], "development")
+    atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "development")
     reviewer = FakeReviewer([PASS_ALL]).install(monkeypatch)
     with tenant_ctx(org.id):
-        _id, verdict = _ask(cto, "cto", "update_application_status", _status_args(ifiok.name))
+        _id, verdict = _ask(cto, "cto", "update_application_status", _status_args(atlas.name))
         assert verdict["state"] == "declined", verdict
-        assert "cto charter does not allow this kind of change" in verdict["message"]
-        assert _status_of(ifiok.id) == "development"
+        assert "Your assistant is not set up to make this kind of change" in verdict["message"]
+        assert "charter" not in verdict["message"].lower() and "update_application_status" not in verdict["message"]
+        assert _status_of(atlas.id) == "development"
     assert reviewer.selected_for == [] and reviewer.review_prompts == []
 
 

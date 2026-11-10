@@ -592,9 +592,16 @@ def init_scheduler(app):
         )
 
         # A change that could not be reviewed in its own turn (no independent reviewer reachable, or the
-        # run's review limit spent) stays in review. Every five minutes the server tries again, one
-        # organisation at a time; after 12 attempts with no reviewer the change is declined with that
-        # reason. Nothing here asks a person to approve anything.
+        # run's review limit spent) stays in review. Every SWEEP_INTERVAL_MINUTES the server tries again, one
+        # organisation at a time (a change is retried by every sweep: its quiet window is shorter than the
+        # interval); after 12 attempts, about 55 minutes, with no reviewer the change is declined with that
+        # reason. Only a change that is in the review loop is swept. Nothing here asks a person to approve
+        # anything.
+        def _sweep_interval_minutes():
+            from app.modules.ai_chat.services.change_review import SWEEP_INTERVAL_MINUTES
+
+            return SWEEP_INTERVAL_MINUTES
+
         def run_change_review_sweep():
             with app.app_context():
                 import logging
@@ -622,7 +629,7 @@ def init_scheduler(app):
 
         scheduler.add_job(
             func=run_change_review_sweep,
-            trigger=IntervalTrigger(minutes=5),
+            trigger=IntervalTrigger(minutes=_sweep_interval_minutes()),
             id="change_review_sweep",
             name="Change Review Sweep",
             replace_existing=True,

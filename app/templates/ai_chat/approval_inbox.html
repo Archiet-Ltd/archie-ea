@@ -55,6 +55,10 @@
     {% endcall %}
     {% if record.same_provider_note %}<p class="text-sm text-muted-foreground" data-testid="review-record-same-provider">{{ record.same_provider_note }}</p>{% endif %}
 
+    {% if record.verdict == 'In review' and record.waiting_reason %}
+    <p class="text-sm text-muted-foreground" data-testid="review-record-waiting">{{ record.waiting_reason }}</p>
+    {% endif %}
+
     {% if record.verdict == 'Declined' and record.reasons %}
     <div data-testid="review-record-reasons">
       <p class="text-sm font-medium text-foreground">Why it was declined</p>
@@ -69,7 +73,7 @@
       <p class="text-sm font-medium text-foreground">Checks the server ran first</p>
       <ul class="mt-1 space-y-1 text-sm text-muted-foreground">
         {% for check in record.checks %}
-        <li><span class="text-foreground">{{ check.name }}:</span> {{ 'passed' if check.passed else 'failed' }}. {{ check.reason }}</li>
+        <li><span class="text-foreground">{{ check.name }}:</span> {{ ('passed' if check.passed else 'failed') if check.get('ran', True) else 'not run' }}. {{ check.reason }}</li>
         {% endfor %}
       </ul>
     </div>

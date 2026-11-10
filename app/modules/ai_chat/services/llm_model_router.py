@@ -454,7 +454,11 @@ class LLMModelRouter:
         waits for the next attempt rather than being judged by a model that was not chosen.
         """
         from app.modules.ai_chat.services.llm_cost_tracker import LLMCostTracker
-        from app.modules.ai_chat.services.llm_service_impl import LLMService
+        from app.modules.ai_chat.services.llm_service_impl import LLMService, _scrub_prompt
+
+        # The same scrub every other outgoing prompt goes through: a key or a card number the person's words
+        # or the change carry never reaches the model.
+        prompt = _scrub_prompt(prompt)
 
         # The organisation's own AI budget applies to a review as to any other call.
         try:

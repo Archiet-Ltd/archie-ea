@@ -5,7 +5,7 @@ ceiling), with DeepSeek as a stub on a loopback port. deepseek-chat drafts the c
 picks deepseek-reasoner to review it, because no second provider is set up.
 
 Journey one: the person (an application manager, whose assistant may change an application's status)
-asks to move Ifiok to production. In the same message the assistant shows
+asks to move Atlas to production. In the same message the assistant shows
 "Applied" with no Approve button anywhere. The link under it opens the change's record, which reads
 the checks, one review with all six criteria and their reasons, deepseek-chat as the drafter and
 deepseek-reasoner as the reviewer, and says both came from DeepSeek. The application's own page then
@@ -54,7 +54,7 @@ def _respond(model, text, has_tools):
         return _review_reply(text)
     if "independent reviewer rejected it" in text:
         # The drafter is asked to revise: it returns its own draft unchanged, which ends the review.
-        draft = re.search(r"<<<YOUR_DRAFT\n(.*?)\nYOUR_DRAFT>>>", text, re.S)
+        draft = re.search(r"=== BEGIN YOUR_DRAFT ===.*?\n\n(\{.*?\})\n=== END YOUR_DRAFT ===", text, re.S)
         arguments = json.loads(draft.group(1))["arguments"] if draft else {}
         return json.dumps({"arguments": arguments, "summary": "The same change."})
     return None
@@ -90,7 +90,7 @@ def _one_person_workspace():
         from app.services.billing_plans import set_contract_plan
 
         Role.insert_roles()
-        org = Organization(name="Ifiok Studio %s" % suffix, slug="ifiok-%s" % suffix)
+        org = Organization(name="Atlas Studio %s" % suffix, slug="atlas-%s" % suffix)
         db.session.add(org)
         db.session.flush()
         set_contract_plan(org, "enterprise", None)
@@ -99,15 +99,15 @@ def _one_person_workspace():
         user.role = Role.query.filter_by(name="Architect").one()
         user.password = PASSWORD
         db.session.add(user)
-        ifiok = ApplicationComponent(name="Ifiok %s" % suffix, organization_id=org.id,
+        atlas = ApplicationComponent(name="Atlas %s" % suffix, organization_id=org.id,
                                      deployment_status="development")
         ledger = ApplicationComponent(name="Old Ledger %s" % suffix, organization_id=org.id,
                                       deployment_status="retiring", lifecycle_status="5. decommissioned")
-        db.session.add_all([ifiok, ledger])
+        db.session.add_all([atlas, ledger])
         db.session.commit()
         people = User.query.filter_by(organization_id=org.id).count()
         assert people == 1, "the workspace must have exactly one person"
-        out = {"org_id": org.id, "email": user.email, "ifiok": (ifiok.id, ifiok.name),
+        out = {"org_id": org.id, "email": user.email, "atlas": (atlas.id, atlas.name),
                "ledger": (ledger.id, ledger.name)}
         db.session.remove()
         return out
@@ -163,7 +163,7 @@ def test_the_one_person_in_a_workspace_gets_ifiok_moved_to_production_with_its_r
 ):
     base = deepseek_server
     ws = _one_person_workspace()
-    ifiok_id, ifiok_name = ws["ifiok"]
+    atlas_id, atlas_name = ws["atlas"]
     context = browser.new_context(viewport={"width": width, "height": 900})
     context.set_default_timeout(PAGE_TIMEOUT)
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
@@ -171,23 +171,23 @@ def test_the_one_person_in_a_workspace_gets_ifiok_moved_to_production_with_its_r
     try:
         _sign_in(page, base, ws["email"])
         verdicts = _ask(page, base, stub, {
-            "application_name": ifiok_name, "new_status": "production",
+            "application_name": atlas_name, "new_status": "production",
             "rationale": "It is live for customers now.",
-        }, "Move %s to production, it is live for customers now." % ifiok_name)
+        }, "Move %s to production, it is live for customers now." % atlas_name)
 
         # The same message carries the outcome: applied, not waiting for anyone.
         text = verdicts.inner_text()
         assert "Applied:" in text, text
-        assert ifiok_name in text and "production" in text, text
+        assert atlas_name in text and "production" in text, text
         body = page.locator("#messages-container").inner_text()
         for stale in ("awaiting approval", "different reviewer", "must approve"):
             assert stale not in body, stale
         assert page.get_by_role("button", name="Approve").count() == 0
         _shot(page, shots, "change-applied-in-chat")
 
-        # The reviewer was the other DeepSeek model, and it read Ifiok's request.
+        # The reviewer was the other DeepSeek model, and it read Atlas's request.
         reviews = [r for r in stub.requests if r["model"] == "deepseek-reasoner"]
-        assert reviews and ifiok_name in reviews[-1]["text"]
+        assert reviews and atlas_name in reviews[-1]["text"]
 
         # The link opens the record of how it was checked.
         page.get_by_test_id("change-record-link").last.click()
@@ -202,7 +202,7 @@ def test_the_one_person_in_a_workspace_gets_ifiok_moved_to_production_with_its_r
         expect(facts.get_by_test_id("property-rubric")).to_have_text("1")
         expect(page.get_by_test_id("review-record-same-provider")).to_contain_text("Both models came from DeepSeek")
         checks = page.get_by_test_id("review-record-checks").inner_text()
-        assert "The thing it changes exists: passed. Found %s." % ifiok_name in checks, checks
+        assert "The thing it changes exists: passed. Found %s." % atlas_name in checks, checks
         round_one = page.get_by_test_id("review-record-round-1")
         expect(round_one.locator("[data-testid^='review-criterion-']")).to_have_count(6)
         expect(round_one.get_by_test_id("review-criterion-5")).to_contain_text(
@@ -211,11 +211,11 @@ def test_the_one_person_in_a_workspace_gets_ifiok_moved_to_production_with_its_r
         _shot(page, shots, "change-record-applied")
 
         # The application itself now reads Production.
-        page.goto(base + "/applications/%d" % ifiok_id, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role("heading", name=ifiok_name).first).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.goto(base + "/applications/%d" % atlas_id, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name=atlas_name).first).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_text("Production", exact=True).first).to_be_visible(timeout=PAGE_TIMEOUT)
         _shot(page, shots, "application-in-production")
-        assert _deployment_status(ifiok_id) == "production"
+        assert _deployment_status(atlas_id) == "production"
     finally:
         context.close()
 

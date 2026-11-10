@@ -49,6 +49,28 @@ def _load_acting_user(user_id):
     return query.first()
 
 
+class AIChatApprovalError(ValueError):
+    """Base class for an approval decision approve_and_execute refuses to make.
+
+    Mirrors app.services.arb_governance_service's ARBDecisionError: refuse before any
+    mutation, audit-log the refusal itself.
+    """
+
+
+class SelfApprovalError(AIChatApprovalError):
+    """The requester attempted to approve their own queued operation that the review loop does not settle (V-01)."""
+
+
+class MissingApproverError(AIChatApprovalError):
+    """No resolvable approver identity, or the approver lacks write permission."""
+
+
+def _review_rubric_version() -> str:
+    from app.modules.ai_chat.services.change_review import RUBRIC_VERSION
+
+    return RUBRIC_VERSION
+
+
 def create_approval_record(
     *,
     organization_id: int,
@@ -68,6 +90,7 @@ def create_approval_record(
     drafter_model: Optional[str] = None,
     settle: bool = False,
     review_budget=None,
+    enter_review: bool = False,
 ) -> AIChatCRUDApproval:
     """The one writer of ai_chat_crud_approvals (consolidation).
 
@@ -88,8 +111,10 @@ def create_approval_record(
     a rule or a form did). ``settle=True`` is for a caller that wants the change
     checked, reviewed and applied or declined in the same turn: the record is
     committed first, then ``settle_after_review`` runs, and the verdict is left on
-    the returned record as ``review_verdict``. A record written without it is
-    settled by the five-minute sweep.
+    the returned record as ``review_verdict``. ``settle`` and ``enter_review`` mark
+    the record as in the review loop (it carries the rubric version), so the sweep
+    settles it if it waits. A record written by any other writer is left to that
+    writer until it is moved into the loop.
     """
     approval = AIChatCRUDApproval(
         user_id=user_id,
@@ -108,6 +133,7 @@ def create_approval_record(
         source_id=source_id,
         persona=persona,
         drafter_model=drafter_model,
+        rubric_version=_review_rubric_version() if (settle or enter_review) else None,
     )
     db.session.add(approval)
     db.session.flush()
@@ -182,6 +208,14 @@ class AIChatApprovalService:
                 "success": False,
                 "code": "FORBIDDEN",
                 "error": "An organization-scoped user is required to manage approvals",
+            }
+        if not actor.is_active:
+            # The one rule for who can sign in (User.is_active): an account that is switched off acts
+            # for no one, so a change it asked for is never applied and nothing it clicks is accepted.
+            return None, {
+                "success": False,
+                "code": "ACCOUNT_OFF",
+                "error": "This account is switched off",
             }
         if require_general:
             from app.models.user import Permission
@@ -573,6 +607,7 @@ class AIChatApprovalService:
                 chat_session_id=chat_session_id,
                 agent_turn_id=agent_turn_id,
                 expiry_minutes=self.DEFAULT_EXPIRY_MINUTES,
+                enter_review=True,
             )
             db.session.commit()
             approval_id = approval.id
@@ -635,7 +670,7 @@ class AIChatApprovalService:
                 "error": f"Failed to create approval: {str(e)}",
             }
 
-    def settle_after_review(self, approval_id: int, budget=None) -> Dict[str, Any]:
+    def settle_after_review(self, approval_id: int, budget=None, approved_by: Optional[int] = None) -> Dict[str, Any]:
         """Check, review, revise and then apply or decline one recorded change, on the server.
 
         The change is checked (organisation, target, details, value, repeat, the requester's role),
@@ -644,6 +679,10 @@ class AIChatApprovalService:
         its reasons. Nothing waits for a second person. A change that cannot be reviewed yet (no
         independent reviewer reachable, or this run's review limit spent) stays in review, pending,
         and is picked up by the five-minute sweep.
+
+        ``approved_by`` is the person who pressed Approve, when it was a person who asked for the change to
+        be settled. It changes nothing about the review: only when the review has passed, the record then
+        names that person as the one who approved it (the audit rows carry their id, not the system's).
 
         The record is looked up in the caller's own organisation only; another organisation's id
         looks absent. Returns the verdict: state (applied, declined, in_review), the summary, the
@@ -654,6 +693,13 @@ class AIChatApprovalService:
         try:
             actor, actor_error = self._acting_user()
             if actor_error:
+                if actor_error.get("code") == "ACCOUNT_OFF" and self.user_id:
+                    # A switched-off account's own change is declined, with that reason and no review.
+                    # (Its person is never the one who settles anyone else's.)
+                    off = _load_acting_user(self.user_id)
+                    mine = self._load_scoped_approval(approval_id, off) if off is not None else None
+                    if mine is not None and mine.user_id == off.id and change_review.in_scope(mine):
+                        return change_review.decline(self, mine, change_review.ACCOUNT_OFF_REASON)
                 return actor_error
             approval = self._load_scoped_approval(approval_id, actor)
             if not approval:
@@ -664,12 +710,20 @@ class AIChatApprovalService:
             requester, requester_error = runner._acting_user()
             if requester_error:
                 return change_review.decline(
-                    runner, approval, "The person who asked for this change is no longer in the workspace."
+                    runner, approval,
+                    change_review.ACCOUNT_OFF_REASON if requester_error.get("code") == "ACCOUNT_OFF"
+                    else "The person who asked for this change is no longer in the workspace.",
                 )
-            return change_review.settle(runner, approval, requester, budget)
+            return change_review.settle(
+                runner, approval, requester, budget, approved_by, self if approved_by else None)
         except Exception:
             db.session.rollback()
             self.logger.exception("Review of approval %s failed; it stays in review", approval_id)
+            # A failed attempt counts like an unreachable reviewer, so a change that can never be
+            # reviewed ends declined after the same number of tries instead of waiting for ever.
+            ended = change_review.count_failed_attempt(self, approval_id)
+            if ended is not None:
+                return ended
             return {
                 "success": False,
                 "state": "in_review",
@@ -711,12 +765,45 @@ class AIChatApprovalService:
                 response[key] = result[key]
         return response
 
+    def _settle_on_person_approval(self, approval: AIChatCRUDApproval, actor: User) -> Dict[str, Any]:
+        """A person pressed Approve (or said "approve it") on a change the review loop settles.
+
+        Their approve is a request to settle it now, not a way round the review: the change goes through
+        ``settle_after_review`` (checks, an independent reviewer, then apply or decline) and the answer is
+        the change's real outcome. If the review fails, is unreachable or the change is declined, nothing
+        is applied."""
+        approval_id = approval.id
+        self._audit(
+            approval,
+            event="settle_requested",
+            to_status=approval.status.value,
+            actor_user_id=actor.id,
+            from_status=approval.status.value,
+            reason="a person asked for this change to be settled now; the review decides",
+        )
+        db.session.commit()
+        verdict = self.settle_after_review(approval_id, approved_by=actor.id)
+        state = verdict.get("state")
+        base = {"approval_id": approval_id, "state": state, "verdict": verdict, "record_url": verdict.get("record_url")}
+        if state == "applied":
+            return {**base, "success": True, "message": verdict.get("message"), "result": {"message": verdict.get("summary")}}
+        if state == "declined":
+            return {**base, "success": False, "code": "DECLINED", "message": verdict.get("message"),
+                    "error": verdict.get("message") or "The change was declined."}
+        if state is None:
+            # settle_after_review answered with an error (not found, not allowed): pass it on unchanged.
+            return {**verdict, "approval_id": approval_id}
+        reason = " ".join(verdict.get("reasons") or []) or "It has not been reviewed yet."
+        return {**base, "success": False, "code": "IN_REVIEW", "message": verdict.get("message"),
+                "error": "Not applied. %s It is applied only after it passes review." % reason}
+
     def approve_and_execute(
         self,
         approval_id: int,
         approving_user_id: Optional[int] = None,
         *,
         settled_by_review: bool = False,
+        approved_by: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Approve and execute a pending CRUD operation.
@@ -749,8 +836,10 @@ class AIChatApprovalService:
                 return actor_error
             # A change the server's review passed is applied as the person who asked for it:
             # the system is the approver, so no user id is recorded as approving it.
-            effective_approver_id = None if settled_by_review else actor.id
-            audit_actor_type = "system" if settled_by_review else None
+            # When a person pressed Approve, the review passed first and that person is then recorded as the
+            # one who approved it.
+            effective_approver_id = approved_by if settled_by_review else actor.id
+            audit_actor_type = "system" if settled_by_review and not approved_by else None
             approval = self._load_scoped_approval(approval_id, actor)
             if not approval:
                 return {
@@ -758,12 +847,46 @@ class AIChatApprovalService:
                     "code": "NOT_FOUND",
                     "error": f"Approval {approval_id} not found",
                 }
-            if settled_by_review and approval.user_id != actor.id:
+            if settled_by_review and approval.user_id != actor.id and approved_by != actor.id:
                 return {
                     "success": False,
                     "code": "FORBIDDEN",
-                    "error": "A reviewed change is applied only as the person who asked for it",
+                    "error": "A reviewed change is applied only as the person who asked for it or the person who approved it",
                 }
+
+            if settled_by_review:
+                # The flag is a claim that the review passed; the record must show it. The latest round on
+                # the record has to be a pass, so nothing can apply a change by passing the flag alone.
+                rounds = (approval.review_reasons or {}).get("rounds") if isinstance(approval.review_reasons, dict) else None
+                if not rounds or not rounds[-1].get("passed"):
+                    return {
+                        "success": False,
+                        "code": "FORBIDDEN",
+                        "error": "This change has not passed review, so it cannot be applied",
+                    }
+
+            # A person's approve never applies a change the review has not passed. A change the review loop
+            # settles (see change_review.in_scope) goes through the same settle path as the assistant's
+            # own turn and the sweep: the checks, the independent review, then apply or decline. A record
+            # the loop does not settle yet keeps the older rule until its own brief: nobody approves
+            # their own request.
+            from app.modules.ai_chat.services import change_review
+
+            settled_here = not settled_by_review and change_review.in_scope(approval)
+            if not settled_by_review and not settled_here and approval.user_id == actor.id:
+                self._audit(
+                    approval,
+                    event="self_approval_refused",
+                    to_status=approval.status.value,
+                    actor_user_id=actor.id,
+                    from_status=approval.status.value,
+                    reason="approver is the same user who requested the operation",
+                )
+                db.session.commit()
+                raise SelfApprovalError(
+                    "You cannot approve your own request. Ask another user with write "
+                    "permission to review and approve it."
+                )
 
             # Connector changes require an administrator (every connector route carries
             # admin_required) but GENERAL write permission alone was enough to reach this
@@ -794,6 +917,9 @@ class AIChatApprovalService:
                     "code": "CONFLICT",
                     "error": f"Approval is already {approval.status.value}",
                 }
+
+            if settled_here:
+                return self._settle_on_person_approval(approval, actor)
 
             # A GitHub proposal that cannot land yet (a part whose application is not
             # in the model, a link whose end is not) is refused here, before it is
@@ -1123,6 +1249,10 @@ class AIChatApprovalService:
 
                 return self._execution_failure_response(result, approval_id)
 
+        except (SelfApprovalError, MissingApproverError) as e:
+            # Refusal was already audit-logged and committed above the raise; nothing to roll back.
+            self.logger.warning(f"Approval {approval_id} refused: {e}")
+            return {"success": False, "error": str(e), "code": "APPROVAL_DENIED"}
         except Exception as e:
             db.session.rollback()
             self.logger.error(f"Failed to approve/execute operation {approval_id}: {e}")
@@ -1262,7 +1392,9 @@ class AIChatApprovalService:
                 .order_by(User.id)
                 .all()
             )
-            inbox_path = f"/ai-chat/approvals/inbox?approval={approval.id}"
+            from app.modules.ai_chat.services.change_review import record_path
+
+            inbox_path = record_path(approval.id)
             message = f"A change needs your review: {approval.summary}"
             notifications = [
                 (
@@ -1391,6 +1523,8 @@ class AIChatApprovalService:
         A rejected proposal keeps its reason here, so the decision is still
         visible after a reload. One read, bounded by RECENT_DECISIONS_LIMIT.
         """
+        from app.modules.ai_chat.services.change_review import record_path
+
         _, org_id, error = self._active_org_actor()
         if error:
             return error
@@ -1412,7 +1546,7 @@ class AIChatApprovalService:
                     "entity_type": row.entity_type,
                     "summary": row.summary,
                     "status": row.status.value,
-                    "record_url": f"/ai-chat/approvals/inbox?approval={row.id}",
+                    "record_url": record_path(row.id),
                     "rejected_reason": row.rejected_reason if row.status == ApprovalStatus.REJECTED else None,
                     "created_at": row.created_at.isoformat() if row.created_at else None,
                     "approved_at": row.approved_at.isoformat() if row.approved_at else None,

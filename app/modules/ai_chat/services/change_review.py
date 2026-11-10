@@ -31,6 +31,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
+from app.middleware.tenant_decorators import is_platform_admin
 from app.models.ai_chat_crud_approval import AIChatApprovalAuditLog, AIChatCRUDApproval, ApprovalStatus
 
 logger = logging.getLogger(__name__)
@@ -59,10 +60,26 @@ RUBRIC: Tuple[Tuple[int, str, str], ...] = (
 
 MAX_REVIEWS = 3  # the first draft and two revisions
 CALLS_PER_RUN = 50  # model calls (reviews and revisions) in one run
-MAX_WAITS = 12  # attempts to reach an independent reviewer, one per five-minute sweep
-SWEEP_QUIET_MINUTES = 5  # a record is swept only after this long with no activity of its own
+MAX_WAITS = 12  # attempts to reach an independent reviewer, one per sweep
+SWEEP_INTERVAL_MINUTES = 5  # how often the sweep runs (the scheduler reads this)
+# A record is swept only after this long with no activity of its own. It is shorter than the interval, so
+# every sweep retries every waiting change: 12 attempts end about 55 minutes after the first, as the
+# decision record states ("every five minutes, up to 12 attempts").
+SWEEP_QUIET_MINUTES = SWEEP_INTERVAL_MINUTES - 1
 RECENT_MINUTES = 10  # an identical change applied this recently makes a new one a duplicate
 NO_REVIEWER_REASON = "No independent reviewer was available."
+CHARTER_REFUSED_REASON = (
+    "Your assistant is not set up to make this kind of change, so nothing was changed. "
+    "You can make it yourself on its own page."
+)
+ACCOUNT_OFF_REASON = "The account that asked for this change has been switched off, so the change was not made."
+WRITES_PAUSED_REASON = (
+    "Changes by the assistant are paused for this workspace. This one is made, after it is checked and "
+    "reviewed, when they resume."
+)
+# What the record shows once a change has been through the loop. A record from before the loop has none of
+# these and a NULL rubric version, and is left alone by the sweep until its own brief moves it in.
+LOOP_EVENTS = ("checked", "reviewed", "revised", "waiting", "paused", "applied", "declined")
 
 # What this review settles: the assistant's tool calls and the chat's own create/update/delete/link of the
 # organisation's records. Other writers of the same record (connectors, detectors, imports) are folded in
@@ -103,9 +120,10 @@ class Check:
     name: str
     passed: bool
     reason: str
+    ran: bool = True  # False: this check was not run for this kind of change (never shown as passed)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"name": self.name, "passed": self.passed, "reason": self.reason}
+        return {"name": self.name, "passed": self.passed, "reason": self.reason, "ran": self.ran}
 
 
 @dataclass
@@ -118,6 +136,8 @@ class Target:
     before: Dict[str, Any] = field(default_factory=dict)
     facts: Dict[str, Any] = field(default_factory=dict)
     value_reason: str = ""  # set when the value written is not legal for the field
+    checked: bool = True  # False: this kind of change has no target lookup, so its checks were not run
+    creates: bool = False  # the change adds a record; there is nothing that must exist first
 
 
 # --------------------------------------------------------------------------- #
@@ -304,6 +324,16 @@ def _entity_model(entity_type: str):
     return None
 
 
+def _scoped_row(model, row_id: Any, org_id: int):
+    """One row of ``model`` by id, for this organisation only.
+
+    The vendor list is shared reference data with no organisation column (see VendorOrganization); who may
+    change it is decided by the platform-administrator rule in run_checks, so it is read by id alone."""
+    if not hasattr(model, "organization_id"):
+        return model.query.filter_by(id=row_id).first()
+    return model.query.filter_by(id=row_id, organization_id=org_id).first()
+
+
 def _target_entity(approval: AIChatCRUDApproval, payload: Dict[str, Any], org_id: int) -> Target:
     """The record an update or delete names, and the fields an update would overwrite."""
     from app.modules.ai_chat.services import ai_data_interaction_service as data
@@ -311,7 +341,7 @@ def _target_entity(approval: AIChatCRUDApproval, payload: Dict[str, Any], org_id
     model = _entity_model(approval.entity_type)
     if model is None or approval.entity_id is None:
         return Target(True, label=approval.entity_type.replace("_", " "), before={"kind": "unrecorded"})
-    row = model.query.filter_by(id=approval.entity_id, organization_id=org_id).first()
+    row = _scoped_row(model, approval.entity_id, org_id)
     if row is None:
         return Target(False, "That %s no longer exists in this workspace." % approval.entity_type.replace("_", " "))
     label = getattr(row, "name", None) or "%s %s" % (approval.entity_type, approval.entity_id)
@@ -341,16 +371,201 @@ def _plain_value(value: Any) -> Any:
     return str(value)
 
 
+def _clean_name(args: Dict[str, Any], key: str) -> str:
+    return str(args.get(key) or "").strip()
+
+
+def _target_bulk_update_application_status(args: Dict[str, Any], org_id: int) -> Target:
+    from app.models.application_portfolio import APPLICATION_LIFECYCLE_STAGES, ApplicationComponent
+
+    new_status = _clean_name(args, "new_status").lower()
+    ids = args.get("app_ids")
+    filt = args.get("filter") or {}
+    query = ApplicationComponent.query.filter_by(organization_id=org_id)
+    wanted: Optional[List[int]] = None
+    if ids:
+        try:
+            wanted = [int(i) for i in ids]
+        except (TypeError, ValueError):
+            return Target(False, "The applications must be named by their numbers.")
+        query = query.filter(ApplicationComponent.id.in_(wanted))
+    elif isinstance(filt, dict) and filt:
+        if filt.get("current_status"):
+            query = query.filter(ApplicationComponent.lifecycle_status == filt["current_status"])
+        if filt.get("component_type"):
+            query = query.filter(ApplicationComponent.component_type == filt["component_type"])
+    else:
+        return Target(False, "Name the applications to change, or say which group of them.")
+    matched = query.order_by(ApplicationComponent.id).all()
+    if not matched:
+        return Target(False, "None of those applications exist in this workspace.")
+    if wanted is not None and len(matched) != len(set(wanted)):
+        missing = sorted(set(wanted) - {a.id for a in matched})
+        return Target(False, "%d of the applications named do not exist in this workspace." % len(missing))
+    will_change = [a for a in matched if (a.lifecycle_status or "") != new_status]
+    target = Target(
+        True, label="%d applications" % len(matched),
+        before={"record": "ApplicationComponent", "records": [
+            {"id": a.id, "name": a.name, "fields": {"lifecycle_status": a.lifecycle_status}} for a in will_change]},
+        facts={"applications_matched": len(matched), "applications_that_would_change": len(will_change),
+               "new_lifecycle_stage": new_status},
+    )
+    if new_status not in APPLICATION_LIFECYCLE_STAGES:
+        target.value_reason = "'%s' is not a lifecycle stage the portfolio uses." % new_status
+    elif not will_change:
+        target.value_reason = "Every one of those applications is already at '%s'." % new_status
+    return target
+
+
+def _target_create_archimate_element(args: Dict[str, Any], org_id: int) -> Target:
+    from app.models.archimate_core import ArchiMateElement
+    from app.utils.duplicate_guard import find_duplicate_by_name
+
+    name = _clean_name(args, "name")
+    target = Target(True, label=name, creates=True,
+                    before={"kind": "create", "note": "Nothing existed before; undoing it removes the new element."},
+                    facts={"element": name, "type": args.get("type"), "layer": args.get("layer")})
+    if not args.get("allow_duplicate") and find_duplicate_by_name(
+        ArchiMateElement, name, organization_id=org_id, extra_filters=[ArchiMateElement.type == args.get("type")]
+    ) is not None:
+        target.value_reason = "An element called '%s' of that type already exists in this workspace." % name
+    return target
+
+
+def _target_create_solution(args: Dict[str, Any], org_id: int) -> Target:
+    from app.models.solution_models import Solution
+    from app.utils.duplicate_guard import find_duplicate_by_name
+
+    name = _clean_name(args, "name")
+    target = Target(True, label=name, creates=True,
+                    before={"kind": "create", "note": "Nothing existed before; undoing it removes the new solution."},
+                    facts={"solution": name})
+    if not args.get("allow_duplicate") and find_duplicate_by_name(Solution, name, organization_id=org_id) is not None:
+        target.value_reason = "A solution called '%s' already exists in this workspace." % name
+    return target
+
+
+def _target_create_archimate_relationship(args: Dict[str, Any], org_id: int) -> Target:
+    from app.modules.ai_chat.tools.resolver import EntityResolver
+
+    ends = []
+    for key, word in (("source_element_name", "source"), ("target_element_name", "target")):
+        name = _clean_name(args, key)
+        found = EntityResolver.resolve_archimate_element(name)
+        if not found.get("resolved"):
+            names = [c.get("name") for c in found.get("candidates", []) if c.get("name")]
+            return Target(False, ("More than one element matches '%s': %s." % (name, ", ".join(names[:5])))
+                          if names else "No element named '%s' exists in this workspace." % name)
+        ends.append(found)
+    source, dest = ends
+    target = Target(True, label="%s to %s" % (source["name"], dest["name"]), creates=True,
+                    before={"kind": "create",
+                            "note": "Nothing existed before; undoing it removes the new relationship."},
+                    facts={"from": source["name"], "from_type": source.get("type"), "to": dest["name"],
+                           "to_type": dest.get("type"), "relationship": args.get("relationship_type")})
+    try:
+        from app.config.archimate_relationship_matrix import is_valid_relationship
+
+        if source.get("type") and dest.get("type") and not is_valid_relationship(
+            source["type"], dest["type"], args.get("relationship_type")
+        ):
+            target.value_reason = "ArchiMate does not allow a %s relationship from a %s to a %s." % (
+                args.get("relationship_type"), source["type"], dest["type"])
+    except ImportError:
+        pass
+    return target
+
+
+def _target_link_capability_to_solution(args: Dict[str, Any], org_id: int) -> Target:
+    from app.models.solution_models import SolutionCapabilityMapping
+    from app.modules.ai_chat.tools.resolver import EntityResolver
+
+    solution = EntityResolver.resolve_solution(_clean_name(args, "solution_name"))
+    if not solution.get("resolved"):
+        return Target(False, "No single solution named '%s' exists in this workspace." % _clean_name(args, "solution_name"))
+    capability = EntityResolver.resolve_capability(_clean_name(args, "capability_name"))
+    if not capability.get("resolved"):
+        return Target(False, "No single capability named '%s' exists in this workspace." % _clean_name(args, "capability_name"))
+    target = Target(True, label="%s and %s" % (capability["name"], solution["name"]), creates=True,
+                    before={"kind": "create", "note": "Nothing existed before; undoing it removes the new link."},
+                    facts={"solution": solution["name"], "capability": capability["name"],
+                           "support_level": args.get("support_level") or "primary"})
+    if SolutionCapabilityMapping.query.filter_by(solution_id=solution["id"], capability_id=capability["id"]).first():
+        target.value_reason = "'%s' is already linked to '%s'." % (capability["name"], solution["name"])
+    return target
+
+
+def _target_record_capability_maturity(args: Dict[str, Any], org_id: int) -> Target:
+    from app.models.business_capabilities import BusinessCapability
+
+    cap = BusinessCapability.query.filter_by(id=args.get("capability_id"), organization_id=org_id).first()
+    if cap is None:
+        return Target(False, "That capability does not exist in this workspace.")
+    fields = {k: _plain_value(getattr(cap, k, None)) for k in (
+        "current_maturity_level", "target_maturity_level", "maturity_gap", "maturity_assessment_date")}
+    target = Target(True, label=cap.name,
+                    before={"record": "BusinessCapability", "id": cap.id, "name": cap.name, "fields": fields},
+                    facts={"capability": cap.name, **fields})
+    for key in ("current_maturity", "target_maturity"):
+        value = args.get(key)
+        if value is not None and not (isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 5):
+            target.value_reason = "%s must be a whole number from 1 to 5." % key.replace("_", " ").capitalize()
+            return target
+    current, wanted = args.get("current_maturity"), args.get("target_maturity")
+    if cap.current_maturity_level == current and (wanted is None or cap.target_maturity_level == wanted):
+        target.value_reason = "'%s' already has that maturity recorded." % cap.name
+    return target
+
+
+def _target_score_rationalization(args: Dict[str, Any], org_id: int) -> Target:
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.application_rationalization import ApplicationRationalizationScore
+
+    app_obj = ApplicationComponent.query.filter_by(id=args.get("app_id"), organization_id=org_id).first()
+    if app_obj is None:
+        return Target(False, "That application does not exist in this workspace.")
+    score = ApplicationRationalizationScore.query.filter_by(
+        application_component_id=app_obj.id, organization_id=org_id).first()
+    if score is None:
+        before = {"kind": "create", "record": "ApplicationRationalizationScore", "application_id": app_obj.id,
+                  "note": "No score existed before; undoing it removes the new score."}
+    else:
+        fields = {k: _plain_value(getattr(score, k, None)) for k in (
+            "overall_health_score", "rationalization_action", "disposition_action", "disposition_confidence")}
+        before = {"record": "ApplicationRationalizationScore", "id": score.id, "name": app_obj.name, "fields": fields}
+    return Target(True, label=app_obj.name, before=before, creates=score is None,
+                  facts={"application": app_obj.name, "has_a_score_already": score is not None})
+
+
+# The tools whose target the review reads from the organisation's own records. The eight an owner-founder's
+# assistant may use are all here; any other tool's change is checked for its shape only and says so.
+_TOOL_TARGETS = {
+    "bulk_update_application_status": _target_bulk_update_application_status,
+    "create_archimate_element": _target_create_archimate_element,
+    "create_archimate_relationship": _target_create_archimate_relationship,
+    "create_solution": _target_create_solution,
+    "link_capability_to_solution": _target_link_capability_to_solution,
+    "record_capability_maturity": _target_record_capability_maturity,
+    "score_rationalization": _target_score_rationalization,
+}
+
+
 def resolve_target(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> Target:
-    """What the change is about. Tools that name their target by name look it up when they run."""
+    """What the change is about, read from the organisation's own records.
+
+    A tool with no lookup of its own comes back with ``checked=False`` and an unrecorded before-snapshot, so
+    the record says its target checks were not run and the reviewer is told no snapshot is kept."""
     if approval.operation_type == "tool_use":
         if approval.entity_type == "update_application_status" and isinstance(payload, dict):
             return _target_update_application_status(payload, org_id)
-        return Target(True, label=approval.entity_type.replace("_", " "),
+        lookup = _TOOL_TARGETS.get(approval.entity_type)
+        if lookup is not None and isinstance(payload, dict):
+            return lookup(payload, org_id)
+        return Target(True, label=approval.entity_type.replace("_", " "), checked=False,
                       before={"kind": "unrecorded", "tool": approval.entity_type})
     if approval.operation_type in ("update", "delete") and isinstance(payload, dict):
         return _target_entity(approval, payload, org_id)
-    return Target(True, label=approval.entity_type.replace("_", " "),
+    return Target(True, label=approval.entity_type.replace("_", " "), creates=True,
                   before={"kind": "create", "note": "Nothing existed before; undoing it removes the new record."})
 
 
@@ -374,8 +589,8 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
     checks: List[Check] = []
     org_id = approval.organization_id
 
-    def add(name: str, passed: bool, reason: str) -> bool:
-        checks.append(Check(name, passed, reason))
+    def add(name: str, passed: bool, reason: str, ran: bool = True) -> bool:
+        checks.append(Check(name, passed, reason, ran))
         return passed
 
     active = getattr(g, "current_org_id", None)
@@ -407,11 +622,9 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
             except Exception:  # noqa: BLE001 - a charter that cannot be read refuses, as the executor does
                 db.session.rollback()
                 permitted = False
-            who = approval.persona.replace("_", " ")
             if not add("The assistant's charter allows it", permitted,
-                       "The %s charter allows this kind of change." % who if permitted
-                       else "The %s charter does not allow this kind of change. Ask an administrator to "
-                            "amend the charter, or use a role whose scope covers it." % who):
+                       "Your assistant is set up to make this kind of change." if permitted
+                       else CHARTER_REFUSED_REASON):
                 return checks, Target(False)
         problem = schema_problem(schema.get("parameters") or {}, payload) if schema else None
         if not add("The request is complete", problem is None,
@@ -424,13 +637,25 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
         return checks, Target(False)
 
     target = resolve_target(approval, payload, org_id)
-    if not add("The thing it changes exists", target.ok,
-               ("Found %s." % target.label) if target.label else "Nothing in the workspace needs to exist first."):
-        checks[-1].reason = target.reason
-        return checks, target
-    if not add("The value is allowed", not target.value_reason,
-               "The value is allowed for that field." if not target.value_reason else target.value_reason):
-        return checks, target
+    if not target.checked:
+        # No lookup exists for this kind of change, so these two checks were not run. They are recorded as
+        # not run, never as passed, and the reviewer is told so.
+        for name in ("The thing it changes exists", "The value is allowed"):
+            add(name, True, "Not run: this kind of change is not checked against the workspace's records yet.",
+                ran=False)
+    elif target.creates and target.ok:
+        add("The thing it changes exists", True, "Not needed: this change adds a new record.", ran=False)
+        if not add("The value is allowed", not target.value_reason,
+                   "The value is allowed." if not target.value_reason else target.value_reason):
+            return checks, target
+    else:
+        if not add("The thing it changes exists", target.ok,
+                   ("Found %s." % target.label) if target.ok and target.label
+                   else (target.reason or "Nothing in the workspace needs to exist first.")):
+            return checks, target
+        if not add("The value is allowed", not target.value_reason,
+                   "The value is allowed for that field." if not target.value_reason else target.value_reason):
+            return checks, target
 
     duplicate = _duplicate_of(service, approval, payload)
     if not add("Not a repeat", duplicate is None,
@@ -440,8 +665,15 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
 
     _actor, role_error = service._acting_user(require_general=True)
     allowed = role_error is None
-    if allowed and approval.entity_type == "connectors" and not requester.is_admin():
+    if role_error is not None and role_error.get("code") == "ACCOUNT_OFF":
+        allowed, role_reason = False, ACCOUNT_OFF_REASON
+    elif allowed and approval.entity_type == "connectors" and not requester.is_admin():
         allowed, role_reason = False, "Connector changes need an administrator, and the person who asked is not one."
+    elif allowed and approval.entity_type == "vendor" and not is_platform_admin(requester):
+        # The vendor list is shared by every workspace, so only a platform administrator changes it (the
+        # same rule as the vendor API).
+        allowed, role_reason = False, (
+            "The vendor list is shared by every workspace, and only a platform administrator can change it.")
     else:
         role_reason = ("The person who asked still has the role this change needs." if allowed
                        else "The person who asked no longer has a role that can make changes.")
@@ -488,7 +720,11 @@ def _duplicate_of(service, approval: AIChatCRUDApproval, payload: Any) -> Option
 
 
 def _fence(label: str, text: str) -> str:
-    return "<<<%s\n%s\n%s>>>" % (label, text, label)
+    """Data in a prompt goes through the one fence (architect_persona_charters.fence_untrusted), which
+    also neutralises a closing marker inside the data."""
+    from app.modules.ai_chat.services.architect_persona_charters import fence_untrusted
+
+    return fence_untrusted(label, text)
 
 
 def build_review_prompt(
@@ -514,8 +750,11 @@ def build_review_prompt(
             "before_snapshot_will_be_kept": bool(target.before and target.before.get("kind") != "unrecorded"),
             "before_snapshot": target.before or None,
         }, default=str, indent=1)),
-        _fence("CHECKS_ALREADY_PASSED", "\n".join("- " + c.name + ": " + c.reason for c in checks)),
+        _fence("CHECKS_ALREADY_PASSED", "\n".join("- " + c.name + ": " + c.reason for c in checks if c.ran)),
     ]
+    not_run = [c for c in checks if not c.ran]
+    if not_run:
+        lines.append(_fence("CHECKS_NOT_RUN", "\n".join("- " + c.name + ": " + c.reason for c in not_run)))
     if earlier:
         lines.append(_fence("EARLIER_REVIEWS", json.dumps([
             {"round": r["round"], "failed": [c for c in r["criteria"] if not c["passed"]]} for r in earlier
@@ -590,6 +829,7 @@ def _state(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "same_provider": state.get("same_provider"),
         "outcome": state.get("outcome"),
         "outcome_reasons": list(state.get("outcome_reasons") or []),
+        "waiting_reason": state.get("waiting_reason"),
     }
 
 
@@ -614,6 +854,33 @@ def _round_words(round_result: Dict[str, Any]) -> str:
     )
 
 
+def _writes_paused(organization_id: int) -> bool:
+    """True while the organisation's stop-all-writes switch is on (the one the tool executor reads)."""
+    from app.models.agent_oversight_state import AgentOversightState
+
+    return bool(AgentOversightState.get_for_org(organization_id).is_paused())
+
+
+def count_failed_attempt(service, approval_id: int) -> Optional[Dict[str, Any]]:
+    """A review that raised counts as one attempt to reach a reviewer, so it cannot repeat for ever.
+
+    Returns the declined verdict when this was the last attempt, else None (the change stays in review).
+    Reads the record by the service's own organisation only."""
+    try:
+        actor, error = service._acting_user()
+        if error:
+            return None
+        approval = service._load_scoped_approval(approval_id, actor)
+        if approval is None or approval.status != ApprovalStatus.PENDING:
+            return None
+        state = _state(approval)
+        return _wait(service, approval, state, "The review could not be completed just now.", counts=True)
+    except Exception:  # noqa: BLE001 - counting must never raise into the caller
+        db.session.rollback()
+        logger.warning("Could not count the failed review of %s", approval_id, exc_info=True)
+        return None
+
+
 def _count_waits(approval: AIChatCRUDApproval) -> int:
     return AIChatApprovalAuditLog.query.filter_by(approval_id=approval.id, event="waiting").count()
 
@@ -632,6 +899,8 @@ def verdict(approval: AIChatCRUDApproval, state: str, summary: str, reasons: Lis
         message = "Declined: %s" % (" ".join(reasons) or summary)
     else:
         message = "In review: %s" % summary
+        if reasons:
+            message += " " + " ".join(reasons)
     return {
         "success": state == "applied",
         "state": state,
@@ -677,6 +946,7 @@ def _wait(service, approval: AIChatCRUDApproval, state: Dict[str, Any], why: str
     if counts and _count_waits(approval) + 1 >= MAX_WAITS:
         return _decline(service, approval, state, [NO_REVIEWER_REASON])
     _event(service, approval, "waiting" if counts else "paused", why)
+    state["waiting_reason"] = why
     _save(approval, state)
     return verdict(approval, "in_review", approval.summary, [why])
 
@@ -686,8 +956,14 @@ def _wait(service, approval: AIChatCRUDApproval, state: Dict[str, Any], why: str
 # --------------------------------------------------------------------------- #
 
 
-def settle(service, approval: AIChatCRUDApproval, requester, budget: Optional[ReviewBudget] = None) -> Dict[str, Any]:
-    """Check, review, revise, then apply or decline one change. Returns the verdict."""
+def settle(
+    service, approval: AIChatCRUDApproval, requester, budget: Optional[ReviewBudget] = None,
+    approved_by: Optional[int] = None, approver_service=None,
+) -> Dict[str, Any]:
+    """Check, review, revise, then apply or decline one change. Returns the verdict.
+
+    When a person pressed Approve (``approved_by``), the review is the same; only a passing review lets
+    ``approver_service`` (that person's) apply the change, recorded as approved by them."""
     if approval.status != ApprovalStatus.PENDING:
         state = "applied" if approval.status == ApprovalStatus.APPROVED else "declined"
         return verdict(approval, state, approval.summary, [approval.rejected_reason] if approval.rejected_reason else [])
@@ -704,10 +980,16 @@ def settle(service, approval: AIChatCRUDApproval, requester, budget: Optional[Re
     state["checks"] = [c.to_dict() for c in checks]
     if not state["rounds"]:
         _event(service, approval, "checked", "; ".join(
-            "%s: %s" % (c.name, "pass" if c.passed else "fail - " + c.reason) for c in checks))
+            "%s: %s" % (c.name, ("pass" if c.ran else "not run") if c.passed else "fail - " + c.reason)
+            for c in checks))
     failed = next((c for c in checks if not c.passed), None)
     if failed is not None:
         return _decline(service, approval, state, [failed.reason])
+
+    # 1b. Writes paused for the organisation: hold the change, with no reviewer call, until they resume. The
+    # assistant's tools are refused while paused, so a review now would cost a call and end in a decline.
+    if approval.operation_type == "tool_use" and _writes_paused(approval.organization_id):
+        return _wait(service, approval, state, WRITES_PAUSED_REASON, counts=False)
 
     # 2. The reviewer: never the model that drafted. It stays the same across the rounds of one change.
     drafter_provider, drafter_model = split_ref(approval.drafter_model)
@@ -763,7 +1045,7 @@ def settle(service, approval: AIChatCRUDApproval, requester, budget: Optional[Re
     # 4. Apply. The before-snapshot is stored first, so the change can be undone.
     approval.before_snapshot = target.before or {"kind": "unrecorded"}
     _save(approval, state)
-    return _apply(service, approval, state)
+    return _apply(approver_service or service, approval, state, approved_by)
 
 
 def _failed_reasons(round_result: Dict[str, Any]) -> List[str]:
@@ -796,9 +1078,11 @@ def _revise(service, router, approval, state, payload, budget) -> Optional[Dict[
     return None
 
 
-def _apply(service, approval: AIChatCRUDApproval, state: Dict[str, Any]) -> Dict[str, Any]:
+def _apply(
+    service, approval: AIChatCRUDApproval, state: Dict[str, Any], approved_by: Optional[int] = None
+) -> Dict[str, Any]:
     approval_id, org_id = approval.id, approval.organization_id
-    result = service.approve_and_execute(approval_id, settled_by_review=True)
+    result = service.approve_and_execute(approval_id, settled_by_review=True, approved_by=approved_by)
     db.session.expire_all()
     approval = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=org_id).first()
     if result.get("success"):
@@ -858,6 +1142,7 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "summary": approval.summary,
         "request": approval.original_command,
         "reasons": saved["outcome_reasons"] or ([approval.rejected_reason] if approval.rejected_reason else []),
+        "waiting_reason": saved["waiting_reason"] if approval.status == ApprovalStatus.PENDING else None,
         "rounds": approval.review_rounds or len(saved["rounds"]),
         "drafter": model_words(approval.drafter_model) if approval.drafter_model else None,
         "reviewer": model_words(approval.reviewer_model) if approval.reviewer_model else None,
@@ -885,6 +1170,10 @@ def waiting_ids(organization_id: int) -> List[int]:
         .group_by(AIChatApprovalAuditLog.approval_id)
         .subquery()
     )
+    has_loop_event = db.exists().where(
+        db.and_(AIChatApprovalAuditLog.approval_id == AIChatCRUDApproval.id,
+                AIChatApprovalAuditLog.event.in_(LOOP_EVENTS))
+    )
     rows = (
         db.session.query(AIChatCRUDApproval)
         .outerjoin(last_event, last_event.c.approval_id == AIChatCRUDApproval.id)
@@ -894,6 +1183,9 @@ def waiting_ids(organization_id: int) -> List[int]:
             AIChatCRUDApproval.user_id.isnot(None),
             AIChatCRUDApproval.source_table.is_(None),
             db.func.coalesce(last_event.c.last_at, AIChatCRUDApproval.created_at) < cutoff,
+            # Only a change that is in the loop: it carries a rubric version or has review events. A row
+            # from before the loop has neither and is left alone until its own brief moves it in.
+            db.or_(AIChatCRUDApproval.rubric_version.isnot(None), has_loop_event),
         )
         .order_by(AIChatCRUDApproval.id)
         .all()
