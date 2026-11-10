@@ -136,7 +136,7 @@ def _closed_and_open_gaps(db_session, make_org):
 
 
 def test_a_completed_gap_is_closed_in_the_roadmap_graph_and_summary(db_session, make_org, tenant_ctx):
-    from app.services.roadmap_builder_service import RoadmapBuilderService
+    from app.modules.solutions_strategic.v2.services.roadmap_builder_service import RoadmapBuilderService
 
     mine, open_gap = _closed_and_open_gaps(db_session, make_org)
     with tenant_ctx(mine.id):
@@ -144,6 +144,26 @@ def test_a_completed_gap_is_closed_in_the_roadmap_graph_and_summary(db_session, 
         summary = RoadmapBuilderService().get_roadmap_summary()
     assert [n["data"]["gapId"] for n in nodes] == [open_gap.id]
     assert summary["gaps"]["open"] == 1
+
+
+def test_the_served_roadmap_summary_and_graph_count_the_registers_open_gaps(
+    db_session, make_org, client, login_as
+):
+    from app.services.gap_register_service import count_gaps
+
+    mine, theirs = _signed_in(db_session, make_org, client, login_as, "served-roadmap")
+    open_gap = _gap(db_session, mine, priority="low", severity="low")
+    no_status = _gap(db_session, mine, priority="low", severity="low", resolution_status=None)
+    _gap(db_session, mine, priority="low", severity="low", resolution_status="completed")
+    _gap(db_session, mine, priority="low", severity="low", resolution_status=" Resolved ")
+    _gap(db_session, theirs, priority="low", severity="low")
+    _gap(db_session, theirs, priority="low", severity="low", resolution_status="completed")
+
+    summary = client.get("/api/roadmap-builder/summary").get_json()["data"]
+    graph = client.get("/api/roadmap-builder/dependency-graph?include_gaps=true").get_json()["data"]
+    gap_nodes = sorted(n["data"]["gapId"] for n in graph["nodes"] if n.get("type") == "gap")
+    assert summary["gaps"]["open"] == count_gaps(mine.id, closed=False) == 2
+    assert gap_nodes == sorted([open_gap.id, no_status.id])
 
 
 def test_a_padded_closed_status_is_closed_in_the_posture_lens(db_session, make_org, tenant_ctx):
