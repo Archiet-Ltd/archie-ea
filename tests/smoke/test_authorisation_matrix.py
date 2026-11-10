@@ -1160,6 +1160,29 @@ def test_rate_limit_writes_refuse_a_signed_in_plain_member(archetype, path, allo
     assert actual == expected, "%s reached %s: expected %s, got %s" % (archetype, path, expected, response.status)
 
 
+# Saved simulation scenarios: every signed-in person lists the organisation's scenarios, and only the
+# roles the require_role gate maps to an architect (or an administrator) save one. An empty body is
+# refused with a 400 after the role is asked, so a role the route admits reaches the handler and
+# anyone else is refused with a 403 before it, and nothing is written either way.
+SCENARIO_SAVE_ARCHETYPES = {
+    "solution_architect", "enterprise_architect", "arb_member", "portfolio_manager", "platform_admin",
+}
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_saved_scenarios_are_listed_by_everyone_and_saved_by_architects(archetype, page, live_server, seeded):
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    listed = page.request.get(live_server + "/strategic/api/scenarios")
+    assert listed.status == 200, "%s could not list scenarios: %s" % (archetype, listed.status)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + "/strategic/api/scenarios", data={}, headers={"X-CSRFToken": csrf}, max_redirects=0)
+    expected = ALLOWED if archetype in SCENARIO_SAVE_ARCHETYPES else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, "%s saving a scenario: expected %s, got %s" % (archetype, expected, response.status)
+
+
 # Role-gated ARB writes. Each is probed with an id that does not exist, except
 # the four decisions, which use a real submitted review (a missing id answers
 # 404 to everyone before the role is asked): a role the route admits reaches

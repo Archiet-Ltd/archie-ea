@@ -112,6 +112,11 @@ def test_a_named_address_lands_on_its_early_access_page_in_wave_one_and_with_the
         monkeypatch.setitem(app.config, "RELEASE_WAVE", wave)
         monkeypatch.delenv("RELEASE_WAVE", raising=False)
         rv = app.test_client().get(path)
+        if path == "/simulations" and wave is None:
+            # released: a visitor is sent to sign in and is never offered a waiting list
+            assert rv.status_code == 302 and "/account/login" in rv.headers["Location"], (path, wave)
+            assert "next=/simulations" in rv.headers["Location"], rv.headers["Location"]
+            continue
         html = rv.get_data(as_text=True)
         assert rv.status_code == 200, (path, wave)
         assert 'data-testid="early-access-page"' in html and "<h1>%s</h1>" % title in html, (path, wave)
