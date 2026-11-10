@@ -89,7 +89,7 @@ def _buying_refusal():
             "Contact us and we will put you in touch with the right person.",
             ("Contact us", "/contact"),
         )
-    names = ", ".join("%s (%s)" % (a["name"], a["email"]) for a in admins)
+    names = ", ".join("%s (%s)" % (a["name"], a["email"]) if a["name"] != a["email"] else a["email"] for a in admins)
     return (
         title,
         "Plans are bought and changed by an administrator. Ask %s to buy the plan you chose." % names,

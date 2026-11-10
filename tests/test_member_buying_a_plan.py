@@ -47,6 +47,51 @@ def test_an_organisation_with_no_administrator_is_pointed_to_contact_us(app, db_
     assert 'href="/contact"' in html
 
 
+def test_a_disabled_administrator_is_never_named_and_the_member_is_sent_to_contact_us(
+        app, db_session, client, login_as, no_billing):
+    from datetime import datetime
+
+    member, admin_a, admin_b = _people(db_session)
+    admin_a.disabled_at = datetime.utcnow()
+    db_session.commit()
+    with app.app_context():
+        login_as(client, member)
+        html = client.get("/admin/billing/", follow_redirects=True).get_data(as_text=True)
+    assert admin_a.email not in html and "Priya Nair" not in html
+    assert admin_b.email not in html
+    assert 'href="/contact"' in html
+
+
+def test_a_disabled_administrator_is_skipped_for_the_one_who_can_sign_in(app, db_session):
+    from datetime import datetime
+
+    from app.services.administrator_guard import administrators_to_ask
+
+    org_a, org_b = _org(db_session, "buy-skip-a"), _org(db_session, "buy-skip-b")
+    gone = _user(db_session, org_a, admin=True)
+    here = _user(db_session, org_a, admin=True)
+    other = _user(db_session, org_b, admin=True)
+    gone.disabled_at = datetime.utcnow()
+    db_session.commit()
+    with app.app_context():
+        assert [a["email"] for a in administrators_to_ask(org_a.id)] == [here.email]
+        assert [a["email"] for a in administrators_to_ask(org_b.id)] == [other.email]
+
+
+def test_an_administrator_with_no_name_shows_the_address_once(app, db_session, client, login_as, no_billing):
+    org = _org(db_session, "buy-nameless")
+    member = _user(db_session, org)
+    admin = _user(db_session, org, admin=True)
+    admin.first_name = admin.last_name = None
+    db_session.commit()
+    with app.app_context():
+        login_as(client, member)
+        html = client.get("/admin/billing/", follow_redirects=True).get_data(as_text=True)
+    assert "Ask %s to buy the plan" % admin.email in html
+    assert "%s (%s)" % (admin.email, admin.email) not in html
+    assert "Email " + admin.email in html
+
+
 def test_an_administrator_still_reaches_the_plan_page(app, db_session, client, login_as, no_billing):
     _member, admin_a, _admin_b = _people(db_session)
     with app.app_context():
