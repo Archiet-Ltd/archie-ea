@@ -33,6 +33,12 @@ import re
 # {"one": ..., "other": ...}. "when" ({key: value} read at the result root)
 # limits a field to one kind of answer. "scope": "public" marks a figure of
 # Entelim's public catalogue.
+# Appended to the description of every connector tool that returns declared figures.
+FIGURE_TOOL_NOTE = (
+    " Each figure this tool returns is listed under \"figures\" with the text it reads as;"
+    " quote that text, never your own digits."
+)
+
 FIGURE_KINDS = (
     "count", "money", "score", "percent", "ratio", "duration", "date", "datetime",
     "year", "month", "rank",
@@ -298,12 +304,6 @@ TOOL_SCHEMAS = [
                            "other": "{value} capabilities at or below the maturity searched"},
                  "reads_null": "the number of matching capabilities was not determined",
                  "label": "Capabilities matching", "concept": "capability-maturity"},
-                {"path": "result[].current_maturity", "kind": "score", "out_of": 5,
-                 "reads": "a current maturity of {value}", "reads_null": "no current maturity recorded",
-                 "label": "Current maturity", "concept": "capability-maturity"},
-                {"path": "result[].target_maturity", "kind": "score", "out_of": 5,
-                 "reads": "a target maturity of {value}", "reads_null": "no target maturity recorded",
-                 "label": "Target maturity", "concept": "capability-maturity"},
                 {"path": "result[].supporting_apps", "kind": "count",
                  "reads": {"one": "{value} supporting application", "other": "{value} supporting applications"},
                  "reads_null": "no supporting application count recorded",

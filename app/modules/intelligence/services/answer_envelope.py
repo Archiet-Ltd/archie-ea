@@ -657,3 +657,45 @@ def present(record, *, include_rows: bool = True) -> Dict[str, Any]:
         body["elements"] = record.elements
         body["citations"] = record.citations
     return body
+
+
+# --------------------------------------------------------------------------- #
+# Figures: what the chat and the connector carry beside an answer's rows
+# --------------------------------------------------------------------------- #
+
+def figure_check_block(
+    *, mode: str, prompt_version: str, first_draft: Dict[str, int], revision_ran: bool,
+    revision_fixed: bool, fallback: Dict[str, Any], references: Dict[str, int],
+) -> Dict[str, Any]:
+    """The evidence of the figure check, as the chat answer's envelope carries it: the mode,
+    the prompt contract version, the violations of the first draft by reason, whether a
+    revision ran and fixed them, the fallback (clauses removed, records-block lines) and the
+    counts of references written, resolved and left unresolved."""
+    return {
+        "mode": mode,
+        "prompt_version": prompt_version,
+        "first_draft_violations": dict(first_draft),
+        "revision_ran": bool(revision_ran),
+        "revision_fixed": bool(revision_fixed),
+        "fallback": dict(fallback),
+        "references": dict(references),
+    }
+
+
+def connector_figures(tool_name: str, result: Any, organization_id) -> List[Dict[str, Any]]:
+    """The declared figures of a connector tool's *result*, each with the text it reads as,
+    from the same table and the same formatter the chat uses."""
+    from app.modules.ai_chat.services import chat_figures
+    from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME
+
+    declaration = (TOOL_SCHEMA_BY_NAME.get(tool_name) or {}).get("figures") or {}
+    if not declaration.get("fields") or not isinstance(result, dict):
+        return []
+    table = chat_figures.FigureTable(organization_id)
+    table.annotate(tool_name, declaration, result, organization_id=organization_id)
+    out = []
+    for entry in table.entries:
+        figure = chat_figures.envelope_figure(entry, entry["rendered"], 0, 0)
+        figure.pop("start"), figure.pop("end")
+        out.append(figure)
+    return out

@@ -11,6 +11,13 @@ import logging
 import re
 from typing import Dict, List, Optional
 
+from app.modules.ai_chat.services.chat_figures import (
+    FIG_REF,
+    REASONS,
+    FigureTable,
+    violations_in,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -222,36 +229,6 @@ class AIHallucinationDetector:
 # assistant turns never ground a claim about the estate.
 
 REF_MARKER = re.compile(r"\[ref:([^\]\s]+)\]", re.IGNORECASE)
-_NOUNS = (
-    r"(?:applications?|elements?|systems?|services?|components?|capabilit(?:y|ies)|"
-    r"risks?|dependenc(?:y|ies)|dependents?|relationships?|interfaces?|servers?|"
-    r"databases?|processes|owners?|solutions?|vendors?|contracts?|rows?|records?)"
-)
-_UNITS = {
-    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
-    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
-    "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
-    "eighteen": 18, "nineteen": 19, "twenty": 20,
-}
-_TENS = {"thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70,
-         "eighty": 80, "ninety": 90}
-_VAGUE = ("dozens", "dozen", "hundreds", "thousands", "scores")
-_NUM_WORD = "|".join(
-    sorted(list(_UNITS) + list(_TENS) + ["hundred"] + list(_VAGUE), key=len, reverse=True)
-)
-_COUNT_CLAIM = re.compile(
-    r"\b(\d[\d,]*|(?:" + _NUM_WORD + r")(?:[ -](?:"
-    + "|".join(list(_UNITS) + list(_TENS))
-    + r"))?)\s+(?:\w+\s+){0,2}?" + _NOUNS + r"\b",
-    re.IGNORECASE,
-)
-_COUNT_KEYS = frozenset({
-    "total", "count", "returned", "rows_total", "explicit_count",
-    "derived_count", "stale_count", "resolved_seed_count", "unresolved_count",
-    "affected_count",
-})
-_NOT_COUNTS = frozenset({"citations_total", "rows_shown"})
-_COUNT_LIKE = re.compile(r"^(?:total|count)|(?:_total|_count)$")
 _ID_KEYS = frozenset({"id", "element_id", "risk_id", "root_element_id"})
 _NAME_KEYS = frozenset({"name", "title"})
 _LEADING = frozenset({
@@ -286,27 +263,6 @@ _NO_ROWS_OK = re.compile(
 )
 # A quantity attached to an estate noun is checked only in a statement of fact
 # about the estate; advice never triggers it.
-_FACT_VERB = re.compile(
-    r"\b(has|have|had|there (?:is|are)|downstream|upstream|are affected|is affected|"
-    r"affected|impacted|depend(?:s|ent)?|"
-    r"stop|stops|break|breaks)\b",
-    re.IGNORECASE,
-)
-_ADVICE = re.compile(
-    r"\b(consider|keep|use|aim|target|should|recommend\w*|prefer|avoid|try|plan|"
-    r"ensure|make sure|you can|you could|you might|let us)\b",
-    re.IGNORECASE,
-)
-# Estate nouns whose attached quantity is checked even where no record is named.
-_ATTACHED_NOUNS = (
-    r"(?:applications?|elements?|dependents?|dependenc(?:y|ies)|relationships?)"
-)
-_NOT_A_COUNT_BEFORE = frozenset({
-    "tier", "level", "phase", "layer", "step", "type", "stage", "release",
-    "version", "v", "number", "no", "least", "most", "about", "around",
-    "roughly", "typically", "usually", "per", "each", "every", "top", "first",
-    "last", "next", "category", "class", "grade", "priority", "p", "wave",
-})
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 _NON_WORD = re.compile(r"[^a-z0-9]+")
 _ALNUM = re.compile(r"[A-Za-z0-9]+")
@@ -346,16 +302,14 @@ def _is_int(value) -> bool:
 
 
 class _ResultFacts:
-    """Names, citable ids and counts that came back with ONE tool result."""
+    """Names and citable ids that came back with ONE tool result."""
 
     def __init__(self) -> None:
         self.names: set = set()
         self.refs: set = set()
         self.ref_names: Dict[str, set] = {}
-        self.counts: set = set()
         self.rows = 0
         self.subjects: set = set()
-        self.row_counts: set = set()   # counts of this result's own answer rows
         self.display: Dict[str, str] = {}  # name key -> the name as written
 
 
@@ -387,12 +341,6 @@ def _facts_of(result: dict) -> _ResultFacts:
                         if isinstance(nm, str) and nm.strip():
                             facts.ref_names.setdefault(str(ident), set()).add(phrase_key(nm))
                             facts.display.setdefault(phrase_key(nm), nm.strip())
-            elif key in _NOT_COUNTS:
-                continue
-            elif (key in _COUNT_KEYS or _COUNT_LIKE.search(str(key))) and _is_int(value):
-                facts.counts.add(value)
-            elif key == "rows" and isinstance(value, list):
-                facts.counts.add(len(value))
             elif key in ("seed_element_ids", "element_ids") and isinstance(value, list):
                 facts.refs.update(str(v) for v in value if _is_int(v))
 
@@ -405,13 +353,8 @@ def _facts_of(result: dict) -> _ResultFacts:
                 facts.subjects.add(phrase_key(element["name"]))
     if isinstance(top, dict) and isinstance(top.get("rows"), list):
         facts.rows = len(top["rows"])
-        facts.row_counts.add(len(top["rows"]))
-        for holder in (top, top.get("summary")):
-            if isinstance(holder, dict) and _is_int(holder.get("total")):
-                facts.row_counts.add(holder["total"])
     elif isinstance(top, list):
         facts.rows = len(top)
-        facts.counts.add(len(top))
     # An answer address covers every record in that answer.
     address = top.get("address") if isinstance(top, dict) else None
     if isinstance(address, str):
@@ -424,7 +367,7 @@ class Grounding:
     this turn and the structured context the system injected. Nothing the user
     typed and nothing an earlier turn said."""
 
-    def __init__(self) -> None:
+    def __init__(self, organization_id=None) -> None:
         self.tool_results = 0
         self.results: List[_ResultFacts] = []
         self.names: set = set()           # keys of records a read returned
@@ -433,7 +376,6 @@ class Grounding:
         self.ref_names: Dict[str, set] = {}
         self.context_names: set = set()   # records the injected context carries
         self.context_text: str = ""       # keyed text of unstructured context
-        self.context_counts: set = set()  # counts the injected context states
         self.rows_returned = 0
         self.subject_names: set = set()   # records the question itself was about
         # Genome slices read this turn (ADR-genome-01 decision 3): every node id
@@ -441,12 +383,11 @@ class Grounding:
         # completeness. Nodes a slice dropped to fit its budget are not here.
         self.genome_nodes: Dict[str, dict] = {}
         self.genome_slices: List[dict] = []
-        # Every number a tool result of this turn carried: the figures an
-        # answer may state. The injected context adds only its stated counts (see unsupported_figures).
-        self.figures: set = set()
-        # Counts the injected context states, by the noun they count ("elements"
-        # -> {40}); a count supports a figure only for its own noun.
-        self.context_nouns: Dict[str, set] = {}
+        # The figure table of this turn (see chat_figures): one entry for each
+        # declared figure of the organisation summary and of every tool result, each
+        # stamped with the organisation it was read for. Built per run, never shared.
+        self.organization_id = organization_id
+        self.figure_table = FigureTable(organization_id)
         self.display_names: Dict[str, str] = {}  # name key -> the name as written
 
     def add_context(self, value) -> None:
@@ -460,21 +401,35 @@ class Grounding:
         facts = _facts_of({"success": True, "result": value})
         self.context_names.update(facts.names)
         self.display_names.update(facts.display)
-        # A count of the shared vendor catalogue is not a count of this
-        # organisation's estate: it supports nothing.
-        own = _facts_of({"success": True, "result": _without_shared_counts(value)})
-        self.context_counts.update(own.counts)
-        for noun, numbers in _counted_nouns(value).items():
-            self.context_nouns.setdefault(noun, set()).update(numbers)
         self.refs.update(facts.refs)
         for ident, names in facts.ref_names.items():
             self.ref_names.setdefault(ident, set()).update(names)
+
+    def model_view(self, tool: str, result, declaration=None, organization_id=None):
+        """The copy of a tool result the model sees: each declared figure is an entry of
+        this turn's table and appears as its key and how it reads; every other value
+        stays as the tool returned it."""
+        as_of = None
+        top = result.get("result") if isinstance(result, dict) else None
+        for holder in (top, result):
+            if isinstance(holder, dict):
+                fresh = holder.get("freshness")
+                as_of = (fresh or {}).get("computed_at") if isinstance(fresh, dict) else None
+                as_of = as_of or holder.get("computed_at") or holder.get("as_of")
+                if as_of:
+                    break
+        if not (isinstance(result, dict) and result.get("success")):
+            return FigureTable.escaped(result)
+        return self.figure_table.annotate(
+            tool, declaration, result,
+            organization_id=self.organization_id if organization_id is None else organization_id,
+            as_of=as_of if isinstance(as_of, str) else None,
+        )
 
     def add_tool_result(self, result, mutates: bool = False) -> None:
         if not (isinstance(result, dict) and result.get("success")):
             return
         self.tool_results += 1
-        self.figures |= _numbers_in(result)
         if mutates:
             # Only the record the write itself created or changed is a
             # receipt; a name found anywhere else in the result is not.
@@ -486,8 +441,6 @@ class Grounding:
             return
         self._add_genome_slice(result.get("result"))
         facts = _facts_of(result)
-        # The count of the rows a result returned is a figure it states.
-        self.figures |= {float(n) for n in facts.counts | facts.row_counts}
         self.results.append(facts)
         self.display_names.update(facts.display)
         self.names.update(facts.names)
@@ -526,26 +479,6 @@ class Grounding:
                 self.genome_nodes.setdefault(str(element_id), node)
                 if isinstance(name, str) and phrase_key(name):
                     self.ref_names.setdefault(str(element_id), set()).add(phrase_key(name))
-
-
-def _count_value(token: str):
-    """The integer a count token states, or None for a vague quantity."""
-    token = token.lower().replace(",", "")
-    if token.isdigit():
-        return int(token)
-    if token in _VAGUE:
-        return None
-    total = 0
-    for part in re.split(r"[ -]", token):
-        if part in _UNITS:
-            total += _UNITS[part]
-        elif part in _TENS:
-            total += _TENS[part]
-        elif part == "hundred":
-            total = max(total, 1) * 100
-        else:
-            return None
-    return total
 
 
 def _trim_phrase(phrase: str) -> str:
@@ -750,29 +683,6 @@ def _mentions(sentence: str, tool_keys: set, context_keys: set, org_keys: set,
     return found
 
 
-def _attached_counts(text: str):
-    """Quantities directly attached to an estate noun (applications, elements,
-    dependents ...), without the ones that are not counts of the estate (tier
-    1, at least three, a year)."""
-    for match in _COUNT_CLAIM.finditer(text):
-        token = match.group(1)
-        if token.lower() == "one":
-            continue
-        after = text[match.end(1):match.end()].split()
-        if not after or not re.fullmatch(_ATTACHED_NOUNS, after[-1].strip(".,;:!?"), re.I):
-            continue
-        if len(after) > 2 or (len(after) == 2 and after[0].lower() not in ("of", "more", "other")):
-            continue  # another word sits between quantity and noun: not "attached"
-        before = text[:match.start(1)].split()
-        if before and before[-1].lower().strip(".,;:()") in _NOT_A_COUNT_BEFORE:
-            continue
-        yield token
-
-
-def _year(token: str) -> bool:
-    return token.isdigit() and len(token) == 4 and 1900 <= int(token) <= 2100
-
-
 def _check_sentence(sentence, grounding, tool_keys, context_keys, org_keys,
                     question_names, estate_question, zero_rows):
     """The unsupported parts of one statement (empty when it is supported)."""
@@ -829,48 +739,7 @@ def _check_sentence(sentence, grounding, tool_keys, context_keys, org_keys,
         else:
             missing.append("not returned this turn: " + key)
 
-    # Counts: a sentence that names a record or carries a marker is checked in
-    # full; any other sentence only for a quantity attached to an estate noun.
-    if mentions or markers:
-        tokens = [
-            m.group(1) for m in _COUNT_CLAIM.finditer(REF_MARKER.sub("", sentence))
-            if m.group(1).lower() != "one"
-            and not _is_non_count(REF_MARKER.sub("", sentence), m)
-        ]
-    elif (
-        estate_question
-        and (grounding.tool_results > 0 or grounding.context_counts)
-        and _FACT_VERB.search(sentence)
-        and not _ADVICE.search(sentence)
-    ):
-        tokens = list(_attached_counts(sentence))
-    else:
-        tokens = []
-    if tokens:
-        referenced = [
-            r for r in grounding.results
-            if any(m["key"] in r.names for m in mentions) or any(i in r.refs for i in ids)
-        ]
-        allowed: set = set(grounding.context_counts)
-        for r in referenced:
-            allowed |= r.counts
-        if not referenced:
-            # No record or marker to tie it to: a count that equals the count
-            # of this turn's own answer rows is accepted.
-            for r in grounding.results:
-                allowed |= r.row_counts
-        for token in tokens:
-            if _year(token):
-                continue
-            value = _count_value(token)
-            if value is None or value not in allowed:
-                missing.append(token)
     return missing
-
-
-def _is_non_count(text: str, match) -> bool:
-    before = text[:match.start(1)].split()
-    return bool(before and before[-1].lower().strip(".,;:()") in _NOT_A_COUNT_BEFORE)
 
 
 def _clarification_exempt(sentence, tool_keys, context_keys, org_keys, question_names) -> bool:
@@ -889,198 +758,6 @@ def _clarification_exempt(sentence, tool_keys, context_keys, org_keys, question_
     return all(m["key"] in question_names for m in mentions)
 
 
-# --------------------------------------------------------------------------- #
-# Figures                                                                      #
-# --------------------------------------------------------------------------- #
-#
-# A figure an answer states (an integer or decimal of two or more digits, a
-# percentage, a money amount, with its scale: 2m, 250k, 1.5 million) must also
-# be a value a tool returned this turn, after thousands separators are removed
-# and the tool's number is rounded to the precision the answer shows. Not
-# figures: years, dates and times, a version or number that belongs to a named
-# standard, product or framework (TOGAF 9.2, NIST SP 800-53, Java 17),
-# identifiers glued to letters, a [ref:] marker or a link, the number in a
-# record's own name, and numbers the user typed in the question.
-
-FIGURE_REASON = "figure no tool returned this turn: "
-FIGURES_NOT_CONFIRMED = (
-    "I could not confirm one or more figures in this answer from the records I "
-    "read, so I left them out."
-)
-NEXT_STEP = "Ask me to list the records behind this question to see the exact figure."
-
-# The fields of a tool result whose numbers are never support for a figure: ids,
-# addresses, hashes, timestamps and dates, durations, versions, the request's
-# own parameters and paging. Everything else a result carries (its counts,
-# totals, amounts, scores and the values in its rows) is a value. One place.
-_NOT_VALUE_FIELDS = frozenset({
-    "id", "ids", "uuid", "guid", "address", "hash", "digest", "etag", "token", "key",
-    "timestamp", "date", "datetime", "as_of", "time", "version", "engine_version",
-    "schema_version", "params", "parameters", "depth", "max_depth", "chain",
-    "chain_elements", "offset", "limit", "page", "per_page", "latency", "duration",
-    "elapsed", "took", "freshness", "provenance", "citations", "url", "uri", "href",
-})
-_NOT_VALUE_FIELD_PARTS = re.compile(
-    r"(?:_(?:at|on|id|ids|hash|digest|date|time|timestamp|ms|url|uri|href|version)$)"
-    r"|^(?:latency|duration|elapsed|took)"
-)
-_HEX_TOKEN = re.compile(r"\b[0-9a-f]{16,}\b", re.IGNORECASE)
-
-
-def _is_value_field(key) -> bool:
-    name = str(key).strip().lower()
-    return name not in _NOT_VALUE_FIELDS and not _NOT_VALUE_FIELD_PARTS.search(name)
-
-
-_ANY_NUMBER = re.compile(r"(?<![\w.])\d[\d,]*(?:\.\d+)?")
-_MONTHS = (
-    r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|"
-    r"sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
-)
-# Standards, products and frameworks: a version or number after one is its name.
-_NAMED_THINGS = (
-    r"togaf|archimate|bpmn|uml|cobit|itil|zachman|dodaf|nist(?:\s+(?:sp|csf))?|csf|"
-    r"iso(?:\s*/\s*iec)?|iec|owasp(?:\s+top)?|rfc|soc|sox|pci(?:\s+dss)?|dss|gdpr|"
-    r"hipaa|cve|tls|ssl|http|oauth|saml|wcag|openapi|java|python|windows(?:\s+server)?|"
-    r"ubuntu|debian|macos|android|postgres(?:ql)?|mysql|kubernetes|angular|django|flask|"
-    r"php|ruby|kotlin|port|ports|article|articles|section|sections|clause|annex"
-)
-_NOT_FIGURE_SPANS = re.compile(
-    "|".join([
-        r"\[ref:[^\]\s]+\]",
-        r"\]\([^)]*\)",
-        r"(?:https?://|www\.)\S+",
-        r"\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?Z?)?",
-        r"\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b",
-        r"\b\d{1,2}:\d{2}(?::\d{2})?(?:\s?[ap]\.?m\.?)?",
-        r"\b\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?" + _MONTHS + r"\b(?:,?\s+\d{4})?",
-        r"\b" + _MONTHS + r"\.?\s+\d{1,2}(?:st|nd|rd|th)?\b(?:,?\s+\d{4})?",
-        r"\b(?:19|20)\d{2}\s*[-\u2013/]\s*(?:\d{4}|\d{2})\b",
-        r"\bv?\d+(?:\.\d+){2,}\b",
-        r"\b(?:version|release|rev|revision|build)\s+v?\d+(?:\.\d+)*",
-        r"\b24\s*/\s*7\b",
-        r"\b(?:" + _NAMED_THINGS + r")\b\.?\s*[-/]?\s*v?\d+(?:[-.:/]\d+)*"
-        r"(?:\s*(?:rev(?:ision)?\.?|r)\s*\d+)?",
-    ]),
-    re.IGNORECASE,
-)
-_LIST_NUMBER = re.compile(r"^\s*[-*#>|]*\s*\d{1,3}[.)]\s")
-_FIGURE = re.compile(
-    r"(?<![\w.])(?<![A-Za-z]-)(?P<cur>[$\u20ac\u00a3]\s?)?"
-    r"(?P<num>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)"
-    r"(?P<suf>\s?%|(?:k|m|bn)(?![\w])|\s(?:million|billion|thousand)\b)?(?![\w])",
-    re.IGNORECASE,
-)
-_SCALES = {"k": 1e3, "thousand": 1e3, "m": 1e6, "million": 1e6, "bn": 1e9, "billion": 1e9}
-_ID_LABEL = re.compile(r"(?:\bid|\bids|#|\bno\.|\bnumber)\s*:?\s*#?\s*$", re.IGNORECASE)
-
-
-def _mask(text: str, spans) -> str:
-    """*text* with the characters of each ``(start, end)`` span blanked."""
-    hidden = [False] * len(text)
-    for start, end in spans:
-        hidden[start:end] = [True] * (end - start)
-    return "".join(" " if gone else ch for ch, gone in zip(text, hidden))
-
-
-def _figures_written_in(text: str) -> set:
-    """The values the numbers written in *text* state, with their scale
-    ("£1.2m" is 1,200,000), after dates, versions and standards are set aside."""
-    text = _mask(text, [m.span() for m in _NOT_FIGURE_SPANS.finditer(text)])
-    text = _mask(text, [m.span() for m in _HEX_TOKEN.finditer(text)])
-    found: set = set()
-    for match in _FIGURE.finditer(text):
-        try:
-            value = float(match.group("num").replace(",", ""))
-        except ValueError:
-            continue
-        scale = _SCALES.get((match.group("suf") or "").strip().lower())
-        found.add(value * scale if scale else value)
-    return found
-
-
-def _numbers_in(value) -> set:
-    """The values *value* carries: numeric leaves and the figures written in
-    its text, leaving out the fields that are not values (see _NOT_VALUE_FIELDS)."""
-    found: set = set()
-
-    def visit(node) -> None:
-        if isinstance(node, bool):
-            return
-        if isinstance(node, (int, float)):
-            found.add(float(node))
-        elif isinstance(node, str):
-            found.update(_figures_written_in(node))
-        elif isinstance(node, dict):
-            for key, item in node.items():
-                if _is_value_field(key):
-                    visit(item)
-        elif isinstance(node, (list, tuple)):
-            for item in node:
-                visit(item)
-
-    visit(value)
-    return found
-
-
-_COUNT_FIELD = re.compile(r"^(?:total|num|number_of)_(?P<a>[a-z_]+)$|^(?P<b>[a-z_]+?)_count$")
-
-
-def _count_noun(key) -> Optional[str]:
-    """The thing a context count field counts: ``total_elements`` -> "element",
-    ``application_count`` -> "application"; None for a field that is not a count."""
-    match = _COUNT_FIELD.match(str(key).lower())
-    if not match:
-        return None
-    return _stem((match.group("a") or match.group("b")).split("_")[-1])
-
-
-def _stem(word: str) -> str:
-    word = word.lower()
-    if word.endswith("ies") and len(word) > 4:
-        return word[:-3] + "y"
-    return word[:-1] if word.endswith("s") and not word.endswith("ss") else word
-
-
-def _is_shared_count(key) -> bool:
-    """The vendor catalogue is shared by every organisation: a count of it says
-    nothing about the signed-in organisation's estate."""
-    return "vendor" in str(key).lower()
-
-
-def _without_shared_counts(value):
-    """*value* without the integer fields that count a shared catalogue."""
-    if isinstance(value, dict):
-        return {
-            k: _without_shared_counts(v) for k, v in value.items()
-            if not (_is_shared_count(k) and _is_int(v))
-        }
-    if isinstance(value, list):
-        return [_without_shared_counts(v) for v in value]
-    return value
-
-
-def _counted_nouns(value) -> Dict[str, set]:
-    """``{noun: {counts}}`` for the count fields of a context structure, leaving
-    out counts of a shared catalogue."""
-    out: Dict[str, set] = {}
-
-    def visit(node) -> None:
-        if isinstance(node, dict):
-            for key, item in node.items():
-                noun = _count_noun(key)
-                if noun and _is_int(item) and not _is_shared_count(key):
-                    out.setdefault(noun, set()).add(item)
-                else:
-                    visit(item)
-        elif isinstance(node, list):
-            for item in node:
-                visit(item)
-
-    visit(value)
-    return out
-
-
 def _name_keys(grounding: Grounding, org_names: Optional[set]):
     """The record-name keys the citation gate looks for: (returned by a tool or
     written by a write of this turn, carried by the context, the organisation's)."""
@@ -1095,102 +772,26 @@ def _name_keys(grounding: Grounding, org_names: Optional[set]):
     return tool_keys, context_keys, org_keys
 
 
-def _stated_figures(sentence: str, keys) -> List[tuple]:
-    """``(text, value, tolerance, is_percent, before, after)`` of each figure
-    *sentence* states, after dates, versions, standards, links and record names
-    are set aside. *before* and *after* are the words around the figure."""
-    text = _LIST_NUMBER.sub(" ", sentence)
-    spans = [m.span() for m in _NOT_FIGURE_SPANS.finditer(text)]
-    spans += [
-        (mention["start"], mention["end"])
-        for mention in _mentions(text, keys[0], keys[1], keys[2], list(REF_MARKER.finditer(text)))
-    ]
-    text = _mask(text, spans)
-    out: List[tuple] = []
-    for match in _FIGURE.finditer(text):
-        num = match.group("num")
-        currency = bool(match.group("cur"))
-        suffix = (match.group("suf") or "").strip().lower()
-        percent = suffix == "%"
-        digits = len(re.sub(r"\D", "", num))
-        if not (currency or suffix or digits >= 2):
-            continue
-        if not (currency or suffix) and "," not in num and "." not in num and _year(num):
-            continue
-        scale = _SCALES.get(suffix, 1.0)
-        decimals = len(num.split(".")[1]) if "." in num else 0
-        value = float(num.replace(",", "")) * scale
-        out.append((
-            match.group(0).strip(), value, 0.5 * 10 ** -decimals * scale, percent,
-            text[max(0, match.start() - 14):match.start()], text[match.end():match.end() + 60],
-        ))
-    return out
-
-
-def _counts_its_noun(grounding: Grounding, value: float, after: str) -> bool:
-    """True when the context counts *value* of the very thing the words after
-    the figure name ("40 elements" against the context's ``total_elements``)."""
-    if value != int(value):
-        return False
-    for word in re.findall(r"[A-Za-z]+", after)[:3]:
-        if int(value) in grounding.context_nouns.get(_stem(word), ()):
-            return True
-    return False
-
-
-def unsupported_figures(sentence: str, grounding: Grounding, keys, question_numbers: set) -> List[str]:
-    """The figures *sentence* states that no tool result of this turn (nor the
-    user's own question, nor a count the injected context states for the very
-    thing counted) carries."""
-    known = grounding.figures | question_numbers
-    missing: List[str] = []
-    for text, value, tolerance, percent, before, after in _stated_figures(sentence, keys):
-        if any(
-            abs(n - value) <= tolerance + 1e-9 or (percent and abs(n * 100 - value) <= tolerance + 1e-9)
-            for n in known
-        ):
-            continue
-        if _counts_its_noun(grounding, value, after):
-            continue
-        # "record id 316": an identifier a tool returned, named as an identifier.
-        if value == int(value) and _ID_LABEL.search(before) and str(int(value)) in grounding.refs:
-            continue
-        if text not in missing:
-            missing.append(text)
-    return missing
-
-
-def figures_of(uncited: List[Dict]) -> List[str]:
-    """The unsupported figures the gate named, in order, without repeats."""
-    out: List[str] = []
-    for claim in uncited:
-        for reason in claim.get("unsupported", []):
-            if reason.startswith(FIGURE_REASON) and reason[len(FIGURE_REASON):] not in out:
-                out.append(reason[len(FIGURE_REASON):])
-    return out
-
-
-def only_figures(uncited: List[Dict]) -> bool:
-    """True when every reason the gate gave is an unsupported figure."""
-    return bool(uncited) and all(
-        reason.startswith(FIGURE_REASON)
-        for claim in uncited for reason in claim.get("unsupported", [])
-    )
-
-
 _CLAUSE_BREAK = re.compile(r"(;\s+|,\s+(?:and|but|while|whereas)\s+|\s+[\u2013\u2014]\s+|\s+-\s+)")
 _LEAD = re.compile(r"^(\s*(?:[-*>|]|\d{1,3}[.)])?\s*)")
 _TAIL = re.compile(r"([.!?]?(?:\s*\[ref:[^\]\s]+\])*\s*)$")
 
 
-def _without_figure_clauses(piece: str, bad) -> str:
-    """*piece* (one statement) without the parenthesis or the clause that states
-    a figure ``bad`` rejects; "" when nothing is left to say. Clauses are only
-    cut at a semicolon, a dash, or ", and" / ", but" / ", while", so what stays
-    is a statement of its own."""
+def _without_bad_clauses(piece: str, bad, cut: List[str]) -> str:
+    """*piece* (one statement) without the parenthesis or the clause ``bad`` rejects;
+    "" when nothing is left to say. Clauses are only cut at a semicolon, a dash, or
+    ", and" / ", but" / ", while", so what stays is a statement of its own. What was
+    cut is appended to *cut*."""
     lead = _LEAD.match(piece).group(1)
     body = piece[len(lead):]
-    body = re.sub(r"\s*\([^()]*\)", lambda m: "" if bad(m.group(0)) else m.group(0), body)
+
+    def drop_parenthesis(m):
+        if bad(m.group(0)):
+            cut.append(m.group(0).strip())
+            return ""
+        return m.group(0)
+
+    body = re.sub(r"\s*\([^()]*\)", drop_parenthesis, body)
     if not bad(body):
         return lead + body
     tail = _TAIL.search(body).group(1)
@@ -1198,8 +799,10 @@ def _without_figure_clauses(piece: str, bad) -> str:
     parts = _CLAUSE_BREAK.split(core)
     clauses = parts[0::2]
     if len(clauses) < 2:
+        cut.append(piece.strip())
         return ""
     kept = [c for c in clauses if c.strip() and not bad(c)]
+    cut.extend(c.strip() for c in clauses if c.strip() and bad(c))
     if not kept:
         return ""
     text = "; ".join(c.strip() for c in kept)
@@ -1210,57 +813,29 @@ def _without_figure_clauses(piece: str, bad) -> str:
     return lead + text + (ending if ending.strip() else ".")
 
 
-def _what_the_records_show(grounding: Grounding) -> str:
-    """A short sentence naming up to three records a tool returned, each with its
-    own citation marker; "" when none is known by name and id."""
-    shown: List[str] = []
-    for ident in sorted((i for i in grounding.ref_names if i.isdigit()), key=int):
-        keys = grounding.ref_names[ident]
-        if len(keys) != 1:
-            continue
-        name = grounding.display_names.get(next(iter(keys)))
-        if name:
-            shown.append("%s [ref:%s]" % (name, ident))
-        if len(shown) == 3:
-            break
-    if not shown:
-        return ""
-    return "The records I read do show " + ", ".join(shown) + "."
-
-
-def remove_unsupported_figures(
-    response_text: str,
-    grounding: Grounding,
-    org_names: Optional[set] = None,
-    question_text: str = "",
-) -> Dict:
-    """``{"text", "removed"}``: *response_text* without the clause, or the
-    statement, that states an unsupported figure, and a plain line saying a
-    figure could not be confirmed. When nothing is left the person reads that
-    line, what the records do show (with its citation) and a next step. It only
-    removes; it never adds or rewrites a fact."""
-    keys = _name_keys(grounding, org_names)
-    question_numbers = _numbers_in(question_text)
+def remove_violating_clauses(response_text: str, bad) -> Dict:
+    """``{"text", "removed"}``: *response_text* without each clause (or statement, item or
+    row) for which ``bad(fragment)`` is true. ``removed`` is the text that was taken out.
+    It only removes; it never adds or rewrites a fact."""
     removed: List[str] = []
-
-    def bad(fragment: str) -> bool:
-        return bool(unsupported_figures(fragment, grounding, keys, question_numbers))
-
     out_lines: List[str] = []
-    for line in (response_text or "").split("\n"):
+    lines = (response_text or "").split("\n")
+    for line in lines:
+        if line.lstrip().startswith("|"):
+            if bad(line):
+                removed.append(line.strip())
+                continue
+            out_lines.append(line)
+            continue
         parts = re.split(r"((?<=[.!?])\s+)", line)
         pieces = parts[0::2]
         keep = [True] * len(pieces)
         changed = False
         for i, piece in enumerate(pieces):
-            if not keep[i] or piece.strip(" \t-*#>|").endswith("?"):
+            if not keep[i] or not bad(piece):
                 continue
-            found = unsupported_figures(piece, grounding, keys, question_numbers)
-            if not found:
-                continue
-            removed.extend(f for f in found if f not in removed)
             changed = True
-            rebuilt = _without_figure_clauses(piece, bad)
+            rebuilt = _without_bad_clauses(piece, bad, removed)
             if rebuilt.strip(" \t-*#>|") and re.search(r"[A-Za-z]", rebuilt) and not bad(rebuilt):
                 pieces[i] = rebuilt
                 continue
@@ -1270,20 +845,36 @@ def remove_unsupported_figures(
                 "", pieces[i + 1]
             ).strip(" .,;"):
                 keep[i + 1] = False
+                removed.append(pieces[i + 1].strip())
         if not changed:
             out_lines.append(line)
             continue
         rebuilt_line = " ".join(p.strip() for p, k in zip(pieces, keep) if k)
         if re.search(r"[A-Za-z0-9]", rebuilt_line):
             out_lines.append(line[: len(line) - len(line.lstrip())] + rebuilt_line)
+    out_lines = _without_empty_tables(out_lines)
     text = re.sub(r"\n{3,}", "\n\n", "\n".join(out_lines)).strip()
-    if removed:
-        if text:
-            text += "\n\n" + FIGURES_NOT_CONFIRMED
-        else:
-            shown = _what_the_records_show(grounding)
-            text = FIGURES_NOT_CONFIRMED + ("\n\n" + shown if shown else "") + "\n\n" + NEXT_STEP
     return {"text": text, "removed": removed}
+
+
+def _without_empty_tables(lines: List[str]) -> List[str]:
+    """A table whose every data row was removed leaves its heading alone: drop that too."""
+    out: List[str] = []
+    block: List[str] = []
+
+    def flush():
+        if len(block) > 2:
+            out.extend(block)
+
+    for line in lines + [""]:
+        if line.lstrip().startswith("|"):
+            block.append(line)
+            continue
+        if block:
+            flush()
+            block = []
+        out.append(line)
+    return out[:-1]
 
 
 def find_uncited_claims(
@@ -1294,11 +885,20 @@ def find_uncited_claims(
     question_names: Optional[set] = None,
     question_text: str = "",
 ) -> List[Dict]:
-    """Sentences of *response_text* that state a fact about the estate which a
-    tool result of this turn does not support. An empty list means the answer
-    may be shown. See the notes above for what is and is not caught."""
+    """Sentences of *response_text* that state a fact about the estate which a tool
+    result of this turn does not support, and the figures it cannot show: a reference
+    that does not resolve for this organisation, and any digit or number word written
+    outside a reference (see chat_figures). An empty list means the answer may be
+    shown. The figure check runs on every turn, with or without a tool. See the notes
+    above for what is and is not caught."""
     if not response_text or not response_text.strip():
         return []
+    figure_claims = [
+        {"claim": item["clause"][:300], "unsupported": ["%s: %s" % (item["reason"], item["span"] or item["key"])]}
+        for item in figure_violations(response_text, grounding, question_text)
+    ]
+    # Reference tokens are engine syntax: the name rules below read the prose only.
+    response_text = FIG_REF.sub("", response_text)
     statements = [
         s for s in _sentences(response_text)
         if len(s) >= 8 and not s.rstrip().endswith("?")
@@ -1307,7 +907,7 @@ def find_uncited_claims(
 
     if estate_question and grounding.tool_results == 0 and statements:
         if not all(_CLARIFICATION_START.search(s) for s in statements):
-            return [{
+            return figure_claims + [{
                 "claim": statements[0][:300],
                 "unsupported": ["no record was read for an estate question"],
             }]
@@ -1317,7 +917,6 @@ def find_uncited_claims(
     zero_rows = bool(estate_question and grounding.tool_results > 0
                      and grounding.rows_returned == 0)
 
-    question_numbers = _numbers_in(question_text)
     uncited: List[Dict] = []
     for sentence in statements:
         if _clarification_exempt(sentence, tool_keys, context_keys, org_keys, question_names):
@@ -1326,12 +925,30 @@ def find_uncited_claims(
             sentence, grounding, tool_keys, context_keys, org_keys,
             question_names, estate_question, zero_rows,
         )
-        if grounding.tool_results > 0:
-            for figure in unsupported_figures(sentence, grounding, keys, question_numbers):
-                missing.append(FIGURE_REASON + figure)
         if missing:
             uncited.append({"claim": sentence[:300], "unsupported": missing})
-    return uncited
+    return figure_claims + uncited
+
+
+def figure_violations(response_text: str, grounding: Grounding, question_text: str = "") -> List[Dict]:
+    """The figure violations of a draft (see chat_figures.violations_in) for this turn's
+    table and organisation."""
+    return violations_in(
+        response_text, grounding.figure_table, grounding.organization_id, question_text
+    )
+
+
+def figure_claims_of(uncited: List[Dict]) -> List[Dict]:
+    """The entries of *uncited* the figure check produced."""
+    return [
+        claim for claim in uncited
+        if any(str(r).split(":", 1)[0] in REASONS for r in claim.get("unsupported", []))
+    ]
+
+
+def only_figures(uncited: List[Dict]) -> bool:
+    """True when every reason the gate gave is a figure violation."""
+    return bool(uncited) and len(figure_claims_of(uncited)) == len(uncited)
 
 
 # --------------------------------------------------------------------------- #

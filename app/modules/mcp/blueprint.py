@@ -54,6 +54,7 @@ from app.modules.ai_chat.tools.route_read_tools import (
     scrub_credentials,
     tool_released,
 )
+from app.modules.intelligence.services.answer_envelope import connector_figures
 from app.modules.oauth_provider.scopes import MCP_READ_SCOPE
 
 logger = logging.getLogger(__name__)
@@ -283,12 +284,16 @@ def mcp_endpoint():
                 return jsonify(_jsonrpc_error(
                     req_id, JSONRPC_INTERNAL_ERROR, "Organisation scope unavailable.",
                 )), 403
-            result = fence_connector_result(catalogue_name, scrub_credentials(
-                ToolExecutor(user_id=user_id).execute(
-                    ToolCall(id=f"mcp-{req_id}", name=catalogue_name, arguments=arguments),
-                    propagate_errors=True,
-                )
-            ))
+            executed = ToolExecutor(user_id=user_id).execute(
+                ToolCall(id=f"mcp-{req_id}", name=catalogue_name, arguments=arguments),
+                propagate_errors=True,
+            )
+            # Each declared figure travels with the text it reads as (the chat's own
+            # rendering): the client's assistant is told to quote it.
+            figures = connector_figures(catalogue_name, executed, org_id)
+            result = fence_connector_result(catalogue_name, scrub_credentials(executed))
+            if figures and isinstance(result, dict):
+                result["figures"] = figures
             # Addresses leave the product, so they are absolute (public base URL).
             result = absolutise_connector_urls(result, current_app.config.get("PUBLIC_BASE_URL"))
             elapsed_ms = int((time.monotonic() - start) * 1000)

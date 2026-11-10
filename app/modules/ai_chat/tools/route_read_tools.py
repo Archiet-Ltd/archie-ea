@@ -22,7 +22,7 @@ from typing import Any, Callable
 from app.utils.internal_api import call_internal_api
 from app.utils.text_sanitization import neutralize_fence_lookalikes
 
-from .registry import TOOL_SCHEMAS
+from .registry import FIGURE_TOOL_NOTE, TOOL_SCHEMAS
 
 CONNECTOR_SURFACE = "mcp"
 
@@ -408,9 +408,12 @@ def connector_tools() -> list[dict]:
     tools = []
     for schema in TOOL_SCHEMAS:
         if _is_connector_tool(schema) and tool_released(schema["name"]):
+            # A tool that returns declared figures tells the client's assistant to quote
+            # the text each figure reads as: Entelim cannot check prose the client writes.
+            note = FIGURE_TOOL_NOTE if (schema.get("figures") or {}).get("fields") else ""
             tools.append({
                 "name": schema["name"],
-                "description": schema["description"],
+                "description": schema["description"] + note,
                 "inputSchema": schema["parameters"],
                 "annotations": {
                     "title": schema["name"].replace("_", " ").capitalize(),

@@ -17,13 +17,13 @@ import json
 import logging
 import time
 from typing import Callable, Optional
+from app.modules.ai_chat.services import chat_figures
 from app.modules.ai_chat.services.ai_hallucination_detector import (
     Grounding,
-    figures_of,
+    figure_claims_of,
     find_uncited_claims,
-    only_figures,
     organisation_names_in_text,
-    remove_unsupported_figures,
+    remove_violating_clauses,
 )
 from app.modules.intelligence.services.answer_envelope import (
     as_whole_number,
@@ -43,6 +43,19 @@ try:
     _MUTATING_TOOLS = _mutating_tool_names()
 except Exception:  # registry import failure must not take the turn with it
     _MUTATING_TOOLS = frozenset()
+
+# What the model is told about figures (prompt contract figures-v1). The version is recorded
+# on every turn; changing the text means a new version and a rerun of the gold set.
+FIGURES_PROMPT_VERSION = chat_figures.PROMPT_VERSION
+FIGURES_CONTRACT = """Figures. You never write a figure yourself. A figure is any count, amount of money, score, percentage, duration, date, rank or other quantity about this organisation.
+- Write each figure as its reference, copied exactly from a "fig" entry in a tool result or in the organisation summary, for example [fig:F3]. Entelim replaces the reference with the value, its unit, its scale and what it counts. The entry's "reads" shows what will appear, so do not repeat those words around it. Example: "Orders Hub [ref:185] has [fig:F3]." is shown as "Orders Hub has 13 connections downstream."
+- A figure that belongs to a record goes in the same sentence, list item or table row as that record's [ref:<id>].
+- In a table, put the reference alone in its cell.
+- Never work out a new figure: no adding, subtracting, multiplying, dividing, averaging, rounding, converting or ratios. If the person needs a figure no tool returned, call the tool that returns it. If none does, say the records do not hold it.
+- Figures in earlier answers are not available in this turn. Read them again with a tool.
+- Apart from references, write no digits and no number words (such as two, ten, dozen, hundred, million), except: a number the person typed in this question, copied exactly as they typed it; numbered list markers (1. 2. 3.); a record name exactly as the tool returned it; and the name of a standard, framework, regulation, protocol or product with its number, in its usual form (ISO 27001, TOGAF 9.2, TLS 1.3, Java 17).
+- Do not give targets, thresholds or periods as numbers unless a tool returned them; describe them in words.
+"""
 
 # Agent-mode system prompt prefix injected before domain context.
 _AGENT_PREFIX = """You are an Enterprise Architecture Copilot with DIRECT WRITE ACCESS
@@ -78,7 +91,7 @@ GROUNDING — this is a system of record, so an unverifiable answer is worse tha
    the answer tool (or simulate_impact) before replying. Do not answer it from memory.
 7b. When you state a recorded fact about a record of the estate, cite it with a marker
    [ref:<id>] where <id> is an element id or the answer address a tool returned this
-   turn. State counts as the tool returned them.
+   turn.
 7c. General architecture guidance (patterns, TOGAF, ArchiMate concepts) is fine; keep it
    apart from statements about this estate.
 7d. What the user asserts, or an earlier turn said, is not a fact on record: look it up.
@@ -86,11 +99,12 @@ GROUNDING — this is a system of record, so an unverifiable answer is worse tha
    attached to your reply as sources automatically — you do not need to write links,
    but the names must match or the citation will not line up with what you said.
 9. Read the coverage fields on every tool result. When a result says it is showing
-   N of M, report M as the total and say the list is partial. Never present the
-   number of rows you were shown as the number that exists.
+   N of M, give the total's figure reference and say the list is partial. Never
+   present the number of rows you were shown as the number that exists.
 10. When context arrives with an "_omitted" key, those parts were withheld for size
     and are NOT empty — retrieve them with a tool before drawing a conclusion.
 
+""" + FIGURES_CONTRACT + """
 LIVE ARCHITECTURE CONTEXT:
 """
 
@@ -347,15 +361,22 @@ class AgentRunner:
         self._held_tokens: Optional[list] = None
         self._withheld_claims: list = []   # sentences refused (enforce mode)
         self._would_withhold: list = []    # sentences logged only (log mode)
+        self._figure_audit: dict = {}      # the turn's figure check, for its run record
+        self._first_draft_figures: Optional[list] = None
+        self._revision_ran = False
 
     GATE_MODES = ("log", "enforce", "off")
+    # The shipped default: one constant. Enforce becomes the default only on the
+    # measured evidence the decision record names, in a one-line change here.
+    GATE_MODE_DEFAULT = "log"
 
     @staticmethod
     def _gate_mode() -> str:
-        """ASSISTANT_CITATION_GATE_MODE: "enforce" (default: an answer the gate
-        refuses is replaced by "Not recorded", and an unsupported figure is sent
-        back once, then taken out), "log" (the answer is shown unchanged and an
-        answer the gate would refuse is logged) or "off". One place."""
+        """ASSISTANT_CITATION_GATE_MODE: "log" (default: the answer is shown unchanged and
+        what the gate would refuse is logged; a reference that does not resolve is still
+        taken out, because a raw token is never shown), "enforce" (an answer the gate
+        refuses is replaced by "Not recorded", and a figure written outside a reference
+        is sent back once, then taken out) or "off". One place."""
         import os
 
         value = None
@@ -367,9 +388,9 @@ class AgentRunner:
         except Exception:  # pragma: no cover - no application at all
             value = None
         if value is None:
-            value = os.environ.get("ASSISTANT_CITATION_GATE_MODE", "enforce")
-        value = str(value or "enforce").strip().lower()
-        return value if value in AgentRunner.GATE_MODES else "enforce"
+            value = os.environ.get("ASSISTANT_CITATION_GATE_MODE", AgentRunner.GATE_MODE_DEFAULT)
+        value = str(value or AgentRunner.GATE_MODE_DEFAULT).strip().lower()
+        return value if value in AgentRunner.GATE_MODES else AgentRunner.GATE_MODE_DEFAULT
 
     def _emit_token(self, text: str) -> None:
         """Stream a token, or hold it while the citation gate has not yet seen
@@ -387,6 +408,15 @@ class AgentRunner:
         if release:
             for text in held or []:
                 self._emit({"type": "token", "text": text})
+
+    @staticmethod
+    def _turn_org():
+        try:
+            from app.middleware.tenant_context import current_org_id
+
+            return current_org_id()
+        except Exception:  # pragma: no cover - no tenant context at all
+            return None
 
     @staticmethod
     def _inject_trusted_tool_context(
@@ -718,14 +748,15 @@ class AgentRunner:
         )
 
         self._context_struct = None
-        # Build system prompt with live domain context
-        system_prompt = self._build_system_prompt(domain, context, persona, user_message=user_message)
-
         # Only this turn's tool results and the structured context the system
         # injected ground a claim about the estate. The words of the user and
         # earlier assistant turns do not: a fact someone asserted is not a fact
-        # on record.
-        self._grounding = Grounding()
+        # on record. The figure table is new for every run and is stamped with
+        # the organisation the turn runs for.
+        self._grounding = Grounding(self._turn_org())
+        # Build system prompt with live domain context (the organisation summary's
+        # figures enter this turn's table as it is built)
+        system_prompt = self._build_system_prompt(domain, context, persona, user_message=user_message)
         self._grounding.add_context(self._context_struct)
         self._grounding.add_context(self._context_text)
         self._gate_mode_now = self._gate_mode()
@@ -745,6 +776,9 @@ class AgentRunner:
                 logger.warning("AgentRunner: question name lookup failed", exc_info=True)
         self._nudged = False
         self._revised = False
+        self._revision_ran = False
+        self._first_draft_figures = None
+        self._figure_audit = {}
         self._question_text = user_message or ""
         self._gate_cache = None
 
@@ -903,61 +937,53 @@ class AgentRunner:
 
             # Text-only response — we're done
             if not llm_resp.get("tool_calls"):
-                # The final text is shown only if the citation gate passes it.
+                # The final text is shown only after the gate has checked it, and then
+                # whole: model text never reaches the browser as it is written, because a
+                # reference or a figure in it is not final until the engine has resolved it.
                 final_text = llm_resp.get("text") or ""
-                if (
-                    self._gate_mode_now == "enforce"
+                enforce = self._gate_mode_now == "enforce"
+                nudge = (
+                    enforce
                     and self._estate_question
                     and self._grounding.tool_results == 0
                     and not self._nudged
                     and iteration < MAX_ITERATIONS - 1
-                ):
-                    # An estate question must be answered from a stored answer.
-                    # One nudge to look it up, then the gate decides.
-                    self._nudged = True
-                    self._release_held_tokens(False)
-                    messages.append({"role": "assistant", "content": final_text or "(no answer)"})
-                    messages.append({
-                        "role": "user",
-                        "content": (
+                )
+                violations = (
+                    self._figure_violations(final_text)
+                    if enforce and not self._revised and iteration < MAX_ITERATIONS - 1
+                    else []
+                )
+                if violations and self._first_draft_figures is None:
+                    self._first_draft_figures = violations
+                left = self._budget_left()
+                if violations and left is not None and left < self.REVISION_MIN_SECONDS:
+                    # Too little of the turn is left for another model call: the fallback
+                    # (see _apply_citation_gate) shows the true figures instead.
+                    violations = []
+                if nudge or violations:
+                    # One message sends the draft back: the existing nudge to look the
+                    # answer up, and each figure violation, together.
+                    parts = []
+                    if nudge:
+                        self._nudged = True
+                        parts.append(
                             "Before replying, call the answer tool for this question "
                             "and reply only from the rows it returns, citing each "
                             "record with [ref:<id>]."
-                        ),
-                    })
-                    continue
-                if (
-                    self._gate_mode_now == "enforce"
-                    and not self._revised
-                    and iteration < MAX_ITERATIONS - 1
-                    and figures_of(self._find_uncited(final_text))
-                ):
-                    # The answer states a figure no tool returned this turn: it
-                    # goes back once with the reason. If the figure is still
-                    # unsupported, the gate removes it (see _apply_citation_gate).
-                    self._revised = True
+                        )
+                    if violations:
+                        self._revised = True
+                        self._revision_ran = True
+                        parts.append(chat_figures.revision_message(
+                            violations, self._grounding.figure_table, self._question_text,
+                            self._grounding.tool_results,
+                        ))
                     self._release_held_tokens(False)
                     messages.append({"role": "assistant", "content": final_text or "(no answer)"})
-                    messages.append({
-                        "role": "user",
-                        "content": (
-                            "Your answer states "
-                            + ", ".join(figures_of(self._find_uncited(final_text)))
-                            + ", which no tool returned in this turn. Reply again "
-                            "using only figures the tools returned, or say that the "
-                            "figure cannot be confirmed. Keep the [ref:<id>] markers."
-                        ),
-                    })
+                    messages.append({"role": "user", "content": "\n\n".join(parts)})
                     continue
-                if self._gate_mode_now == "enforce":
-                    gate_passes = not self._find_uncited(final_text)
-                else:
-                    # Monitor mode: the answer is shown unchanged; the gate
-                    # is evaluated (and logged) once, in _apply_citation_gate.
-                    gate_passes = True
-                # An answer that read the genome is shown only after its
-                # citation post-check, drawn by the server (see _finalize).
-                self._release_held_tokens(gate_passes and not self._grounding.genome_slices)
+                self._release_held_tokens(False)
                 return self._finalize(
                     {
                         "response": llm_resp.get("text", ""),
@@ -989,6 +1015,7 @@ class AgentRunner:
                     ),
                 )
                 schema = TOOL_SCHEMA_BY_NAME.get(tc.name, {})
+                model_view = None
 
                 if tc.name not in offered_tools:
                     # Tool selection is the server's: only a tool offered on the
@@ -1033,6 +1060,9 @@ class AgentRunner:
                     self._grounding.add_tool_result(
                         result, mutates=tc.name in _MUTATING_TOOLS
                     )
+                    model_view = self._grounding.model_view(
+                        tc.name, result, schema.get("figures"), self._grounding.organization_id,
+                    )
                     self._emit({"type": "tool_result", "tool": tc.name, "result": result})
 
                     if result.get("success"):
@@ -1050,7 +1080,7 @@ class AgentRunner:
                     elif result.get("recovery"):
                         required_actions.append(result["recovery"])
 
-                tool_results.append((tc_raw, result))
+                tool_results.append((tc_raw, model_view if model_view is not None else result))
 
             # Feed results back into messages for next iteration
             messages = self._append_tool_results(provider, messages, llm_resp, tool_results)
@@ -1141,6 +1171,14 @@ class AgentRunner:
                 # documents) is data, not instruction: it is fenced.
                 from app.modules.ai_chat.services.architect_persona_charters import fence_untrusted
 
+                # The organisation summary's declared figures enter the turn's table and
+                # reach the model as one line of references; the raw values leave the
+                # context, so the model writes keys, never values.
+                from app.modules.ai_chat.tools.registry import ORGANISATION_SUMMARY_FIGURES
+
+                raw_ctx, summary_line = self._grounding.figure_table.declare_summary(
+                    raw_ctx, ORGANISATION_SUMMARY_FIGURES, self._grounding.organization_id,
+                )
                 # The structured rows the model is handed ground its answer.
                 serialised = self._serialise_context(raw_ctx)
                 # Only what the model actually saw (whole keys are dropped
@@ -1151,6 +1189,8 @@ class AgentRunner:
                     seen = None
                 self._context_struct = seen if isinstance(seen, dict) else None
                 ctx_block = fence_untrusted("LIVE ARCHITECTURE DATA", serialised)
+                if summary_line:
+                    ctx_block += "\n" + summary_line + "\n"
         except Exception as e:
             logger.debug("AgentRunner: context build failed: %s", e)
 
@@ -1847,6 +1887,11 @@ class AgentRunner:
                         if self._would_withhold
                         else {}
                     ),
+                    **(
+                        {"figure_check": self._figure_audit}
+                        if self._figure_audit
+                        else {}
+                    ),
                 },
                 tools_called=[
                     {
@@ -1940,73 +1985,183 @@ class AgentRunner:
         "application fails, and I will answer from the recorded rows."
     )
 
+    # A revision is one more model call: under this many seconds of the turn's budget it is
+    # skipped and the fallback shows the true figures instead.
+    REVISION_MIN_SECONDS = 15.0
+
+    def _figure_violations(self, text: str) -> list:
+        """The figure violations of *text* (see chat_figures), from the gate's one entry point."""
+        return [
+            violation for violation in chat_figures.violations_in(
+                text, self._grounding.figure_table, self._grounding.organization_id, self._question_text
+            )
+        ]
+
     def _apply_citation_gate(self, result: dict) -> None:
         """Check an answer's statements about the estate against this turn's
-        tool results and context, according to ASSISTANT_CITATION_GATE_MODE.
+        tool results and context, according to ASSISTANT_CITATION_GATE_MODE, and show
+        its figures as the engine's rendering of this turn's figure table.
 
-        "log" (default): the answer is shown unchanged; an answer the gate
-        would have refused is logged once (record names and reasons, not the
-        text) and its sentences are kept on the run record under
-        ``citation_gate_would_withhold``. "enforce": such an answer is replaced
-        by an honest "not recorded" and its sentences are kept under
-        ``citation_gate_withheld``. "off": nothing runs. The result carries
-        counts only (``citation_gate``); sentences never reach the browser.
+        "log" (default): the answer is shown unchanged; an answer the gate would have
+        refused is logged once (record names and reasons, not the text) and its
+        sentences are kept on the run record under ``citation_gate_would_withhold``.
+        "enforce": such an answer is replaced by an honest "not recorded" and its
+        sentences are kept under ``citation_gate_withheld``; a figure written outside a
+        reference is sent back once (see run) and then taken out. "off": nothing is
+        recorded. In every mode a reference is resolved and rendered, and a clause that
+        holds one that does not resolve is taken out, because a raw token is never
+        shown. The result carries counts only (``citation_gate``); sentences never reach
+        the browser.
         """
         mode = self._gate_mode_now
         text = result.get("response")
-        if mode == "off" or result.get("error") or result.get("system_generated") \
+        if result.get("error") or result.get("system_generated") \
                 or not isinstance(text, str) or not text.strip():
             return
-        try:
-            uncited = self._find_uncited(text)
-        except Exception:
-            if mode == "enforce":
-                raise
-            logger.warning("AgentRunner: citation gate failed (monitor mode)", exc_info=True)
-            return
+        uncited: list = []
+        if mode != "off":
+            try:
+                uncited = self._find_uncited(text)
+            except Exception:
+                if mode == "enforce":
+                    raise
+                logger.warning("AgentRunner: citation gate failed (monitor mode)", exc_info=True)
+                return
         enforce = mode == "enforce"
-        # Counts only: the result is spread into the stream's done event, and
-        # the claims withheld must not reach the browser. They go to the run
-        # record (see _record_run) and the log.
-        result["citation_gate"] = {
-            "checked": True,
-            "mode": mode,
-            "refused": bool(uncited) and enforce,
-            "would_refuse": bool(uncited),
-            "uncited_count": len(uncited),
-            "sources": len(result.get("sources") or []),
-        }
-        if not uncited:
-            return
-        if enforce:
-            self._withheld_claims = uncited
-        else:
-            self._would_withhold = uncited
-        if enforce and only_figures(uncited):
-            # Only figures are unsupported: they are taken out and the answer
-            # says so; the rest of the answer stands.
-            from app.middleware.tenant_context import current_org_id
-
-            trimmed = remove_unsupported_figures(
-                text, self._grounding,
-                org_names=organisation_names_in_text(text, current_org_id()),
-                question_text=self._question_text,
-            )
-            result["response"] = trimmed["text"]
-            result["citation_gate"].update({"refused": False, "figures_removed": len(trimmed["removed"])})
-            result.pop("genome_answer", None)
-            logger.warning(
-                "AgentRunner: citation gate removed %d unsupported figure(s)", len(trimmed["removed"]),
-            )
-            return
-        if enforce:
+        figure_claims = figure_claims_of(uncited)
+        other_claims = [claim for claim in uncited if claim not in figure_claims]
+        if mode != "off":
+            # Counts only: the result is spread into the stream's done event, and
+            # the claims withheld must not reach the browser. They go to the run
+            # record (see _record_run) and the log.
+            result["citation_gate"] = {
+                "checked": True,
+                "mode": mode,
+                "refused": bool(other_claims) and enforce,
+                "would_refuse": bool(uncited),
+                "uncited_count": len(uncited),
+                "sources": len(result.get("sources") or []),
+            }
+        if uncited:
+            if enforce:
+                self._withheld_claims = uncited
+            else:
+                self._would_withhold = uncited
+        if enforce and other_claims:
             logger.warning(
                 "AgentRunner: citation gate refused an answer (%d uncited claim(s))",
-                len(uncited),
+                len(other_claims),
             )
             result["response"] = self.CITATION_REFUSAL
+            result["figures"] = []
             return
-        self._log_would_refuse(uncited)
+        self._deliver_figures(result, text, mode)
+        if uncited and not enforce and mode != "off":
+            self._log_would_refuse(uncited)
+
+    def _deliver_figures(self, result: dict, text: str, mode: str) -> None:
+        """Resolve the references in *text* and show each as its declared phrase; take out
+        the clauses that cannot be shown; when something was taken out, add the plain line,
+        the records block and the next step. Sets ``figures`` and ``figure_check``."""
+        from app.modules.intelligence.services import answer_envelope as envelope
+
+        table = self._grounding.figure_table
+        org = self._grounding.organization_id
+        question = self._question_text
+        enforce = mode == "enforce"
+        draft = text
+        violations = chat_figures.violations_in(draft, table, org, question)
+        first_draft = self._first_draft_figures if self._first_draft_figures is not None else violations
+        blocked = {chat_figures.REASON_UNKNOWN, chat_figures.REASON_OTHER_ORG, chat_figures.REASON_UNBOUND}
+        if enforce:
+            blocked.add(chat_figures.REASON_WRITTEN)
+
+        def bad(fragment: str) -> bool:
+            return any(
+                v["reason"] in blocked
+                for v in chat_figures.violations_in(fragment, table, org, question)
+            )
+
+        removed: list = []
+        if any(v["reason"] in blocked for v in violations):
+            cleaned = remove_violating_clauses(text, bad)
+            text, removed = cleaned["text"], cleaned["removed"]
+        rendered, figures = chat_figures.render(text, table) if text.strip() else ("", [])
+        block_lines = 0
+        if removed:
+            block, block_figures = chat_figures.records_block(
+                table, removed, {f["key"] for f in figures}, self._grounding.tool_results,
+            )
+            pieces = [rendered] if rendered.strip() else []
+            pieces.append(chat_figures.PLAIN_LINE)
+            if block:
+                base = len("\n\n".join(pieces)) + 2
+                for entry, phrase, start, end in block_figures:
+                    figures.append(chat_figures.envelope_figure(entry, phrase, base + start, base + end))
+                pieces.append(block)
+                block_lines = block.count("\n")
+            pieces.append(chat_figures.NEXT_STEP)
+            rendered = "\n\n".join(pieces)
+        result["response"] = rendered
+        result["figures"] = figures
+        if mode == "off":
+            return
+        by_reason: dict = {}
+        for violation in first_draft:
+            by_reason[violation["reason"]] = by_reason.get(violation["reason"], 0) + 1
+        remaining_written = sum(1 for v in violations if v["reason"] == chat_figures.REASON_WRITTEN)
+        unresolved = [v for v in violations if v["reason"] != chat_figures.REASON_WRITTEN]
+        all_refs = len(chat_figures.FIG_REF.findall(draft))
+        result["figure_check"] = envelope.figure_check_block(
+            mode=mode,
+            prompt_version=FIGURES_PROMPT_VERSION,
+            first_draft=by_reason,
+            revision_ran=self._revision_ran,
+            revision_fixed=bool(self._revision_ran and not violations),
+            fallback={"clauses_removed": len(removed), "records_block_lines": block_lines},
+            references={
+                "written": all_refs,
+                "resolved": max(0, all_refs - len(unresolved)),
+                "unresolved": len(unresolved),
+            },
+        )
+        # The violating spans, each with the three words before it, go to the run record.
+        self._figure_audit = {
+            "violations": [
+                {
+                    "reason": v["reason"],
+                    "span": v.get("span"),
+                    "before": " ".join(draft[: v["start"]].split()[-3:]),
+                }
+                for v in violations
+            ]
+        } if violations else {}
+        self._log_figure_check(by_reason, remaining_written, len(removed), block_lines, len(unresolved),
+                               all_refs, bool(question and chat_figures.typed_spans(question, table.names)))
+
+    def _log_figure_check(self, first_draft: dict, written: int, removed: int, block_lines: int,
+                          unresolved: int, references: int, typed_numbers: bool) -> None:
+        """One event per turn. The violating spans go to the run record, never to the log."""
+        event = {
+            "event": "chat.figure_check",
+            "organization_id": self._grounding.organization_id,
+            "conversation_id": self.chat_session_id,
+            "provider": getattr(self, "_provider_used", None),
+            "model": getattr(self, "_model_used", None),
+            "prompt_version": FIGURES_PROMPT_VERSION,
+            "mode": self._gate_mode_now,
+            "references_written": references,
+            "references_unresolved": unresolved,
+            "first_draft_violations": first_draft,
+            "written_number_violations": written,
+            "question_had_typed_numbers": typed_numbers,
+            "revision_ran": self._revision_ran,
+            "fallback": bool(removed),
+            "clauses_removed": removed,
+            "records_block_lines": block_lines,
+            "annotation_tokens": self._grounding.figure_table.annotation_tokens,
+        }
+        logger.info("chat.figure_check %s", json.dumps(event, default=str), extra={"figure_event": event})
 
     def _apply_genome_post_check(self, result: dict, provider: Optional[str]) -> None:
         """When this turn read a genome slice: remove every sentence that cites an
@@ -2070,6 +2225,7 @@ class AgentRunner:
         ``answered_by`` names the provider and model that produced the reply,
         read from the entry that answered (``model_used``), never the first one
         tried. A refused or failed turn carries none, so no model is named."""
+        self._provider_used, self._model_used = provider_used, model_used
         self._apply_genome_post_check(result, provider_used)
         self._apply_citation_gate(result)
         if (result.get("citation_gate") or {}).get("refused"):

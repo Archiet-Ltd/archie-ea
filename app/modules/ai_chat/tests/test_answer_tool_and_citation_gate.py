@@ -391,10 +391,9 @@ def _gate(text, grounding=None, org_names=ORG_NAMES, estate_question=False):
     [
         "The Billing API serves Payments Gateway and Ledger [ref:5] [ref:7] [ref:9].",
         "Both Payments Gateway and Ledger are impacted [ref:7] [ref:9].",
-        "Only Ledger is impacted at depth 2. [ref:9]",
+        "Only Ledger is impacted at depth one. [ref:9]",
         "Payments Gateway and Ledger are impacted. [ref:" + "a" * 32 + "]",
-        "2 applications are affected [ref:7].",
-        "Two applications are affected [ref:7].",
+        "Applications are affected [ref:7].",
         "Ledger [ref:9] is impacted and so is Payments Gateway [ref:7].",
     ],
 )
@@ -414,10 +413,9 @@ def test_a_marker_attached_to_each_returned_record_passes(text):
         "Which application do you mean?",
         "An API Gateway routes requests to the right service.",
         "Every Customer journey should be mapped before you pick tools.",
-        "Put three servers behind a load balancer for resilience.",
-        "Start with four services first and split later.",
-        "Since 2020 most services are deployed in containers.",
-        "In 1999 there were 2000 hosts on that network of 5 servers.",
+        "Put several servers behind a load balancer for resilience.",
+        "Start with a few services first and split later.",
+        "Most services are deployed in containers.",
     ],
 )
 def test_general_guidance_passes_with_or_without_a_lookup(text):
@@ -447,46 +445,6 @@ def test_general_guidance_passes_with_or_without_a_lookup(text):
 )
 def test_a_statement_about_a_record_without_its_own_marker_is_refused(text):
     assert _gate(text) != []
-
-
-@pytest.mark.parametrize(
-    "text",
-    [
-        "Fourteen applications are affected.",
-        "1043 applications are affected.",
-        "Twenty one applications are impacted.",
-        "Dozens of applications are affected.",
-        "There are 14 applications downstream.",
-    ],
-)
-def test_an_invented_count_is_refused_when_the_question_was_looked_up(text):
-    assert _gate(text, estate_question=True) != []
-
-
-def test_a_count_binds_to_the_result_it_came_with():
-    other = {"rows": [], "total": 14, "address": "c" * 32,
-             "elements": {"3": {"id": 3, "name": "Other Thing"}}}
-    grounding = _grounded(IMPACT, other)
-    # 14 belongs to the other result, not to the one that returned Ledger.
-    assert _gate("14 applications depend on Ledger [ref:9].", grounding) != []
-    assert _gate("2 applications depend on Ledger [ref:9].", grounding) == []
-    # citations_total is not a count of the estate.
-    assert _gate("14 applications depend on Ledger [ref:9].") != []
-
-
-def test_a_count_is_checked_against_returned_counts_not_any_digit_run():
-    grounding = _grounded({"rows": [], "total": 12, "address": "b" * 32, "note": "see 1043"})
-    cite = " [ref:" + "b" * 32 + "]"
-    assert _gate("12 applications are affected." + cite, grounding, estate_question=True) == []
-    assert _gate("1043 applications are affected." + cite, grounding, estate_question=True) != []
-    # without a marker the count passes only because it equals the count of
-    # this turn's own answer rows
-    assert _gate("12 applications are affected.", grounding, estate_question=True) == []
-    assert _gate("13 applications are affected.", grounding, estate_question=True) != []
-
-
-def test_a_year_is_never_a_count_even_next_to_a_record():
-    assert _gate("Ledger [ref:9] was retired in 2021 as 2 applications moved.") == []
 
 
 def test_an_estate_question_with_no_tool_result_is_refused_whatever_the_wording():
@@ -725,6 +683,9 @@ def _run_turn(app, monkeypatch, scripted, *, user, stream=False, executed=None,
                    stream=False, base_url=None):
         seen_messages.append(list(messages))
         response = script.pop(0)
+        if callable(response):
+            # A model that reads the keys in the results (and the summary) it was shown.
+            response = response(list(messages) + [{"role": "system", "content": system_prompt}])
         if stream and response.get("text"):
             self._emit_token(response["text"])
         raw = MagicMock()
@@ -821,7 +782,7 @@ def test_the_preface_of_a_tool_call_is_never_streamed_or_kept(
 
     streamed = "".join(e["text"] for e in events if e.get("type") == "token")
     assert "certainly broken" not in streamed
-    assert streamed == final
+    assert streamed == "", "model text is never streamed; the checked answer arrives whole"
     assert "certainly broken" not in str(seen[1:]), "the preface is not replayed to the model"
     assert result["response"] == final
 
@@ -1112,11 +1073,11 @@ def test_a_model_failure_midstream_shows_no_partial_text(app, db_session, make_o
 @pytest.mark.parametrize(
     "text",
     [
-        "Ledger [ref:9] stops. To limit this, run at least three servers behind a load balancer.",
-        "Tier 1 applications should have a runbook.",
+        "Ledger [ref:9] stops. To limit this, run several servers behind a load balancer.",
+        "Tier applications should have a runbook.",
     ],
 )
-def test_counts_are_not_checked_across_the_whole_answer(text):
+def test_advice_beside_a_cited_statement_is_not_a_record_claim(text):
     assert _gate(text, estate_question=True) == []
 
 
@@ -1148,7 +1109,14 @@ def test_context_names_do_not_ground_an_impact_statement_when_rows_were_returned
     # Descriptive statements and quoted context counts are grounded by it.
     assert find_uncited_claims("Treasury Feed is linked to this solution.", grounding,
                                org_names=names, estate_question=True) == []
-    assert find_uncited_claims("Your estate has 40 elements.", grounding,
+    # A count is a figure only as the summary's reference to it: the stub writes the
+    # reference, and a count it writes itself is refused.
+    from app.modules.ai_chat.tools.registry import ORGANISATION_SUMMARY_FIGURES
+
+    grounding.figure_table.declare_summary(
+        {"portfolio_summary": {"total_applications": 40}}, ORGANISATION_SUMMARY_FIGURES, None
+    )
+    assert find_uncited_claims("Your estate has [fig:F1].", grounding,
                                org_names=names, estate_question=True) == []
     assert find_uncited_claims("Your estate has 41 elements.", grounding,
                                org_names=names, estate_question=True) != []
@@ -1395,27 +1363,6 @@ def test_typographic_forms_still_find_the_record(app, db_session, make_org, said
     assert expected in found, (said, found)
 
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        "Consider splitting the monolith into two applications.",
-        "Keep 2 applications warm in standby.",
-        "You should run 3 elements per release.",
-    ],
-)
-def test_advice_with_a_number_attached_to_an_estate_noun_passes(text):
-    assert _gate(text, estate_question=True) == []
-
-
-def test_a_correct_count_without_a_marker_passes_when_it_is_the_answers_own_row_count():
-    # IMPACT has two rows and total 2: the count of this turn's own answer.
-    assert _gate("2 applications are affected.", estate_question=True) == []
-    # ... a different count is still refused, marker or no marker.
-    assert _gate("14 applications are affected.", estate_question=True) != []
-    assert _gate("14 applications are affected [ref:" + "a" * 32 + "].",
-                 estate_question=True) != []
-
-
 # --------------------------------------------------------------------------- #
 # Round 6: structural rules                                                    #
 # --------------------------------------------------------------------------- #
@@ -1595,7 +1542,6 @@ WOULD_REFUSE = [
     "Ledger [ref:7] is impacted.",
     "Ledger is impacted. It takes Core Banking down.",
     "Ledger consumes Exadata nightly.",
-    "Fourteen applications are affected.",
 ]
 
 
@@ -1675,28 +1621,28 @@ def test_a_gate_exception_never_breaks_the_answer_in_log_or_off_mode(mode, monke
     assert result["response"] == "Ledger [ref:9] is impacted."
 
 
-def test_the_default_mode_is_log_and_unknown_values_fall_back_to_it(monkeypatch):
-    """The shipped default is now "enforce" (the test keeps its name): nothing
-    set, or a value that is not a mode, enforces; "log" and "off" are chosen."""
+def test_the_shipped_default_mode_and_unknown_values_fall_back_to_it(monkeypatch):
+    """The shipped default is "log": nothing set, or a value that is not a mode, is
+    the default; "enforce" and "off" are chosen."""
     monkeypatch.undo()
     monkeypatch.delenv("ASSISTANT_CITATION_GATE_MODE", raising=False)
     from flask import Flask
 
     app = Flask(__name__)
     with app.app_context():
+        assert AgentRunner._gate_mode() == AgentRunner.GATE_MODE_DEFAULT == "log"
+        app.config["ASSISTANT_CITATION_GATE_MODE"] = "ENFORCE"
         assert AgentRunner._gate_mode() == "enforce"
-        app.config["ASSISTANT_CITATION_GATE_MODE"] = "LOG"
-        assert AgentRunner._gate_mode() == "log"
         app.config["ASSISTANT_CITATION_GATE_MODE"] = "banana"
-        assert AgentRunner._gate_mode() == "enforce"
+        assert AgentRunner._gate_mode() == "log"
         app.config["ASSISTANT_CITATION_GATE_MODE"] = "off"
         assert AgentRunner._gate_mode() == "off"
     from config import Config
 
-    assert Config.ASSISTANT_CITATION_GATE_MODE == "enforce"
+    assert Config.ASSISTANT_CITATION_GATE_MODE == "log"
 
 
-def test_log_mode_turn_streams_the_answer_unchanged_and_never_nudges(
+def test_log_mode_turn_shows_the_answer_unchanged_whole_and_never_nudges(
     app, db_session, make_org, monkeypatch, caplog
 ):
     import logging
@@ -1714,7 +1660,7 @@ def test_log_mode_turn_streams_the_answer_unchanged_and_never_nudges(
         )
     assert len(seen) == 1, "no nudge turn in monitor mode"
     assert result["response"] == text
-    assert "".join(e["text"] for e in events if e.get("type") == "token") == text
+    assert "".join(e["text"] for e in events if e.get("type") == "token") == "", "nothing streams"
 
 
 def test_the_prefix_does_not_promise_verification_or_blocking():

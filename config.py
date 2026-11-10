@@ -131,11 +131,11 @@ class Config:
     ]
 
     APP_NAME = os.environ.get("APP_NAME", "Entelim")
-    # The assistant's citation gate: "enforce" (default; an answer the gate
-    # refuses is replaced by "Not recorded", an unsupported figure is taken out),
-    # "log" (answers are shown unchanged and what the gate would refuse is
-    # logged) or "off".
-    ASSISTANT_CITATION_GATE_MODE = os.environ.get("ASSISTANT_CITATION_GATE_MODE", "enforce")
+    # The assistant's citation gate: "log" (default; answers are shown unchanged and
+    # what the gate would refuse is logged), "enforce" (an answer the gate refuses is
+    # replaced by "Not recorded", a figure written outside a reference is sent back
+    # once, then taken out) or "off". The same default is AgentRunner.GATE_MODE_DEFAULT.
+    ASSISTANT_CITATION_GATE_MODE = os.environ.get("ASSISTANT_CITATION_GATE_MODE", "log")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     if not SECRET_KEY:
         import secrets
