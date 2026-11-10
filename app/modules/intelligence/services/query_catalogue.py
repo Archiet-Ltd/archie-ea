@@ -145,40 +145,23 @@ def _applications_without_owner(organization_id: int, **_: Any) -> Dict[str, Any
 def _owner_names_by_application(
     organization_id: int, application_ids: List[int], ownership_types: Optional[tuple] = None,
 ) -> Dict[int, List[str]]:
-    """{application id: the names of its recorded owners}: the one reader of who owns what
-    for the answers below. A user is named as the owner record names them; a person
-    recorded without an account is named as recorded; a user outside this organisation
-    is not named."""
+    """{application id: the names of its recorded owners}, read through the one owner reader
+    (a user, or a person recorded without an account, each named as the record names them; a
+    user with no name is named by email)."""
     from app.models.application_owner import ApplicationOwner
-    from app.models.user import User
-    from app.services.element_ownership_service import owner_label
 
     if not application_ids:
         return {}
-    query = db.session.query(ApplicationOwner).filter(
-        ApplicationOwner.organization_id == organization_id,
-        ApplicationOwner.application_id.in_(application_ids),
-    )
-    if ownership_types:
-        query = query.filter(ApplicationOwner.ownership_type.in_(ownership_types))
-    owner_rows = query.all()
-    user_ids = {row.user_id for row in owner_rows if row.user_id is not None}
-    users_by_id = {
-        u.id: u
-        for u in User.query.filter(
-            User.id.in_(user_ids or {-1}), User.organization_id == organization_id,
-        ).all()
-    }
     names: Dict[int, List[str]] = {}
-    for row in owner_rows:
-        if row.user_id is None:
-            if row.person_name:
-                names.setdefault(row.application_id, []).append(row.person_name)
-            continue
-        user = users_by_id.get(row.user_id)
-        if user is not None:
-            names.setdefault(row.application_id, []).append(
-                owner_label(user.first_name, user.last_name, user.email))
+    for application_id, rows in ApplicationOwner.get_display_rows_for_applications(
+        application_ids, organization_id,
+    ).items():
+        for row in rows:
+            if ownership_types and row["ownership_type"] not in ownership_types:
+                continue
+            name = row["user_name"] if row["user_name"] != "\u2014" else row["user_email"]
+            if name:
+                names.setdefault(application_id, []).append(name)
     return names
 
 
