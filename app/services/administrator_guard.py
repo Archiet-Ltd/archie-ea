@@ -231,15 +231,16 @@ def administrator_ids(org_id: int) -> set[int]:
 def administrators_to_ask(org_id: int, limit: int = 3) -> list[dict]:
     """Name and email of up to ``limit`` administrators of ``org_id``, for a member who needs one to act."""
     from app.models.user import User
+    from app.modules.account.services.invitation_service import is_unactivated
 
     ids = administrator_ids(org_id)
     if not ids:
         return []
     # tenant-scoping-ok: ids come from administrator_ids(org_id), this organisation's own administrators
     people = User.query.filter(User.id.in_(ids)).order_by(User.id).all()
-    # Only people who can sign in: the sign-in rule is ``User.is_active`` (disabled accounts are refused)
-    # and service accounts never hold a session.
-    people = [u for u in people if u.is_active and not u.is_service_user and u.email][:limit]
+    # Only people who can sign in: ``User.is_active`` refuses disabled accounts, service accounts never hold a
+    # session, and an invited administrator has no password until they take up the invitation.
+    people = [u for u in people if u.is_active and not u.is_service_user and not is_unactivated(u) and u.email][:limit]
     return [{"name": " ".join(p for p in (u.first_name, u.last_name) if p) or u.email, "email": u.email}
             for u in people]
 
