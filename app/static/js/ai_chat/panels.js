@@ -482,9 +482,9 @@
                 /* Applications are recorded and how they connect is not: the questions that need no links,
                    and the two ways to record the connections. */
                 done('<div data-linkless-next-step></div>' +
-                    '<div class="mt-4 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(general) + '</div>' +
-                    '<p class="mt-3 text-center text-xs text-muted-foreground" data-linkless-note>General questions to start with. ' +
-                    'Your applications are recorded, but not how they connect. Once they are connected, these become questions about them.</p>');
+                    '<div class="mt-3 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(general) + '</div>' +
+                    '<p class="mt-2 text-center text-xs text-muted-foreground" data-linkless-note>General questions to start with. ' +
+                    'Your applications are recorded, but not how they connect.</p>');
                 const linklessSteps = document.getElementById('linkless-next-step');
                 if (linklessSteps) host.querySelector('[data-linkless-next-step]').appendChild(linklessSteps.content.cloneNode(true));
                 host._items = general;
