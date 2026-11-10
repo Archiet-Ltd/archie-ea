@@ -285,7 +285,7 @@
                         {% endif %}
                     </h3>
 
-                    <form method="POST" action="{{ url_for('admin.api_settings') }}">
+                    <form method="POST" action="{{ settings_url or url_for('admin.api_settings') }}">
                         {{ form.hidden_tag() }}
                         
                         <div class="space-y-4">

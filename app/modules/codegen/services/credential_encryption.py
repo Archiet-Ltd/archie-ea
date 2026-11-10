@@ -17,6 +17,13 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 
 
+WRONG_MASTER_KEY = (
+    "the saved access details cannot be opened on this server, because its encryption key is not the one "
+    "they were saved with. The person who runs this installation can fix the server's key; "
+    "once that is done, give the access details again."
+)
+
+
 class CredentialUnreadable(Exception):
     """Raised when a stored credential cannot be decrypted (wrong key,
     corrupted ciphertext, or missing key row). Never silently returns None."""
@@ -115,16 +122,30 @@ def _get_org_fernet(org_id: int, key_version: int | None = None) -> Fernet:
         # Requested a version that is not current — try the previous key
         if (record.previous_encrypted_key is not None
                 and key_version == record.key_version - 1):
-            raw_key = master.decrypt(record.previous_encrypted_key)
-            return Fernet(raw_key)
+            return Fernet(_open_org_key(master, record.previous_encrypted_key, org_id))
         raise CredentialUnreadable(
             f"Credential for org {org_id} uses key version {key_version} "
             f"but only version {record.key_version} (current) and "
             f"{record.key_version - 1} (previous) are available."
         )
 
-    raw_key = master.decrypt(record.encrypted_key)
-    return Fernet(raw_key)
+    return Fernet(_open_org_key(master, record.encrypted_key, org_id))
+
+
+def _open_org_key(master: Fernet, sealed: bytes, org_id: int) -> bytes:
+    """An organisation's key opened with the server's master key.
+
+    A master key that is not the one the organisation's key was sealed with is a server setting
+    only an administrator of the installation can put right; the person reads that in a sentence,
+    and the log keeps the error class.
+    """
+    try:
+        return master.decrypt(sealed)
+    except InvalidToken as exc:
+        logger.error(
+            "Organisation %s key could not be opened with the master key (%s)", org_id, type(exc).__name__
+        )
+        raise CredentialUnreadable(WRONG_MASTER_KEY) from None
 
 
 def _create_org_fernet(org_id: int) -> tuple[Fernet, int]:

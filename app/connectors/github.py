@@ -1661,11 +1661,16 @@ def run_first_sync(org_id, connector_id) -> Dict[str, Any]:
     """Run the connector's read for one organisation (the job the connect page starts and the
     re-sync button restarts). Returns counts only: no repository content and no credential."""
     from app.jobs.tenant_safe_job import tenant_scope
+    from app.modules.codegen.services.credential_encryption import CredentialUnreadable
     from app.services.connector_framework import run_connector_sync
 
-    with tenant_scope(org_id):
-        result = run_connector_sync(org_id=org_id, connector_id=connector_id, delegated=True)
-        db.session.commit()
+    try:
+        with tenant_scope(org_id):
+            result = run_connector_sync(org_id=org_id, connector_id=connector_id, delegated=True)
+            db.session.commit()
+    except CredentialUnreadable as exc:  # the sentence says what failed and who can fix it
+        db.session.rollback()
+        return {"success": False, "repositories": 0, "proposals": pending_total(org_id), "error": str(exc)}
     return {
         "success": bool(result.get("success")),
         "repositories": result.get("records_processed", 0),

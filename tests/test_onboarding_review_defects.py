@@ -196,3 +196,37 @@ def test_the_ai_settings_page_opened_from_sign_up_offers_the_way_back(signed_in)
     assert "/account/welcome?step=4" in opened
     on_its_own = signed_in.get("/admin/api-settings").get_data(as_text=True)
     assert "ai-settings-back-to-signup" not in on_its_own
+
+
+def test_a_wrong_master_key_reaches_the_person_as_a_plain_sentence(db_session, org_a, people, acme, connect, tenant_ctx, monkeypatch, caplog):
+    """The server's key is not the one the organisation's key was saved with: the read says what failed
+    and who can fix it, never the library's error class; the log keeps the class."""
+    from cryptography.fernet import Fernet
+
+    from app.connectors import github as gh
+    from app.modules.codegen.services import credential_encryption as encryption
+
+    cfg = connect(org_a, token="placeholder-read-only-token")
+    db_session.commit()
+    monkeypatch.setitem(encryption.current_app.config, "ORG_ENCRYPTION_MASTER_KEY", Fernet.generate_key().decode())
+    with caplog.at_level("ERROR"):
+        result = gh.run_first_sync(org_a.id, cfg.id)
+    assert result["success"] is False, result
+    sentence = result["error"]
+    assert "InvalidToken" not in sentence and "CredentialUnreadable" not in sentence, sentence
+    assert "encryption key" in sentence and "runs this installation" in sentence, sentence
+    assert "InvalidToken" in caplog.text
+
+
+def test_saving_a_key_opened_from_sign_up_keeps_the_way_back(signed_in):
+    form = {"provider": "openai", "key_label": "signup-key", "api_key": "placeholder-key-for-the-test", "enabled": "y",
+            "default_model": "", "max_tokens": "4000", "temperature": "0.7"}
+    opened = signed_in.get("/admin/api-settings?from=signup").get_data(as_text=True)
+    assert "/admin/api-settings?from=signup" in opened  # the form posts where the person is
+    saved = signed_in.post("/admin/api-settings?from=signup", data=form, follow_redirects=True)
+    page = saved.get_data(as_text=True)
+    assert "saved successfully" in page
+    assert 'data-testid="ai-settings-back-to-signup"' in page
+    assert "/account/welcome?step=4" in page
+    alone = signed_in.post("/admin/api-settings", data={**form, "key_label": "other-key"}, follow_redirects=True)
+    assert "ai-settings-back-to-signup" not in alone.get_data(as_text=True)
