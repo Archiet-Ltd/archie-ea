@@ -189,7 +189,7 @@ def _element_key(element_type: str, element_id: int) -> dict:
     return {"element_type": element_type, "element_id": element_id}
 
 
-def _match_users_by_name(name: str, organization_id: int):
+def _match_users_by_name(name: str, organization_id: int):  # reuse-ok: the body of the one name-to-user lookup (resolve_user_by_name), which also reports who a name was ambiguous between
     """(the one user, the people it was ambiguous between): full name first, then email, both
     exact and case-insensitive. Exactly one of the two is set, or neither when nobody matches."""
     from app.models.user import User
