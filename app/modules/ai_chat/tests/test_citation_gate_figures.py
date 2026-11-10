@@ -141,7 +141,7 @@ def test_removal_leaves_no_unsupported_figure_and_says_so():
 
 def test_removing_the_only_statement_leaves_just_the_plain_line():
     out = detector.remove_unsupported_figures("About 14 connections depend on it.", _grounded(IMPACT_13))
-    assert out["text"] == detector.FIGURES_NOT_CONFIRMED
+    assert out["text"] == detector.FIGURES_NOT_CONFIRMED + "\n\n" + detector.NEXT_STEP
 
 
 # --------------------------------------------------------------------------- #
@@ -222,3 +222,210 @@ def test_a_figure_from_another_organisations_turn_does_not_support_an_answer(
     assert "14 dependents" in result_a["response"]
     assert "14" not in result_b["response"]
     assert result_b["response"].endswith(detector.FIGURES_NOT_CONFIRMED)
+
+
+# --------------------------------------------------------------------------- #
+# Only a tool's value fields support a figure                                  #
+# --------------------------------------------------------------------------- #
+
+import datetime as _real_datetime
+import types
+
+# Tool results carry timestamps, durations, ids and hashes next to their values.
+# None of them is a figure the answer may quote.
+WITH_METADATA = {
+    "summary": {"total": 13, "latency_ms": 20.977989},
+    "computed_at": "2026-11-21T11:10:52.552000Z",
+    "freshness": {"computed_at": "2026-11-21T11:10:52.552000Z", "stale_rows": 0},
+    "address": "383400e1b1fa497c8515e89eaba70b08",
+    "rows": [{
+        "element_id": 21,
+        "relation": {
+            "depth": 1, "chain": [55, 52],
+            "provenance": {"recorded_at": "2026-11-10T04:26:19.392796", "relationship_id": 10},
+        },
+    }],
+    "message": "13 row(s). Answer address 383400e1b1fa497c8515e89eaba70b08.",
+}
+
+
+@pytest.mark.parametrize("wrong", ["21", "55", "52", "11", "10", "20.98"])
+def test_a_timestamp_a_duration_or_an_id_does_not_support_a_figure(wrong):
+    claims = _gate("The change touches %s connections in the estate." % wrong, _grounded(WITH_METADATA))
+    assert _figures(claims) == [wrong]
+
+
+def test_the_value_fields_of_the_same_result_still_support_a_figure():
+    assert _gate("The change touches 13 connections in the estate.", _grounded(WITH_METADATA)) == []
+
+
+def test_an_identifier_a_tool_returned_is_a_figure_only_when_named_as_an_identifier():
+    grounding = _grounded({"rows": [], "elements": {"316": {"id": 316, "name": "Calibration Ledger"}}})
+    assert _figures(_gate("The record id 316 is in the register.", grounding)) == []
+    assert _figures(_gate("The record #316 is in the register.", grounding)) == []
+    assert _figures(_gate("There are 316 connections in the register.", grounding)) == ["316"]
+
+
+# --------------------------------------------------------------------------- #
+# A name's number, a scale                                                     #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The method is TOGAF 9.2 for this work.",
+        "The notation is ArchiMate 3.2 throughout.",
+        "The control set is NIST 800-53 here.",
+        "The control set is NIST SP 800-53 Rev 5 here.",
+        "Reporting uses NIST CSF 2.0 here.",
+        "Web checks use the OWASP Top 10 here.",
+        "Support runs 24/7 for the estate.",
+        "It runs on Java 17 in production.",
+        "It runs on Windows 11 for staff.",
+        "It runs on Python 3.12 in production.",
+        "It runs on PostgreSQL 16 in production.",
+        "It runs on Ubuntu 22.04 in production.",
+        "Payment follows PCI DSS 4.0 here.",
+        "The record cites ISO 27001 and ISO/IEC 27001:2022.",
+        "Follow SOX 404 for this control.",
+    ],
+)
+def test_a_version_or_number_that_belongs_to_a_named_standard_or_product_is_not_a_figure(text):
+    assert _gate(text) == []
+
+
+@pytest.mark.parametrize(
+    "question,answer",
+    [
+        ("Is a £2m budget enough?", "The £2m budget stands."),
+        ("Is a budget of 1.5 million enough?", "The 1.5 million budget stands."),
+        ("Is a $250k spend fine?", "The $250k spend stands."),
+        ("Is £1,500,000 too much?", "The £1.5m figure stands."),
+    ],
+)
+def test_a_scaled_amount_the_person_typed_is_kept(question, answer):
+    assert _figures(_gate(answer)) != []
+    assert _gate(answer, question_text=question) == []
+
+
+def test_a_scaled_amount_in_tool_text_supports_the_same_amount_in_the_answer():
+    grounding = _grounded({"message": "The cost is £1.2m this year", "rows": []})
+    assert _gate("The cost is £1.2m for the year.", grounding) == []
+    assert _figures(_gate("The cost is £1.3m for the year.", grounding)) == ["£1.3m"]
+
+
+# --------------------------------------------------------------------------- #
+# A context count supports only its own noun, only for the organisation        #
+# --------------------------------------------------------------------------- #
+
+CONTEXT = {"total_elements": 40, "total_applications": 20, "vendor_count": 16, "total_vendors": 16}
+
+
+def test_a_context_count_supports_a_figure_for_its_own_noun_only():
+    grounding = _grounded(IMPACT_13, context=CONTEXT)
+    assert _gate("Your estate has 40 elements in all.", grounding) == []
+    assert _gate("Your estate has 20 applications in all.", grounding) == []
+    assert _figures(_gate("The change touches 40 connections in the estate.", grounding)) == ["40"]
+    assert _figures(_gate("The change touches 20 records in the estate.", grounding)) == ["20"]
+
+
+def test_a_shared_catalogue_count_supports_nothing():
+    grounding = _grounded(IMPACT_13, context=CONTEXT)
+    assert _figures(_gate("The catalogue lists 16 vendors for you.", grounding)) == ["16"]
+    assert 16 not in grounding.context_counts
+    assert "vendor" not in grounding.context_nouns
+
+
+# --------------------------------------------------------------------------- #
+# Removal keeps the rest                                                       #
+# --------------------------------------------------------------------------- #
+
+
+def test_removing_a_figure_keeps_the_rest_of_the_sentence():
+    text = "Fig Mid [ref:2] is impacted, and 14 connections depend on it too."
+    out = detector.remove_unsupported_figures(text, _grounded(IMPACT_13))
+    assert out["removed"] == ["14"]
+    assert out["text"].startswith("Fig Mid [ref:2] is impacted.")
+    assert "14" not in out["text"]
+    assert out["text"].endswith(detector.FIGURES_NOT_CONFIRMED)
+
+
+def test_removing_a_figure_in_brackets_keeps_the_sentence():
+    out = detector.remove_unsupported_figures(
+        "Fig Mid [ref:2] is impacted (14 connections in all) by the change.", _grounded(IMPACT_13)
+    )
+    assert out["removed"] == ["14"]
+    assert out["text"].startswith("Fig Mid [ref:2] is impacted by the change.")
+
+
+def test_a_one_sentence_answer_leaves_the_plain_line_what_the_records_show_and_a_next_step():
+    grounding = _grounded({
+        "rows": [],
+        "elements": {"7": {"id": 7, "name": "Orders Hub"}, "8": {"id": 8, "name": "Orders Client"}},
+    })
+    out = detector.remove_unsupported_figures("Orders Hub [ref:7] has 14 connections.", grounding)
+    assert out["text"].splitlines()[0] == detector.FIGURES_NOT_CONFIRMED
+    assert "The records I read do show Orders Hub [ref:7], Orders Client [ref:8]." in out["text"]
+    assert out["text"].endswith(detector.NEXT_STEP)
+    assert "14" not in out["text"]
+
+
+def test_a_figure_next_to_a_marker_after_the_full_stop_is_removed():
+    out = detector.remove_unsupported_figures(
+        "$14m. [ref:7]", _grounded(IMPACT_13)
+    )
+    assert out["removed"] == ["$14m"]
+    assert "$14m" not in out["text"]
+
+
+# --------------------------------------------------------------------------- #
+# The turn does not depend on the clock                                        #
+# --------------------------------------------------------------------------- #
+
+
+def _freeze_answer_clock(monkeypatch, moment):
+    from app.modules.intelligence.services import answer_envelope as envelope
+
+    class Frozen(_real_datetime.datetime):
+        @classmethod
+        def utcnow(cls):
+            return moment
+
+    shim = types.SimpleNamespace(**{k: getattr(_real_datetime, k) for k in dir(_real_datetime) if not k.startswith("__")})
+    shim.datetime = Frozen
+    monkeypatch.setattr(envelope, "_dt", shim)
+
+
+# The clock digits that used to count as support: minute 14, and a moment whose
+# parts are 21, 11, 10, 52 and 55 (the wrong counts below).
+MOMENTS = [
+    _real_datetime.datetime(2026, 11, 10, 3, 14, 0),
+    _real_datetime.datetime(2026, 11, 21, 11, 10, 52, 552000),
+]
+
+
+@pytest.mark.parametrize("moment", MOMENTS, ids=["minute-14", "21-11-10-52-55"])
+def test_wrong_counts_are_removed_whatever_the_clock_says(app, db_session, make_org, monkeypatch, moment):
+    _freeze_answer_clock(monkeypatch, moment)
+    org_a = make_org("fig-clock-a")
+    org_b = make_org("fig-clock-b")
+    user = _user(db_session, org_a.id)
+    root, mid, leaf = _estate(db_session, org_a.id, "Clk")
+    _estate(db_session, org_b.id, "Other")
+    db_session.commit()
+    wrong = (
+        f"Clk Mid [ref:{mid.id}] and Clk Leaf [ref:{leaf.id}] are impacted. "
+        "That is 21 connections in all. Elsewhere 55 depend on them. About 52 more follow. "
+        "Another 11 sit behind them. A further 10 do too. 14 is the total."
+    )
+    script = [_call_answer(root.id), {"text": wrong}, {"text": wrong}]
+
+    result, _events, _runner, _seen = _run_turn(
+        app, monkeypatch, script, user=user, message="what breaks if Clk Root fails?"
+    )
+
+    for count in ("21", "55", "52", "11", "10", "14"):
+        assert count not in result["response"].replace(f"[ref:{mid.id}]", "").replace(f"[ref:{leaf.id}]", ""), count
+    assert result["citation_gate"]["figures_removed"] == 6
+    assert f"Clk Mid [ref:{mid.id}]" in result["response"]
