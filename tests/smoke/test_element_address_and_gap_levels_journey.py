@@ -125,7 +125,7 @@ def test_generate_preview_puts_a_severity_critical_gap_in_the_nearest_plateau(br
             _, name = estate["gaps"][key]
             page.get_by_label("Select Close %s %s" % (name, theme)).check(timeout=PAGE_TIMEOUT)
         with page.expect_response(lambda r: "roadmap/ai-generate" in r.url) as seen:
-            page.get_by_role("button", name=re.compile("AI Generate")).click()
+            page.get_by_role("button", name=re.compile("Generate roadmap")).click()
         assert seen.value.status == 200
         dialog = page.locator("#rdm-ai-generate-modal")
         expect(dialog.get_by_text("Plateau 1 — Immediate")).to_be_visible(timeout=PAGE_TIMEOUT)

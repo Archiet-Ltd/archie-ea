@@ -42,7 +42,9 @@ from app.services.rate_limiter import rate_limit
 from app import db
 
 from . import capability_map
+import json
 import logging
+import re
 logger = logging.getLogger(__name__)
 
 # Roles that may change what a gap, a work package and a plateau are linked to.
@@ -2076,6 +2078,29 @@ def api_roadmap_detect_gaps():
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
+_GAP_NUMBER_MAX = 2147483647  # the largest number the gap id column holds
+
+
+def _gap_numbers(raw):
+    """The gap numbers in a request body, or (None, a plain sentence naming the bad value). The body must be a
+    list; each item is a JSON whole number or a string of digits, from 1 to the column's largest number."""
+    if not isinstance(raw, list):
+        return None, "gap_ids must be a list of gap numbers."
+    numbers = []
+    for item in raw:
+        if isinstance(item, bool) or not isinstance(item, (int, str)):
+            number = None
+        elif isinstance(item, int):
+            number = item
+        else:
+            number = int(item) if re.fullmatch(r"[0-9]{1,30}", item) else None
+        if number is None or not 1 <= number <= _GAP_NUMBER_MAX:
+            return None, "%s is not a gap number: gap_ids must be whole numbers from 1 to %d." % (
+                json.dumps(item), _GAP_NUMBER_MAX)
+        numbers.append(number)
+    return numbers, None
+
+
 @capability_map.route("/api/roadmap/ai-generate", methods=["POST"])
 @login_required
 @rate_limit(10, "1m")
@@ -2103,11 +2128,9 @@ def api_roadmap_ai_generate():
         if not gap_ids:
             return jsonify({"success": False, "error": "gap_ids is required and must be non-empty"}), 400
 
-        try:
-            # The page sends the ticked checkboxes' values, which arrive as text.
-            gap_ids = [int(g) for g in gap_ids]
-        except (TypeError, ValueError):
-            return jsonify({"success": False, "error": "gap_ids must be whole numbers"}), 400
+        gap_ids, bad = _gap_numbers(gap_ids)
+        if bad is not None:
+            return jsonify({"success": False, "error": bad}), 400
 
         gaps = Gap.query.filter(Gap.id.in_(gap_ids)).all()
         if not gaps:
@@ -2118,7 +2141,8 @@ def api_roadmap_ai_generate():
 
         preview = []
         for gap in gaps:
-            rating = effective_severity(gap) or gap.priority or "medium"
+            # The one rating, with no second fallback: a gap with none is unrated and goes in the last plateau.
+            rating = (effective_severity(gap) or "").strip().lower() or None
             timeframe_days = PRIORITY_TIMEFRAMES.get(rating, 365)
             start_offset = (
                 0 if rating == "critical"
@@ -2140,13 +2164,13 @@ def api_roadmap_ai_generate():
                 "gap_id": gap.id,
                 "gap_name": gap.name,
                 "gap_type": gap.gap_type,
-                "gap_priority": rating,
+                "gap_priority": rating or "unrated",
                 "suggested_work_package": {
                     "name": f"Resolve: {gap.name}",
                     "description": (
                         f"Work package to close gap '{gap.name}'. "
                         f"Gap type: {gap.gap_type or 'coverage'}. "
-                        f"Priority: {rating}."
+                        + (f"Priority: {rating}." if rating else "The gap is not rated.")
                     ),
                     "priority": rating,
                     "estimated_start_date": estimated_start.isoformat(),

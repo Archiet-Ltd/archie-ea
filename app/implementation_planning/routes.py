@@ -899,27 +899,16 @@ def api_gaps():
     API endpoint to get gaps.
     Supports query parameters: priority (filter), severity (filter), limit.
 
-    severity reads the column the gap register filters on and leaves out
+    Both filters read the rating the gap register filters on and leave out
     plateau transitions, so a count here is the register's count.
     """
     try:
-        severity = request.args.get("severity")
+        # ?severity= and ?priority= both ask for a level: the register's own list and count, so this list,
+        # the register and every critical-gap figure are one rule (plateau transitions left out).
+        level = request.args.get("severity") or request.args.get("priority")
         limit = safe_int_arg('limit', None, minimum=1, maximum=500)
-        total = None
-        if severity:
-            # The register's own list and count, so this list and every critical-gap figure are one rule.
-            gaps = gap_register_service.list_gaps(_org_id(), severity=severity, limit=limit)
-            total = gap_register_service.count_gaps(_org_id(), severity=severity)
-        else:
-            query = ImplementationGap.query
-            priority = request.args.get("priority")
-            if priority:
-                query = query.filter(gap_register_service.priority_filter_clause(priority))
-            query = query.order_by(ImplementationGap.created_at.desc())
-            total = query.order_by(None).count()
-            if limit:
-                query = query.limit(limit)
-            gaps = query.all()
+        gaps = gap_register_service.list_gaps(_org_id(), severity=level, limit=limit)
+        total = gap_register_service.count_gaps(_org_id(), severity=level)
         shown = [_serialize_entity(gap) for gap in gaps]
         if request.args.get("footer"):
             # The page draws each gap in the browser, so the one footer travels with it as markup.
@@ -1310,7 +1299,8 @@ def generate_report():
         work_packages = ImplementationWorkPackage.query.all()
 
         # Get gaps
-        gaps = ImplementationGap.query.all()
+        # The register's gaps (plateau transitions left out), so this report's counts are the register's.
+        gaps = gap_register_service.gap_register_query(_org_id()).all()
 
         # Get deliverables
         deliverables = work_package_service.deliverables_query(_org_id()).all()
@@ -1347,7 +1337,7 @@ def generate_report():
 
         # Calculate gaps by priority
         for gap in gaps:
-            priority = gap_register_service.effective_severity(gap) or gap.priority or "medium"
+            priority = (gap_register_service.effective_severity(gap) or "").strip().lower() or "unrated"
             report_data["summary"]["gaps_by_priority"][priority] = (
                 report_data["summary"]["gaps_by_priority"].get(priority, 0) + 1
             )

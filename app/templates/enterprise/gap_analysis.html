@@ -112,7 +112,7 @@
 
 {% if severity_filter %}
 <p class="flex flex-wrap items-center gap-2 text-sm" data-testid="gap-severity-filter">
-  <span class="text-muted-foreground">Showing only</span> {{ state_badge(severity_filter) }} <span class="text-muted-foreground">severity gaps ({{ gaps|length }} of {{ total_gap_count or gaps|length }}).</span>
+  <span class="text-muted-foreground">Showing only</span> {{ state_badge(severity_filter) }} <span class="text-muted-foreground">{{ 'gaps' if severity_filter == 'unrated' else 'severity gaps' }} ({{ gaps|length }} of {{ total_gap_count or gaps|length }}).</span>
   <a href="{{ url_for('enterprise.gap_analysis') }}" class="font-medium text-primary hover:underline" data-testid="gap-severity-filter-clear">Show all gaps</a>
 </p>
 {% endif %}
