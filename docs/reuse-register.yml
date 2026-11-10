@@ -1024,3 +1024,41 @@ entries:
     known_exceptions:
       - path: app/services/adm_requirement_service.py
         reason: links an ADM requirement to a solution, a different concept with the same verb
+
+  - id: figure-format
+    concept: Turning a declared figure's value into the text a person reads (count, money, score, percent, duration, date, rank)
+    status: active
+    canonical:
+      path: app/modules/intelligence/services/figure_format.py
+      symbols: [render_figure, value_only, money]
+    reuse: >
+      render_figure(entry) is the only code that turns a chat figure into text, for the chat and the connector. It
+      never abbreviates, converts a unit or currency, or computes a relative date. Do not write a second formatter
+      for chat or connector figures; declare the figure under "figures" in the tool registry instead.
+    must_not_create:
+      - id: second-figure-renderer
+        regex: 'def\s+(render|format)_(figure|figures|chat_figure)\w*\s*\('
+        scope: [app]
+    known_exceptions: []
+
+  - id: chat-figures
+    concept: The figure table, references, resolution, closed prose rule, revision message and records block of a chat turn
+    status: active
+    canonical:
+      path: app/modules/ai_chat/services/chat_figures.py
+      symbols: [FigureTable, violations_in, scan_written_numbers, resolve_references, render, records_block, revision_message]
+    reuse: >
+      A figure in a chat answer is a [fig:Fn] reference to a declared tool figure that the engine renders. Declare
+      figures under "figures" beside the tool in app/modules/ai_chat/tools/registry.py; find_uncited_claims is the one
+      gate entry point and remove_violating_clauses the one clause remover. Do not add a text check that decides
+      whether a number the model wrote is true, a deny-list of fields, or an allowance outside the six forms.
+    must_not_create:
+      - id: second-written-number-scan
+        regex: 'def\s+(unsupported_figures|figures_of|_figures_written_in|_stated_figures)\s*\('
+        scope: [app]
+      - id: second-clause-remover
+        regex: 'def\s+(remove_unsupported_figures|remove_violating_clauses)\s*\('
+        scope: [app]
+    known_exceptions:
+      - path: app/modules/ai_chat/services/ai_hallucination_detector.py
+        reason: holds the one clause remover and the one gate entry point

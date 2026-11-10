@@ -815,7 +815,8 @@ def _without_bad_clauses(piece: str, bad, cut: List[str]) -> str:
 
 def remove_violating_clauses(response_text: str, bad) -> Dict:
     """``{"text", "removed"}``: *response_text* without each clause (or statement, item or
-    row) for which ``bad(fragment)`` is true. ``removed`` is the text that was taken out.
+    row) for which ``bad(fragment)`` is true. ``removed`` holds the whole statement, item or
+    row each removal came out of, as it was written, so the records it cited can be found.
     It only removes; it never adds or rewrites a fact."""
     removed: List[str] = []
     out_lines: List[str] = []
@@ -835,7 +836,8 @@ def remove_violating_clauses(response_text: str, bad) -> Dict:
             if not keep[i] or not bad(piece):
                 continue
             changed = True
-            rebuilt = _without_bad_clauses(piece, bad, removed)
+            removed.append(piece.strip())
+            rebuilt = _without_bad_clauses(piece, bad, [])
             if rebuilt.strip(" \t-*#>|") and re.search(r"[A-Za-z]", rebuilt) and not bad(rebuilt):
                 pieces[i] = rebuilt
                 continue

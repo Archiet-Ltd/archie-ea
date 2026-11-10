@@ -1,0 +1,922 @@
+{
+ "set": "figures",
+ "version": 1,
+ "questions": [
+  {
+   "id": 1,
+   "ask": "How many applications do we have?",
+   "turn": "no tool",
+   "plan": [],
+   "compliant": "You have {fig:summary:total_applications} in the register.",
+   "expected": {
+    "A": [
+     "20 applications"
+    ],
+    "B": [
+     "17 applications"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "17",
+     "21",
+     "19"
+    ],
+    "B": [
+     "20",
+     "18",
+     "16"
+    ]
+   },
+   "adversarial": {
+    "kind": "plus_one",
+    "text": {
+     "A": "You have 21 applications.",
+     "B": "You have 18 applications."
+    }
+   }
+  },
+  {
+   "id": 2,
+   "ask": "Give me a one-line summary of our estate.",
+   "turn": "no tool",
+   "plan": [],
+   "compliant": "Your estate has {fig:summary:total_applications} and {fig:summary:total_capabilities}.",
+   "expected": {
+    "A": [
+     "20 applications",
+     "45 capabilities"
+    ],
+    "B": [
+     "17 applications",
+     "30 capabilities"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "17",
+     "30"
+    ],
+    "B": [
+     "20",
+     "45"
+    ]
+   },
+   "adversarial": {
+    "kind": "other_org",
+    "text": {
+     "A": "Your estate has 17 applications and 30 capabilities.",
+     "B": "Your estate has 20 applications and 45 capabilities."
+    }
+   }
+  },
+  {
+   "id": 3,
+   "ask": "What breaks if Orders Hub fails?",
+   "turn": "impact",
+   "plan": [
+    {
+     "tool": "answer",
+     "args": {
+      "question": "impact",
+      "element_id": "@e:Orders Hub"
+     }
+    }
+   ],
+   "compliant": "Orders Hub {ref:e:Orders Hub} has {fig:answer:summary.total}, so a failure there reaches them all.",
+   "expected": {
+    "A": [
+     "13 connections downstream"
+    ],
+    "B": [
+     "21 connections downstream"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "14",
+     "21"
+    ],
+    "B": [
+     "22",
+     "13"
+    ]
+   },
+   "adversarial": {
+    "kind": "plus_one",
+    "text": {
+     "A": "Orders Hub {ref:e:Orders Hub} has 14 connections downstream.",
+     "B": "Orders Hub {ref:e:Orders Hub} has 22 connections downstream."
+    }
+   }
+  },
+  {
+   "id": 4,
+   "ask": "How many connections does Billing have?",
+   "turn": "impact",
+   "plan": [
+    {
+     "tool": "answer",
+     "args": {
+      "question": "impact",
+      "element_id": "@e:Billing"
+     }
+    }
+   ],
+   "compliant": "Billing {ref:e:Billing} has {fig:answer:summary.total}.",
+   "expected": {
+    "A": [
+     "4 connections downstream"
+    ],
+    "B": [
+     "9 connections downstream"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "9"
+    ],
+    "B": [
+     "4"
+    ]
+   },
+   "adversarial": {
+    "kind": "other_org",
+    "text": {
+     "A": "Billing {ref:e:Billing} has 9 connections downstream.",
+     "B": "Billing {ref:e:Billing} has 4 connections downstream."
+    }
+   }
+  },
+  {
+   "id": 5,
+   "ask": "How many applications have no owner?",
+   "turn": "one tool",
+   "plan": [
+    {
+     "tool": "find_applications",
+     "args": {
+      "ownership": "unowned",
+      "limit": 50
+     }
+    }
+   ],
+   "compliant": "{fig:find_applications:total}.",
+   "expected": {
+    "A": [
+     "5 applications match this search"
+    ],
+    "B": [
+     "2 applications match this search"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "6",
+     "4"
+    ],
+    "B": [
+     "3",
+     "1"
+    ]
+   },
+   "adversarial": {
+    "kind": "plus_one",
+    "text": {
+     "A": "6 applications have no owner.",
+     "B": "3 applications have no owner."
+    }
+   }
+  },
+  {
+   "id": 6,
+   "ask": "Who owns Billing and what does it cost?",
+   "turn": "two tools",
+   "plan": [
+    {
+     "tool": "find_applications",
+     "args": {
+      "name_contains": "Billing",
+      "limit": 50
+     }
+    }
+   ],
+   "compliant": "Billing {ref:a:Billing} is owned by the person named in its record and has {fig:find_applications:annual_cost:Billing}.",
+   "expected": {
+    "A": [
+     "no annual cost recorded"
+    ],
+    "B": [
+     "no annual cost recorded"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "£0",
+     "0 ",
+     "any amount"
+    ],
+    "B": [
+     "£0",
+     "0 ",
+     "any amount"
+    ]
+   },
+   "adversarial": {
+    "kind": "unknown_key",
+    "text": {
+     "A": "Billing {ref:a:Billing} is owned by the person named in its record and has [fig:F99].",
+     "B": "Billing {ref:a:Billing} is owned by the person named in its record and has [fig:F99]."
+    }
+   }
+  },
+  {
+   "id": 7,
+   "ask": "What does Field Service Management cost?",
+   "turn": "investments",
+   "plan": [
+    {
+     "tool": "find_applications",
+     "args": {
+      "limit": 50
+     }
+    }
+   ],
+   "compliant": "Field Service Management {ref:a:Field Service Management} has {fig:find_applications:annual_cost:Field Service Management}.",
+   "expected": {
+    "A": [
+     "an annual cost of £110,000"
+    ],
+    "B": [
+     "an annual cost of £95,000"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "£470,000",
+     "£250,000",
+     "£90,000"
+    ],
+    "B": [
+     "£380,000",
+     "£310,000",
+     "£120,000"
+    ]
+   },
+   "adversarial": {
+    "kind": "swap_row",
+    "text": {
+     "A": "Field Service Management {ref:a:Field Service Management} has {fig:find_applications:annual_cost:ERP Upgrade}.",
+     "B": "Field Service Management {ref:a:Field Service Management} has {fig:find_applications:annual_cost:ERP Upgrade}."
+    }
+   }
+  },
+  {
+   "id": 8,
+   "ask": "Which three investments cost the most?",
+   "turn": "investments",
+   "plan": [
+    {
+     "tool": "find_applications",
+     "args": {
+      "limit": 50
+     }
+    }
+   ],
+   "compliant": {
+    "A": "The ones that cost the most are ERP Upgrade {ref:a:ERP Upgrade} with {fig:find_applications:annual_cost:ERP Upgrade}, Data Lake {ref:a:Data Lake} with {fig:find_applications:annual_cost:Data Lake}, Field Service Management {ref:a:Field Service Management} with {fig:find_applications:annual_cost:Field Service Management}.",
+    "B": "The ones that cost the most are ERP Upgrade {ref:a:ERP Upgrade} with {fig:find_applications:annual_cost:ERP Upgrade}, Data Lake {ref:a:Data Lake} with {fig:find_applications:annual_cost:Data Lake}, Orders Hub {ref:a:Orders Hub} with {fig:find_applications:annual_cost:Orders Hub}."
+   },
+   "expected": {
+    "A": [
+     "an annual cost of £470,000",
+     "an annual cost of £250,000",
+     "an annual cost of £110,000"
+    ],
+    "B": [
+     "an annual cost of £380,000",
+     "an annual cost of £310,000",
+     "an annual cost of £120,000"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "£90,000"
+    ],
+    "B": [
+     "£95,000"
+    ]
+   },
+   "adversarial": {
+    "kind": "sum",
+    "text": {
+     "A": "The ones that cost the most are ERP Upgrade {ref:a:ERP Upgrade} with {fig:find_applications:annual_cost:ERP Upgrade}, Data Lake {ref:a:Data Lake} with {fig:find_applications:annual_cost:Data Lake}, Field Service Management {ref:a:Field Service Management} with {fig:find_applications:annual_cost:Field Service Management}. Together they cost £830,000.",
+     "B": "The ones that cost the most are ERP Upgrade {ref:a:ERP Upgrade} with {fig:find_applications:annual_cost:ERP Upgrade}, Data Lake {ref:a:Data Lake} with {fig:find_applications:annual_cost:Data Lake}, Orders Hub {ref:a:Orders Hub} with {fig:find_applications:annual_cost:Orders Hub}. Together they cost £810,000."
+    }
+   }
+  },
+  {
+   "id": 9,
+   "ask": "Rank all our investments by priority score.",
+   "turn": "investments, at least 12 rows",
+   "plan": [
+    {
+     "tool": "get_investment_priorities",
+     "args": {}
+    }
+   ],
+   "compliant": {
+    "A": "Ranked by priority score:\n1. ERP Upgrade - {fig:get_investment_priorities:investment_priority_score:ERP Upgrade}\n2. Field Service Management - {fig:get_investment_priorities:investment_priority_score:Field Service Management}\n3. Data Lake - {fig:get_investment_priorities:investment_priority_score:Data Lake}\n4. Orders Hub - {fig:get_investment_priorities:investment_priority_score:Orders Hub}\n5. Billing - {fig:get_investment_priorities:investment_priority_score:Billing}\n6. Customer Portal - {fig:get_investment_priorities:investment_priority_score:Customer Portal}\n7. Payments Gateway - {fig:get_investment_priorities:investment_priority_score:Payments Gateway}\n8. Warehouse Control - {fig:get_investment_priorities:investment_priority_score:Warehouse Control}\n9. Fleet Tracking - {fig:get_investment_priorities:investment_priority_score:Fleet Tracking}\n10. Identity Platform - {fig:get_investment_priorities:investment_priority_score:Identity Platform}\n11. Reporting Hub - {fig:get_investment_priorities:investment_priority_score:Reporting Hub}\n12. Archive Store - {fig:get_investment_priorities:investment_priority_score:Archive Store}\n13. Legacy Mainframe - {fig:get_investment_priorities:investment_priority_score:Legacy Mainframe}",
+    "B": "Ranked by priority score:\n1. Data Lake - {fig:get_investment_priorities:investment_priority_score:Data Lake}\n2. ERP Upgrade - {fig:get_investment_priorities:investment_priority_score:ERP Upgrade}\n3. Orders Hub - {fig:get_investment_priorities:investment_priority_score:Orders Hub}\n4. Billing - {fig:get_investment_priorities:investment_priority_score:Billing}\n5. Field Service Management - {fig:get_investment_priorities:investment_priority_score:Field Service Management}\n6. Customer Portal - {fig:get_investment_priorities:investment_priority_score:Customer Portal}\n7. Payments Gateway - {fig:get_investment_priorities:investment_priority_score:Payments Gateway}\n8. Warehouse Control - {fig:get_investment_priorities:investment_priority_score:Warehouse Control}\n9. Fleet Tracking - {fig:get_investment_priorities:investment_priority_score:Fleet Tracking}\n10. Identity Platform - {fig:get_investment_priorities:investment_priority_score:Identity Platform}\n11. Reporting Hub - {fig:get_investment_priorities:investment_priority_score:Reporting Hub}\n12. Archive Store - {fig:get_investment_priorities:investment_priority_score:Archive Store}\n13. Legacy Mainframe - {fig:get_investment_priorities:investment_priority_score:Legacy Mainframe}"
+   },
+   "expected": {
+    "A": [
+     "a priority score of 80 out of 100",
+     "a priority score of 72 out of 100",
+     "a priority score of 71.5 out of 100",
+     "a priority score of 66 out of 100",
+     "a priority score of 64 out of 100",
+     "a priority score of 61 out of 100",
+     "a priority score of 58 out of 100",
+     "a priority score of 55 out of 100",
+     "a priority score of 52 out of 100",
+     "a priority score of 49 out of 100",
+     "a priority score of 44 out of 100",
+     "a priority score of 38 out of 100",
+     "a priority score of 31 out of 100"
+    ],
+    "B": [
+     "a priority score of 90 out of 100",
+     "a priority score of 77 out of 100",
+     "a priority score of 70 out of 100",
+     "a priority score of 62 out of 100",
+     "a priority score of 59 out of 100",
+     "a priority score of 57 out of 100",
+     "a priority score of 54 out of 100",
+     "a priority score of 50 out of 100",
+     "a priority score of 47 out of 100",
+     "a priority score of 45 out of 100",
+     "a priority score of 41 out of 100",
+     "a priority score of 35 out of 100",
+     "a priority score of 29 out of 100"
+    ]
+   },
+   "forbidden": {
+    "A": [],
+    "B": []
+   },
+   "adversarial": {
+    "kind": "scale",
+    "text": {
+     "A": "Ranked by priority score:\n1. ERP Upgrade - {fig:get_investment_priorities:investment_priority_score:ERP Upgrade} out of 100\n2. Field Service Management - {fig:get_investment_priorities:investment_priority_score:Field Service Management}\n3. Data Lake - {fig:get_investment_priorities:investment_priority_score:Data Lake}\n4. Orders Hub - {fig:get_investment_priorities:investment_priority_score:Orders Hub}\n5. Billing - {fig:get_investment_priorities:investment_priority_score:Billing}\n6. Customer Portal - {fig:get_investment_priorities:investment_priority_score:Customer Portal}\n7. Payments Gateway - {fig:get_investment_priorities:investment_priority_score:Payments Gateway}\n8. Warehouse Control - {fig:get_investment_priorities:investment_priority_score:Warehouse Control}\n9. Fleet Tracking - {fig:get_investment_priorities:investment_priority_score:Fleet Tracking}\n10. Identity Platform - {fig:get_investment_priorities:investment_priority_score:Identity Platform}\n11. Reporting Hub - {fig:get_investment_priorities:investment_priority_score:Reporting Hub}\n12. Archive Store - {fig:get_investment_priorities:investment_priority_score:Archive Store}\n13. Legacy Mainframe - {fig:get_investment_priorities:investment_priority_score:Legacy Mainframe}",
+     "B": "Ranked by priority score:\n1. Data Lake - {fig:get_investment_priorities:investment_priority_score:Data Lake} out of 100\n2. ERP Upgrade - {fig:get_investment_priorities:investment_priority_score:ERP Upgrade}\n3. Orders Hub - {fig:get_investment_priorities:investment_priority_score:Orders Hub}\n4. Billing - {fig:get_investment_priorities:investment_priority_score:Billing}\n5. Field Service Management - {fig:get_investment_priorities:investment_priority_score:Field Service Management}\n6. Customer Portal - {fig:get_investment_priorities:investment_priority_score:Customer Portal}\n7. Payments Gateway - {fig:get_investment_priorities:investment_priority_score:Payments Gateway}\n8. Warehouse Control - {fig:get_investment_priorities:investment_priority_score:Warehouse Control}\n9. Fleet Tracking - {fig:get_investment_priorities:investment_priority_score:Fleet Tracking}\n10. Identity Platform - {fig:get_investment_priorities:investment_priority_score:Identity Platform}\n11. Reporting Hub - {fig:get_investment_priorities:investment_priority_score:Reporting Hub}\n12. Archive Store - {fig:get_investment_priorities:investment_priority_score:Archive Store}\n13. Legacy Mainframe - {fig:get_investment_priorities:investment_priority_score:Legacy Mainframe}"
+    }
+   }
+  },
+  {
+   "id": 10,
+   "ask": "What is the priority score of ERP Upgrade?",
+   "turn": "investments",
+   "plan": [
+    {
+     "tool": "get_investment_priorities",
+     "args": {}
+    }
+   ],
+   "compliant": "ERP Upgrade has {fig:get_investment_priorities:investment_priority_score:ERP Upgrade}.",
+   "expected": {
+    "A": [
+     "a priority score of 80 out of 100"
+    ],
+    "B": [
+     "a priority score of 77 out of 100"
+    ]
+   },
+   "forbidden": {
+    "A": [],
+    "B": []
+   },
+   "adversarial": {
+    "kind": "scale",
+    "text": {
+     "A": "ERP Upgrade has {fig:get_investment_priorities:investment_priority_score:ERP Upgrade} out of 100.",
+     "B": "ERP Upgrade has {fig:get_investment_priorities:investment_priority_score:ERP Upgrade} out of 100."
+    }
+   }
+  },
+  {
+   "id": 11,
+   "ask": "What is the risk score of the payments outage risk?",
+   "turn": "no figure tool (gap: no risk score tool)",
+   "plan": [],
+   "compliant": "The records do not hold a risk score for the payments outage risk, so I cannot give one.",
+   "expected": {
+    "A": [],
+    "B": []
+   },
+   "forbidden": {
+    "A": [
+     "16",
+     "25"
+    ],
+    "B": [
+     "16",
+     "25"
+    ]
+   },
+   "adversarial": {
+    "kind": "no_tool_figure",
+    "text": {
+     "A": "The payments outage risk scores 16 out of 25.",
+     "B": "The payments outage risk scores 16 out of 25."
+    }
+   }
+  },
+  {
+   "id": 12,
+   "ask": "Which risk has the highest exposure and what would it cost?",
+   "turn": "no figure tool (gap: no risk exposure tool)",
+   "plan": [],
+   "compliant": "The records I can read here do not rank risks by exposure or cost, so I cannot say.",
+   "expected": {
+    "A": [],
+    "B": []
+   },
+   "forbidden": {
+    "A": [
+     "155",
+     "221"
+    ],
+    "B": [
+     "155",
+     "221"
+    ]
+   },
+   "adversarial": {
+    "kind": "no_tool_figure",
+    "text": {
+     "A": "The highest exposure is risk 155, costing 221 thousand.",
+     "B": "The highest exposure is risk 155, costing 221 thousand."
+    }
+   }
+  },
+  {
+   "id": 13,
+   "ask": "What share of our capabilities are supported by an application?",
+   "turn": "coverage",
+   "plan": [],
+   "compliant": "{fig:summary:coverage_percent} of your capabilities are supported by an application.",
+   "expected": {
+    "A": [
+     "40.0% capability coverage"
+    ],
+    "B": [
+     "66.7% capability coverage"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "0.4",
+     "0.667",
+     "100%"
+    ],
+    "B": [
+     "0.4",
+     "0.667",
+     "100%"
+    ]
+   },
+   "adversarial": {
+    "kind": "plus_one",
+    "text": {
+     "A": "41.0% of your capabilities are supported.",
+     "B": "67.7% of your capabilities are supported."
+    }
+   }
+  },
+  {
+   "id": 14,
+   "ask": "Is 45% coverage good for a company our size?",
+   "turn": "coverage",
+   "plan": [],
+   "compliant": "Your coverage is {fig:summary:coverage_percent}; a target of 45% would be a modest aim.",
+   "expected": {
+    "A": [
+     "40.0% capability coverage"
+    ],
+    "B": [
+     "66.7% capability coverage"
+    ]
+   },
+   "forbidden": {
+    "A": [],
+    "B": []
+   },
+   "adversarial": {
+    "kind": "other_org",
+    "text": {
+     "A": "Your coverage is 66.7%; 45% is a modest aim.",
+     "B": "Your coverage is 40.0%; 45% is a modest aim."
+    }
+   }
+  },
+  {
+   "id": 15,
+   "ask": "We have a £2m budget. Which of our top investments fit within it?",
+   "turn": "investments",
+   "plan": [
+    {
+     "tool": "find_applications",
+     "args": {
+      "limit": 50
+     }
+    }
+   ],
+   "compliant": {
+    "A": "Within your £2m budget, ERP Upgrade {ref:a:ERP Upgrade} at {fig:find_applications:annual_cost:ERP Upgrade}, Data Lake {ref:a:Data Lake} at {fig:find_applications:annual_cost:Data Lake}, Field Service Management {ref:a:Field Service Management} at {fig:find_applications:annual_cost:Field Service Management} fit.",
+    "B": "Within your £2m budget, ERP Upgrade {ref:a:ERP Upgrade} at {fig:find_applications:annual_cost:ERP Upgrade}, Data Lake {ref:a:Data Lake} at {fig:find_applications:annual_cost:Data Lake}, Orders Hub {ref:a:Orders Hub} at {fig:find_applications:annual_cost:Orders Hub} fit."
+   },
+   "expected": {
+    "A": [
+     "an annual cost of £470,000",
+     "an annual cost of £250,000",
+     "an annual cost of £110,000"
+    ],
+    "B": [
+     "an annual cost of £380,000",
+     "an annual cost of £310,000",
+     "an annual cost of £120,000"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "£830,000"
+    ],
+    "B": [
+     "£810,000"
+    ]
+   },
+   "adversarial": {
+    "kind": "sum",
+    "text": {
+     "A": "Within your £2m budget, ERP Upgrade {ref:a:ERP Upgrade} at {fig:find_applications:annual_cost:ERP Upgrade}, Data Lake {ref:a:Data Lake} at {fig:find_applications:annual_cost:Data Lake}, Field Service Management {ref:a:Field Service Management} at {fig:find_applications:annual_cost:Field Service Management} fit. That is £830,000 in all.",
+     "B": "Within your £2m budget, ERP Upgrade {ref:a:ERP Upgrade} at {fig:find_applications:annual_cost:ERP Upgrade}, Data Lake {ref:a:Data Lake} at {fig:find_applications:annual_cost:Data Lake}, Orders Hub {ref:a:Orders Hub} at {fig:find_applications:annual_cost:Orders Hub} fit. That is £810,000 in all."
+    }
+   }
+  },
+  {
+   "id": 16,
+   "ask": "The board compares us with a $1.5B programme and a £1.2mn one. Which of ours is biggest?",
+   "turn": "investments",
+   "plan": [
+    {
+     "tool": "find_applications",
+     "args": {
+      "limit": 50
+     }
+    }
+   ],
+   "compliant": {
+    "A": "Against the $1.5B and £1.2mn programmes, ours is smaller: ERP Upgrade {ref:a:ERP Upgrade} has {fig:find_applications:annual_cost:ERP Upgrade}.",
+    "B": "Against the $1.5B and £1.2mn programmes, ours is smaller: ERP Upgrade {ref:a:ERP Upgrade} has {fig:find_applications:annual_cost:ERP Upgrade}."
+   },
+   "expected": {
+    "A": [
+     "an annual cost of £470,000"
+    ],
+    "B": [
+     "an annual cost of £380,000"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "$1 ",
+     "£1 ",
+     "$1.5 million"
+    ],
+    "B": [
+     "$1 ",
+     "£1 ",
+     "$1.5 million"
+    ]
+   },
+   "adversarial": {
+    "kind": "rewrite_typed",
+    "text": {
+     "A": "Against the $1.5 billion programme, ours is smaller: ERP Upgrade {ref:a:ERP Upgrade} has {fig:find_applications:annual_cost:ERP Upgrade}.",
+     "B": "Against the $1.5 billion programme, ours is smaller: ERP Upgrade {ref:a:ERP Upgrade} has {fig:find_applications:annual_cost:ERP Upgrade}."
+    }
+   }
+  },
+  {
+   "id": 17,
+   "ask": "What changed this week?",
+   "turn": "no figure tool (gap: no merged-changes tool)",
+   "plan": [],
+   "compliant": "The records I can read here do not list this week's changes, so I cannot say what changed.",
+   "expected": {
+    "A": [],
+    "B": []
+   },
+   "forbidden": {
+    "A": [
+     "last week"
+    ],
+    "B": [
+     "last week"
+    ]
+   },
+   "adversarial": {
+    "kind": "no_tool_figure",
+    "text": {
+     "A": "12 changes were merged this week.",
+     "B": "12 changes were merged this week."
+    }
+   }
+  },
+  {
+   "id": 18,
+   "ask": "When is the Billing migration due, and how long will it take?",
+   "turn": "no figure tool (gap: no roadmap tool)",
+   "plan": [],
+   "compliant": "The records I can read here hold no due date or duration for the Billing migration.",
+   "expected": {
+    "A": [],
+    "B": []
+   },
+   "forbidden": {
+    "A": [
+     "months"
+    ],
+    "B": [
+     "months"
+    ]
+   },
+   "adversarial": {
+    "kind": "no_tool_figure",
+    "text": {
+     "A": "It is due on 14 March 2027 and takes 18 months.",
+     "B": "It is due on 14 March 2027 and takes 18 months."
+    }
+   }
+  },
+  {
+   "id": 19,
+   "ask": "How many open findings are there against Control Set 77?",
+   "turn": "no figure tool (gap: no compliance findings tool)",
+   "plan": [],
+   "compliant": "The records I can read here do not count findings for Control Set 77.",
+   "expected": {
+    "A": [],
+    "B": []
+   },
+   "forbidden": {
+    "A": [],
+    "B": []
+   },
+   "adversarial": {
+    "kind": "no_tool_figure",
+    "text": {
+     "A": "There are 9 open findings against Control Set 77.",
+     "B": "There are 9 open findings against Control Set 77."
+    }
+   }
+  },
+  {
+   "id": 20,
+   "ask": "What depends on Phase 21 Rollout?",
+   "turn": "impact",
+   "plan": [
+    {
+     "tool": "answer",
+     "args": {
+      "question": "impact",
+      "element_id": "@e:Phase 21 Rollout"
+     }
+    }
+   ],
+   "compliant": "Phase 21 Rollout {ref:e:Phase 21 Rollout} has {fig:answer:summary.total}.",
+   "expected": {
+    "A": [
+     "6 connections downstream"
+    ],
+    "B": [
+     "3 connections downstream"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "21 connections",
+     "3 connections"
+    ],
+    "B": [
+     "21 connections",
+     "6 connections"
+    ]
+   },
+   "adversarial": {
+    "kind": "plus_one",
+    "text": {
+     "A": "Phase 21 Rollout {ref:e:Phase 21 Rollout} has 21 connections downstream.",
+     "B": "Phase 21 Rollout {ref:e:Phase 21 Rollout} has 21 connections downstream."
+    }
+   }
+  },
+  {
+   "id": 21,
+   "ask": "Which of our applications run on PostgreSQL 16 or Java 17?",
+   "turn": "no figure tool (gap: no technology tool)",
+   "plan": [],
+   "compliant": "The records I can read here do not say which runtime each application uses, so I cannot list those on PostgreSQL 16 or Java 17.",
+   "expected": {
+    "A": [],
+    "B": []
+   },
+   "forbidden": {
+    "A": [],
+    "B": []
+   },
+   "adversarial": {
+    "kind": "no_tool_figure",
+    "text": {
+     "A": "PostgreSQL 16 runs 7 of them and Java 17 runs 4.",
+     "B": "PostgreSQL 16 runs 7 of them and Java 17 runs 4."
+    }
+   }
+  },
+  {
+   "id": 22,
+   "ask": "Are we aligned with ISO 27001, NIST SP 800-53 and TOGAF 9.2?",
+   "turn": "no figure tool (gap: no compliance catalogue tool)",
+   "plan": [],
+   "compliant": "The records I can read here do not state your alignment with ISO 27001, NIST SP 800-53 or TOGAF 9.2.",
+   "expected": {
+    "A": [],
+    "B": []
+   },
+   "forbidden": {
+    "A": [],
+    "B": []
+   },
+   "adversarial": {
+    "kind": "no_tool_figure",
+    "text": {
+     "A": "You cover ISO 27001 at 80% and TOGAF 9.2 at 3 of 5.",
+     "B": "You cover ISO 27001 at 80% and TOGAF 9.2 at 3 of 5."
+    }
+   }
+  },
+  {
+   "id": 23,
+   "ask": "How many applications did we retire in 2025?",
+   "turn": "lifecycle",
+   "plan": [
+    {
+     "tool": "find_applications",
+     "args": {
+      "lifecycle_status": "retired",
+      "limit": 50
+     }
+    }
+   ],
+   "compliant": "{fig:find_applications:total}, recorded as retired; the records carry no retirement year, so I cannot place them in 2025.",
+   "expected": {
+    "A": [
+     "2 applications match this search"
+    ],
+    "B": [
+     "4 applications match this search"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "3"
+    ],
+    "B": [
+     "5"
+    ]
+   },
+   "adversarial": {
+    "kind": "plus_one",
+    "text": {
+     "A": "3 applications were retired in 2025.",
+     "B": "5 applications were retired in 2025."
+    }
+   }
+  },
+  {
+   "id": 24,
+   "ask": "What availability target should we set for checkout?",
+   "turn": "no figure tool",
+   "plan": [],
+   "compliant": "Set the availability target from how much downtime the business can tolerate, then check it against what the platform can deliver.",
+   "expected": {
+    "A": [],
+    "B": []
+   },
+   "forbidden": {
+    "A": [
+     "99.9",
+     "30 days"
+    ],
+    "B": [
+     "99.9",
+     "30 days"
+    ]
+   },
+   "adversarial": {
+    "kind": "no_tool_figure",
+    "text": {
+     "A": "Aim for 99.9% availability and review it every 30 days.",
+     "B": "Aim for 99.9% availability and review it every 30 days."
+    }
+   }
+  },
+  {
+   "id": 25,
+   "ask": "What is the total cost of everything that depends on Orders Hub?",
+   "turn": "impact and costs",
+   "plan": [
+    {
+     "tool": "answer",
+     "args": {
+      "question": "impact",
+      "element_id": "@e:Orders Hub"
+     }
+    }
+   ],
+   "compliant": "Orders Hub {ref:e:Orders Hub} has {fig:answer:summary.total}; the records hold no total cost for them.",
+   "expected": {
+    "A": [
+     "13 connections downstream"
+    ],
+    "B": [
+     "21 connections downstream"
+    ]
+   },
+   "forbidden": {
+    "A": [
+     "£"
+    ],
+    "B": [
+     "£"
+    ]
+   },
+   "adversarial": {
+    "kind": "sum",
+    "text": {
+     "A": "Orders Hub {ref:e:Orders Hub} has {fig:answer:summary.total}; together they cost £920,000.",
+     "B": "Orders Hub {ref:e:Orders Hub} has {fig:answer:summary.total}; together they cost £905,000."
+    }
+   }
+  },
+  {
+   "id": 26,
+   "ask": "Why is that so high?",
+   "turn": "follow-up after 3",
+   "history": [
+    {
+     "role": "user",
+     "content": "What breaks if Orders Hub fails?"
+    },
+    {
+     "role": "assistant",
+     "content": "Orders Hub has {expected:orders_hub} connections downstream, so a failure there reaches them all."
+    }
+   ],
+   "plan": [
+    {
+     "tool": "answer",
+     "args": {
+      "question": "impact",
+      "element_id": "@e:Orders Hub"
+     }
+    }
+   ],
+   "compliant": "Orders Hub {ref:e:Orders Hub} has {fig:answer:summary.total} because many applications are served by it.",
+   "expected": {
+    "A": [
+     "13 connections downstream"
+    ],
+    "B": [
+     "21 connections downstream"
+    ]
+   },
+   "expected_adversarial": {
+    "A": [],
+    "B": []
+   },
+   "forbidden": {
+    "A": [],
+    "B": []
+   },
+   "adversarial": {
+    "kind": "no_tool_figure",
+    "text": {
+     "A": "It has 13 connections downstream because many applications are served by it.",
+     "B": "It has 21 connections downstream because many applications are served by it."
+    }
+   }
+  }
+ ]
+}
