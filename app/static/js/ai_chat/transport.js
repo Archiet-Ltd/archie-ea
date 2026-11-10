@@ -83,6 +83,19 @@
         return data;
     }
 
+    /* Save a change to an application that a preview card described. Resolves to
+       {success, html}: the card for what was saved, or the words for why it was not. */
+    async function confirmApplicationChange(token) {
+        var resp = await apiFetch('/ai-chat/application-change/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token })
+        });
+        var data = await resp.json().catch(function () { return {}; });
+        if (!data.html) throw new Error(data.error || 'application change ' + resp.status);
+        return data;
+    }
+
     /* Work out the indirect connections of the whole organisation. A run already in
        progress (409) is reported by status so the caller can say so in plain words. */
     async function recomputeConnections() {
@@ -378,6 +391,7 @@
         isProviderConfigurationFault: isProviderConfigurationFault,
         sendMessage: sendMessage,
         askEstate: askEstate,
+        confirmApplicationChange: confirmApplicationChange,
         recomputeConnections: recomputeConnections,
         streamMessage: streamMessage,
         abort: abort,

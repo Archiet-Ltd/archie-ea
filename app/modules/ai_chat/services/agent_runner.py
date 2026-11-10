@@ -57,6 +57,12 @@ Solution state: get_solution_summary, get_completeness_score, update_solution_fi
                 update_solution_phase, search_archimate_elements, find_applications,
                 query_capability_gaps
 Portfolio: update_application_status (requires confirmation)
+Application details (description, version, category, business domain, technology stack, deployment
+status, owners): there is no tool for these. The person types "set <application>'s <field> to <value>"
+(for example: set Ifiok's description to Runs the tenant billing) and the chat shows the change for
+them to save. Tell them that; never send them to the application form to do it.
+Which capabilities an application supports: the person asks "which capabilities does <application>
+support?" and the chat answers from the model, citing each capability.
 Blueprint: generate_blueprint_narrative (requires confirmation)
 
 HOW TO OPERATE:

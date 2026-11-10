@@ -6,7 +6,9 @@ from flask import jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
+from app.decorators import audit_log
 from app.middleware.tenant_context import current_org_id
+from app.modules.ai_chat.services import application_change
 from app.modules.ai_chat.services.catalogue_answer import answer_catalogue_question
 from app.modules.ai_chat.services.estate_answer import answer_estate_question, explanations_for, recorded_text
 from app.modules.ai_chat.services.lens_answer import answer_lens_question
@@ -19,6 +21,7 @@ from . import unified_ai_chat_bp
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION_CHARS = 2000
+MAX_CHANGE_CHARS = 8000
 ANSWERED_FROM_RECORDS = "records"  # kept with the saved answer; the chat page reads the same word
 SHOWN_LIMIT = 25  # connections drawn as cards; the template and its explanations agree on it
 
@@ -130,6 +133,43 @@ def _catalogue_response(message, thread_id, keep):
     )
 
 
+def _application_change_response(change, message, thread_id, keep):
+    """The preview card for "set <application>'s <field> to <value>", or the words for why not."""
+    organization_id = current_org_id()
+    result = application_change.propose(change, current_user, int(organization_id)) if organization_id else {
+        "state": "unknown", "label": change["label"], "typed_application": change["application"], "others": []}
+    line = {
+        "preview": "Change preview: the %s of %s. Nothing is saved until you press Save." % (
+            result.get("label"), result.get("application")),
+        "refused": "Not changed: your role cannot edit applications.",
+    }.get(result["state"], "Not changed: %s." % result["state"])
+    return jsonify({
+        "success": True,
+        "found": True,
+        "thread_id": _remember(thread_id, message, line, keep=keep),
+        "change_state": result["state"],
+        "html": render_template("ai_chat/_application_change.html", result=result),
+    })
+
+
+@unified_ai_chat_bp.route("/application-change/confirm", methods=["POST"])
+@login_required
+@audit_log("ai_chat_application_change")
+def confirm_application_change():
+    """Save the change a preview card described, once the person has pressed Save."""
+    body = request.get_json(silent=True)
+    token = body.get("token") if isinstance(body, dict) else None
+    organization_id = current_org_id()
+    if not isinstance(token, str) or not organization_id:
+        return jsonify({"success": False, "error": "Ask for the change again."}), 400
+    result = application_change.confirm(token, current_user, int(organization_id))
+    return jsonify({
+        "success": result["state"] == "saved",
+        "change_state": result["state"],
+        "html": render_template("ai_chat/_application_change.html", result=result),
+    })
+
+
 @unified_ai_chat_bp.route("/estate-answer", methods=["POST"])
 @login_required
 def estate_answer():
@@ -145,6 +185,11 @@ def estate_answer():
         return jsonify({"success": False, "error": "Ask a question first."}), 400
     thread_id = body.get("thread_id") if isinstance(body.get("thread_id"), str) else None
     keep = body.get("remember") is not False
+    # Read whole: cutting a long value short would save text the person did not write. The
+    # description limit refuses anything this cap leaves too long.
+    change = application_change.parse_change_request(message[:MAX_CHANGE_CHARS])
+    if change is not None:
+        return _application_change_response(change, message, thread_id, keep)
     lens = answer_lens_question(message[:MAX_QUESTION_CHARS])
     if lens is not None:
         component_id = ((lens["data"] or {}).get("application_component_id")) if lens["lens"] == "portfolio" else None
