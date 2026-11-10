@@ -285,6 +285,7 @@ def test_every_count_card_opens_the_rows_it_counts(browser, live_server, viewpor
         message = page.get_by_test_id("gaps-table-empty")
         button = page.get_by_role("link", name="Add a gap record")
         for target in (message, button):
+            target.scroll_into_view_if_needed()
             box = target.bounding_box()
             assert box and box["x"] >= 0 and box["x"] + box["width"] <= width, (box, width)
             on_top = target.evaluate(
@@ -314,9 +315,11 @@ def test_every_count_card_opens_the_rows_it_counts(browser, live_server, viewpor
         assert link.count() == 1, "Gap signals is not a link on the board"
         link.click()
         page.wait_for_url(re.compile(r"/capability-roadmap"), timeout=PAGE_TIMEOUT)
-        page.wait_for_function(
-            "n => { const el = document.querySelector('[data-testid=\\"rdm-gap-signals\\"]');"
-            " return el && el.innerText.includes(': ' + n + ' signals'); }", arg=signals, timeout=PAGE_TIMEOUT)
+        landed = page.get_by_test_id("rdm-gap-signals")
+        landed.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+        page.wait_for_function("el => /: [0-9]+ signals/.test(el.innerText)", arg=landed.element_handle(),
+                               timeout=PAGE_TIMEOUT)
+        assert "Detected: %d signals" % signals in landed.inner_text(), landed.inner_text()
         _frame(page, "signals-landing", width, theme)
         assert other not in page.locator("body").inner_text()
     finally:
