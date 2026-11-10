@@ -43,7 +43,7 @@ SECONDARY = ["Connections", "Reports", "Help"]
 WORK_CHILDREN = {
     "Systems": ["Applications", "Portfolio", "Data register", "Interfaces", "Technology radar"],
     "Impact": ["Impact analysis", "Traceability"],
-    "Changes": ["Gaps", "Solutions", "Options analysis", "Business cases", "Work packages", "Roadmap", "Programmes"],
+    "Changes": ["Gaps", "Solutions", "Options analysis", "Scenarios", "Business cases", "Work packages", "Roadmap", "Programmes"],
     "Spend": ["Costs", "Vendors", "Vendor catalogue", "Contracts and licences", "Renewals", "Investments"],
     "Compliance": ["Controls", "Risks", "Decisions", "Review board", "Evidence"],
 }
