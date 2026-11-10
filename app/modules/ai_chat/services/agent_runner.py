@@ -15,6 +15,7 @@ Tools marked 'approve' tier are queued for user confirmation — not executed.
 from app.modules.ai_chat.tools.executor import ToolCall
 import json
 import logging
+import threading
 import time
 from typing import Callable, Optional
 from app.modules.ai_chat.services.ai_hallucination_detector import (
@@ -283,6 +284,30 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
             for key in keys:
                 chain.append((provider, model, key, os.getenv("AI_PROVIDER_BASE_URL_" + provider.upper()) or _base_url_of(provider)))
     return chain
+
+
+class _ProviderRead:
+    """One provider read handed to the helper thread: when its first chunk came, whether it was given up on."""
+
+    def __init__(self):
+        self.first = threading.Event()
+        self.done = threading.Event()
+        self.abandoned = False
+        self.result = None
+        self.error = None
+
+    def chunk(self) -> None:
+        """Called for every parsed chunk: marks the first token and stops a read that was given up on."""
+        if self.abandoned:
+            raise TimeoutError("the turn's time budget is spent")
+        self.first.set()
+
+
+def _quietly(fn: Callable) -> None:
+    try:
+        fn()
+    except Exception:  # swallow-ok: closing a connection already given up on; nothing waits on it
+        pass
 
 
 class AgentRunner:
@@ -673,12 +698,16 @@ class AgentRunner:
         stream_mode: bool = False,
         history: Optional[list] = None,
         waited_seconds: float = 0.0,
+        already_done: Optional[list] = None,
     ) -> dict:
         """
         Execute the full ReAct loop for one user message.
 
+        `already_done` is the changes an earlier try of this same question made before it stopped, as
+        [{"tool": str, "arguments": dict}, ...]; a retry does not make the same change a second time.
+
         `waited_seconds` is what the person has already waited since sending (the stored-answer lookup
-        ran first); the turn's budget is the rest of CHAT_TURN_BUDGET_SECONDS, never under 10 seconds.
+        ran first); the turn's budget is the rest of CHAT_TURN_BUDGET_SECONDS less CHAT_TURN_MARGIN_SECONDS, never under 10 seconds.
 
         `history` is the prior turns of this conversation as
         [{"role": "user"|"assistant", "content": str}, ...], oldest first.
@@ -706,7 +735,12 @@ class AgentRunner:
         from app.modules.ai_chat.services import model_defaults
 
         self._turn_id = str(_uuid.uuid4())
-        _budget = float(model_defaults.CHAT_TURN_BUDGET_SECONDS)
+        self._already_done = {
+            self._change_key(item.get("tool"), item.get("arguments"))
+            for item in (already_done or [])
+            if isinstance(item, dict)
+        }
+        _budget = float(model_defaults.CHAT_TURN_BUDGET_SECONDS) - float(model_defaults.CHAT_TURN_MARGIN_SECONDS)
         self._turn_deadline = time.monotonic() + max(
             min(10.0, _budget), _budget - max(0.0, float(waited_seconds or 0.0))
         )
@@ -851,7 +885,10 @@ class AgentRunner:
                 if self._budget_left() <= 0:
                     logger.warning("AgentRunner: turn budget spent before %s/%s answered", provider, model)
                     return self._finalize(
-                        self._fallback("LLM call failed: the turn's time budget is spent", busy=True),
+                        self._stopped(
+                            "LLM call failed: the turn's time budget is spent", True,
+                            actions_taken, required_actions, pending_approvals, sources,
+                        ),
                         user_message=user_message, domain=domain, context=context,
                         persona=persona, model_used=model,
                     )
@@ -878,7 +915,10 @@ class AgentRunner:
                             self._held_tokens = []
                             continue
                         return self._finalize(
-                            self._fallback(f"LLM call failed: {e}", busy=True),
+                            self._stopped(
+                                f"LLM call failed: {e}", True,
+                                actions_taken, required_actions, pending_approvals, sources,
+                            ),
                             user_message=user_message, domain=domain, context=context,
                             persona=persona, model_used=model,
                         )
@@ -888,7 +928,10 @@ class AgentRunner:
                     )
                     logger.debug("AgentRunner LLM call failed (iteration %d)", iteration, exc_info=True)
                     return self._finalize(
-                        self._fallback(f"LLM call failed: {e}"),
+                        self._stopped(
+                            f"LLM call failed: {e}", False,
+                            actions_taken, required_actions, pending_approvals, sources,
+                        ),
                         user_message=user_message, domain=domain, context=context,
                         persona=persona, model_used=model,
                     )
@@ -959,7 +1002,18 @@ class AgentRunner:
                 )
                 schema = TOOL_SCHEMA_BY_NAME.get(tc.name, {})
 
-                if tc.name not in offered_tools:
+                if (
+                    tc.name in offered_tools
+                    and tc.name in _MUTATING_TOOLS
+                    and self._change_key(tc.name, tc.arguments) in self._already_done
+                ):
+                    # An earlier try of this question made this change before it stopped: a retry reports
+                    # it as done and does not make it again.
+                    result = {
+                        "success": True,
+                        "message": "This change was already made before the retry; it was not made again.",
+                    }
+                elif tc.name not in offered_tools:
                     # Tool selection is the server's: only a tool offered on the
                     # chat surface can run, whatever text (a pasted document, a
                     # retrieved excerpt, an earlier tool result) names another.
@@ -1222,6 +1276,51 @@ class AgentRunner:
         if left is not None and left <= 0:
             raise TimeoutError("the turn's time budget is spent")
 
+    def _read_within_turn(self, work: Callable, closer: Optional[Callable] = None):
+        """Run one provider read so that it ends by the turn's wall clock, whatever bytes arrive.
+
+        A client timeout is a gap between bytes, and a provider that keeps sending comment lines, or goes
+        silent after one token, restarts it. So the read runs on a helper thread and this thread waits for
+        it: no first token within PROVIDER_FIRST_TOKEN_SECONDS, or no end by the turn's deadline, abandons the
+        read (its connection is closed, its later output is dropped) and raises a timeout, which the one
+        provider chain treats like any refused call. ``work`` receives a handle whose ``chunk()`` it calls
+        for every parsed chunk. With no turn running there is no deadline and ``work`` runs on this thread.
+        """
+        from app.modules.ai_chat.services import model_defaults
+
+        read = _ProviderRead()
+        left = self._budget_left()
+        if left is None:
+            return work(read)
+        import contextvars
+
+        context = contextvars.copy_context()
+
+        def target():
+            try:
+                read.result = context.run(work, read)
+            except BaseException as exc:  # handed to the waiting thread
+                read.error = exc
+            finally:
+                read.first.set()
+                read.done.set()
+
+        threading.Thread(target=target, daemon=True, name="provider-read").start()
+        first_limit = max(0.0, min(float(model_defaults.PROVIDER_FIRST_TOKEN_SECONDS), left))
+        reason = None
+        if not read.first.wait(first_limit):
+            reason = "no first token within %.0f seconds" % first_limit
+        elif not read.done.wait(max(0.0, self._budget_left())):
+            reason = "the turn's time budget is spent"
+        if reason is not None:
+            read.abandoned = True
+            if closer is not None:
+                threading.Thread(target=_quietly, args=(closer,), daemon=True).start()
+            raise TimeoutError(reason)
+        if read.error is not None:
+            raise read.error
+        return read.result
+
     def _call_llm(
         self,
         provider: str,
@@ -1318,19 +1417,22 @@ class AgentRunner:
         client = anthropic.Anthropic(api_key=api_key, timeout=self._call_timeout(), max_retries=0)
         max_tokens = 8192 if "sonnet" in model or "opus" in model else 4096
 
-        response = client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=[
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=messages,
-            tools=tools,
-            tool_choice={"type": "auto"},
+        response = self._read_within_turn(
+            lambda read: client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                system=[
+                    {
+                        "type": "text",
+                        "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                messages=messages,
+                tools=tools,
+                tool_choice={"type": "auto"},
+            ),
+            closer=client.close,
         )
 
         text = None
@@ -1355,24 +1457,28 @@ class AgentRunner:
         client = anthropic.Anthropic(api_key=api_key, timeout=self._call_timeout(), max_retries=0)
         max_tokens = 8192 if "sonnet" in model or "opus" in model else 4096
 
-        with client.messages.stream(
-            model=model,
-            max_tokens=max_tokens,
-            system=[
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=messages,
-            tools=tools,
-            tool_choice={"type": "auto"},
-        ) as stream:
-            for text in stream.text_stream:
-                self._check_budget()
-                self._emit_token(text)
-            final = stream.get_final_message()
+        def read_stream(read):
+            with client.messages.stream(
+                model=model,
+                max_tokens=max_tokens,
+                system=[
+                    {
+                        "type": "text",
+                        "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                messages=messages,
+                tools=tools,
+                tool_choice={"type": "auto"},
+            ) as stream:
+                for text in stream.text_stream:
+                    read.chunk()
+                    self._check_budget()
+                    self._emit_token(text)
+                return stream.get_final_message()
+
+        final = self._read_within_turn(read_stream, closer=client.close)
 
         text = None
         tool_calls = []
@@ -1413,14 +1519,17 @@ class AgentRunner:
         # Newer OpenAI models (o1, o3, gpt-5.x) require max_completion_tokens; all other models
         # accept it too (it supersedes the deprecated max_tokens parameter).
         _token_limit = 8192 if ("gpt-4" in model or "gpt-5" in model) else 4096
-        response = client.chat.completions.create(
-            model=model,
-            messages=full_messages,
-            tools=tools,
-            tool_choice="auto",
-            temperature=0.0,
-            max_completion_tokens=_token_limit,
-            extra_body=self._provider_extra_body(provider_name),
+        response = self._read_within_turn(
+            lambda read: client.chat.completions.create(
+                model=model,
+                messages=full_messages,
+                tools=tools,
+                tool_choice="auto",
+                temperature=0.0,
+                max_completion_tokens=_token_limit,
+                extra_body=self._provider_extra_body(provider_name),
+            ),
+            closer=client.close,
         )
 
         msg = response.choices[0].message
@@ -1454,44 +1563,49 @@ class AgentRunner:
 
         # Newer OpenAI models (o1, o3, gpt-5.x) require max_completion_tokens.
         _token_limit = 8192 if ("gpt-4" in model or "gpt-5" in model) else 4096
-        with client.chat.completions.create(
-            model=model,
-            messages=full_messages,
-            tools=tools,
-            tool_choice="auto",
-            temperature=0.0,
-            max_completion_tokens=_token_limit,
-            stream=True,
-            stream_options={"include_usage": True},
-            extra_body=self._provider_extra_body(provider_name),
-        ) as stream:
-            for chunk in stream:
-                self._check_budget()
-                if getattr(chunk, "usage", None):
-                    usage = chunk.usage
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-                if delta.content:
-                    text_acc += delta.content
-                    self._emit_token(delta.content)
-                if delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        # Tool-call output the provider has sent counts toward the spend estimate too.
-                        self._streamed_chars = getattr(self, "_streamed_chars", 0) + len(
-                            (tc.id or "")
-                            + ((tc.function.name or "") if tc.function else "")
-                            + ((tc.function.arguments or "") if tc.function else "")
-                        )
-                        idx = tc.index
-                        if idx not in tool_calls_acc:
-                            tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}
-                        if tc.id:
-                            tool_calls_acc[idx]["id"] = tc.id
-                        if tc.function and tc.function.name:
-                            tool_calls_acc[idx]["name"] += tc.function.name
-                        if tc.function and tc.function.arguments:
-                            tool_calls_acc[idx]["arguments"] += tc.function.arguments
+        def read_stream(read):
+            nonlocal text_acc, usage
+            with client.chat.completions.create(
+                model=model,
+                messages=full_messages,
+                tools=tools,
+                tool_choice="auto",
+                temperature=0.0,
+                max_completion_tokens=_token_limit,
+                stream=True,
+                stream_options={"include_usage": True},
+                extra_body=self._provider_extra_body(provider_name),
+            ) as stream:
+                for chunk in stream:
+                    read.chunk()
+                    self._check_budget()
+                    if getattr(chunk, "usage", None):
+                        usage = chunk.usage
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    if delta.content:
+                        text_acc += delta.content
+                        self._emit_token(delta.content)
+                    if delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            # Tool-call output the provider has sent counts toward the spend estimate too.
+                            self._streamed_chars = getattr(self, "_streamed_chars", 0) + len(
+                                (tc.id or "")
+                                + ((tc.function.name or "") if tc.function else "")
+                                + ((tc.function.arguments or "") if tc.function else "")
+                            )
+                            idx = tc.index
+                            if idx not in tool_calls_acc:
+                                tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}
+                            if tc.id:
+                                tool_calls_acc[idx]["id"] = tc.id
+                            if tc.function and tc.function.name:
+                                tool_calls_acc[idx]["name"] += tc.function.name
+                            if tc.function and tc.function.arguments:
+                                tool_calls_acc[idx]["arguments"] += tc.function.arguments
+
+        self._read_within_turn(read_stream, closer=client.close)
 
         tool_calls = []
         for idx in sorted(tool_calls_acc.keys()):
@@ -1719,8 +1833,25 @@ class AgentRunner:
     # Fallbacks                                                           #
     # ------------------------------------------------------------------ #
 
+    @staticmethod
+    def _change_key(tool, arguments) -> tuple:
+        """One change, named by the tool and its arguments, comparable between a try and its retry."""
+        return (str(tool or ""), json.dumps(arguments or {}, sort_keys=True, default=str))
+
+    def _stopped(self, reason: str, busy: bool, actions_taken: list, required_actions: list,
+                 pending_approvals: list, sources: list) -> dict:
+        """The result of a turn that stopped without an answer. It still reports every change the turn made,
+        so the person is told what was done and a retry can leave it alone."""
+        result = self._fallback(reason, busy=busy)
+        result["actions_taken"] = list(actions_taken)
+        result["required_actions"] = list(required_actions)
+        result["pending_approvals"] = list(pending_approvals)
+        result["sources"] = list(sources)
+        return result
+
     def _fallback(self, reason: str, busy: bool = False) -> dict:
         reason_l = (reason or "").lower()
+        not_set_up = False
         if "answers are paused" in reason_l:
             from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE
 
@@ -1730,26 +1861,29 @@ class AgentRunner:
                 "The assistant is busy right now. Wait a minute, then press Retry."
             )
         elif any(t in reason_l for t in ("no api key", "not configured", "no provider", "no keys")):
-            msg = (
-                "AI features aren't configured yet — add an API key under "
-                "Admin → API Settings to enable the assistant."
-            )
+            from app.modules.ai_chat.services.failure_messages import FEATURE_INTROS
+
+            msg = FEATURE_INTROS["chat"]
+            not_set_up = True
         elif any(t in reason_l for t in _QUOTA_PHRASES):
             msg = (
                 "The AI service is busy right now (its free usage limit was reached). "
                 "Wait a minute, then press Retry."
             )
         else:
-            msg = (
-                "The AI request couldn't be completed. See the error detail below "
-                "or check Admin → API Settings."
-            )
-        return {
+            from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
+
+            msg = ASSISTANT_UNAVAILABLE
+        result = {
             "response": msg,
             "actions_taken": [],
             "pending_approvals": [],
             "error": reason,
         }
+        if not_set_up:
+            # The browser shows an administrator the way to the provider settings, and a member nothing.
+            result["not_set_up"] = True
+        return result
 
     def _record_run(
         self,

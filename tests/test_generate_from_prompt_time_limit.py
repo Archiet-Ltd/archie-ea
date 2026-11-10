@@ -55,7 +55,11 @@ def test_the_interpreter_maps_a_question_to_nothing_when_the_model_does_not_answ
 def test_the_turn_gets_what_is_left_of_its_minute():
     runner = AgentRunner(user_id=1)
     runner._turn_deadline = None
-    for waited, expected in ((0, 60.0), (25, 35.0), (58, 10.0)):
+    # The server ends its turn CHAT_TURN_MARGIN_SECONDS before the minute so the reply reaches the screen
+    # inside it; a turn given less than ten seconds of the minute keeps ten.
+    margin = model_defaults.CHAT_TURN_MARGIN_SECONDS
+    assert margin > 0
+    for waited, expected in ((0, 60.0 - margin), (25, 35.0 - margin), (58, 10.0)):
         started = time.monotonic()
         # run() sets the deadline before anything else can fail; stop it at the system prompt.
         runner._build_system_prompt = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stop"))

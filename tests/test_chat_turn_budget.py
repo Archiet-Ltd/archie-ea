@@ -91,6 +91,7 @@ def peers():
 def short_limits(monkeypatch):
     monkeypatch.setattr(model_defaults, "PROVIDER_FIRST_TOKEN_SECONDS", 1.0)
     monkeypatch.setattr(model_defaults, "CHAT_TURN_BUDGET_SECONDS", 3.0)
+    monkeypatch.setattr(model_defaults, "CHAT_TURN_MARGIN_SECONDS", 0.0, raising=False)
 
 
 def _runner(monkeypatch, peers_in_order):
@@ -143,6 +144,154 @@ def test_each_call_waits_for_the_first_token_no_longer_than_the_set_limit_and_th
     assert 9.0 < runner._call_timeout() <= 10.0
     runner._turn_deadline = time.monotonic() + 40
     assert runner._call_timeout() == 25.0
+
+
+def _chunk(text):
+    body = {"id": "x", "object": "chat.completion.chunk", "created": 1, "model": "m",
+            "choices": [{"index": 0, "delta": {"role": "assistant", "content": text}, "finish_reason": None}]}
+    return ("data: " + json.dumps(body) + "\n\n").encode()
+
+
+class _StreamPeer(_Peer):
+    """A loopback provider that opens an event stream and then misbehaves: comment lines only, one token and
+    then comment lines, or one token and then silence."""
+
+    def __init__(self, behaviour):
+        self.behaviour = behaviour
+        super().__init__(answer=None)
+
+    def _serve(self):
+        while self._open:
+            try:
+                conn, _ = self._sock.accept()
+            except OSError:
+                return
+            self.calls += 1
+            self._held.append(conn)
+            threading.Thread(target=self._stream, args=(conn,), daemon=True).start()
+
+    def _stream(self, conn):
+        try:
+            conn.settimeout(2)
+            conn.recv(65536)
+            conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n")
+            if self.behaviour != "comments":
+                conn.sendall(_chunk("Partial "))
+            if self.behaviour == "token_then_silence":
+                return
+            while self._open:
+                conn.sendall(b": keep-alive\n\n")
+                time.sleep(0.1)
+        except OSError:
+            pass
+
+
+def _run_in_thread(runner, limit, **kwargs):
+    """Run a streamed turn on a thread; return (result or None if it had not ended after `limit`, seconds)."""
+    box = {}
+    started = time.monotonic()
+    worker = threading.Thread(target=lambda: box.update(result=runner.run("How many applications do we run?", **kwargs)), daemon=True)
+    worker.start()
+    worker.join(limit)
+    return box.get("result"), time.monotonic() - started
+
+
+@pytest.mark.parametrize("behaviour", ["comments", "token_then_comments", "token_then_silence"])
+def test_a_provider_that_keeps_the_connection_alive_without_answering_cannot_hold_the_turn_past_the_budget(
+    monkeypatch, short_limits, behaviour
+):
+    streams = [_StreamPeer(behaviour) for _ in range(3)]
+    try:
+        runner = _runner(monkeypatch, streams)
+        result, took = _run_in_thread(runner, 8.0, stream_mode=True)
+        assert result is not None, "the turn had not ended after %.1f seconds" % took
+        assert result["response"] == BUSY
+        assert took < 3.0 + 1.0, took
+    finally:
+        for peer in streams:
+            peer.close()
+
+
+def test_the_server_ends_its_turn_before_the_minute_so_the_reply_can_reach_the_screen():
+    assert 0 < model_defaults.CHAT_TURN_MARGIN_SECONDS < model_defaults.CHAT_TURN_BUDGET_SECONDS / 2
+    runner = AgentRunner(user_id=1)
+    runner._build_system_prompt = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stop"))
+    started = time.monotonic()
+    with pytest.raises(RuntimeError):
+        runner.run("hello")
+    allowed = runner._turn_deadline - started
+    assert allowed <= model_defaults.CHAT_TURN_BUDGET_SECONDS - model_defaults.CHAT_TURN_MARGIN_SECONDS + 0.5, allowed
+
+
+WRITE_TOOL = "create_goal"
+
+
+def _write_script(monkeypatch, runner, steps):
+    """The model's replies in order; each is a tool call to the write tool, an answer, or an exception."""
+    writes = []
+
+    class _Executor:
+        def __init__(self, *a, **k):
+            pass
+
+        def execute(self, call):
+            writes.append((call.name, dict(call.arguments)))
+            return {"success": True, "result": {"id": len(writes)}, "message": "Created the application Billing."}
+
+    monkeypatch.setattr("app.modules.ai_chat.tools.executor.ToolExecutor", _Executor)
+    monkeypatch.setattr(ar, "_MUTATING_TOOLS", frozenset({WRITE_TOOL}))
+    monkeypatch.setattr(AgentRunner, "_should_queue", staticmethod(lambda schema, auto: False))
+    pending = list(steps)
+
+    def fake(*a, **k):
+        step = pending.pop(0)
+        if isinstance(step, Exception):
+            raise step
+        if step == "write":
+            return {"text": None, "raw": None,
+                    "tool_calls": [{"id": "t1", "name": WRITE_TOOL, "arguments": {"name": "Billing"}}]}
+        return {"text": step, "tool_calls": [], "raw": None}
+
+    monkeypatch.setattr(runner, "_call_llm", fake)
+    return writes
+
+
+def test_a_turn_that_made_a_change_reports_it_whatever_ends_the_turn_and_a_retry_does_not_make_it_again(monkeypatch):
+    chain = [("openrouter", "m0", "test-key-0", "http://127.0.0.1:9/v1")]
+    monkeypatch.setattr(LLMService, "_get_configured_provider", staticmethod(lambda *a, **k: chain[0][:2]))
+    monkeypatch.setattr(LLMService, "_get_all_api_keys", staticmethod(lambda p, **k: ["test-key-0"]))
+    monkeypatch.setattr(ar, "build_provider_chain", lambda *a, **k: list(chain))
+    runner = AgentRunner(user_id=1)
+    monkeypatch.setattr(runner, "_gate_mode", lambda: "off")
+    monkeypatch.setattr(runner, "_build_system_prompt", lambda *a, **k: "system")
+    monkeypatch.setattr(runner, "_record_run", lambda *a, **k: None)
+    writes = _write_script(monkeypatch, runner, ["write", TimeoutError("the turn's time budget is spent")])
+
+    first = runner.run("Create an application called Billing.")
+    assert first["response"] == BUSY
+    assert len(writes) == 1
+    assert [(a["tool"], a["arguments"]) for a in first["actions_taken"]] == [(WRITE_TOOL, {"name": "Billing"})]
+
+    # Retry: the browser sends back what the first try already did.
+    writes_after_first = len(writes)
+    _write_script_again = ["write", "The application Billing is recorded."]
+    monkeypatch.setattr(runner, "_call_llm", _replay(runner, _write_script_again))
+    second = runner.run("Create an application called Billing.", already_done=first["actions_taken"])
+    assert second["response"] == "The application Billing is recorded."
+    assert len(writes) == writes_after_first == 1, writes
+
+
+def _replay(runner, steps):
+    pending = list(steps)
+
+    def fake(*a, **k):
+        step = pending.pop(0)
+        if step == "write":
+            return {"text": None, "raw": None,
+                    "tool_calls": [{"id": "t2", "name": WRITE_TOOL, "arguments": {"name": "Billing"}}]}
+        return {"text": step, "tool_calls": [], "raw": None}
+
+    return fake
 
 
 def test_two_organisations_each_keep_their_own_chain(app, two_orgs, monkeypatch):
