@@ -86,12 +86,13 @@ DEFAULT_PROVIDER_ORDER = ("gemini", "nvidia")
 PRICED_PROVIDERS = frozenset({"openai", "anthropic", "azure", "gemini", "deepseek"})
 
 # List prices in USD per million tokens (input, output) used when no price is configured.
-# DeepSeek: deepseek-chat list price (cache-miss input 0.28, output 0.42) from DeepSeek's published pricing
-# page, api-docs.deepseek.com/quick_start/pricing, as recorded 4 Nov 2026. Override with
+# DeepSeek: every call is counted at the peak list price, whatever the hour, so the ledger may over-count an
+# off-peak call and never under-counts. deepseek-flash: cache-miss input 0.30, output 1.20; deepseek-v4-pro
+# (any name containing "pro"): 1.32 and 3.96. From api-docs.deepseek.com/quick_start/pricing, 10 Nov 2026. Override with
 # LLM_PRICE_PER_MTOK_IN_DEEPSEEK / LLM_PRICE_PER_MTOK_OUT_DEEPSEEK if the page changes.
 _BUILT_IN_PRICES = {
     "gemini": {"flash": (0.5, 1.5), "": (3.5, 10.5)},
-    "deepseek": {"": (0.28, 0.42)},
+    "deepseek": {"pro": (1.32, 3.96), "": (0.30, 1.20)},
     # OpenAI embeddings: text-embedding-3-small list price, USD 0.02 per million input tokens, no output.
     # Chat models keep a zero list price here until one is configured.
     "openai": {"embedding": (0.02, 0.0), "": (0.0, 0.0)},
@@ -157,6 +158,7 @@ from app.modules.ai_chat.services.model_defaults import (
     OPENAI_COMPATIBLE_BASE_URLS,
     PLATFORM_DEFAULT_MODELS,
     PUBLIC_INPUT_CHAIN,
+    deepseek_request_for,
     PUBLIC_INPUT_MODELS,
     fallback_models_for,
     is_free_model,
@@ -2170,7 +2172,7 @@ Output clean, executable test code."""
     @staticmethod
     def _call_openai_compatible(
         base_url: str, prompt: str, model: str, api_key: str,
-        max_tokens: Optional[int] = None, timeout: Optional[float] = None,
+        max_tokens: Optional[int] = None, timeout: Optional[float] = None, extra_body: Optional[dict] = None,
     ) -> Tuple[str, int, int, float]:
         """One chat completion from a provider that speaks the OpenAI chat protocol (free tier: no cost)."""
         from openai import OpenAI
@@ -2183,6 +2185,7 @@ Output clean, executable test code."""
             temperature=0.0,
             max_tokens=min(max_tokens or 4096, 8192),
             timeout=effective_timeout,
+            extra_body=extra_body,
         )
         usage = response.usage
         return (response.choices[0].message.content or "",
@@ -2191,8 +2194,9 @@ Output clean, executable test code."""
     @staticmethod
     def _call_deepseek(prompt, model, api_key, max_tokens=None, timeout=None):
         """DeepSeek speaks the OpenAI chat protocol; the address is DEEPSEEK_API_BASE or its published one."""
+        served, extra_body = deepseek_request_for(model)
         return LLMService._call_openai_compatible(
-            LLMService.base_url_for("deepseek"), prompt, model, api_key, max_tokens, timeout)
+            LLMService.base_url_for("deepseek"), prompt, served, api_key, max_tokens, timeout, extra_body=extra_body)
 
     @staticmethod
     def _call_cerebras(prompt, model, api_key, max_tokens=None, timeout=None):

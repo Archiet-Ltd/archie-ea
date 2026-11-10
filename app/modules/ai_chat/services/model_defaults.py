@@ -20,7 +20,7 @@ reasoning through the cheapest tier in the lineup.
 
 Found live, 8 Sep 2026: a real AI-chat verification run against the actual
 OpenRouter API hit "not a valid model ID" on every call. The app's own
-provider fallback silently caught it and fell through to deepseek/deepseek-chat
+provider fallback silently caught it and fell through to the DeepSeek model
 every time, so this had zero user-visible impact -- but it meant the documented
 free tier was fiction. OpenRouter's free-tier catalog churns; if this id goes
 stale again, list current free models with `GET
@@ -66,8 +66,37 @@ DEFAULT_MODELS = {
 # because tests/test_ai_free_provider_route.py pins DeepSeek out of DEFAULT_MODELS and default_model_for();
 # a DeepSeek key alone still configures nothing, it is used only when the order names it.
 PLATFORM_DEFAULT_MODELS = {
-    "deepseek": "deepseek-chat",
+    "deepseek": "deepseek-flash",
 }
+
+# The two names DeepSeek's model list returns (api-docs.deepseek.com, read 10 Nov 2026). Both answer in thinking
+# mode unless the request says otherwise, and the thinking text spends the max_tokens budget, so every call
+# states its mode: {"thinking": {"type": "disabled" | "enabled"}} in the request body.
+DEEPSEEK_MODELS = ("deepseek-flash", "deepseek-v4-pro")
+# Names an organisation's API settings may still hold, mapped to what DeepSeek serves and the mode they meant.
+# The old names were discontinued on 24 Jul 2026; the older flash names are billed as deepseek-flash.
+_DEEPSEEK_RETIRED = {
+    "deepseek-chat": ("deepseek-flash", False),
+    "deepseek-reasoner": ("deepseek-flash", True),
+    "deepseek-v3.2": ("deepseek-flash", False),
+    "deepseek-v4-flash": ("deepseek-flash", False),
+}
+
+
+def deepseek_request_for(model: str, tools: bool = False) -> tuple:
+    """The (model name, request-body extras) to send to DeepSeek for *model*.
+
+    Drafting and chat run non-thinking. Thinking is chosen only for the reasoning model: ``deepseek-v4-pro`` and
+    the retired ``deepseek-reasoner``. A tool-calling loop never thinks, because DeepSeek then requires every
+    earlier turn's reasoning text to be passed back and the loop does not keep it. An empty or unknown name
+    falls back to the platform default rather than being sent as typed.
+    """
+    name = (model or "").strip().lower()
+    served, thinking = _DEEPSEEK_RETIRED.get(name, (name, name == "deepseek-v4-pro"))
+    if served not in DEEPSEEK_MODELS:
+        served, thinking = PLATFORM_DEFAULT_MODELS["deepseek"], False
+    mode = "enabled" if thinking and not tools else "disabled"
+    return served, {"thinking": {"type": mode}}
 
 # Ordered free fallback models tried within OpenRouter and NVIDIA before
 # moving on to the next provider when the primary free model is rate-limited
