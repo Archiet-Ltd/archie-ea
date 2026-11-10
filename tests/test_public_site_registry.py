@@ -11,7 +11,7 @@ from html.parser import HTMLParser
 
 import pytest
 
-from app.services.site_registry import items_needing_own_page, raw_registry, site_registry
+from app.services.site_registry import items_needing_own_page, raw_registry, site_registry, wave_released
 
 # group, label, line (menu item descriptions v2)
 PRODUCT_ITEMS = [
@@ -33,11 +33,11 @@ PRODUCT_ITEMS = [
     ("What it costs", "Business case", "Work out an investment's net present value from its costs and benefits."),
     ("What you are changing", "Roadmaps", "Record programmes and place them on a roadmap."),
     ("What you are changing", "Portfolio", "Register initiatives and see them together in a portfolio."),
+    ("What you are changing", "Scenarios", "Try a change on a copy of your model and compare the scenarios you save."),
     ("Approvals", "Architecture review board", "Submit a change for board review and track it from submission to decision."),
     ("Approvals", "AI approval queue", "Review changes an AI assistant proposes, then approve or reject each."),
 ]
 PRODUCT_SOON = [
-    ("Scenarios", "Coming soon: compare what-if plans side by side before you commit."),
     ("Software and tool discovery", "Coming soon: discover the software and tools you actually pay for and use."),
 ]
 SOLUTIONS = [
@@ -49,7 +49,6 @@ SOLUTIONS = [
     ("Architecture governance", "Review architecture changes, record the decision and its conditions."),
 ]
 SOLUTIONS_SOON = [
-    ("Scenarios", "Coming soon: compare what-if plans side by side before you commit."),
     ("Software and tool discovery", "Coming soon: discover the software and tools you actually pay for and use."),
 ]
 
@@ -220,7 +219,9 @@ def test_the_footer_is_one_set_of_columns_with_coming_soon_in_one_group(home_htm
     assert columns == ["product", "solutions", "roles", "compare", "resources", "company", "legal", "coming-soon"]
     assert "Ask anything" not in foot
     soon = foot[foot.index('data-footer-column="coming-soon"'):]
-    assert "Scenarios" in soon and "Software and tool discovery" in soon
+    # a released Scenarios is listed with the product, not under coming soon
+    assert "Scenarios" not in soon and "Software and tool discovery" in soon
+    assert "Scenarios" in foot[:foot.index('data-footer-column="coming-soon"')]
     for live in ("Build your model from your tools", "Every answer shows its sources"):
         assert live not in soon
         assert live in foot
@@ -258,6 +259,11 @@ def test_coming_soon_items_point_at_a_waiting_list_and_are_never_in_a_plan(app):
     with app.test_client() as client:
         for item in soon:
             html = client.get(item["href"]).data.decode()
+            screens = [e["signed_in"]["href"] for e in soon if e["href"] == item["href"] and e.get("signed_in")]
+            if screens and wave_released({"href": screens[0]}):
+                # its screen is released: the page says available and no longer offers a waiting list
+                assert "Available now" in html and "Not built yet" not in html, item["label"]
+                continue
             assert 'data-testid="feature-interest-form"' in html, f"{item['label']} has no waiting list form"
             # the page's own content: not the site footer, which sits inside <main> and carries the logo
             main = re.sub(r"<footer\b.*?</footer>", "", _slice(html, "main"), flags=re.DOTALL)
@@ -312,6 +318,34 @@ def test_signed_in_visitor_sees_open_entelim_and_the_account_menu_goes_home(app,
     assert "Log out" in header
 
 
+def test_the_features_page_opens_scenarios_on_the_working_screen_for_a_signed_in_visitor(
+        app, db_session, make_org, login_as):
+    """The footer and menus send a signed-in person to /simulations; the features page agrees with them."""
+    from app.models.user import User
+
+    org = make_org("feat")
+    user = User(email="feat-user@example.com", first_name="Fay", last_name="Features",
+                organization_id=org.id, confirmed=True)
+    db_session.add(user)
+    db_session.flush()
+
+    def scenario_links(html):
+        return {href for href, text in _links(html, "main") if text.strip() == "Scenarios"}
+
+    with app.test_client() as client:
+        assert scenario_links(client.get("/features").data.decode()) == {"/modules/scenario-modelling"}
+        login_as(client, user)
+        html = client.get("/features").data.decode()
+        assert scenario_links(html) == {"/simulations"}
+        assert "/modules/scenario-modelling" not in _slice(html, "main")
+        available, _, waiting = html.partition('<h2 id="coming-soon">')
+        assert 'href="/simulations">Scenarios</a>: compare' in available
+        assert "Scenarios" not in waiting.split("</ul>")[0]
+        assert "planned" not in available.split('id="simulation-and-scenario-planning"')[1].split("<h3")[0]
+        landing = client.get("/simulations")
+        assert landing.status_code == 200 and "Run simulation" in landing.data.decode()
+
+
 def test_no_page_in_the_registry_is_a_redirect_or_a_merged_page(app):
     from app.services.public_pages import MERGED_PAGES
 
@@ -322,3 +356,106 @@ def test_no_page_in_the_registry_is_a_redirect_or_a_merged_page(app):
     hrefs += [i["href"] for i in raw["solutions"]["items"]]
     for href in hrefs:
         assert href.split("#")[0] not in MERGED_PAGES, f"{href} is a 301"
+
+
+def test_a_signed_in_promotion_sits_only_where_the_registry_reads_it():
+    """The signed-in key promotes an entry of the product menu's coming-soon list; anywhere else it is never read."""
+    import pathlib
+    import yaml
+
+    raw = yaml.safe_load((pathlib.Path(__file__).resolve().parents[1] / "content/site/registry.yml").read_text())
+
+    def holders(node, path=""):
+        if isinstance(node, dict):
+            if "signed_in" in node:
+                yield path
+            for key, value in node.items():
+                yield from holders(value, path + "/" + str(key))
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                yield from holders(value, path + "/" + str(index))
+
+    assert all(p.startswith("/product/coming_soon/items/") for p in holders(raw)), list(holders(raw))
+    assert list(holders(raw)), "the product entry that promotes Scenarios has lost its signed_in key"
+
+
+@pytest.fixture
+def wave(app, monkeypatch):
+    def set_wave(number):
+        monkeypatch.setitem(app.config, "RELEASE_WAVE", str(number))
+
+    return set_wave
+
+
+def _surfaces(client):
+    """What a person reads about Scenarios on the home page (outside its footer) and the features page."""
+    home_page = client.get("/")
+    # a signed-in person is sent past the home page to the dashboard
+    home = re.sub(r"<footer\b.*?</footer>", "", home_page.data.decode(), flags=re.DOTALL) if home_page.status_code == 200 else "<main></main>"
+    features = client.get("/features").data.decode()
+    return {
+        "home": [text.strip() for href, text in _links(home, "main") if "Scenarios" in text],
+        "features_waiting": features.partition('<h2 id="coming-soon">')[2].split("</ul>")[0] if '<h2 id="coming-soon">' in features else "",
+        "features": features,
+    }
+
+
+@pytest.mark.parametrize("signed_in", [False, True], ids=["visitor", "signed-in"])
+def test_a_released_scenarios_is_available_on_every_surface_and_offers_no_waiting_list(
+        app, wave, db_session, make_org, login_as, signed_in):
+    """Once the Scenarios screen is released, the menus, footer, home page, features page and module page agree."""
+    from app.models.user import User
+
+    wave(3)
+    with app.test_client() as client:
+        if signed_in:
+            org = make_org("rel")
+            user = User(email="rel-user@example.com", first_name="Rae", last_name="Released",
+                        organization_id=org.id, confirmed=True)
+            db_session.add(user)
+            db_session.flush()
+            login_as(client, user)
+        target = "/simulations" if signed_in else "/modules/scenario-modelling"
+        with app.test_request_context("/"):
+            if signed_in:
+                from flask_login import login_user
+
+                login_user(user)
+            reg = site_registry()
+        menu = [i["href"] for g in reg["product"]["groups"] for i in g["items"] if i["label"] == "Scenarios"]
+        assert menu == [target]
+        soon = reg["product"]["coming_soon"]["items"] + reg["solutions"]["coming_soon"]["items"]
+        assert "Scenarios" not in [i["label"] for i in soon]
+        assert "Software and tool discovery" in [i["label"] for i in soon]
+        footer_columns = {c["id"]: c["items"] for r in reg["footer"]["rows"] for c in r["columns"]}
+        assert target in [i["href"] for i in footer_columns["product"] if i["label"] == "Scenarios"]
+        assert "Scenarios" not in [i["label"] for i in footer_columns["coming-soon"]]
+
+        seen = _surfaces(client)
+        assert seen["home"] == ([] if signed_in else ["Scenarios"]), seen["home"]
+        assert "Scenarios" not in seen["features_waiting"]
+        assert 'id="available-now"' in seen["features"]
+        section = seen["features"].split('id="simulation-and-scenario-planning"')[1].split("<h3")[0]
+        assert "Early access" not in section and "waiting list" not in section
+        assert ("Sign in to open it" in _slice(seen["features"], "main")) is (not signed_in)
+
+        module = client.get("/modules/scenario-modelling")
+        if signed_in:
+            # a signed-in person is sent from the module page to the working screen
+            assert module.status_code == 302 and module.headers["Location"].endswith("/simulations")
+            return
+        html = module.data.decode()
+        assert "Available now" in html and "Not built yet" not in html
+        assert html.count('data-testid="feature-interest-form"') == 0, "a released page offers a waiting list"
+
+
+def test_before_its_screen_is_released_scenarios_is_coming_soon_everywhere_and_the_page_has_the_waiting_list(app, wave):
+    wave(2)
+    with app.test_request_context("/"):
+        reg = site_registry()
+    assert "Scenarios" in [i["label"] for i in reg["product"]["coming_soon"]["items"]]
+    with app.test_client() as client:
+        seen = _surfaces(client)
+        assert seen["home"] == ["Scenarios (coming soon)"], seen["home"]
+        assert "Scenarios" in seen["features_waiting"]
+        assert client.get("/modules/scenario-modelling").data.decode().count('data-testid="feature-interest-form"') == 1

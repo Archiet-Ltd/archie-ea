@@ -1,6 +1,5 @@
 """An enterprise architect on Impact Analysis clicks Compare Scenarios and gets the
-comparison dialog with the scenarios saved in this browser to pick from."""
-import json
+comparison dialog with the scenarios their organisation has saved to pick from."""
 import os
 
 import pytest
@@ -22,6 +21,23 @@ SAVED = [
 ]
 
 
+def _seed_scenarios(app, email, saved):
+    """Keep exactly these scenarios for the (test) organisation of this person, replacing any earlier ones."""
+    from app import db
+    from app.models.saved_scenario import SavedScenario
+    from app.models.user import User
+
+    with app.app_context():
+        org_id = User.query.filter_by(email=email).one().organization_id
+        SavedScenario.query.filter(SavedScenario.organization_id == org_id).delete(synchronize_session=False)
+        for item in saved:
+            db.session.add(SavedScenario(
+                organization_id=org_id, name=item["name"], change_type=item["change_type"],
+                element_name=item["element"]["name"], analysis_result=item["analysis_result"]))
+        db.session.commit()
+        db.session.remove()
+
+
 def _login(page, base, email):
     page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.fill("#email", email)
@@ -33,13 +49,12 @@ def _login(page, base, email):
 @pytest.mark.smoke
 @pytest.mark.journey
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=["1440-light", "390-dark"])
-def test_compare_scenarios_opens_the_dialog_with_saved_scenarios(browser, live_server, seeded, viewport, scheme):
+def test_compare_scenarios_opens_the_dialog_with_saved_scenarios(browser, live_server, app, seeded, viewport, scheme):
+    _seed_scenarios(app, seeded["emails"]["enterprise_architect"], SAVED)
     ctx = browser.new_context(viewport=viewport, color_scheme=scheme, ignore_https_errors=True)
     page = ctx.new_page()
     _login(page, live_server, seeded["emails"]["enterprise_architect"])
     page.goto(live_server + "/strategic/impact-analysis", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.evaluate("s => localStorage.setItem('impactAnalysisScenarios', s)", json.dumps(SAVED))
-    page.reload(wait_until="domcontentloaded")
     page.wait_for_timeout(1500)
 
     trigger = page.get_by_role("button", name="Compare Scenarios")
@@ -76,14 +91,13 @@ SCORED = {
 }
 
 
-def _open_dialog(browser, live_server, seeded, viewport, scheme, saved):
+def _open_dialog(browser, live_server, app, seeded, viewport, scheme, saved):
+    _seed_scenarios(app, seeded["emails"]["enterprise_architect"], saved)
     ctx = browser.new_context(viewport=viewport, color_scheme=scheme, ignore_https_errors=True,
                               accept_downloads=True)
     page = ctx.new_page()
     _login(page, live_server, seeded["emails"]["enterprise_architect"])
     page.goto(live_server + "/strategic/impact-analysis", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.evaluate("s => localStorage.setItem('impactAnalysisScenarios', s)", json.dumps(saved))
-    page.reload(wait_until="domcontentloaded")
     page.wait_for_timeout(1500)
     trigger = page.get_by_role("button", name="Compare Scenarios")
     trigger.focus()
@@ -101,8 +115,8 @@ def _compare(dialog, *names):
 @pytest.mark.smoke
 @pytest.mark.journey
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=["1440-light", "390-dark"])
-def test_missing_figures_are_stated_not_shown_as_zero(browser, live_server, seeded, viewport, scheme, tmp_path):
-    ctx, page, trigger, dialog = _open_dialog(browser, live_server, seeded, viewport, scheme, SAVED + [SCORED])
+def test_missing_figures_are_stated_not_shown_as_zero(browser, live_server, app, seeded, viewport, scheme, tmp_path):
+    ctx, page, trigger, dialog = _open_dialog(browser, live_server, app, seeded, viewport, scheme, SAVED + [SCORED])
     _compare(dialog, "Retire the legacy billing system", "Consolidate the billing databases")
     table = dialog.locator("table")
     expect(table).to_be_visible()
@@ -117,10 +131,12 @@ def test_missing_figures_are_stated_not_shown_as_zero(browser, live_server, seed
     expect(row("Affected Capabilities")).to_contain_text("2")
     expect(row("Affected Processes")).to_contain_text("1")
     expect(row("Direct Dependencies")).to_contain_text("3")
-    expect(row("Financial Risk")).to_contain_text("$250k")
-    expect(table).not_to_contain_text("$0k")
-    zero_cells = table.locator("td", has_text="0").filter(has_text="^0$")
-    assert zero_cells.count() == 0
+    cells = [t.strip() for t in row("Financial Risk").get_by_role("cell").all_inner_texts()]
+    assert cells[-2:] == ["Not recorded", "£250,000.00"] or cells[-2:] == ["£250,000.00", "Not recorded"], cells
+    expect(table).not_to_contain_text("£0.00")
+    # a figure that was never scored is never drawn as a bare zero: no cell of the table reads just 0
+    bare_zero = [t for t in table.get_by_role("cell").all_inner_texts() if t.strip() == "0"]
+    assert bare_zero == [], bare_zero
     # the recommendation does not rank a scenario whose figures were never scored
     expect(dialog.get_by_text("Recommended Scenario")).to_be_hidden()
     expect(dialog.get_by_text("cannot be ranked")).to_be_visible()
@@ -140,9 +156,9 @@ def test_missing_figures_are_stated_not_shown_as_zero(browser, live_server, seed
 
 @pytest.mark.smoke
 @pytest.mark.journey
-def test_comparison_table_scrolls_inside_the_dialog_on_a_phone(browser, live_server, seeded):
+def test_comparison_table_scrolls_inside_the_dialog_on_a_phone(browser, live_server, app, seeded):
     viewport = {"width": 390, "height": 844}
-    ctx, page, trigger, dialog = _open_dialog(browser, live_server, seeded, viewport, "dark", SAVED + [SCORED])
+    ctx, page, trigger, dialog = _open_dialog(browser, live_server, app, seeded, viewport, "dark", SAVED + [SCORED])
     _compare(dialog, "Retire the legacy billing system", "Move billing to the cloud",
              "Consolidate the billing databases")
     table = dialog.locator("table")
@@ -179,8 +195,8 @@ def test_comparison_table_scrolls_inside_the_dialog_on_a_phone(browser, live_ser
 @pytest.mark.journey
 @pytest.mark.parametrize("how", ["backdrop", "escape"])
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=["1440-light", "390-dark"])
-def test_dialog_closes_from_outside_and_escape_and_returns_focus(browser, live_server, seeded, viewport, scheme, how):
-    ctx, page, trigger, dialog = _open_dialog(browser, live_server, seeded, viewport, scheme, SAVED)
+def test_dialog_closes_from_outside_and_escape_and_returns_focus(browser, live_server, app, seeded, viewport, scheme, how):
+    ctx, page, trigger, dialog = _open_dialog(browser, live_server, app, seeded, viewport, scheme, SAVED)
     if how == "backdrop":
         page.mouse.click(2, 2)
     else:
@@ -193,9 +209,74 @@ def test_dialog_closes_from_outside_and_escape_and_returns_focus(browser, live_s
 @pytest.mark.smoke
 @pytest.mark.journey
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=["1440-light", "390-dark"])
-def test_no_saved_scenarios_says_why_and_what_to_do(browser, live_server, seeded, viewport, scheme):
-    ctx, page, trigger, dialog = _open_dialog(browser, live_server, seeded, viewport, scheme, [])
+def test_no_saved_scenarios_says_why_and_what_to_do(browser, live_server, app, seeded, viewport, scheme):
+    ctx, page, trigger, dialog = _open_dialog(browser, live_server, app, seeded, viewport, scheme, [])
     expect(dialog.get_by_text("No Saved Scenarios")).to_be_visible()
     expect(dialog.get_by_text("Run an analysis and save it to compare scenarios")).to_be_visible()
     expect(dialog.get_by_role("button", name="Export")).to_be_disabled()
+    ctx.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=["1440-light", "390-dark"])
+def test_the_dialog_says_it_is_loading_until_the_saved_scenarios_arrive(browser, live_server, app, seeded, viewport, scheme):
+    _seed_scenarios(app, seeded["emails"]["enterprise_architect"], SAVED)
+    ctx = browser.new_context(viewport=viewport, color_scheme=scheme, ignore_https_errors=True)
+    page = ctx.new_page()
+    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    page.goto(live_server + "/strategic/impact-analysis", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(1500)
+
+    held = []
+
+    def hold(route):
+        held.append(route)
+
+    page.route("**/strategic/api/scenarios", hold)
+    page.get_by_role("button", name="Compare Scenarios").click()
+    dialog = page.get_by_role("dialog", name="Compare Impact Scenarios")
+    expect(dialog).to_be_visible()
+    # while the list is on its way the person is told so, and is not shown the empty-list message
+    expect(dialog.get_by_text("Loading the saved scenarios")).to_be_visible()
+    expect(dialog.get_by_text("No Saved Scenarios")).to_be_hidden()
+    page.wait_for_timeout(300)
+    for route in held:
+        route.continue_()
+    expect(dialog.get_by_text("Retire the legacy billing system")).to_be_visible()
+    expect(dialog.get_by_text("Loading the saved scenarios")).to_be_hidden()
+    ctx.close()
+
+
+def _scored(scenario_id, name, severity, cost):
+    return {
+        "id": scenario_id, "name": name, "change_type": "modify", "element": {"name": name + " element"},
+        "analysis_result": {
+            "severity": severity, "impacted_capabilities": [{"name": "Invoicing"}],
+            "impacted_processes": [{"name": "Month end close"}], "estimated_risk_cost": cost,
+            "dependencies": [{"name": "Ledger"}],
+        },
+    }
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=["1440-light", "390-dark"])
+def test_two_equal_scenarios_are_named_as_a_tie_and_a_lower_one_is_named_alone(browser, live_server, app, seeded, viewport, scheme):
+    tied = [_scored("t1", "Retire the ledger", "HIGH", 25200), _scored("t2", "Replace the ledger", "HIGH", 25200)]
+    lower = _scored("t3", "Keep the ledger", "LOW", 1000)
+    ctx, page, trigger, dialog = _open_dialog(browser, live_server, app, seeded, viewport, scheme, tied + [lower])
+    _compare(dialog, "Retire the ledger", "Replace the ledger")
+    sentence = dialog.get_by_test_id("scenario-recommendation")
+    expect(sentence).to_have_text(
+        "Retire the ledger and Replace the ledger tie on the lowest combined risk score based on severity and financial impact.")
+    assert "has the lowest" not in sentence.inner_text()
+    heading = dialog.get_by_test_id("scenario-recommendation-heading")
+    expect(heading).to_have_text("Scenarios tie")
+    if WALK_DIR:
+        os.makedirs(WALK_DIR, exist_ok=True)
+        page.screenshot(path="%s/compare-tie-%d-%s.png" % (WALK_DIR, viewport["width"], scheme))
+    _compare(dialog, "Keep the ledger")
+    expect(heading).to_have_text("Recommended Scenario")
+    expect(sentence).to_have_text("Keep the ledger has the lowest combined risk score based on severity and financial impact.")
     ctx.close()
