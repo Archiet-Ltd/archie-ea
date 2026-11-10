@@ -375,6 +375,7 @@ def _scenario_figures(server):
         "dependencies": list(server["direct_dependencies"]),
         "indirect_dependencies": list(server["indirect_dependencies"]),
         "financial_risk_reason": server.get("financial_risk_reason") or "",
+        "figures": [dict(f) for f in (server.get("simulation") or {}).get("figures") or []],
     }
 
 
@@ -420,7 +421,7 @@ def api_save_scenario():
     if found is None:
         return jsonify({"error": "That element is not in your model."}), 404
     try:
-        server = ImpactAnalysisService.analyze_change_impact(found.id, change_type, record=False)
+        server = simulation_service.simulate_change(found.id, change_type)
     except Exception:
         current_app.logger.exception("Scenario analysis failed")
         return jsonify({"error": "The scenario could not be saved. Try again in a moment."}), 500
@@ -438,6 +439,71 @@ def api_save_scenario():
     db.session.add(row)
     db.session.commit()
     return jsonify(row.to_dict()), 201
+
+
+def _scenario_row(scenario_id):
+    """The organisation's own saved scenario for an id such as ``scenario-12``; another organisation's is not found."""
+    from app.models.saved_scenario import SavedScenario
+
+    text = str(scenario_id)
+    number = text[len("scenario-"):] if text.startswith("scenario-") else text
+    if not number.isdigit() or not 0 < int(number) <= 2147483647:
+        return None
+    return SavedScenario.query.filter_by(id=int(number)).first()
+
+
+@strategic_bp.route("/api/scenarios/<scenario_id>", methods=["PATCH"])
+@login_required
+@require_role(*SCENARIO_SAVE_ROLES)
+@audit_log("scenario_rename")
+def api_rename_scenario(scenario_id):
+    """Give a saved scenario another name."""
+    row = _scenario_row(scenario_id)
+    if row is None:
+        return jsonify({"error": "That scenario is not saved for your organisation."}), 404
+    name = str((request.get_json(silent=True) or {}).get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Give the scenario a name so you can find it when you compare."}), 400
+    if len(name) > 200:
+        return jsonify({"error": "Use a name of 200 characters or fewer."}), 400
+    row.name = name
+    db.session.commit()
+    return jsonify(row.to_dict())
+
+
+@strategic_bp.route("/api/scenarios/<scenario_id>", methods=["DELETE"])
+@login_required
+@require_role(*SCENARIO_SAVE_ROLES)
+@audit_log("scenario_delete")
+def api_delete_scenario(scenario_id):
+    """Remove a saved scenario. The model it was tried on is not touched."""
+    row = _scenario_row(scenario_id)
+    if row is None:
+        return jsonify({"error": "That scenario is not saved for your organisation."}), 404
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify({"deleted": "scenario-%d" % row.id})
+
+
+@strategic_bp.route("/api/scenarios/export.csv", methods=["GET"])
+@login_required
+def api_export_scenarios_csv():
+    """The chosen saved scenarios side by side as a CSV file (ids as ``?ids=scenario-1,scenario-2``)."""
+    from flask import Response
+
+    from app.modules.solutions_strategic.v2.services.scenario_comparison_csv import comparison_csv
+
+    rows = []
+    for raw in str(request.args.get("ids") or "").split(",")[:3]:
+        row = _scenario_row(raw.strip()) if raw.strip() else None
+        if row is not None:
+            rows.append(row)
+    if not rows:
+        return jsonify({"error": "Choose at least one saved scenario to export."}), 400
+    return Response(
+        comparison_csv([r.to_dict() for r in rows]),
+        mimetype="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="scenario-comparison.csv"'})
 
 
 @strategic_bp.route("/api/impact-analysis/history", methods=["GET"])

@@ -271,3 +271,76 @@ def test_the_refusal_names_exactly_the_roles_the_route_admits(client, login_as, 
     for path in ("/strategic/impact-analysis", "/simulations"):
         page = client.get(path).get_data(as_text=True)
         assert "Only %s can save a scenario" % named in page, path
+
+
+def _save(client, element, name, change_type):
+    body = _body(element)
+    body.update(name=name, change_type=change_type)
+    response = client.post(URL, json=body)
+    assert response.status_code == 201, response.get_data(as_text=True)[:300]
+    return response.get_json()
+
+
+def test_a_saved_scenario_keeps_the_figures_its_run_worked_out(client, login_as, db_session, world):
+    login_as(client, world["architect"])
+    retire = _save(client, world["element"], "Retire it", "RETIRE")["analysis_result"]["figures"]
+    replace = _save(client, world["element"], "Replace it", "REPLACE")["analysis_result"]["figures"]
+    elements = {f["label"]: f for f in retire}["Elements in the model"]
+    assert elements["change"] == -1
+    assert {f["label"]: f for f in replace}["Elements in the model"]["change"] == 0
+
+
+def test_another_organisation_cannot_rename_or_delete_a_scenario(client, login_as, db_session, world):
+    login_as(client, world["architect"])
+    saved = _save(client, world["element"], "Mine", "RETIRE")
+    assert client.patch("%s/%s" % (URL, saved["id"]), json={"name": "Mine"}).status_code == 200
+    login_as(client, world["other"])
+    assert client.patch("%s/%s" % (URL, saved["id"]), json={"name": "Taken"}).status_code == 404
+    assert client.delete("%s/%s" % (URL, saved["id"])).status_code == 404
+    login_as(client, world["architect"])
+    listed = client.get(URL).get_json()
+    assert [s["name"] for s in listed if s["id"] == saved["id"]] == ["Mine"]
+
+
+def test_an_architect_renames_and_deletes_and_a_viewer_cannot(client, login_as, db_session, world):
+    login_as(client, world["architect"])
+    saved = _save(client, world["element"], "First name", "RETIRE")
+    address = "%s/%s" % (URL, saved["id"])
+    assert client.patch(address, json={"name": "  "}).status_code == 400
+    login_as(client, world["viewer"])
+    assert client.patch(address, json={"name": "Viewer"}).status_code == 403
+    assert client.delete(address).status_code == 403
+    login_as(client, world["architect"])
+    renamed = client.patch(address, json={"name": "Second name"})
+    assert renamed.status_code == 200 and renamed.get_json()["name"] == "Second name"
+    assert [s["name"] for s in client.get(URL).get_json() if s["id"] == saved["id"]] == ["Second name"]
+    assert client.delete(address).status_code == 200
+    assert [s for s in client.get(URL).get_json() if s["id"] == saved["id"]] == []
+    assert client.delete(address).status_code == 404
+
+
+def test_the_export_is_a_table_that_quotes_every_cell_and_neutralises_a_formula(client, login_as, db_session, world):
+    import csv
+    import io
+
+    login_as(client, world["architect"])
+    hostile = _save(client, world["element"], '=HYPERLINK("http://x"),"a, b"', "RETIRE")
+    plain = _save(client, world["element"], "Replace it", "REPLACE")
+    response = client.get("%s/export.csv?ids=%s,%s" % (URL, hostile["id"], plain["id"]))
+    assert response.status_code == 200 and response.mimetype == "text/csv"
+    text = response.get_data(as_text=True)
+    rows = list(csv.reader(io.StringIO(text)))
+    assert len({len(r) for r in rows}) == 1 and len(rows[0]) == 3 and len(rows) > 8
+    assert rows[0][1] == '\'=HYPERLINK("http://x"),"a, b"'
+    assert all(line.startswith('"') and line.endswith('"') for line in text.splitlines())
+    by_metric = {r[0]: r[1:] for r in rows}
+    assert by_metric["Elements in the model"][0].endswith("(change -1)")
+    assert by_metric["Elements in the model"][1].endswith("(change 0)")
+    assert by_metric["Elements in the model"][0] != by_metric["Elements in the model"][1]
+
+
+def test_the_export_leaves_out_another_organisation_s_scenario(client, login_as, db_session, world):
+    login_as(client, world["architect"])
+    mine = _save(client, world["element"], "Mine", "RETIRE")
+    login_as(client, world["other"])
+    assert client.get("%s/export.csv?ids=%s" % (URL, mine["id"])).status_code == 400
