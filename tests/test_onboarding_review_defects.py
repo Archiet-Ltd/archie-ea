@@ -171,3 +171,11 @@ def test_no_text_in_the_application_calls_the_ai_settings_page_by_its_old_name()
                 if "API Settings" in line:
                     hits.append("%s:%d" % (path.relative_to(root.parent), number))
     assert not hits, hits
+
+
+def test_the_ai_settings_page_opened_from_sign_up_offers_the_way_back(signed_in):
+    opened = signed_in.get("/admin/api-settings?from=signup").get_data(as_text=True)
+    assert 'data-testid="ai-settings-back-to-signup"' in opened
+    assert "/account/welcome?step=4" in opened
+    on_its_own = signed_in.get("/admin/api-settings").get_data(as_text=True)
+    assert "ai-settings-back-to-signup" not in on_its_own

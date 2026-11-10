@@ -133,12 +133,17 @@ def test_signup_words_lead_to_the_ai_key_page_and_the_review_page_matches_the_mo
         assert "Settings." not in built_in.inner_text().replace("AI settings", "")
         shoot(page, "step4-words")
         page.get_by_test_id("signup-api-settings-link").click()
-        page.wait_for_url("**/admin/api-settings")
+        page.wait_for_url("**/admin/api-settings?from=signup")
         expect(page.get_by_role("heading", name="AI settings", level=1)).to_be_visible()
         expect(page.locator("main")).not_to_contain_text("does not include this page")
         expect(page.locator("main form").first).to_be_visible()
         assert page.locator("main input, main select").count() > 0
         shoot(page, "api-settings-opened-from-step4")
+        # There is a way back to where the person was: the AI step of sign-up, with its words and its Finish.
+        page.get_by_test_id("ai-settings-back-to-signup").click()
+        page.wait_for_url("**/account/welcome?step=4")
+        expect(page.get_by_role("heading", name="Your AI provider")).to_be_visible()
+        expect(page.get_by_test_id("signup-finish")).to_be_visible()
 
         # Payment is closed on this server: the billing page offers no Buy and says what to do instead.
         page.goto(base + "/admin/billing/?plan=startup", wait_until="domcontentloaded")

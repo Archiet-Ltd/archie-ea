@@ -33,7 +33,7 @@
             {% macro built_in_card() %}
             <div class="space-y-2" data-testid="signup-built-in">
                 <h2 class="text-sm font-semibold">Use the built-in AI</h2>
-                <p class="text-sm text-muted-foreground">Nothing to set up. Questions are answered by {{ config.APP_NAME }}'s own provider, and you can add your own key later in <a href="{{ url_for('admin.api_settings') }}" class="text-primary underline" data-testid="signup-api-settings-link">AI settings</a>.</p>
+                <p class="text-sm text-muted-foreground">Nothing to set up. Questions are answered by {{ config.APP_NAME }}'s own provider, and you can add your own key later in <a href="{{ url_for('admin.api_settings', **{'from': 'signup'}) }}" class="text-primary underline" data-testid="signup-api-settings-link">AI settings</a>.</p>
             </div>
             {% endmacro %}
             {% if paying %}
