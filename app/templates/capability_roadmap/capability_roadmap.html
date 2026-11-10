@@ -990,7 +990,7 @@
       preview: [],
 
       initFromGlobal() {
-        document.addEventListener('platform:modal:opened', async (e) => {
+        document.addEventListener('modal:open', async (e) => {
           if (e.detail?.id !== 'rdm-ai-generate-modal') return;
           const gapIds = Alpine.store('rdm').pendingGapIds;
           if (!gapIds.length) return;

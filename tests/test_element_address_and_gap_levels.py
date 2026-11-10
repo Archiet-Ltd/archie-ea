@@ -92,6 +92,20 @@ def test_the_roadmap_preview_places_a_gap_by_its_rating(db_session, make_org, cl
     assert resp.status_code == 200
     rows = {r["gap_id"]: r for r in resp.get_json()["preview"]}
     assert rows[rated.id]["suggested_plateau"] == "Plateau 1 — Immediate"
+    assert rows[rated.id]["gap_priority"] == "critical"
+    assert rows[rated.id]["suggested_work_package"]["priority"] == "critical"
     assert rows[plain.id]["suggested_plateau"] == "Plateau 2 — Near Term"
     assert (rows[rated.id]["suggested_work_package"]["estimated_start_date"]
             < rows[plain.id]["suggested_work_package"]["estimated_start_date"])
+
+
+def test_the_roadmap_preview_takes_the_gap_numbers_the_page_sends(db_session, make_org, client, login_as):
+    from tests.test_work_package_writer import _user
+
+    org = make_org("prev-text")
+    gap = _gap(db_session, org, priority="medium", severity="critical")
+    login_as(client, _user(db_session, org, "prevtext", role="enterprise_architect"))
+    resp = client.post("/capability-map/api/roadmap/ai-generate", json={"gap_ids": [str(gap.id)]})
+    assert resp.status_code == 200
+    assert resp.get_json()["preview"][0]["suggested_plateau"] == "Plateau 1 — Immediate"
+    assert client.post("/capability-map/api/roadmap/ai-generate", json={"gap_ids": ["x"]}).status_code == 400

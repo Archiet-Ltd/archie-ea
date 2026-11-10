@@ -2103,6 +2103,12 @@ def api_roadmap_ai_generate():
         if not gap_ids:
             return jsonify({"success": False, "error": "gap_ids is required and must be non-empty"}), 400
 
+        try:
+            # The page sends the ticked checkboxes' values, which arrive as text.
+            gap_ids = [int(g) for g in gap_ids]
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "gap_ids must be whole numbers"}), 400
+
         gaps = Gap.query.filter(Gap.id.in_(gap_ids)).all()
         if not gaps:
             return jsonify({"success": False, "error": "No gaps found for the provided IDs"}), 404
@@ -2134,15 +2140,15 @@ def api_roadmap_ai_generate():
                 "gap_id": gap.id,
                 "gap_name": gap.name,
                 "gap_type": gap.gap_type,
-                "gap_priority": gap.priority,
+                "gap_priority": rating,
                 "suggested_work_package": {
                     "name": f"Resolve: {gap.name}",
                     "description": (
                         f"Work package to close gap '{gap.name}'. "
                         f"Gap type: {gap.gap_type or 'coverage'}. "
-                        f"Priority: {gap.priority or 'medium'}."
+                        f"Priority: {rating}."
                     ),
-                    "priority": gap.priority or "medium",
+                    "priority": rating,
                     "estimated_start_date": estimated_start.isoformat(),
                     "target_resolution_date": target_resolution.isoformat(),
                     "element_type": "WorkPackage",
