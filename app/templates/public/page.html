@@ -46,6 +46,16 @@
   <article class="public-page-content public-prose prose max-w-none">
     {{ page.body_html }}
 
+    {% if coming_soon %}
+    <h2 id="coming-soon">Coming soon</h2>
+    <p>These are not available yet. Open one to join its waiting list and we will email you when you can use it.</p>
+    <ul data-testid="coming-soon-list">
+      {% for item in coming_soon %}
+      <li><a href="{{ item.url }}">{{ item.title }}</a>{% if item.description %}: {{ item.description }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
     {% if hub_groups %}
     {% set groups = hub_groups %}
     {% set show_descriptions = true %}

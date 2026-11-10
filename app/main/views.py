@@ -1084,6 +1084,8 @@ def public_site_page(slug):
         connectors = sorted(
             (p for p in feed if p.family == "connector"), key=lambda p: p.title.lower()
         )
+        from app.release_waves.routes import coming_soon_entries
+
         hub_groups = [
             group for group in (
                 {"label": "Every module", "pages": modules},
@@ -1091,7 +1093,7 @@ def public_site_page(slug):
             ) if group["pages"]
         ]
         return render_template(
-            "public/page.html", page=page, hub_groups=hub_groups,
+            "public/page.html", page=page, hub_groups=hub_groups, coming_soon=coming_soon_entries(),
             jsonld=build_hub_jsonld(
                 page.title, page.url, page.description, modules + connectors,
                 page.body_html,

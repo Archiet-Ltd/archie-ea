@@ -32,6 +32,42 @@ def coming_groups() -> list[dict]:
     return [seen[k] for k in sorted(seen)]
 
 
+def coming_soon_entries() -> list[dict]:
+    """Every capability whose page answers a visitor with a waiting list, once each, each linked to that page.
+
+    The early-access groups come from ``coming_groups``, the list the hub shows. A module page the content marks
+    as a waiting-list page answers its own waiting list. While the release switch is on, a module page of a later
+    release answers the waiting list of its group, which is listed too, or, when its group has none, its own."""
+    from flask import current_app
+
+    from app.release_waves import GENERIC_GROUP, entry_for, group_for
+    from app.services.public_pages import MERGED_PAGES, load_all_pages
+
+    # every module page that is not withdrawn: a page held back from the feeds still answers a waiting list
+    module_pages = [p for p in load_all_pages()
+                    if p.family == "module" and p.url not in MERGED_PAGES and p.front_matter.get("state") != "not_planned"]
+
+    found = [{"url": f"{EARLY_ACCESS_PREFIX}/{g['slug']}", "title": g["title"], "description": g["blurb"]}
+             for g in coming_groups()]
+    for page in module_pages:
+        own = page.cta == "waiting_list"
+        if not own and page.wave_closed:
+            endpoint = page.front_matter.get("endpoint")
+            rule = next(iter(current_app.url_map.iter_rules(endpoint)), None) if endpoint in current_app.view_functions else None
+            code, info = group_for(entry_for(rule.rule, rule.endpoint) if rule is not None else None)
+            own = not has_page(info) or code == GENERIC_GROUP
+            if not own:
+                found.append({"url": f"{EARLY_ACCESS_PREFIX}/{code_slug(code)}", "title": info["title"],
+                              "description": info["blurb"]})
+        if own:
+            found.append({"url": page.url, "title": page.front_matter.get("module_label") or page.title,
+                          "description": page.description})
+    unique: dict[str, dict] = {}
+    for item in found:
+        unique.setdefault(item["url"], item)
+    return sorted(unique.values(), key=lambda item: item["title"].lower())
+
+
 def early_access_paths() -> list[str]:
     """Every public early-access address: the hub and the page of each capability it lists."""
     return [EARLY_ACCESS_PREFIX] + [f"{EARLY_ACCESS_PREFIX}/{group['slug']}" for group in coming_groups()]
