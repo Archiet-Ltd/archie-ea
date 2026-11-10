@@ -386,7 +386,7 @@
     /* The network half of a turn, separated from _submitTurn so the error
        card's Retry can run it again without echoing the user's message into
        the transcript a second time. */
-    async function _deliverTurn(message, timestamp, completed) {
+    async function _deliverTurn(message, timestamp, retry) {
         // Show loading indicator
         const loadingId = 'loading-' + Date.now();
         const loadingDiv = document.createElement('div');
@@ -440,8 +440,9 @@
         }
 
         const startTime = performance.now();
-        // Changes an earlier try of this question already made: a retry does not make them again.
-        const _completed = completed || [];
+        // A Retry says only that it is one: the server reads what the failed turn recorded from its own
+        // record and leaves those changes alone.
+        const _isRetry = !!retry;
         // thread_id keeps multi-turn chats in one conversation. waited_seconds is read when each request is
         // built, so the plain request that follows a dropped stream carries the time already spent and does
         // not start a second minute.
@@ -455,7 +456,7 @@
             thread_id: window.__threadId || null,
             // Since the send: the stored-answer lookup, and any stream that dropped, took part of the minute.
             waited_seconds: (performance.now() - _sentAt) / 1000,
-            completed_actions: _completed,
+            retry: _isRetry,
         });
         const _payload = _buildPayload();
 
@@ -596,7 +597,7 @@
                     appendError(errorMessage || fullError, null, { adminLink: true });
                 } else {
                     Platform.toast.error(fullError);
-                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
+                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.' + recordedNote(data.pending_approvals), () => _retryTurn(message, timestamp));
                 }
             } else {
                 // Add AI response to history
@@ -681,19 +682,25 @@
         }
     }
 
-    /* The sentence for a missing AI provider, written for the reader: an
-       administrator is told where to fix it (the settings link follows, from
-       appendError), a member is told who can. The server's own text names an
-       internal feature key and is not shown. */
+    /* The sentence for a missing AI provider is the server's, the one the page was given: a state has one
+       sentence. An administrator gets the settings link after it (from appendError). */
     function configFaultSentence() {
-        return window.chatIsAdmin
-            ? 'The assistant is not set up yet. Add an AI provider in Settings to start getting answers.'
-            : 'The assistant is not set up yet. Ask an administrator of your organisation to add an AI provider.';
+        return window.chatNotSetUpSentence || '';
     }
 
-    function _retryTurn(message, timestamp, completed) {
+    /* What a failed turn already recorded and nobody has applied yet, in plain words for the failure card.
+       Each change is named by the summary the server wrote; Retry does not record it again. */
+    function recordedNote(pending) {
+        const list = (pending || []).map(a => String(a.summary || a.tool || '')
+            .replace(/^Ask the assistant to /, '').replace(/\.$/, '')).filter(Boolean);
+        return list.length
+            ? ' Recorded, not applied yet, and not recorded again on Retry: ' + list.join('; ') + '.'
+            : '';
+    }
+
+    function _retryTurn(message, timestamp) {
         _setSendingUI(true);
-        _deliverTurn(message, timestamp, completed).finally(() => _setSendingUI(false));
+        _deliverTurn(message, timestamp, true).finally(() => _setSendingUI(false));
     }
 
     // Stream an AI reply via SSE. Renders tokens live into a bubble; returns true
@@ -752,19 +759,13 @@
                     if (result.error && !result.paused) {
                         /* A failed turn is a failure card with Retry, not a bubble in the assistant's voice. */
                         let _msg = '';
-                        let _before = [];
-                        try { const _sent = JSON.parse(payload); _msg = _sent.message; _before = _sent.completed_actions || []; } catch (_) { /* swallow-ok: the payload is built here from JSON.stringify; if it cannot be read the failure card still shows, without a Retry that re-asks */ }
-                        /* A change this try made before it stopped is told to the person and is not made again
-                           by Retry: it is sent back with the question and the server leaves it alone. */
+                        try { _msg = JSON.parse(payload).message; } catch (_) { /* swallow-ok: the payload is built here from JSON.stringify; if it cannot be read the failure card still shows, without a Retry that re-asks */ }
                         const _made = (result.actions || []).filter(a => a.mutates);
-                        const _kept = _before.concat(
-                            _made.concat(result.pendingApprovals || []).map(a => ({ tool: a.tool, arguments: a.arguments || {} }))
-                        );
                         const _madeNote = _made.length
                             ? ' Already done, and not repeated on Retry: ' + _made.map(a => a.message || a.tool).join('; ') + '.'
                             : '';
-                        appendError((result.text || 'The assistant is busy right now. Wait a minute, then press Retry.') + _madeNote,
-                            _msg && !result.notSetUp ? () => _retryTurn(_msg, timestamp, _kept) : null,
+                        appendError((result.text || 'The assistant is busy right now. Wait a minute, then press Retry.') + _madeNote + recordedNote(result.pendingApprovals),
+                            _msg && !result.notSetUp ? () => _retryTurn(_msg, timestamp) : null,
                             result.notSetUp ? { adminLink: true } : { ownKeyLink: true });
                         return;
                     }

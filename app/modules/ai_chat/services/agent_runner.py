@@ -350,6 +350,7 @@ class AgentRunner:
         self._turn_id: Optional[str] = None
         # When this turn must stop (time.monotonic()); set by run().
         self._turn_deadline: Optional[float] = None
+        self._recorded: list = []
         # What this turn may state: tool results, the context handed to the
         # model, the conversation so far and the user's own words. The citation
         # gate in _finalize refuses an answer that states a fact about the
@@ -699,12 +700,18 @@ class AgentRunner:
         history: Optional[list] = None,
         waited_seconds: float = 0.0,
         already_done: Optional[list] = None,
+        retry: bool = False,
     ) -> dict:
         """
         Execute the full ReAct loop for one user message.
 
         `already_done` is the changes an earlier try of this same question made before it stopped, as
         [{"tool": str, "arguments": dict}, ...]; a retry does not make the same change a second time.
+
+        `retry` marks a question asked again after a failed turn. The changes that turn recorded are then
+        read from the approval record (never from the browser): the model is told each one's real state, a
+        change asking for the same target and fields is not recorded a second time, and the ones still
+        waiting are returned in `pending_approvals` so the failure card can name them.
 
         `waited_seconds` is what the person has already waited since sending (the stored-answer lookup
         ran first); the turn's budget is the rest of CHAT_TURN_BUDGET_SECONDS less CHAT_TURN_MARGIN_SECONDS, never under 10 seconds.
@@ -740,6 +747,13 @@ class AgentRunner:
             for item in (already_done or [])
             if isinstance(item, dict)
         }
+        self._recorded = []
+        if retry:
+            from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+            self._recorded = AIChatApprovalService(self.user_id).recorded_changes(
+                [self.chat_session_id, "chat_user_%s" % self.user_id]
+            )
         _budget = float(model_defaults.CHAT_TURN_BUDGET_SECONDS) - float(model_defaults.CHAT_TURN_MARGIN_SECONDS)
         self._turn_deadline = time.monotonic() + max(
             min(10.0, _budget), _budget - max(0.0, float(waited_seconds or 0.0))
@@ -872,7 +886,15 @@ class AgentRunner:
         executor = ToolExecutor(self.user_id, persona=persona)
         actions_taken = []
         required_actions = []
-        pending_approvals = []
+        # Changes a failed turn recorded and nobody has applied yet: they stay in the answer so the person
+        # is told they are there, whatever else this try does.
+        pending_approvals = [
+            {
+                "approval_id": c["approval_id"], "tool": c["tool"], "arguments": c["arguments"],
+                "summary": c["summary"],
+            }
+            for c in self._recorded if not c["applied"]
+        ]
         # Records the read tools actually returned this turn, for citation.
         sources = []
 
@@ -1012,6 +1034,18 @@ class AgentRunner:
                     result = {
                         "success": True,
                         "message": "This change was already made before the retry; it was not made again.",
+                    }
+                elif tc.name in offered_tools and tc.name in _MUTATING_TOOLS and self._recorded_match(tc):
+                    # An earlier try recorded this change for this conversation: it is not recorded again.
+                    recorded = self._recorded_match(tc)
+                    result = {
+                        "success": True,
+                        "applied": recorded["applied"],
+                        "message": (
+                            "This change was already made before the retry; it was not made again."
+                            if recorded["applied"]
+                            else "This change is recorded and not applied yet; it was not recorded again."
+                        ),
                     }
                 elif tc.name not in offered_tools:
                     # Tool selection is the server's: only a tool offered on the
@@ -1432,7 +1466,7 @@ class AgentRunner:
                 tools=tools,
                 tool_choice={"type": "auto"},
             ),
-            closer=client.close,
+            closer=getattr(client, "close", None),
         )
 
         text = None
@@ -1478,7 +1512,7 @@ class AgentRunner:
                     self._emit_token(text)
                 return stream.get_final_message()
 
-        final = self._read_within_turn(read_stream, closer=client.close)
+        final = self._read_within_turn(read_stream, closer=getattr(client, "close", None))
 
         text = None
         tool_calls = []
@@ -1529,7 +1563,7 @@ class AgentRunner:
                 max_completion_tokens=_token_limit,
                 extra_body=self._provider_extra_body(provider_name),
             ),
-            closer=client.close,
+            closer=getattr(client, "close", None),
         )
 
         msg = response.choices[0].message
@@ -1605,7 +1639,7 @@ class AgentRunner:
                             if tc.function and tc.function.arguments:
                                 tool_calls_acc[idx]["arguments"] += tc.function.arguments
 
-        self._read_within_turn(read_stream, closer=client.close)
+        self._read_within_turn(read_stream, closer=getattr(client, "close", None))
 
         tool_calls = []
         for idx in sorted(tool_calls_acc.keys()):
@@ -1832,6 +1866,15 @@ class AgentRunner:
     # ------------------------------------------------------------------ #
     # Fallbacks                                                           #
     # ------------------------------------------------------------------ #
+
+    def _recorded_match(self, tc: "ToolCall") -> Optional[dict]:
+        """The change an earlier try recorded that this call asks for again, or None."""
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        for change in self._recorded:
+            if AIChatApprovalService.same_change(tc.name, tc.arguments, change["tool"], change["arguments"]):
+                return change
+        return None
 
     @staticmethod
     def _change_key(tool, arguments) -> tuple:
@@ -2186,9 +2229,15 @@ class AgentRunner:
         """Run a plain text call (no tools) for unsupported providers."""
         try:
             prompt = system_prompt + "\n\nUser: " + message
-            text, _ = LLMService._call_llm_with_failover(
-                prompt=prompt, model=model, provider=provider
-            )
+            def ask(read):
+                # One plain call has no first token to wait for: only the turn's own end limits it.
+                read.first.set()
+                return LLMService._call_llm_with_failover(
+                    prompt=prompt, model=model, provider=provider,
+                    timeout=self._call_timeout(), deadline=self._turn_deadline,
+                )
+
+            text, _ = self._read_within_turn(ask)
             return self._finalize(
                 {
                     "response": text,
@@ -2203,7 +2252,7 @@ class AgentRunner:
             )
         except Exception as e:
             return self._finalize(
-                self._fallback(str(e)),
+                self._fallback(str(e), busy=isinstance(e, TimeoutError)),
                 user_message=user_message or message,
                 domain=domain,
                 context=context,

@@ -2080,23 +2080,57 @@ Output clean, executable test code."""
             )
         else:
             deadline = time.monotonic() + max(0.0, float(time_limit))
-            with one_attempt():
-                response, interaction = LLMService._call_llm(
-                    prompt=prompt,
-                    model=model,
-                    provider=provider,
-                    pipeline_stage_id=pipeline_stage_id,
-                    expected_schema=expected_schema,
-                    job_id=job_id,
-                    timeout=timeout,
-                    deadline=deadline,
-                )
+
+            def attempt():
+                with one_attempt():
+                    return LLMService._call_llm(
+                        prompt=prompt,
+                        model=model,
+                        provider=provider,
+                        pipeline_stage_id=pipeline_stage_id,
+                        expected_schema=expected_schema,
+                        job_id=job_id,
+                        timeout=timeout,
+                        deadline=deadline,
+                    )
+
+            response, interaction = LLMService._within_wall_clock(attempt, deadline)
 
         # Cache the response
         if use_cache:
             LLMService._cache_response(cache_key, response, cache_ttl)
 
         return response
+
+    @staticmethod
+    def _within_wall_clock(work, deadline: float):
+        """Run ``work`` and return its result, or raise TimeoutError at ``deadline`` (a time.monotonic() value).
+
+        A client timeout is a gap between bytes, so a provider that keeps sending bytes holds a call past it.
+        The call runs on a helper thread that the caller stops waiting for at the deadline; its late result
+        is dropped.
+        """
+        import contextvars
+        import threading
+
+        context = contextvars.copy_context()
+        outcome: Dict[str, Any] = {}
+        finished = threading.Event()
+
+        def target():
+            try:
+                outcome["result"] = context.run(work)
+            except BaseException as exc:  # handed to the waiting thread
+                outcome["error"] = exc
+            finally:
+                finished.set()
+
+        threading.Thread(target=target, daemon=True, name="timed-provider-call").start()
+        if not finished.wait(max(0.0, deadline - time.monotonic())):
+            raise TimeoutError("the time limit for this call is spent")
+        if "error" in outcome:
+            raise outcome["error"]
+        return outcome["result"]
 
     # What one attempt at one provider may take, and how long to wait once after a 429 with no Retry-After.
     PUBLIC_ATTEMPT_SECONDS = 45.0  # one call to one model, measured: a 25,000-character page set takes about 30 seconds

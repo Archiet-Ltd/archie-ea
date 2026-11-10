@@ -1024,3 +1024,26 @@ entries:
     known_exceptions:
       - path: app/services/adm_requirement_service.py
         reason: links an ADM requirement to a solution, a different concept with the same verb
+
+  - id: chat-turn-budget
+    concept: How long a chat request may wait, whatever a provider sends, and what a Retry says of a change already recorded
+    status: active
+    canonical:
+      path: app/modules/ai_chat/services/model_defaults.py
+      symbols: [PROVIDER_FIRST_TOKEN_SECONDS, CHAT_TURN_BUDGET_SECONDS, CHAT_TURN_MARGIN_SECONDS]
+    reuse: >
+      The chat has one budget (CHAT_TURN_BUDGET_SECONDS), one margin (CHAT_TURN_MARGIN_SECONDS) and one first-token
+      limit, all in model_defaults. A provider call under the agent ends by that wall clock through
+      AgentRunner._read_within_turn (plain, text-only and streamed reads alike); a call with a time_limit ends by it
+      through LLMService._within_wall_clock; the page aborts the stored-answer lookup at the lookup limit plus the
+      margin, read from the page's own settings. Do not add a second timeout constant or rely on a client timeout,
+      which is a gap between bytes. What a Retry tells the model and the person is read from the approval record
+      through AIChatApprovalService.recorded_changes and same_change, filtered by organisation, person and
+      conversation; never trust a list the browser sends.
+    must_not_create:
+      - id: second-chat-timeout-constant
+        regex: '^(CHAT|LOOKUP|ESTATE)_\w*(TIMEOUT|BUDGET|MARGIN)\w*\s*='
+        scope: [app]
+    known_exceptions:
+      - path: app/modules/ai_chat/services/model_defaults.py
+        reason: the canonical file

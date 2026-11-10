@@ -123,6 +123,15 @@ mechanisms:
   tenant_context: 'none: the read holds only the provider call; the organisation is resolved and the
     provider guard run on the turn thread before it starts'
 - kind: thread
+  file: app/modules/ai_chat/services/llm_service_impl.py
+  entry: LLMService._within_wall_clock
+  purpose: Runs one provider call that has a time limit so the caller can stop waiting at the limit; the
+    late result is dropped
+  class: request-helper
+  disposition: keep
+  tenant_context: 'request context copied in; the organisation is resolved from it inside the call, and the
+    caller does not touch the database again after it stops waiting'
+- kind: thread
   file: app/modules/architecture/routes/archimate_routes.py
   entry: _run_archimate_llm_generation
   purpose: Runs model generation on a single-worker pool with a timeout

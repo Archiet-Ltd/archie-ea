@@ -96,6 +96,13 @@ class _Provider:
             conn.settimeout(5)
             request = self._read_request(conn)
             streamed = b'"stream":true' in request.replace(b" ", b"")
+            if mode == "trickle":
+                # Bytes forever on every request, the stored-answer lookup's plain request included.
+                conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: %s\r\n\r\n" % (b"text/event-stream" if streamed else b"application/json"))
+                while self._open:
+                    conn.sendall(b": keep-alive\n\n" if streamed else b" \n")
+                    time.sleep(1)
+                return
             if mode in ("keepalive", "stall"):
                 if streamed:
                     conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n")
@@ -252,6 +259,7 @@ CASES = {
     "one-token-then-silence-lookup-not-kept": ("stall", "hang", False, BUSY),
     "one-token-then-silence-lookup-kept": ("stall", "none", True, BUSY),
     "not-retryable-error": ("bad", "hang", False, PLAIN),
+    "bytes-forever-on-the-stored-answer-lookup": ("trickle", "hang", False, BUSY),
 }
 
 

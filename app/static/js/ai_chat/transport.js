@@ -73,12 +73,23 @@
        handing a grounded question to a model. */
     async function askEstate(message, options) {
         var remember = !(options && options.remember === false);
-        var resp = await apiFetch('/ai-chat/estate-answer', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember })
-        });
-        var data = await resp.json().catch(function () { return {}; });
+        /* The lookup has one total limit, set by the server from the same budget and margin as the
+           turn: whatever bytes arrive, the request ends then and the chat shows the failure card. */
+        var limit = new AbortController();
+        var timer = setTimeout(function () { limit.abort(); }, window.chatLookupAbortMs || 33000);
+        var resp, data;
+        try {
+            resp = await apiFetch('/ai-chat/estate-answer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember }),
+                signal: limit.signal
+            });
+            data = await resp.json().catch(function () { return {}; });
+            if (limit.signal.aborted) throw new Error('estate answer ran past its limit');
+        } finally {
+            clearTimeout(timer);
+        }
         if (!resp.ok || data.success === false) throw new Error(data.error || 'estate answer ' + resp.status);
         return data;
     }

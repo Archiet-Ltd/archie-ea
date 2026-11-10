@@ -18,8 +18,8 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 PLAIN = "The assistant could not answer just now. Your question is saved; try again in a moment."
 # A missing provider is not a failure to retry: the person reads that the assistant is not set up.
-NOT_SET_UP_MEMBER = "The assistant is not set up yet. Ask an administrator of your organisation to add an AI provider."
-NOT_SET_UP_ADMIN = "The assistant is not set up yet. Add an AI provider in Settings to start getting answers."
+NOT_SET_UP_MEMBER = "The assistant is not set up for your organisation yet."
+NOT_SET_UP_ADMIN = "The assistant is not set up for your organisation yet."
 SIZES = [("1440", {"width": 1440, "height": 900}), ("390", {"width": 390, "height": 844})]
 FAILURES = {
     "provider-not-configured": (503, {"error": "service_unavailable", "message": "AI feature 'chat' is not available. LLM provider must be configured.", "feature": "chat"}),

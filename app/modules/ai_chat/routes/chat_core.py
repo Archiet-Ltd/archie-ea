@@ -308,18 +308,11 @@ def _waited_seconds(data) -> float:
     return min(max(float(value), 0.0), 600.0)
 
 
-def _completed_actions(data) -> list:
-    """The changes an earlier try of this question made before it stopped, as the browser echoes them on
-    Retry: [{"tool": str, "arguments": dict}]. Only names and arguments are read; a retry skips a change
-    that matches one, so a malformed entry can only fail to skip, never cause a change."""
-    value = data.get("completed_actions") if isinstance(data, dict) else None
-    if not isinstance(value, list):
-        return []
-    return [
-        {"tool": item["tool"], "arguments": item["arguments"]}
-        for item in value[:50]
-        if isinstance(item, dict) and isinstance(item.get("tool"), str) and isinstance(item.get("arguments"), dict)
-    ]
+def _is_retry(data) -> bool:
+    """Whether the browser says this is a Retry of a failed turn. Only the fact is read: what an earlier try
+    recorded is read from the approval record, filtered by the signed-in person's organisation and
+    conversation, so a list sent by the browser has no say."""
+    return bool(isinstance(data, dict) and data.get("retry") is True)
 
 
 def _load_history(thread_id, user_id):
@@ -435,10 +428,10 @@ def send_message():
     if isinstance(data, dict) and "waited_seconds" in data:
         data = dict(data)
         data.pop("waited_seconds", None)
-    completed_actions = _completed_actions(data)
-    if isinstance(data, dict) and "completed_actions" in data:
-        data = dict(data)
-        data.pop("completed_actions", None)
+    is_retry = _is_retry(data)
+    if isinstance(data, dict):
+        # "completed_actions" is no longer read: a browser's list of changes is not evidence of any.
+        data = {k: v for k, v in data.items() if k not in ("retry", "completed_actions")}
 
     # T-031: marshmallow schema validation
     _schema = ChatMessageSchema()
@@ -669,7 +662,7 @@ def send_message():
             requested_model=requested_model,
             history=_load_history(incoming_thread_id, current_user.id),
             waited_seconds=waited_seconds,
-            already_done=completed_actions,
+            retry=is_retry,
         )
 
         # ENH-018: Populate junction tables if agent result includes design_output
@@ -902,10 +895,10 @@ def send_message_stream():
     if isinstance(data, dict) and "waited_seconds" in data:
         data = dict(data)
         data.pop("waited_seconds", None)
-    completed_actions = _completed_actions(data)
-    if isinstance(data, dict) and "completed_actions" in data:
-        data = dict(data)
-        data.pop("completed_actions", None)
+    is_retry = _is_retry(data)
+    if isinstance(data, dict):
+        # "completed_actions" is no longer read: a browser's list of changes is not evidence of any.
+        data = {k: v for k, v in data.items() if k not in ("retry", "completed_actions")}
 
     _schema = ChatMessageSchema()
     _validated, _err = _load_and_validate(_schema, data)
@@ -1036,7 +1029,7 @@ def send_message_stream():
                     stream_mode=True,
                     history=history_for_thread,
                     waited_seconds=waited_seconds,
-                    already_done=completed_actions,
+                    retry=is_retry,
                 )
                 # Persist this turn (thread-backed history rail). Always on;
                 # never breaks the stream. thread_id rides back on the done event.

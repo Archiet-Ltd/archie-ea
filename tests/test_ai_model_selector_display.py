@@ -19,6 +19,7 @@ from playwright.sync_api import expect, sync_playwright
 from tests.chat_opening_fixture import (
     APPLICATIONS, APPLICATIONS_PATH, close_chat_options, open_chat_options,
 )
+from app.modules.ai_chat.services.failure_messages import FEATURE_INTROS
 from tests.render_context import app_template_context
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,6 +46,7 @@ def html():
     return env.get_template('ai_chat/index.html').render(
         **app_template_context(),
         llm_configured=True, domain_config={},
+        not_set_up_sentence=FEATURE_INTROS['chat'],
         persona_config={'categories': {}, 'personas': {}}, default_chat_persona='',
         chat_persona_preference_key='test-model-display', csrf_token=lambda: 'test-token',
         url_for=lambda endpoint, **kw: '/static/' + kw['filename'] if endpoint == 'static' else '/')
