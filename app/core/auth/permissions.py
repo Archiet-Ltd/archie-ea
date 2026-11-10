@@ -213,6 +213,45 @@ def can_change_model(user, organization_id: Optional[int] = None) -> bool:
     )
 
 
+READ_ONLY_CODE = "READ_ONLY_ROLE"
+
+# Every cell of the matrix that changes something. A person granted any one of these, by their role
+# or by an administrator's override, is a person who writes.
+_WRITE_CELLS = tuple(
+    (action, object_type)
+    for object_type in OBJECT_TYPES
+    for action in ("create", "edit", "delete", "bulk_delete")
+)
+_GOVERNANCE_WRITE_CELLS = tuple(
+    (action, object_type)
+    for object_type, actions in GOVERNANCE_ACTIONS.items()
+    for action in actions
+    if action != "view_all"
+)
+
+
+def may_write(user, organization_id: Optional[int] = None) -> bool:
+    """Whether ``user`` holds write permission in the organisation.
+
+    The one answer the API write guard asks. A member whose organisation role is viewer, and an
+    account whose platform role carries no write permission, are refused unless the matrix or a
+    governance persona grants them a write; everyone else keeps the write permission their platform
+    role carries, as every route guard has always read it.
+    """
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    for action, object_type in _WRITE_CELLS + _GOVERNANCE_WRITE_CELLS:
+        if can(user, action, object_type, organization_id):
+            return True
+    from app.models.user import Permission
+
+    try:
+        general = bool(user.can(Permission.GENERAL))
+    except Exception:  # fabricated-ok: an unreadable permission is no write permission
+        return False
+    return general and role_key(user, organization_id) != "viewer"
+
+
 def default_allowed(role: str, action: str, object_type: str) -> bool:
     if object_type in GOVERNANCE_ACTIONS:
         return str(role).lower() in _GOVERNANCE_DEFAULTS[object_type].get(action, frozenset())
