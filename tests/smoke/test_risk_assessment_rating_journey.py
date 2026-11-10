@@ -1,10 +1,10 @@
-"""The Risk Assessment page rates every gap the way the gap register does.
+"""The open-gaps-by-severity page rates every gap the way the gap register does.
 
-An enterprise architect opens Risk Assessment in an organisation holding a gap that is critical by
-priority only, one critical by severity only, a high, a medium and a low gap, and a second
-organisation's critical gap. The High Risk tile counts the gaps the register rates critical or high,
-each row's Risk Level is the register's rating for that gap, every gap name opens that gap's page, and
-the other organisation's gap never appears. An organisation with no gaps says so.
+An enterprise architect opens the page that used to be called Risk Assessment in an organisation holding a
+gap that is critical by priority only, one critical by severity only, a high, a medium and a low gap, and a
+second organisation's critical gap. The Critical and High tiles count the open gaps the register rates so,
+each row's Severity is the register's rating for that gap, every gap name opens that gap's page, and the
+other organisation's gap never appears. An organisation with no gaps says so.
 """
 import os
 import re
@@ -42,9 +42,8 @@ def _frame(page, name, viewport):
 
 
 def _tiles(page):
-    text = page.locator("div.grid.md\\:grid-cols-4").first.inner_text()
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    return {lines[i]: lines[i + 1] for i in range(len(lines) - 1) if lines[i] in ("Total Gaps", "High Risk", "Medium Risk", "Low Risk")}
+    return {level: page.locator('[data-testid="gapsev-%s-value"]' % level).inner_text().strip()
+            for level in ("critical", "high", "medium", "low")}
 
 
 @pytest.mark.parametrize("viewport", VIEWPORTS)
@@ -90,8 +89,9 @@ def test_risk_assessment_rates_each_gap_as_the_register_does(browser, live_serve
         page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_text(names["low"], exact=True)).to_be_visible(timeout=PAGE_TIMEOUT)
         tiles = _tiles(page)
-        assert tiles == {"Total Gaps": "5", "High Risk": "3", "Medium Risk": "1", "Low Risk": "1"}, tiles
-        assert tiles["High Risk"] == str(sum(1 for v in register.values() if v in ("critical", "high")))
+        assert tiles == {"critical": "2", "high": "1", "medium": "1", "low": "1"}, tiles
+        for level in tiles:
+            assert tiles[level] == str(sum(1 for v in register.values() if v == level)), (level, tiles, register)
         for key, name in names.items():
             row = page.locator("tbody tr").filter(has=page.get_by_role("link", name=name, exact=True))
             expect(row).to_have_count(1)
@@ -114,8 +114,8 @@ def test_risk_assessment_with_no_gaps_says_so(browser, live_server):
     try:
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
         page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role("heading", name="Risk Assessment")).to_be_visible(timeout=PAGE_TIMEOUT)
-        assert _tiles(page) == {"Total Gaps": "0", "High Risk": "0", "Medium Risk": "0", "Low Risk": "0"}
-        expect(page.locator("tbody")).to_contain_text("No")
+        expect(page.get_by_role("heading", name="Open gaps by severity")).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert _tiles(page) == {"critical": "0", "high": "0", "medium": "0", "low": "0"}
+        expect(page.locator("tbody")).to_contain_text("No open gaps")
     finally:
         context.close()

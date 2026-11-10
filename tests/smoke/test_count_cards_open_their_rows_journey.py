@@ -247,6 +247,16 @@ def test_every_count_card_opens_the_rows_it_counts(browser, live_server, viewpor
         total, unplanned, covered, closed = (_number(page, t) for t in ("gap-total", "gap-unclosed", "gap-covered", "gap-closed"))
         assert (total, covered, closed) == (RECORDED, 1, CLOSED), (total, covered, closed)
         assert unplanned == RECORDED - 1 - CLOSED and total == unplanned + covered + closed
+        # The empty table's message and "Add a gap record" are on the page and not under a pinned column.
+        message = page.get_by_test_id("gaps-table-empty")
+        button = page.get_by_role("link", name="Add a gap record")
+        for target in (message, button):
+            box = target.bounding_box()
+            assert box and box["x"] >= 0 and box["x"] + box["width"] <= width, (box, width)
+            on_top = target.evaluate(
+                "el => { const r = el.getBoundingClientRect(); const t = document.elementFromPoint("
+                "r.x + r.width / 2, r.y + r.height / 2); return el.contains(t); }")
+            assert on_top, "something covers %s at %d wide" % (target, width)
         _frame(page, "board", width, theme)
         for key, listed_url, count in (
                 ("gap-unclosed", r"status=open&work=none", unplanned),

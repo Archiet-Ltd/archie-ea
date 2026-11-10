@@ -162,7 +162,7 @@ def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server
         expect(landing).to_contain_text("Critical")
         # The page's own summary agrees with the list: one critical gap.
         summary = page.get_by_test_id("gap-stat-critical")
-        expect(summary).to_contain_text("Rated critical on the gap itself")
+        expect(summary).to_contain_text("Rated critical on severity or priority, all still open")
         expect(summary).to_contain_text(re.compile(r"\b1\s+Critical\b"))
         expect(page.get_by_test_id("gap-stat-critical-value")).to_have_text("1")
 

@@ -221,7 +221,7 @@ def test_layer_risk_and_gap_figures_agree(browser, live_server, viewport, theme)
         rows = page.locator('[data-testid="critical-gap-row"]')
         expect(rows).to_have_count(5, timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("critical-gaps-total")).to_contain_text(
-            "Showing 5 of %d critical gaps" % register_gaps)
+            "Showing 5 of %d open critical gaps" % register_gaps)
         text = page.locator('[data-testid="critical-gaps-list"]').inner_text()
         assert "plateau step" not in text and other not in text
         _frame(page, "implementation-gaps", viewport["width"], theme)

@@ -158,14 +158,14 @@ def test_the_sentence_says_it_for_one_gap_and_them_for_several(browser, live_ser
             db.session.remove()
         page.goto(live_server + "/implementation/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         total = page.get_by_test_id("critical-gaps-total")
-        expect(total).to_have_text(re.compile(r"1 critical gap\.\s*Open it in the gap register"), timeout=PAGE_TIMEOUT)
+        expect(total).to_have_text(re.compile(r"1 open critical gap\.\s*Open it in the gap register"), timeout=PAGE_TIMEOUT)
         with create_app("testing").app_context():
             create_gap(org["org_id"], "Second critical %s" % org["suffix"], severity="critical")
             db.session.commit()
             db.session.remove()
         page.goto(live_server + "/implementation/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("critical-gaps-total")).to_have_text(
-            re.compile(r"2 critical gaps\.\s*Open them in the gap register"), timeout=PAGE_TIMEOUT)
+            re.compile(r"2 open critical gaps\.\s*Open them in the gap register"), timeout=PAGE_TIMEOUT)
     finally:
         context.close()
 

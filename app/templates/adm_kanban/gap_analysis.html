@@ -110,6 +110,13 @@
 
     {# -- Gap table ------------------------------------------------------ #}
     {% macro _gap_record_empty_action() %}{{ button(text='Add a gap record', variant='outline', size='sm', href=url_for('adm_kanban_view.index', new='Gap', next=url_for('adm_kanban_view.gap_analysis'))) }}{% endmacro %}
+    {% if not gaps %}
+    {#- No rows: the message is said in the page itself, not inside a table whose last column is pinned and covers it at 390 wide. -#}
+    <div class="rounded-lg border border-border p-6 text-center" data-testid="gaps-table">
+        <p class="text-sm text-muted-foreground" data-testid="gaps-table-empty">{{ ('No gap has been added from the board yet. The ' ~ recorded_count ~ ' recorded ' ~ ('gap is' if recorded_count == 1 else 'gaps are') ~ ' in the gap register.') if recorded_count else 'No gap record has been made yet. The gaps shown above are computed from the capability map.' }}</p>
+        {% if can_change_model() %}<div class="mt-4 flex justify-center">{{ _gap_record_empty_action() }}</div>{% endif %}
+    </div>
+    {% else %}
     {% call(gap) list_table(rows=gaps, columns=[{'label': 'Gap', 'sortable': true}, {'label': 'Domain', 'sortable': true}, {'label': 'Phase', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Work packages that close it', 'sortable': false}, {'label': 'Covered', 'align': 'right'}],
                            caption='Gap records and the work packages that close them', testid='gaps-table', row_testid='gap-row',
                            search_placeholder='Filter gaps...',
@@ -177,6 +184,8 @@
         {% endif %}
     {% endcall %}
     {% endcall %}
+
+    {% endif %}
 
     {% from 'basecoat/progress.html' import progress, progress_indicator %}
 
