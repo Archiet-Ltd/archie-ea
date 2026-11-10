@@ -50,7 +50,7 @@ def test_a_row_figure_needs_a_declared_row_list():
     field = {"path": "result[].cost", "kind": "money", "currency": "organisation", "reads": "{value}",
              "reads_null": "none recorded", "label": "Cost", "concept": "application.cost"}
     assert figure_declaration_problems({"fields": [field], "rows": [], "names": []})
-    rows = [{"path": "result[]", "id": "id", "name": "name"}]
+    rows = [{"path": "result[]", "id_field": "id", "name_field": "name"}]
     assert figure_declaration_problems({"fields": [field], "rows": rows, "names": []}) == []
 
 
@@ -68,8 +68,6 @@ def test_placeholder_investment_cost_and_timeframe_are_not_declared():
 # --------------------------------------------------------------------------- #
 # Each declared field renders from seeded data                                 #
 # --------------------------------------------------------------------------- #
-
-import pytest  # noqa: E402
 
 from app.modules.ai_chat.services import chat_figures as cf  # noqa: E402
 from app.modules.ai_chat.services.ai_hallucination_detector import Grounding  # noqa: E402

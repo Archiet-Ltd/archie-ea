@@ -668,7 +668,7 @@ def test_an_error_result_is_not_rewritten_by_the_gate():
 
 
 def _run_turn(app, monkeypatch, scripted, *, user, stream=False, executed=None,
-              context=None, message="what breaks if Turn Root fails?", history=None):
+              context=None, message="what breaks if Turn Root fails?", history=None, domain="general"):
     """Drive AgentRunner.run with a scripted model: *scripted* is a list of
     llm responses ({"text", "tool_calls"}); each _call_llm pops one."""
     from unittest.mock import MagicMock
@@ -711,7 +711,7 @@ def _run_turn(app, monkeypatch, scripted, *, user, stream=False, executed=None,
         g.current_org_id = user.organization_id
         result = runner.run(
             user_message=message,
-            domain="general",
+            domain=domain,
             context=context or {},
             stream_mode=stream,
             history=history,

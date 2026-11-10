@@ -26,7 +26,7 @@ DECLARATION = {
          "reads": "a priority score of {value}", "reads_null": "no priority score recorded",
          "label": "Priority score", "concept": "demo.score"},
     ],
-    "rows": [{"path": "result[]", "id": "id", "name": "name"}],
+    "rows": [{"path": "result[]", "id_field": "id", "name_field": "name"}],
     "names": ["name"],
 }
 ROWS = {

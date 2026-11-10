@@ -770,6 +770,12 @@ class MultiDomainChatService:
                         user_id=_cf.get('user_id') or self.user_id or 0
                     )
                 context_data.update(self._load_architecture_context(context_filter))
+                # The default chat domain: the organisation's own portfolio counts travel with
+                # the snapshot, so a question about them has figures to reference.
+                try:
+                    context_data["portfolio_summary"] = self._portfolio_summary()
+                except Exception as exc:
+                    logger.debug("portfolio summary skipped: %s", exc)
             elif domain == "technology":
                 context_data.update(self._load_technology_context(context_filter))
             elif domain == "business_capability":
@@ -5425,6 +5431,72 @@ Use enterprise architecture terminology appropriate for this role."""
                 logger.debug("Failed to rollback session after data architecture error", exc_info=True)
             return {"data_architecture": "No data architecture model in this environment."}
 
+    def _portfolio_summary(self) -> Dict[str, Any]:
+        """The organisation's portfolio counts: applications, capabilities, how many capabilities an
+        application supports, and the shared vendor catalogue's size. The one place these are counted;
+        a count that cannot be trusted is None, never a number that disagrees with another."""
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.business_capabilities import BusinessCapability
+        from app.models.vendor.vendor_organization import VendorOrganization
+        from sqlalchemy import text
+
+        total_apps = ApplicationComponent.query.count()
+        total_caps = BusinessCapability.query.count()
+        total_vendors = VendorOrganization.query.count()
+        try:
+            # ARCH-015: this WAS a raw db.session.execute("SELECT COUNT(DISTINCT
+            # business_capability_id) FROM application_capability_mapping") with a
+            # comment claiming it was "tenant-filtered: scoped via parent FK" — it
+            # was not. Raw SQL bypasses the ORM do_orm_execute tenant-isolation
+            # event entirely (see CLAUDE.md, "Multi-tenancy is implicit"), so this
+            # counted mapped capabilities across EVERY organisation while
+            # total_caps above (an ORM query) was correctly scoped to the current
+            # org. That is exactly how mapped_capabilities: 50 coexisted with
+            # total_capabilities: 0 — the numerator and denominator were computed
+            # over different tenants. application_capability_mapping carries its
+            # own organization_id (app/models/application_capability.py), so add
+            # the predicate explicitly rather than relying on a comment.
+            mapped = db.session.execute(
+                text(
+                    "SELECT COUNT(DISTINCT business_capability_id) "
+                    "FROM application_capability_mapping "
+                    "WHERE organization_id = :org_id"
+                ),
+                {"org_id": getattr(g, "current_org_id", None)},
+            ).scalar() or 0
+        except Exception as e:
+            logger.debug(f"Mapped capabilities count skipped: {e}")
+            mapped = None
+
+        # Never inject a summary that is internally impossible (more mapped
+        # capabilities than capabilities that exist, in particular) — per
+        # CLAUDE.md's "never invent data" rule, a figure that fails a basic
+        # sanity check must be omitted (None → the model is told it is
+        # unavailable), never handed to the model as if it were trustworthy.
+        summary = {
+            "total_applications": total_apps,
+            "total_capabilities": total_caps,
+            "total_vendors": total_vendors,
+        }
+        if mapped is None or mapped > total_caps or mapped < 0:
+            if mapped is not None:
+                logger.warning(
+                    "portfolio_summary: mapped_capabilities (%s) exceeds "
+                    "total_capabilities (%s) after tenant-scoping the mapping "
+                    "count — refusing to inject an inconsistent figure.",
+                    mapped, total_caps,
+                )
+            summary["mapped_capabilities"] = None
+            summary["capability_gaps"] = None
+            summary["coverage_percent"] = None
+        else:
+            summary["mapped_capabilities"] = int(mapped)
+            summary["capability_gaps"] = max(0, total_caps - int(mapped))
+            summary["coverage_percent"] = round((int(mapped) / total_caps * 100) if total_caps else 0, 1)
+
+        return summary
+
+
     def _load_general_context(self, context_filter: Optional[Dict]) -> Dict[str, Any]:
         """Load general context with live portfolio summary counts."""
         ctx = {
@@ -5435,62 +5507,11 @@ Use enterprise architecture terminology appropriate for this role."""
             from app.models.application_portfolio import ApplicationComponent
             from app.models.business_capabilities import BusinessCapability
             from app.models.vendor.vendor_organization import VendorOrganization
-            from sqlalchemy import text
 
-            total_apps = ApplicationComponent.query.count()
-            total_caps = BusinessCapability.query.count()
-            total_vendors = VendorOrganization.query.count()
-            try:
-                # ARCH-015: this WAS a raw db.session.execute("SELECT COUNT(DISTINCT
-                # business_capability_id) FROM application_capability_mapping") with a
-                # comment claiming it was "tenant-filtered: scoped via parent FK" — it
-                # was not. Raw SQL bypasses the ORM do_orm_execute tenant-isolation
-                # event entirely (see CLAUDE.md, "Multi-tenancy is implicit"), so this
-                # counted mapped capabilities across EVERY organisation while
-                # total_caps above (an ORM query) was correctly scoped to the current
-                # org. That is exactly how mapped_capabilities: 50 coexisted with
-                # total_capabilities: 0 — the numerator and denominator were computed
-                # over different tenants. application_capability_mapping carries its
-                # own organization_id (app/models/application_capability.py), so add
-                # the predicate explicitly rather than relying on a comment.
-                mapped = db.session.execute(
-                    text(
-                        "SELECT COUNT(DISTINCT business_capability_id) "
-                        "FROM application_capability_mapping "
-                        "WHERE organization_id = :org_id"
-                    ),
-                    {"org_id": getattr(g, "current_org_id", None)},
-                ).scalar() or 0
-            except Exception as e:
-                logger.debug(f"Mapped capabilities count skipped: {e}")
-                mapped = None
-
-            # Never inject a summary that is internally impossible (more mapped
-            # capabilities than capabilities that exist, in particular) — per
-            # CLAUDE.md's "never invent data" rule, a figure that fails a basic
-            # sanity check must be omitted (None → the model is told it is
-            # unavailable), never handed to the model as if it were trustworthy.
-            summary = {
-                "total_applications": total_apps,
-                "total_capabilities": total_caps,
-                "total_vendors": total_vendors,
-            }
-            if mapped is None or mapped > total_caps or mapped < 0:
-                if mapped is not None:
-                    logger.warning(
-                        "portfolio_summary: mapped_capabilities (%s) exceeds "
-                        "total_capabilities (%s) after tenant-scoping the mapping "
-                        "count — refusing to inject an inconsistent figure.",
-                        mapped, total_caps,
-                    )
-                summary["mapped_capabilities"] = None
-                summary["capability_gaps"] = None
-                summary["coverage_percent"] = None
-            else:
-                summary["mapped_capabilities"] = int(mapped)
-                summary["capability_gaps"] = max(0, total_caps - int(mapped))
-                summary["coverage_percent"] = round((int(mapped) / total_caps * 100) if total_caps else 0, 1)
-
+            summary = self._portfolio_summary()
+            total_apps = summary["total_applications"]
+            total_caps = summary["total_capabilities"]
+            total_vendors = summary["total_vendors"]
             ctx["portfolio_summary"] = summary
 
             # Name some of the estate, not just count it.

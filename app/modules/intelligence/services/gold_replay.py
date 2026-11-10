@@ -302,7 +302,7 @@ def run_set(app, estates: Estates, document: Dict[str, Any], behaviours=BEHAVIOU
     saved = (AgentRunner._gate_mode, AgentRunner._call_llm, LLMService._get_configured_provider,
              LLMService._get_all_api_keys, ToolExecutor._tool_get_investment_priorities)
     AgentRunner._gate_mode = staticmethod(lambda: "enforce")
-    LLMService._get_configured_provider = staticmethod(lambda: ("anthropic", "claude-opus-5"))
+    LLMService._get_configured_provider = staticmethod(lambda: ("anthropic", "replay-model"))
     LLMService._get_all_api_keys = staticmethod(lambda provider: ["gold-key"])
     # The investment scorer reads a shared catalogue that no organisation owns, so the replay
     # gives the tool the scorer's own output shape for the organisation asking.

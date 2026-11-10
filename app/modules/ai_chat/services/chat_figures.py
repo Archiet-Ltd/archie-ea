@@ -190,7 +190,7 @@ class FigureTable:
             self._collect_names(result, key)
         rows = {r["path"]: r for r in declaration.get("rows", [])}
         for row in rows.values():
-            for field_name in (row.get("name"), row.get("label_field")):
+            for field_name in (row.get("name_field"), row.get("label_field")):
                 if field_name:
                     self._collect_names(result, field_name)
         subject = self._subject_of(declaration.get("subject"), result)
@@ -241,15 +241,15 @@ class FigureTable:
                     if isinstance(element, dict) and isinstance(element.get("name"), str):
                         return {"id": ident, "name": element["name"]}
             return None
-        ident, name = _get(result, spec.get("id", "")), _get(result, spec.get("name", ""))
+        ident, name = _get(result, spec.get("id_path", "")), _get(result, spec.get("name_path", ""))
         return {"id": ident, "name": name} if name else None
 
     def _entry(self, tool, call, field, value, parent, row, row_meta, subject, organization_id, as_of):
         record_id = record_name = label = None
         if row_meta and isinstance(row, dict):
-            if row_meta.get("id"):
-                record_id = row.get(row_meta["id"])
-                record_name = row.get(row_meta.get("name"))
+            if row_meta.get("id_field"):
+                record_id = row.get(row_meta["id_field"])
+                record_name = row.get(row_meta.get("name_field"))
             else:
                 label = row.get(row_meta["label_field"])
         elif subject:
@@ -289,6 +289,7 @@ class FigureTable:
         values and the one line that carries them to the model."""
         stripped = copy.deepcopy(context) if isinstance(context, dict) else {}
         parts = []
+        listed = set()
         for field in declaration.get("fields", []):
             tokens = _tokens(field["path"])
             for parent, name, _row in list(_leaves(stripped, tokens)):
@@ -300,7 +301,10 @@ class FigureTable:
                 if entry is None:
                     continue
                 self.entries.append(entry)
-                parts.append('[fig:%s] reads "%s"' % (entry["key"], entry["rendered"]))
+                if entry["rendered"] not in listed:
+                    # The same count carried in two places is told to the model once.
+                    listed.add(entry["rendered"])
+                    parts.append('[fig:%s] reads "%s"' % (entry["key"], entry["rendered"]))
                 parent.pop(name, None)
         line = ("Organisation summary: " + "; ".join(parts) + ".") if parts else ""
         return stripped, line

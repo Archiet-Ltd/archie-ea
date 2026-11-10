@@ -21,7 +21,7 @@ import re
 # A tool's "figures" holds:
 #   fields   the declared figures (below)
 #   rows     the row lists whose items carry figures: {"path": "result[]",
-#            "id": <record id field>, "name": <record name field>} or, for a row
+#            "id_field": <record id field>, "name_field": <record name field>} or, for a row
 #            that is not a record, {"path": ..., "label_field": <field>}
 #   names    the keys whose string values are names of records
 #   subject  optional: {"map": <key of a dict of id -> {"name"}>} the record a
@@ -309,7 +309,7 @@ TOOL_SCHEMAS = [
                  "reads_null": "no supporting application count recorded",
                  "label": "Supporting applications", "concept": "applications-list"},
             ],
-            "rows": [{"path": "result[]", "id": "id", "name": "name"}],
+            "rows": [{"path": "result[]", "id_field": "id", "name_field": "name"}],
             "names": ["name"],
         },
         "record_types_written": [],
@@ -359,7 +359,7 @@ TOOL_SCHEMAS = [
                  "reads": "an annual cost of {value}", "reads_null": "no annual cost recorded",
                  "label": "Annual cost", "concept": "application.cost"},
             ],
-            "rows": [{"path": "result[]", "id": "id", "name": "name"}],
+            "rows": [{"path": "result[]", "id_field": "id", "name_field": "name"}],
             "names": ["name"],
         },
         "record_types_written": [],
@@ -996,7 +996,7 @@ TOOL_SCHEMAS = [
             ],
             "rows": [],
             "names": ["name"],
-            "subject": {"id": "result.id", "name": "result.name"},
+            "subject": {"id_path": "result.id", "name_path": "result.name"},
         },
         "record_types_written": [],
         "description": (
@@ -2363,6 +2363,23 @@ ORGANISATION_SUMMARY_FIGURES = {
         {"path": "portfolio_summary.coverage_percent", "kind": "percent", "decimals": 1,
          "reads": "{value} capability coverage", "reads_null": "no capability coverage recorded",
          "label": "Capability coverage", "concept": "capability-maturity"},
+        {"path": "total_elements", "kind": "count",
+         "reads": {"one": "{value} element in the architecture model", "other": "{value} elements in the architecture model"},
+         "reads_null": "no element count recorded", "label": "Elements", "concept": "archimate-elements"},
+        {"path": "architecture_summary.total_elements", "kind": "count",
+         "reads": {"one": "{value} element in the architecture model", "other": "{value} elements in the architecture model"},
+         "reads_null": "no element count recorded", "label": "Elements", "concept": "archimate-elements"},
+        {"path": "portfolio_sample.of_applications", "kind": "count",
+         "reads": {"one": "{value} application", "other": "{value} applications"},
+         "reads_null": "no application count recorded", "label": "Applications", "concept": "applications-list"},
+        {"path": "portfolio_sample.of_capabilities", "kind": "count",
+         "reads": {"one": "{value} capability", "other": "{value} capabilities"},
+         "reads_null": "no capability count recorded", "label": "Capabilities", "concept": "capability-maturity"},
+        {"path": "portfolio_sample.of_vendors", "kind": "count", "scope": "public",
+         "reads": {"one": "{value} vendor in Entelim's public catalogue",
+                   "other": "{value} vendors in Entelim's public catalogue"},
+         "reads_null": "no vendor count recorded", "label": "Vendors in the public catalogue",
+         "concept": "vendor-catalogue"},
         {"path": "portfolio_summary.total_vendors", "kind": "count", "scope": "public",
          "reads": {"one": "{value} vendor in Entelim's public catalogue",
                    "other": "{value} vendors in Entelim's public catalogue"},
@@ -2384,8 +2401,8 @@ def figure_declaration_problems(declaration) -> list:
     for row in declaration.get("rows", []):
         if not str(row.get("path", "")).endswith("[]"):
             problems.append("row list path %r does not end in []" % row.get("path"))
-        if not (row.get("label_field") or (row.get("id") and row.get("name"))):
-            problems.append("row list %r needs id and name, or a label_field" % row.get("path"))
+        if not (row.get("label_field") or (row.get("id_field") and row.get("name_field"))):
+            problems.append("row list %r needs id_field and name_field, or a label_field" % row.get("path"))
     for field in declaration.get("fields", []):
         where = field.get("path", "?")
         for key in ("path", "kind", "reads", "reads_null", "label", "concept"):

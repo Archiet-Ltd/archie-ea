@@ -120,6 +120,43 @@ def test_the_no_tool_fallback_shows_the_summary_figures(app, db_session, make_or
     assert lines[-1] == cf.NEXT_STEP
 
 
+def test_the_default_chat_domain_carries_the_portfolio_counts_as_references(app, db_session, make_org, monkeypatch):
+    """The chat opens on the architecture domain: its snapshot has no application count of its own,
+    so the same portfolio counts the general domain carries travel with it."""
+    org_a, org_b = make_org("fig-arch-a"), make_org("fig-arch-b")
+    user_a, user_b = _user(db_session, org_a.id), _user(db_session, org_b.id)
+    _applications(db_session, org_a.id, 3, "Kappa")
+    _applications(db_session, org_b.id, 5, "Lambda")
+    _element(db_session, org_a.id, "Kappa Root")
+    db_session.commit()
+
+    def says(messages):
+        key = _summary_key(messages, "[0-9]+ application")
+        return {"text": "You have [fig:%s]." % key}
+
+    result_a, *_ = _run_turn(app, monkeypatch, [says], user=user_a, domain="architecture",
+                             message="How many applications do we have?")
+    result_b, *_ = _run_turn(app, monkeypatch, [says], user=user_b, domain="architecture",
+                             message="How many applications do we have?")
+
+    assert result_a["response"] == "You have 3 applications."
+    assert result_b["response"] == "You have 5 applications."
+
+
+def test_an_element_count_in_the_architecture_snapshot_is_a_reference_too(app, db_session, make_org, monkeypatch):
+    org = make_org("fig-elements")
+    user = _user(db_session, org.id)
+    _element(db_session, org.id, "Mu Root")
+    _element(db_session, org.id, "Mu Leaf")
+    db_session.commit()
+    says = lambda messages: {"text": "The model holds [fig:%s]." % _summary_key(messages, "[0-9]+ elements? in the")}  # noqa: E731
+
+    result, *_ = _run_turn(app, monkeypatch, [says], user=user, domain="architecture",
+                           message="How many elements are in the model?")
+
+    assert result["response"] == "The model holds 2 elements in the architecture model."
+
+
 # --------------------------------------------------------------------------- #
 # Revision and fallback                                                        #
 # --------------------------------------------------------------------------- #
