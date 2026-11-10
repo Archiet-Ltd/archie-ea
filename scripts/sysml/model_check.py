@@ -192,7 +192,7 @@ def brief_id(stem: str) -> str:
 def own_branch(text: str, stem: str) -> str:
     """The branch a brief is built on: the one its SEAT NOTE gives ("you work on branch ui/<id>"), else `ui/<brief id>`.
     Any other branch the text names is a mention of someone else's work."""
-    m = re.search(r"\byou work on branch\s+`?(ui/[\w.-]+)`?", text, re.I)
+    m = re.search(r"\byou work on branch\s+`?(ui/(?:[\w-]+\.)*[\w-]+)", text, re.I)
     return m.group(1) if m else f"ui/{brief_id(stem)}"
 
 

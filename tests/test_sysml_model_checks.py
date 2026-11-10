@@ -560,6 +560,8 @@ def test_the_check_command_exits_non_zero_over_a_ratchet_and_zero_at_or_below_it
 def test_a_brief_names_its_own_branch_from_its_seat_note_else_from_its_id_and_never_from_a_mention(tmp_path):
     seat = "# x\n\nSEAT NOTE: you work on branch ui/sysmodel02, based on ui/sysmodel01.\nSee branch `ui/other` too.\n"
     assert mc.own_branch(seat, "sysmodel02") == "ui/sysmodel02"
+    assert mc.own_branch("SEAT NOTE: you work on branch ui/sysmodel02.\n", "x") == "ui/sysmodel02"
+    assert mc.own_branch("you work on branch `ui/fix-1.2` today", "x") == "ui/fix-1.2"
     mention = "# T\n\nThe slice on branch `ui/sysmodel01` already holds the rule.\n"
     assert mc.own_branch(mention, "T-sysmodel-01-dispatch-impact-check") == "ui/T-sysmodel-01"
     assert mc.brief_id("T-sysmodel-05b-interaction-model-and-checks") == "T-sysmodel-05b"
