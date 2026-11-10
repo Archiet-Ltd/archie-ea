@@ -1,9 +1,11 @@
 """The Approvals page tells a person what is true about each record, and offers Approve only where it acts.
 
-A technical founder signs up (a workspace of one). Writes are paused, so a change waits; the page says the loop
-reviews it automatically and links to how it was checked. A record the loop does not settle, asked for by the
-founder, carries no Approve button and says why; a colleague's record of the same kind does. After writes resume
-the held change is settled and the page lists it as decided. The empty page never promises a second person.
+A technical founder signs up (a workspace of one). Writes are paused, so a change waits; the page says it waits for
+writes to resume (and links to how it was checked, which says the same). A record the loop does not settle, asked
+for by the founder, carries no Approve button and says why; a colleague's record of the same kind does. After
+writes resume a change with a recorded check says it is applied or declined without waiting for a person, and a
+change with no review on record makes no such claim. At 390 wide the footer, with Reject open, stays inside its
+card. The empty page never promises a second person.
 """
 import re
 import uuid
@@ -37,16 +39,37 @@ def _out_of_loop_record(org_id, user_id, summary):
         return out
 
 
+def _record_checks(approval_id):
+    """Give a waiting change the checks the server records first, as a change that has been looked at once has."""
+    from app import db
+
+    app = _app_context()
+    with app.app_context():
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+
+        row = AIChatCRUDApproval.query.filter_by(id=approval_id).one()
+        row.review_reasons = {"checks": [{"name": "Target exists", "passed": True, "ran": True,
+                                          "reason": "The application was found in this workspace."}],
+                              "rounds": []}
+        db.session.commit()
+        db.session.remove()
+
+
+def _inside(box, outer):
+    return box["x"] >= outer["x"] - 1 and box["x"] + box["width"] <= outer["x"] + outer["width"] + 1
+
+
 @pytest.mark.parametrize("width,theme", VIEWS)
 def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_server, stub, shots, width, theme):
     base = deepseek_server
     email = "founder.%s@example.com" % uuid.uuid4().hex[:8]
     name = "Atlas %s" % uuid.uuid4().hex[:6]
+    checked_name = "Borealis %s" % uuid.uuid4().hex[:6]
     context = _context(browser, width, theme)
     page = context.new_page()
     try:
         _sign_up(page, base, email)
-        ws = _workspace_of(email, [name])
+        ws = _workspace_of(email, [name, checked_name])
 
         page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         body = page.locator("main").inner_text()
@@ -55,39 +78,74 @@ def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_s
         _shot(page, shots, "approvals-empty", theme)
 
         _writes(ws["org_id"], paused=True)
-        held_id = _waiting_change(ws["org_id"], ws["user_id"], name)
+        older_id = _waiting_change(ws["org_id"], ws["user_id"], name)
+        checked_id = _waiting_change(ws["org_id"], ws["user_id"], checked_name)
+        _record_checks(checked_id)
         colleague = _second_person(ws["org_id"], switched_off=False)
         own_id = _out_of_loop_record(ws["org_id"], ws["user_id"], "Charter change asked for by the founder")
         theirs_id = _out_of_loop_record(ws["org_id"], colleague, "Charter change asked for by a colleague")
 
         page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        held = page.get_by_test_id("approval-card-%d" % held_id)
-        expect(held).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(held.get_by_test_id("approval-in-review-%d" % held_id)).to_contain_text("applied or declined without waiting")
+        # While writes are paused every change in the loop waits, and says so; none claims a settlement and
+        # Approve is not offered anywhere, because it would apply nothing.
+        for approval_id in (older_id, checked_id):
+            card = page.get_by_test_id("approval-card-%d" % approval_id)
+            expect(card).to_be_visible(timeout=PAGE_TIMEOUT)
+            expect(card.get_by_test_id("approval-held-%d" % approval_id)).to_contain_text("paused for this workspace")
+            expect(card.get_by_test_id("approval-held-%d" % approval_id)).to_contain_text("once they resume")
+            expect(card.get_by_test_id("approval-in-review-%d" % approval_id)).to_have_count(0)
+            expect(card.get_by_role("button", name="Approve")).to_have_count(0)
         own = page.get_by_test_id("approval-card-%d" % own_id)
         expect(own).to_be_visible()
         expect(own.get_by_role("button", name="Approve")).to_have_count(0)
-        expect(own.get_by_test_id("approval-own-request-%d" % own_id)).to_contain_text("another person")
+        expect(own.get_by_test_id("approval-own-request-%d" % own_id)).to_contain_text("paused for this workspace")
         theirs = page.get_by_test_id("approval-card-%d" % theirs_id)
-        expect(theirs.get_by_role("button", name="Approve")).to_have_count(1)
+        expect(theirs.get_by_role("button", name="Approve")).to_have_count(0)
         _shot(page, shots, "approvals-held-and-own", theme)
 
-        # The link lands on the record of that held change, with content.
-        held.get_by_role("link", name="See how it was checked").click()
-        page.wait_for_url(re.compile(r"approval=%d" % held_id), timeout=PAGE_TIMEOUT)
+        # The link of a held change lands on its record, with content: what it waits for and its checks.
+        checked = page.get_by_test_id("approval-card-%d" % checked_id)
+        checked.get_by_role("link", name="See how it was checked").click()
+        page.wait_for_url(re.compile(r"approval=%d" % checked_id), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("review-record-verdict")).to_have_text("In review")
+        expect(page.get_by_test_id("review-record-waiting")).to_contain_text("paused for this workspace")
+        expect(page.get_by_test_id("review-record-checks")).to_contain_text("The application was found in this workspace")
         _shot(page, shots, "held-record", theme)
         assert _status_of(ws["apps"][name]) == "development"
+        assert _status_of(ws["apps"][checked_name]) == "development"
 
-        # Writes resume: the held change is settled in the loop (the person's Approve goes through review).
+        # Writes resume. The change with a recorded check now says it is settled without a person, and its link
+        # lands on those checks; the row with no review on record makes no such claim and is Approve-able.
         _writes(ws["org_id"], paused=False)
-        page.goto(base + "/ai-chat/approvals/inbox?approval=%d" % held_id, wait_until="domcontentloaded",
+        page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        checked = page.get_by_test_id("approval-card-%d" % checked_id)
+        expect(checked.get_by_test_id("approval-in-review-%d" % checked_id)).to_contain_text(
+            "applied or declined without waiting")
+        older = page.get_by_test_id("approval-card-%d" % older_id)
+        expect(older.get_by_test_id("approval-in-review-%d" % older_id)).to_have_count(0)
+        expect(older.get_by_test_id("approval-held-%d" % older_id)).to_have_count(0)
+        expect(older.get_by_role("button", name="Approve")).to_have_count(1)
+        card_box = older.bounding_box()
+        for button in (older.get_by_role("button", name="Approve"), older.locator("summary", has_text="Reject")):
+            assert _inside(button.bounding_box(), card_box), "a footer control is clipped by its card"
+        older.locator("summary", has_text="Reject").click()
+        expect(older.get_by_role("button", name="Confirm Reject")).to_be_visible()
+        card_box = older.bounding_box()
+        assert _inside(older.get_by_role("button", name="Confirm Reject").bounding_box(), card_box)
+        assert _inside(older.get_by_label("Why are you rejecting this?").bounding_box(), card_box)
+        _shot(page, shots, "approvals-reject-open", theme)
+        checked.get_by_role("link", name="See how it was checked").click()
+        page.wait_for_url(re.compile(r"approval=%d" % checked_id), timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("review-record-checks")).to_contain_text("The application was found in this workspace")
+
+        # The person's Approve goes through the review and the change is applied once.
+        page.goto(base + "/ai-chat/approvals/inbox?approval=%d" % older_id, wait_until="domcontentloaded",
                   timeout=PAGE_TIMEOUT)
-        page.get_by_test_id("approval-card-%d" % held_id).get_by_role("button", name="Approve").click()
+        page.get_by_test_id("approval-card-%d" % older_id).get_by_role("button", name="Approve").click()
         page.wait_for_load_state("domcontentloaded")
         assert _status_of(ws["apps"][name]) == "production"
         page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_test_id("approval-record-link-%d" % held_id)).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("approval-record-link-%d" % older_id)).to_be_visible(timeout=PAGE_TIMEOUT)
         _shot(page, shots, "approvals-after-resume", theme)
     finally:
         context.close()

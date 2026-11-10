@@ -1174,6 +1174,9 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         label, tone = "Declined", "negative"
     else:
         label, tone = "In review", "caution"
+    waiting_reason = saved["waiting_reason"] if approval.status == ApprovalStatus.PENDING else None
+    if approval.status == ApprovalStatus.PENDING and in_scope(approval) and _writes_paused(approval.organization_id):
+        waiting_reason = WRITES_PAUSED_REASON  # true now, whatever the last sweep recorded
     drafter_provider, _ = split_ref(approval.drafter_model)
     reviewer_provider, _ = split_ref(approval.reviewer_model)
     same = bool(approval.drafter_model and approval.reviewer_model and drafter_provider == reviewer_provider)
@@ -1190,7 +1193,7 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "summary": approval.summary,
         "request": approval.original_command,
         "reasons": saved["outcome_reasons"] or ([approval.rejected_reason] if approval.rejected_reason else []),
-        "waiting_reason": saved["waiting_reason"] if approval.status == ApprovalStatus.PENDING else None,
+        "waiting_reason": waiting_reason,
         "rounds": approval.review_rounds or len(saved["rounds"]),
         "drafter": model_words(approval.drafter_model) if approval.drafter_model else None,
         "reviewer": model_words(approval.reviewer_model) if approval.reviewer_model else None,
