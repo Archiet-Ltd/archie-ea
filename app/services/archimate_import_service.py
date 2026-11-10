@@ -962,17 +962,44 @@ class ArchiMateImportService:
         """A stored element of the same type whose name differs only by words added to
         one end ("Ifiok" and "Ifiok - agentic generation platform"), or None."""
         from app.models.archimate_core import ArchiMateElement
+        from app.utils.duplicate_guard import folded_column, normalize_name
 
-        stored = db.func.lower(ArchiMateElement.name)
+        folded = normalize_name(name_lower)
+        stored = folded_column(ArchiMateElement.name)
         return ArchiMateElement.query.filter(  # model-safety-ok: bounded by XML element count
             ArchiMateElement.type.in_(self._match_types(elem_type)),
             *self._in_organization(ArchiMateElement, org_id),
             db.or_(
-                db.literal(name_lower).startswith(stored + " "),
-                stored.startswith(name_lower + " "),
+                # Compared by length, not LIKE, so a "%" or "_" in a stored name is a character.
+                db.func.left(db.literal(folded), db.func.length(stored) + 1) == stored + " ",
+                stored.startswith(folded + " ", autoescape=True),
             ),
-            stored != name_lower,
+            stored != folded,
         ).order_by(ArchiMateElement.id).first()
+
+    @staticmethod
+    def _describe_matches(matches: List[Dict[str, Any]], created_in_file: set, org_id: Optional[int]) -> None:
+        """Say, for each match, whether the element it matched was created earlier in the same file,
+        and which layer page it belongs to (the address of its page carries that layer)."""
+        if not matches:
+            return
+        from app.models.archimate_core import ArchiMateElement
+
+        ids = {m["existing_id"] for m in matches if m.get("existing_id")}
+        layers = {
+            row.id: row.layer
+            for row in ArchiMateElement.query.filter(  # model-safety-ok: bounded by the matches of one file
+                ArchiMateElement.id.in_(ids),
+                *ArchiMateImportService._in_organization(ArchiMateElement, org_id),
+            )
+        } if ids else {}
+        for m in matches:
+            m["in_file"] = m.get("existing_id") in created_in_file
+            text = (layers.get(m.get("existing_id")) or "").strip().lower()
+            text = "implementation" if text.startswith("implementation") else text
+            m["existing_layer"] = text if text in (
+                "motivation", "strategy", "business", "application", "technology", "physical", "implementation"
+            ) else "application"
 
     @staticmethod
     def _match_types(elem_type: str) -> tuple:
@@ -1433,6 +1460,7 @@ class ArchiMateImportService:
             relationships_created, relationships_skipped, len(relationships_failed),
         )
 
+        self._describe_matches(matches, set(created_ids), org_id)
         return {
             "created": created,
             "updated": updated,
