@@ -44,7 +44,10 @@ def application_capability_links(application_id: int, organization_id: int) -> L
             BusinessCapability,
             ApplicationCapabilityMapping.business_capability_id == BusinessCapability.id,
         )
-        .filter(ApplicationCapabilityMapping.application_component_id == application_id)
+        .filter(
+            ApplicationCapabilityMapping.application_component_id == application_id,
+            ApplicationCapabilityMapping.organization_id == organization_id,
+        )
         .all()
     )
     seen = {cap.id for _, cap in pairs}

@@ -458,8 +458,10 @@ def set_named_person_owner(
             record = same
         elif replace and current:
             record = current[0]
-            for key, value in values.items():
-                setattr(record, key, value)
+            record.person_name, record.person_email, record.person_role = (
+                values["person_name"], email, role,
+            )
+            record.user_id, record.assigned_by = None, assigned_by
         else:
             record = None
         if replace and record is not None:
