@@ -672,9 +672,13 @@ class AgentRunner:
         requested_model: Optional[str] = None,
         stream_mode: bool = False,
         history: Optional[list] = None,
+        waited_seconds: float = 0.0,
     ) -> dict:
         """
         Execute the full ReAct loop for one user message.
+
+        `waited_seconds` is what the person has already waited since sending (the stored-answer lookup
+        ran first); the turn's budget is the rest of CHAT_TURN_BUDGET_SECONDS, never under 10 seconds.
 
         `history` is the prior turns of this conversation as
         [{"role": "user"|"assistant", "content": str}, ...], oldest first.
@@ -702,7 +706,9 @@ class AgentRunner:
         from app.modules.ai_chat.services import model_defaults
 
         self._turn_id = str(_uuid.uuid4())
-        self._turn_deadline = time.monotonic() + float(model_defaults.CHAT_TURN_BUDGET_SECONDS)
+        self._turn_deadline = time.monotonic() + max(
+            10.0, float(model_defaults.CHAT_TURN_BUDGET_SECONDS) - max(0.0, float(waited_seconds or 0.0))
+        )
 
         self._context_struct = None
         # Build system prompt with live domain context

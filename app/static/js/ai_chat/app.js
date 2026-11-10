@@ -417,6 +417,7 @@
 
         // A question that names something in the organisation's records is answered
         // from those records, as cited cards, before any model is asked.
+        const _sentAt = performance.now();
         try {
             const estate = await ArchieChat.transport.askEstate(message);
             if (estate.found) {
@@ -448,6 +449,8 @@
             persona: state.currentPersona || null,
             model: document.getElementById('model-selector')?.value || null,
             thread_id: window.__threadId || null,
+            // What the stored-answer lookup took: the turn gets the rest of the minute.
+            waited_seconds: (performance.now() - _sentAt) / 1000,
         });
 
         // Stream the reply token-by-token (like ChatGPT). If streaming can't be
