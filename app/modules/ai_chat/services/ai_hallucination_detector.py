@@ -828,7 +828,9 @@ def remove_violating_clauses(response_text: str, bad) -> Dict:
                 continue
             out_lines.append(line)
             continue
-        parts = re.split(r"((?<=[.!?])\s+)", line)
+        # An item's marker ("1." or "-") is not a sentence end: it stays with its item.
+        lead = _LEAD.match(line).group(1)
+        parts = re.split(r"((?<=[.!?])\s+)", line[len(lead):])
         pieces = parts[0::2]
         keep = [True] * len(pieces)
         changed = False
@@ -853,7 +855,7 @@ def remove_violating_clauses(response_text: str, bad) -> Dict:
             continue
         rebuilt_line = " ".join(p.strip() for p, k in zip(pieces, keep) if k)
         if re.search(r"[A-Za-z0-9]", rebuilt_line):
-            out_lines.append(line[: len(line) - len(line.lstrip())] + rebuilt_line)
+            out_lines.append(lead + rebuilt_line)
     out_lines = _without_empty_tables(out_lines)
     text = re.sub(r"\n{3,}", "\n\n", "\n".join(out_lines)).strip()
     return {"text": text, "removed": removed}

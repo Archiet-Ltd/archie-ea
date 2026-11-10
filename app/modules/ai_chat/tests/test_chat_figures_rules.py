@@ -382,3 +382,16 @@ def test_find_uncited_claims_is_the_one_entry_point_for_figure_violations(make_o
     claims = find_uncited_claims("You have 999 applications, and [fig:F99] more.", grounding, org_names=set())
     reasons = sorted(r.split(":", 1)[0] for c in claims for r in c["unsupported"])
     assert reasons == [cf.REASON_UNKNOWN, cf.REASON_WRITTEN]
+
+
+def test_a_list_keeps_its_items_and_their_positions_when_a_figure_clause_is_taken_out(make_org):
+    from app.modules.ai_chat.services.ai_hallucination_detector import remove_violating_clauses
+
+    org = make_org("fig-list-out")
+    grounding, _ = _turn(org.id)
+    text = ("Ranked:\n1. ERP Upgrade [ref:12] - 80 out of 100\n2. Field Service Management [ref:13] - 60 out of 100\n"
+            "- Phase 21 Rollout [ref:14] has 45 points")
+    cleaned = remove_violating_clauses(text, lambda f: bool(_violations(f, grounding, org.id)))
+    assert cleaned["text"].split("\n") == [
+        "Ranked:", "1. ERP Upgrade [ref:12].", "2. Field Service Management [ref:13]."]  # an item with one clause goes whole
+    assert _shown(cleaned["text"], grounding).split("\n")[1].startswith("1. ERP Upgrade")

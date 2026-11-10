@@ -382,10 +382,8 @@ def test_a_ranked_list_of_twelve_keeps_every_row_with_its_figure(browser, server
             noun = "supporting application" if count == 1 else "supporting applications"
             assert cap in text, cap
             assert "%d %s" % (count, noun) in text, (cap, count)
-        # The list markers are positions: one to twelve.
-        items = reply.locator("ol > li")
-        if items.count():
-            assert items.count() >= 12 or "What the records show:" in text
+        # The list markers are positions: twelve items, one to twelve.
+        assert reply.locator("ol > li").count() >= 12, "the ranked list keeps its twelve items"
         _walk(page, "j4-ranked-twelve", name)
     finally:
         context.close()
