@@ -285,7 +285,6 @@ def test_a_row_from_before_the_loop_does_not_make_a_new_request_a_repeat(
     ledger = _application(db_session, org.id, "Ledger %s" % uuid.uuid4().hex[:6], "development")
     other_ledger = _application(db_session, other.id, "Ledger %s" % uuid.uuid4().hex[:6], "development")
     payload = {"application_name": ledger.name, "new_status": "production", "rationale": "The founder asked for it"}
-    other_payload = dict(payload, application_name=other_ledger.name)
     with tenant_ctx(org.id):
         old = create_approval_record(
             organization_id=org.id, operation_type="tool_use", entity_type="update_application_status",
@@ -294,7 +293,7 @@ def test_a_row_from_before_the_loop_does_not_make_a_new_request_a_repeat(
         AIChatCRUDApproval.query.filter_by(id=old.id).update({"created_at": datetime.utcnow() - timedelta(days=30)})
         db.session.commit()
         assert old.rubric_version is None
-    reviewer = FakeReviewer([PASS_ALL, PASS_ALL]).install(monkeypatch)
+    FakeReviewer([PASS_ALL, PASS_ALL]).install(monkeypatch)
     with tenant_ctx(org.id):
         _id, verdict = _ask_for_status(user, ledger.name, "production")
         assert verdict["state"] == "applied", verdict
