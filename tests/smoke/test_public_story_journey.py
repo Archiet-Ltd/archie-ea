@@ -13,8 +13,8 @@ import pytest
 
 from .conftest import PAGE_TIMEOUT
 
-# The retired Ask page's address, written in two parts so that only the two redirect tests name it whole.
-RETIRED_ASK = "/intelligence/" + "ask"
+# The retired Ask page's address; these tests assert it is absent and never open it.
+RETIRED_ASK = "/intelligence/ask"
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 

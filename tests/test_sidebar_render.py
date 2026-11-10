@@ -19,8 +19,8 @@ import pytest
 from app.utils.role_access import SIDEBAR_LINK_BUDGET
 from scripts.check_sidebar_links import count_links as _real_link_count
 
-# The retired Ask page's address, written in two parts so that only the two redirect tests name it whole.
-RETIRED_ASK = "/intelligence/" + "ask"
+# The retired Ask page's address; these tests assert it is absent and never open it.
+RETIRED_ASK = "/intelligence/ask"
 
 pytestmark = pytest.mark.usefixtures("db_session")
 

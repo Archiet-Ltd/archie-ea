@@ -16,8 +16,8 @@ from werkzeug.serving import make_server
 
 from app.services.site_registry import raw_registry
 
-# The retired Ask page's address, written in two parts so that only the two redirect tests name it whole.
-RETIRED_ASK = "/intelligence/" + "ask"
+# The retired Ask page's address; these tests assert it is absent and never open it.
+RETIRED_ASK = "/intelligence/ask"
 
 DESKTOP = {"width": 1440, "height": 900}
 PHONE = {"width": 390, "height": 844}

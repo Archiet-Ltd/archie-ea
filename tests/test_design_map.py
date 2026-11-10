@@ -12,7 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 LIST_PAGE = "app/templates/applications/list_simple.html"
 NEW_PAGE = "app/templates/admin/zz_new_page.html"
-# One row per page template in the tree. The designers' port map was cut at 406 pages; the tree holds 406
+# One row per page template in the tree. The designers' port map was cut at 406 pages; the tree holds 407
 # since the two decision table pages (list and record) and the rate limits page were added with their rows; before that it held 403
 # today: five solution templates and their rows were deleted on purpose, so the page count and the C2 and C5
 # totals below fell with them. Every total derived from the count is the tree's, not the snapshot's. The map

@@ -31,8 +31,8 @@ from app.models.user import (
 from app.navigation import registry
 from app.utils.role_access import SIDEBAR_LINK_BUDGET
 
-# The retired Ask page's address, written in two parts so that only the two redirect tests name it whole.
-RETIRED_ASK = "/intelligence/" + "ask"
+# The retired Ask page's address; these tests assert it is absent and never open it.
+RETIRED_ASK = "/intelligence/ask"
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
