@@ -133,21 +133,21 @@ def _provenance(row: Dict[str, Any], corrected: bool, user) -> Dict[str, Any]:
     }
 
 
-def _stamp(element, row: Dict[str, Any], corrected: bool, user) -> None:
-    person = _name_of(user)
+def _origin(row: Dict[str, Any], corrected: bool, user) -> Dict[str, Any]:
+    """The origin columns of an element made from a website fact, given as it is first written."""
     now = datetime.utcnow()
     if corrected:
-        element.source_kind = "manual"
-        element.source_ref = str(user.id)
-        element.source_label = person
-    else:
-        element.source_kind = "import"
-        element.source_ref = json.dumps({
+        return {"source_kind": "manual", "source_ref": str(user.id), "source_label": _name_of(user),
+                "source_recorded_at": now}
+    return {
+        "source_kind": "import",
+        "source_ref": json.dumps({
             "system": "website", "url": row.get("source_url"), "fetched_at": row.get("fetched_at"),
             "confidence": row.get("confidence"),
-        }, sort_keys=True)
-        element.source_label = "Company website %s" % row.get("source_url")
-    element.source_recorded_at = now
+        }, sort_keys=True),
+        "source_label": "Company website %s" % row.get("source_url"),
+        "source_recorded_at": now,
+    }
 
 
 def _find_element(org_id: int, element_type: str, name: str):
@@ -187,8 +187,8 @@ def _element(org_id: int, field: str, value: Any, row: Dict[str, Any], corrected
     elif field == "product":
         description = "Product or service named on the company website"
     element = create_backbone_element(
-        element_type=etype, layer=layer, name=name, description=description, organization_id=org_id, provenance=props)
-    _stamp(element, row, corrected, user)
+        element_type=etype, layer=layer, name=name, description=description, organization_id=org_id, provenance=props,
+        origin=_origin(row, corrected, user))
     return element
 
 
@@ -212,8 +212,8 @@ def _requirement(org_id: int, text: str, row: Dict[str, Any], corrected: bool, u
     element = create_backbone_element(
         element_type="Requirement", layer="Motivation", name=title,
         description="Stated on the company website: %s" % text.strip(), organization_id=org_id,
-        provenance={**prov, "framework": framework.code if framework else None})
-    _stamp(element, row, corrected, user)
+        provenance={**prov, "framework": framework.code if framework else None},
+        origin=_origin(row, corrected, user))
     db.session.add(ComplianceRequirement(
         organization_id=org_id, archimate_element_id=element.id, title=title,
         description="Stated on the company website: %s" % text.strip(), requirement_type="regulatory",
