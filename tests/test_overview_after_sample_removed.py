@@ -75,3 +75,72 @@ def test_removing_the_sample_leaves_the_panels_at_nothing_and_the_other_organisa
 
     login_as(client, user_a)
     assert _panel(_page(client)) == a_before
+
+
+def _history_rows(org_id):
+    """The organisation's own change history as (table, action, record id), read straight from the table."""
+    from app.models.audit_log import AuditLog
+
+    return [
+        (r.table_name, r.action, r.record_id)
+        for r in AuditLog.query.filter_by(organization_id=org_id).order_by(AuditLog.id)
+    ]
+
+
+def test_a_real_record_added_then_deleted_still_counts_once_added_and_once_deleted_after_the_sample_is_removed(
+    client, login_as, make_org
+):
+    from datetime import datetime
+
+    from app.modules.dashboard.services import overview_figures as figures
+    from app.services import sample_company_service
+    from app.services.change_source import change_source
+
+    org_a, org_b = make_org(), make_org()
+    user_a = _architect(org_a, "gone-a@example.com")
+    user_b = _architect(org_b, "gone-b@example.com")
+    _own_record(org_a, user_a)
+
+    login_as(client, user_a)
+    a_before = _panel(_page(client))
+    assert a_before["total"] == "1", a_before
+
+    login_as(client, user_b)
+    assert client.post("/architecture/sample-company/load").status_code == 302
+    # one real record of the organisation's own: added, then deleted by a person
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.archimate_backbone import create_backbone_element
+
+    with change_source("screen", user_id=user_b.id):
+        mine = create_backbone_element(
+            element_type="BusinessActor", layer="Business", name="Treasury desk", organization_id=org_b.id
+        )
+    db.session.commit()
+    mine_id = mine.id
+    with change_source("screen", user_id=user_b.id):
+        db.session.delete(db.session.get(ArchiMateElement, mine_id))
+        db.session.commit()
+    assert client.post("/architecture/sample-company/remove").status_code == 303
+
+    now = datetime.utcnow()
+    sample = sample_company_service.written_by_the_sample(org_b.id)
+    raw = _history_rows(org_b.id)
+    assert ("archimate_elements", "create", mine_id) in raw and ("archimate_elements", "delete", mine_id) in raw, raw
+    # the history table names an add "create"; the panels read it as an insert
+    own_inserts = [r for r in raw if r[0] == "archimate_elements" and r[1] == "create" and (r[0], r[2]) not in sample]
+
+    kept = figures._history(org_b.id, now)
+    kept_rows = [(c.table_name, c.action, c.record_id) for c in kept]
+    # the sample's rows are gone, and the person's own add and delete are both there
+    assert sorted(kept_rows) == sorted([("archimate_elements", "insert", mine_id), ("archimate_elements", "delete", mine_id)]), kept_rows
+
+    activity = figures._activity(kept, now, org_b.id)
+    # the records-added figure is the number of non-sample inserts in the organisation's own history
+    assert activity["ranges"]["90d"]["total"] == len(own_inserts) == 1, activity["ranges"]["90d"]
+    assert activity["this_year"] == "1 added this year" or activity["this_year"] == 1, activity["this_year"]
+    removed = _panel(_page(client))
+    assert removed["total"] == "1" and not removed["empty"], removed
+    assert not removed["week_empty"], removed
+
+    login_as(client, user_a)
+    assert _panel(_page(client)) == a_before

@@ -139,12 +139,13 @@ def find_restore_point(org_id: int):
     return None
 
 
-def written_by_the_sample(org_id: int) -> set:
+def written_by_the_sample(org_id: int, removed_only: bool = False) -> set:
     """What the sample company wrote in this organisation, loaded now or removed since.
 
     Pairs of (the change history's name for the table, the record's id). The restore point keeps
     the ids of everything a load brought in, and keeps them after the removal, so the history of a
     removed sample can still be told from the history of anything the organisation added itself.
+    With ``removed_only`` only the loads since removed are read.
     """
     from app.models.import_audit import ImportSessionLog
     from app.services.import_snapshot_service import IMPORT_SOURCE
@@ -152,14 +153,14 @@ def written_by_the_sample(org_id: int) -> set:
     history_name = {
         "archimate_elements": "archimate_elements", "archimate_relationships": "archimate_relationships",
         "application_components": "application_component", "business_capability": "business_capability",
-        "solutions": "solution",
+        "solutions": "solution", "unified_capabilities": "unified_capabilities",
     }
     keys = set()
     for log in ImportSessionLog.query.filter(
         ImportSessionLog.organization_id == org_id, ImportSessionLog.import_source == IMPORT_SOURCE
     ):
         data = log.snapshot_data or {}
-        if data.get("model_name") != SAMPLE_MODEL_NAME:
+        if data.get("model_name") != SAMPLE_MODEL_NAME or (removed_only and not log.is_rolled_back):
             continue
         keys |= {("archimate_elements", int(i)) for i in data.get("created_element_ids") or []}
         keys |= {("archimate_relationships", int(i)) for i in data.get("created_relationship_ids") or []}
@@ -328,6 +329,8 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
             organization_id=org_id, source_table=SOURCE_TABLE, source_id=str(row.id),
         ).first()
         if projected is not None:
+            # the sample corrects the projection, so the change history lists it among the sample's writes
+            note("unified_capabilities", projected)
             projected.capability_type = _CAPABILITY_TYPES[name]
             db.session.refresh(row)
             if projected.archimate_element_id is None and row.archimate_element_id:
