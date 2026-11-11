@@ -226,6 +226,16 @@ def test_a_new_token_on_the_connect_page_replaces_details_this_server_cannot_ope
         assert "Internal Server Error" not in main, main
         expect(page.locator("main")).to_contain_text("Connected. Reading your repositories now")
         shoot(page, "connect-page-after-save-with-a-wrong-server-key")
+        # At phone width the whole sentence shows: the status wraps and nothing of it is cut off.
+        page.set_viewport_size({"width": 390, "height": 844})
+        status_line = page.get_by_role("status").filter(has_text="Connected. Reading your repositories now")
+        expect(status_line).to_contain_text("this page shows when it is done.")
+        clipped = status_line.evaluate(
+            "el => [...el.querySelectorAll('span')].filter(s => s.scrollWidth > s.clientWidth + 1"
+            " || getComputedStyle(s).textOverflow === 'ellipsis').length"
+        )
+        assert clipped == 0, "the connect page's status is cut off at 390 wide"
+        page.set_viewport_size({"width": 1440, "height": 900})
         state = _wait_for_the_second_read(page, base)
         assert state["state"] == "done" and state["counts"]["repositories"] == 16, state
         assert state["has_token"] is True

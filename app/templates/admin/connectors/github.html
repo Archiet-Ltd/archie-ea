@@ -22,7 +22,7 @@
         {% if messages %}
             <div class="mb-6 space-y-2">
                 {% for category, message in messages %}
-                    {{ quiet_alert('success' if category == 'success' else ('danger' if category == 'error' else 'info'), text=message) }}
+                    {% call quiet_alert('success' if category == 'success' else ('danger' if category == 'error' else 'info')) %}{{ message }}{% endcall %}
                 {% endfor %}
             </div>
         {% endif %}
