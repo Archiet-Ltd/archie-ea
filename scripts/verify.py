@@ -935,8 +935,8 @@ def gate_system_model() -> Result:
     return its counts, then every check runs on the real model and none may exceed model/ratchet.json."""
     first = _sysml("model_check.py", "selfcheck")
     if first.returncode == 3:
-        return Result("system-model", SKIP, "the SysML parser is not installed: run scripts/sysml/install_parser.sh "
-                      "and set SYSML_HOME")
+        return Result("system-model", FAIL, "the SysML parser is not installed: run scripts/sysml/install_parser.sh "
+                      "and set SYSML_HOME", 1, 0)
     if first.returncode:
         return Result("system-model", FAIL, first.stdout[-1500:], 1, 0)
     proc = _sysml("model_check.py", "check")
@@ -2423,7 +2423,8 @@ def build_gates(baseline: dict) -> list[Gate]:
              "the SysML parser reads the model and every model check stays within model/ratchet.json",
              "command", gate_system_model,
              remediation="install the parser with scripts/sysml/install_parser.sh, then run "
-                         "python scripts/sysml/model_check.py check"),
+                         "python scripts/sysml/model_check.py check",
+             tags=["static"]),
         Gate("null-filters", "default() never feeds a len()-calling filter", "zero",
              gate_null_filters,
              remediation="add the boolean argument: default('x', true) - plain "

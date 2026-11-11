@@ -353,6 +353,107 @@ def test_a_text_box_for_the_field_is_a_reader_that_does_not_take_the_list(tmp_pa
     assert len(found) == 1 and "box.html:1" in found[0] and "free text" in found[0]
 
 
+def test_a_raw_select_with_hand_written_options_is_found_in_a_template_wherever_it_is_under_app(tmp_path):
+    _statuses(tmp_path)
+    _write(tmp_path, "app/modules/deep/templates/form.html",
+           "<form>\n<label>S</label>\n<select id=\"deployment_status\" name=\"deployment_status\" class=\"x\">\n"
+           "  <option value=\"\">Not set</option>\n  <option value=\"gamma\">Gamma</option>\n"
+           "  <option value=\"delta\">Delta</option>\n</select>\n</form>\n")
+    found = mc.check_one_source(CONSTRAINTS, _vocab_sources(tmp_path), tmp_path)
+    assert len(found) == 1
+    assert "app/modules/deep/templates/form.html:3 (raw-select)" in found[0] and "gamma,delta" in found[0]
+
+
+def test_a_raw_select_that_loops_over_a_list_the_route_passes_is_named_with_the_file_that_holds_the_list(tmp_path):
+    _statuses(tmp_path)
+    _write(tmp_path, "app/routes.py",
+           "STATUSES_HERE = ['one', 'two']\n\n\ndef view():\n    return render_template('f.html', deployment_statuses=STATUSES_HERE)\n")
+    _write(tmp_path, "app/templates/f.html",
+           "<select name=\"deployment_status\">\n{% for value in deployment_statuses %}<option value=\"{{ value }}\">x</option>"
+           "{% endfor %}\n</select>\n")
+    found = [f for f in mc.check_one_source(CONSTRAINTS, _vocab_sources(tmp_path), tmp_path) if "f.html" in f]
+    assert len(found) == 1 and "takes deployment_status from app/routes.py" in found[0]
+
+
+def test_a_raw_select_that_loops_over_a_pair_list_written_across_lines_is_found_with_its_values(tmp_path):
+    _statuses(tmp_path)
+    _write(tmp_path, "app/templates/pairs.html",
+           "<select id=\"deployment_status\"\n        name=\"deployment_status\">\n{% for value, label in [\n  ('on', 'On'),\n  ('off', 'Off')\n] %}\n"
+           "<option value=\"{{ value }}\">{{ label }}</option>\n{% endfor %}\n</select>\n")
+    found = mc.check_one_source(CONSTRAINTS, _vocab_sources(tmp_path), tmp_path)
+    assert len(found) == 1 and "app/templates/pairs.html:1 (raw-select)" in found[0] and "(on,off)" in found[0]
+
+
+def test_a_select_built_in_javascript_and_a_javascript_list_of_options_are_found(tmp_path):
+    _statuses(tmp_path)
+    _write(tmp_path, "app/static/js/rows.js",
+           "const row = `\n  <select class=\"w\" name=\"deployment_status\">\n    <option value=\"\">Pick</option>\n"
+           "    <option value=\"planned\">Planned</option>\n    <option value=\"live\">Live</option>\n  </select>`;\n")
+    _write(tmp_path, "app/static/js/lists.js",
+           "const DEPLOYMENT_STATUS_CHOICES = [\n  { value: 'alpha', label: 'Alpha' },\n  { value: 'beta', label: 'Beta' },\n];\n"
+           "const other = { deployment_status: '' };\n")
+    found = mc.check_one_source(CONSTRAINTS, _vocab_sources(tmp_path), tmp_path)
+    text = "\n".join(found)
+    assert len(found) == 2, text
+    assert "app/static/js/rows.js:2 (raw-select)" in text and "planned,live" in text
+    assert "app/static/js/lists.js:1 (script-list)" in text and "alpha,beta" in text
+
+
+def test_a_python_list_tuple_or_set_of_allowed_values_is_found_beside_a_route_and_a_query_filter_is_not(tmp_path):
+    _statuses(tmp_path)
+    _write(tmp_path, "app/routes_a.py", "DEPLOYMENT_STATUSES = ['design', 'live']\n")
+    _write(tmp_path, "app/routes_b.py", "ALLOWED_DEPLOYMENT_STATUS: tuple = ('x', 'y')\n")
+    _write(tmp_path, "app/routes_c.py", "VALID_DEPLOYMENT_STATUSES = {'p', 'q'}\n")
+    _write(tmp_path, "app/query.py", "rows = q.filter(Model.deployment_status.in_(['production', 'staging']))\n")
+    found = mc.check_one_source(CONSTRAINTS, _vocab_sources(tmp_path), tmp_path)
+    text = "\n".join(found)
+    assert len(found) == 3, text
+    assert "app/routes_a.py:1 (allowed-list)" in text and "design,live" in text
+    assert "app/routes_b.py:1 (allowed-list)" in text and "app/routes_c.py:1 (allowed-list)" in text
+    assert "query.py" not in text
+
+
+def test_a_list_kept_in_the_one_named_file_is_clean_for_every_form(tmp_path):
+    _write(tmp_path, CANON, "DEPLOYMENT_STATUSES = ('a', 'b')\n")
+    _write(tmp_path, "app/templates/ok.html", "{% for v in deployment_statuses %}{% endfor %}\n")
+    assert mc.check_one_source(CONSTRAINTS, _vocab_sources(tmp_path), tmp_path) == []
+
+
+def test_the_real_tree_reports_the_two_hand_written_deployment_status_lists_the_model_used_to_miss():
+    scope = json.loads((REPO_ROOT / "model" / "scope.json").read_text(encoding="utf-8"))
+    sources = _vocab_sources(REPO_ROOT)
+    constraints = {"c": {"column": "deployment_status", "canonicalSource": "app/services/application_status.py"}}
+    text = "\n".join(mc.check_one_source(constraints, sources, REPO_ROOT))
+    assert scope["vocabularies"][0]["column"] == "deployment_status"
+    assert "app/modules/my_applications/templates/my_applications/app_form.html:" in text
+    assert "app/modules/my_applications/crud_routes.py:35 (allowed-list)" in text
+    assert "app/static/js/application_mgmt/application_import.js:" in text and "planned,development,testing,production" in text
+
+
+def test_the_check_says_which_forms_it_reads_and_which_it_does_not(monkeypatch, tmp_path, capsys):
+    ratchet = {k: 0 for k in ("1", "2", "3", "4", "S", "U")}
+    _command_over(monkeypatch, tmp_path, {k: [] for k in ratchet}, ratchet)
+    out = capsys.readouterr().out
+    assert "reads:" in out and "does not read:" in out
+    for form in as_built.FORMS_READ + as_built.FORMS_NOT_READ:
+        assert form in out
+    assert as_built.FORMS_NOT_READ and "model_check" not in " ".join(as_built.FORMS_NOT_READ)
+
+
+def test_the_system_model_gate_carries_the_static_tag_and_fails_with_one_line_when_the_parser_is_missing(monkeypatch):
+    import verify
+    gate = next(g for g in verify.build_gates(verify.load_baseline()) if g.name == "system-model")
+    assert "static" in gate.tags
+
+    class Run:
+        returncode = 3
+        stdout = ""
+    monkeypatch.setattr(verify, "_sysml", lambda *a: Run())
+    result = verify.gate_system_model()
+    assert result.status == verify.FAIL and "SysML parser is not installed" in result.detail
+    assert "\n" not in result.detail.strip()
+
+
 def test_the_scope_names_the_fields_modelled_and_does_not_limit_which_readers_are_read(tmp_path):
     _statuses(tmp_path)
     _write(tmp_path, "app/templates/never_listed.html",

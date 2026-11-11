@@ -7,8 +7,9 @@
 Reads (model/scope.json says which slice to model; the code decides the facts):
   - the routes and the forms of the screens, from scripts/component_inventory.py, the one reader of both
     (docs/component-inventory.json for this checkout; a fresh run of the inventory for another checkout);
-  - every place in the repository where a stored field of the slice gets its allowed values (a form's select,
-    an AI tool's enum, a template's select or text box) and where each of them takes the list from.
+  - every place under app/ where a stored field of the slice gets its allowed values, and where each of them takes
+    the list from. The forms it reads are named in FORMS_READ and the ones it cannot read in FORMS_NOT_READ; the
+    model check prints both, so a form that is not read is never taken for a form that is clean.
 Writes a SysML v2 package (model/as-built/<slice>.sysml) and an interaction model in JSON that follows the shape of
 the Interaction Flow Modeling Language (model/as-built/<slice>.ifml.json, schema in model/schema/ifml.schema.json).
 Deterministic: the same tree always gives byte-identical files, so a CI run can fail when the committed copy is stale.
@@ -128,8 +129,27 @@ def _imports(tree) -> dict[str, str]:
     return out
 
 
+FORMS_READ = (
+    "a form class field with choices",
+    "an AI tool's enum",
+    "a template's native_select, with its options written in the call or in its body",
+    "a template's raw <select> with hand-written options, or options looped from a variable the route passes",
+    "a <select> written inside a JavaScript string",
+    "a JavaScript array or object literal named for the field",
+    "a template's text box",
+    "a Python list, tuple or set of constants named for the field, anywhere under app/",
+)
+FORMS_NOT_READ = (
+    "a select built in JavaScript one element at a time (createElement and appendChild)",
+    "a select whose macro is not native_select",
+    "a Python dict whose keys are the allowed values",
+    "a list in a file that is not Python, a template or JavaScript (JSON, YAML, a database table)",
+    "a list whose name does not contain the field's name",
+)
+
+
 def _values_of(node) -> list[str] | None:
-    if isinstance(node, (ast.List, ast.Tuple)):
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
         vals = []
         for e in node.elts:
             if isinstance(e, (ast.Tuple, ast.List)) and e.elts and _const(e.elts[0]) is not None:
@@ -172,10 +192,10 @@ def _dget(d: ast.Dict, key: str):
 
 
 def _corpus(root: Path) -> list[tuple[Path, str]]:
-    """Every Python file and template under app/, read once."""
+    """Every Python file, template and JavaScript file under app/, read once."""
     out = []
     for p in sorted((root / "app").rglob("*")):
-        if p.suffix in (".py", ".html") and "__pycache__" not in p.parts and "/tests/" not in p.as_posix():
+        if p.suffix in (".py", ".html", ".js") and "__pycache__" not in p.parts and "/tests/" not in p.as_posix():
             try:
                 out.append((p, p.read_text(encoding="utf-8", errors="replace")))
             except OSError:
@@ -361,6 +381,154 @@ def template_fields(root: Path, corpus, column: str, defs: dict[str, list[str]])
     return out
 
 
+def _norm(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+def _split_commas(body: str) -> list[str]:
+    """The items of a bracketed literal's inside, split at the commas that sit outside every bracket and quote."""
+    parts, depth, quote, cur = [], 0, None, ""
+    for ch in body:
+        if quote:
+            cur += ch
+            if ch == quote:
+                quote = None
+            continue
+        if ch in "'\"`":
+            quote = ch
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+    if cur.strip():
+        parts.append(cur.strip())
+    return parts
+
+
+_STR = r"""['"]([^'"\n]+)['"]"""
+
+
+def _script_values(literal: str) -> list[str]:
+    """The allowed values a JavaScript array or object literal holds: each string item, the `value` of each item
+    that is an object, the first of each pair, and the keys of an object."""
+    inner = literal[1:-1]
+    vals = []
+    for item in _split_commas(inner):
+        if literal[0] == "{":
+            m = re.match(r"""\s*(?:['"]([^'"]+)['"]|([A-Za-z_$][\w$]*))\s*:""", item)
+            if m:
+                vals.append(m.group(1) or m.group(2))
+            continue
+        m = re.fullmatch(_STR, item)
+        if m:
+            vals.append(m.group(1))
+            continue
+        m = re.search(r"""\bvalue\s*:\s*""" + _STR, item) or re.match(r"""\s*\[\s*""" + _STR, item)
+        if m:
+            vals.append(m.group(1))
+    return vals
+
+
+def _route_variable_origin(corpus, defs: dict[str, list[str]], root: Path, var: str, here: str) -> str:
+    """Where a template's loop variable gets its list: the file that defines what a route passes under that name."""
+    for p, text in corpus:
+        if p.suffix != ".py" or var not in text:
+            continue
+        m = re.search(r"\b%s\s*=\s*([A-Za-z_]\w*(?:\([^()\n]*\))?)\s*[,)\n]" % re.escape(var), text)
+        if m:
+            origin, _ = _expression_origin(defs, m.group(1), p.relative_to(root).as_posix())
+            return origin
+    return here + " (options come from a variable the route passes; not resolved)"
+
+
+def raw_selects(root: Path, corpus, column: str, defs: dict[str, list[str]]) -> list[dict]:
+    """Every `<select name="column">` written by hand in a template or inside a JavaScript string, and where its
+    options come from."""
+    out = []
+    for p, text in corpus:
+        if p.suffix not in (".html", ".js") or column not in text:
+            continue
+        rel = p.relative_to(root).as_posix()
+        for m in re.finditer(r"<select\b([^>]*)>", text):
+            name = re.search(r"""\bname\s*=\s*['"]%s['"]""" % re.escape(column), m.group(1)) or (
+                not re.search(r"\bname\s*=", m.group(1)) and re.search(r"""\bid\s*=\s*['"]%s['"]""" % re.escape(column), m.group(1)))
+            if not name:
+                continue
+            stop = text.find("</select>", m.end())
+            body = text[m.end():stop if stop > 0 else m.end() + 1500]
+            loop = re.search(r"\{%-?\s*for\s+\w+(?:\s*,\s*\w+)*\s+in\s+([A-Za-z_]\w*)\s*-?%\}", body)
+            literal = re.search(r"\{%-?\s*for\s+\w+(?:\s*,\s*\w+)*\s+in\s+\[(.*?)\]\s*-?%\}", body, re.S)
+            options = [v for v in re.findall(r"""<option\s+value=["']([^"'{}]+)["']""", body) if v]
+            if literal:
+                origin = rel + " (written out in place)"
+                vals = re.findall(r"""\(\s*['"]([^'"\n]+)['"]\s*,""", literal.group(1)) or re.findall(_STR, literal.group(1))
+            elif loop:
+                origin, vals = _route_variable_origin(corpus, defs, root, loop.group(1), rel), None
+            elif options:
+                origin, vals = rel + " (written out in place)", options
+            else:
+                origin, vals = rel + " (options not resolved)", None
+            out.append({"file": rel, "line": text.count("\n", 0, m.start()) + 1, "origin": origin, "values": vals or None,
+                        "note": "select", "kind": "raw-select"})
+    return out
+
+
+def script_lists(root: Path, corpus, column: str) -> list[dict]:
+    """Every JavaScript array or object literal, or `set` in a template, whose name holds the field's name and
+    which holds at least two values."""
+    out = []
+    want = _norm(column)
+    for p, text in corpus:
+        if p.suffix not in (".html", ".js") or want not in _norm(text):
+            continue
+        rel = p.relative_to(root).as_posix()
+        for m in re.finditer(r"([A-Za-z_$][\w$]*)\s*(?::|=(?![=>]))\s*([\[{])", text):
+            if want not in _norm(m.group(1)):
+                continue
+            start = m.end() - 1
+            literal = text[start:_balanced(text, start)]
+            vals = _script_values(literal)
+            if len(vals) >= 2:
+                out.append({"file": rel, "line": text.count("\n", 0, m.start()) + 1,
+                            "origin": rel + " (written out in place)", "values": vals, "note": "literal",
+                            "kind": "script-list"})
+    return out
+
+
+def python_lists(root: Path, corpus, column: str) -> list[dict]:
+    """Every Python list, tuple or set of constants, kept in a name that holds the field's name, anywhere under app/."""
+    out = []
+    want = _norm(column)
+    for p, text in corpus:
+        if p.suffix != ".py" or want not in _norm(text):
+            continue
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            continue
+        rel = p.relative_to(root).as_posix()
+        for st in ast.walk(tree):
+            if isinstance(st, ast.Assign):
+                targets, value = st.targets, st.value
+            elif isinstance(st, ast.AnnAssign) and st.value is not None:
+                targets, value = [st.target], st.value
+            else:
+                continue
+            names = [t.id if isinstance(t, ast.Name) else t.attr for t in targets if isinstance(t, (ast.Name, ast.Attribute))]
+            if not any(want in _norm(n) for n in names) or not isinstance(value, (ast.List, ast.Tuple, ast.Set)):
+                continue
+            vals = _values_of(value)
+            if vals is not None and len(vals) >= 2:
+                out.append({"file": rel, "line": st.lineno, "origin": rel, "values": vals,
+                            "note": "constant", "kind": "allowed-list"})
+    return out
+
+
 def vocabulary_sources(root: Path, scope: dict) -> list[dict]:
     """Every reader of each stored field the slice names, found by reading the whole of app/."""
     out = []
@@ -368,7 +536,8 @@ def vocabulary_sources(root: Path, scope: dict) -> list[dict]:
     defs = _definitions(root, corpus)
     for v in scope.get("vocabularies", []):
         found = (form_selects(root, corpus, v["column"]) + tool_enums(root, corpus, v["column"])
-                 + template_fields(root, corpus, v["column"], defs))
+                 + template_fields(root, corpus, v["column"], defs) + raw_selects(root, corpus, v["column"], defs)
+                 + script_lists(root, corpus, v["column"]) + python_lists(root, corpus, v["column"]))
         for s in found:
             s["column"] = v["column"]
             out.append(s)

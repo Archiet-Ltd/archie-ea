@@ -10,9 +10,10 @@ The five checks (the model and its rules are described in model/README.md):
   1  one definition per concept     one handler per save route the model names; a route whose handler the
                                     inventory cannot trace is listed as unresolved and counted (U)
   2  allocation completeness        every function is allocated to one part, every part is in the code
-  3  one source per figure or list  every reader of a field's allowed values anywhere under app/ (a form's
-                                    select, a template's select or text box, an AI tool's enum) reads the one
-                                    the model names; model/scope.json says only which fields are modelled
+  3  one source per figure or list  every reader of a field's allowed values anywhere under app/ reads the one
+                                    the model names; model/scope.json says only which fields are modelled.
+                                    The forms it reads and the forms it cannot read are as_built.FORMS_READ and
+                                    as_built.FORMS_NOT_READ, and the check prints both under its findings
   4  satisfied and verified         every requirement has a part that satisfies it and a test that proves it
   5  no collision                   no two open briefs change the same model element
 and the screen check: every event on a screen reaches the route the model names, never a second one.
@@ -346,6 +347,9 @@ def cmd_check(a) -> int:
             status = "ok, below the ratchet: lower it to " + str(n)
         bad += n > cap
         print(f"  check {k}: findings={n} ratchet={cap} {status}")
+        if k == "3":
+            print("  reads: " + "; ".join(as_built.FORMS_READ))
+            print("  does not read: " + "; ".join(as_built.FORMS_NOT_READ))
     reqs = model.requirements()
     print(f"\nmodel: {len(reqs)} requirements, {len(model.parts())} parts; "
           f"release-rule lines without a requirement under them: {len(cover['without_requirement'])} of {cover['rule_lines']}")
