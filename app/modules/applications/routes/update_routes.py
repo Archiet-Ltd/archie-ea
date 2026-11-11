@@ -33,7 +33,7 @@ def _validate_overview(app, form):
     """Return (values to save, {form key: error in words}) for the posted fields."""
     from app.services import element_ownership_service as owners
     from app.services.application_overview_fields import OVERVIEW_TEXT_FIELDS, overview_limits
-    from app.services.application_status import APPLICATION_STATUS_VALUES, match_status, same_status
+    from app.services.application_status import same_status, status_for_write
 
     limits = overview_limits()
     values, errors = {}, {}
@@ -62,12 +62,12 @@ def _validate_overview(app, form):
     if "deployment_status" in form:
         status = form.get("deployment_status", "").strip()
         stored = (app.deployment_status or "").strip()
-        if status and not same_status(status, stored) and match_status(status) is None:
-            errors["deployment_status"] = (
-                "Deployment Status must be one of: " + ", ".join(APPLICATION_STATUS_VALUES) + "."
-            )
-        elif not same_status(status, stored):
-            values["deployment_status"] = match_status(status) or status or None
+        if not same_status(status, stored):
+            stored_status, status_refusal = status_for_write(status)
+            if status_refusal:
+                errors["deployment_status"] = status_refusal
+            else:
+                values["deployment_status"] = stored_status
 
     if "userCount" in form:
         raw = form.get("userCount", "").strip()

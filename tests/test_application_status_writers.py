@@ -171,18 +171,24 @@ def test_the_chat_tool_still_refuses_an_unknown_status(orgs, db_session, tenant_
     result = executor._tool_update_application_status(
         {"application_name": app_a.name, "new_status": "Mystery"})
     assert result["success"] is False
-    assert "Status must be one of" in result["error"]
+    assert "Status 'Mystery' is not one of: design, development" in result["error"]
 
 
 def test_the_planned_figure_counts_design_in_any_case_and_old_planned(orgs, db_session,
                                                                       tenant_ctx):
+    from app import db
     from app.models.application_portfolio import ApplicationComponent
     from app.models.metrics import ApplicationMetricsSnapshot
 
     for word in ("design", "Design ", "planned", "not_started", "development", "production"):
         row = _make_app(db_session, orgs["org_a"], "Ledger")
-        row.deployment_status = word
-    db_session.flush()
+        db_session.flush()
+        # Rows stored before the list existed are seeded as stored: the model refuses them.
+        db_session.execute(
+            db.text("UPDATE application_components SET deployment_status = :w WHERE id = :i"),
+            {"w": word, "i": row.id},
+        )
+    db_session.expire_all()
     with tenant_ctx(orgs["org_a"].id):
         snapshot = ApplicationMetricsSnapshot.create_snapshot()
         rows = ApplicationComponent.query.all()

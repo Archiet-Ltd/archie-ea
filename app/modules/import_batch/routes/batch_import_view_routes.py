@@ -310,7 +310,7 @@ def batch_review(batch_id: int):
 
         # Check access
         if batch.job.user_id != current_user.id:
-            abort(403, description="You don't have permission to review this batch")
+            abort(404, description="Batch not found")
 
         # Get batch summary
         summary = approval_service.get_batch_summary(batch_id)
@@ -375,6 +375,8 @@ def batch_review(batch_id: int):
             can_commit=can_commit,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error loading batch review {batch_id}: {e}", exc_info=True)
         flash("Error loading batch. Please try again.", "error")

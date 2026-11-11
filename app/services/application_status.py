@@ -59,7 +59,38 @@ STATUS_SYNONYMS = {
     "preprod": "staging",
     "pre-prod": "staging",
     "pre-production": "staging",
+    "planning": "design",
+    "in development": "development",
+    "end of life": "decommissioned",
+    "decommission": "decommissioned",
 }
+
+
+# The headings a file may give its status column, in the order they are tried. The CSV,
+# Excel and batch imports and the batch preview all read the column through this one list.
+STATUS_COLUMN_HEADINGS = (
+    "Status",
+    "deployment_status",
+    "Deployment Status",
+    "App Status",
+    "Application Status",
+)
+
+
+def _heading_key(heading) -> str:
+    return " ".join(str(heading).replace("_", " ").split()).lower()
+
+
+def status_cell(row):
+    """(found, value) for the status column of a row keyed by the file's own headings."""
+    by_key = {}
+    for heading, value in (row or {}).items():
+        by_key.setdefault(_heading_key(heading), value)
+    for heading in STATUS_COLUMN_HEADINGS:
+        key = _heading_key(heading)
+        if key in by_key:
+            return True, by_key[key]
+    return False, None
 
 
 def words_for_status(status):
@@ -103,6 +134,19 @@ def status_options(current=None):
     return options
 
 
+def refusal_for(value) -> str:
+    """The one sentence every screen, import and API gives for a refused status."""
+    return f"Status '{str(value).strip()}' is not one of: " + ", ".join(APPLICATION_STATUS_VALUES)
+
+
+class StatusRefused(ValueError):
+    """A status that is not on the list; its text is the one refusal sentence."""
+
+    def __init__(self, value):
+        self.value = value
+        super().__init__(refusal_for(value))
+
+
 def status_for_write(value):
     """What to store for a status a person typed or a file held: (stored, refusal).
 
@@ -116,6 +160,18 @@ def status_for_write(value):
     stored = canonical_status(word) or STATUS_SYNONYMS.get(word)
     if stored:
         return stored, None
-    return None, (
-        f"Status '{str(value).strip()}' is not one of: " + ", ".join(APPLICATION_STATUS_VALUES)
-    )
+    return None, refusal_for(value)
+
+
+def status_to_store(current, value):
+    """What a model stores when `value` is set over `current`; raises StatusRefused.
+
+    A value equal to the stored one passes unchanged, so an off-list value already
+    stored is kept until the person picks one from the list.
+    """
+    if value is not None and current is not None and same_status(value, current):
+        return value
+    stored, refusal = status_for_write(value)
+    if refusal:
+        raise StatusRefused(value)
+    return stored

@@ -19,6 +19,7 @@ from app.models.batch_import import BatchImportApplication, BatchImportJob
 from app.modules.import_batch.v2.services.duplicate_detection_utils_v2 import (
     DuplicateDetectionUtils,
 )
+from app.services.application_status import status_cell
 from app.services.application_cost_accessor import (
     detect_cost_columns,
     map_import_cost_columns,
@@ -154,6 +155,11 @@ class ImportPreviewService:
             clean_rows = []
             for row in applications_data:
                 clean = {k: v for k, v in row.items() if not k.startswith("_")}
+                if "deployment_status" not in clean:
+                    # A file headed Status or Application Status is validated as the status.
+                    found, cell = status_cell(clean)
+                    if found:
+                        clean["deployment_status"] = cell
                 clean_rows.append(clean)
 
             ImportValidator = _get_import_validator()

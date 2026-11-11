@@ -43,7 +43,7 @@ from app.models.application_portfolio import (
 )
 from app.models.audit_log import AuditLog
 from app.services.ai_import_service import get_ai_import_service
-from app.services.application_status import status_for_write
+from app.services.application_status import STATUS_COLUMN_HEADINGS, status_for_write
 from app.utils.file_validation import (
     InvalidFileTypeError,
     get_allowed_extensions_display,
@@ -1117,27 +1117,63 @@ def _refused_rows_message(refused):
 
 
 
+def _import_json_reply(notes, summary):
+    """The modal's answer: how many rows were stored, and each refused row with its reason."""
+    stored = summary["created"] + summary["updated"]
+    errors = [message for category, message in notes if category == "error"]
+    refused_text = _refused_rows_message(summary["refused"]) if summary["refused"] else None
+    notes = [(c, m) for c, m in notes if m != refused_text]
+    if errors and not stored and not summary["refused"]:
+        return jsonify({"success": False, "error": errors[0]}), 400
+    return jsonify(
+        {
+            "success": True,
+            "stored": stored,
+            "created": summary["created"],
+            "updated": summary["updated"],
+            "skipped": summary["skipped"],
+            "refused": summary["refused"],
+            "messages": [{"category": c, "message": m} for c, m in notes],
+        }
+    )
+
+
 @unified_applications_bp.route("/import", methods=["POST"])
 @login_required
 @audit_log("application_import")
 @import_rate_limit(max_calls_per_minute=5, max_calls_per_hour=30, max_calls_per_day=150)
 def application_import():
     """Import Application Components from CSV or JSON with AI-powered analysis"""
-    if "file" not in request.files:
-        flash("No file uploaded", "error")
+    wants_json = request.accept_mimetypes.best == "application/json"
+    notes = []  # (category, message), in the order a person reads them
+    summary = {"created": 0, "updated": 0, "skipped": 0, "refused": []}
+
+    def say(message, category="info"):
+        """Tell the person: a flash for a form post, a line in the reply for the modal."""
+        notes.append((category, message))
+        if not wants_json:
+            flash(message, category)
+
+    def _finish():
+        if wants_json:
+            return _import_json_reply(notes, summary)
         return redirect(url_for("unified_applications.application_list"))
+
+    if "file" not in request.files:
+        say("No file uploaded", "error")
+        return _finish()
 
     file = request.files["file"]
     original_filename = file.filename  # Store for audit logging
 
     if file.filename == "":
-        flash("No file selected", "error")
-        return redirect(url_for("unified_applications.application_list"))
+        say("No file selected", "error")
+        return _finish()
 
     # AUDIT-IMP-004: Validate file extension to prevent uploading of unsafe file types
     import os
 
-    allowed_extensions = {".csv", ".xlsx", ".xls"}
+    allowed_extensions = {".csv", ".xlsx", ".xls", ".json"}
     file_ext = os.path.splitext(file.filename or "")[1].lower()
     if file_ext not in allowed_extensions:
         # IMP-002: Audit failed upload
@@ -1149,11 +1185,11 @@ def application_import():
             status="failed",
             error_message=f"Invalid file extension: {file_ext}"
         )
-        flash(
-            f"Invalid file type '{file_ext}'. Only CSV and Excel files (.csv, .xlsx, .xls) are allowed.",
+        say(
+            f"Invalid file type '{file_ext}'. Only CSV, Excel and JSON files (.csv, .xlsx, .xls, .json) are allowed.",
             "error",
         )
-        return redirect(url_for("unified_applications.application_list"))
+        return _finish()
 
     # IMP-001: Validate MIME type by magic numbers (file header), not just extension
     try:
@@ -1168,11 +1204,11 @@ def application_import():
             status="failed",
             error_message=f"Invalid MIME type: {str(e)}"
         )
-        flash(
+        say(
             f"Invalid file type. Allowed: {get_allowed_extensions_display()}",
             "error",
         )
-        return redirect(url_for("unified_applications.application_list"))
+        return _finish()
 
     # AUDIT-IMP-005: Content-hash idempotency check to prevent double-click race condition.
     # Read file content once into memory so we can hash it for dedup and still parse it later.
@@ -1186,12 +1222,12 @@ def application_import():
 
     _cached_result = check_import_idempotency(_file_content_bytes, current_user.id)
     if _cached_result is not None:
-        flash(
+        say(
             "This file was already imported within the last 5 minutes. "
             "Returning previous result.",
             "warning",
         )
-        return redirect(url_for("unified_applications.application_list"))
+        return _finish()
 
     # Legacy DB-based idempotency check (kept for backward compatibility with import_token)
     import_token = request.form.get("import_token")
@@ -1207,11 +1243,11 @@ def application_import():
             >= datetime.utcnow() - timedelta(seconds=idempotency_window),
         ).first()
         if recent_dup:
-            flash(
+            say(
                 "This file was already imported within the last 5 minutes. Please wait and try again.",
                 "warning",
             )
-            return redirect(url_for("unified_applications.application_list"))
+            return _finish()
 
     # Get import mode: 'skip', 'update', or 'duplicate' (default to skip for safety)
     import_mode = request.form.get("import_mode", "skip")
@@ -1227,8 +1263,8 @@ def application_import():
     try:
         confidence_threshold = float(request.form.get("confidence_threshold", "0.7"))
     except (ValueError, TypeError):
-        flash("confidence_threshold must be a number", "error")
-        return redirect(url_for("unified_applications.application_list"))
+        say("confidence_threshold must be a number", "error")
+        return _finish()
 
     # Quick import mode: skip AI to prevent timeout (for E2E tests and fast imports)
     quick_mode = request.form.get("quick_mode", "false").lower() == "true"
@@ -1467,14 +1503,7 @@ def application_import():
                             )
                         )
                         row_status = _status_value(
-                            get_csv_field(
-                                row,
-                                "Status",
-                                "deployment_status",
-                                "Deployment Status",
-                                "App Status",
-                                "Application Status",
-                            )
+                            get_csv_field(row, *STATUS_COLUMN_HEADINGS)
                         )
                         if existing_app and import_mode == "update":
                             # Update existing record with flexible column matching
@@ -1929,12 +1958,13 @@ def application_import():
                 except Exception as e:
                     current_app.logger.error(f"AI import service error: {e}")
                     db.session.rollback()
-                    flash(
+                    say(
                         "Import succeeded but AI analysis encountered an error.",
                         "warning",
                     )
 
             # Build success message
+            summary.update(created=count, updated=updated, skipped=skipped, refused=refused)
             msg_parts = []
             if count > 0:
                 msg_parts.append(f"{count} created")
@@ -1946,16 +1976,16 @@ def application_import():
                 msg_parts.append(f"{len(refused)} refused")
 
             if stopped_at_row is not None:
-                flash(
+                say(
                     f"Import stopped after {_MAX_DATABASE_ERRORS_IN_A_ROW} database errors "
                     f"in a row at row {stopped_at_row}; the rows after it were not read. "
                     f"Saved so far: {', '.join(msg_parts)}",
                     "error",
                 )
             else:
-                flash(f"Import complete: {', '.join(msg_parts)}", "success")
+                say(f"Import complete: {', '.join(msg_parts)}", "success")
             if refused:
-                flash(_refused_rows_message(refused), "warning")
+                say(_refused_rows_message(refused), "warning")
 
             # Add AI results to flash message if AI was enabled
             if enable_ai and (
@@ -1969,13 +1999,13 @@ def application_import():
                     )
                 if ai_results["vendor_matches"] > 0:
                     ai_msg += f", {ai_results['vendor_matches']} vendor matches"
-                flash(ai_msg, "success")
+                say(ai_msg, "success")
 
             if len(non_numeric_user_counts) > 0:
                 preview = ", ".join(non_numeric_user_counts[:5])
                 if len(non_numeric_user_counts) > 5:
                     preview += ", ..."
-                flash(
+                say(
                     "Some user counts were non-numeric and were left blank: " + preview,
                     "warning",
                 )
@@ -1983,15 +2013,34 @@ def application_import():
         elif filename.endswith(".json"):
             # Parse JSON
             data = json.load(file.stream)
+            if isinstance(data, dict):
+                # The preview reads the same wrapped forms, so the import does too.
+                data = data.get("applications", data.get("data", [data]))
 
             if not isinstance(data, list):
                 raise ValueError("JSON payload must be a list of application objects.")
+
+            # Column mapping sent by the import page: {key in the file: target field}.
+            json_renames = {}
+            _raw_json_mappings = request.form.get("field_mappings")
+            if _raw_json_mappings:
+                try:
+                    _json_mappings = json.loads(_raw_json_mappings)
+                except json.JSONDecodeError:
+                    raise ValueError("The column mapping could not be read.")
+                if isinstance(_json_mappings, dict):
+                    json_renames = {
+                        key: target
+                        for key, target in _json_mappings.items()
+                        if target and target != key
+                    }
 
             count = 0
             skipped = 0
             updated = 0
             # Track names processed in THIS import to detect duplicates within the same JSON file
             processed_names = set()
+            refused = []  # {row, name, reason} for each record the import could not save
 
             # Batch prefetch all existing application names for case-insensitive lookup
             _all_existing_apps_json = ApplicationComponent.query.limit(
@@ -2002,9 +2051,16 @@ def application_import():
             }
 
             for index, item in enumerate(data, start=1):
+                if not isinstance(item, dict):
+                    refused.append({"row": index, "name": "", "reason": "the record is not an object"})
+                    continue
+                for key, target in json_renames.items():
+                    if key in item:
+                        item = {**item, target: item[key]}
                 name = _clean(item.get("name"))
                 if not name:
-                    raise ValueError(f"Record {index}: 'name' is required.")
+                    refused.append({"row": index, "name": "", "reason": "the name is empty"})
+                    continue
 
                 # Normalize name for duplicate checking (case-insensitive)
                 name_lower = name.lower()
@@ -2023,73 +2079,87 @@ def application_import():
                 # Check if application exists (case-insensitive match, using prefetched data)
                 existing_app = _existing_app_by_name_json.get(name_lower)
 
-                row_status, status_refusal = status_for_write(item.get("deployment_status"))
-                if status_refusal:
-                    raise ValueError(f"Record {index}: {status_refusal}")
-
                 if existing_app and import_mode == "skip":
                     skipped += 1
                     processed_names.add(name_lower)  # Track that we've seen this name
                     continue
-                elif existing_app and import_mode == "update":
-                    # Update existing record
-                    _set_if_present(existing_app, "component_type", _clean(item.get("component_type")))
-                    _set_if_present(existing_app, "application_category", _clean(
-                        item.get("application_category")
-                    ))
-                    _set_if_present(existing_app, "technology_stack", _clean(item.get("technology_stack")))
-                    _set_if_present(existing_app, "version", _clean(item.get("version")))
-                    _set_if_present(existing_app, "deployment_status", row_status)
-                    _set_if_present(existing_app, "business_domain", _clean(item.get("business_domain")))
-                    _set_if_present(existing_app, "business_owner", _clean(item.get("business_owner")))
-                    _set_if_present(existing_app, "development_team", _clean(item.get("development_team")))
-                    _set_if_present(existing_app, "user_base_size", _parse_user_count(
-                        item.get("user_count")
-                    ))
-                    _set_if_present(existing_app, "business_criticality", _clean(
-                        item.get("business_criticality")
-                    ))
+                outcome = None
+                refusal = None
+                try:
+                    with db.session.begin_nested():
+                        row_status = _status_value(item.get("deployment_status"))
+                        if existing_app and import_mode == "update":
+                            # Update existing record
+                            _set_if_present(existing_app, "component_type", _clean(item.get("component_type")))
+                            _set_if_present(existing_app, "application_category", _clean(
+                                item.get("application_category")
+                            ))
+                            _set_if_present(existing_app, "technology_stack", _clean(item.get("technology_stack")))
+                            _set_if_present(existing_app, "version", _clean(item.get("version")))
+                            _set_if_present(existing_app, "deployment_status", row_status)
+                            _set_if_present(existing_app, "business_domain", _clean(item.get("business_domain")))
+                            _set_if_present(existing_app, "business_owner", _clean(item.get("business_owner")))
+                            _set_if_present(existing_app, "development_team", _clean(item.get("development_team")))
+                            _set_if_present(existing_app, "user_base_size", _parse_user_count(
+                                item.get("user_count")
+                            ))
+                            _set_if_present(existing_app, "business_criticality", _clean(
+                                item.get("business_criticality")
+                            ))
 
-                    # Add import fields for auto-mapping functionality
-                    _set_if_present(existing_app, "imported_capabilities", _clean(
-                        item.get("imported_capabilities")
-                    ))
-                    _set_if_present(existing_app, "application_services", _clean(
-                        item.get("application_services")
-                    ))
-                    _set_if_present(existing_app, "application_functions_text", _clean(
-                        item.get("application_functions_text")
-                    ))
-                    _set_if_present(existing_app, "imported_apqc_codes", _clean(
-                        item.get("imported_apqc_codes")
-                    ))
-                    updated += 1
-                    processed_names.add(name_lower)  # Track that we've seen this name
-                else:
-                    # Create new record (duplicate mode or doesn't exist)
-                    app = ApplicationComponent(
-                        name=name,
-                        component_type=_clean(item.get("component_type")),
-                        application_category=_clean(item.get("application_category")),
-                        technology_stack=_clean(item.get("technology_stack")),
-                        version=_clean(item.get("version")),
-                        deployment_status=row_status,
-                        business_domain=_clean(item.get("business_domain")),
-                        business_owner=_clean(item.get("business_owner")),
-                        development_team=_clean(item.get("development_team")),
-                        user_base_size=_parse_user_count(item.get("user_count")),
-                        business_criticality=_clean(item.get("business_criticality")),
-                        # Add import fields for auto-mapping functionality
-                        imported_capabilities=_clean(item.get("imported_capabilities")),
-                        application_services=_clean(item.get("application_services")),
-                        application_functions_text=_clean(
-                            item.get("application_functions_text")
-                        ),
-                        imported_apqc_codes=_clean(item.get("imported_apqc_codes")),
+                            # Add import fields for auto-mapping functionality
+                            _set_if_present(existing_app, "imported_capabilities", _clean(
+                                item.get("imported_capabilities")
+                            ))
+                            _set_if_present(existing_app, "application_services", _clean(
+                                item.get("application_services")
+                            ))
+                            _set_if_present(existing_app, "application_functions_text", _clean(
+                                item.get("application_functions_text")
+                            ))
+                            _set_if_present(existing_app, "imported_apqc_codes", _clean(
+                                item.get("imported_apqc_codes")
+                            ))
+                            outcome = "updated"
+                        else:
+                            # Create new record (duplicate mode or doesn't exist)
+                            app = ApplicationComponent(
+                                name=name,
+                                component_type=_clean(item.get("component_type")),
+                                application_category=_clean(item.get("application_category")),
+                                technology_stack=_clean(item.get("technology_stack")),
+                                version=_clean(item.get("version")),
+                                deployment_status=row_status,
+                                business_domain=_clean(item.get("business_domain")),
+                                business_owner=_clean(item.get("business_owner")),
+                                development_team=_clean(item.get("development_team")),
+                                user_base_size=_parse_user_count(item.get("user_count")),
+                                business_criticality=_clean(item.get("business_criticality")),
+                                # Add import fields for auto-mapping functionality
+                                imported_capabilities=_clean(item.get("imported_capabilities")),
+                                application_services=_clean(item.get("application_services")),
+                                application_functions_text=_clean(
+                                    item.get("application_functions_text")
+                                ),
+                                imported_apqc_codes=_clean(item.get("imported_apqc_codes")),
+                            )
+                            db.session.add(app)
+                            outcome = "created"
+                except _RowRefused as exc:
+                    refusal = str(exc)
+                except Exception as exc:
+                    current_app.logger.warning(
+                        "Application import: record %s refused: %s", index, exc
                     )
-                    db.session.add(app)
+                    refusal = _database_reason(exc, index)
+                if refusal is not None:
+                    refused.append({"row": index, "name": name, "reason": refusal})
+                    continue
+                if outcome == "updated":
+                    updated += 1
+                else:
                     count += 1
-                    processed_names.add(name_lower)  # Track that we've seen this name
+                processed_names.add(name_lower)
 
             db.session.commit()
 
@@ -2279,12 +2349,13 @@ def application_import():
                 except Exception as e:
                     current_app.logger.error(f"AI import service error (JSON): {e}")
                     db.session.rollback()
-                    flash(
+                    say(
                         "Import succeeded but AI analysis encountered an error.",
                         "warning",
                     )
 
             # Build success message
+            summary.update(created=count, updated=updated, skipped=skipped, refused=refused)
             msg_parts = []
             if count > 0:
                 msg_parts.append(f"{count} created")
@@ -2292,8 +2363,12 @@ def application_import():
                 msg_parts.append(f"{updated} updated")
             if skipped > 0:
                 msg_parts.append(f"{skipped} skipped")
+            if refused:
+                msg_parts.append(f"{len(refused)} refused")
 
-            flash(f"Import complete: {', '.join(msg_parts)}", "success")
+            say(f"Import complete: {', '.join(msg_parts)}", "success")
+            if refused:
+                say(_refused_rows_message(refused), "warning")
 
             if enable_ai and (
                 ai_results["total_capabilities_mapped"] > 0
@@ -2306,18 +2381,18 @@ def application_import():
                     )
                 if ai_results["vendor_matches"] > 0:
                     ai_msg += f", {ai_results['vendor_matches']} vendor matches"
-                flash(ai_msg, "success")
+                say(ai_msg, "success")
 
         elif filename.endswith(".xlsx") or filename.endswith(".xls"):
             # Parse Excel file
             try:
                 from openpyxl import load_workbook
             except ImportError:
-                flash(
+                say(
                     "Excel support requires openpyxl library. Please install it with: pip install openpyxl",
                     "error",
                 )
-                return redirect(url_for("unified_applications.application_list"))
+                return _finish()
 
             # Load workbook from file stream
             workbook = load_workbook(filename=io.BytesIO(file.read()), data_only=True)
@@ -2367,6 +2442,7 @@ def application_import():
             updated = 0
             non_numeric_user_counts = []
             processed_names = set()
+            refused = []  # {row, name, reason} for each row the import could not save
 
             # Batch prefetch all existing application names for case-insensitive lookup
             _all_existing_apps_xlsx = ApplicationComponent.query.limit(
@@ -2389,7 +2465,10 @@ def application_import():
 
                 name = _clean(row_dict.get(name_column))
                 if not name:
-                    raise ValueError(f"Row {row_idx}: 'Name' is required.")
+                    refused.append(
+                        {"row": row_idx, "name": "", "reason": "the Name cell is empty"}
+                    )
+                    continue
 
                 name_lower = name.lower()
                 declared.append((name, declared_dependencies.depends_on_cell(row_dict)))
@@ -2428,119 +2507,132 @@ def application_import():
                                 return value
                     return None
 
-                row_status, status_refusal = status_for_write(
-                    get_field("Application Status", "Status", "deployment_status")
-                )
-                if status_refusal:
-                    raise ValueError(f"Row {row_idx}: {status_refusal}")
-
                 if existing_app and import_mode == "skip":
                     skipped += 1
                     processed_names.add(name_lower)
                     continue
-                elif existing_app and import_mode == "update":
-                    # Update existing record with your template column names
-                    _set_if_present(existing_app, "description", _clean(get_field("Description")))
-                    _set_if_present(existing_app, "application_category", _clean(
-                        get_field("Category", "application_category")
-                    ))
-                    _set_if_present(existing_app, "business_criticality", _clean(
-                        get_field("Business Criticality", "business_criticality")
-                    ))
-                    _set_if_present(existing_app, "deployment_status", row_status)
-                    _set_if_present(existing_app, "lifecycle_status", _clean(
-                        get_field("Lifecycle Status", "lifecycle_status")
-                    ))
-                    _set_if_present(existing_app, "business_owner", _clean(
-                        get_field(
-                            "App Business Owner", "Business Owner", "business_owner"
-                        )
-                    ))
-                    _set_if_present(existing_app, "application_owner", _clean(
-                        get_field("Application Manager", "application_owner")
-                    ))
-                    _set_if_present(existing_app, "user_types", _clean(
-                        get_field("Target Users", "user_types")
-                    ))
-                    _set_if_present(existing_app, "programming_languages", _clean(
-                        get_field("Programming Languages", "programming_languages")
-                    ))
-                    _set_if_present(existing_app, "support_level", _clean(
-                        get_field("Support Level", "support_level")
-                    ))
-                    _set_if_present(existing_app, "vendor_name", _clean(
-                        get_field("Package Vendor", "Vendor", "vendor_name")
-                    ))
-                    _set_if_present(existing_app, "technical_risk", _clean(
-                        get_field("Risk Level", "technical_risk")
-                    ))
-                    _set_if_present(existing_app, "number_of_integrations", _parse_user_count(
-                        get_field("Interfaces - Number", "number_of_integrations")
-                    ))
-                    _set_if_present(existing_app, "cloud_provider", _clean(
-                        get_field("Public Cloud Provider", "cloud_provider")
-                    ))
-                    _set_if_present(existing_app, "rpo_hours", _parse_user_count(
-                        get_field("RPO", "rpo_hours")
-                    ))
-                    _set_if_present(existing_app, "rto_hours", _parse_user_count(
-                        get_field("RTO", "rto_hours")
-                    ))
-                    updated += 1
-                    processed_names.add(name_lower)
-                else:
-                    # Create new record with your template column names
-                    app = ApplicationComponent(
-                        name=name,
-                        description=_clean(get_field("Description")),
-                        application_category=_clean(
-                            get_field("Category", "application_category")
-                        ),
-                        business_criticality=_clean(
-                            get_field("Business Criticality", "business_criticality")
-                        ),
-                        deployment_status=row_status,
-                        lifecycle_status=_clean(
-                            get_field("Lifecycle Status", "lifecycle_status")
-                        ),
-                        business_owner=_clean(
-                            get_field(
-                                "App Business Owner", "Business Owner", "business_owner"
+                outcome = None
+                refusal = None
+                try:
+                    with db.session.begin_nested():
+                        row_status = _status_value(get_field(*STATUS_COLUMN_HEADINGS))
+                        if existing_app and import_mode == "update":
+                            # Update existing record with your template column names
+                            _set_if_present(existing_app, "description", _clean(get_field("Description")))
+                            _set_if_present(existing_app, "application_category", _clean(
+                                get_field("Category", "application_category")
+                            ))
+                            _set_if_present(existing_app, "business_criticality", _clean(
+                                get_field("Business Criticality", "business_criticality")
+                            ))
+                            _set_if_present(existing_app, "deployment_status", row_status)
+                            _set_if_present(existing_app, "lifecycle_status", _clean(
+                                get_field("Lifecycle Status", "lifecycle_status")
+                            ))
+                            _set_if_present(existing_app, "business_owner", _clean(
+                                get_field(
+                                    "App Business Owner", "Business Owner", "business_owner"
+                                )
+                            ))
+                            _set_if_present(existing_app, "application_owner", _clean(
+                                get_field("Application Manager", "application_owner")
+                            ))
+                            _set_if_present(existing_app, "user_types", _clean(
+                                get_field("Target Users", "user_types")
+                            ))
+                            _set_if_present(existing_app, "programming_languages", _clean(
+                                get_field("Programming Languages", "programming_languages")
+                            ))
+                            _set_if_present(existing_app, "support_level", _clean(
+                                get_field("Support Level", "support_level")
+                            ))
+                            _set_if_present(existing_app, "vendor_name", _clean(
+                                get_field("Package Vendor", "Vendor", "vendor_name")
+                            ))
+                            _set_if_present(existing_app, "technical_risk", _clean(
+                                get_field("Risk Level", "technical_risk")
+                            ))
+                            _set_if_present(existing_app, "number_of_integrations", _parse_user_count(
+                                get_field("Interfaces - Number", "number_of_integrations")
+                            ))
+                            _set_if_present(existing_app, "cloud_provider", _clean(
+                                get_field("Public Cloud Provider", "cloud_provider")
+                            ))
+                            _set_if_present(existing_app, "rpo_hours", _parse_user_count(
+                                get_field("RPO", "rpo_hours")
+                            ))
+                            _set_if_present(existing_app, "rto_hours", _parse_user_count(
+                                get_field("RTO", "rto_hours")
+                            ))
+                            outcome = "updated"
+                        else:
+                            # Create new record with your template column names
+                            app = ApplicationComponent(
+                                name=name,
+                                description=_clean(get_field("Description")),
+                                application_category=_clean(
+                                    get_field("Category", "application_category")
+                                ),
+                                business_criticality=_clean(
+                                    get_field("Business Criticality", "business_criticality")
+                                ),
+                                deployment_status=row_status,
+                                lifecycle_status=_clean(
+                                    get_field("Lifecycle Status", "lifecycle_status")
+                                ),
+                                business_owner=_clean(
+                                    get_field(
+                                        "App Business Owner", "Business Owner", "business_owner"
+                                    )
+                                ),
+                                application_owner=_clean(
+                                    get_field("Application Manager", "application_owner")
+                                ),
+                                user_types=_clean(get_field("Target Users", "user_types")),
+                                programming_languages=_clean(
+                                    get_field("Programming Languages", "programming_languages")
+                                ),
+                                support_level=_clean(
+                                    get_field("Support Level", "support_level")
+                                ),
+                                vendor_name=_clean(
+                                    get_field("Package Vendor", "Vendor", "vendor_name")
+                                ),
+                                technical_risk=_clean(
+                                    get_field("Risk Level", "technical_risk")
+                                ),
+                                number_of_integrations=_parse_user_count(
+                                    get_field("Interfaces - Number", "number_of_integrations")
+                                ),
+                                cloud_provider=_clean(
+                                    get_field("Public Cloud Provider", "cloud_provider")
+                                ),
+                                rpo_hours=_parse_user_count(get_field("RPO", "rpo_hours")),
+                                rto_hours=_parse_user_count(get_field("RTO", "rto_hours")),
                             )
-                        ),
-                        application_owner=_clean(
-                            get_field("Application Manager", "application_owner")
-                        ),
-                        user_types=_clean(get_field("Target Users", "user_types")),
-                        programming_languages=_clean(
-                            get_field("Programming Languages", "programming_languages")
-                        ),
-                        support_level=_clean(
-                            get_field("Support Level", "support_level")
-                        ),
-                        vendor_name=_clean(
-                            get_field("Package Vendor", "Vendor", "vendor_name")
-                        ),
-                        technical_risk=_clean(
-                            get_field("Risk Level", "technical_risk")
-                        ),
-                        number_of_integrations=_parse_user_count(
-                            get_field("Interfaces - Number", "number_of_integrations")
-                        ),
-                        cloud_provider=_clean(
-                            get_field("Public Cloud Provider", "cloud_provider")
-                        ),
-                        rpo_hours=_parse_user_count(get_field("RPO", "rpo_hours")),
-                        rto_hours=_parse_user_count(get_field("RTO", "rto_hours")),
+                            db.session.add(app)
+                            outcome = "created"
+                except _RowRefused as exc:
+                    refusal = str(exc)
+                except Exception as exc:
+                    current_app.logger.warning(
+                        "Application import: row %s refused: %s", row_idx, exc
                     )
-                    db.session.add(app)
+                    refusal = _database_reason(exc, row_idx)
+                if refusal is not None:
+                    refused.append({"row": row_idx, "name": name, "reason": refusal})
+                    continue
+                if outcome == "updated":
+                    updated += 1
+                else:
                     count += 1
-                    processed_names.add(name_lower)
+                processed_names.add(name_lower)
 
             db.session.commit()
             declared_dependencies.record(declared, original_filename)
 
             # Build success message
+            summary.update(created=count, updated=updated, skipped=skipped, refused=refused)
             msg_parts = []
             if count > 0:
                 msg_parts.append(f"{count} created")
@@ -2548,8 +2640,12 @@ def application_import():
                 msg_parts.append(f"{updated} updated")
             if skipped > 0:
                 msg_parts.append(f"{skipped} skipped")
+            if refused:
+                msg_parts.append(f"{len(refused)} refused")
 
-            flash(f"Import complete: {', '.join(msg_parts)}", "success")
+            say(f"Import complete: {', '.join(msg_parts)}", "success")
+            if refused:
+                say(_refused_rows_message(refused), "warning")
 
             # Store successful import in idempotency cache to prevent duplicate processing
             store_import_idempotency(
@@ -2571,19 +2667,19 @@ def application_import():
             )
 
         else:
-            flash(
+            say(
                 "Invalid file format. Please upload CSV, JSON, or Excel (.xlsx)",
                 "error",
             )
 
     except ValueError as exc:
         db.session.rollback()
-        flash(f"Invalid import data: {exc}", "error")
+        say(f"Invalid import data: {exc}", "error")
     except Exception:
         db.session.rollback()
-        flash("Error importing file. Please try again.", "error")
+        say("Error importing file. Please try again.", "error")
 
-    return redirect(url_for("unified_applications.application_list"))
+    return _finish()
 
 
 # ---------------------------------------------------------------------------

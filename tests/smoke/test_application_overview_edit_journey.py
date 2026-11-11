@@ -24,7 +24,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 ARCHITECT = "enterprise_architect"
 
 # Opt-in walk screenshots: off unless a directory is named.
-WALK = os.environ.get("APPEDIT_WALK_DIR")
+WALK = os.environ.get("SMOKE_SCREENSHOT_DIR")
 
 
 def _shot(page, name):

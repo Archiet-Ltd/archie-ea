@@ -116,4 +116,4 @@ def test_the_import_preview_accepts_design_and_retiring_and_is_private(
     assert "deployment_status" not in validation["errors_by_field"]
 
     login_as(client, user_b)
-    assert client.get(f"/api/batch-import/jobs/{job.id}/preview").status_code == 403
+    assert client.get(f"/api/batch-import/jobs/{job.id}/preview").status_code == 404

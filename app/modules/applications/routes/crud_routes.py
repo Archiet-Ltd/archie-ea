@@ -804,24 +804,16 @@ def application_edit(id):
                 is_valid, validated_status, error = validate_string(
                     deployment_status, max_length=50, field_name="deployment_status"
                 )
-                from app.services.application_status import (
-                    APPLICATION_STATUS_VALUES,
-                    match_status,
-                    same_status,
-                )
+                from app.services.application_status import same_status, status_for_write
 
                 if not is_valid:
                     validation_errors.append(error)
-                elif (
-                    not same_status(validated_status, app.deployment_status)
-                    and match_status(validated_status) is None
-                ):
-                    validation_errors.append(
-                        "Deployment Status must be one of: "
-                        + ", ".join(APPLICATION_STATUS_VALUES) + "."
-                    )
                 elif not same_status(validated_status, app.deployment_status):
-                    app.deployment_status = match_status(validated_status) or validated_status
+                    stored_status, status_refusal = status_for_write(validated_status)
+                    if status_refusal:
+                        validation_errors.append(status_refusal)
+                    else:
+                        app.deployment_status = stored_status
 
             # Validate business_purpose
             business_purpose = request.form.get("business_purpose")
