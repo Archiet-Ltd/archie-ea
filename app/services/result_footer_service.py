@@ -481,7 +481,9 @@ def gap_footer(gap, now: Optional[datetime] = None) -> Dict[str, Any]:
     when = getattr(gap, "updated_at", None) or getattr(gap, "created_at", None)
     href = page_link("archimate_crud.detail_element", layer="implementation", element_type="Gap", element_id=gap.id)
     facts = [fact(gap.name, href=href, source_kind=kind, as_of=when, subject="Gap")]
-    severity = (getattr(gap, "severity", None) or "").strip()
+    from app.services.gap_register_service import effective_severity
+
+    severity = (effective_severity(gap) or "").strip()
     if severity:
         facts.append(fact("Severity: %s" % severity, href=href, source_kind="manual", subject="Severity", as_of=when))
     else:
@@ -631,7 +633,8 @@ def roadmap_summary_footer(organization_id: int, capability_count: int, domain_c
     (passed in, so footer and card cannot disagree); gaps, plateaus and work packages are counted for this
     organisation. Each is dated by the newest record behind it."""
     from app import db
-    from app.models.implementation_migration import Gap, Plateau
+    from app.models.implementation_migration import GAP_KIND_PLATEAU_TRANSITION, Gap, Plateau
+    from app.services.gap_register_service import count_gaps
     from app.models.unified_capability import BusinessDomain, UnifiedCapability
     from app.models.unified_work_package import UnifiedWorkPackage
 
@@ -646,12 +649,16 @@ def roadmap_summary_footer(organization_id: int, capability_count: int, domain_c
                 model.organization_id == organization_id)).one()
         return named(label, count, subject, endpoint, newest)
 
+    # Gaps are the register's count (plateau transitions left out), the figure the Recorded gaps card shows.
+    gaps_newest = db.session.execute(db.select(db.func.max(Gap.updated_at)).where(
+        Gap.organization_id == organization_id, Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION)).scalar()
+    gap_count_fact = named("Gaps", count_gaps(organization_id), "Gaps", "enterprise.gap_analysis", gaps_newest)
     capabilities_newest = db.session.execute(db.select(db.func.max(UnifiedCapability.updated_at))).scalar()
     domains_newest = db.session.execute(db.select(db.func.max(BusinessDomain.updated_at))).scalar()
     return build_footer([
         named("Capabilities", capability_count, "Capabilities", "capability_map.index", capabilities_newest),
         named("Domains", domain_count, "Domains", "capability_map.index", domains_newest),
-        counted(Gap, "Gaps", "Gaps", "enterprise.gap_analysis"),
+        gap_count_fact,
         counted(Plateau, "Plateaus", "Plateaus", "implementation_planning.plateaus_list"),
         counted(UnifiedWorkPackage, "Work packages", "Work packages", "implementation_planning.work_packages_list"),
     ], now)

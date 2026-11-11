@@ -11,6 +11,7 @@ from app import db
 # Import blueprint after other imports to avoid circular import
 from app.main.views import main
 from app.models.application_layer import ApplicationComponent
+from app.services.gap_register_service import severity_order_expr
 from app.models.archimate_core import ArchiMateElement
 from app.models.implementation_migration import Gap, Plateau, WorkPackage
 from app.models.unified_work_package import UnifiedWorkPackage
@@ -35,7 +36,7 @@ def application_roadmap(id):
         # Get gaps related to this application
         gaps = (
             Gap.query.filter(Gap.application_component_id == id)
-            .order_by(Gap.priority.desc(), Gap.created_at.desc())
+            .order_by(severity_order_expr(), Gap.created_at.desc())
             .all()
         )
 

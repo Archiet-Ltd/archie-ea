@@ -24,7 +24,9 @@
 {% set layer_label = layer | plain_layer(current_user) %}
 {% set conn = page.connections %}
 {% set connection_count = (conn.depends_on | length + conn.used_by | length + conn.other | length) if conn.available else none %}
-{% set edit_url = url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id) %}
+{# An element held with no record of its own is addressed by the element's id, and says so: the two number spaces overlap. #}
+{% set id_scope = {'ae': 1} if element.__class__.__name__ == 'ArchiMateElement' else {} %}
+{% set edit_url = url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id, **id_scope) %}
 {% set flag_help = {
     'Critical path member': 'Part of a chain that has to keep running for the business to run.',
     'Is customized': 'Changed from the standard definition this element started from.',
@@ -88,10 +90,12 @@
                 </p>
                 {% endif %}
             </div>
+            {% if can_change_model() %}
             <span class="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
             {% call button(variant='outline', on_click='deleteElement()', testid='delete-element', aria_label='Delete ' ~ elem_name, class='gap-2 text-destructive-emphasis col-span-2 sm:col-span-1') %}
                 <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>Delete
             {% endcall %}
+            {% endif %}
         </div>
     {% endmacro %}
 
@@ -305,7 +309,7 @@
                 {% endif %}
                 {% for field in display_fields if field.label not in flag_help %}
                 <div><dt class="text-muted-foreground">{{ field.label }}</dt>
-                <dd class="break-words font-medium">{{ field.value }}</dd></div>
+                <dd class="break-words font-medium">{% if field.href %}<a href="{{ field.href }}" class="text-primary hover:underline">{{ field.value }}</a>{% else %}{{ field.value }}{% endif %}</dd></div>
                 {% endfor %}
             </dl>
 
@@ -434,7 +438,7 @@ function archimateDetail() {
             if (!(await Platform.modal.confirm('Delete "' + {{ elem_name | tojson }} + '"? This cannot be undone.'))) return;
             try {
                 const data = await Platform.fetch(
-                    '{{ url_for("archimate_crud.delete_element", layer=layer, element_type=element_type, element_id=element.id) }}',
+                    '{{ url_for("archimate_crud.delete_element", layer=layer, element_type=element_type, element_id=element.id, **id_scope) }}',
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -442,7 +446,7 @@ function archimateDetail() {
                     }
                 );
                 if (data.success) {
-                    window.location.href = '{{ url_for("archimate_crud.list_elements", layer=layer, element_type=element_type) }}';
+                    window.location.href = {{ after_delete_url | tojson }};
                 } else {
                     Platform.toast.error('Error: ' + (data.error || 'Unknown error'));
                 }

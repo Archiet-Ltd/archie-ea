@@ -29,7 +29,7 @@ from ..models.implementation_migration import (
     Plateau as ImplementationPlateau,
 )
 from ..models.unified_work_package import UnifiedWorkPackage as ImplementationWorkPackage
-from ..services import result_footer_service, work_package_service
+from ..services import gap_register_service, result_footer_service, work_package_service
 from ..models.unified_capability import UnifiedCapability
 from ..services.gap_discovery_service import GapDiscoveryService
 from . import implementation_planning
@@ -98,9 +98,7 @@ def implementation_dashboard():
             "completed": ImplementationWorkPackage.query.filter_by(
                 status="completed"
             ).count(),
-            "critical_gaps": ImplementationGap.query.filter_by(
-                priority="critical"
-            ).count(),
+            "critical_gaps": gap_register_service.count_gaps(_org_id(), severity="critical"),
         }
 
         # Get recent work packages
@@ -113,12 +111,7 @@ def implementation_dashboard():
         )
 
         # Get critical gaps
-        critical_gaps = (
-            ImplementationGap.query.filter_by(priority="critical")
-            .order_by(ImplementationGap.created_at.desc())
-            .limit(5)
-            .all()
-        )
+        critical_gaps = gap_register_service.list_gaps(_org_id(), severity="critical", limit=5)
 
         # Get capability implementation summary
         # Maps Capability -> List of Work Packages via Application mapping
@@ -599,9 +592,7 @@ def api_dashboard_stats():
             "completed": ImplementationWorkPackage.query.filter_by(
                 status="completed"
             ).count(),
-            "critical_gaps": ImplementationGap.query.filter_by(
-                priority="critical"
-            ).count(),
+            "critical_gaps": gap_register_service.count_gaps(_org_id(), severity="critical"),
         }
         return jsonify({"stats": stats})
     except Exception:
@@ -798,14 +789,14 @@ def gaps_list():
             query = query.filter(ImplementationGap.gap_type == gap_type)
 
         if priority:
-            query = query.filter(ImplementationGap.priority == priority)
+            query = query.filter(gap_register_service.priority_filter_clause(priority))
 
         if status:
             query = query.filter(ImplementationGap.resolution_status == status)
 
         # Order by priority and creation date
         query = query.order_by(
-            ImplementationGap.priority.desc(), ImplementationGap.created_at.desc()
+            gap_register_service.severity_order_expr(), ImplementationGap.created_at.desc()
         )
 
         # Paginate
@@ -814,7 +805,7 @@ def gaps_list():
         # Get statistics
         stats = {
             "total": ImplementationGap.query.count(),
-            "critical": ImplementationGap.query.filter_by(priority="critical").count(),
+            "critical": gap_register_service.count_gaps(_org_id(), severity="critical"),
             "high": ImplementationGap.query.filter_by(priority="high").count(),
             "identified": ImplementationGap.query.filter_by(
                 resolution_status="identified"
@@ -881,7 +872,7 @@ def gap_detail(gap_id):
     Show detailed view of a gap.
     """
     try:
-        gap = ImplementationGap.query.get_or_404(gap_id)
+        gap = ImplementationGap.query.filter_by(id=gap_id).first_or_404()
 
         # Get related work packages (Gap.work_packages: the gap_work_packages
         # association table, not a required_work_packages id list -- that
@@ -906,24 +897,24 @@ def gap_detail(gap_id):
 def api_gaps():
     """
     API endpoint to get gaps.
-    Supports query parameters: priority (filter), limit.
+    Supports query parameters: priority (filter), severity (filter), limit.
+
+    Both filters read the rating the gap register filters on and leave out
+    plateau transitions, so a count here is the register's count.
     """
     try:
-        query = ImplementationGap.query
-        priority = request.args.get("priority")
-        if priority:
-            query = query.filter_by(priority=priority)
-        query = query.order_by(ImplementationGap.created_at.desc())
+        # ?severity= and ?priority= both ask for a level: the register's own list and count, so this list,
+        # the register and every critical-gap figure are one rule (plateau transitions left out).
+        level = request.args.get("severity") or request.args.get("priority")
         limit = safe_int_arg('limit', None, minimum=1, maximum=500)
-        if limit:
-            query = query.limit(limit)
-        gaps = query.all()
+        gaps = gap_register_service.list_gaps(_org_id(), severity=level, limit=limit)
+        total = gap_register_service.count_gaps(_org_id(), severity=level)
         shown = [_serialize_entity(gap) for gap in gaps]
         if request.args.get("footer"):
             # The page draws each gap in the browser, so the one footer travels with it as markup.
             for gap, item in zip(gaps, shown):
                 item["footer_html"] = result_footer_service.render_footer(result_footer_service.gap_footer(gap))
-        return jsonify({"gaps": shown})
+        return jsonify({"gaps": shown, "total": total if total is not None else len(shown)})
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
@@ -1308,7 +1299,8 @@ def generate_report():
         work_packages = ImplementationWorkPackage.query.all()
 
         # Get gaps
-        gaps = ImplementationGap.query.all()
+        # The register's gaps (plateau transitions left out), so this report's counts are the register's.
+        gaps = gap_register_service.gap_register_query(_org_id()).all()
 
         # Get deliverables
         deliverables = work_package_service.deliverables_query(_org_id()).all()
@@ -1345,7 +1337,7 @@ def generate_report():
 
         # Calculate gaps by priority
         for gap in gaps:
-            priority = gap.priority or "medium"
+            priority = (gap_register_service.effective_severity(gap) or "").strip().lower() or "unrated"
             report_data["summary"]["gaps_by_priority"][priority] = (
                 report_data["summary"]["gaps_by_priority"].get(priority, 0) + 1
             )
