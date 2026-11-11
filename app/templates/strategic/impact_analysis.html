@@ -48,8 +48,14 @@
         </div>
     </div>
 
+    {% if simulation %}
+    {# The prioritised action list belongs to Impact Analysis; this page links to it rather than repeating it. #}
+    <p class="text-sm text-muted-foreground" data-testid="priority-actions-link-line">What should be done first is ranked on
+        <a href="{{ url_for('strategic.impact_analysis') }}#priority-actions" class="font-medium text-primary hover:underline" data-testid="priority-actions-link">Impact Analysis</a>.</p>
+    {% else %}
     {# Strategic actions: the one shared prioritised action list #}
     {% include 'components/priority_actions.html' %}
+    {% endif %}
 
     <!-- Main Grid -->
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -229,6 +235,7 @@
                                 </template>
                             {% endcall %}
                         {% endcall %}{% endcall %}
+                        <p class="text-sm text-foreground" x-show="analysisResult?.simulation?.no_effect" x-cloak data-testid="no-effect" x-text="analysisResult?.simulation?.no_effect"></p>
                         <p class="text-sm text-muted-foreground" data-testid="real-model-line" x-text="realModelLine()"></p>
                         <div class="space-y-2" data-testid="simulation-risks">
                             <h4 class="text-sm font-semibold">Open risks touching the change</h4>

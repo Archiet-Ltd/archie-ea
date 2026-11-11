@@ -1134,6 +1134,57 @@ def _seed_decisions(org_id, user_id) -> dict:
     return {"architecture_decisions_created": created}
 
 
+# ── saved scenarios ────────────────────────────────────────────────────────
+
+# (name, system it is tried on, kind of change): two ways to deal with the same system, so Compare Scenarios
+# has two saved scenarios to put side by side.
+_SCENARIOS = [
+    ("Retire Calibration Ledger", "Calibration Ledger", "RETIRE"),
+    ("Replace Calibration Ledger with a managed service", "Calibration Ledger", "REPLACE"),
+]
+
+
+def _seed_scenarios(org_id, user_id) -> dict:
+    """Two saved scenarios on one system, worked out by the same analysis a person's save uses.
+    Idempotent: a scenario whose name the organisation already has is left as it is."""
+    from flask import g
+
+    from app.models.saved_scenario import SavedScenario
+    from app.modules.solutions_strategic.v2.routes.strategic_routes import _scenario_figures
+    from app.modules.solutions_strategic.v2.services import simulation_service
+    from app.modules.solutions_strategic.v2.services.impact_analysis_service import ImpactAnalysisService
+
+    elements = _resolve_elements(org_id)
+    existing = {
+        row.name for row in db.session.query(SavedScenario.name).filter(SavedScenario.organization_id == org_id)
+    }
+    created = 0
+    had_org = hasattr(g, "current_org_id")
+    previous = getattr(g, "current_org_id", None)
+    g.current_org_id = org_id  # the analysis reads the organisation the way a request does
+    try:
+        for name, system, change_type in _SCENARIOS:
+            element = elements.get(system)
+            if element is None or name in existing:
+                continue
+            server = ImpactAnalysisService.analyze_change_impact(element.id, change_type, record=False)
+            db.session.add(SavedScenario(
+                organization_id=org_id, name=name, element_id=element.id, element_name=element.name,
+                element_type=element.type, change_type=change_type,
+                change_label=simulation_service.change_label(change_type),
+                analysis_result=_scenario_figures(server), created_by_id=user_id,
+            ))
+            created += 1
+    finally:
+        if had_org:
+            g.current_org_id = previous
+        else:
+            del g.current_org_id
+    if created:
+        db.session.flush()
+    return {"saved_scenarios_created": created}
+
+
 # ── products ───────────────────────────────────────────────────────────────
 
 # (product, what it is, [(relationship, direction, other element name, type, layer)]). "out" is product to element,
@@ -4371,6 +4422,7 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_data_flows(org_id))
         stats.update(_seed_raci(org_id))
         stats.update(_seed_decisions(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_scenarios(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_products(org_id))
 
         # The portfolio opens already scored: run the existing scoring

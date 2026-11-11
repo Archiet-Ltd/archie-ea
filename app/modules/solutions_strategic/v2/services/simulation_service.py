@@ -229,12 +229,18 @@ def simulate_change(element_id: int, change_type: str = "MODIFY") -> Dict[str, A
         _figure("Open risks touching the change", len(risks), len(risks), risk_note),
     ]
     unchanged = _model_figures(org_id) == before
+    no_effect = None
+    if all(f["change"] in (0, None) for f in figures):
+        lower = lambda text: text[0].lower() + text[1:]  # noqa: E731
+        no_effect = "This change moves none of these figures: %s, %s, and %s" % (
+            lower(element_note.rstrip(".")), lower(rel_note.rstrip(".")), lower(cost_note))
     return {
         **analysis,
         "simulation": {
             "change_type": change_type,
             "change_label": change_label(change_type),
             "figures": figures,
+            "no_effect": no_effect,
             "risks": risks,
             "real_model": before,
             "real_model_unchanged": unchanged,
