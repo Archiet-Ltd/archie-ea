@@ -328,11 +328,12 @@ def _validate_and_clean_import_row(row, clean_func):
     cleaned["version"] = _truncate_to_length(
         _get_column_value(row, "version", clean_func), "version"
     )
-    cleaned["deployment_status"] = (
-        _truncate_to_length(
-            _get_column_value(row, "deployment_status", clean_func), "deployment_status"
-        )
-        or "planned"
+    # One list of statuses: a known word is stored in the list's form, a blank
+    # stores nothing, anything else is refused for this row.
+    from app.services.application_status import status_for_write
+
+    cleaned["deployment_status"], cleaned["status_error"] = status_for_write(
+        _get_column_value(row, "deployment_status", clean_func)
     )
     cleaned["business_domain"] = _truncate_to_length(
         _get_column_value(row, "business_domain", clean_func), "business_domain"

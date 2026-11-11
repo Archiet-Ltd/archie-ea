@@ -52,12 +52,15 @@
           <select id="deployment_status" name="deployment_status"
                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
             <option value="">Not set</option>
-            {% for value in deployment_statuses %}
-            <option value="{{ value }}" {% if app.deployment_status == value %}selected{% endif %}>
-              {{ value | title }}
+            {% for value, label in deployment_options %}
+            <option value="{{ value }}" {% if deployment_selected == value %}selected{% endif %}>
+              {{ label }}
             </option>
             {% endfor %}
           </select>
+          {% if deployment_error %}
+          <p class="text-xs text-destructive mt-1" role="alert">{{ deployment_error }}</p>
+          {% endif %}
         </div>
         <div>
           <label for="health_status" class="block text-sm font-medium text-muted-foreground mb-1">Health</label>

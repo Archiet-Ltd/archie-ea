@@ -477,7 +477,7 @@
         class="modal-root fixed inset-0 z-50 flex items-center justify-center"
     >
         <div class="modal-root fixed inset-0 bg-overlay/50" @click="showCommitModal = false"></div>
-        <div class="relative z-50 w-full max-w-md rounded-lg border bg-background p-6 border-border" role="alertdialog" aria-modal="true" tabindex="-1">
+        <div class="relative modal-panel w-full max-w-md rounded-lg border bg-background p-6 border-border" role="alertdialog" aria-modal="true" tabindex="-1">
             {% call button(aria_label=("Close commit confirmation dialog"), variant='bare', size='bare', class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-4 top-4", attrs_dict={"@click": ("showCommitModal = false")}) %}
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             {% endcall %}

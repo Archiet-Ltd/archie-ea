@@ -135,7 +135,7 @@
           {% call native_select(id=("deployment_status"), name=("deployment_status"), size='sm', class="w-full") %}
             <option value="" {% if not application.deployment_status %}selected{% endif %}>Not set</option>
             {% for val, label in status_options(application.deployment_status) %}
-            <option value="{{ val }}" {% if application.deployment_status and application.deployment_status == val %}selected{% endif %}>{{ label }}</option>
+            <option value="{{ val }}" {% if application.deployment_status and (application.deployment_status == val or match_status(application.deployment_status) == val) %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           {% endcall %}
         </div>

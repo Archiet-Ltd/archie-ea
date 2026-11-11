@@ -427,43 +427,53 @@ async function processExcelImport() {
   importBtn.textContent = 'Importing...';
 
   try {
-    // Platform.fetch.post will throw on non-ok responses, and automatically inject CSRF token.
-    // It returns parsed JSON or null (204). Since we need to handle redirects (non-JSON responses),
-    // we cannot rely solely on Platform.fetch because it expects JSON or text.
-    // However, the server may return a redirect (HTML) which would cause Platform.fetch to throw.
-    // We'll use Platform.fetch with { silent: true } and catch any error to treat it as a redirect.
-    // If the error is a PlatformError with status 200? Actually, redirects are 302/303 etc.
-    // The current code treats any non-JSON response as a redirect and reloads.
-    // We'll mimic that by catching the error and checking if it's a redirect.
-    const data = await Platform.fetch.post('/applications/import', formData, { silent: true });
-    // If we reach here, the response was JSON (success or error).
-    if (data.error) {
-      importBtn.disabled = false;
-      importBtn.textContent = originalText;
-      _importInProgress = false;  // AUDIT-IMP-005: Reset guard on error
-      Platform.toast.error('Error: ' + data.error);
-      return;
-    }
-
+    // The server answers a request that accepts JSON with how many rows were stored and
+    // each refused row with its reason; a plain form post keeps its flash and redirect.
+    const data = await Platform.fetch.post('/applications/import', formData, {
+      silent: true,
+      headers: { Accept: 'application/json' }
+    });
     importBtn.disabled = false;
     importBtn.textContent = originalText;
-    _importInProgress = false;  // AUDIT-IMP-005: Reset guard on success
+    _importInProgress = false;  // AUDIT-IMP-005: Reset guard once the server has answered
 
-    // Import succeeded, reload to see flash messages
-    window.location.reload();
-  } catch (error) {
-    // Platform.fetch throws on non-ok responses, but also on network errors.
-    // The original code treated a redirect (non-JSON) as success and reloaded.
-    // We'll assume any error here is a redirect (or network error).
-    // For safety, we'll reload only if the error is likely a redirect (status 3xx).
-    // However, we cannot access error.status because PlatformError may not expose it.
-    // The original code reloaded on any non-JSON response, even if it's a redirect.
-    // We'll mimic that by reloading on any error, but keep the error toast for network errors.
-    if (error.type === 'HttpError' && error.status >= 300 && error.status < 400) {
-      // It's a redirect, reload without showing an error toast.
-      window.location.reload();
+    if (!data || typeof data !== 'object' || data.success !== true || !Number.isInteger(data.stored)) {
+      Platform.toast.error('Error: ' + ((data && data.error) || 'The import returned an unreadable answer.'));
       return;
     }
+
+    const refused = Array.isArray(data.refused) ? data.refused : [];
+    const resultLines = [`${data.stored} stored`];
+    if (data.skipped > 0) resultLines.push(`${data.skipped} skipped`);
+    if (refused.length > 0) {
+      resultLines.push(`${refused.length} refused:`);
+      refused.forEach(row => {
+        resultLines.push(`Row ${row.row}${row.name ? ' (' + row.name + ')' : ''}: ${row.reason}`);
+      });
+    }
+    (data.messages || [])
+      .filter(note => note.category === 'error' || note.category === 'warning')
+      .forEach(note => resultLines.push(note.message));
+    if (refused.length > 0) {
+      Platform.toast.warning(`${refused.length} row${refused.length === 1 ? '' : 's'} refused`);
+    }
+
+    // The import dialog is closed first, so nothing is drawn over the result. The result
+    // stays open until the person closes it, then the list is reloaded.
+    closeApplicationImportModal();
+    const resultId = Platform.modal.create({
+      title: data.stored > 0 ? 'Import saved' : 'Nothing was imported',
+      size: 'md',
+      backdrop: false,
+      keyboard: false,
+      content: resultLines.map(line =>
+        `<p class="text-sm text-foreground">${escapeHtml(String(line))}</p>`).join(''),
+      buttons: [{ label: 'Done — refresh applications', variant: 'primary', resolve: true }]
+    });
+    await Platform.modal.prompt(resultId);
+    Platform.modal.destroy(resultId);
+    window.location.reload();
+  } catch (error) {
     importBtn.disabled = false;
     importBtn.textContent = originalText;
     _importInProgress = false;  // AUDIT-IMP-005: Reset guard on failure

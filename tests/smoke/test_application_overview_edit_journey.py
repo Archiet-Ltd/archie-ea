@@ -24,7 +24,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 ARCHITECT = "enterprise_architect"
 
 # Opt-in walk screenshots: off unless a directory is named.
-WALK = os.environ.get("APPEDIT_WALK_DIR")
+WALK = os.environ.get("SMOKE_SCREENSHOT_DIR")
 
 
 def _shot(page, name):
@@ -309,3 +309,59 @@ def test_choosing_decommissioned_shows_the_application_as_ended(page, live_serve
     assert banner.is_visible(), "no banner for a decommissioned application"
     assert "Decommissioned" in page.locator("main").inner_text()
     _shot(page, "decommissioned-light-1440")
+
+
+def _set_status(app_id, status):
+    from app import create_app, db
+
+    app = create_app("testing")
+    with app.app_context():
+        # Stored as an older release stored it: the model itself would store the list's form.
+        db.session.execute(
+            db.text("UPDATE application_components SET deployment_status = :s WHERE id = :i"),
+            {"s": status, "i": app_id},
+        )
+        db.session.commit()
+        db.session.remove()
+
+
+def test_a_stored_status_in_another_case_is_offered_once_and_kept_on_save(page, live_server, orgs):
+    org_a, org_b = orgs
+    app_id = org_a["app_id"]
+    _set_status(app_id, "Production")
+    _set_status(org_b["app_id"], "Production")
+    fresh_org.sign_in(page, live_server, org_a["emails"][ARCHITECT])
+    page.goto("%s/applications/%d?edit=1&tab=overview" % (live_server, app_id),
+              wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.set_viewport_size({"width": 1440, "height": 900})
+
+    select = page.locator("#edit-deployment_status")
+    shown = [o.strip() for o in select.locator("option").all_inner_texts() if o.strip() != "Not set"]
+    assert shown == ["Design", "Development", "Testing", "Staging", "Production",
+                     "Retiring", "Decommissioned"], shown
+    assert select.input_value() == "production", "the stored status is not the one chosen"
+    _shot(page, "status-stored-production-light-1440")
+
+    description = page.locator("#edit-description")
+    description.click()
+    page.keyboard.press("Control+A")
+    page.keyboard.type("Status left alone.")
+    _save(page)
+    assert "edit=1" not in page.url, page.url
+    assert "Status left alone." in page.locator("main").inner_text()
+    assert "Production" in page.locator("main").first.inner_text()
+    stored = _stored(app_id)
+    assert stored["description"] == "Status left alone."
+    assert stored["deployment_status"] == "Production", "a save with no pick rewrote the status"
+    assert _stored(org_b["app_id"])["deployment_status"] == "Production"
+
+    page.goto("%s/applications/%d?edit=1&tab=overview" % (live_server, app_id),
+              wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    _phone_dark(page)
+    page.locator("#edit-deployment_status").scroll_into_view_if_needed()
+    assert page.locator("#edit-deployment_status").is_visible()
+    _shot(page, "status-stored-production-dark-390")
+    page.locator("#edit-deployment_status").select_option("retiring")
+    _save(page)
+    assert _stored(app_id)["deployment_status"] == "retiring"
+    assert page.get_by_text("RETIRING \u2014").first.is_visible()

@@ -62,6 +62,18 @@ def _make_app(db_session, org, name):
     return row
 
 
+def _store_as_stored(db_session, row, word):
+    """Leave a row holding `word` exactly as an older release stored it (the model refuses it now)."""
+    from app import db
+
+    db_session.flush()
+    db_session.execute(
+        db.text("UPDATE application_components SET deployment_status = :w WHERE id = :i"),
+        {"w": word, "i": row.id},
+    )
+    db_session.expire(row)
+
+
 @pytest.fixture
 def two_orgs(db_session, make_org):
     org_a, org_b = make_org("ovw-a"), make_org("ovw-b")
@@ -148,13 +160,13 @@ def test_a_status_off_the_list_is_refused_unless_unchanged(two_orgs, client, log
     html = _edit_page(client, app_a.id)
     resp = client.post(
         _form_action(html),
-        data=dict(FORM_FIELDS, csrf_token=_csrf(html), deployment_status="Live"),
+        data=dict(FORM_FIELDS, csrf_token=_csrf(html), deployment_status="Mystery"),
     )
     assert resp.status_code == 422
-    assert "Deployment Status must be one of" in resp.get_data(as_text=True)
+    assert "is not one of: design, development" in resp.get_data(as_text=True)
 
     # A stored value that is not on the list is shown as it is and kept.
-    app_a.deployment_status = "Live"
+    _store_as_stored(db_session, app_a, "Live")
     db_session.flush()
     html = _edit_page(client, app_a.id)
     assert '<option value="Live" selected' in html
@@ -369,7 +381,7 @@ def test_a_stored_status_with_a_trailing_space_still_saves_the_other_fields(
     from app.models.application_portfolio import ApplicationComponent
 
     app_a = two_orgs["app_a"]
-    app_a.deployment_status = "Live "
+    _store_as_stored(db_session, app_a, "Live ")
     db_session.flush()
     login_as(client, two_orgs["user_a"])
     html = _edit_page(client, app_a.id)
@@ -387,7 +399,15 @@ def test_every_screen_that_offers_a_status_reads_the_one_list(
     from app.schemas.api_schemas import VALID_DEPLOYMENT_STATUS
     from app.services.application_status import APPLICATION_STATUS_VALUES
 
+    from app.modules.import_batch.v2.services.import_validation import (
+        validation_schemas_v2,
+    )
+    from app.services.import_validation import validation_schemas
+
     assert list(VALID_DEPLOYMENT_STATUS) == list(APPLICATION_STATUS_VALUES)
+    # The batch import (both copies of its schemas) reads the same list.
+    assert list(validation_schemas.DEPLOYMENT_STATUS_VALUES) == list(APPLICATION_STATUS_VALUES)
+    assert list(validation_schemas_v2.DEPLOYMENT_STATUS_VALUES) == list(APPLICATION_STATUS_VALUES)
     app_a = two_orgs["app_a"]
     login_as(client, two_orgs["user_a"])
 
@@ -413,10 +433,10 @@ def test_every_screen_that_offers_a_status_reads_the_one_list(
     html = legacy.get_data(as_text=True)
     refused = client.post(
         f"/applications/{app_a.id}/edit",
-        data={"csrf_token": _csrf(html), "name": app_a.name, "deployment_status": "Live"},
+        data={"csrf_token": _csrf(html), "name": app_a.name, "deployment_status": "Mystery"},
     )
     assert refused.status_code == 400
-    assert "Deployment Status must be one of" in refused.get_data(as_text=True)
+    assert "is not one of: design, development" in refused.get_data(as_text=True)
 
 
 def test_an_application_at_the_end_of_its_life_is_flagged_everywhere(
@@ -426,7 +446,7 @@ def test_an_application_at_the_end_of_its_life_is_flagged_everywhere(
     login_as(client, two_orgs["user_a"])
     for stored, banner in (("decommissioned", "RETIRED"), ("retiring", "RETIRING"),
                            ("retired", "RETIRED"), ("deprecated", "RETIRED")):
-        app_a.deployment_status = stored
+        _store_as_stored(db_session, app_a, stored)
         db_session.flush()
         page = client.get(f"/applications/{app_a.id}").get_data(as_text=True)
         assert banner + " \u2014" in page, f"no banner for {stored}"
@@ -438,3 +458,83 @@ def test_an_application_at_the_end_of_its_life_is_flagged_everywhere(
     db_session.flush()
     page = client.get(f"/applications/{app_a.id}").get_data(as_text=True)
     assert "RETIRED \u2014" not in page and "RETIRING \u2014" not in page
+
+
+def _status_select(html, select_id):
+    block = re.search(r'<select[^>]*id="%s"[^>]*>(.*?)</select>' % select_id, html, re.S)
+    assert block, select_id
+    return re.findall(r'<option([^>]*)value="([^"]*)"([^>]*)>', block.group(1))
+
+
+@pytest.mark.parametrize("stored", ["Production", " PRODUCTION "])
+def test_a_stored_status_in_another_case_is_offered_once_and_selected(
+    two_orgs, client, login_as, db_session, stored
+):
+    app_a = two_orgs["app_a"]
+    _store_as_stored(db_session, app_a, stored)
+    db_session.flush()
+    login_as(client, two_orgs["user_a"])
+    overview = _status_select(_edit_page(client, app_a.id), "edit-deployment_status")
+    legacy = _status_select(
+        client.get(f"/applications/{app_a.id}/edit").get_data(as_text=True), "deployment_status"
+    )
+    for options in (overview, legacy):
+        values = [v for _a, v, _b in options if v]
+        assert values.count("production") == 1 and len(values) == 7, values
+        chosen = [v for a, v, b in options if "selected" in a + b]
+        assert chosen == ["production"], chosen
+
+
+def test_a_stored_status_in_another_case_is_kept_on_save_and_changes_when_picked(
+    two_orgs, client, login_as, db_session
+):
+    from app.models.application_portfolio import ApplicationComponent
+
+    app_a = two_orgs["app_a"]
+    _store_as_stored(db_session, app_a, "Production")
+    db_session.flush()
+    login_as(client, two_orgs["user_a"])
+    html = _edit_page(client, app_a.id)
+    assert _post(client, app_a.id, html, deployment_status="production").status_code == 302
+    db_session.expire_all()
+    assert db_session.get(ApplicationComponent, app_a.id).deployment_status == "Production"
+    assert _post(client, app_a.id, html, deployment_status="Retiring ").status_code == 302
+    db_session.expire_all()
+    assert db_session.get(ApplicationComponent, app_a.id).deployment_status == "retiring"
+
+
+def test_the_older_edit_page_saves_when_the_stored_status_has_a_trailing_space(
+    two_orgs, client, login_as, db_session
+):
+    from app.models.application_portfolio import ApplicationComponent
+
+    app_a = two_orgs["app_a"]
+    _store_as_stored(db_session, app_a, "Live ")
+    db_session.flush()
+    login_as(client, two_orgs["user_a"])
+    html = client.get(f"/applications/{app_a.id}/edit").get_data(as_text=True)
+    resp = client.post(
+        f"/applications/{app_a.id}/edit",
+        data={"csrf_token": _csrf(html), "name": app_a.name, "deployment_status": "Live"},
+    )
+    assert resp.status_code != 400, resp.get_data(as_text=True)[:300]
+    db_session.expire_all()
+    assert db_session.get(ApplicationComponent, app_a.id).deployment_status == "Live "
+
+
+def test_an_owner_name_two_people_share_asks_for_an_email_not_a_missing_person(
+    two_orgs, client, login_as, db_session
+):
+    org = two_orgs["org_a"]
+    owner = two_orgs["user_a"]  # the plan admits three people: owner, and the two of one name
+    _make_user(db_session, org, "sam1", first="Sam", last="Twin")
+    _make_user(db_session, org, "sam2", first="Sam", last="Twin")
+    owned = _owned_app(db_session, org, owner)
+    login_as(client, two_orgs["user_a"])
+    html = _edit_page(client, owned.id)
+    page = _post(client, owned.id, html, businessOwner="Sam Twin").get_data(as_text=True)
+    assert "2 people in this organisation are called" in page
+    assert "Type the email of the one you mean" in page
+    assert "no one in this organisation is called" not in page
+    page = _post(client, owned.id, html, businessOwner="Nobody Atall").get_data(as_text=True)
+    assert "no one in this organisation is called" in page

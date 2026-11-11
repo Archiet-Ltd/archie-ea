@@ -17,7 +17,7 @@ from wtforms import (
 )
 from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
-from app.services.application_status import APPLICATION_STATUSES
+from app.services.application_status import APPLICATION_STATUSES, match_status
 
 
 class ApplicationComponentForm(FlaskForm):
@@ -96,6 +96,7 @@ class ApplicationComponentForm(FlaskForm):
         choices=list(APPLICATION_STATUSES),
         default="design",
         validators=[DataRequired()],
+        filters=[lambda value: match_status(value) or value],
     )
 
     business_domain = StringField(

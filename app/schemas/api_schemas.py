@@ -8,7 +8,7 @@ Covers:
   - ChatMessageSchema         → AI chat /message endpoint
 """
 
-from marshmallow import Schema, ValidationError, fields, validate, validates
+from marshmallow import Schema, ValidationError, fields, pre_load, validate, validates
 
 from app.services.application_status import APPLICATION_STATUS_VALUES
 
@@ -79,9 +79,21 @@ class ApplicationCreateSchema(Schema):
     )
     deployment_status = fields.Str(
         load_default=None,
-        validate=validate.OneOf(VALID_DEPLOYMENT_STATUS),
         allow_none=True,
     )
+
+    @pre_load
+    def _status_in_the_lists_form(self, data, **_kwargs):
+        """Read a status in any case and spacing as the list's value; an unknown one is refused."""
+        from app.services.application_status import status_for_write
+
+        if isinstance(data, dict) and isinstance(data.get("deployment_status"), str):
+            stored, refusal = status_for_write(data["deployment_status"])
+            if refusal:
+                raise ValidationError({"deployment_status": [refusal]})
+            data = {**data, "deployment_status": stored}
+        return data
+
     technology_stack = fields.Str(
         load_default=None,
         validate=validate.Length(max=500),
