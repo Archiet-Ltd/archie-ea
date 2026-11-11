@@ -28,7 +28,7 @@ TOP = ["Home", "AI chat", "Approvals"]
 WORK = ["Systems", "Impact", "Changes", "Spend", "Compliance"]
 LAYERS = ["Strategy", "Business", "Application", "Technology", "Physical", "Motivation",
           "Implementation and migration", "Other"]
-MODEL = LAYERS + ["Frameworks", "Canvases", "Composer"]
+MODEL = ["Model map"] + LAYERS + ["Frameworks", "Canvases", "Composer"]
 # Connections is for the architects who author the model and for administrators.
 INTERFACES = {"business_architect", "data_architect", "enterprise_architect", "platform_admin", "security_architect",
               "solution_architect"}

@@ -15,6 +15,7 @@ from ..models.application_portfolio import ApplicationComponent
 from ..models.models import ArchiMateElement, ArchiMateRelationship
 from ..models.requirements import Requirement
 from ..services.application_cost_accessor import set_annual_cost
+from ..services.application_status import status_for_write
 from ..utils.html_sanitizer import sanitize_html
 from ..utils.validators import (
     validate_application_name,
@@ -83,7 +84,9 @@ def application_create():
             if not is_valid:
                 validation_errors.append(error)
             else:
-                deployment_status = validated_status
+                deployment_status, status_refusal = status_for_write(validated_status)
+                if status_refusal:
+                    validation_errors.append(status_refusal)
 
             # Validate optional fields
             description = request.form.get("description", "")

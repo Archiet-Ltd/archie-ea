@@ -2439,7 +2439,6 @@
 "/dashboard/applications/<x>/link-vendor":["X","BP:application_mgmt","unplanned",null,null],
 "/dashboard/applications/<x>/nodes":["X","BP:application_mgmt","unplanned",null,null],
 "/dashboard/applications/<x>/nodes/<x>":["X","BP:application_mgmt","unplanned",null,null],
-"/dashboard/applications/<x>/overview-update":["X","BP:application_mgmt","unplanned",null,null],
 "/dashboard/applications/<x>/physical-equipment/<x>/delete":["X","BP:application_mgmt","unplanned",null,null],
 "/dashboard/applications/<x>/physical-equipment/<x>/edit":["X","BP:application_mgmt","unplanned",null,null],
 "/dashboard/applications/<x>/physical-equipment/add":["X","BP:application_mgmt","unplanned",null,null],
