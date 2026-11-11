@@ -274,6 +274,11 @@
   ═══════════════════════════════════════════════════════════════════════════ #}
   {% call tab_panel('overview', active=(resolved_tab == 'overview')) %}
   <div class="space-y-6">
+    {% if imported_gaps and not edit_mode %}
+    {% set gaps = imported_gaps %}{% set compact = false %}
+    {% set cap_onclick = "initUnifiedMappingModal({context:'capability', apiEndpoint:'/capability-map/api'}); openUnifiedMappingModalReverse({context:'capability', appId:" ~ app.id ~ ", appName:" ~ (app.name | tojson | forceescape) ~ ", onSaveCallback:function(){window.location.reload();}})" %}
+    <!-- inline-event-ok -->{% include 'applications/_imported_needs.html' with context %}
+    {% endif %}
     {% if edit_mode %}
     <form id="overview-edit-form" method="POST" action="{{ url_for('unified_applications.update_overview', id=app.id) }}">
       {{ input(type="hidden", name="csrf_token", value=(csrf_token())) }}
@@ -422,7 +427,7 @@
       </div>
 
       {# Ownership #}
-      <div data-slot="card" class="rounded-lg border border-border bg-card">
+      <div id="ownership" data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
           <h3 class="text-lg font-semibold">Ownership</h3>
         </div>

@@ -1,0 +1,46 @@
+{# What an application read from GitHub still needs, and the step that fills each.
+   gaps        the entry for this application from application_gaps (none: nothing is drawn)
+   app         the application
+   compact     true on the list: one line of links; false on the application page: a card with the reason
+               and, where the repository gives one, a suggestion and where it came from
+   cap_onclick the script that opens the capability dialog on the page this is drawn on
+   sfx         added to the test ids so a list of rows keeps them apart #}
+{% from 'components/button.html' import button %}
+{% if gaps %}
+{% set editable = can('edit', 'application') %}
+{% macro step(gap) %}
+  {%- if not editable -%}
+    <span>{{ gap.label }}</span>
+  {%- elif gap.href -%}
+    <a href="{{ gap.href }}" class="font-medium text-primary underline-offset-4 hover:underline">{{ gap.label }}</a>
+  {%- else -%}
+    {{ button(text=gap.label, variant='link', size='bare', class='font-medium ' ~ ('text-xs' if compact else 'text-sm'), on_click=cap_onclick, aria_label='Map a capability for ' ~ app.name) }}
+  {%- endif -%}
+{% endmacro %}
+{% if compact %}
+<p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground" data-testid="imported-needs-{{ app.id }}">
+  <span>Still needs:</span>
+  {% for gap in gaps.gaps %}<span data-testid="need-{{ gap.key }}-{{ app.id }}{{ sfx or '' }}">{{ step(gap) }}</span>{% if not loop.last %}<span aria-hidden="true">·</span>{% endif %}{% endfor %}
+</p>
+{% else %}
+<div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="imported-needs-card">
+  <div class="flex flex-col space-y-1.5 p-6 pb-3">
+    <h3 class="text-lg font-semibold">What this application still needs</h3>
+    <p class="text-sm text-muted-foreground">Read from GitHub{% if gaps.where %}: {{ gaps.where }}{% endif %}. GitHub does not say these, so each one is filled by a person.</p>
+  </div>
+  <ul class="space-y-3 p-6 pt-0 text-sm">
+    {% for gap in gaps.gaps %}
+    <li class="flex flex-col gap-1" data-testid="need-{{ gap.key }}">
+      <p><span class="font-medium text-foreground">{{ step(gap) }}</span> <span class="text-muted-foreground">{{ gap.detail }}</span></p>
+      {% if gap.suggestion %}
+      <p class="text-xs text-muted-foreground">Suggested: <span class="font-medium text-foreground">{{ gap.suggestion }}</span>. {{ gap.evidence }}.</p>
+      {% endif %}
+      {% if gap.note %}
+      <p class="text-xs text-muted-foreground">{{ gap.note }}</p>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endif %}

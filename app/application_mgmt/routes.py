@@ -2367,9 +2367,19 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     technology_cost_shares = technology_cost.shares_for_application(
         app_obj.organization_id, app_obj.id)
 
+    # What an application read from a connector still needs; a repository nobody has promoted is not one.
+    from app.connectors.github import unpromoted_import_ids
+    from app.connectors.github_gaps import application_gaps
+
+    imported_gaps = application_gaps(
+        app_obj.organization_id, [app_obj],
+        skip_ids=unpromoted_import_ids(app_obj.organization_id, [app_obj.id]),
+    ).get(app_obj.id)
+
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
+        imported_gaps=imported_gaps,
         form_values=form_values or {},
         form_errors=form_errors or {},
         status_options=status_options,
