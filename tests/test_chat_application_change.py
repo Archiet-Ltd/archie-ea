@@ -7,6 +7,7 @@ organisation it was shown to.
 
 from __future__ import annotations
 
+import html as html_module
 import re
 import uuid
 
@@ -142,7 +143,9 @@ def test_what_the_form_would_refuse_is_refused_in_words_before_it_is_shown(world
     assert "5000 characters or fewer" in shown["html"]
     shown = _ask(client, f"set {world['name']}'s status to nonsense")
     assert shown["change_state"] == "invalid"
-    assert "Deployment Status must be one of" in shown["html"]
+    from app.services.application_status import refusal_for
+
+    assert refusal_for("nonsense") in html_module.unescape(shown["html"])
     assert _stored(db_session, world["apps"]["a"]) == "Old description a"
 
 

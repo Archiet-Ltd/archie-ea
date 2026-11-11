@@ -536,5 +536,9 @@ def test_an_owner_name_two_people_share_asks_for_an_email_not_a_missing_person(
     assert "2 people in this organisation are called" in page
     assert "Type the email of the one you mean" in page
     assert "no one in this organisation is called" not in page
-    page = _post(client, owned.id, html, businessOwner="Nobody Atall").get_data(as_text=True)
-    assert "no one in this organisation is called" in page
+    # A name no one has is recorded as a named person (see the test above), not refused.
+    resp = _post(client, owned.id, html, businessOwner="Nobody Atall")
+    assert resp.status_code == 302
+    assert "no one in this organisation is called" not in resp.get_data(as_text=True)
+    db_session.expire_all()
+    assert db_session.get(type(owned), owned.id).business_owner == "Nobody Atall"
