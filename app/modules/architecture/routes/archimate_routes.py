@@ -39,7 +39,7 @@ register_lucidchart_import_routes(archimate_bp)
 # Must exceed the OpenRouter client's own read timeout (80s, see
 # LLMService._call_openrouter's default) or this outer guard always loses the
 # race on a real, working generation: reproduced directly on 10 Sep 2026 —
-# a genuine deepseek/deepseek-v3.2 call for a 37-element ArchiMate model hit
+# a genuine DeepSeek call via OpenRouter for a 37-element ArchiMate model hit
 # this 45s guard, got reported as "timed out" and silently replaced with the
 # noun-extraction mock fallback, while the real call kept running in the
 # background (ThreadPoolExecutor.cancel() cannot stop an already-running
@@ -1046,7 +1046,7 @@ def api_composer_extract_from_image():
             "success": False,
             "error": "No vision-capable AI provider is configured, so a diagram "
                      "image cannot be read. Add an Anthropic, OpenAI or Gemini "
-                     "key in Admin → API Settings. A text-only provider cannot do this.",
+                     "key in Admin → AI settings. A text-only provider cannot do this.",
             "error_type": "no_vision_provider",
         }), 503
 

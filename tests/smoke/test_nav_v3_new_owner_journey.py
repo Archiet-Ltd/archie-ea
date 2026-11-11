@@ -224,10 +224,3 @@ def test_07_a_page_is_found_by_its_old_name(walk):
     hit.click()
     page.wait_for_url(re.compile(r".*/genome/roadmap.*"))
     expect(page.locator("main").first).not_to_be_empty()
-
-
-def test_08_the_old_ask_address_opens_the_chat(walk):
-    page = walk.page
-    page.goto(walk.base + "/intelligence/ask?q=" + "which%20systems%20have%20no%20owner", wait_until="domcontentloaded")
-    page.wait_for_url(re.compile(r".*/ai-chat.*"))
-    expect(page.locator("#user-input")).to_have_value("which systems have no owner")

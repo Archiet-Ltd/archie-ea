@@ -62,12 +62,12 @@ def production_shape(app, stub, monkeypatch):
 def test_only_the_deepseek_key_answers_and_spend_is_recorded(app, production_shape):
     with app.app_context():
         assert LLMService.is_priced("deepseek")
-        assert LLMService._get_configured_provider() == ("deepseek", "deepseek-chat")
+        assert LLMService._get_configured_provider() == ("deepseek", "deepseek-flash")
         answer = LLMService.generate_from_prompt("Reply with exactly the word: ready", use_cache=False)
     assert answer == "deepseek says ready"
-    assert [r["model"] for r in production_shape.requests] == ["deepseek-chat"]
+    assert [r["model"] for r in production_shape.requests] == ["deepseek-flash"]
     spent, requests = _ledger(app, "deepseek")
-    assert requests == 1 and spent == pytest.approx(1000 * 0.28 / 1e6 + 500 * 0.42 / 1e6, abs=1e-6)
+    assert requests == 1 and spent == pytest.approx(1000 * 0.30 / 1e6 + 500 * 1.20 / 1e6, abs=1e-6)
 
 
 def test_an_enabled_settings_row_for_deepseek_is_chosen(app, production_shape, monkeypatch):
@@ -79,12 +79,12 @@ def test_an_enabled_settings_row_for_deepseek_is_chosen(app, production_shape, m
     monkeypatch.delenv("DEEPSEEK_API_KEY")
     with app.app_context():
         g.current_org_id = 1  # an organisation's own row counts only for that organisation
-        row = APISettings(provider="deepseek", enabled=True, default_model="deepseek-chat", organization_id=1)
+        row = APISettings(provider="deepseek", enabled=True, default_model="deepseek-flash", organization_id=1)
         row.set_api_key(KEY) if hasattr(row, "set_api_key") else setattr(row, "api_key", KEY)
         db.session.add(row)
         db.session.commit()  # selection commits first thing, so the row is real; removed below
         try:
-            assert LLMService._get_configured_provider() == ("deepseek", "deepseek-chat")
+            assert LLMService._get_configured_provider() == ("deepseek", "deepseek-flash")
         finally:
             db.session.rollback()
             APISettings.query.filter_by(provider="deepseek").delete()
@@ -94,7 +94,7 @@ def test_an_enabled_settings_row_for_deepseek_is_chosen(app, production_shape, m
 def test_at_the_ceiling_the_call_pauses_and_never_reaches_the_stub(app, production_shape, monkeypatch):
     monkeypatch.setenv("LLM_SPEND_CEILING_USD_DEEPSEEK", "0.0001")
     with app.app_context():
-        LLMService.record_spend("deepseek", "deepseek-chat", 10000, 10000)  # well over the ceiling
+        LLMService.record_spend("deepseek", "deepseek-flash", 10000, 10000)  # well over the ceiling
         with pytest.raises(AnswersPaused) as paused:
             LLMService.generate_from_prompt("hello", use_cache=False)
         assert str(paused.value).startswith(PAUSED_MESSAGE)

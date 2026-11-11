@@ -20,14 +20,14 @@ reasoning through the cheapest tier in the lineup.
 
 Found live, 8 Sep 2026: a real AI-chat verification run against the actual
 OpenRouter API hit "not a valid model ID" on every call. The app's own
-provider fallback silently caught it and fell through to deepseek/deepseek-chat
+provider fallback silently caught it and fell through to the DeepSeek model
 every time, so this had zero user-visible impact -- but it meant the documented
 free tier was fiction. OpenRouter's free-tier catalog churns; if this id goes
 stale again, list current free models with `GET
 https://openrouter.ai/api/v1/models` and filter for ids ending `:free` rather
 than guessing.
 
-Operators still choose their own model per provider in Admin -> API Settings
+Operators still choose their own model per provider in Admin -> AI settings
 (APISettings.default_model); this is only the fallback used when nothing is
 configured, and the guidance shown alongside that field.
 
@@ -66,14 +66,44 @@ DEFAULT_MODELS = {
 # because tests/test_ai_free_provider_route.py pins DeepSeek out of DEFAULT_MODELS and default_model_for();
 # a DeepSeek key alone still configures nothing, it is used only when the order names it.
 PLATFORM_DEFAULT_MODELS = {
-    "deepseek": "deepseek-chat",
+    "deepseek": "deepseek-flash",
 }
 
+# The two names DeepSeek's model list returns (api-docs.deepseek.com, read 10 Nov 2026). Both answer in thinking
+# mode unless the request says otherwise, and the thinking text spends the max_tokens budget, so every call
+# states its mode: {"thinking": {"type": "disabled" | "enabled"}} in the request body.
+DEEPSEEK_MODELS = ("deepseek-flash", "deepseek-v4-pro")
+# Names an organisation's API settings may still hold, mapped to what DeepSeek serves and the mode they meant.
+# The old names were discontinued on 24 Jul 2026; the older flash names are billed as deepseek-flash.
+_DEEPSEEK_RETIRED = {
+    "deepseek-chat": ("deepseek-flash", False),
+    "deepseek-reasoner": ("deepseek-flash", True),
+    "deepseek-v3.2": ("deepseek-flash", False),
+    "deepseek-v4-flash": ("deepseek-flash", False),
+}
+
+
+def deepseek_request_for(model: str, tools: bool = False) -> tuple:
+    """The (model name, request-body extras) to send to DeepSeek for *model*.
+
+    Drafting and chat run non-thinking. Thinking is chosen only for the reasoning model: ``deepseek-v4-pro`` and
+    the retired ``deepseek-reasoner``. A tool-calling loop never thinks, because DeepSeek then requires every
+    earlier turn's reasoning text to be passed back and the loop does not keep it. An empty or unknown name
+    falls back to the platform default rather than being sent as typed.
+    """
+    name = (model or "").strip().lower()
+    served, thinking = _DEEPSEEK_RETIRED.get(name, (name, name == "deepseek-v4-pro"))
+    if served not in DEEPSEEK_MODELS:
+        served, thinking = PLATFORM_DEFAULT_MODELS["deepseek"], False
+    mode = "enabled" if thinking and not tools else "disabled"
+    return served, {"thinking": {"type": mode}}
+
 # The model that reviews a change when the drafter's own provider is the only one configured: the provider's
-# other model, so a change is never reviewed by the model that drafted it. Production has only DeepSeek, so
-# deepseek-chat drafts are reviewed by deepseek-reasoner and the reverse. One place for this pairing.
+# other model, so a change is never reviewed by the model that drafted it. Production has only DeepSeek, which
+# serves two models: a deepseek-flash draft is reviewed by deepseek-v4-pro and a deepseek-v4-pro draft by
+# deepseek-flash. One place for this pairing.
 PLATFORM_REVIEWER_MODELS = {
-    "deepseek": "deepseek-reasoner",
+    "deepseek": "deepseek-v4-pro",
 }
 
 # When a second provider is configured, the reviewer comes from the first of these that differs from the
@@ -232,6 +262,9 @@ def reviewer_model_for(provider: str, drafter_model: str = "") -> str:
     model reviews. Any other provider uses the first of its named models that is not the drafter."""
     provider = (provider or "").strip().lower()
     drafter_model = (drafter_model or "").strip()
+    if provider == "deepseek" and drafter_model:
+        # A stored retired name is the served model it maps to, by the one rule that names what is sent.
+        drafter_model = deepseek_request_for(drafter_model)[0]
     named = PLATFORM_REVIEWER_MODELS.get(provider)
     if named and named != drafter_model:
         return named

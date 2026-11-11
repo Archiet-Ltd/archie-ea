@@ -10,6 +10,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock, Thread
 
 KEY = "sk-deepseek-stub-never-real-0001"
+# The names DeepSeek's model list returns; any other name is refused, as the real service does once an alias is gone.
+SERVED_MODELS = ("deepseek-flash", "deepseek-v4-pro")
+# What a thinking call spends before it answers; a request whose max_tokens is no larger gets an empty answer.
+THINKING_TOKENS = 4096
 NAME_RULE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 
 
@@ -53,6 +57,8 @@ class DeepSeekStub:
                     owner.keys_seen.append(token)
                 if token not in owner.accepted:
                     return self._json(401, {"error": {"message": "invalid key"}})
+                if str(body.get("model")).startswith("deepseek") and body.get("model") not in SERVED_MODELS:
+                    return self._json(400, {"error": {"message": "Model Not Exist"}})
                 names = [t.get("function", {}).get("name", "") for t in body.get("tools") or []]
                 bad = [n for n in names if not NAME_RULE.match(n)]
                 if bad or len(set(names)) != len(names):
@@ -61,6 +67,7 @@ class DeepSeekStub:
                 with owner._lock:
                     owner.requests.append({"model": body.get("model"), "tool_names": names,
                                            "stream": bool(body.get("stream")),
+                                           "thinking": (body.get("thinking") or {}).get("type"),
                                            "text": " ".join(str(m.get("content")) for m in body.get("messages", []))})
                     scripted = owner.tool_script.pop(0) if owner.tool_script and names else None
                 usage = None if owner.usage is None else {
@@ -75,7 +82,13 @@ class DeepSeekStub:
                 else:
                     text = " ".join(str(m.get("content")) for m in body.get("messages", []))
                     custom = owner.respond(body.get("model"), text, bool(names)) if owner.respond else None
-                    message = {"role": "assistant", "content": owner.reply if custom is None else custom}
+                    # Thinking is on unless the request turns it off, and its text spends the budget: no answer
+                    # unless max_tokens leaves room for the answer after the thinking text.
+                    thinking = (body.get("thinking") or {}).get("type") != "disabled"
+                    spent = THINKING_TOKENS if thinking else 0
+                    answered = (body.get("max_tokens") or 0) > spent or (not thinking and not body.get("max_tokens"))
+                    reply = owner.reply if custom is None else custom
+                    message = {"role": "assistant", "content": reply if answered else ""}
                     finish = "stop"
                 if body.get("stream"):
                     delta = dict(message)

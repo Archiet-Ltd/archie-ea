@@ -71,15 +71,12 @@ def billing_index():
         )
 
     refresh_error = None
-    if monelytics_provider.configured():
-        config = monelytics_provider.configuration_status()
-        if config["ready"]:
-            try:
-                BillingService.refresh_from_monelytics(org)
-            except BillingError as exc:
-                refresh_error = str(exc)
-    else:
-        config = billing_plans.configuration_status()
+    config = billing_plans.payment_status()
+    if monelytics_provider.configured() and config["ready"]:
+        try:
+            BillingService.refresh_from_monelytics(org)
+        except BillingError as exc:
+            refresh_error = str(exc)
 
     # The buy form on this page is answered with a redirect to the provider's hosted checkout.
     g.csp_form_action_extra = " ".join(BillingService.checkout_origins())

@@ -59,7 +59,7 @@ class GapResolutionService:
             >>> work_packages = service.create_work_packages_from_gap(gap.id)
             >>> # Returns: [WorkPackage("Design Integration"), WorkPackage("Implement API"), ...]
         """
-        gap = db.session.get(Gap, gap_id)
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             raise ValueError(f"Gap {gap_id} not found")
 
@@ -147,7 +147,7 @@ class GapResolutionService:
                 'blockers': [...]
             }
         """
-        gap = db.session.get(Gap, gap_id)
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             raise ValueError(f"Gap {gap_id} not found")
 
@@ -233,7 +233,7 @@ class GapResolutionService:
         progress = self.get_gap_resolution_progress(gap_id)
 
         if progress["completion_percentage"] == 100:
-            gap = db.session.get(Gap, gap_id)
+            gap = Gap.query.filter_by(id=gap_id).first()
             gap.resolution_status = "resolved"
             gap.resolved_at = date.today()
             db.session.commit()
@@ -270,7 +270,7 @@ Gap Information:
 Name: {gap.name}
 Description: {gap.description or 'No description provided'}
 Priority: {gap.priority}
-Severity: {gap.severity if hasattr(gap, 'severity') else 'medium'}
+Severity: {gap.rated_severity if hasattr(gap, 'rated_severity') else 'medium'}
 Impact: {gap.impact if hasattr(gap, 'impact') else 'medium'}
 Current State: {gap.current_state_ref or 'Not specified'}
 Target State: {gap.target_state_ref or 'Not specified'}
