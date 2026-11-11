@@ -329,7 +329,10 @@ def get_viewpoint_counts(solution_id: int) -> dict:
 # this change.
 LAYER_TYPES = {
     "motivation": {"stakeholder", "driver", "assessment", "goal", "outcome",
-                   "principle", "requirement", "constraint", "meaning", "value"},
+                   "principle", "requirement", "constraint", "meaning", "value",
+                   # Measures and recorded evidence sit with the motivation
+                   # elements they support (ArchiMate 3.2 motivation extension).
+                   "metric", "evidencerecord"},
     "strategy": {"resource", "capability", "valuestream", "courseofaction"},
     "business": {"businessactor", "businessrole", "businesscollaboration",
                  "businessinterface", "businessprocess", "businessfunction",
@@ -356,7 +359,15 @@ LAYER_TYPE_TO_LAYER = {t: layer for layer, ts in LAYER_TYPES.items() for t in ts
 # The set of layer keys a caller is allowed to filter by (composer `layer=`
 # query param). Untrusted input must be allowlisted against exactly this set
 # -- an unrecognised value is a 400, never a silent "no filter".
-VALID_LAYER_KEYS = frozenset(LAYER_TYPES.keys())
+# Composite elements (Location, Grouping) and the Junction connectors belong to
+# no layer in ArchiMate 3.2, and a stored type the registry does not know has no
+# layer either. They open together as one view, so a card for them always has
+# elements behind it.
+COMPOSITE_LAYER = "composite"
+COMPOSITE_TITLE = "Composite and other elements"
+COMPOSITE_TYPES = frozenset({"location", "grouping", "junction", "andjunction", "orjunction"})
+
+VALID_LAYER_KEYS = frozenset(LAYER_TYPES.keys()) | {COMPOSITE_LAYER}
 
 
 def _types_for_layer(layer: str) -> list:
@@ -368,6 +379,17 @@ def _types_for_layer(layer: str) -> list:
     already validated `layer` against VALID_LAYER_KEYS before calling this.
     """
     return sorted(LAYER_TYPES.get(layer, set()))
+
+
+def _filter_to_layer(query, layer, layer_type_names):
+    """Narrow an element query to one layer; the composite view takes every type no layer holds."""
+    from app import db as _db
+    from app.models.archimate_core import ArchiMateElement
+
+    lowered = _db.func.lower(_db.func.coalesce(ArchiMateElement.type, ""))
+    if layer == COMPOSITE_LAYER:
+        return query.filter(_db.not_(lowered.in_(list(LAYER_TYPE_TO_LAYER))))
+    return query.filter(lowered.in_(layer_type_names))
 
 
 # The most elements one viewpoint answer carries.
@@ -382,6 +404,7 @@ LAYER_TITLES = {
     "motivation": "Motivation", "strategy": "Strategy", "business": "Business",
     "application": "Application", "technology": "Technology",
     "implementation": "Implementation & Migration",
+    COMPOSITE_LAYER: COMPOSITE_TITLE,
 }
 
 
@@ -432,11 +455,10 @@ def _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, org_id):
         query = query.where(ArchiMateElement.type.in_(allowed_types))
     counts = {}
     for type_name, n in _db.session.execute(query).all():
-        key = LAYER_TYPE_TO_LAYER.get(type_name or "", "other")
+        key = LAYER_TYPE_TO_LAYER.get(type_name or "", COMPOSITE_LAYER)
         counts[key] = counts.get(key, 0) + n
     order = [k for k in vp.get('layer_order', layers or []) if k in counts]
     order += [k for k in LAYER_TITLES if k in counts and k not in order]
-    order += [k for k in counts if k not in order]
     return {
         'viewpoint_id': viewpoint_id,
         'viewpoint_name': vp['name'],
@@ -446,7 +468,7 @@ def _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, org_id):
         'relationships': [],
         'total': 0,
         'overview': [
-            {'layer': k, 'title': LAYER_TITLES.get(k, k.title()), 'count': counts[k]} for k in order
+            {'layer': k, 'title': LAYER_TITLES[k], 'count': counts[k]} for k in order
         ],
         'store_total': matching,
     }
@@ -556,7 +578,7 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             if allowed_types:
                 query = query.filter(ArchiMateElement.type.in_(allowed_types))
             if layer_type_names is not None:
-                query = query.filter(_db.func.lower(ArchiMateElement.type).in_(layer_type_names))
+                query = _filter_to_layer(query, layer, layer_type_names)
             matching = query.count()
             if layer is None and matching > VIEWPOINT_OPENING_LIMIT:
                 return _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, _current_org_id())
@@ -599,8 +621,7 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             if allowed_types:
                 query = query.filter(ArchiMateElement.type.in_(allowed_types))
             if layer_type_names is not None:
-                from app import db as _db
-                query = query.filter(_db.func.lower(ArchiMateElement.type).in_(layer_type_names))
+                query = _filter_to_layer(query, layer, layer_type_names)
             elements = query.limit(500).all()
         elif not is_enterprise_wide:
             elements = []
@@ -725,8 +746,11 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
         )
     if store_total is not None:
         result['store_total'] = store_total
-        result['omitted'] = store_total - len(serialised)
+        # With a layer open, "other layers" counts only the other layers: this
+        # layer's own capped elements are said once, in layer_omitted_note.
+        shown_or_in_layer = layer_total if (layer is not None and layer_total is not None) else len(serialised)
+        result['omitted'] = store_total - shown_or_in_layer
         result['omitted_note'] = _omitted_note(
-            store_total - len(serialised), layer, bool(allowed_types)
+            store_total - shown_or_in_layer, layer, bool(allowed_types)
         )
     return result
