@@ -611,15 +611,40 @@ def api_export_architecture_csv(id):
     )
 
 
-@application_mgmt.route(
-    "/api/applications/<string:id>/architecture/documents", methods=["GET"]
-)
-@login_required
-def api_get_architecture_documents(id):
-    """Get all architecture documents for an application."""
+def _own_application_or_404(application_id):
+    """The application, only when it belongs to the active organisation; otherwise 404."""
+    from app.middleware.tenant_context import current_org_id
+
+    org_id = current_org_id()
+    if org_id is None:
+        abort(404)
+    return ApplicationComponent.query.filter(
+        ApplicationComponent.id == application_id,
+        ApplicationComponent.organization_id == org_id,
+    ).first_or_404()
+
+
+def _own_document_or_404(application_id, doc_id):
+    """The document, found through its application in the active organisation; otherwise 404."""
     from ..models.miscellaneous import ArchitectureDocument
 
-    ApplicationComponent.query.get_or_404(id)
+    _own_application_or_404(application_id)
+    return ArchitectureDocument.query.filter(
+        ArchitectureDocument.id == doc_id,
+        ArchitectureDocument.application_id == application_id,
+    ).first_or_404()
+
+
+@application_mgmt.route(
+    "/api/applications/<int:id>/architecture/documents", methods=["GET"]
+)
+@login_required
+@require_permission("read", "application")
+def api_get_architecture_documents(id):
+    """Get all architecture documents for one of the active organisation's applications."""
+    from ..models.miscellaneous import ArchitectureDocument
+
+    _own_application_or_404(id)
     documents = (
         ArchitectureDocument.query.filter_by(application_id=id)
         .order_by(ArchitectureDocument.created_at.desc())
@@ -635,18 +660,19 @@ def api_get_architecture_documents(id):
 
 
 @application_mgmt.route(
-    "/api/applications/<string:id>/architecture/documents", methods=["POST"]
+    "/api/applications/<int:id>/architecture/documents", methods=["POST"]
 )
 @login_required
+@require_permission("edit", "application")
 def api_upload_architecture_document(id):
-    """Upload new architecture document."""
+    """Upload a new architecture document to one of the active organisation's applications."""
     import os
 
     from werkzeug.utils import secure_filename
 
     from ..models.miscellaneous import ArchitectureDocument
 
-    ApplicationComponent.query.get_or_404(id)
+    _own_application_or_404(id)
 
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
@@ -697,17 +723,14 @@ def api_upload_architecture_document(id):
 
 
 @application_mgmt.route(
-    "/api/applications/<string:id>/architecture/documents/<string:doc_id>",
+    "/api/applications/<int:id>/architecture/documents/<int:doc_id>",
     methods=["GET"],
 )
 @login_required
+@require_permission("read", "application")
 def api_download_architecture_document(id, doc_id):
-    """Download architecture document file."""
-    from ..models.miscellaneous import ArchitectureDocument
-
-    doc = ArchitectureDocument.query.filter_by(
-        id=doc_id, application_id=id
-    ).first_or_404()
+    """Download the file of a document of one of the active organisation's applications."""
+    doc = _own_document_or_404(id, doc_id)
 
     return send_file(
         doc.file_path,
@@ -727,25 +750,7 @@ def api_delete_architecture_document(id, doc_id):
     """Delete an architecture document of one of the active organisation's applications."""
     import os
 
-    from app.middleware.tenant_context import current_org_id
-
-    from ..models.miscellaneous import ArchitectureDocument
-
-    org_id = current_org_id()
-    if org_id is None:
-        abort(404)
-
-    doc = (
-        ArchitectureDocument.query.join(
-            ApplicationComponent, ApplicationComponent.id == ArchitectureDocument.application_id
-        )
-        .filter(
-            ArchitectureDocument.id == doc_id,
-            ArchitectureDocument.application_id == id,
-            ApplicationComponent.organization_id == org_id,
-        )
-        .first_or_404()
-    )
+    doc = _own_document_or_404(id, doc_id)
 
     try:
         file_path = doc.file_path
