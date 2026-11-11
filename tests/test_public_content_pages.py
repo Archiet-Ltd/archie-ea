@@ -520,10 +520,12 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     # the sitemap is built from the feed set, which leaves out a held page,
     # a merged page, and a page withdrawn from discovery (state:
     # not_planned) -- see app/services/public_pages.py::load_feed_pages.
-    # The early-access hub and the page of each capability it lists are views too.
+    # The early-access hub and the page of each capability it lists, and one share page (/see/<slug>) for each
+    # recording, are views too.
     from app.release_waves.routes import early_access_paths
+    from app.services.public_pages import share_page_paths
 
-    assert len(entries) == len(load_feed_pages()) + 3 + len(early_access_paths())
+    assert len(entries) == len(load_feed_pages()) + 3 + len(early_access_paths()) + len(share_page_paths())
 
 
 def test_withdrawn_pages_200_but_excluded_from_every_feed(app):

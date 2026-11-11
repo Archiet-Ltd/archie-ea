@@ -15,6 +15,16 @@ early_access_bp = Blueprint("early_access", __name__)
 CONSENT_TEXT = "Used to tell you when this becomes available, and for nothing else."
 
 
+SIMULATIONS_GROUP = "PG-SIM"
+
+
+def simulations_released() -> bool:
+    """True when the simulation screen is open: the one release check its address and the hub both ask."""
+    from app.release_waves import is_released_endpoint
+
+    return is_released_endpoint("early_access.simulations")
+
+
 def coming_groups() -> list[dict]:
     """The capabilities that open in a later release, once each, in alphabetical order.
 
@@ -22,8 +32,11 @@ def coming_groups() -> list[dict]:
     doc = wave_map()
     open_now = {entry[1] for entry in doc["rules"].values() if entry[0] == "W1"}
     seen: dict[str, dict] = {}
+    simulations_open = simulations_released()
     for entry in doc["rules"].values():
         wave, code = entry[0], entry[1]
+        if code == SIMULATIONS_GROUP and simulations_open:
+            continue
         if code in open_now or wave in doc["pass_waves"] or wave in ("W1", "X", "RT") or code.startswith("BP:") or code in ("infra", "PG-RT", "PG-RTP", "PG-NEW", "PG-EA", "PG-OPS"):
             continue
         info = doc["groups"].get(code)
@@ -150,16 +163,18 @@ def recommendations():
 
 @early_access_bp.route("/simulations")
 def simulations():
-    """A signed-in person gets the simulation screen; a visitor, or any wave that keeps it closed, the waiting list."""
-    from flask_login import current_user
+    """The simulation screen once it is released, for a signed-in person; a visitor is sent to sign in.
 
-    from app.release_waves import is_released_endpoint
+    While the screen is still closed, everyone is offered the waiting list."""
+    from flask import current_app
 
-    if current_user.is_authenticated and is_released_endpoint("strategic.api_simulation"):
-        from app.modules.solutions_strategic.v2.routes.strategic_routes import simulations_page
+    if not simulations_released():
+        return early_access_page(code_slug("PG-SIM"))
+    if not current_user.is_authenticated:
+        return current_app.login_manager.unauthorized()
+    from app.modules.solutions_strategic.v2.routes.strategic_routes import simulations_page
 
-        return simulations_page()
-    return early_access_page(code_slug("PG-SIM"))
+    return simulations_page()
 
 
 @early_access_bp.route("/early-access")

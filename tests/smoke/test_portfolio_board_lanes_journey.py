@@ -19,7 +19,7 @@ from .test_seeded_boards_journey import DEMO_EMAIL, demo_org  # noqa: F401  (fix
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-READER_EMAIL = "drew.dataanalyst@lantern-quay.example.com"
+READER_EMAIL = "drew.holloway@lantern-quay.example.com"
 BOARD = "/safe/portfolio/"
 WALK = pathlib.Path(os.environ.get("KANBAN_WALK_DIR", "/tmp/kanban-walk"))
 # The gallery kanban's cards are about 110px tall; ours may carry one more line.

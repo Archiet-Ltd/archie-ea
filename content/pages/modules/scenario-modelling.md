@@ -5,6 +5,7 @@ module_label: "Scenarios"
 state: briefed
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
+released_variant: {screen: /simulations, file: _released/scenario-modelling.md}
 icon: git-compare
 headline: Compare what-if plans side by side (early access)
 summary: Not built yet. Entelim is building scenarios so you can compare what-if plans before you commit money. You can join the waiting list, and use the twin map and roadmaps today.

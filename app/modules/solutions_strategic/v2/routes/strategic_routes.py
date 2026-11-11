@@ -61,6 +61,7 @@ from app import db
 from app.decorators import audit_log
 from datetime import datetime
 from app.utils.pagination import safe_int_arg
+from app.utils.rbac import require_role, user_has_role, who_holds_role
 
 strategic_bp = Blueprint("strategic", __name__, url_prefix="/strategic")
 
@@ -259,6 +260,9 @@ def impact_analysis():
 
     return render_template(
         "strategic/impact_analysis.html",
+        can_save_scenario=user_has_role(current_user, *SCENARIO_SAVE_ROLES),
+        scenario_list_limit=SCENARIO_LIST_LIMIT,
+        save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
     )
@@ -321,6 +325,9 @@ def simulations_page():
     return render_template(
         "strategic/impact_analysis.html",
         simulation=True,
+        can_save_scenario=user_has_role(current_user, *SCENARIO_SAVE_ROLES),
+        scenario_list_limit=SCENARIO_LIST_LIMIT,
+        save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
         priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
     )
@@ -351,6 +358,86 @@ def api_simulation():
     except Exception:
         current_app.logger.exception("Simulation failed")
         return jsonify({"error": "The simulation could not be worked out. Try again in a moment."}), 500
+
+
+SCENARIO_SAVE_ROLES = ("architect", "org_admin", "super_admin")
+# the saved-scenario list holds this many, newest first; the dialog says so when it is full
+SCENARIO_LIST_LIMIT = 200
+
+
+def _scenario_figures(server):
+    """What a saved scenario keeps: the lists and figures the server worked out, nothing the browser sent."""
+    return {
+        "severity": server["risk_level"],
+        "estimated_risk_cost": server["estimated_financial_risk"],
+        "impacted_capabilities": list(server["impacted_capabilities"]),
+        "impacted_processes": list(server["impacted_processes"]),
+        "dependencies": list(server["direct_dependencies"]),
+        "indirect_dependencies": list(server["indirect_dependencies"]),
+        "financial_risk_reason": server.get("financial_risk_reason") or "",
+    }
+
+
+@strategic_bp.route("/api/scenarios", methods=["GET"])
+@login_required
+def api_list_scenarios():
+    """The scenarios the caller's organisation has saved, newest first."""
+    from app.models.saved_scenario import SavedScenario
+
+    rows = SavedScenario.query.order_by(SavedScenario.created_at.desc(), SavedScenario.id.desc()).limit(SCENARIO_LIST_LIMIT).all()
+    return jsonify([r.to_dict() for r in rows])
+
+
+@strategic_bp.route("/api/scenarios", methods=["POST"])
+@login_required
+@require_role(*SCENARIO_SAVE_ROLES)
+@audit_log("scenario_save")
+def api_save_scenario():
+    """Keep a named scenario for the organisation, so a colleague can compare it after signing in."""
+    from app.models.saved_scenario import SavedScenario
+
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name") or "").strip()
+    change_type = str(data.get("change_type") or "").upper()
+    element = data.get("element") if isinstance(data.get("element"), dict) else {}
+    result = data.get("analysis_result")
+    if not name:
+        return jsonify({"error": "Give the scenario a name so you can find it when you compare."}), 400
+    if len(name) > 200:
+        return jsonify({"error": "Use a name of 200 characters or fewer."}), 400
+    if change_type not in simulation_service.CHANGE_LABELS:
+        return jsonify({"error": "change_type must be one of " + ", ".join(sorted(simulation_service.CHANGE_LABELS))}), 400
+    if not isinstance(result, dict):
+        return jsonify({"error": "Run the analysis before saving it as a scenario."}), 400
+    element_id = element.get("id")
+    if isinstance(element_id, bool) or not isinstance(element_id, int):
+        return jsonify({"error": "The scenario needs the element it was run on."}), 400
+    if not 0 < element_id <= 2147483647:
+        return jsonify({"error": "That element is not in your model."}), 404
+    from app.models import ArchiMateElement
+
+    found = ArchiMateElement.query.filter_by(id=element_id).first()
+    if found is None:
+        return jsonify({"error": "That element is not in your model."}), 404
+    try:
+        server = ImpactAnalysisService.analyze_change_impact(found.id, change_type, record=False)
+    except Exception:
+        current_app.logger.exception("Scenario analysis failed")
+        return jsonify({"error": "The scenario could not be saved. Try again in a moment."}), 500
+    result = _scenario_figures(server)
+    row = SavedScenario(
+        name=name,
+        element_id=found.id,
+        element_name=found.name,
+        element_type=found.type,
+        change_type=change_type,
+        change_label=simulation_service.change_label(change_type),
+        analysis_result=result,
+        created_by_id=current_user.id,
+    )
+    db.session.add(row)
+    db.session.commit()
+    return jsonify(row.to_dict()), 201
 
 
 @strategic_bp.route("/api/impact-analysis/history", methods=["GET"])

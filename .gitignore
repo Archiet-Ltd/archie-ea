@@ -199,6 +199,7 @@ verification_artifacts/
 !docs/design_system/*.png
 !app/static/img/*.png
 !app/static/img/*.jpg
+!app/static/video/share/*.jpg
 !tests/smoke/visual_baselines/*.png
 
 # One-off diagnostic scripts.

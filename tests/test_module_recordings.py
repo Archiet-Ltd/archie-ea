@@ -16,6 +16,7 @@ import re
 
 import pytest
 
+from tests._published_text_rules import BUILD_PROCESS_WORDS, PLACEHOLDER_PERSON_NAME
 from app.services.public_pages import (
     IMG_MODULES_DIR,
     MODULE_RECORDING_DEFECTS,
@@ -30,7 +31,6 @@ from app.services.public_pages import (
 MAX_VIDEO_BYTES = 2 * 1024 * 1024
 MAX_POSTER_BYTES = 200 * 1024
 SIGN_UP = "Start free at entelim.org"
-NAMES_NOT_FOR_PEOPLE = re.compile(r"claude|codex|kilo|aider|orchestrator|agent|R1-B|TB-\d|PB-\d", re.I)
 
 
 def _manifest():
@@ -53,7 +53,7 @@ def test_every_module_has_a_recording_or_a_named_defect_and_never_both():
 def test_a_defect_names_the_screen_and_what_is_wrong(slug):
     reason = MODULE_RECORDING_DEFECTS[slug]
     assert len(reason) > 40, "%s: the defect reason is too short to act on" % slug
-    assert not NAMES_NOT_FOR_PEOPLE.search(reason)
+    assert not BUILD_PROCESS_WORDS.search(reason)
 
 
 @pytest.mark.parametrize("slug", sorted(MODULE_RECORDINGS))
@@ -80,13 +80,14 @@ def test_a_recording_is_inside_the_standard(slug):
 
 
 @pytest.mark.parametrize("slug", sorted(MODULE_RECORDINGS))
-def test_the_words_with_a_recording_describe_it_and_name_no_tool(slug):
+def test_the_words_with_a_recording_describe_it_and_say_nothing_of_how_the_product_was_built(slug):
     entry = MODULE_RECORDINGS[slug]
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", entry["summary"].strip()) if s]
     assert 2 <= len(sentences) <= 4, "%s: the summary is %d sentences" % (slug, len(sentences))
     assert entry["alt"].startswith("Recording of "), slug
     for field in ("title", "promise", "summary", "alt"):
-        assert not NAMES_NOT_FOR_PEOPLE.search(entry[field]), "%s %s names a tool" % (slug, field)
+        assert not BUILD_PROCESS_WORDS.search(entry[field]), "%s %s describes how the product was built" % (slug, field)
+        assert not PLACEHOLDER_PERSON_NAME.search(entry[field]), "%s %s names a person like a placeholder" % (slug, field)
 
 
 @pytest.mark.parametrize("slug", sorted(MODULE_RECORDINGS))
@@ -155,7 +156,7 @@ SCREENS_THAT_BREAK_THE_STANDARD = [
 ]
 
 SCREENS_THAT_ARE_FINE = [
-    "20 shown of 21\nCalibration Ledger\nMorgan Calibrator",
+    "20 shown of 21\nCalibration Ledger\nMorgan Hale",
     "Evidence worked out 07 Nov 2026\n10 depend on it \u00b7 it depends on 8",
     "Total cost of ownership\n\u00a30.00 saved\n100%\n2.6 against 3.8",
     "Control A.5.11\nEvent Relay\tverified",

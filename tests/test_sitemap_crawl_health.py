@@ -22,7 +22,7 @@ import re
 from urllib.parse import urlparse
 
 from app.release_waves.routes import early_access_paths
-from app.services.public_pages import SITE_URL, load_all_pages, load_feed_pages
+from app.services.public_pages import SITE_URL, load_all_pages, load_feed_pages, share_page_paths
 
 _LOC_RE = re.compile(r"<loc>([^<]+)</loc>")
 _DESCRIPTION_RE = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"')
@@ -62,8 +62,9 @@ def test_every_sitemap_url_is_crawlable_and_tagged(app):
     with app.test_client() as client:
         paths = _sitemap_paths(client)
         # Same shape as test_sitemap_xml_lists_the_homepage_once_with_top_priority:
-        # +3 non-content URLs (home, /vs, /use-cases) and the early-access pages over load_feed_pages().
-        assert len(paths) == len(pages_by_url) + len(_NON_CONTENT_PAGE_PATHS) + len(early_access_paths())
+        # +3 non-content URLs (home, /vs, /use-cases), the early-access pages and one share page (/see/<slug>) for each
+        # recording over load_feed_pages().
+        assert len(paths) == len(pages_by_url) + len(_NON_CONTENT_PAGE_PATHS) + len(early_access_paths()) + len(share_page_paths())
 
         for path in paths:
             rv = client.get(path)
@@ -143,7 +144,7 @@ def test_ping_indexnow_excludes_a_withdrawn_page(app, monkeypatch):
     # public_pages.feed_page_paths(), the one path list this command and
     # /sitemap.xml are both built from (D-26: a manual ping used to miss
     # the two hub pages the sitemap always listed).
-    assert len(submitted) == len(feed_pages) + 3 + len(early_access_paths())
+    assert len(submitted) == len(feed_pages) + 3 + len(early_access_paths()) + len(share_page_paths())
     assert any(url.endswith("/vs") for url in submitted)
     assert any(url.endswith("/use-cases") for url in submitted)
     for page in feed_pages:

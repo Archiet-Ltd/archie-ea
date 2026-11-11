@@ -79,6 +79,11 @@ FEATURE_INTEREST_CONSENT_TEXT = (
     "Used to tell you when this becomes available, and for nothing else."
 )
 IMG_MODULES_DIR = STATIC_ROOT / "img" / "modules"
+# The share files of each module recording (three shapes, a cover image and the manifest a distribution tool reads),
+# cut from the recordings by scripts/capture/share_assets.py.
+SHARE_DIR = STATIC_ROOT / "video" / "share"
+SHARE_MANIFEST = "manifest.json"
+SHARE_URL_PREFIX = "/see"
 IMG_USE_CASES_DIR = STATIC_ROOT / "img" / "use-cases"
 IMG_ROLES_DIR = STATIC_ROOT / "img" / "roles"
 VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
@@ -88,9 +93,9 @@ VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
 # registries below; kept here (not duplicated in the capture script) so the
 # fictional persona list has one source.
 DEMO_PERSONA = "demo@lantern-quay.example.com"
-ITOPS_ADMIN_PERSONA = "sage.itops@lantern-quay.example.com"
-APP_MANAGER_PERSONA = "casey.inventory@lantern-quay.example.com"
-PROCUREMENT_PERSONA = "taylor.procurement@lantern-quay.example.com"
+ITOPS_ADMIN_PERSONA = "sage.okafor@lantern-quay.example.com"
+APP_MANAGER_PERSONA = "casey.marsh@lantern-quay.example.com"
+PROCUREMENT_PERSONA = "taylor.brennan@lantern-quay.example.com"
 
 # Role pages: each role's workspace in Ask, open on the impact question for the
 # Calibration Ledger application with its first answer row shown
@@ -513,6 +518,8 @@ _ALLOWED_ATTRS = {
     # id is not an XSS vector; allowed so a page's own headings can carry a
     # deep-link anchor (e.g. /features#strategy-management) for other pages
     # to link into, without needing the markdown "toc" extension.
+    # a paragraph may carry an id too: "needs-<screen>" holds it back until that screen's wave is released
+    "p": ["id"],
     "h1": ["id"], "h2": ["id"], "h3": ["id"], "h4": ["id"], "h5": ["id"], "h6": ["id"],
 }
 
@@ -933,8 +940,12 @@ def get_module_recording(page: "PublicPage") -> dict[str, Any] | None:
     meta = json.loads(manifest_path.read_text(encoding="utf-8")).get(page.slug)
     if meta is None:
         return None
+    share = get_share(page.slug)
     return {
         "video_url": f"/static/img/modules/{page.slug}.webm",
+        # The H.264 file cut for the same recording, for the browsers that do not play WebM (iPhone).
+        "mp4_url": share["files"]["wide"]["path"] if share else None,
+        "share_path": f"{SHARE_URL_PREFIX}/{page.slug}" if share else None,
         "poster_url": f"/static/img/modules/{page.slug}.poster.webp",
         "width": meta["width"],
         "height": meta["height"],
@@ -943,6 +954,42 @@ def get_module_recording(page: "PublicPage") -> dict[str, Any] | None:
         "caption": entry["summary"],
         "alt": entry["alt"],
         "name": f"{entry['title']} \u2014 recorded walkthrough",
+    }
+
+
+def load_share_manifest() -> list[dict[str, Any]]:
+    """Every entry of the share manifest, or an empty list while the file has not been generated."""
+    path = SHARE_DIR / SHARE_MANIFEST
+    if not path.is_file():
+        return []
+    return json.loads(path.read_text(encoding="utf-8")).get("recordings", [])
+
+
+def get_share(slug: str) -> dict[str, Any] | None:
+    """The share-manifest entry of one module recording, or None when that module has none."""
+    return next((entry for entry in load_share_manifest() if entry["slug"] == slug), None)
+
+
+def share_page_paths() -> list[str]:
+    """The path of every share page, for the sitemap. A held or merged module has none listed, as its own page
+    is left out of load_feed_pages()."""
+    listed = {page.url for page in load_feed_pages()}
+    return [f"{SHARE_URL_PREFIX}/{entry['slug']}" for entry in load_share_manifest()
+            if f"/modules/{entry['slug']}" in listed]
+
+
+def share_social(share: dict[str, Any]) -> dict[str, Any]:
+    """The link-preview fields of a recording (``partials/_seo_meta.html`` draws them): the cover image, the wide
+    file and the type, with every address absolute so a platform can fetch it without the page around it."""
+    return {
+        "title": share["title"],
+        "description": share["message"],
+        "url": share["share_url"],
+        "image": SITE_URL + share["cover"],
+        "image_alt": share["alt"],
+        "video": SITE_URL + share["files"]["wide"]["path"],
+        "video_width": share["files"]["wide"]["width"],
+        "video_height": share["files"]["wide"]["height"],
     }
 
 
@@ -1002,9 +1049,31 @@ def _apply_legal_blocks(body_md: str) -> str:
     )
 
 
+def _released_variant(front_matter: dict[str, Any], file_path: Path) -> Path | None:
+    """The page's own "available" text, when the screen it is waiting for is in a released wave.
+
+    A not-yet-built page may name ``released_variant: {screen: /route, file: relative/path.md}``. Once the
+    release wave that opens that route is released (or the wave switch is off) the variant file is
+    read in its place, so the page and every menu that reads it never describe a working screen as
+    not built. It is the same map entry the menu check reads, without needing an application context.
+    """
+    from app.release_waves import OPEN, configured_wave, entry_for, state_for
+
+    spec = front_matter.get("released_variant")
+    if not isinstance(spec, dict):
+        return None
+    wave = configured_wave()
+    if wave is not None and state_for(entry_for(str(spec["screen"])), wave) != OPEN:
+        return None
+    return file_path.parent / str(spec["file"])
+
+
 def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     raw = file_path.read_text(encoding="utf-8")
     front_matter, body_md = _parse_front_matter(raw)
+    variant = _released_variant(front_matter, file_path)
+    if variant is not None:
+        front_matter, body_md = _parse_front_matter(variant.read_text(encoding="utf-8"))
     body_md = _apply_legal_blocks(body_md)
     if family == "function-per-segment":
         slug, url = _use_case_slug_and_url(front_matter, slug)
@@ -1063,7 +1132,10 @@ def _content_fingerprint() -> tuple[tuple[str, int], ...]:
     from app.services.legal_pages import legal_pages_enabled
 
     # The flag is part of the key: a page's body can differ with it.
-    return (("legal-pages", int(legal_pages_enabled())),) + tuple(sorted(
+    from app.release_waves import configured_wave
+
+    # the release wave is part of the key too: a page may read differently once its screen is released
+    return (("legal-pages", int(legal_pages_enabled())), ("release-wave", str(configured_wave()))) + tuple(sorted(
         (str(p), p.stat().st_mtime_ns) for p in CONTENT_ROOT.rglob("*.md")
     ))
 
@@ -1123,7 +1195,7 @@ def feed_page_paths() -> list[str]:
     """
     from app.release_waves.routes import early_access_paths
 
-    paths = ["/", "/vs", "/use-cases"] + early_access_paths() + [page.url for page in load_feed_pages()]
+    paths = ["/", "/vs", "/use-cases"] + early_access_paths() + [page.url for page in load_feed_pages()] + share_page_paths()
     return list(dict.fromkeys(paths))
 
 
@@ -2029,6 +2101,17 @@ def _link_list_cards(body: str, pages_by_url: dict[str, PublicPage]) -> list[Lan
     return cards
 
 
+def _start_action() -> tuple[str, str]:
+    """The one call to action of every module and share page: a signed-in person is offered their dashboard, a
+    visitor is offered sign-up."""
+    from flask import has_request_context, url_for
+    from flask_login import current_user
+
+    if has_request_context() and current_user.is_authenticated:
+        return ("Open Entelim", url_for("dashboard.overview"))
+    return ("Start free", url_for("account.register"))
+
+
 def build_landing(page: PublicPage) -> Landing | None:
     """The landing-page view of ``page`` for public/_partials/_landing.html,
     or ``None`` when ``page.family`` keeps the document layout.
@@ -2042,8 +2125,6 @@ def build_landing(page: PublicPage) -> Landing | None:
     """
     if page.family not in LANDING_FAMILIES:
         return None
-
-    from flask import url_for
 
     body = str(page.body_html)
     nodes = _top_level_nodes(body)
@@ -2115,7 +2196,7 @@ def build_landing(page: PublicPage) -> Landing | None:
         # second action is a conversation, not a plan.
         secondary_action = ("Talk to us", "/contact")
     else:
-        primary_action = ("Start free", url_for("account.register"))
+        primary_action = _start_action()
         secondary_action = ("See pricing", "/pricing")
 
     return Landing(
