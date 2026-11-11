@@ -9,6 +9,7 @@ computation of a compliance percentage; this service lists and words it.
 from datetime import datetime
 from typing import Dict, List
 
+from app.services import result_footer_service as footers
 from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService
 
 from .decorators import transactional
@@ -87,7 +88,37 @@ class ComplianceTrackingService:
             "next_step": next_step,
             "last_review": last_review.strftime("%d %b %Y") if last_review else None,
             "findings": assessment["findings"],
+            "footer": ComplianceTrackingService._footer(capability, assessment),
         }
+
+    @staticmethod
+    def _footer(capability: Dict, assessment: Dict) -> Dict:
+        """Evidence, source, confidence and date for one capability's figure, from the one result footer."""
+        facts = [
+            footers.fact(
+                capability["name"],
+                href=footers.page_link("archimate_crud.detail_element", layer="strategy",
+                                       element_type="Capability", element_id=capability["id"]),
+                source_kind="manual", as_of=capability.get("updated_at"), subject="Capability"),
+        ]
+        total = assessment["assessed_controls"]
+        if not total:
+            facts.append(footers.fact("No control is mapped to the applications that support it", missing=True))
+            return footers.build_footer(facts)
+        in_place = assessment["implemented"]
+        facts.append(footers.fact(
+            "%d control%s mapped, %d in place" % (total, "" if total == 1 else "s", in_place),
+            href=footers.page_link("application_mgmt.compliance_frameworks_dashboard"),
+            source_kind="manual", as_of=assessment["newest_record"], subject="Controls"))
+        documented = assessment["with_evidence"]
+        if documented:
+            facts.append(footers.fact(
+                "Evidence document recorded for %d of %d controls" % (documented, total),
+                source_kind="manual", as_of=assessment["newest_record"], subject="Document"))
+        else:
+            facts.append(footers.fact("No evidence document is recorded for any of its %d control%s"
+                                      % (total, "" if total == 1 else "s"), missing=True))
+        return footers.build_footer(facts)
 
     @staticmethod
     def _recommendations(rows: List[Dict]) -> List[str]:
@@ -125,6 +156,7 @@ class ComplianceTrackingService:
         from app.models.business_capability import BusinessCapability
 
         return [
-            {"id": cap.id, "name": cap.name, "domain": cap.business_domain}
+            {"id": cap.id, "name": cap.name, "domain": cap.business_domain,
+             "updated_at": cap.updated_at or cap.created_at}
             for cap in BusinessCapability.query.order_by(BusinessCapability.name).all()
         ]

@@ -94,6 +94,11 @@ class ComplianceInheritanceService:
             credit = _CONTROL_CREDIT.get(status, 0.0)
             row["assessed_controls"] += 1
             row["credit"] += credit
+            if mapping.evidence_url:
+                row["with_evidence"] += 1
+            recorded = mapping.updated_at or mapping.created_at
+            if recorded and (row["newest_record"] is None or recorded > row["newest_record"]):
+                row["newest_record"] = recorded
             bucket = "implemented" if credit == 1.0 else "partial" if credit else "missing"
             row[bucket] += 1
             if bucket != "implemented":
@@ -186,8 +191,12 @@ class ComplianceInheritanceService:
             row = result[cap_id]
             for app_id in sorted(apps):
                 part = by_app[app_id]
-                for key in ("assessed_controls", "implemented", "partial", "missing", "credit"):
+                for key in ("assessed_controls", "implemented", "partial", "missing", "credit", "with_evidence"):
                     row[key] += part[key]
+                if part["newest_record"] and (
+                    row["newest_record"] is None or part["newest_record"] > row["newest_record"]
+                ):
+                    row["newest_record"] = part["newest_record"]
                 row["findings"].extend(part["findings"])
                 if part["last_review"] and (
                     row["last_review"] is None or part["last_review"] > row["last_review"]
@@ -238,6 +247,8 @@ class ComplianceInheritanceService:
             "credit": 0.0,
             "findings": [],
             "last_review": None,
+            "with_evidence": 0,
+            "newest_record": None,
         }
 
     @staticmethod
