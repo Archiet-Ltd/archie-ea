@@ -48638,6 +48638,123 @@
    "status": "mapped",
    "tier": "B",
    "type_changed": false
+  },
+  "app/templates/admin/connectors/sharepoint.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/element_table.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
+    "components/file_upload.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/list_table.html",
+    "components/loading_state.html",
+    "components/modal.html",
+    "components/modal_form.html",
+    "components/page_header.html",
+    "components/provenance.html",
+    "components/radio_group.html",
+    "components/risk_matrix.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/switch.html",
+    "components/tabs.html",
+    "macros/check_password.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "settings",
+   "charts": [],
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "empty",
+    "field",
+    "input",
+    "page-header",
+    "switch",
+    "tabs",
+    "card",
+    "item",
+    "select",
+    "table"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 2,
+    "form": 1
+   },
+   "departures": [
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G3",
+   "inhouse_components": [
+    "page-header:Replace"
+   ],
+   "macros": [
+    "components/alert.html",
+    "components/button.html",
+    "components/page_header.html"
+   ],
+   "original": "preview-02",
+   "page_type": "settings",
+   "patterns": [
+    "P01-page-header",
+    "P16-settings-section",
+    "P23-status-badge",
+    "P22-toast-feedback"
+   ],
+   "persona": "platform_admin",
+   "reason": "Choose a SharePoint list, map its columns and save the connection.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn blocks: sidebar-08 (inset section navigation)",
+     "url": "https://ui.shadcn.com/blocks#sidebar-08"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: profile",
+     "image": "docs/design/reference/basecoat-profile.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-no-permission",
+    "error-field",
+    "error-region",
+    "long-job-running",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
   }
  }
 }
