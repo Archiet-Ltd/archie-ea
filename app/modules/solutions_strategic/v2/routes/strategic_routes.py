@@ -366,6 +366,8 @@ def api_simulation():
 
         result["footer_html"] = result_footer_service.render_footer(
             result_footer_service.impact_footer(current_org_id(), result))
+        if not simulation_service.may_see_costs(current_user):
+            result = simulation_service.withhold_costs(result)
         return jsonify(result)
     except simulation_service.ElementNotInModel:
         return jsonify({"error": "That element is not in your model."}), 404
@@ -393,6 +395,14 @@ def _scenario_figures(server):
     }
 
 
+def _scenario_for_caller(row):
+    """A saved scenario as the caller may read it: the running costs are left out for a person the cost rule withholds from."""
+    data = row.to_dict()
+    if not simulation_service.may_see_costs(current_user):
+        data["analysis_result"] = simulation_service.withhold_costs(data["analysis_result"])
+    return data
+
+
 @strategic_bp.route("/api/scenarios", methods=["GET"])
 @login_required
 def api_list_scenarios():
@@ -400,7 +410,7 @@ def api_list_scenarios():
     from app.models.saved_scenario import SavedScenario
 
     rows = SavedScenario.query.order_by(SavedScenario.created_at.desc(), SavedScenario.id.desc()).limit(SCENARIO_LIST_LIMIT).all()
-    return jsonify([r.to_dict() for r in rows])
+    return jsonify([_scenario_for_caller(r) for r in rows])
 
 
 @strategic_bp.route("/api/scenarios", methods=["POST"])
@@ -452,7 +462,7 @@ def api_save_scenario():
     )
     db.session.add(row)
     db.session.commit()
-    return jsonify(row.to_dict()), 201
+    return jsonify(_scenario_for_caller(row)), 201
 
 
 def _scenario_row(scenario_id):
@@ -461,7 +471,7 @@ def _scenario_row(scenario_id):
 
     text = str(scenario_id)
     number = text[len("scenario-"):] if text.startswith("scenario-") else text
-    if not number.isdigit() or not 0 < int(number) <= 2147483647:
+    if not (number.isascii() and number.isdigit()) or not 0 < int(number) <= 2147483647:
         return None
     return SavedScenario.query.filter_by(id=int(number)).first()
 
@@ -482,7 +492,7 @@ def api_rename_scenario(scenario_id):
         return jsonify({"error": "Use a name of 200 characters or fewer."}), 400
     row.name = name
     db.session.commit()
-    return jsonify(row.to_dict())
+    return jsonify(_scenario_for_caller(row))
 
 
 @strategic_bp.route("/api/scenarios/<scenario_id>", methods=["DELETE"])
@@ -515,7 +525,7 @@ def api_export_scenarios_csv():
     if not rows:
         return jsonify({"error": "Choose at least one saved scenario to export."}), 400
     return Response(
-        comparison_csv([r.to_dict() for r in rows]),
+        comparison_csv([_scenario_for_caller(r) for r in rows]),
         mimetype="text/csv",
         headers={"Content-Disposition": 'attachment; filename="scenario-comparison.csv"'})
 

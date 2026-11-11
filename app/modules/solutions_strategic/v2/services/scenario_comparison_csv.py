@@ -4,17 +4,15 @@ import csv
 import io
 from typing import Any, Dict, List, Optional
 
-# A cell that starts with one of these is read as a formula by a spreadsheet.
-_FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
-
 NOT_RECORDED = "Not recorded"
 NOT_SAVED = "Not saved with this scenario"
 
 
 def safe_text(value: Any) -> str:
     """Text a person typed, kept as text: a leading formula character is neutralised with a single quote."""
-    text = "" if value is None else str(value)
-    return "'" + text if text.startswith(_FORMULA_STARTS) else text
+    from app.application_mgmt.import_routes import _import_history_csv_value
+
+    return _import_history_csv_value("" if value is None else str(value))
 
 
 def _count(items: Any) -> str:
@@ -30,10 +28,13 @@ def _number(value: Any, money: bool) -> str:
 def figure_text(figure: Dict[str, Any]) -> str:
     """One figure of a run as the dialog draws it: the figure now, after the change, and the change worded as the screen words it."""
     money = bool(figure.get("money"))
+    if figure.get("withheld"):
+        return str(figure.get("note") or "")
     text = "%s to %s" % (_number(figure.get("before"), money), _number(figure.get("after"), money))
     change = figure.get("change")
     if change is None:
-        return text
+        unknown = figure.get("before") is None or figure.get("after") is None
+        return text + (" (%s)" % figure["note"] if unknown and figure.get("note") else "")
     return text + (" (No change)" if change == 0 else " (%s %s)" % ("Up" if change > 0 else "Down", _number(abs(change), money)))
 
 
@@ -66,7 +67,8 @@ def comparison_csv(scenarios: List[Dict[str, Any]]) -> str:
     writer.writerow(["Affected Capabilities"] + [_count(results(s).get("impacted_capabilities")) for s in scenarios])
     writer.writerow(["Affected Processes"] + [_count(results(s).get("impacted_processes")) for s in scenarios])
     writer.writerow(["Financial Risk (organisation currency)"] + [
-        NOT_RECORDED if cost(s) is None else _number(cost(s), True) for s in scenarios])
+        results(s).get("financial_risk_reason") if results(s).get("costs_withheld")
+        else NOT_RECORDED if cost(s) is None else _number(cost(s), True) for s in scenarios])
     writer.writerow(["Direct Dependencies"] + [_count(results(s).get("dependencies")) for s in scenarios])
     for label in figure_labels(scenarios):
         cells = []
