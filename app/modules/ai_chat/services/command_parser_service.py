@@ -22,6 +22,25 @@ def _element_meant_by(name, model):
     return model.query.filter_by(id=element_id, organization_id=org_id).first() if element_id else None
 
 
+def _no_such_element(command, name, domain):
+    """The answer to a name no element carries: the closest recorded names, each one a command to
+    run, and one sentence saying what to type. The closest names come from the one helper the
+    question catalogue uses."""
+    from app.middleware.tenant_context import current_org_id
+    from app.modules.intelligence.services.query_catalogue import _closest_recorded_names
+
+    org_id = current_org_id()
+    closest = _closest_recorded_names(org_id, name) if org_id is not None else []
+    lines = [f"Nothing recorded is called `{name}`."]
+    if closest:
+        lines.append("\nThe closest recorded names:")
+        lines.extend(f"- `{command} {recorded}`" for recorded in closest)
+        lines.append(f"\nType `{command}` and one of these names, or click one.")
+    else:
+        lines.append(f"\nNothing similar is recorded. Type `{command}` and the name of a recorded element.")
+    return {"response": "\n".join(lines), "domain": domain, "command_type": command.lstrip("/")}
+
+
 class CommandParserService:
     """Parse and execute slash commands in AI chat messages."""
 
@@ -687,7 +706,10 @@ class CommandParserService:
     def _handle_portfolio_check(self, args, user_id, domain):
         """Show impact propagation for an ArchiMate element across the portfolio.
 
-        Finds the element by fuzzy name match, traces 1st and 2nd degree
+        Finds the element by the one rule every answer uses (a name matches ignoring case,
+        spacing, "-" and "_"; a shared name means the element with the most relationships),
+        counts relationships by the same live count the overview and the first-question cards
+        read, so a relationship to a deleted element appears nowhere, traces 1st and 2nd degree
         relationships, and groups impacted elements by ArchiMate layer.
         """
         element_name = " ".join(args)
@@ -695,23 +717,29 @@ class CommandParserService:
         try:
             from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
-            # Fuzzy search by name (case-insensitive LIKE)
+            # The element the name means, by the rule every answer shares
             element = _element_meant_by(element_name, ArchiMateElement)
 
             if not element:
-                return {
-                    "response": f"No ArchiMate element found matching `{element_name}`.",
-                    "domain": domain,
-                    "command_type": "portfolio-check",
-                }
+                return _no_such_element("/portfolio-check", element_name, domain)
+
+            from app.modules.dashboard.services.overview_figures import _relationship_pairs, relationship_split
+
+            # Only relationships whose both ends are live count, as everywhere else.
+            org_id = element.organization_id
+            live_pairs = set(_relationship_pairs(org_id))
 
             # --- 1st degree: direct relationships ---
-            outgoing_rels = ArchiMateRelationship.query.filter_by(
-                source_id=element.id
-            ).all()
-            incoming_rels = ArchiMateRelationship.query.filter_by(
-                target_id=element.id
-            ).all()
+            outgoing_rels = [
+                rel
+                for rel in ArchiMateRelationship.query.filter_by(source_id=element.id).all()
+                if (rel.source_id, rel.target_id) in live_pairs
+            ]
+            incoming_rels = [
+                rel
+                for rel in ArchiMateRelationship.query.filter_by(target_id=element.id).all()
+                if (rel.source_id, rel.target_id) in live_pairs
+            ]
 
             first_degree_ids = set()
             rel_type_counts = {}
@@ -730,15 +758,10 @@ class CommandParserService:
             # --- 2nd degree: relationships of 1st-degree elements ---
             second_degree_ids = set()
             if first_degree_ids:
-                second_rels = ArchiMateRelationship.query.filter(
-                    db.or_(
-                        ArchiMateRelationship.source_id.in_(first_degree_ids),
-                        ArchiMateRelationship.target_id.in_(first_degree_ids),
-                    )
-                ).all()
-                for rel in second_rels:
-                    second_degree_ids.add(rel.source_id)
-                    second_degree_ids.add(rel.target_id)
+                for source_id, target_id in live_pairs:
+                    if source_id in first_degree_ids or target_id in first_degree_ids:
+                        second_degree_ids.add(source_id)
+                        second_degree_ids.add(target_id)
                 # Remove the root element and all 1st-degree elements
                 second_degree_ids -= first_degree_ids
                 second_degree_ids.discard(element.id)
@@ -748,7 +771,8 @@ class CommandParserService:
             layer_groups = {}  # layer -> list of (name, type, degree)
             if all_impacted_ids:
                 impacted_elements = ArchiMateElement.query.filter(
-                    ArchiMateElement.id.in_(all_impacted_ids)
+                    ArchiMateElement.id.in_(all_impacted_ids),
+                    ArchiMateElement.deleted_at.is_(None),
                 ).all()
                 for el in impacted_elements:
                     layer = el.layer or "Unknown"
@@ -762,6 +786,7 @@ class CommandParserService:
                 f"**Portfolio Impact Check: {element.name}**\n",
                 f"- **Element Type:** {element.type or 'N/A'}",
                 f"- **Layer:** {element.layer or 'N/A'}",
+                f"- **Relationships:** {relationship_split(org_id, element.id)['total']}",
                 f"- **Outgoing Relationships:** {len(outgoing_rels)}",
                 f"- **Incoming Relationships:** {len(incoming_rels)}",
                 f"- **1st Degree Impacted:** {len(first_degree_ids)}",
@@ -1266,9 +1291,10 @@ class CommandParserService:
         from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
         from app import db
 
-        el = _element_meant_by(args, ArchiMateElement)
+        name = " ".join(args)
+        el = _element_meant_by(name, ArchiMateElement)
         if not el:
-            return {"response": f"Element not found: `{args}`", "domain": domain, "command_type": "dependencies"}
+            return _no_such_element("/dependencies", name, domain)
 
         # BFS traversal (3 hops)
         visited = {el.id}
@@ -1287,7 +1313,7 @@ class CommandParserService:
                     visited.add(r.target_id)
                     next_frontier.add(r.target_id)
                     tgt = db.session.get(ArchiMateElement, r.target_id)
-                    if tgt:
+                    if tgt and tgt.deleted_at is None:
                         dependents.append({
                             "name": tgt.name, "type": tgt.type,
                             "layer": tgt.layer, "rel": r.type, "hop": hop + 1,

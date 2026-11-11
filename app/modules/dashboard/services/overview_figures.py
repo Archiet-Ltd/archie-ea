@@ -238,9 +238,10 @@ def _sourced_share(org_id):
     }
 
 
-def _relationship_pairs(org_id, element_id=None):
+def _relationship_pairs(org_id, element_id=None, since=None):
     """The (source, target) of each recorded relationship of the organisation, or only those
-    touching *element_id*. The one place relationships are read for these counts."""
+    touching *element_id*, or only those recorded since *since*. The one place relationships are
+    read for these counts."""
     from app.models import ArchiMateRelationship as R
 
     from app.models import ArchiMateElement as E
@@ -253,6 +254,8 @@ def _relationship_pairs(org_id, element_id=None):
     )
     if element_id is not None:
         query = query.where(or_(R.source_id == element_id, R.target_id == element_id))
+    if since is not None:
+        query = query.where(R.created_at >= since)
     return db.session.execute(query).all()
 
 
@@ -343,20 +346,13 @@ def relationship_split(org_id, element_id):
 
 def _relationships(org_id, now):
     from app.models import ArchiMateElement as E
-    from app.models.audit_log import AuditLog
 
     total = len(_relationship_pairs(org_id))
     if not total:
         return {"total": 0}
     since = now - timedelta(days=30)
-    added = db.session.execute(
-        db.select(func.count(AuditLog.id)).where(
-            AuditLog.organization_id == org_id,
-            AuditLog.table_name == "archimate_relationships",
-            AuditLog.action == "create",
-            AuditLog.created_at >= since,
-        )
-    ).scalar_one()
+    # the same live relationships the total counts, so the figure beside it can never exceed it
+    added = len(_relationship_pairs(org_id, since=since))
     ends = relationship_ends(org_id)
     top = None
     if ends:
