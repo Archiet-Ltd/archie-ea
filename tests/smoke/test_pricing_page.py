@@ -8,9 +8,22 @@ repository; the billing questions open. Anonymous throughout.
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT
+from .conftest import PAGE_TIMEOUT, boot_live_server
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+
+@pytest.fixture(scope="module")
+def paid_server(request, app):
+    """A server with the payment settings present, so the plan cards offer Buy."""
+    return boot_live_server(request, None, app, extra_env={
+        "STRIPE_SECRET_KEY": "sk_test_journey_not_a_real_key",
+        "STRIPE_WEBHOOK_SECRET": "whsec_journey_not_a_real_secret",
+        "STRIPE_PRICE_STARTUP_MONTHLY": "price_journey_startup_month",
+        "STRIPE_PRICE_STARTUP_ANNUAL": "price_journey_startup_year",
+        "STRIPE_PRICE_TEAM_MONTHLY": "price_journey_team_month",
+        "STRIPE_PRICE_TEAM_ANNUAL": "price_journey_team_year",
+    })
 
 
 def _open(browser, live_server, width=1440, height=900):
@@ -47,8 +60,8 @@ def test_each_plan_card_holds_its_price_and_its_buy_button(browser, live_server)
         context.close()
 
 
-def test_toggle_switches_prices_and_the_live_buy_link(browser, live_server):
-    context, page = _open(browser, live_server)
+def test_toggle_switches_prices_and_the_live_buy_link(browser, paid_server):
+    context, page = _open(browser, str(paid_server))
     try:
         startup = page.get_by_test_id("plan-card-startup")
         shown = startup.locator(".pp-price > span:visible")

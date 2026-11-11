@@ -738,7 +738,7 @@ def update_editor_contents():
 
 
 # ============================================================================
-# API Settings
+# AI settings
 # ============================================================================
 
 
@@ -753,6 +753,8 @@ def api_settings():
     edit_id = request.args.get("edit", type=int)
     edit_settings = APISettings.query.get(edit_id) if edit_id else None
     form = APISettingsForm()
+    # a person who came from sign-up to add a key keeps the way back after saving it
+    settings_url = url_for("admin.api_settings", **({"from": "signup"} if request.args.get("from") == "signup" else {}))
     from app.modules.ai_chat.services.llm_service_impl import LLMService
 
     # What the platform has spent on answers this month, per provider in its order, with ceilings.
@@ -795,6 +797,7 @@ def api_settings():
                     edit_id=edit_id,
                     edit_settings=edit_settings,
                     spend_ledger=spend_ledger,
+                    settings_url=settings_url,
                 )
 
             settings = APISettings(
@@ -824,7 +827,7 @@ def api_settings():
         if form.test.data:
             if not api_key_to_test:
                 flash("No API key available to test.", "error")
-                return redirect(url_for("admin.api_settings"))
+                return redirect(settings_url)
             test_result = test_api_key(provider, api_key_to_test)
             settings.test_status = "success" if test_result["success"] else "failed"
             settings.test_message = test_result.get("message", "")
@@ -841,10 +844,10 @@ def api_settings():
                 )
         else:
             label_suffix = f" ({key_label})" if key_label else ""
-            flash(f"API settings for {provider}{label_suffix} saved successfully.", "success")
+            flash(f"AI settings for {provider}{label_suffix} saved successfully.", "success")
 
         db.session.commit()
-        return redirect(url_for("admin.api_settings"))
+        return redirect(settings_url)
 
     if edit_settings:
         form.provider.data = edit_settings.provider
@@ -870,6 +873,7 @@ def api_settings():
         edit_id=edit_id,
         edit_settings=edit_settings,
         spend_ledger=spend_ledger,
+        settings_url=settings_url,
     )
 
 
@@ -884,7 +888,7 @@ def delete_api_settings(settings_id):
     provider = settings.provider
     db.session.delete(settings)
     db.session.commit()
-    flash(f"API settings for {provider} deleted successfully.", "success")
+    flash(f"AI settings for {provider} deleted successfully.", "success")
     return redirect(url_for("admin.api_settings"))
 
 

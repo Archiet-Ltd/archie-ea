@@ -90,10 +90,12 @@
                 </p>
                 {% endif %}
             </div>
+            {% if can_change_model() %}
             <span class="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
             {% call button(variant='outline', on_click='deleteElement()', testid='delete-element', aria_label='Delete ' ~ elem_name, class='gap-2 text-destructive-emphasis col-span-2 sm:col-span-1') %}
                 <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>Delete
             {% endcall %}
+            {% endif %}
         </div>
     {% endmacro %}
 
@@ -444,7 +446,7 @@ function archimateDetail() {
                     }
                 );
                 if (data.success) {
-                    window.location.href = '{{ url_for("archimate_crud.list_elements", layer=layer, element_type=element_type) }}';
+                    window.location.href = {{ after_delete_url | tojson }};
                 } else {
                     Platform.toast.error('Error: ' + (data.error || 'Unknown error'));
                 }

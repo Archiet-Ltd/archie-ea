@@ -3622,7 +3622,8 @@
     "table",
     "input-group",
     "checkbox",
-    "dropdown-menu"
+    "dropdown-menu",
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -3743,7 +3744,8 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -16187,7 +16189,8 @@
     "item",
     "table",
     "field",
-    "select"
+    "select",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -16434,7 +16437,9 @@
     "select",
     "table",
     "tabs",
-    "card"
+    "card",
+    "figures",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -18159,7 +18164,8 @@
     "tabs",
     "input-group",
     "dialog",
-    "dropdown-menu"
+    "dropdown-menu",
+    "disabled-action"
    ],
    "confidence": "high",
    "controls": {
@@ -26436,7 +26442,8 @@
     "input",
     "page-shell",
     "select",
-    "provenance"
+    "provenance",
+    "disabled-action"
    ],
    "confidence": "high",
    "controls": {
@@ -27398,7 +27405,8 @@
     "disabled-action",
     "fact-list",
     "list-table",
-    "see-how"
+    "see-how",
+    "provenance"
    ],
    "confidence": "low",
    "controls": {
@@ -32957,7 +32965,9 @@
     "select",
     "table",
     "card",
-    "page-shell"
+    "page-shell",
+    "disabled-action",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -33178,7 +33188,8 @@
     "table",
     "list-table",
     "page-shell",
-    "figures"
+    "figures",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -33292,7 +33303,8 @@
     "select",
     "table",
     "tabs",
-    "dropdown-menu"
+    "dropdown-menu",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -33887,7 +33899,8 @@
     "tabs",
     "figures",
     "list-table",
-    "page-shell"
+    "page-shell",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -37061,7 +37074,8 @@
     "checkbox",
     "field",
     "select",
-    "provenance"
+    "provenance",
+    "gantt-timeline"
    ],
    "confidence": "high",
    "controls": {
@@ -40447,7 +40461,8 @@
     "pagination",
     "select",
     "table",
-    "tabs"
+    "tabs",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -46594,7 +46609,10 @@
     "page-header",
     "progress",
     "table",
-    "dialog"
+    "dialog",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "low",
    "controls": {
@@ -47300,7 +47318,9 @@
     "radio-group",
     "skeleton",
     "table",
-    "tabs"
+    "tabs",
+    "list-table",
+    "select"
    ],
    "confidence": "low",
    "controls": {

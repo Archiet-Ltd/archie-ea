@@ -358,7 +358,8 @@ def run_github_import(org_id: int, connector_id: str, approver_id: int) -> Dict[
     with tenant_scope(org_id):
         outcome = gh.approve_all_proposals(org_id, approver_id)
         db.session.commit()
-    result["added"] = outcome["approved"]
+    # One count of what is in the model: the figures the review page shows.
+    result["added"] = sum(gh.model_counts(org_id).values())
     result["not_added"] = len(outcome["failed"])
     return result
 

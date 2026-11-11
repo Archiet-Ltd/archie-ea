@@ -83,6 +83,27 @@ def effective_severity_expr():
     return case((func.lower(func.trim(Gap.priority)) == "critical", "critical"), else_=Gap.severity)
 
 
+def severity_order_expr():
+    """Gaps ordered most serious first, by `effective_severity_expr`. Order by this, never by the priority
+    or severity text: sorted as words, 'medium' comes before 'critical'."""
+    return case(
+        {"critical": 0, "high": 1, "medium": 2, "low": 3},
+        value=effective_severity_expr(),
+        else_=4,
+    )
+
+
+def priority_filter_clause(priority):
+    """The filter for a gap list asked for one level. Every level is the gap's rating by the one rule
+    (`effective_severity_expr`), so a gap is listed under exactly one level and the four levels plus
+    'unrated' (no rating at all) add up to every gap. A NULL rating matches only 'unrated'."""
+    level = (priority or "").strip().lower()
+    rating = func.lower(func.trim(effective_severity_expr()))
+    if level == "unrated":
+        return rating.is_(None)
+    return func.coalesce(rating, "") == level
+
+
 def get_unified_gap_register(
     adm_phase: str = None,
     severity: str = None,
@@ -459,7 +480,7 @@ def gap_register_query(
         Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
     )
     if severity:
-        query = query.filter(effective_severity_expr() == severity)
+        query = query.filter(priority_filter_clause(severity))
     if closed is not None:
         is_closed_ = db.func.coalesce(closed_gap_expr(), db.false())
         query = query.filter(is_closed_ if closed else ~is_closed_)

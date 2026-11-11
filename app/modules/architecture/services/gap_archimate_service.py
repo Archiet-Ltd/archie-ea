@@ -19,7 +19,12 @@ from typing import Dict, List, Optional, Tuple
 
 from app import db
 from app.models.implementation_migration import Gap, WorkPackage
-from app.services.gap_register_service import normalise_priority, normalise_severity
+from app.services.gap_register_service import (
+    normalise_priority,
+    normalise_severity,
+    priority_filter_clause,
+    severity_order_expr,
+)
 
 # Gap type color mapping (consistent with UI)
 GAP_TYPE_COLORS = {
@@ -589,7 +594,7 @@ class GapArchiMateService:
             if filters.get("gap_type"):
                 query = query.filter(Gap.gap_type == filters["gap_type"])
             if filters.get("priority"):
-                query = query.filter(Gap.priority == filters["priority"])
+                query = query.filter(priority_filter_clause(filters["priority"]))
             if filters.get("resolution_status"):
                 query = query.filter(Gap.resolution_status == filters["resolution_status"])
             if filters.get("source_capability_type"):
@@ -597,7 +602,7 @@ class GapArchiMateService:
                     Gap.source_capability_type == filters["source_capability_type"]
                 )
 
-        return query.order_by(Gap.priority.desc(), Gap.estimated_start_date).all()
+        return query.order_by(severity_order_expr(), Gap.estimated_start_date).all()
 
     def get_work_packages_for_gap(self, gap_id: int) -> List[WorkPackage]:
         """Get all work packages for a gap."""

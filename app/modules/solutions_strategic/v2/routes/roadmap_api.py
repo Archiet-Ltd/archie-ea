@@ -1006,9 +1006,10 @@ def get_gaps():
         priority = request.args.get("priority")
         gap_type = request.args.get("gap_type")
 
-        query = ImplementationGap.query
-        if priority:
-            query = query.filter(ImplementationGap.priority == priority)
+        # The register's own selection (plateau transitions left out), filtered by its one rating.
+        from app.services.gap_register_service import gap_register_query
+
+        query = gap_register_query(current_organization_id(), priority or request.args.get("severity"))
         if gap_type:
             query = query.filter(ImplementationGap.gap_type == gap_type)
 

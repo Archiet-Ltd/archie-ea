@@ -224,6 +224,22 @@ def configuration_status() -> Dict:
     return {"ready": not missing, "missing": missing, "prices": prices}
 
 
+def payment_status() -> Dict:
+    """The one billing switch: the active provider's configuration status.
+
+    The billing page and every public page that offers a paid plan read this, so a
+    "Buy" button is shown exactly when buying works."""
+    from app.services import monelytics_provider
+
+    if monelytics_provider.configured():
+        return monelytics_provider.configuration_status()
+    return configuration_status()
+
+
+def payment_is_open() -> bool:
+    return bool(payment_status()["ready"])
+
+
 # --------------------------------------------------------------------------- #
 # Plan limits                                                                  #
 # --------------------------------------------------------------------------- #

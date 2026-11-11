@@ -878,7 +878,7 @@ def plateaus():
         )
 
 
-_GAP_SEVERITIES = ("critical", "high", "medium", "low")
+_GAP_SEVERITIES = ("critical", "high", "medium", "low", "unrated")
 
 _GAP_SORT_COLUMNS = {
     "name": Gap.name,

@@ -3,6 +3,7 @@ Roadmap Automation Engine
 Intelligent generation and optimization of roadmap elements
 """
 
+from app.services.gap_register_service import effective_severity
 import json
 import logging
 from dataclasses import dataclass
@@ -723,7 +724,7 @@ class RoadmapAutomationEngine:
         risk_score = 1.0
 
         # Risk from gaps
-        high_priority_gaps = len([g for g in gaps if g.priority in ["critical", "high"]])
+        high_priority_gaps = len([g for g in gaps if effective_severity(g) in ["critical", "high"]])
         risk_score += high_priority_gaps * 0.3
 
         # Risk from application complexity

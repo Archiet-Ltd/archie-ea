@@ -117,7 +117,7 @@
 {% if severity_filter or status_filter or work_filter %}
 <p class="flex flex-wrap items-center gap-2 text-sm" data-testid="gap-severity-filter">
   <span class="text-muted-foreground">Showing only</span>
-  {% if severity_filter %}{{ state_badge(severity_filter) }} <span class="text-muted-foreground">severity</span>{% endif %}
+  {% if severity_filter %}{{ state_badge(severity_filter) }}{% if severity_filter != 'unrated' %} <span class="text-muted-foreground">severity</span>{% endif %}{% endif %}
   <span class="text-muted-foreground">{% if status_filter == 'open' %}open {% elif status_filter == 'closed' %}resolved {% elif status_filter == 'in_progress' %}in progress {% endif %}{% if work_filter == 'covered' %}gaps with a work package{% elif work_filter == 'none' %}gaps with no work package{% else %}gaps{% endif %} ({{ listed_count }} of {{ recorded }}).</span>
   <a href="{{ url_for('enterprise.gap_analysis') }}" class="font-medium text-primary hover:underline" data-testid="gap-severity-filter-clear">Show all gaps</a>
 </p>

@@ -2158,3 +2158,103 @@ def test_roadmap_write_routes_refuse_a_read_only_account(method, path, page, liv
         live_server + path, method=method, data={}, headers={"X-CSRFToken": csrf_token}, max_redirects=0
     )
     assert response.status == 403, "a Viewer reached %s %s: %s" % (method, path, response.status)
+
+
+# ── Changing the model: a read-only account is refused and nothing changes; a write role acts ───────────────────
+#
+# Observed on a Viewer and an Architect, each in an organisation of its own with a Goal, and a gap, plus a second
+# real organisation whose Goal must stay as it was whoever acts.
+
+def _model_change_setup(platform_role):
+    persona = "enterprise_architect" if platform_role == "Architect" else "data_analyst"
+    import uuid
+
+    from app import create_app, db
+    from app.models.implementation_migration import Gap
+    from .fresh_org import create_fresh_org
+    from .test_element_number_links_journey import _seed
+
+    org = create_fresh_org(persona, platform_role=platform_role)
+    other = create_fresh_org("enterprise_architect")
+    tag = uuid.uuid4().hex[:6]
+    goals = {
+        key: _seed(o, "Goal", "%s goal %s" % (key, tag), "%s second goal %s" % (key, tag), with_solution=False)
+        for key, o in (("mine", org), ("theirs", other))
+    }
+    with create_app("testing").app_context():
+        gap = Gap(organization_id=org["org_id"], name="Matrix gap " + tag, gap_type="coverage",
+                  priority="medium", severity="medium")
+        db.session.add(gap)
+        db.session.commit()
+        gap_id = gap.id
+        db.session.remove()
+    return org, other, goals, gap_id, tag
+
+
+def _model_state(org, other, goals, gap_id):
+    from app import create_app
+    from app.models.implementation_migration import Gap
+    from app.modules.architecture.routes.archimate_crud.routes import MODEL_REGISTRY
+
+    with create_app("testing").app_context():
+        model = MODEL_REGISTRY["Goal"]
+        field = "name" if hasattr(model, "name") else "title"
+        gap = Gap.query.filter_by(id=gap_id).first()
+        return {
+            "goal": getattr(model.query.filter_by(id=goals["mine"]["a"]).first(), field, None),
+            "other goal": getattr(model.query.filter_by(id=goals["theirs"]["a"]).first(), field, None),
+            "gap": (gap.name, gap.priority) if gap else None,
+        }
+
+
+@pytest.mark.parametrize("platform_role,writes", [("Viewer", False), ("Architect", True)])
+@pytest.mark.parametrize("change", ["element edit", "gap edit", "element delete", "bulk delete"])
+def test_model_changes_are_refused_to_a_read_only_account_and_made_by_a_write_role(
+    change, platform_role, writes, browser, live_server,
+):
+    from .fresh_org import sign_in
+
+    org, other, goals, gap_id, tag = _model_change_setup(platform_role)
+    before = _model_state(org, other, goals, gap_id)
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1280, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, next(iter(org["emails"].values())))
+        page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+        record = goals["mine"]["a"]
+        headers = {"X-CSRFToken": csrf, "Content-Type": "application/json"}
+        import json
+        if change == "element edit":
+            response = page.request.post(
+                live_server + "/architecture/motivation/Goal/%d/edit" % record,
+                data=json.dumps({"name": "Renamed " + tag, "title": "Renamed " + tag}), headers=headers, max_redirects=0)
+        elif change == "gap edit":
+            response = page.request.post(
+                live_server + "/architecture/implementation/Gap/%d/edit" % gap_id,
+                data=json.dumps({"name": "Renamed " + tag, "priority": "high"}), headers=headers, max_redirects=0)
+        elif change == "element delete":
+            response = page.request.post(
+                live_server + "/architecture/motivation/Goal/%d/delete" % record, headers=headers, max_redirects=0)
+        else:
+            response = page.request.post(
+                live_server + "/architecture/motivation/Goal/bulk-delete",
+                data=json.dumps({"ids": [record, goals["theirs"]["a"]]}), headers=headers, max_redirects=0)
+        after = _model_state(org, other, goals, gap_id)
+        assert after["other goal"] == before["other goal"], "another organisation's Goal changed"
+        if not writes:
+            assert response.status == 403, "%s by a read-only account: expected 403, got %s" % (change, response.status)
+            assert after == before, "a refused %s still changed the record: %s -> %s" % (change, before, after)
+        else:
+            assert response.status < 400, "%s by a write role was refused: %s" % (change, response.status)
+            assert after != before, "%s by a write role changed nothing" % change
+            expected = {
+                "element edit": ("goal", lambda v: v == "Renamed " + tag),
+                "gap edit": ("gap", lambda v: v == ("Renamed " + tag, "high")),
+                "element delete": ("goal", lambda v: v is None),
+                "bulk delete": ("goal", lambda v: v is None),
+            }[change]
+            assert expected[1](after[expected[0]]), (change, after)
+    finally:
+        context.close()

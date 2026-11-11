@@ -395,3 +395,78 @@ def test_another_organisations_gap_answers_not_found_on_its_edit_page_and_save(d
         db.text("SELECT name, priority, severity FROM gaps WHERE id = :id"), {"id": foreign_id}
     ).one()
     assert kept[1:] == ("medium", "medium") and kept[0] != "Taken"
+
+
+def test_gap_lists_filter_and_order_by_the_rule_not_by_the_priority_word(db_session, make_org, client, login_as):
+    from app.modules.architecture.services.gap_archimate_service import GapArchiMateService
+    from tests.test_work_package_writer import _user
+
+    org, other = make_org("rule-lists"), make_org("rule-lists-other")
+    user = _user(db_session, org, "rulelists", role="enterprise_architect")
+    by_severity = _gap(db_session, org, priority="high", severity="critical")
+    by_priority = _gap(db_session, org, priority="critical", severity="medium")
+    plain_low = _gap(db_session, org, priority="low", severity="low")
+    plain_medium = _gap(db_session, org, priority="medium", severity="medium")
+    _gap(db_session, other, priority="critical", severity="critical")
+    login_as(client, user)
+
+    def page_listing(**args):
+        with mock.patch("app.implementation_planning.routes.render_template", return_value="ok") as render:
+            client.get("/implementation/gaps", query_string=args)
+        return [g.id for g in render.call_args.kwargs["gaps"].items]
+
+    assert set(page_listing(priority="critical")) == {by_severity.id, by_priority.id}
+    assert set(page_listing()[:2]) == {by_severity.id, by_priority.id}
+    assert page_listing()[2:] == [plain_medium.id, plain_low.id]
+
+    roadmap = GapArchiMateService()
+    mine = {by_severity.id, by_priority.id, plain_low.id, plain_medium.id}
+    assert {g.id for g in roadmap.get_gaps_for_roadmap({"priority": "critical"})} & mine == {by_severity.id, by_priority.id}
+    ordered = [g.id for g in roadmap.get_gaps_for_roadmap() if g.id in mine]
+    assert set(ordered[:2]) == {by_severity.id, by_priority.id} and ordered[2:] == [plain_medium.id, plain_low.id]
+
+
+def test_roadmap_sequencing_and_risk_counts_read_the_rule_not_the_priority_word(db_session, make_org):
+    from types import SimpleNamespace
+
+    from app.modules.architecture.services.roadmap_generator import RoadmapGenerator
+    from app.modules.solutions_strategic.v2.services.roadmap_automation import RoadmapAutomationEngine as V2Engine
+    from app.services.roadmap_automation import RoadmapAutomationEngine
+
+    org = make_org("rule-sequence")
+    plain_high = _gap(db_session, org, priority="high", severity="high")
+    by_severity = _gap(db_session, org, priority="medium", severity="critical")
+    plain_low = _gap(db_session, org, priority="low", severity="low")
+    ordered = RoadmapGenerator()._sort_gaps_by_priority([plain_low, plain_high, by_severity])
+    assert [g.id for g in ordered] == [by_severity.id, plain_high.id, plain_low.id]
+
+    # Two gaps rated critical by severity push the risk level over the same line two high-priority gaps do.
+    capability = SimpleNamespace()
+    gaps = [by_severity, SimpleNamespace(priority="low", severity="critical")]
+    for engine in (RoadmapAutomationEngine, V2Engine):
+        assert engine.__new__(engine)._assess_risk_level(capability, [], gaps) == "medium"
+        assert engine.__new__(engine)._assess_risk_level(capability, [], [plain_low]) == "low"
+
+
+def test_a_priority_filter_lists_a_gap_under_exactly_one_rating(db_session, make_org, client, login_as):
+    from app.models.implementation_migration import Gap
+    from app.services.gap_register_service import priority_filter_clause
+
+    org = _editor(db_session, make_org, client, login_as, "one-level")
+    by_severity = _gap(db_session, org, priority="high", severity="critical")
+    by_priority = _gap(db_session, org, priority="critical", severity="medium")
+    plain_high = _gap(db_session, org, priority="high", severity="high")
+    mine = {by_severity.id, by_priority.id, plain_high.id}
+
+    def listed(level):
+        return {g.id for g in Gap.query.filter(Gap.organization_id == org.id, priority_filter_clause(level))} & mine
+
+    assert listed("critical") == {by_severity.id, by_priority.id}
+    assert listed("high") == {plain_high.id}
+    levels = [listed(level) for level in ("critical", "high", "medium", "low")]
+    assert sum(len(found) for found in levels) == len(mine)
+
+    for url in ("/implementation/api/gaps?priority=critical", "/implementation/api/gaps?severity=critical"):
+        assert {g["id"] for g in client.get(url).get_json()["gaps"]} == {by_severity.id, by_priority.id}, url
+    roadmap = client.get("/api/roadmap/gaps?priority=critical").get_json()
+    assert {g["id"] for g in roadmap["gaps"]} == {by_severity.id, by_priority.id}

@@ -15,7 +15,7 @@ CRITICAL POLICY: NO HARDCODED DATA
 =====================================
 This service strictly enforces a NO HARDCODED DATA policy:
 
-1. MODEL SELECTION: ONLY models configured via API Settings database are used.
+1. MODEL SELECTION: ONLY models configured via AI settings database are used.
    NO hardcoded model names or fallback models are allowed.
 
 2. PROVIDER CONFIGURATION: All provider settings (API keys, models, endpoints)
@@ -935,7 +935,7 @@ class LLMService:
                 continue
             logger.info(
                 "Using environment-configured provider: %s with default model %s. "
-                "Migrate this key to Admin > API Settings to suppress this message.",
+                "Migrate this key to Admin > AI settings to suppress this message.",
                 provider_name, model,
             )
             return provider_name, model
@@ -955,12 +955,12 @@ class LLMService:
                 f"No enabled LLM provider found with a configured model{excluded_msg}. "
                 f"Environment variables detected: {', '.join(configured_env_vars)} but their providers "
                 f"already have DB records — check that the DB record is enabled and has a default_model set. "
-                f"Go to Admin > API Settings to review."
+                f"Go to Admin > AI settings to review."
             )
         else:
             raise ValueError(
                 f"No enabled LLM provider found with a configured model{excluded_msg}. "
-                f"Please configure at least one provider at Admin > API Settings "
+                f"Please configure at least one provider at Admin > AI settings "
                 f"(or set OPENAI_API_KEY / ANTHROPIC_API_KEY in .env as a bootstrap key)."
             )
 
@@ -2327,7 +2327,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         if not db_has_record:
             logger.info(
                 "No database record for provider '%s' — falling back to environment variables. "
-                "Consider migrating the key to Admin > API Settings.",
+                "Consider migrating the key to Admin > AI settings.",
                 provider,
             )
 
@@ -3123,7 +3123,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             logger.info(f"Error details: {str(e)}")
             logger.error(f"Anthropic authentication error: {str(e)}")
             raise ValueError(
-                "Authentication failed - Invalid API key. Please check your API settings at /admin/api-settings"
+                "Authentication failed - Invalid API key. Please check your AI settings at /admin/api-settings"
             )
         except anthropic.BadRequestError as e:
             error_str = str(e)
@@ -3207,7 +3207,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
             # 404 errors are permanent (wrong model/endpoint) - don't retry
             if status == 404:
-                error_msg = f"Gemini model '{model_normalized}' not found (404). Check model name in API settings."
+                error_msg = f"Gemini model '{model_normalized}' not found (404). Check model name in AI settings."
                 logger.error(error_msg)
                 raise ValueError(error_msg) from exc
 

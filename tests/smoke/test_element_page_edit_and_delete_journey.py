@@ -1,7 +1,7 @@
 """An architect works from an element's own page. Edit opens that element's form and saving lands back on its
 page showing the change, for a Goal and a Product (each held with a record whose id differs from its
-element's). On the page of an element held with no record, Edit and Delete act on that element and not on
-the record that happens to carry the same number. Export of only such elements says why nothing is exported.
+element's, opened by the record's number and by the element's number), and for a Gap element with no gap row. On the page of an element held with no record, Edit and Delete act
+on that element and not on the record that happens to carry the same number. Export of only such elements says why nothing is exported.
 """
 import os
 import re
@@ -38,18 +38,45 @@ def _signed_in(browser, live_server, org, viewport, theme):
 
 
 def _make_record(org, kind, name):
-    """A record of this kind whose id differs from its architecture element's id."""
+    """A record of this kind linked to an architecture element whose id differs from the record's id."""
     from app import create_app, db
+    from app.models.archimate_core import ArchiMateElement
     from app.modules.architecture.routes.archimate_crud.routes import MODEL_REGISTRY
 
     with create_app("testing").app_context():
         model = MODEL_REGISTRY[kind]
+        layer = "Motivation" if kind == "Goal" else "Business"
         row = model(organization_id=org["org_id"], **{"title" if kind == "Goal" and not hasattr(model, "name") else "name": name})
         db.session.add(row)
+        db.session.flush()
+        element = ArchiMateElement(organization_id=org["org_id"], name=name, type=kind, layer=layer)
+        db.session.add(element)
+        db.session.flush()
+        while element.id == row.id:  # take the next element number so the two ids differ
+            db.session.delete(element)
+            db.session.flush()
+            element = ArchiMateElement(organization_id=org["org_id"], name=name, type=kind, layer=layer)
+            db.session.add(element)
+            db.session.flush()
+        row.archimate_element_id = element.id
         db.session.commit()
-        ids = {"record": row.id, "element": row.archimate_element_id}
+        ids = {"record": row.id, "element": element.id}
         db.session.remove()
+    assert ids["record"] != ids["element"], "the record and its element must have different ids: %s" % ids
     return ids
+
+
+def _held(org, kind, ids):
+    """The names the record and its element hold now."""
+    from app import create_app
+    from app.models.archimate_core import ArchiMateElement
+    from app.modules.architecture.routes.archimate_crud.routes import MODEL_REGISTRY
+
+    with create_app("testing").app_context():
+        record = MODEL_REGISTRY[kind].query.filter_by(id=ids["record"]).first()
+        element = ArchiMateElement.query.filter_by(id=ids["element"]).first()
+        return ((getattr(record, "name", None) or getattr(record, "title", None)) if record else None,
+                element.name if element else None)
 
 
 def _names(org, kind):
@@ -236,5 +263,89 @@ def test_a_refusal_on_the_create_form_is_in_view_where_the_person_pressed_create
         assert box and box["y"] >= 0 and box["y"] + box["height"] <= viewport["height"], (
             "the refusal is outside the visible screen: %s" % box)
         _frame(page, "create-refused", viewport, theme)
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("viewport,theme", VIEWPORTS)
+@pytest.mark.parametrize("layer,kind", KINDS)
+def test_edit_from_the_elements_own_number_saves_to_the_record_and_shows_the_new_name(
+        browser, live_server, layer, kind, viewport, theme):
+    org = create_fresh_org("enterprise_architect")
+    name = "%s by element %s" % (kind, uuid.uuid4().hex[:6])
+    ids = _make_record(org, kind, name)
+    context, page = _signed_in(browser, live_server, org, viewport, theme)
+    try:
+        page.goto(live_server + "/architecture/%s/%s/%d" % (layer, kind, ids["element"]),
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text(name, timeout=PAGE_TIMEOUT)
+        _frame(page, "%s-by-element-page" % kind, viewport, theme)
+        page.get_by_role("link", name="Edit").first.click()
+        form = page.locator("#archimate-form-modal")
+        expect(form.get_by_role("textbox", name="Element name")).to_have_value(name, timeout=PAGE_TIMEOUT)
+        _frame(page, "%s-by-element-form" % kind, viewport, theme)
+        form.get_by_role("textbox", name="Element name").fill(name + " renamed")
+        form.get_by_role("button", name="Update").click()
+        page.wait_for_url(re.compile(r"/%s/%d$" % (kind, ids["record"])), timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text(name + " renamed", timeout=PAGE_TIMEOUT)
+        page.reload(wait_until="domcontentloaded")
+        expect(page.locator("body")).to_contain_text(name + " renamed", timeout=PAGE_TIMEOUT)
+        _frame(page, "%s-by-element-saved" % kind, viewport, theme)
+        assert _held(org, kind, ids) == (name + " renamed", name + " renamed")
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("viewport,theme", VIEWPORTS[:1])
+@pytest.mark.parametrize("layer,kind", KINDS)
+def test_delete_from_the_elements_own_number_removes_the_record_and_its_element(
+        browser, live_server, layer, kind, viewport, theme):
+    org = create_fresh_org("enterprise_architect")
+    name = "%s delete by element %s" % (kind, uuid.uuid4().hex[:6])
+    ids = _make_record(org, kind, name)
+    context, page = _signed_in(browser, live_server, org, viewport, theme)
+    try:
+        page.goto(live_server + "/architecture/%s/%s/%d" % (layer, kind, ids["element"]),
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text(name, timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("delete-element").click()
+        dialog = page.get_by_role("dialog", name="Confirm")
+        expect(dialog).to_contain_text(name, timeout=PAGE_TIMEOUT)
+        dialog.get_by_role("button", name="Confirm").click()
+        page.wait_for_url(re.compile(r"/architecture/%s/%s$" % (layer, kind)), timeout=PAGE_TIMEOUT)
+        assert _held(org, kind, ids) == (None, None)
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("viewport,theme", VIEWPORTS)
+def test_a_gap_element_with_no_gap_row_edits_and_saves_as_an_element(browser, live_server, viewport, theme):
+    from app import create_app, db
+    from app.models.archimate_core import ArchiMateElement
+
+    org = create_fresh_org("enterprise_architect")
+    name = "Gap element only %s" % uuid.uuid4().hex[:6]
+    with create_app("testing").app_context():
+        element = ArchiMateElement(organization_id=org["org_id"], name=name, type="Gap", layer="implementation")
+        db.session.add(element)
+        db.session.commit()
+        element_id = element.id
+        db.session.remove()
+    context, page = _signed_in(browser, live_server, org, viewport, theme)
+    try:
+        page.goto(live_server + "/architecture/implementation/Gap/%d" % element_id,
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text(name, timeout=PAGE_TIMEOUT)
+        _frame(page, "gap-element-only-page", viewport, theme)
+        page.get_by_role("link", name="Edit").first.click()
+        form = page.locator("#archimate-form-modal")
+        expect(form.get_by_role("textbox", name="Element name")).to_have_value(name, timeout=PAGE_TIMEOUT)
+        _frame(page, "gap-element-only-form", viewport, theme)
+        form.get_by_role("textbox", name="Element name").fill(name + " renamed")
+        form.get_by_role("button", name="Update").click()
+        page.wait_for_url(re.compile(r"/Gap/%d(\?ae=1)?$" % element_id), timeout=PAGE_TIMEOUT)
+        page.reload(wait_until="domcontentloaded")
+        expect(page.locator("body")).to_contain_text(name + " renamed", timeout=PAGE_TIMEOUT)
+        _frame(page, "gap-element-only-saved", viewport, theme)
     finally:
         context.close()
