@@ -478,15 +478,19 @@ def get_applications_table_data():
             "testing": "In Process",
             "staging": "In Process",
             "in_process": "In Process",
+            "design": "Not Started",
             "planned": "Not Started",
             "not_started": "Not Started",
         }
+        from app.services.application_status import END_OF_LIFE_STATUSES
+
+        status_map.update({value: "Retired" for value in END_OF_LIFE_STATUSES})
 
         for row in items:
             # Handle Row object from column-based query
             data = row._mapping if hasattr(row, '_mapping') else {col: getattr(row, col, None) for col in safe_columns}
             status_val = data.get("deployment_status", "planned") or "planned"
-            status = status_map.get(status_val.lower(), "Not Started")
+            status = status_map.get(status_val.strip().lower(), "Not Started")
 
             table_data.append(
                 {
