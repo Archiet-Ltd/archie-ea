@@ -182,7 +182,11 @@
     <p class="mx-auto max-w-3xl text-3xl font-semibold tracking-tight text-balance text-foreground md:text-5xl">Import your model and get a free, cited answer to what breaks if a system fails, in minutes.</p>
     <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
       <a href="{{ primary_url }}" class="public-btn public-btn--primary">{{ primary_label }}</a>
+      {% if page.cta == 'waiting_list' %}
+      <a href="{{ secondary_url }}" class="public-btn public-btn--outline">{{ secondary_label }}</a>
+      {% else %}
       <a href="/contact" class="public-btn public-btn--outline">{{ 'Talk to us' if page.family == 'role' else 'Get in touch' }}</a>
+      {% endif %}
     </div>
   </div>
 </section>

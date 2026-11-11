@@ -273,9 +273,18 @@ def rotate_org_encryption_key(org_id: int) -> tuple[Fernet, Fernet | None, int]:
 def replace_unopenable_org_key(org_id: int) -> int:
     """Give an organisation a new key sealed with this server's master key, in place of one it cannot open.
 
-    Used only when new access details are being saved: the old ones cannot be read either way, and the
-    new ones must not wait on them. Raises ``CredentialUnreadable`` with the plain sentence when the
-    master key cannot seal a key at all. The caller commits. Returns the new key version.
+    Used only when new access details are being saved: the new ones must not wait on the old. Nothing
+    that a different server key could still open is thrown away:
+
+    - the sealed key it could not open becomes the previous key, as in ``rotate_org_encryption_key``, so
+      the saved details sealed with it open again once the right server key is back;
+    - when the previous key is one this server key does open, that one is kept instead, because it is
+      the key the other saved details need now, and the unopenable current key was sealed by another
+      server key.
+
+    The new key takes the version number that makes the kept key the previous one. Raises
+    ``CredentialUnreadable`` with the plain sentence when the master key cannot seal a key at all.
+    The caller commits. Returns the new key version.
     """
     from app.extensions import db
     from app.models.connector_config import OrganizationEncryptionKey
@@ -289,8 +298,21 @@ def replace_unopenable_org_key(org_id: int) -> int:
     record = OrganizationEncryptionKey.query.filter_by(organization_id=org_id).with_for_update().first()
     if record is None:
         raise CredentialUnreadable(WRONG_MASTER_KEY)
-    record.encrypted_key = sealed
-    record.previous_encrypted_key = None
-    record.key_version = (record.key_version or 0) + 1
+    current_version = record.key_version or 0
+    previous_opens = False
+    if record.previous_encrypted_key is not None:
+        try:
+            master.decrypt(record.previous_encrypted_key)
+            previous_opens = True
+        except InvalidToken:
+            pass
+    if previous_opens:
+        # the previous key stays as it is; the new key sits where the unopenable current one was
+        record.encrypted_key = sealed
+        record.key_version = current_version
+    else:
+        record.previous_encrypted_key = record.encrypted_key
+        record.encrypted_key = sealed
+        record.key_version = current_version + 1
     db.session.flush()
     return record.key_version
