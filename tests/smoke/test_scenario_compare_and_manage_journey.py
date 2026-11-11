@@ -39,7 +39,7 @@ def server(request, app):
 def _run_and_save(page, server, name, change):
     page.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     _pick(page, change=change)
-    page.get_by_role("button", name="Run simulation").click()
+    page.get_by_role("button", name="Run scenario").click()
     expect(page.get_by_test_id("simulation-panel")).to_be_visible(timeout=PAGE_TIMEOUT)
     page.get_by_role("button", name="Save Scenario for Comparison", exact=True).click()
     dialog = page.get_by_role("dialog", name="Save scenario")
@@ -178,7 +178,7 @@ def test_an_organisation_with_no_elements_is_told_its_model_is_empty_and_offered
         empty = page.get_by_test_id("model-empty")
         expect(empty).to_contain_text("Your model has no elements yet")
         assert page.get_by_text("Nothing needs doing right now").count() == 0
-        expect(page.get_by_role("button", name="Run simulation")).to_be_disabled()
+        expect(page.get_by_role("button", name="Run scenario")).to_be_disabled()
         page.get_by_label("Type to search...").fill("anything")
         expect(page.get_by_role("status").filter(has_text="Your model has no elements yet")).to_be_visible()
         _shot(page, "scenarios-empty-model", viewport, scheme)

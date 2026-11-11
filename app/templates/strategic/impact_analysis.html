@@ -134,7 +134,7 @@
                         {# x-show sits on a wrapper, not on the <i>: Lucide swaps each <i> for an <svg> and the binding is lost. #}
                         <span x-show="!loading" x-cloak class="mr-2 inline-flex"><i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i></span>
                         <span x-show="loading" x-cloak class="mr-2 inline-flex"><i data-lucide="loader-2" class="h-4 w-4 animate-spin" aria-hidden="true"></i></span>
-                        {{ 'Run simulation' if simulation else 'Analyze Impact' }}
+                        {{ 'Run scenario' if simulation else 'Analyze Impact' }}
                     </button>
                 </div>
             </div>
@@ -145,7 +145,7 @@
             <div class="flex flex-col space-y-1.5 p-6 border-b">
                 <h3 class="font-semibold leading-none tracking-tight">Analysis Report</h3>
                 <p class="text-sm text-muted-foreground"
-                    x-text="analysisResult ? ('Impact of ' + changeLabel() + ' on ' + selectedElement.name) : (loading ? ('Analyzing ' + changeLabel() + ' on ' + selectedElement.name + '…') : (analysisError ? ('Analysis failed for ' + selectedElement.name) : (selectedElement ? (selectedElement.name + ' selected — click {{ 'Run simulation' if simulation else 'Analyze Impact' }} to run') : 'Select an element to begin analysis')))">
+                    x-text="analysisResult ? ('Impact of ' + changeLabel() + ' on ' + selectedElement.name) : (loading ? ('Analyzing ' + changeLabel() + ' on ' + selectedElement.name + '…') : (analysisError ? ('Analysis failed for ' + selectedElement.name) : (selectedElement ? (selectedElement.name + ' selected — click {{ 'Run scenario' if simulation else 'Analyze Impact' }} to run') : 'Select an element to begin analysis')))">
                 </p>
             </div>
 
@@ -248,10 +248,12 @@
                         <div class="space-y-2" data-testid="simulation-risks">
                             <h4 class="text-sm font-semibold">Open risks touching the change</h4>
                             <p class="text-sm text-muted-foreground" x-show="!(analysisResult?.simulation?.risks || []).length" x-cloak>No open risk is recorded against this element or anything that depends on it.</p>
+                            <p class="text-sm text-muted-foreground" data-testid="risk-register-coming" x-show="(analysisResult?.simulation?.risks || []).some(r => !r.href)" x-cloak>The risk register is coming, so these risks are named here without a link.</p>
                             <ul class="space-y-1">
                                 <template x-for="risk in (analysisResult?.simulation?.risks || [])" :key="risk.id">
                                     <li class="text-sm">
-                                        <a :href="risk.href" class="font-medium text-primary underline underline-offset-2" x-text="risk.title"></a>
+                                        <a x-show="risk.href" :href="risk.href" class="font-medium text-primary underline underline-offset-2" x-text="risk.title"></a>
+                                        <span x-show="!risk.href" x-cloak class="font-medium" x-text="risk.title"></span>
                                         <span class="text-muted-foreground" x-text="' · ' + risk.level + (risk.about ? ' · about ' + risk.about : '')"></span>
                                     </li>
                                 </template>
@@ -611,6 +613,7 @@
             },
 
             costAtRiskText() {
+                if (this.analysisResult && this.analysisResult.costs_withheld) return 'Withheld';
                 const cost = this.analysisResult ? this.analysisResult.estimated_risk_cost : null;
                 return (cost === null || cost === undefined) ? 'Not worked out' : this.money(cost);
             },
@@ -625,12 +628,14 @@
             },
 
             figureValue(figure, value) {
+                if (figure.withheld) return 'Withheld';
                 if (value === null || value === undefined) return 'Not worked out';
                 if (figure.money) return this.money(value);
                 return String(value);
             },
 
             figureChange(figure) {
+                if (figure.withheld) return 'Withheld';
                 if (figure.change === null || figure.change === undefined) return 'Not worked out';
                 if (figure.change === 0) return 'No change';
                 const text = figure.money ? this.figureValue(figure, Math.abs(figure.change)) : String(Math.abs(figure.change));
@@ -849,6 +854,7 @@
                         dependencies: direct.map(function(d, i) { return self.dependencyRow(d, i, 'Level ' + d.level + ' dependency'); }),
                         indirect_dependencies: indirect.map(function(d, i) { return self.dependencyRow(d, i, 'Level ' + d.level + ' (transitive)'); }),
                         financial_risk_reason: raw.financial_risk_reason || '',
+                        costs_withheld: !!raw.costs_withheld,
                         simulation: raw.simulation || null,
                         footer_html: raw.footer_html || '',
                         total_affected: raw.total_affected || 0,

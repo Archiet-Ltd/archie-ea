@@ -9,6 +9,7 @@
         selectedScenarios: [],
         loading: false,
         loadError: '',
+        exportError: '',
         carriedNotice: '',
         goneCount: 0,
         refusedCount: 0,
@@ -62,7 +63,12 @@
             return (window.currencyManager && window.currencyManager.format) ? window.currencyManager.format(value) : value.toLocaleString();
         },
 
+        costsWithheld(s) {
+            return !!(s && s.analysis_result && s.analysis_result.costs_withheld);
+        },
+
         costLabel(s) {
+            if (this.costsWithheld(s)) return s.analysis_result.financial_risk_reason;
             const cost = this.riskCost(s);
             return cost === null ? 'Not recorded' : this.money(cost);
         },
@@ -181,8 +187,28 @@
         
         // The file is written on the server, by the writer every other export uses, from the saved scenarios.
         exportToCSV() {
-            if (this.selectedScenarios.length === 0) return;
-            window.location.href = '/strategic/api/scenarios/export.csv?ids=' + this.selectedScenarios.map(encodeURIComponent).join(',');
+            if (this.selectedScenarios.length === 0) return Promise.resolve();
+            this.exportError = '';
+            const url = '/strategic/api/scenarios/export.csv?ids=' + this.selectedScenarios.map(encodeURIComponent).join(',');
+            /* The reply is read here, so a refusal is worded in the dialog and the tab stays on the page. */
+            return fetch(url, { credentials: 'same-origin' }).then(response => {
+                if (response.ok) {
+                    return response.blob().then(blob => {
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = 'scenario-comparison.csv';
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        URL.revokeObjectURL(link.href);
+                    });
+                }
+                return response.json().catch(() => ({})).then(body => {
+                    this.exportError = (body && body.error) || 'The file could not be written. Try again in a moment.';
+                });
+            }).catch(() => {
+                this.exportError = 'The file could not be written. Try again in a moment.';
+            });
         },
 
         // What each run worked out about the model: the same figures the Scenarios screen showed, one row for each
@@ -207,11 +233,13 @@
         figureLine(s, label) {
             const f = this.figureOf(s, label);
             if (!f) return 'Not saved with this scenario';
+            if (f.withheld) return f.note;
             let change = '';
             if (f.change !== null && f.change !== undefined) {
                 change = f.change === 0 ? ' (No change)' : ' (' + (f.change > 0 ? 'Up ' : 'Down ') + this.figureValue(f, Math.abs(f.change)) + ')';
             }
-            return this.figureValue(f, f.before) + ' to ' + this.figureValue(f, f.after) + change;
+            const unknown = (f.before === null || f.before === undefined || f.after === null || f.after === undefined) && f.note;
+            return this.figureValue(f, f.before) + ' to ' + this.figureValue(f, f.after) + change + (unknown ? ' (' + f.note + ')' : '');
         },
 
         startRename(scenario) {
@@ -548,12 +576,14 @@
                         </div>
                     </div>
                     <div x-show="selectedScenarios.length > 1 && !canRank()" x-cloak class="bg-muted border border-border rounded-lg p-4">
-                        <p class="text-sm text-muted-foreground">These scenarios cannot be ranked: at least one has no severity or no recorded financial risk. Run the analysis again and save it to compare them.</p>
+                        <p class="text-sm text-muted-foreground" x-show="!getComparisonData().some(costsWithheld)">These scenarios cannot be ranked: at least one has no severity or no recorded financial risk. Run the analysis again and save it to compare them.</p>
+                        <p class="text-sm text-muted-foreground" x-show="getComparisonData().some(costsWithheld)" x-cloak>These scenarios are not ranked because ranking uses cost figures, which are withheld for your role.</p>
                     </div>
                 </div>
 
                 <!-- Footer -->
                 <div class="shrink-0 bg-background flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+                    <p class="mr-auto text-sm text-destructive" data-testid="export-error" role="status" x-show="exportError" x-cloak x-text="exportError"></p>
                     <button type="button"
                         @click="exportToCSV()"
                         :disabled="selectedScenarios.length === 0"

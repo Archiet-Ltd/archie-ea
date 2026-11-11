@@ -146,7 +146,7 @@ def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, l
         listed = int(re.match(r"(\d+) shown", badge).group(1))
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(page)
-        page.get_by_role("button", name="Run simulation").click()
+        page.get_by_role("button", name="Run scenario").click()
 
         panel = page.get_by_test_id("simulation-panel")
         expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -228,7 +228,7 @@ def test_a_scenario_is_named_in_a_dialog_saved_and_two_are_compared_after_a_relo
         for change, name in (("Decommission / Retirement", "Retire the ledger"), ("Full Replacement", "Replace the ledger")):
             page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
             _pick(page, change=change)
-            page.get_by_role("button", name="Run simulation").click()
+            page.get_by_role("button", name="Run scenario").click()
             expect(page.get_by_test_id("simulation-panel")).to_be_visible(timeout=PAGE_TIMEOUT)
 
             # announced by its full name, and naming the scenario opens a dialog, not a browser prompt
@@ -331,7 +331,7 @@ def test_an_element_with_nothing_attached_says_why_there_is_no_cost_and_no_risk(
         sign_in(page, live_server, mine["emails"]["enterprise_architect"])
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(page, name="Lone Capability")
-        page.get_by_role("button", name="Run simulation").click()
+        page.get_by_role("button", name="Run scenario").click()
         panel = page.get_by_test_id("simulation-panel")
         expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("tco-at-risk")).to_have_text("Not worked out")
@@ -358,6 +358,6 @@ def test_a_visitor_who_is_not_signed_in_is_sent_to_sign_in_and_returns_to_the_sc
         page.fill("#password", PASSWORD)
         page.locator("#submit").click()
         page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
     finally:
         context.close()
