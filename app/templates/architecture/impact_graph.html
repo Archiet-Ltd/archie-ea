@@ -1,24 +1,52 @@
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from "components/page_header.html" import page_header %}
+{% from "components/button.html" import button %}
 
-{% block title %}{{ element.name }} — Impact{% endblock %}
+{% block title %}{% if model_map %}Model map{% else %}{{ element.name }} — Impact{% endif %}{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto">
 
   {{ page_header(
-      title='Impact graph',
-      description='Blast radius — what depends on this element, and what it depends on.',
-      breadcrumbs=[
+      title='Model map' if model_map else 'Impact graph',
+      description=('Every element of your model, coloured by ArchiMate layer. Hover an element to see where it came from; click it to open it.' if model_map else 'Blast radius — what depends on this element, and what it depends on.'),
+      breadcrumbs=([
+        {'label': 'Model', 'href': '/architecture/elements'},
+        {'label': 'Model map'}
+      ] if model_map else [
         {'label': 'ArchiMate elements', 'href': '/archimate/elements'},
         {'label': element.name},
         {'label': 'Impact'}
-      ]
+      ])
   ) }}
+
+  {% if model_map and not map_total %}
+  <section class="rounded-lg border border-border bg-card p-6" data-testid="model-map-empty" aria-labelledby="model-map-empty-title">
+    <h2 id="model-map-empty-title" class="text-base font-semibold text-foreground">Your model is empty, so there is nothing to draw yet</h2>
+    <p class="mt-1 text-sm text-muted-foreground max-w-2xl">The map draws the elements in your model and the links between them. Connect GitHub or Jira and Entelim proposes a first model for you to approve, then it appears here.</p>
+    <div class="mt-4 flex flex-wrap gap-3">
+      {% if 'm365_connector.github_connect' in flask.current_app.view_functions %}
+      {{ button(text='Connect GitHub', icon='github', variant='primary', href=url_for('m365_connector.github_connect'), testid='model-map-connect-github') }}
+      {% endif %}
+      {% if 'm365_connector.jira_config' in flask.current_app.view_functions %}
+      {{ button(text='Connect Jira', variant='outline', href=url_for('m365_connector.jira_config'), testid='model-map-connect-jira') }}
+      {% endif %}
+      {{ button(text='Add an element in the Composer', variant='outline', href='/archimate/composer', testid='model-map-open-composer') }}
+    </div>
+  </section>
+  {% else %}
 
   {# ── Control bar: depth + counts ─────────────────────────────────────── #}
   <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    {% if model_map %}
+    <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Show one layer">
+      {{ button(text='All layers', variant='default' if not map_layer else 'outline', size='sm', href=url_for('archimate.model_map_page'), testid='model-map-all-layers') }}
+      {% for c in map_counts if c.count %}
+      {{ button(text=c.label ~ ' (' ~ c.count ~ ')', variant='default' if map_layer == c.layer else 'outline', size='sm', href=url_for('archimate.model_map_page', layer=c.layer), testid='model-map-layer-' ~ c.layer) }}
+      {% endfor %}
+    </div>
+    {% else %}
     <div class="flex items-center gap-2">
       <span class="text-sm text-muted-foreground">Depth</span>
       <div class="inline-flex rounded-md border border-border overflow-hidden" role="group" aria-label="Graph depth">
@@ -28,27 +56,66 @@
       </div>
       <span class="text-xs text-muted-foreground ml-1">hops from centre</span>
     </div>
-    <div id="impact-counts" class="text-sm text-muted-foreground" aria-live="polite">Loading…</div>
+    {% endif %}
+    <div class="flex items-center gap-3">
+      <div id="impact-counts" class="text-sm text-muted-foreground" aria-live="polite" data-testid="model-map-counts">Loading…</div>
+      {% if model_map %}
+      {{ button(text='View as list', icon='list', variant='outline', size='sm', href=url_for('architecture_crud.list_elements', layer=map_layer) if map_layer else url_for('architecture_crud.list_elements'), testid='model-map-view-as-list') }}
+      {% endif %}
+    </div>
   </div>
 
   {# ── Graph + side panel ──────────────────────────────────────────────── #}
   <div class="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
     <div class="rounded-lg border border-border bg-card overflow-hidden relative">
+      {% if model_map %}
+      <svg id="impact-svg" class="w-full block touch-none"
+           style="height:600px"  {# inline-style-ok: fixed graph canvas height #}
+           role="group" aria-label="Model map. Tab to an element to hear its name, type and source; arrow keys move between elements; Enter opens it."
+           data-mode="model"
+           data-layer="{{ map_layer }}"
+           data-endpoint="{{ url_for('archimate.api_model_map') }}"
+           data-page="{{ url_for('archimate.model_map_page') }}"></svg>
+      {% else %}
       <svg id="impact-svg" class="w-full block"
            style="height:600px"  {# inline-style-ok: fixed graph canvas height #}
            data-element-id="{{ element.id }}"
            data-center-name="{{ element.name | e }}"
            data-endpoint="{{ url_for('archimate.api_element_impact_graph', element_id=element.id) }}"
            data-page="{{ url_for('archimate.element_impact_graph_page', element_id=0) }}"></svg>
+      {% endif %}
       <div id="impact-empty" class="hidden absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-        This element has no recorded relationships yet.
+        {% if model_map %}No elements in this layer.{% else %}This element has no recorded relationships yet.{% endif %}
       </div>
       <div id="impact-loading" class="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-        Building blast radius…
+        {% if model_map %}Drawing your model…{% else %}Building blast radius…{% endif %}
       </div>
     </div>
 
     <aside class="rounded-lg border border-border bg-card p-4">
+      {% if model_map %}
+      <div x-data="{ open: false }">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-foreground">Legend</h2>
+          {{ button(text='Show legend', variant='outline', size='xs', class='lg:hidden', aria_label='Show or hide the legend', attrs_dict={'@click': 'open = !open', ':aria-expanded': 'open', 'aria-controls': 'model-map-legend'}) }}
+        </div>
+        <ul id="model-map-legend" class="space-y-1.5 text-sm mt-3 lg:block" :class="open ? '' : 'hidden lg:block'" data-testid="model-map-legend">
+          {% for c in map_counts if c.count %}
+          <li class="flex items-center justify-between gap-2" data-layer="{{ c.layer }}" data-testid="model-map-legend-{{ c.layer }}">
+            <span class="flex items-center gap-2 min-w-0"><span class="inline-block h-3 w-3 shrink-0 rounded-full bg-{{ 'layer-' ~ c.layer if c.layer not in ('physical', 'other') else ('chart-4' if c.layer == 'physical' else 'muted-foreground') }}"></span><span class="truncate">{{ c.label }}</span></span>
+            <span class="tabular-nums text-muted-foreground" data-testid="model-map-count-{{ c.layer }}">{{ c.count }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="mt-4 pt-4 border-t border-border">
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Selected</h3>
+        <div id="impact-selected" class="text-sm text-foreground" data-testid="model-map-selected" aria-live="polite">Hover or focus an element to see its type and where it came from. Click it to open it.</div>
+      </div>
+      <p class="mt-4 pt-4 border-t border-border text-xs text-muted-foreground">
+        Lines are relationships. Drag to rearrange, scroll or pinch to zoom.
+      </p>
+      {% else %}
       <h2 class="text-sm font-semibold text-foreground mb-3">Legend</h2>
       <ul class="space-y-1.5 text-sm">
         <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded-full" style="background:#B9770E">{# inline-style-ok #}</span> Business</li>
@@ -65,7 +132,8 @@
       <p class="mt-4 pt-4 border-t border-border text-xs text-muted-foreground">
         Solid arrow = depends on. Drag to rearrange, scroll to zoom.
       </p>
-      {% if 'arch_decisions.view_decision' in flask.current_app.view_functions %}
+      {% endif %}
+      {% if not model_map and 'arch_decisions.view_decision' in flask.current_app.view_functions %}
       <section class="mt-4 pt-4 border-t border-border" aria-labelledby="element-decisions-heading" data-element-decisions>
         <h2 id="element-decisions-heading" class="text-sm font-semibold text-foreground mb-2">Decisions</h2>
         {% if decisions %}
@@ -95,6 +163,7 @@
   </div>
 
   {# ── Readable lists of the same answer the graph draws ─────────────── #}
+  {% if not model_map %}
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
     {% for key, heading, hint in [
          ('consumers', 'Consumers (depend on this)', 'A change to this element can reach each of these.'),
@@ -108,10 +177,14 @@
     </section>
     {% endfor %}
   </div>
+  {% endif %}
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
+{% if not model_map or map_total %}
 <script src="/static/vendor/d3.min.js"></script>
 <script src="/static/js/impact_graph.js"></script>
+{% endif %}
 {% endblock %}

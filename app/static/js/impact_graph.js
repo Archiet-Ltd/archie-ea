@@ -1,4 +1,11 @@
-/* Impact / dependency graph — interactive blast-radius view.
+/* Impact / dependency graph — interactive blast-radius view, and the whole-model map.
+ *
+ * Whole-model mode (the svg carries data-mode="model"): every element of the organisation's model is
+ * drawn at once, coloured by ArchiMate layer from the layer tokens. Hovering or focusing a node shows its
+ * name, type, source and date; clicking it opens that element's page. Over the node limit the server
+ * sends one node per layer with its count, and a click opens that layer.
+ *
+ * Impact mode:
  *
  * Renders the nodes+edges from /archimate/api/element/<id>/impact-graph as a
  * d3 force-directed graph: the chosen element at the centre, everything that
@@ -18,6 +25,172 @@
         physical: '#2E8B57', other: '#64748B'
     };
     function colour(layer) { return LAYER[(layer || 'other').toLowerCase()] || LAYER.other; }
+
+    // ── Whole-model mode ────────────────────────────────────────────────────────────────────
+    // Layer colours come from the layer tokens, so the dark theme is the same palette on dark tokens.
+    var LAYER_TOKEN = {
+        strategy: '--layer-strategy', business: '--layer-business', application: '--layer-application',
+        technology: '--layer-technology', physical: '--chart-4', motivation: '--layer-motivation',
+        implementation: '--layer-implementation', other: '--muted-foreground'
+    };
+    function tokenFill(layer) { return 'hsl(var(' + (LAYER_TOKEN[layer] || LAYER_TOKEN.other) + '))'; }
+
+    function modelMap() {
+        var svg = d3.select(svgEl);
+        var width = svgEl.clientWidth || 800;
+        var height = svgEl.clientHeight || 600;
+        var started = (window.performance && performance.now) ? performance.now() : Date.now();
+        var root = svg.append('g');
+        var linkG = root.append('g');
+        var nodeG = root.append('g');
+        var zoomer = d3.zoom().scaleExtent([0.1, 6]).on('zoom', function (ev) { root.attr('transform', ev.transform); });
+        svg.call(zoomer);
+
+        function text(id, t) { var e = document.getElementById(id); if (e) e.textContent = t; }
+        function hide(id) { var e = document.getElementById(id); if (e) e.classList.add('hidden'); }
+        function show(id) { var e = document.getElementById(id); if (e) e.classList.remove('hidden'); }
+
+        function selected(d) {
+            var box = document.getElementById('impact-selected');
+            if (!box) return;
+            while (box.firstChild) box.removeChild(box.firstChild);
+            function line(cls, t) {
+                var p = document.createElement('p'); p.className = cls; p.textContent = t; box.appendChild(p);
+            }
+            if (d.cluster) {
+                line('font-medium', d.name);
+                line('text-xs text-muted-foreground', d.count + ' elements. Click to draw this layer.');
+                return;
+            }
+            line('font-medium break-words', d.name);
+            line('text-xs text-muted-foreground', d.type);
+            line('text-xs text-muted-foreground mt-1', 'Source: ' + d.source);
+            line('text-xs text-muted-foreground', d.as_of ? 'Recorded: ' + d.as_of : 'No date recorded.');
+            var a = document.createElement('a');
+            a.href = d.href; a.className = 'mt-2 inline-flex text-xs font-medium text-primary hover:underline';
+            a.textContent = 'Open ' + d.name;
+            box.appendChild(a);
+        }
+
+        function describe(d) {
+            if (d.cluster) return d.name + ', ' + d.count + ' elements. Press Enter to draw this layer.';
+            return d.name + ', ' + d.type + '. Source: ' + d.source + '. ' + (d.as_of ? 'Recorded ' + d.as_of + '.' : 'No date recorded.');
+        }
+
+        function open(d) {
+            window.location.href = d.cluster
+                ? PAGE_TMPL + '?layer=' + encodeURIComponent(d.layer)
+                : d.href;
+        }
+
+        function render(data) {
+            hide('impact-loading');
+            var nodes = data.nodes || [];
+            if (!nodes.length) { show('impact-empty'); text('impact-counts', 'No elements in this layer.'); return; }
+            var clusters = data.mode === 'clusters';
+            var edges = data.edges || [];
+
+            if (clusters) {
+                text('impact-counts', data.total + ' elements, drawn one circle per layer. Click a layer to open it.');
+            } else {
+                text('impact-counts', nodes.length + ' elements · ' + edges.length + ' relationships'
+                    + (data.truncated ? ' · first ' + data.max_nodes + ' shown, pick a layer to narrow it' : ''));
+            }
+
+            var link = linkG.selectAll('line').data(edges).enter().append('line')
+                .attr('stroke', 'currentColor').attr('class', 'text-border').attr('stroke-width', 1);
+
+            var radius = function (d) { return d.cluster ? 18 + Math.sqrt(d.count) : 7; };
+            var many = nodes.length > 150;
+            var node = nodeG.selectAll('g').data(nodes).enter().append('g')
+                .attr('tabindex', 0).attr('role', 'link').attr('data-node-id', function (d) { return d.id; })
+                .attr('data-layer', function (d) { return d.layer; })
+                .attr('aria-label', describe)
+                .style('cursor', 'pointer')
+                .call(d3.drag()
+                    .on('start', function (ev, d) { if (!ev.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+                    .on('drag', function (ev, d) { d.fx = ev.x; d.fy = ev.y; })
+                    .on('end', function (ev, d) { if (!ev.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+            node.append('title').text(describe);
+            node.append('circle').attr('r', radius)
+                .style('fill', function (d) { return tokenFill(d.layer); })
+                .style('stroke', 'hsl(var(--card))').attr('stroke-width', 1.5);
+            if (clusters || !many) {
+                node.append('text')
+                    .text(function (d) {
+                        var n = d.cluster ? d.name + ' · ' + d.count : d.name;
+                        return n.length > 26 ? n.slice(0, 25) + '…' : n;
+                    })
+                    .attr('x', function (d) { return radius(d) + 4; }).attr('y', 4).attr('font-size', 11)
+                    .attr('fill', 'currentColor').attr('class', 'text-foreground')
+                    .style('paint-order', 'stroke').attr('stroke', 'var(--card)').attr('stroke-width', 3);
+            }
+
+            node.on('mouseover focus', function (ev, d) { selected(d); })
+                .on('click', function (ev, d) { open(d); })
+                .on('keydown', function (ev, d) {
+                    var all = node.nodes(), i = all.indexOf(this);
+                    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(d); }
+                    else if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') { ev.preventDefault(); all[Math.min(i + 1, all.length - 1)].focus(); }
+                    else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') { ev.preventDefault(); all[Math.max(i - 1, 0)].focus(); }
+                });
+
+            // Place the nodes on a ring before the first paint so the map is readable at once; the
+            // simulation then settles them while the person is already hovering and clicking.
+            nodes.forEach(function (d, i) {
+                var a = (i / nodes.length) * 2 * Math.PI, r = Math.min(width, height) * 0.4;
+                d.x = width / 2 + r * Math.cos(a); d.y = height / 2 + r * Math.sin(a);
+            });
+            function paint() {
+                link.attr('x1', function (d) { return d.source.x; }).attr('y1', function (d) { return d.source.y; })
+                    .attr('x2', function (d) { return d.target.x; }).attr('y2', function (d) { return d.target.y; });
+                node.attr('transform', function (d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+            }
+            sim = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(edges).id(function (d) { return d.id; }).distance(clusters ? 120 : 40).strength(0.5))
+                .force('charge', d3.forceManyBody().strength(clusters ? -400 : (many ? -30 : -120)))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collide', d3.forceCollide().radius(function (d) { return radius(d) + 2; }))
+                // gravity keeps unconnected elements in view instead of drifting off the canvas
+                .force('x', d3.forceX(width / 2).strength(0.06))
+                .force('y', d3.forceY(height / 2).strength(0.06))
+                .alphaDecay(many ? 0.06 : 0.04)
+                .on('tick', paint)
+                .on('end', function () { fit(nodes); svgEl.setAttribute('data-settled', '1'); });
+            paint();
+            // When the layout settles, zoom to show every element with a margin.
+            function fit(list) {
+                var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+                list.forEach(function (d) {
+                    var r = radius(d);
+                    x0 = Math.min(x0, d.x - r); y0 = Math.min(y0, d.y - r);
+                    x1 = Math.max(x1, d.x + r + (many ? 0 : 150)); y1 = Math.max(y1, d.y + r);
+                });
+                var w = x1 - x0, h = y1 - y0;
+                if (!(w > 0 && h > 0)) return;
+                var k = Math.max(0.1, Math.min(1, 0.92 * Math.min(width / w, height / h)));
+                var t = d3.zoomIdentity.translate(width / 2 - k * (x0 + x1) / 2, height / 2 - k * (y0 + y1) / 2).scale(k);
+                svg.transition().duration(250).call(zoomer.transform, t);
+            }
+            var done = function () {
+                var ms = ((window.performance && performance.now) ? performance.now() : Date.now()) - started;
+                svgEl.setAttribute('data-rendered-ms', String(Math.round(ms)));
+                svgEl.setAttribute('data-node-count', String(nodes.length));
+            };
+            if (window.requestAnimationFrame) window.requestAnimationFrame(done); else done();
+        }
+
+        var sim = null;
+        var layer = svgEl.getAttribute('data-layer');
+        Platform.fetch(ENDPOINT + (layer ? '?layer=' + encodeURIComponent(layer) : ''))
+            .then(render)
+            .catch(function () {
+                hide('impact-loading');
+                text('impact-counts', 'Could not load the model map.');
+            });
+    }
+    if (svgEl.getAttribute('data-mode') === 'model') { modelMap(); return; }
 
     var svg = d3.select(svgEl);
     var width = svgEl.clientWidth || 800;
