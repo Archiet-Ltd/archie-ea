@@ -453,8 +453,16 @@ class AgentRunner:
         name unlinked in that case - still verifiable, since the id travels with
         it.
         """
-        from flask import url_for
+        from flask import current_app, has_request_context, url_for
 
+        if not has_request_context():
+            # A streamed turn runs on a background thread with only an application context,
+            # where url_for cannot build a path: borrow a request context so the link is drawn.
+            try:
+                with current_app.test_request_context("/"):
+                    return AgentRunner._source_url(entity_type, row)
+            except Exception:
+                return None
         try:
             if entity_type == "application":
                 return url_for("unified_applications.application_detail", id=row["id"])
@@ -1708,6 +1716,7 @@ class AgentRunner:
             msg = PAUSED_MESSAGE
         elif "empty reply" in reason_l:
             msg = "The assistant could not answer this time. Press Retry."
+            busy = True
         elif busy:
             msg = (
                 "The assistant is busy right now. Wait a minute, then press Retry."
@@ -1727,12 +1736,15 @@ class AgentRunner:
                 "The AI request couldn't be completed. See the error detail below "
                 "or check Admin → AI settings."
             )
-        return {
+        out = {
             "response": msg,
             "actions_taken": [],
             "pending_approvals": [],
             "error": reason,
         }
+        if busy:
+            out["retryable"] = True  # the chat offers Retry beside this sentence
+        return out
 
     def _record_run(
         self,
