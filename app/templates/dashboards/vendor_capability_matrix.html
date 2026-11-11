@@ -305,8 +305,8 @@ document.addEventListener('alpine:init', () => {
             <p class="text-sm font-medium text-foreground" x-show="loadingCategories || allCategories.length > 0">Select a product category to load the matrix</p>
             <p class="text-sm font-medium text-foreground" x-cloak x-show="!loadingCategories && allCategories.length === 0" data-testid="no-categories">No vendor products are recorded yet, so there is no category to pick</p>
             <p x-cloak class="text-xs text-muted-foreground" x-show="!loadingCategories && allCategories.length === 0">
-                Add a vendor product to a system, then pick its category here.
-                <a href="{{ url_for('unified_applications.vendor_catalogue') }}" class="text-primary underline underline-offset-2" data-testid="no-categories-next">Open the vendor catalogue</a>
+                A vendor product is recorded against a system on that system's Vendors tab, and only products already in the vendor catalogue can be picked. The catalogue has none yet, so start by adding the vendor on the Vendors list.
+                <a href="{{ url_for('unified_applications.vendors') }}" class="text-primary underline underline-offset-2" data-testid="no-categories-next">Open the vendors list</a>
             </p>
             <p x-cloak class="text-xs text-muted-foreground" x-show="loadingCategories">Loading categories…</p>
             <p x-cloak class="text-xs text-muted-foreground" x-show="!loadingCategories && allCategories.length > 0">
