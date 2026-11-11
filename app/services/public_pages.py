@@ -440,6 +440,7 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
     "investment-analysis": "domain Unknown and 0 apps coverage on every capability row",
     "gap-analysis": "type None on every row",
     "value-streams": "0 stages and 0 capabilities on every value stream",
+    "scenario-modelling": "the page is live now that the scenarios screen is released; its screen has not been captured yet",
 }
 
 # The one live use-case page: same screen as the capability-maturity module
