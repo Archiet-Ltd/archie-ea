@@ -10,7 +10,7 @@ column is added only when absent (reconcile-schema may already have added it). T
 what is present. Imports nothing from ``app``.
 
 Revision ID: 20261110_change_review_columns
-Revises: 20261109_saved_scenarios
+Revises: 20261109_principle_description
 Create Date: 2026-11-10
 """
 import sqlalchemy as sa
@@ -18,7 +18,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261110_change_review_columns"
-down_revision = "20261109_saved_scenarios"
+down_revision = "20261109_principle_description"
 branch_labels = None
 depends_on = None
 

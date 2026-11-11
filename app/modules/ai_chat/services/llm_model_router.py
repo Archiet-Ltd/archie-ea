@@ -476,7 +476,8 @@ class LLMModelRouter:
             prompt=prompt,
             model=choice.model,
             provider=choice.provider,
-            max_tokens=4096,
+            # The largest budget a call may state: a reviewer that thinks spends part of it before the verdict.
+            max_tokens=8192,
             timeout=timeout,
             _already_tried=sorted(blocked),
         )
