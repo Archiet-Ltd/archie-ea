@@ -2,8 +2,8 @@
 Whitelist-based HTML sanitizer for user-generated rich text content.
 
 Strips dangerous elements (script, iframe, etc.) and attributes (on* events,
-javascript: URLs) while preserving safe formatting HTML from CKEditor and
-similar rich-text editors.
+javascript: URLs) while preserving safe formatting HTML from rich text
+editors.
 
 Usage as Jinja2 filter:
     {{ user_html_content | sanitize_html }}

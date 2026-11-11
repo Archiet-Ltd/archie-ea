@@ -664,6 +664,14 @@ def init_context_processors(app):
 
     app.jinja_env.globals["flask"] = flask
 
+    def _template_payment_open():
+        """Whether a paid plan can be bought here; the billing page reads the same switch."""
+        from app.services import billing_plans
+
+        return billing_plans.payment_is_open()
+
+    app.jinja_env.globals["payment_open"] = _template_payment_open
+
     # One permission matrix: the `can(action, object_type)` template global reads the
     # same answer require_permission gives the server.
     from flask_login import current_user as _matrix_user

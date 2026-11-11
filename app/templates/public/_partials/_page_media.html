@@ -2,8 +2,28 @@
    tests/test_public_landing_layout.py (landing layout media band).
    Partial: public/_partials/_page_media.html -- the screenshot and recording figures of a
    module or use-case page, included from both layouts of public/page.html (document and
-   landing) so the markup exists once. Expects `screenshot` / `recording` (may be None). -#}
-  {% if screenshot %}
+   landing) so the markup exists once. Expects `screenshot` / `recording` (may be None).
+   A page with a recording shows the recording and not the screenshot: the screenshot is the view the
+   recording opens on, so showing both repeats one picture. This is the one place that is decided. -#}
+  {% if recording %}
+  {# A short recording of a multi-step answer -- see
+     app/services/public_pages.py:get_page_recording(). Never autoplays: no
+     autoplay attribute, preload="none" so nothing fetches until the visitor
+     presses play. #}
+  <figure class="public-figure mt-10" data-testid="page-recording">
+    <video controls muted playsinline preload="none"
+           poster="{{ recording.poster_url }}" aria-label="{{ recording.alt }}"
+           width="{{ recording.width }}" height="{{ recording.height }}"
+           class="w-full rounded-lg border border-border">
+      <source src="{{ recording.video_url }}" type="video/webm">
+      {% if recording.mp4_url %}<source src="{{ recording.mp4_url }}" type="video/mp4">{% endif %}
+    </video>
+    <figcaption class="mt-2 text-sm text-muted-foreground">{{ recording.caption }}</figcaption>
+    {% if recording.share_path and not share %}<p class="mt-2 text-sm"><a href="{{ recording.share_path }}" data-testid="share-recording-link">Share this recording</a></p>{% endif %}
+  </figure>
+  {% endif %}
+
+  {% if screenshot and not recording %}
   {# A real captured screen of this module/use case -- see
      app/services/public_pages.py:get_page_screenshot(). Only ever set for a
      capture_status: live page whose captured file exists on disk. #}
@@ -23,21 +43,5 @@
            class="rounded-lg border border-border">
     </picture>
     <figcaption class="mt-2 text-sm text-muted-foreground">{{ screenshot.caption }}</figcaption>
-  </figure>
-  {% endif %}
-
-  {% if recording %}
-  {# A short recording of a multi-step answer -- see
-     app/services/public_pages.py:get_page_recording(). Never autoplays: no
-     autoplay attribute, preload="none" so nothing fetches until the visitor
-     presses play. #}
-  <figure class="public-figure mt-10" data-testid="page-recording">
-    <video controls muted playsinline preload="none"
-           poster="{{ recording.poster_url }}" aria-label="{{ recording.alt }}"
-           width="{{ recording.width }}" height="{{ recording.height }}"
-           class="w-full rounded-lg border border-border">
-      <source src="{{ recording.video_url }}" type="video/webm">
-    </video>
-    <figcaption class="mt-2 text-sm text-muted-foreground">{{ recording.caption }}</figcaption>
   </figure>
   {% endif %}

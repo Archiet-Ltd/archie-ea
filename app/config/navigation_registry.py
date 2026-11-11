@@ -391,7 +391,7 @@ NAVIGATION_REGISTRY = {
                 "url_fallback": "/admin/users",
             },
             {
-                "label": "API Settings",
+                "label": "AI settings",
                 "icon": "key",
                 "endpoint": "admin.api_settings",
                 "url_fallback": "/admin/api-settings",

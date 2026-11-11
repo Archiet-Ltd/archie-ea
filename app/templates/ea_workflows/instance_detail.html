@@ -42,7 +42,7 @@
     'implementation_migration': 'implementation'
 } %}
 {% macro row_href(endpoint) %}{% if endpoint in flask.current_app.view_functions %}{{ url_for(endpoint, **kwargs) }}{% endif %}{% endmacro %}
-{% macro am_href(layer, element_id) %}{% set _l = _AM_LAYERS.get((layer or '')|lower) %}{% if _l and element_id and 'archimate_crud.detail_element' in flask.current_app.view_functions %}{{ url_for('archimate_crud.detail_element', layer=_l, element_type='ArchiMateElement', element_id=element_id) }}{% endif %}{% endmacro %}
+{% macro am_href(layer, element_id) %}{% set _l = _AM_LAYERS.get((layer or '')|lower) %}{% if _l and element_id and 'archimate_crud.detail_element' in flask.current_app.view_functions %}{{ url_for('archimate_crud.detail_element', layer=_l, element_type='ArchiMateElement', element_id=element_id, ae=1) }}{% endif %}{% endmacro %}
 {% set outputs_map = {
     'APP_ONBOARDING': ['Application Portfolio Entry', 'APQC Process Mappings', 'ArchiMate Elements', 'Gap Analysis Report'],
     'GAP_REMEDIATION': ['Gap Analysis Report', 'Remediation Roadmap', 'Task Assignments'],
