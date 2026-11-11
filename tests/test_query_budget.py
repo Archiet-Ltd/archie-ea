@@ -133,12 +133,15 @@ def tenant(app):
             if row is not None:
                 db.session.delete(row)
         db.session.commit()
+        from tests._outbox_cleanup import purge_outbox_events
+
+        # Creating the applications wrote audit entries naming this user, so they go first.
+        purge_outbox_events(db.session, [created["org_id"]])
         user = db.session.get(User, created["user_id"])
         if user is not None:
             db.session.delete(user)
         db.session.commit()
-        from tests._outbox_cleanup import purge_outbox_events
-
+        # removing the user wrote one more entry naming the organisation
         purge_outbox_events(db.session, [created["org_id"]])
         org = db.session.get(Organization, created["org_id"])
         if org is not None:

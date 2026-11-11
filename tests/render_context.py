@@ -18,16 +18,3 @@ def app_template_context():
         is_org_admin=True,
     )
     return {"current_user": user, "link_requires_satisfied": link_requires_satisfied}
-
-
-def basecoat_globals():
-    """The component helpers the app registers on its Jinja environment (``init_basecoat``). A bare
-    environment that renders a template using a component macro needs them, or the macro fails with
-    "'slot' is undefined"."""
-    from types import SimpleNamespace
-
-    from app.basecoat_kit import init_basecoat
-
-    registered = {}
-    init_basecoat(SimpleNamespace(jinja_env=SimpleNamespace(globals=registered)))
-    return registered

@@ -36,7 +36,7 @@
     "architecture"
   ],
   "author": "Entelim Development Team",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "devDependencies": {
     "@playwright/test": "^1.40.0",
     "@tailwindcss/container-queries": "^0.1.1",
@@ -56,10 +56,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-org/archie-platform.git"
+    "url": "https://github.com/Archiet-Ltd/archie-ea.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/archie-platform/issues"
+    "url": "https://github.com/Archiet-Ltd/archie-ea/issues"
   },
-  "homepage": "https://github.com/your-org/archie-platform#readme"
+  "homepage": "https://github.com/Archiet-Ltd/archie-ea#readme"
 }

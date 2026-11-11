@@ -438,7 +438,7 @@
     }
 
     /* The assistant's own "couldn't be completed" text already names Admin
-       -> API Settings, but as plain text a reader cannot click through from.
+       -> AI settings, but as plain text a reader cannot click through from.
        This is the pointer the brief asks for, attached below the message
        rather than parsed out of it — no assumption about the exact wording
        survives a copy edit to agent_runner.py's fallback strings. */

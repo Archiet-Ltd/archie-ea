@@ -79,6 +79,11 @@ FEATURE_INTEREST_CONSENT_TEXT = (
     "Used to tell you when this becomes available, and for nothing else."
 )
 IMG_MODULES_DIR = STATIC_ROOT / "img" / "modules"
+# The share files of each module recording (three shapes, a cover image and the manifest a distribution tool reads),
+# cut from the recordings by scripts/capture/share_assets.py.
+SHARE_DIR = STATIC_ROOT / "video" / "share"
+SHARE_MANIFEST = "manifest.json"
+SHARE_URL_PREFIX = "/see"
 IMG_USE_CASES_DIR = STATIC_ROOT / "img" / "use-cases"
 IMG_ROLES_DIR = STATIC_ROOT / "img" / "roles"
 VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
@@ -88,9 +93,9 @@ VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
 # registries below; kept here (not duplicated in the capture script) so the
 # fictional persona list has one source.
 DEMO_PERSONA = "demo@lantern-quay.example.com"
-ITOPS_ADMIN_PERSONA = "sage.itops@lantern-quay.example.com"
-APP_MANAGER_PERSONA = "casey.inventory@lantern-quay.example.com"
-PROCUREMENT_PERSONA = "taylor.procurement@lantern-quay.example.com"
+ITOPS_ADMIN_PERSONA = "sage.okafor@lantern-quay.example.com"
+APP_MANAGER_PERSONA = "casey.marsh@lantern-quay.example.com"
+PROCUREMENT_PERSONA = "taylor.brennan@lantern-quay.example.com"
 
 # Role pages: each role's workspace in Ask, open on the impact question for the
 # Calibration Ledger application with its first answer row shown
@@ -935,8 +940,12 @@ def get_module_recording(page: "PublicPage") -> dict[str, Any] | None:
     meta = json.loads(manifest_path.read_text(encoding="utf-8")).get(page.slug)
     if meta is None:
         return None
+    share = get_share(page.slug)
     return {
         "video_url": f"/static/img/modules/{page.slug}.webm",
+        # The H.264 file cut for the same recording, for the browsers that do not play WebM (iPhone).
+        "mp4_url": share["files"]["wide"]["path"] if share else None,
+        "share_path": f"{SHARE_URL_PREFIX}/{page.slug}" if share else None,
         "poster_url": f"/static/img/modules/{page.slug}.poster.webp",
         "width": meta["width"],
         "height": meta["height"],
@@ -945,6 +954,42 @@ def get_module_recording(page: "PublicPage") -> dict[str, Any] | None:
         "caption": entry["summary"],
         "alt": entry["alt"],
         "name": f"{entry['title']} \u2014 recorded walkthrough",
+    }
+
+
+def load_share_manifest() -> list[dict[str, Any]]:
+    """Every entry of the share manifest, or an empty list while the file has not been generated."""
+    path = SHARE_DIR / SHARE_MANIFEST
+    if not path.is_file():
+        return []
+    return json.loads(path.read_text(encoding="utf-8")).get("recordings", [])
+
+
+def get_share(slug: str) -> dict[str, Any] | None:
+    """The share-manifest entry of one module recording, or None when that module has none."""
+    return next((entry for entry in load_share_manifest() if entry["slug"] == slug), None)
+
+
+def share_page_paths() -> list[str]:
+    """The path of every share page, for the sitemap. A held or merged module has none listed, as its own page
+    is left out of load_feed_pages()."""
+    listed = {page.url for page in load_feed_pages()}
+    return [f"{SHARE_URL_PREFIX}/{entry['slug']}" for entry in load_share_manifest()
+            if f"/modules/{entry['slug']}" in listed]
+
+
+def share_social(share: dict[str, Any]) -> dict[str, Any]:
+    """The link-preview fields of a recording (``partials/_seo_meta.html`` draws them): the cover image, the wide
+    file and the type, with every address absolute so a platform can fetch it without the page around it."""
+    return {
+        "title": share["title"],
+        "description": share["message"],
+        "url": share["share_url"],
+        "image": SITE_URL + share["cover"],
+        "image_alt": share["alt"],
+        "video": SITE_URL + share["files"]["wide"]["path"],
+        "video_width": share["files"]["wide"]["width"],
+        "video_height": share["files"]["wide"]["height"],
     }
 
 
@@ -990,6 +1035,16 @@ def get_page_recording(page: "PublicPage") -> dict[str, Any] | None:
 _LEGAL_BLOCK = re.compile(
     r"\[\[if legal-pages\]\](.*?)(?:\[\[else\]\](.*?))?\[\[/if\]\]", re.DOTALL
 )
+_PAYMENT_BLOCK = re.compile(
+    r"\[\[if payment-open\]\](.*?)(?:\[\[else\]\](.*?))?\[\[/if\]\]", re.DOTALL
+)
+
+
+def _payment_open() -> bool:
+    """The one billing switch, so a page promises buying only while buying works."""
+    from app.services.billing_plans import payment_is_open
+
+    return payment_is_open()
 
 
 def _apply_legal_blocks(body_md: str) -> str:
@@ -999,8 +1054,13 @@ def _apply_legal_blocks(body_md: str) -> str:
     from app.services.legal_pages import legal_pages_enabled
 
     live = legal_pages_enabled()
-    return _LEGAL_BLOCK.sub(
+    body_md = _LEGAL_BLOCK.sub(
         lambda m: (m.group(1) if live else (m.group(2) or "")), body_md
+    )
+    # ``[[if payment-open]]a[[else]]b[[/if]]`` reads the one billing switch the same way.
+    paying = _payment_open()
+    return _PAYMENT_BLOCK.sub(
+        lambda m: (m.group(1) if paying else (m.group(2) or "")), body_md
     )
 
 
@@ -1090,7 +1150,11 @@ def _content_fingerprint() -> tuple[tuple[str, int], ...]:
     from app.release_waves import configured_wave
 
     # the release wave is part of the key too: a page may read differently once its screen is released
-    return (("legal-pages", int(legal_pages_enabled())), ("release-wave", str(configured_wave()))) + tuple(sorted(
+    return (
+        ("legal-pages", int(legal_pages_enabled())),
+        ("payment-open", int(_payment_open())),
+        ("release-wave", str(configured_wave())),
+    ) + tuple(sorted(
         (str(p), p.stat().st_mtime_ns) for p in CONTENT_ROOT.rglob("*.md")
     ))
 
@@ -1148,7 +1212,7 @@ def feed_page_paths() -> list[str]:
     the way they did when each built its own (see
     tests/test_public_content_pages.py::test_indexnow_submission_matches_sitemap_urls).
     """
-    return ["/", "/vs", "/use-cases"] + [page.url for page in load_feed_pages()]
+    return ["/", "/vs", "/use-cases"] + [page.url for page in load_feed_pages()] + share_page_paths()
 
 
 def load_page(family: str, slug: str | None = None) -> PublicPage | None:
@@ -2053,6 +2117,17 @@ def _link_list_cards(body: str, pages_by_url: dict[str, PublicPage]) -> list[Lan
     return cards
 
 
+def _start_action() -> tuple[str, str]:
+    """The one call to action of every module and share page: a signed-in person is offered their dashboard, a
+    visitor is offered sign-up."""
+    from flask import has_request_context, url_for
+    from flask_login import current_user
+
+    if has_request_context() and current_user.is_authenticated:
+        return ("Open Entelim", url_for("dashboard.overview"))
+    return ("Start free", url_for("account.register"))
+
+
 def build_landing(page: PublicPage) -> Landing | None:
     """The landing-page view of ``page`` for public/_partials/_landing.html,
     or ``None`` when ``page.family`` keeps the document layout.
@@ -2066,8 +2141,6 @@ def build_landing(page: PublicPage) -> Landing | None:
     """
     if page.family not in LANDING_FAMILIES:
         return None
-
-    from flask import url_for
 
     body = str(page.body_html)
     nodes = _top_level_nodes(body)
@@ -2139,7 +2212,7 @@ def build_landing(page: PublicPage) -> Landing | None:
         # second action is a conversation, not a plan.
         secondary_action = ("Talk to us", "/contact")
     else:
-        primary_action = ("Start free", url_for("account.register"))
+        primary_action = _start_action()
         secondary_action = ("See pricing", "/pricing")
 
     return Landing(
