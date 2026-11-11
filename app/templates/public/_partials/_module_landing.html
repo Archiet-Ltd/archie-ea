@@ -65,20 +65,7 @@
 </div></section>
 {% endif %}
 
-<section class="home-closing" data-testid="landing-closing">
-  <div class="container px-4">
-    {% if page.cta == 'waiting_list' %}
-    <p class="home-cta-eyebrow">Early access</p>
-    <h2 class="home-h2 mx-auto max-w-3xl">Tell us you need this.</h2>
-    <p class="home-section-lead">It is not built yet. Join the waiting list and we will tell you the day it ships.</p>
-    {% else %}
-    <p class="home-cta-eyebrow">Start today</p>
-    <h2 class="home-h2 mx-auto max-w-3xl">Connect your tools. Get a cited answer.</h2>
-    <p class="home-section-lead">Free for up to three people, with no trial clock. Self-host it free under AGPL-3.0, at any size.</p>
-    {% endif %}
-    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <a href="{{ primary_url }}" class="public-btn public-btn--lg public-btn--primary" data-testid="module-cta">{{ primary_label }}</a>
-      <a href="/contact" class="public-btn public-btn--lg public-btn--outline">Get in touch</a>
-    </div>
-  </div>
-</section>
+{% with closing_testid = 'landing-closing', closing_waiting = (page.cta == 'waiting_list'),
+        closing_primary = (primary_label, primary_url, 'module-cta'), closing_secondary = ('Get in touch', '/contact', none) %}
+{% include 'public/_partials/_section_closing.html' %}
+{% endwith %}
