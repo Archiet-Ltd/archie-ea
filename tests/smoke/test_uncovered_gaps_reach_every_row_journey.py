@@ -43,10 +43,12 @@ def _seed(org, covered, bare):
         db.session.remove()
 
 
-def _frame(page, name, width, theme):
+def _frame(page, name, width, theme, scroll_to=None):
     folder = os.environ.get("SMOKE_SCREENSHOT_DIR")
     if folder:
         os.makedirs(folder, exist_ok=True)
+        if scroll_to is not None:
+            scroll_to.scroll_into_view_if_needed()
         page.evaluate("theme => document.documentElement.classList.toggle('dark', theme === 'dark')", theme)
         page.screenshot(path="%s/uncovered-%s-%d-%s.png" % (folder, name, width, theme), full_page=True)
 
@@ -72,7 +74,7 @@ def test_the_uncovered_section_reaches_every_gap_with_no_work_package(browser, l
                 % (PAGE, BARE, BARE))
             assert section.locator('[data-testid="not-addressed-gap-row"]').count() == PAGE
             assert theirs["suffix"] not in page.locator("body").inner_text()
-            _frame(page, "section", viewport["width"], theme)
+            _frame(page, "section", viewport["width"], theme, scroll_to=section.get_by_test_id("gaps-not-addressed-total"))
 
             section.get_by_test_id("gaps-not-addressed-all").click()
             page.wait_for_url(re.compile(r"status=open&work=none"), timeout=PAGE_TIMEOUT)
