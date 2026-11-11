@@ -242,6 +242,13 @@
             </button>
             <div class="flex-1"></div>
             <span class="text-sm text-muted-foreground" x-text="totalCount + ' elements'"></span>
+            {% if 'archimate.model_map_page' in flask.current_app.view_functions %}
+            <a :href="'{{ url_for('archimate.model_map_page') }}' + (activeLayer ? '?layer=' + encodeURIComponent(activeLayer) : '')"
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4"
+               data-testid="open-model-map">
+                <i data-lucide="waypoints" class="h-4 w-4" aria-hidden="true"></i>Model map
+            </a>
+            {% endif %}
             {% if can_change_model() %}
             <a href="{{ url_for('architect_ui.import_oef') }}"
                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"

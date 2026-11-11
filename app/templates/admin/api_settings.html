@@ -2,6 +2,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}AI settings{% endblock %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/button.html' import button %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -14,6 +15,12 @@
             {'label': 'AI settings'}
         ]
     ) }}
+
+    {% if request.args.get('from') == 'signup' %}
+    <div class="mb-6">
+        {{ button(text='Back to sign-up', variant='outline', size='sm', icon='arrow-left', href=url_for('account.welcome', step=4), testid='ai-settings-back-to-signup') }}
+    </div>
+    {% endif %}
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -278,7 +285,7 @@
                         {% endif %}
                     </h3>
 
-                    <form method="POST" action="{{ url_for('admin.api_settings') }}">
+                    <form method="POST" action="{{ settings_url or url_for('admin.api_settings') }}">
                         {{ form.hidden_tag() }}
                         
                         <div class="space-y-4">

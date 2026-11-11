@@ -30,6 +30,11 @@ NAMED = (
     ("/simulations", "Simulation scenarios"),
 )
 APPLICATIONS = 3
+# The addresses a signed-in person opens as pages, with the sentence an organisation holding no records reads there.
+SIGNED_IN_PAGES = {
+    "/opportunities": "No opportunity has been found",
+    "/recommendations": "Nothing to recommend yet",
+}
 
 
 @pytest.fixture(scope="module", params=["", "1"], ids=["switch-off", "wave-1"])
@@ -113,9 +118,19 @@ def test_named_addresses_land_on_a_page_with_a_next_step(browser, server, reques
         response = page.goto(server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert response.status == 200, "%s answered %s" % (path, response.status)
         expect(page.get_by_role("heading", level=1)).to_have_text(title)
+        assert "couldn't find that page" not in page.locator("body").inner_text().lower()
+        if path in SIGNED_IN_PAGES and (switch_off or path == "/recommendations"):
+            # Open to a signed-in person (recommendations from the first release, opportunities with the
+            # switch off): the page itself, never the waiting list; this organisation holds no
+            # records, so the page says why it is empty and what to do next. Opportunities under the first
+            # release are still the waiting list, below.
+            expect(page.get_by_test_id("early-access-page")).to_have_count(0)
+            main = page.locator("main").inner_text()
+            assert "waiting list" not in main.lower(), (path, main[-300:])
+            assert SIGNED_IN_PAGES[path] in main, (path, main[-600:])
+            continue
         expect(page.get_by_test_id("early-access-page")).to_contain_text(title)
         expect(page.get_by_test_id("early-access-submit")).to_be_visible()
-        assert "couldn't find that page" not in page.locator("body").inner_text().lower()
     if not switch_off:
         mobile = _context(browser, 390, dark=True).new_page()
         sign_in(mobile, server, mine["emails"]["enterprise_architect"])
@@ -181,7 +196,7 @@ def test_recommendations_and_consolidation_say_the_real_reason(browser, server):
     sign_in(other, server, empty["emails"]["enterprise_architect"])
     other.goto(server + "/enterprise/analysis/ai-architecture", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     text = other.locator("main").inner_text()
-    assert "your model holds no applications" in text and "Add applications" in text
+    assert "Your model holds no applications" in text and "Add applications" in text
 
 
 def test_compare_scenarios_opens_a_dialog(browser, server):
@@ -240,14 +255,28 @@ def test_consolidation_opportunities_list_agrees_with_its_savings_and_links_to_t
         _drop_opportunity(opportunity_id, target_id)
 
 
-def _seed_named(org_id, names):
+def _seed_named(org_id, names, shared_capability=None):
+    """Applications for an organisation; with ``shared_capability`` they all support one capability, which is
+    what makes the candidates pair them (a pair needs a shared capability, a shared function or a near-identical name)."""
     from app import create_app, db
+    from app.models.application_capability import ApplicationCapabilityMapping
     from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
 
     app = create_app("testing")
     with app.app_context():
-        for name in names:
-            db.session.add(ApplicationComponent(name=name, organization_id=org_id))
+        apps = [ApplicationComponent(name=name, organization_id=org_id) for name in names]
+        db.session.add_all(apps)
+        db.session.flush()
+        if shared_capability:
+            capability = BusinessCapability(name=shared_capability, organization_id=org_id, level=2,
+                                            code="C" + uuid.uuid4().hex[:10])
+            db.session.add(capability)
+            db.session.flush()
+            for application in apps:
+                db.session.add(ApplicationCapabilityMapping(
+                    organization_id=org_id, application_component_id=application.id,
+                    business_capability_id=capability.id, is_active=True))
         db.session.commit()
         db.session.remove()
 
@@ -275,7 +304,8 @@ def test_empty_consolidation_candidates_say_why_and_the_analysis_fills_them(brow
     mine = create_fresh_org("enterprise_architect")
     alone = create_fresh_org("enterprise_architect")
     request.addfinalizer(lambda: _drop_candidates(mine["org_id"]))
-    _seed_named(mine["org_id"], ["General Ledger %s" % suffix, "General Ledger %s Cloud" % suffix])
+    _seed_named(mine["org_id"], ["General Ledger %s" % suffix, "General Ledger %s Cloud" % suffix],
+                shared_capability="Financial accounting %s" % suffix)
     _seed_named(alone["org_id"], ["Only application %s" % suffix])
 
     page = _context(browser).new_page()

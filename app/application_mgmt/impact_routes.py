@@ -191,7 +191,7 @@ def ai_analyze():
                 jsonify(
                     {
                         "available": False,
-                        "error": "No LLM provider configured. Please configure API settings.",
+                        "error": "No LLM provider configured. Please configure AI settings.",
                         "configure_url": url_for("admin.api_settings"),
                     }
                 ),

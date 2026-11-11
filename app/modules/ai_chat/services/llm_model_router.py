@@ -228,7 +228,7 @@ class LLMModelRouter:
         if not candidates:
             raise ValueError(
                 "No available LLM models configured. "
-                "Please configure at least one provider in Admin > API Settings"
+                "Please configure at least one provider in Admin > AI settings"
             )
 
         # Select best candidate based on optimization criteria

@@ -152,8 +152,9 @@ def test_coming_soon_is_grouped_marked_and_leads_to_a_waiting_list(desktop, site
     expect(soon.get_by_text("Coming soon", exact=True)).to_be_visible()
     expect(soon.get_by_text("Early access. Tell us which ones you need and we will talk.")).to_be_visible()
     rows = soon.locator("a[data-availability='early_access']")
-    assert rows.count() == 1
+    assert rows.count() == 2
     expect(soon.get_by_role("link", name="Software and tool discovery")).to_be_visible()
+    expect(soon.get_by_role("link", name="Bring your SysML models")).to_be_visible()
     # a released Scenarios is not waiting: it sits among the delivered items and opens its page
     expect(soon.get_by_role("link", name="Scenarios")).to_have_count(0)
     released = page.locator("#menu-product a[data-availability='live']").filter(has_text="Scenarios")

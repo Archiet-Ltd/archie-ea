@@ -119,7 +119,7 @@ def _gap_rows(organization_id: int) -> List[Dict[str, Any]]:
     for gap, addressed in gap_register_service.open_gaps_with_coverage(organization_id):
         name = _bare_name(gap.name)
         key = (name.lower(), bool(addressed))
-        sev = _severity_label(gap.severity)
+        sev = _severity_label(gap_register_service.effective_severity(gap))
         lead = ("%s severity" % sev) if sev else "Severity not recorded"
         if addressed:
             action = "Close the %s once its work is done" % name
@@ -136,9 +136,9 @@ def _gap_rows(organization_id: int) -> List[Dict[str, Any]]:
         analysis = "%s#gap-%d" % (analysis, gap.id) if analysis else None
         href = record if addressed else analysis
         # The footer points at the other page about the same gap, never at the action's own address.
-        row = _item("gap", gap.id, name, action, gap.severity, group, 0, why, covered=bool(addressed),
+        row = _item("gap", gap.id, name, action, gap_register_service.effective_severity(gap), group, 0, why, covered=bool(addressed),
                     href=href, footer=_footer("The gap record", analysis if addressed else record,
-                                              gap.severity, gap.updated_at, gap.created_at, subject="Gap"))
+                                              gap_register_service.effective_severity(gap), gap.updated_at, gap.created_at, subject="Gap"))
         row["_records"] = 1
         kept = best.get(key)
         if kept is None:

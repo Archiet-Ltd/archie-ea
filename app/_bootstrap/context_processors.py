@@ -664,6 +664,14 @@ def init_context_processors(app):
 
     app.jinja_env.globals["flask"] = flask
 
+    def _template_payment_open():
+        """Whether a paid plan can be bought here; the billing page reads the same switch."""
+        from app.services import billing_plans
+
+        return billing_plans.payment_is_open()
+
+    app.jinja_env.globals["payment_open"] = _template_payment_open
+
     # One permission matrix: the `can(action, object_type)` template global reads the
     # same answer require_permission gives the server.
     from flask_login import current_user as _matrix_user
@@ -674,6 +682,19 @@ def init_context_processors(app):
         return _matrix_can(_matrix_user, action, object_type)
 
     app.jinja_env.globals["can"] = _template_can
+
+    from app.services.application_status import status_options as _status_options
+
+    # The one deployment-status list, for every form that offers a choice.
+    app.jinja_env.globals["status_options"] = _status_options
+
+    from app.services.application_status import match_status as _match_status
+
+    app.jinja_env.globals["match_status"] = _match_status
+
+    from app.services.application_status import is_end_of_life as _is_end_of_life
+
+    app.jinja_env.globals["is_end_of_life"] = _is_end_of_life
 
     from app.core.auth.permissions import can_change_model as _can_change_model
 

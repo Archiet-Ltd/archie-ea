@@ -3622,7 +3622,8 @@
     "table",
     "input-group",
     "checkbox",
-    "dropdown-menu"
+    "dropdown-menu",
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -3743,7 +3744,8 @@
     "page-header",
     "page-shell",
     "progress",
-    "table"
+    "table",
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -16187,7 +16189,8 @@
     "item",
     "table",
     "field",
-    "select"
+    "select",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -16434,7 +16437,9 @@
     "select",
     "table",
     "tabs",
-    "card"
+    "card",
+    "figures",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -18159,7 +18164,8 @@
     "tabs",
     "input-group",
     "dialog",
-    "dropdown-menu"
+    "dropdown-menu",
+    "disabled-action"
    ],
    "confidence": "high",
    "controls": {
@@ -18296,7 +18302,11 @@
     "table",
     "tabs",
     "item",
-    "disabled-action"
+    "disabled-action",
+    "element-table",
+    "field",
+    "provenance",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -18353,7 +18363,7 @@
     "P29-export-share"
    ],
    "persona": "startup_cto",
-   "reason": "Element page on the startup path; key-value cards, one linked-record table per tab, quick edit dialog.",
+   "reason": "Element page on the startup path; key-value cards, one linked-record table per tab, quick edit dialog. A Product's page adds a layered element table (element-table), an add-an-element dialog with a native select and labelled field (select, field) and the source footer (provenance).",
    "reference": {
     "shadcn": {
      "name": "shadcn examples: mail (reading pane)",
@@ -26436,7 +26446,8 @@
     "input",
     "page-shell",
     "select",
-    "provenance"
+    "provenance",
+    "disabled-action"
    ],
    "confidence": "high",
    "controls": {
@@ -27083,6 +27094,103 @@
    "tier": "C1",
    "type_changed": true
   },
+  "app/templates/compliance/control_evidence.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/avatar.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/canvas_box.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/detail_meta.html",
+    "components/dialog.html",
+    "components/disabled_action.html",
+    "components/dropdown_menu.html",
+    "components/element_table.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/list_table.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/risk_matrix.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "components/traceability_panel.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "record-detail",
+   "charts": [],
+   "components": [
+    "breadcrumb",
+    "button",
+    "card",
+    "fact-list"
+   ],
+   "confidence": "high",
+   "controls": {
+    "link": 3,
+    "table": 0,
+    "testid": 2
+   },
+   "departures": [],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "extra_macros": [],
+   "frame": "dashboard-01",
+   "grid": "G3",
+   "inhouse_components": [],
+   "macros": [
+    "components/fact_list.html"
+   ],
+   "original": "preview",
+   "page_type": "record-detail",
+   "patterns": [
+    "P01-page-header",
+    "P25-key-value-summary"
+   ],
+   "persona": "compliance",
+   "reason": "Evidence for one control on one application, opened from the register, with the way back to that control.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: mail (reading pane)",
+     "url": "https://ui.shadcn.com/examples/mail"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: product detail",
+     "image": "docs/design/reference/basecoat-product-detail.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "populated",
+    "empty-first-use"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
   "app/templates/compliance/data_subject_request_detail.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -27398,7 +27506,8 @@
     "disabled-action",
     "fact-list",
     "list-table",
-    "see-how"
+    "see-how",
+    "provenance"
    ],
    "confidence": "low",
    "controls": {
@@ -32957,7 +33066,9 @@
     "select",
     "table",
     "card",
-    "page-shell"
+    "page-shell",
+    "disabled-action",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -33178,7 +33289,8 @@
     "table",
     "list-table",
     "page-shell",
-    "figures"
+    "figures",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -33292,7 +33404,8 @@
     "select",
     "table",
     "tabs",
-    "dropdown-menu"
+    "dropdown-menu",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -33995,7 +34108,8 @@
     "tabs",
     "figures",
     "list-table",
-    "page-shell"
+    "page-shell",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -37169,7 +37283,8 @@
     "checkbox",
     "field",
     "select",
-    "provenance"
+    "provenance",
+    "gantt-timeline"
    ],
    "confidence": "high",
    "controls": {
@@ -40555,7 +40670,8 @@
     "pagination",
     "select",
     "table",
-    "tabs"
+    "tabs",
+    "provenance"
    ],
    "confidence": "high",
    "controls": {
@@ -46702,7 +46818,10 @@
     "page-header",
     "progress",
     "table",
-    "dialog"
+    "dialog",
+    "figures",
+    "list-table",
+    "page-shell"
    ],
    "confidence": "low",
    "controls": {
@@ -47408,7 +47527,9 @@
     "radio-group",
     "skeleton",
     "table",
-    "tabs"
+    "tabs",
+    "list-table",
+    "select"
    ],
    "confidence": "low",
    "controls": {

@@ -70,7 +70,7 @@
       {% call table_cell(class='hidden text-muted-foreground md:table-cell') %}{% if p.parent %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.parent_id) }}">{{ p.parent }}</a>{% else %}Top level{% endif %}{% endcall %}
       {% call table_cell(class='hidden text-muted-foreground md:table-cell') %}{{ p.owner or 'No owner recorded' }}{% endcall %}
       {% call table_cell(class='hidden md:table-cell') %}{% if p.drawn %}{% call ui.badge() %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }}{% endcall %}{% else %}{% call ui.badge(variant='secondary') %}Not drawn{% endcall %}{% endif %}{% endcall %}
-      {% call table_cell(class='text-right') %}<div class="flex flex-col items-end gap-2">{% if p.element_id %}<a class="text-sm hover:underline" data-testid="process-element-link" href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=p.element_id) }}">Model element</a>{% endif %}{{ button(text='Open diagram', variant='outline', size='sm', class='whitespace-nowrap', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}</div>{% endcall %}
+      {% call table_cell(class='text-right') %}<div class="flex flex-col items-end gap-2">{% if p.element_id %}<a class="text-sm hover:underline" data-testid="process-element-link" href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=p.element_id, ae=1) }}">Model element</a>{% endif %}{{ button(text='Open diagram', variant='outline', size='sm', class='whitespace-nowrap', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}</div>{% endcall %}
     {% endcall %}
   {% else %}
     <div class="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4" data-testid="process-diagram-cards">
@@ -83,7 +83,7 @@
         {% call ui.card_content(class='mt-auto flex flex-wrap items-center gap-2') %}
           {% for lane in p.lanes[:3] %}{% call ui.badge(variant='secondary') %}{{ lane }}{% endcall %}{% endfor %}
           {% if p.lanes|length > 3 %}{% call ui.badge(variant='outline') %}+{{ p.lanes|length - 3 }} more{% endcall %}{% endif %}
-          <span class="ml-auto flex items-center gap-3">{% if p.element_id %}<a class="text-sm hover:underline" data-testid="process-element-link" href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=p.element_id) }}">Model element</a>{% endif %}{{ button(text='Open diagram', variant='outline', size='sm', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}</span>
+          <span class="ml-auto flex items-center gap-3">{% if p.element_id %}<a class="text-sm hover:underline" data-testid="process-element-link" href="{{ url_for('archimate_crud.detail_element', layer='business', element_type='BusinessProcess', element_id=p.element_id, ae=1) }}">Model element</a>{% endif %}{{ button(text='Open diagram', variant='outline', size='sm', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}</span>
         {% endcall %}
       {% endcall %}
       {% endfor %}

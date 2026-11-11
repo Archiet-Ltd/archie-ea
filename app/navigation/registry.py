@@ -274,11 +274,19 @@ def _layer_children(layer_key: str, types: tuple) -> tuple:
     return tuple(children)
 
 
-MODEL: tuple = tuple(
+MODEL: tuple = (
+    # The whole model as one graph; a doorway to every element's page.
+    _l("model_map", "Model map", "archimate.model_map_page", "waypoints", job="1",
+       aliases=("Model graph", "Graph", "Map", "Architecture map", "Knowledge graph", "Your model")),
+) + tuple(
     _l("layer_" + key, label, "archimate_crud.dashboard", icon, job="1", toggle=True, group="model",
        children=_layer_children(layer_key, types))
     for key, label, icon, layer_key, types in _MODEL_LAYERS
 ) + (
+    # Every Product in the organisation; each one opens onto its own page of everything that makes it up.
+    _l("products", "Products", "archimate_crud.list_elements", "package", job="1",
+       url_values={"layer": "business", "element_type": "Product"},
+       aliases=("Product", "Product page", "Offerings", "Product portfolio")),
     _l("frameworks", "Frameworks", "frameworks.gallery", "library", job="1",
        aliases=("Maturity frameworks", "Capability frameworks", "TOGAF", "APQC", "Industry frameworks",
                 "Industry process frameworks", "Compliance frameworks"),

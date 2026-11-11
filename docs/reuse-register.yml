@@ -366,6 +366,23 @@ entries:
       - path: app/services/architecture_change_impact_service.py
         reason: delegates the walk to cross_layer_impact
 
+  - id: product-page
+    concept: What makes up one Product (its elements by ArchiMate layer, linked material, cost, gaps and risks)
+    status: active
+    canonical:
+      path: app/modules/architecture/routes/archimate_crud/product_page.py
+      symbols: [members, build, linked_material, cost_of, gaps_and_risks, export_payload]
+    reuse: >
+      A Product's page is the element page (archimate_crud/detail.html) extended; the Products list is the element
+      list for the Product type. The members come from impact_graph.build_impact_graph, owners from the one owner
+      record, cost from application_cost_accessor and technology_cost, decisions from ArchitectureDecision,
+      diagrams from SavedDiagram, the footer from result_footer_service.product_footer. Searched before writing:
+      element page, impact answer, owner, cost, export, search. Do not write a second product page, product table
+      or product walk; see docs/adr/0015-product-page.md.
+    must_not_create:
+      - id: product-walk
+        regex: 'def\s+_?(walk|collect|gather|list)_product_(members|elements|graph)\w*\s*\('
+
   - id: capability-maturity
     concept: A capability's current and target maturity
     status: active
@@ -1024,3 +1041,109 @@ entries:
     known_exceptions:
       - path: app/services/adm_requirement_service.py
         reason: links an ADM requirement to a solution, a different concept with the same verb
+
+  - id: force-graph
+    concept: The force-directed node-link graph (the impact graph and the whole-model map)
+    status: active
+    canonical:
+      path: app/static/js/impact_graph.js
+      symbols: [modelMap]
+    reuse: >
+      Draw a force-directed graph of model elements with app/static/js/impact_graph.js: its impact mode centres on one
+      element and its whole-model mode (the svg carries data-mode="model") draws every element, coloured by the layer
+      tokens, from app/services/model_map.py. Give the page a mode of this renderer; do not write a second d3 force
+      layout. app/templates/capability_map/network.html still draws its own inline force graph and is a known exception
+      to migrate in a later brief. The composer's diagram engine (JointJS) draws diagrams people compose and is a
+      different concept.
+    must_not_create:
+      - id: second-force-simulation
+        regex: 'd3\.forceSimulation\('
+        scope: [app]
+        suffixes: [.js, .html]
+    known_exceptions:
+      - path: app/templates/capability_map/network.html
+        reason: its own inline force graph, to be migrated onto impact_graph.js in a later brief
+      - path: app/static/js/archimate_diagram_renderer.js
+        reason: an older force layout inside the diagram renderer, to be moved onto impact_graph.js in a later brief
+      - path: app/templates/solutions/program_view.html
+        reason: the programme view's own inline force graph, to be moved onto impact_graph.js in a later brief
+      - path: app/templates/stakeholders/map.html
+        reason: the stakeholder map's own inline force graph, to be moved onto impact_graph.js in a later brief
+
+  - id: diagram
+    concept: Drawing a notation of the model (ArchiMate, BPMN 2.0, UML sequence, use case and class, ERD) on a screen
+    status: active
+    canonical:
+      path: app/static/js/archimate/composer_renderer.js
+      symbols: [ComposerRenderer]
+    reuse: >
+      Decided in docs/adr/0016-one-drawing-engine.md. JointJS is the one drawing library and ComposerRenderer is
+      the engine; a notation ArchiMate cannot draw is a sibling module on the same library and the shared chrome
+      in app/templates/components/diagram/ (siblings today: app/static/js/bpmn/bpmn_editor.js for BPMN and
+      app/static/js/data/erd.js for the ERD; class diagrams keep app/static/js/codegen/uml_shapes.js). The model
+      is the store: a BPMN flow lives on BusinessProcess.bpmn_flow, entities on DataEntity (register entry
+      data-model-diagram), and sequence, use case and class views are derived at read time, never stored. Do not
+      add a library, a diagram table, a second flow column or an inline svg drawing. Frozen, with the pattern that
+      stops new use named below: workflow_designer.js (code workflows), workflow_builder.js,
+      archimate_diagram_renderer.js and solution_composer_cytoscape.js (loaded by no template; to be deleted, each
+      in its own change), mermaid_diagram_generator.py (one test only), Mermaid on screen, and UMLModel.
+    must_not_create:
+      - id: frozen-diagram-script-loaded
+        regex: '(?:workflow_builder|archimate_diagram_renderer|solution_composer_cytoscape)\.js'
+        scope: [app/templates]
+        suffixes: [.html]
+      - id: frozen-workflow-designer-loaded
+        regex: 'workflow_(?:designer|shapes)\.js'
+        scope: [app/templates]
+        suffixes: [.html]
+      - id: second-diagram-library
+        regex: '(?i)(?:vendor/|from\s+|import\s+|require\()[\w/.-]*(?:cytoscape|mxgraph|bpmn-js|bpmn-moddle|gojs|konva|plantuml)'
+        scope: [app]
+        suffixes: [.html, .js, .py]
+      - id: mermaid-on-screen
+        regex: 'mermaid\.(?:initialize|render|run|contentLoaded)\s*\(|vendor/mermaid'
+        scope: [app/templates, app/static/js]
+        suffixes: [.html, .js]
+      - id: mermaid-diagram-generator-use
+        regex: '(?:from|import)\s+[\w.]*mermaid_diagram_generator'
+        scope: [app]
+        suffixes: [.py]
+      - id: second-bpmn-flow-store
+        regex: '^\s*\w*(?:bpmn|flow_doc|process_flow|flow_json)\w*\s*=\s*(?:db\.)?(?:Column|mapped_column)\('
+        scope: [app/models, app/modules]
+        suffixes: [.py]
+      - id: chat-visual-or-generator-diagram-on-a-page
+        regex: 'VisualGenerationService|visual_generation_service|structured_deliverable_service|_build_mermaid_diagram|SequenceDiagramDef'
+        scope: [app/modules/architecture, app/modules/business_architecture, app/modules/solutions_product/routes, app/templates, app/static/js]
+        suffixes: [.py, .html, .js]
+      - id: new-d3-chart-layout
+        regex: 'd3\.(?:sankey|tree|cluster)\('
+        scope: [app/static/js, app/templates]
+        suffixes: [.html, .js]
+      - id: uml-model-row-for-product-diagram
+        regex: '\bUMLModel\s*\('
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/models/process_data.py
+        reason: BusinessProcess.bpmn_flow is the one BPMN flow store named in docs/adr/0016-one-drawing-engine.md
+      - path: app/models/archimate_technology.py
+        reason: process_flow is an older text description of automation steps on a technology element; nothing
+          draws it, and it must not be used as a BPMN flow store
+      - path: app/templates/codegen/workflow_designer.html
+        reason: the frozen code workflow designer loads its own scripts; nothing new may load them
+      - path: app/templates/applications/dashboard.html
+        reason: frozen Mermaid use (mermaid_diagrams is passed empty); no new Mermaid on screen
+      - path: app/models/models.py
+        reason: UMLModel is defined here, frozen for codegen only
+      - path: app/static/js/archimate_views/traceability_sankey.js
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+      - path: app/static/js/solutions/traceability_sankey.js
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+      - path: app/templates/solutions/partials/_layer_sankey.html
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+      - path: app/static/js/organization/org_chart.js
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+    note: >
+      Searched before writing: joint, d3, mermaid, plantuml, cytoscape, dagre, bpmn, UMLModel, SavedDiagram across
+      app/. dagre is a layout helper that composer.js and erd.js already use and is not a drawing library.

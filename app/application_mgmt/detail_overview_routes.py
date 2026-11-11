@@ -6,15 +6,13 @@ Detail overview/governance/roadmap routes for Application Management.
 import logging
 from datetime import datetime
 
-from flask import current_app, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import current_app, flash, jsonify, render_template, request
 from flask_login import login_required
 
 from .. import db
 from ..models.application_portfolio import ApplicationComponent
 from ..models.implementation_migration import WorkPackage
-from ..utils.validators import sanitize_html, validate_description, validate_integer, validate_string
 from . import application_mgmt
-from .forms import OverviewForm
 from .routes import _redirect_to_detail
 
 logger = logging.getLogger(__name__)
@@ -190,279 +188,6 @@ def application_roadmap(id):
         start_date=start_date,
         end_date=end_date,
     )
-
-
-@application_mgmt.route("/applications/<int:id>/overview-update", methods=["POST"])
-@login_required
-def update_overview(id):
-    """Unified save for Overview: updates app metadata and vendor classifications atomically."""
-    app = ApplicationComponent.query.get_or_404(id)
-
-    # csrf-ok: global CSRFProtect active
-
-    try:
-        # Build form from submitted data for validation
-        form = OverviewForm()
-        # Populate vendor_components entries from submitted form data if present
-        # Existing entries will correspond to names like vendor_components - 0 - comp_id, vendor_components - 0 - vendor_classification
-        # WTForms will bind these automatically on form = OverviewForm(request.form) when validate_on_submit is called
-        form = OverviewForm(request.form)
-
-        if not form.validate():
-            flash("Validation failed. Please correct errors and try again.", "error")
-            return redirect(
-                url_for("unified_applications.application_detail", id=app.id, edit="1")
-            )
-
-        # Validate and update application fields with input validation
-        # Note: Model uses technical_lead (not technical_owner), support_team (not support_level)
-        # operational_status field does NOT exist on ApplicationComponent model
-        validation_errors = []
-
-        # Validate name
-        name_raw = request.form.get("name")
-        is_valid, name, error = validate_string(
-            name_raw, max_length=255, field_name="name"
-        )
-        if not is_valid:
-            validation_errors.append(error)
-        elif name:
-            name = sanitize_html(name)
-
-        # Validate version
-        version_raw = request.form.get("version")
-        is_valid, version, error = validate_string(
-            version_raw, max_length=50, field_name="version"
-        )
-        if not is_valid:
-            validation_errors.append(error)
-        elif version:
-            version = sanitize_html(version)
-
-        # Validate application_category
-        category_raw = request.form.get("application_category")
-        is_valid, application_category, error = validate_string(
-            category_raw, max_length=100, field_name="application_category"
-        )
-        if not is_valid:
-            validation_errors.append(error)
-
-        # Validate deployment_status
-        status_raw = request.form.get("deployment_status")
-        is_valid, deployment_status, error = validate_string(
-            status_raw, max_length=50, field_name="deployment_status"
-        )
-        if not is_valid:
-            validation_errors.append(error)
-
-        # Validate business_criticality
-        criticality_raw = request.form.get("businessCriticality")
-        is_valid, business_criticality, error = validate_string(
-            criticality_raw, max_length=50, field_name="businessCriticality"
-        )
-        if not is_valid:
-            validation_errors.append(error)
-
-        # Validate user_count (integer)
-        user_count_raw = request.form.get("userCount")
-        is_valid, user_count, error = validate_integer(
-            user_count_raw, min_val=0, max_val=10000000, field_name="userCount"
-        )
-        if not is_valid:
-            validation_errors.append(error)
-
-        # Validate business_owner
-        owner_raw = request.form.get("businessOwner")
-        is_valid, business_owner, error = validate_string(
-            owner_raw, max_length=255, field_name="businessOwner"
-        )
-        if not is_valid:
-            validation_errors.append(error)
-        elif business_owner:
-            business_owner = sanitize_html(business_owner)
-
-        # Validate technical_lead
-        tech_owner_raw = request.form.get("techOwner")
-        is_valid, technical_lead, error = validate_string(
-            tech_owner_raw, max_length=255, field_name="techOwner"
-        )
-        if not is_valid:
-            validation_errors.append(error)
-        elif technical_lead:
-            technical_lead = sanitize_html(technical_lead)
-
-        # Validate development_team
-        dev_team_raw = request.form.get("devTeam")
-        is_valid, development_team, error = validate_string(
-            dev_team_raw, max_length=255, field_name="devTeam"
-        )
-        if not is_valid:
-            validation_errors.append(error)
-        elif development_team:
-            development_team = sanitize_html(development_team)
-
-        # Validate business_domain
-        domain_raw = request.form.get("businessDomain")
-        is_valid, business_domain, error = validate_string(
-            domain_raw, max_length=100, field_name="businessDomain"
-        )
-        if not is_valid:
-            validation_errors.append(error)
-        elif business_domain:
-            business_domain = sanitize_html(business_domain)
-
-        # Validate description
-        desc_raw = request.form.get("description")
-        is_valid, description, error = validate_description(desc_raw)
-        if not is_valid:
-            validation_errors.append(error)
-        elif description:
-            description = sanitize_html(description)
-
-        # Validate support_team
-        support_raw = request.form.get("supportLevel")
-        is_valid, support_team, error = validate_string(
-            support_raw, max_length=255, field_name="supportLevel"
-        )
-        if not is_valid:
-            validation_errors.append(error)
-        elif support_team:
-            support_team = sanitize_html(support_team)
-
-        # Return validation errors if any
-        if validation_errors:
-            for error in validation_errors:
-                flash(error, "error")
-            return redirect(
-                url_for("unified_applications.application_detail", id=app.id, edit="1")
-            )
-
-        # Capture originals to build change list
-        orig = {
-            "name": app.name,
-            "version": app.version,
-            "applicationCategory": app.application_category,
-            "businessCriticality": app.business_criticality,
-            "userCount": app.user_count,
-            "businessOwner": app.business_owner,
-            "techLead": app.technical_lead,
-            "devTeam": app.development_team,
-            "businessDomain": app.business_domain,
-            "description": app.description,
-            "supportTeam": app.support_team,
-            "deploymentStatus": app.deployment_status,
-        }
-
-        # Apply updates to fields that actually exist on the model
-        app.name = name or app.name
-        app.version = version or app.version
-        app.application_category = application_category or app.application_category
-        app.business_criticality = business_criticality or app.business_criticality
-        app.user_count = user_count if user_count is not None else app.user_count
-        app.business_owner = business_owner or app.business_owner
-        app.technical_lead = (
-            technical_lead or app.technical_lead
-        )  # Fixed: was technical_owner
-        app.development_team = development_team or app.development_team
-        app.business_domain = business_domain or app.business_domain
-        app.description = description or app.description
-        app.support_team = support_team or app.support_team  # Fixed: was support_level
-        app.deployment_status = deployment_status or app.deployment_status
-
-        # Update vendor classifications using WTForms FieldList entries
-        import json as _json
-
-        updated_components = []
-        changed_fields = []
-        try:
-            for vc in form.vendor_components:
-                try:
-                    comp_id = int(vc.comp_id.data)
-                except Exception:
-                    continue
-                comp = db.session.get(ApplicationComponent, comp_id)
-                if not comp:
-                    continue
-                tags = {}
-                if comp.tags:
-                    try:
-                        tags = (
-                            _json.loads(comp.tags)
-                            if isinstance(comp.tags, str)
-                            else comp.tags
-                        )
-                    except Exception:
-                        tags = {}
-                old_cls = (
-                    tags.get("vendor_classification")
-                    if isinstance(tags, dict)
-                    else None
-                )
-                new_cls = (vc.vendor_classification.data or "").strip() or None
-                if old_cls != new_cls:
-                    tags["vendor_classification"] = new_cls
-                    comp.tags = _json.dumps(tags)
-                    db.session.add(comp)
-                    updated_components.append(comp.name)
-                    changed_fields.append(f"vendorClass_{comp_id}")
-        except Exception as e:  # fabricated-ok: guarded skip on error; emits no fabricated value
-            # Fallback: no vendor component updates
-            logger.debug(f"Vendor component update error: {e}")
-
-        # Determine other changed fields (using correct field names)
-        if (orig["name"] or None) != (app.name or None):
-            changed_fields.append("name")
-        if (orig["version"] or None) != (app.version or None):
-            changed_fields.append("version")
-        if (orig["applicationCategory"] or None) != (app.application_category or None):
-            changed_fields.append("applicationCategory")
-        if (orig["businessCriticality"] or None) != (app.business_criticality or None):
-            changed_fields.append("businessCriticality")
-        if (orig["userCount"] or None) != (app.user_count or None):
-            changed_fields.append("userCount")
-        if (orig["businessOwner"] or None) != (app.business_owner or None):
-            changed_fields.append("businessOwner")
-        if (orig["techLead"] or None) != (app.technical_lead or None):
-            changed_fields.append("techLead")
-        if (orig["devTeam"] or None) != (app.development_team or None):
-            changed_fields.append("devTeam")
-        if (orig["businessDomain"] or None) != (app.business_domain or None):
-            changed_fields.append("businessDomain")
-        if (orig["description"] or None) != (app.description or None):
-            changed_fields.append("description")
-        if (orig["supportTeam"] or None) != (app.support_team or None):
-            changed_fields.append("supportTeam")
-        if (orig["deploymentStatus"] or None) != (app.deployment_status or None):
-            changed_fields.append("deploymentStatus")
-
-        # Commit atomically
-        db.session.add(app)
-        db.session.commit()
-
-        # Store changed field ids in session to highlight after redirect
-        try:
-            session["overview_changes"] = _json.dumps(changed_fields)
-        except Exception:
-            session["overview_changes"] = None
-
-        change_count = len(changed_fields)
-        vendor_msg = (
-            f" Vendor classifications updated for: {', '.join(updated_components)}"
-            if updated_components
-            else ""
-        )
-        flash(
-            f"Overview updated successfully ({change_count} changes).{vendor_msg}",
-            "success",
-        )
-    except Exception as exc:
-        db.session.rollback()
-        flash(f"Unable to save Overview changes: {exc}", "error")
-        return redirect(
-            url_for("unified_applications.application_detail", id=app.id, edit="1")
-        )
-
-    return _redirect_to_detail(app.id, tab="overview")
 
 
 @application_mgmt.route(
@@ -676,7 +401,16 @@ def application_quick_update(id):
         if "component_type" in data:
             app.component_type = data["component_type"]
         if "deployment_status" in data:
-            app.deployment_status = data["deployment_status"]
+            from app.services.application_status import same_status, status_for_write
+
+            stored_status, status_refusal = status_for_write(data["deployment_status"])
+            if same_status(data["deployment_status"], app.deployment_status):
+                status_refusal = None
+                stored_status = None
+            if status_refusal:
+                return jsonify({"success": False, "error": status_refusal}), 400
+            if stored_status:
+                app.deployment_status = stored_status
         if "business_criticality" in data:
             # Convert numeric criticality back to text
             crit_map = {

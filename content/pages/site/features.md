@@ -312,7 +312,7 @@ Enterprise sign-in, access control, proven tenant isolation, audit and billing, 
 passes the checks your security team runs first.
 
 **Today:** single sign-on through SAML or OpenID Connect, every record scoped to your organisation, a
-verifiable audit log, and plans you can buy, change and cancel yourself.
+verifiable audit log, and [[if payment-open]]plans you can buy, change and cancel yourself[[else]]a free plan to start on, with paid plans set up in a conversation with us[[/if]].
 
 For certifications and what we do and do not claim today, see [Security](/security).
 
@@ -327,3 +327,4 @@ These are not available yet. Open one to join its waiting list and we will tell 
 
 - [Scenarios](/modules/scenario-modelling): compare what-if plans side by side before you commit.
 - [Software and tool discovery](/modules/software-and-tool-discovery): discover the software and tools you actually pay for and use.
+- [Bring your SysML models](/modules/sysml-to-archimate): read the engineering model beside your applications, owners, costs and risks, with every element traced to its source.

@@ -39,7 +39,7 @@ register_lucidchart_import_routes(archimate_bp)
 # Must exceed the OpenRouter client's own read timeout (80s, see
 # LLMService._call_openrouter's default) or this outer guard always loses the
 # race on a real, working generation: reproduced directly on 10 Sep 2026 —
-# a genuine deepseek/deepseek-v3.2 call for a 37-element ArchiMate model hit
+# a genuine DeepSeek call via OpenRouter for a 37-element ArchiMate model hit
 # this 45s guard, got reported as "timed out" and silently replaced with the
 # noun-extraction mock fallback, while the real call kept running in the
 # background (ThreadPoolExecutor.cancel() cannot stop an already-running
@@ -1046,7 +1046,7 @@ def api_composer_extract_from_image():
             "success": False,
             "error": "No vision-capable AI provider is configured, so a diagram "
                      "image cannot be read. Add an Anthropic, OpenAI or Gemini "
-                     "key in Admin → API Settings. A text-only provider cannot do this.",
+                     "key in Admin → AI settings. A text-only provider cannot do this.",
             "error_type": "no_vision_provider",
         }), 503
 
@@ -7397,6 +7397,35 @@ def api_shared_elements():
 
 
 # ── Impact / dependency graph — the interactive blast-radius lens ────────────
+
+
+@archimate_bp.route("/model-map", methods=["GET"])
+@login_required
+def model_map_page():
+    """The whole model as one force graph: the impact graph's page in its whole-model mode.
+
+    ``?layer=<layer>`` opens one layer (the same filter the element list takes).
+    """
+    from app.services import model_map  # noqa: PLC0415
+
+    layer = request.args.get("layer", "").strip().lower()
+    layer = layer if layer in model_map.LAYERS else ""
+    counts = model_map.layer_counts()
+    total = sum(c["count"] for c in counts)
+    return render_template(
+        "architecture/impact_graph.html", element=None, decisions=[], model_map=True,
+        map_layer=layer, map_counts=counts, map_total=total,
+    )
+
+
+@archimate_bp.route("/api/model-map", methods=["GET"])
+@login_required
+def api_model_map():
+    """Nodes, links and per-layer counts for the signed-in organisation's model."""
+    from app.services import model_map  # noqa: PLC0415
+
+    layer = request.args.get("layer", "").strip().lower()
+    return jsonify(model_map.build_model_map(layer if layer in model_map.LAYERS else None))
 
 
 @archimate_bp.route("/elements/<int:element_id>/impact", methods=["GET"])
