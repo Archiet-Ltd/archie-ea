@@ -320,11 +320,14 @@ def test_choosing_decommissioned_shows_the_application_as_ended(page, live_serve
 
 def _set_status(app_id, status):
     from app import create_app, db
-    from app.models.application_portfolio import ApplicationComponent
 
     app = create_app("testing")
     with app.app_context():
-        db.session.get(ApplicationComponent, app_id).deployment_status = status
+        # Stored as an older release stored it: the model itself would store the list's form.
+        db.session.execute(
+            db.text("UPDATE application_components SET deployment_status = :s WHERE id = :i"),
+            {"s": status, "i": app_id},
+        )
         db.session.commit()
         db.session.remove()
 
