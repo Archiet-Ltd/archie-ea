@@ -414,13 +414,15 @@ def test_tech_debt_table_keeps_every_debt_score_reachable_with_a_long_support_va
             if width < 1024:
                 dims = wrapper.evaluate("e => [e.scrollWidth, e.clientWidth, getComputedStyle(e).overflowX]")
                 assert dims[0] > dims[1] and dims[2] in ("auto", "scroll"), dims
-                wrapper.evaluate("e => { e.scrollLeft = e.scrollWidth; }")
+                wrapper.evaluate("e => e.scrollTo({left: e.scrollWidth, behavior: 'instant'})")
+                long_badge.scroll_into_view_if_needed()
                 assert wrapper.evaluate("e => e.scrollLeft") > 0
                 wbox = wrapper.bounding_box()
                 bbox = long_badge.bounding_box()
                 assert bbox and bbox["x"] >= wbox["x"] - 1 and bbox["x"] + bbox["width"] <= wbox["x"] + wbox["width"] + 1, (bbox, wbox)
+                assert bbox["x"] >= 0 and bbox["x"] + bbox["width"] <= width, (bbox, width)
                 assert long_badge.inner_text().strip() == "0%"
-                page.screenshot(path=os.path.join(walk, "%s%d-tech-debt-long-name-scrolled.png" % (scheme, width)))
+                wrapper.screenshot(path=os.path.join(walk, "%s%d-tech-debt-long-name-scrolled.png" % (scheme, width)))
                 wrapper.evaluate("e => { e.scrollLeft = 0; }")
 
             def badge_of(name):
