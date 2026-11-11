@@ -141,17 +141,17 @@
                             <tr class="hover:bg-muted/30">
                                 <td class="px-4 py-2 font-medium text-foreground" >
                                     <span x-text="item.app_name || item.name || item.element_name || 'Unnamed'"></span>
-                                    <span class="block text-xs font-normal text-muted-foreground break-all lg:hidden" data-testid="debt-detail-compact" :title="item.detail_full || item.detail || item.reason" :aria-label="item.detail_full || item.detail || item.reason" x-text="item.detail || item.reason"></span>
+                                    <span class="block text-xs font-normal text-muted-foreground break-words lg:hidden" data-testid="debt-detail-compact" :title="item.detail_full || item.detail || item.reason"><span aria-hidden="true" data-testid="debt-detail-text" x-text="item.detail || item.reason"></span><span class="sr-only" data-testid="debt-detail-full" x-text="item.detail_full || item.detail || item.reason"></span></span>
                                 </td>
                                 <td class="px-4 py-2 text-muted-foreground capitalize" x-text="item.layer || 'application'"></td>
                                 <td class="px-4 py-2 text-center">
                                     <span x-show="item.debt_score === null" x-cloak class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-muted text-muted-foreground">Not rated</span>
                                     <span x-show="item.debt_score !== null" class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold"
                                           :data-partly-scored="(item.missing || []).length + (item.unreadable || []).length > 0 ? 'true' : 'false'"
-                                          :class="(item.missing || []).length + (item.unreadable || []).length > 0 ? 'border border-border text-foreground' : Platform.figure.num(item.debt_score) >= 70 ? 'bg-destructive/10 text-destructive-emphasis' : Platform.figure.num(item.debt_score) >= 40 ? 'bg-warning/10 text-warning-emphasis' : 'bg-success/10 text-success-emphasis'"
+                                          :class="Platform.figure.num(item.debt_score) >= 70 ? 'bg-destructive/10 text-destructive-emphasis' : Platform.figure.num(item.debt_score) >= 40 ? 'bg-warning/10 text-warning-emphasis' : (item.missing || []).length + (item.unreadable || []).length > 0 ? 'border border-border text-foreground' : 'bg-success/10 text-success-emphasis'"
                                           x-text="Platform.figure.percent(item.debt_score)"></span>
                                 </td>
-                                <td class="px-4 py-2 text-xs text-muted-foreground break-all hidden lg:table-cell" data-testid="debt-detail" :title="item.detail_full || item.detail || item.reason" :aria-label="item.detail_full || item.detail || item.reason" x-text="item.detail || item.reason"></td>
+                                <td class="px-4 py-2 text-xs text-muted-foreground break-words hidden lg:table-cell" data-testid="debt-detail" :title="item.detail_full || item.detail || item.reason"><span aria-hidden="true" data-testid="debt-detail-text" x-text="item.detail || item.reason"></span><span class="sr-only" data-testid="debt-detail-full" x-text="item.detail_full || item.detail || item.reason"></span></td>
                             </tr>
                         </template>
                     </tbody>

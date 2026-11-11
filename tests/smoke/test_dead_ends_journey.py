@@ -322,6 +322,29 @@ def test_tech_debt_panel_reads_each_recorded_support_value_as_what_it_is(
 
 
 LONG_SUPPORT_VALUE = "UnbrokenSupportTextOfThirtyChs"  # 30 characters, no space to wrap at
+LONG_NAME_PREFIX = "UnbrokenApplicationNameWithNoSpaceToWrapAtAll"  # 46 characters, only sideways scroll keeps its score reachable
+
+# Every line of the factors text must end at a space or at the end of the text; the quoted value may break.
+WORD_SPLIT_JS = """(el) => {
+  const node = el.firstChild;
+  const text = node.textContent;
+  const quoted = text.indexOf('\u201c');
+  const limit = quoted === -1 ? text.length : quoted;
+  const range = document.createRange();
+  const bad = [];
+  let prevTop = null;
+  for (let i = 0; i < limit; i++) {
+    range.setStart(node, i); range.setEnd(node, i + 1);
+    const rects = range.getClientRects();
+    if (!rects.length) continue;
+    const top = Math.round(rects[0].top);
+    if (prevTop !== null && top > prevTop + 3 && text[i] !== ' ' && text[i - 1] !== ' ') {
+      bad.push(text.slice(Math.max(0, i - 6), i) + '/' + text.slice(i, i + 6));
+    }
+    prevTop = top;
+  }
+  return bad;
+}"""
 
 
 def test_tech_debt_table_keeps_every_debt_score_reachable_with_a_long_support_value(
@@ -340,6 +363,9 @@ def test_tech_debt_table_keeps_every_debt_score_reachable_with_a_long_support_va
         {"name": "Fully scored %s" % tag, "end_of_life_date": "2040-01-01", "version": "10.2",
          "support_level": "Supported"},
         {"name": "Partly scored %s" % tag, "end_of_life_date": "2040-01-01", "version": "10.2"},
+        {"name": "Old partly %s" % tag, "end_of_life_date": "2010-01-01"},
+        {"name": LONG_NAME_PREFIX + tag, "end_of_life_date": "2040-01-01", "version": "10.2",
+         "support_level": "Supported"},
     ]
     for scheme, width, height in VIEWPORTS:
         context = browser.new_context(viewport={"width": width, "height": height}, color_scheme=scheme)
@@ -353,10 +379,10 @@ def test_tech_debt_table_keeps_every_debt_score_reachable_with_a_long_support_va
             page.reload(wait_until="domcontentloaded")
             page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
             page.get_by_role("button", name="Tech Debt Analysis").click()
-            page.get_by_text("Showing 3 of 3 applications analysed").wait_for(timeout=PAGE_TIMEOUT)
+            page.get_by_text("Showing 5 of 5 applications analysed").wait_for(timeout=PAGE_TIMEOUT)
             debt = page.locator("table.dense-table", has_text="Debt Score")
-            for name in ("Long support", "Fully scored", "Partly scored"):
-                row = debt.locator("tr", has_text="%s %s" % (name, tag))
+            for name in ("Long support", "Fully scored", "Partly scored", "Old partly", LONG_NAME_PREFIX):
+                row = debt.locator("tr", has_text=name if name == LONG_NAME_PREFIX else "%s %s" % (name, tag))
                 assert row.count() == 1, name
                 badge = row.locator("td").nth(2).locator("span[data-partly-scored]")
                 badge.scroll_into_view_if_needed()
@@ -368,10 +394,34 @@ def test_tech_debt_table_keeps_every_debt_score_reachable_with_a_long_support_va
             assert body_overflow <= 1, "page scrolls sideways by %s px" % body_overflow
             long_row = debt.locator("tr", has_text="Long support %s" % tag)
             compact = long_row.get_by_test_id("debt-detail-compact") if width < 1024 else long_row.get_by_test_id("debt-detail")
-            assert LONG_SUPPORT_VALUE not in compact.inner_text(), compact.inner_text()
-            assert "…" in compact.inner_text(), compact.inner_text()
+            shown = compact.get_by_test_id("debt-detail-text").inner_text()
+            assert LONG_SUPPORT_VALUE not in shown, shown
+            assert "…" in shown, shown
             assert LONG_SUPPORT_VALUE in compact.get_attribute("title")
-            assert LONG_SUPPORT_VALUE in compact.get_attribute("aria-label")
+            assert compact.get_attribute("aria-label") is None
+            # A screen-reader user hears the full value from visually hidden text, not from a title.
+            hidden_full = compact.get_by_test_id("debt-detail-full")
+            assert "sr-only" in hidden_full.get_attribute("class")
+            assert LONG_SUPPORT_VALUE in hidden_full.text_content()
+            # No ordinary word of any row's factors text is split across lines.
+            for factors in debt.locator("tr").locator(
+                    "[data-testid=debt-detail-text]:visible").element_handles():
+                assert factors.evaluate(WORD_SPLIT_JS) == [], factors.inner_text()
+            # The wrapper scrolls sideways when a row is wider than it, and the score is there after scrolling.
+            wrapper = debt.locator("xpath=ancestor::div[contains(@class,'rounded-lg')][1]")
+            long_name_row = debt.locator("tr", has_text=LONG_NAME_PREFIX)
+            long_badge = long_name_row.locator("span[data-partly-scored]")
+            if width < 1024:
+                dims = wrapper.evaluate("e => [e.scrollWidth, e.clientWidth, getComputedStyle(e).overflowX]")
+                assert dims[0] > dims[1] and dims[2] in ("auto", "scroll"), dims
+                wrapper.evaluate("e => { e.scrollLeft = e.scrollWidth; }")
+                assert wrapper.evaluate("e => e.scrollLeft") > 0
+                wbox = wrapper.bounding_box()
+                bbox = long_badge.bounding_box()
+                assert bbox and bbox["x"] >= wbox["x"] - 1 and bbox["x"] + bbox["width"] <= wbox["x"] + wbox["width"] + 1, (bbox, wbox)
+                assert long_badge.inner_text().strip() == "0%"
+                page.screenshot(path=os.path.join(walk, "%s%d-tech-debt-long-name-scrolled.png" % (scheme, width)))
+                wrapper.evaluate("e => { e.scrollLeft = 0; }")
 
             def badge_of(name):
                 return debt.locator("tr", has_text="%s %s" % (name, tag)).locator("span[data-partly-scored]")
@@ -383,6 +433,10 @@ def test_tech_debt_table_keeps_every_debt_score_reachable_with_a_long_support_va
             assert partly.get_attribute("data-partly-scored") == "true"
             assert "bg-success/10" not in partly.get_attribute("class")
             assert "border-border" in partly.get_attribute("class")
+            old = badge_of("Old partly")
+            assert old.get_attribute("data-partly-scored") == "true"
+            assert old.inner_text().strip() == "100%", old.inner_text()
+            assert "bg-destructive/10" in old.get_attribute("class")
             page.screenshot(path=os.path.join(walk, "%s%d-tech-debt-long-support.png" % (scheme, width)), full_page=True)
         finally:
             context.close()
