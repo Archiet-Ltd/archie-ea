@@ -306,17 +306,32 @@ def _glue_broken_keys(text: str) -> str:
         text = joined
 
 
+# A calendar date (2026-11-10, or 10/11/2026) is neither a credential nor a phone number. This is the one place
+# that says what a date looks like; the secret rule and the phone rule both use it.
+_CALENDAR_DATE = re.compile(
+    r"(?<![\d\-/])(?:(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])"
+    r"|(?:0?[1-9]|[12]\d|3[01])/(?:0?[1-9]|1[0-2])/(?:19|20)\d{2})(?![\d\-/])"
+)
+
+
+def _is_calendar_date(value: str) -> bool:
+    return _CALENDAR_DATE.fullmatch(value.strip()) is not None
+
+
 def _value_is_a_secret(key: str, value: str, spaced: bool, quoted: bool = False) -> bool:
     plain = value.strip()
     lowered = plain.lower()
     if not plain or lowered in _PLACEHOLDER_VALUES or plain.startswith("[") or re.fullmatch(r"<[^<>]*>", plain):
         return False
     if plain.isdigit() and len(plain) <= 6:
+        return False  # a count or a limit ("Max token: 4096"), not a secret
+    if not spaced and key.lower() not in _PROSE_KEYS:
+        # <secret word> then = or : gives the value: it is redacted whatever its characters, down to one.
+        return True
+    if spaced and _is_calendar_date(plain):
         return False
     marked = bool(re.search(r"[\d!@#$%^&*]", plain))
-    if spaced or key.lower() in _PROSE_KEYS:
-        return marked and len(plain) >= 6 and not (quoted and re.search(r"\s", plain))
-    return quoted or len(plain) >= 8 or (len(plain) >= 4 and marked)
+    return marked and len(plain) >= 6 and not (quoted and re.search(r"\s", plain))
 
 
 def _structure_value_is_a_secret(key: Any, item: Any) -> bool:
@@ -353,7 +368,7 @@ def _scrub_keyword_values(text: str) -> str:
         quoted = _QUOTED_VALUE.match(text, start)
         if quoted is not None and not spaced:
             inner = quoted.group("quoted")
-            if len(inner) >= 3 and _value_is_a_secret(key, inner, False, quoted=True):
+            if inner and _value_is_a_secret(key, inner, False, quoted=True):
                 out.append(text[pos:quoted.start("quoted")])
                 out.append(REDACTED)
                 pos = scan = quoted.end("quoted")
@@ -385,6 +400,16 @@ _PII_PATTERNS: List[Tuple[re.Pattern, str]] = [
 ]
 
 
+def _mask_pii(text: str) -> str:
+    """Mask e-mail addresses and phone numbers; a calendar date between them is left as it is."""
+    pieces = re.split("(%s)" % _CALENDAR_DATE.pattern, text)
+    # re.split with the one capturing group returns text, date, text, date ...
+    for index in range(0, len(pieces), 2):
+        for pattern, replacement in _PII_PATTERNS:
+            pieces[index] = pattern.sub(replacement, pieces[index])
+    return "".join(pieces)
+
+
 # OpenRouter data-policy setting sent with every request.
 OPENROUTER_PROVIDER_POLICY = {"data_collection": "deny"}
 OPENROUTER_PUBLIC_POLICY = {"data_collection": "allow"}  # text a company published on its own website
@@ -400,8 +425,7 @@ def _scrub_text(text: str, mask_pii: bool) -> str:
     text = _scrub_keyword_values(text)
     text = _scrub_cards(text)
     if mask_pii:
-        for pattern, replacement in _PII_PATTERNS:
-            text = pattern.sub(replacement, text)
+        text = _mask_pii(text)
     return text
 
 

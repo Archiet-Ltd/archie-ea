@@ -88,6 +88,12 @@ MUST_BE_REDACTED = [
     ("card dashed", "card 5500-0000-0000-0004", "5500-0000-0000-0004"),
     ("amex 4-6-5", "card 3782 822463 10005", "3782 822463 10005"),
     ("card ungrouped", "card 4111111111111111", "4111111111111111"),
+    ("pwd with four letters", "pwd: abcd", "abcd"),
+    ("pwd with three letters", "pwd=xyz", "xyz"),
+    ("password with one character", "password: q", ": q"),
+    ("token with a short word", "token: abc rest", "abc"),
+    ("quoted two character password", 'password: "ab"', "ab"),
+    ("secret then a date under an equals sign", "secret=2026-11-10", "2026-11-10"),
 ]
 
 
@@ -191,12 +197,32 @@ ORDINARY = [
     "10.0.0.1 10.0.0.2 10.0.0.3",
     "the password reset flow is owned by the identity team",
     "We pass the token to the gateway and the secret stays in the vault.",
+    "Rotate the secret 2026-11-10 quarterly",
+    "Rotate the password 10/11/2026 and review it",
+    "Review the token 2026-12-31",
+    "Due 2026-11-10",
 ]
 
 
 @pytest.mark.parametrize("text", ORDINARY, ids=[str(i) for i in range(len(ORDINARY))])
 def test_ordinary_text_comes_through_unchanged(text):
     assert reviewer_path(text) == text
+
+
+def test_a_short_value_after_a_secret_word_is_redacted_and_the_word_stays():
+    assert reviewer_path("pwd: abcd") == "pwd: " + "[CREDENTIAL_REDACTED]"
+    assert reviewer_path("Set password: q now") == "Set password: [CREDENTIAL_REDACTED] now"
+
+
+def test_a_date_is_kept_on_the_chat_path_and_a_phone_number_is_still_masked():
+    chat = lambda text: scrub_for_model(text, mask_pii=True)  # noqa: E731 - the chat path masks personal data
+    assert chat("Due 2026-11-10") == "Due 2026-11-10"
+    assert chat("Due 2026-11-10 and 2026-12-01 for review") == "Due 2026-11-10 and 2026-12-01 for review"
+    assert chat("Review on 10/11/2026") == "Review on 10/11/2026"
+    assert "[PHONE_REDACTED]" in chat("Call +44 20 7946 0958 about it")
+    assert "[PHONE_REDACTED]" in chat("Due 2026-11-10, call 020 7946 0958")
+    assert "2026-11-10" in chat("Due 2026-11-10, call 020 7946 0958")
+    assert "[EMAIL_REDACTED]" in chat("Due 2026-11-10 to jane@example.com")
 
 
 def test_two_iso_dates_and_money_figures_are_never_taken_for_a_card():
