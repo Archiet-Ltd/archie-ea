@@ -25,7 +25,7 @@
     {% macro _ps_actions() %}
     {{ button(text='Show in diagram', variant='outline', icon='workflow', href=url_for('data_architecture.data_entity_diagram', domain_id=entity.domain_id), testid='entity-diagram-link') }}
     {% if entity.archimate_element_id %}
-    {{ button(text='Open in the architecture model', variant='outline', icon='box', href=url_for('archimate_crud.detail_element', layer='application', element_type='DataObject', element_id=entity.archimate_element_id), testid='entity-archimate-link') }}
+    {{ button(text='Open in the architecture model', variant='outline', icon='box', href=url_for('archimate_crud.detail_element', layer='application', element_type='DataObject', element_id=entity.archimate_element_id, ae=1), testid='entity-archimate-link') }}
     {% endif %}
     {{ button(text='Edit', icon='pencil', href=url_for('data_architecture.edit_data_entity', entity_id=entity.id)) }}
     {% endmacro %}

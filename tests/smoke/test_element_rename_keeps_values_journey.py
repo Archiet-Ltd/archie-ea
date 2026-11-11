@@ -3,8 +3,8 @@
 An architect has a Goal, a Driver and a Technology Service with typed values filled in. From each element's
 page they click Edit, change only the name, save, and open Edit again: every typed value is still there. On an
 element brought in from a model file the form offers the same typed values and they are really stored; the
-person's own description that happens to begin "Inferred from" is shown as their description; "Full Edit
-Page" is a link that opens the same element; and the date card says it is the date recorded, not a last edit.
+person's own description that happens to begin "Inferred from" is shown as their description; the Edit page
+offers no "Full Edit Page" link to itself; and the date card says it is the date recorded, not a last edit.
 A match between two elements of one file is reported as matched, with a link to a page that has content.
 """
 import os
@@ -128,9 +128,9 @@ def test_imported_element_keeps_what_the_form_offers(browser, live_server, seede
         card = page.locator("[data-testid='kpi-updated']").inner_text()
         assert "Recorded" in card and "Last updated" not in card, card
         _open_edit_from_page(page)
-        # Full Edit Page is a link that lands on this same element's edit page.
-        full = page.get_by_role("link", name="Full Edit Page")
-        expect(full).to_have_attribute("href", "/architecture/motivation/Goal/%s/edit?ae=1" % row["id"])
+        # The Edit page is the full edit page: it offers no link that leads to the page it is on.
+        expect(page.get_by_role("link", name="Full Edit Page")).to_have_count(0)
+        assert "/edit" in page.url
         # The form offers Goal Type and Category; choose both, give a description that starts "Inferred from".
         selects = page.locator("#archimate-form-modal select[x-model='formData[fld.name]']")
         expect(selects).to_have_count(3, timeout=PAGE_TIMEOUT)
@@ -148,9 +148,7 @@ def test_imported_element_keeps_what_the_form_offers(browser, live_server, seede
         # What the form offered was stored: open it again.
         _open_edit_from_page(page)
         assert _typed_values_in_form(page, 2) == ["strategic", "growth"]
-        full = page.get_by_role("link", name="Full Edit Page")
-        full.click()
-        page.wait_for_load_state("networkidle")
+        expect(page.get_by_role("link", name="Full Edit Page")).to_have_count(0)
         expect(page.locator("input[x-model='formData.name']")).to_have_value(name)
     finally:
         context.close()

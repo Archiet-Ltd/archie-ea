@@ -10,6 +10,10 @@ from dataclasses import dataclass, field
 from app.models.archimate_element_types import StandardTypeTable
 
 
+# The one name for a gap's rating: the Edit form and the record page both show it.
+GAP_RATING_LABEL = 'Rating (sets priority and severity)'
+
+
 @dataclass
 class FieldOption:
     """Represents a select field option."""
@@ -27,6 +31,9 @@ class ElementField:
     placeholder: str = ""
     options: List[FieldOption] = field(default_factory=list)
     grid_column: int = 1  # 1 or 2 for grid layout
+    effect: str = ""  # what choosing a value changes, when it is more than this field
+    allow_empty: bool = True  # False: the select offers no "Not set" and a blank is saved as `default`
+    default: str = ""  # the value a record is created with when none is chosen
 
 
 @dataclass
@@ -48,7 +55,10 @@ class ElementTypeConfig:
                 'required': f.required,
                 'placeholder': f.placeholder,
                 'options': [{'value': opt.value, 'label': opt.label} for opt in f.options],
-                'grid_column': f.grid_column
+                'grid_column': f.grid_column,
+                'effect': f.effect,
+                'allow_empty': f.allow_empty,
+                'default': f.default,
             }
             for f in self.fields
         ]
@@ -63,8 +73,10 @@ class ElementTypeConfig:
             'type': 'select',
             'required': False,
             'placeholder': '',
+            'effect': '',
+            'allow_empty': True,
+            'default': '',
             'options': [
-                {'value': '', 'label': 'Unspecified'},
                 {'value': 'Baseline', 'label': 'As-Is (baseline)'},
                 {'value': 'Target', 'label': 'To-Be (target)'},
                 {'value': 'Transition', 'label': 'Transition'},
@@ -229,7 +241,7 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
             ElementField(name='outcome_type', label='Outcome Type', field_type='select',
                 options=[FieldOption('business','Business'), FieldOption('technical','Technical'),
                          FieldOption('operational','Operational')], grid_column=1),
-            ElementField(name='measurement', label='Measurement / KPI', field_type='text',
+            ElementField(name='kpi_metric', label='Measurement / KPI', field_type='text',
                 placeholder='e.g., NPS > 50, Uptime 99.9%', grid_column=2),
         ]
     ),
@@ -239,6 +251,8 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Architecture Principle',
         description='A qualitative statement of intent that should be met by the architecture',
         fields=[
+            ElementField(name='statement', label='Statement', field_type='textarea', required=True,
+                placeholder='What the architecture must do', grid_column=1),
             ElementField(name='category', label='Category', field_type='select',
                 options=[FieldOption('business','Business'), FieldOption('data','Data'),
                          FieldOption('application','Application'), FieldOption('technology','Technology'),
@@ -290,8 +304,10 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Business Function',
         description='A collection of business behavior based on a chosen set of criteria',
         fields=[
+            ElementField(name='capability_id', label='Capability', field_type='capability', required=True,
+                placeholder='Search capabilities', grid_column=1),
             ElementField(name='domain', label='Domain', field_type='text',
-                placeholder='e.g., Finance, HR, Operations', grid_column=1),
+                placeholder='e.g., Finance, HR, Operations', grid_column=2),
         ]
     ),
     'BusinessService': ElementTypeConfig(
@@ -300,7 +316,7 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Business Service',
         description='An explicitly defined exposed business behavior',
         fields=[
-            ElementField(name='service_level', label='Service Level', field_type='select',
+            ElementField(name='sla_support_level', label='Service Level', field_type='select',
                 options=[FieldOption('standard','Standard'), FieldOption('premium','Premium'),
                          FieldOption('basic','Basic')], grid_column=1),
         ]
@@ -318,11 +334,11 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
     ),
     'ValueStream': ElementTypeConfig(
         element_type='ValueStream',
-        layer='business',
+        layer='strategy',
         display_name='Value Stream',
         description='A sequence of activities that creates an overall result for a customer',
         fields=[
-            ElementField(name='domain', label='Domain', field_type='text',
+            ElementField(name='industry_domain', label='Domain', field_type='text',
                 placeholder='e.g., Order-to-Cash, Hire-to-Retire', grid_column=1),
         ]
     ),
@@ -399,7 +415,7 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
                 options=[FieldOption('server','Server'), FieldOption('vm','Virtual Machine'),
                          FieldOption('container','Container'), FieldOption('cloud','Cloud Instance'),
                          FieldOption('mainframe','Mainframe')], grid_column=1),
-            ElementField(name='location', label='Location / Data Centre', field_type='text',
+            ElementField(name='datacenter', label='Location / Data Centre', field_type='text',
                 placeholder='e.g., AWS us-east-1, On-Prem DC1', grid_column=2),
         ]
     ),
@@ -452,8 +468,8 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
                 options=[FieldOption('lan','LAN'), FieldOption('wan','WAN'),
                          FieldOption('vpn','VPN'), FieldOption('internet','Internet'),
                          FieldOption('mpls','MPLS')], grid_column=1),
-            ElementField(name='bandwidth', label='Bandwidth', field_type='text',
-                placeholder='e.g., 1Gbps, 100Mbps', grid_column=2),
+            ElementField(name='bandwidth_gbps', label='Bandwidth (Gbps)', field_type='text',
+                placeholder='e.g., 1, 10, 100', grid_column=2),
         ]
     ),
 
@@ -468,7 +484,7 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
                 options=[FieldOption('planned','Planned'), FieldOption('in_progress','In Progress'),
                          FieldOption('complete','Complete'), FieldOption('cancelled','Cancelled')],
                 grid_column=1),
-            ElementField(name='target_date', label='Target Date', field_type='text',
+            ElementField(name='target_date', label='Target date', field_type='date',
                 placeholder='YYYY-MM-DD', grid_column=2),
         ]
     ),
@@ -482,10 +498,27 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
                 options=[FieldOption('document','Document'), FieldOption('system','System'),
                          FieldOption('service','Service'), FieldOption('capability','Capability')],
                 grid_column=1),
-            ElementField(name='status', label='Status', field_type='select',
-                options=[FieldOption('draft','Draft'), FieldOption('review','In Review'),
-                         FieldOption('approved','Approved'), FieldOption('delivered','Delivered')],
+            ElementField(name='delivery_status', label='Delivery status', field_type='select',
+                options=[FieldOption('planned','Planned'), FieldOption('in_progress','In progress'),
+                         FieldOption('completed','Completed')],
                 grid_column=2),
+        ]
+    ),
+    'Gap': ElementTypeConfig(
+        element_type='Gap',
+        layer='implementation',
+        display_name='Gap',
+        description='A statement of difference between two plateaus',
+        fields=[
+            ElementField(name='priority', label=GAP_RATING_LABEL, field_type='select', effect='priority and severity',
+                options=[FieldOption('critical','Critical'), FieldOption('high','High'),
+                         FieldOption('medium','Medium'), FieldOption('low','Low')],
+                grid_column=1, allow_empty=False, default='medium'),
+            ElementField(name='resolution_status', label='Resolution status', field_type='select',
+                options=[FieldOption('identified','Identified'), FieldOption('analysis','In analysis'),
+                         FieldOption('approved','Approved'), FieldOption('in_progress','In progress'),
+                         FieldOption('resolved','Resolved')],
+                grid_column=2, allow_empty=False, default='identified'),
         ]
     ),
     'Plateau': ElementTypeConfig(
@@ -497,7 +530,7 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
             ElementField(name='plateau_type', label='Plateau Type', field_type='select',
                 options=[FieldOption('baseline','Baseline'), FieldOption('target','Target'),
                          FieldOption('transition','Transition')], grid_column=1),
-            ElementField(name='target_date', label='Target Date', field_type='text',
+            ElementField(name='target_date', label='Target date', field_type='date',
                 placeholder='YYYY-MM-DD', grid_column=2),
         ]
     ),
@@ -509,7 +542,7 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Capability',
         description='An ability that an active structure element possesses',
         fields=[
-            ElementField(name='maturity_level', label='Maturity Level', field_type='select',
+            ElementField(name='current_maturity_level', label='Maturity Level', field_type='select',
                 options=[FieldOption('1','1 – Initial'), FieldOption('2','2 – Developing'),
                          FieldOption('3','3 – Defined'), FieldOption('4','4 – Managed'),
                          FieldOption('5','5 – Optimizing')], grid_column=1),

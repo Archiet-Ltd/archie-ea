@@ -76,9 +76,10 @@
                 {% elif status.state == 'failed' %}{{ status.job.error if status.job and status.job.error else 'The read did not finish.' }}
                 {% else %}Connected to {{ status.organization }}.{% endif %}
             </p>
-            <dl class="mt-3 grid grid-cols-3 gap-4 text-xs text-muted-foreground">
+            <dl class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs text-muted-foreground">
                 <div><dt>Applications in your model</dt><dd class="text-base text-foreground tabular-nums" id="github-count-applications">{{ status.counts.applications }}</dd></div>
                 <div><dt>Parts</dt><dd class="text-base text-foreground tabular-nums" id="github-count-components">{{ status.counts.components }}</dd></div>
+                <div><dt>Technology</dt><dd class="text-base text-foreground tabular-nums" id="github-count-technologies">{{ status.counts.technologies }}</dd></div>
                 <div><dt>Links</dt><dd class="text-base text-foreground tabular-nums" id="github-count-relationships">{{ status.counts.relationships }}</dd></div>
             </dl>
             <div class="mt-4 flex items-center justify-end gap-3">
@@ -100,7 +101,7 @@
     var tries = 0;
     function show(s) {
         var c = s.counts || {};
-        ['applications', 'components', 'relationships'].forEach(function (k) {
+        ['applications', 'components', 'technologies', 'relationships'].forEach(function (k) {
             var el = document.getElementById('github-count-' + k);
             if (el) { el.textContent = c[k] || 0; }
         });

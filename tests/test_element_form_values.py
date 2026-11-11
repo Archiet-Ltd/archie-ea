@@ -1,8 +1,8 @@
 """The element form keeps every value it offers: on create, on rename and when it is reopened.
 
-Fifteen fields the form offers have no column on their element's record (an actor type on a role, a protocol
-on an application service, a location on a node). Their values are kept in the element's custom_properties
-under the field's own key, read back into the form, and shown on the element's page with the field's label.
+Eight fields the form offers have no column on their element's record (an actor type on a role, a protocol
+on an application service, a domain on a business function). Their values are kept in the element's
+custom_properties under the field's own key, read back into the form, and shown on the element's page with the field's label.
 An empty date, number or choice is stored as NULL, so any element can be renamed with its optional fields
 empty, and a stored date reaches its box as 2027-03-15.
 """
@@ -21,13 +21,12 @@ from app.modules.architecture.routes.archimate_crud.services.field_configs impor
 
 CONFIGS = ELEMENT_TYPE_CONFIGS
 
-# The fields the form offers on a record that has no column for them.
+# The fields the form offers on a record that has no column for them. Seven fields that once lived here now
+# have a column of their own (a node's data centre, a deliverable's delivery status, ...), so they are saved there.
 KEPT_IN_PROPERTIES = {
-    ("Outcome", "outcome_type"), ("Outcome", "measurement"), ("BusinessRole", "actor_type"),
-    ("BusinessProcess", "apqc_code"), ("BusinessFunction", "domain"), ("BusinessService", "service_level"),
-    ("BusinessObject", "lifecycle_state"), ("ValueStream", "domain"), ("ApplicationService", "protocol"),
-    ("ApplicationService", "sla_tier"), ("Node", "location"), ("CommunicationNetwork", "bandwidth"),
-    ("Deliverable", "status"), ("Plateau", "plateau_type"), ("Capability", "maturity_level"),
+    ("Outcome", "outcome_type"), ("BusinessRole", "actor_type"), ("BusinessProcess", "apqc_code"),
+    ("BusinessFunction", "domain"), ("BusinessObject", "lifecycle_state"), ("ApplicationService", "protocol"),
+    ("ApplicationService", "sla_tier"), ("Plateau", "plateau_type"),
 }
 
 
@@ -44,7 +43,29 @@ def _offered(element_type):
     return [f for f in CONFIGS[element_type].fields if f.name != "architecture_state"]
 
 
-def _value_for(field):
+def _optional(element_type):
+    """The offered fields a person may leave empty: not required, and not a choice that always has a value."""
+    return [f for f in _offered(element_type) if not f.required and f.allow_empty and f.field_type != "capability"]
+
+
+def _text(value):
+    """A value as its box holds it; a number reads the same however many decimals the column keeps."""
+    try:
+        return str(float(value))
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _shown(target, element_type):
+    """The form's values as text, the way a box holds them."""
+    return {f.name: _text(target[f.name]) for f in _offered(element_type)}
+
+
+def _value_for(field, capability_id=None):
+    if field.field_type == "capability":
+        return str(capability_id)
+    if field.name == "bandwidth_gbps":
+        return "10"
     if field.name.endswith("date"):
         return "2027-03-15"
     if field.field_type == "select":
@@ -65,7 +86,7 @@ def _create(client, element_type, name, values, capability_id=None):
 def _edit_target(client, element_type, element_id):
     resp = client.get("/architecture/%s/%s/%s/edit" % (_layer(element_type), element_type, element_id))
     assert resp.status_code == 200, (element_type, resp.status_code)
-    found = re.search(r"editTarget = (\{.*?\});\n", resp.get_data(as_text=True), re.S)
+    found = re.search(r"editingElement = (\{.*?\});\n", resp.get_data(as_text=True), re.S)
     assert found, element_type
     return json.loads(found.group(1))
 
@@ -99,14 +120,9 @@ def _capability(db_session, org):
 
 
 def _make(db_session, client, org, element_type, name, values):
-    """A stored element. The form cannot create a Principle (its statement is required and not offered)."""
+    """A stored element, created from the form the way a person does."""
     if element_type == "Principle":
-        from app.models.models import Principle
-
-        record = Principle(name=name, statement="Statement", organization_id=org.id)
-        db_session.add(record)
-        db_session.flush()
-        return record.id
+        values = dict(values, statement="Statement")
     capability = _capability(db_session, org) if element_type == "BusinessFunction" else None
     return _create(client, element_type, name, values, capability_id=capability)
 
@@ -118,25 +134,30 @@ def test_every_type_renames_with_all_optional_fields_empty_and_with_each_set(
     org = _signed_in(client, db_session, make_org, "form-values")
     element_id = _make(db_session, client, org, element_type, "Before %s" % uuid.uuid4().hex[:6], {})
 
-    # Rename with every optional field empty, as the form sends them.
-    empty = {f.name: "" for f in _offered(element_type)}
+    capability = _capability(db_session, org) if element_type == "BusinessFunction" else None
+    values = {f.name: _value_for(f, capability) for f in _offered(element_type)}
+    optional = {f.name for f in _optional(element_type)}
+
+    # Rename with every optional field empty, as the form sends them. A field the record must have is sent as it is.
+    empty = {name: ("" if name in optional else value) for name, value in values.items()}
     resp = _rename(client, element_type, element_id, "After empty", empty)
     assert resp.status_code == 200, (element_type, resp.get_data(as_text=True))
     target = _edit_target(client, element_type, element_id)
     assert target["name"] == "After empty"
-    assert all(target[f.name] == "" for f in _offered(element_type)), (element_type, target)
+    assert all(target[name] == "" for name in optional), (element_type, target)
 
     # Rename with each field set: every value is stored and comes back to the form.
-    values = {f.name: _value_for(f) for f in _offered(element_type)}
     resp = _rename(client, element_type, element_id, "After set", values)
     assert resp.status_code == 200, (element_type, resp.get_data(as_text=True))
     target = _edit_target(client, element_type, element_id)
-    assert {f.name: target[f.name] for f in _offered(element_type)} == values, element_type
+    assert _shown(target, element_type) == {name: _text(value) for name, value in values.items()}, element_type
 
     # A rename that changes only the name sends the stored values back and keeps them.
-    resp = _rename(client, element_type, element_id, "After third", values)
+    resp = _rename(client, element_type, element_id, "After third",
+                    {f.name: target[f.name] for f in _offered(element_type)})
     assert resp.status_code == 200
-    assert {f.name: _edit_target(client, element_type, element_id)[f.name] for f in _offered(element_type)} == values
+    assert _shown(_edit_target(client, element_type, element_id), element_type) == {
+        name: _text(value) for name, value in values.items()}
 
 
 def test_fifteen_fields_without_a_column_are_kept_and_shown_on_the_page(app, db_session, client, make_org):
@@ -159,6 +180,9 @@ def test_fifteen_fields_without_a_column_are_kept_and_shown_on_the_page(app, db_
         fields = {f.name: f for f in _offered(element_type)}
         values = {n: _value_for(fields[n]) for n in names}
         element_id = _make(db_session, client, org, element_type, "Kept %s" % element_type, values)
+        # A field the record must have is sent with its value on every save below.
+        capability = _capability(db_session, org) if element_type == "BusinessFunction" else None
+        must = {f.name: _value_for(f, capability) for f in _offered(element_type) if f not in _optional(element_type)}
 
         # Created with the value: it is stored on the model-graph row under the field's key.
         record = crud.MODEL_REGISTRY[element_type].query.filter_by(id=element_id).first()
@@ -168,10 +192,10 @@ def test_fifteen_fields_without_a_column_are_kept_and_shown_on_the_page(app, db_
 
         # Renamed, then reopened: the form shows it.
         resp = _rename(client, element_type, element_id, "Renamed %s" % element_type,
-                       {f.name: values.get(f.name, "") for f in _offered(element_type)})
+                       {**{f.name: values.get(f.name, "") for f in _offered(element_type)}, **must})
         assert resp.status_code == 200, (element_type, resp.get_data(as_text=True))
         target = _edit_target(client, element_type, element_id)
-        assert {n: target[n] for n in names} == values, element_type
+        assert {n: str(target[n]) for n in names} == values, element_type
 
         # The page says each value under the field's label.
         page = client.get("/architecture/%s/%s/%s" % (_layer(element_type), element_type, element_id))
@@ -185,7 +209,7 @@ def test_fifteen_fields_without_a_column_are_kept_and_shown_on_the_page(app, db_
 
         # Emptying a field removes the stored value.
         _rename(client, element_type, element_id, "Cleared %s" % element_type,
-                {f.name: "" for f in _offered(element_type)})
+                {**{f.name: "" for f in _offered(element_type)}, **must})
         db_session.expire_all()
         row = ArchiMateElement.query.filter_by(id=record.archimate_element_id).first()
         assert not any(k in (row.custom_properties or {}) for k in names), element_type
@@ -193,7 +217,7 @@ def test_fifteen_fields_without_a_column_are_kept_and_shown_on_the_page(app, db_
 
 def test_stored_value_on_the_page_is_not_visible_to_another_organisation(app, db_session, client, make_org):
     _signed_in(client, db_session, make_org, "form-owner")
-    element_id = _create(client, "Node", "Private node", {"location": "Dublin data centre"})
+    element_id = _create(client, "Node", "Private node", {"datacenter": "Dublin data centre"})
     page = client.get("/architecture/technology/Node/%s" % element_id)
     assert "Dublin data centre" in page.get_data(as_text=True)
 

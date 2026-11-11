@@ -56,6 +56,20 @@ def _create(page, base, kind, layer, name, values=None):
     return "%s/architecture/%s/%s/%s" % (base, layer, kind, body["id"])
 
 
+def _store_outside_the_options(record_url, value):
+    """Give a Goal a category its form does not offer, as an older import left it: the form refuses to create one."""
+    from app import create_app, db
+    from app.modules.architecture.routes.archimate_crud.routes import MODEL_REGISTRY
+
+    goal_class = MODEL_REGISTRY["Goal"]
+    with create_app("testing").app_context():
+        db.session.execute(
+            db.update(goal_class).where(goal_class.id == int(record_url.rsplit("/", 1)[1])).values(category=value)
+        )
+        db.session.commit()
+        db.session.remove()
+
+
 def _open_edit(page, detail):
     page.goto(detail, wait_until="networkidle", timeout=PAGE_TIMEOUT)
     page.get_by_role("link", name="Edit", exact=True).first.click()
@@ -166,7 +180,8 @@ def test_stored_value_outside_the_options_is_shown_and_the_form_has_one_close_bu
     try:
         _login(page, live_server, seeded["emails"]["solution_architect"])
         page.goto(live_server + "/architecture/dashboard", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        goal = _create(page, live_server, "Goal", "motivation", "Regulated goal %s" % tag, {"category": "regulator"})
+        goal = _create(page, live_server, "Goal", "motivation", "Regulated goal %s" % tag, {"category": "growth"})
+        _store_outside_the_options(goal, "regulator")
         _open_edit(page, goal)
         category = _select_for(page, "Category")
         expect(category).to_have_value("regulator")
@@ -193,8 +208,9 @@ def test_the_form_is_usable_at_phone_width_in_dark_mode(browser, live_server, se
         undated = _create(page, live_server, "WorkPackage", "implementation", "Phone package %s" % tag)
         dated = _create(page, live_server, "Plateau", "implementation", "Phone plateau %s" % tag,
                         {"target_date": "2027-03-15"})
-        node = _create(page, live_server, "Node", "technology", "Phone node %s" % tag, {"location": "Cork"})
-        goal = _create(page, live_server, "Goal", "motivation", "Phone goal %s" % tag, {"category": "regulator"})
+        node = _create(page, live_server, "Node", "technology", "Phone node %s" % tag, {"datacenter": "Cork"})
+        goal = _create(page, live_server, "Goal", "motivation", "Phone goal %s" % tag, {"category": "growth"})
+        _store_outside_the_options(goal, "regulator")
 
         _open_edit(page, undated)
         _dark(page)

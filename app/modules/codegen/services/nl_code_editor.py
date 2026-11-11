@@ -178,7 +178,7 @@ def stream_chat_edit(
         return
 
     if not llm_response:
-        yield f"event: error\ndata: {json.dumps({'message': 'LLM returned an empty response. Check that an API key with available credits is configured in Admin → API Settings.'})}\n\n"
+        yield f"event: error\ndata: {json.dumps({'message': 'LLM returned an empty response. Check that an API key with available credits is configured in Admin → AI settings.'})}\n\n"
         return
 
     if llm_response.strip() == "NO_CHANGE":

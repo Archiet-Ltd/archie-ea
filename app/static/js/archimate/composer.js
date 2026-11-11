@@ -2172,6 +2172,15 @@ function composerApp() {
 
             /* ── Port affordance discovery hint (ENT-120) ── */
             this.paper.on('element:mouseenter', function(cellView) {
+                /* A long name is cut to one line inside its box so the type label stays readable: the full name is the hover text. */
+                if (cellView && cellView.el && cellView.model && !cellView.el.querySelector(':scope > title')) {
+                    let full = cellView.model.attr('nameLabel/text');
+                    if (full) {
+                        let tip = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                        tip.textContent = full;
+                        cellView.el.insertBefore(tip, cellView.el.firstChild);
+                    }
+                }
                 if (self.mode === 'view') return;
                 /* CMP-14 (revised): only raise the hovered element when it
                    ACTUALLY overlaps a neighbour — the case where its ports would

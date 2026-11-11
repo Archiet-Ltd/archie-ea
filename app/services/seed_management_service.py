@@ -257,11 +257,11 @@ class SeedManagementService:
              "state": FeatureState.STABLE.value, "enabled": True,
              "sidebar_label": "Users", "sidebar_icon": "users",
              "routes": ["/admin/users*"], "sort_order": 101},
-            {"key": "admin_api_settings", "name": "Admin API Settings",
+            {"key": "admin_api_settings", "name": "Admin AI settings",
              "description": "API key management in admin panel",
              "feature_type": FeatureType.SIDEBAR_SECTION.value,
              "state": FeatureState.STABLE.value, "enabled": True,
-             "sidebar_label": "API Settings", "sidebar_icon": "key",
+             "sidebar_label": "AI settings", "sidebar_icon": "key",
              "routes": ["/admin/api-settings*"], "sort_order": 102},
         ]
 

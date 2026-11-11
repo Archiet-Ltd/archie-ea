@@ -27,7 +27,7 @@ stale again, list current free models with `GET
 https://openrouter.ai/api/v1/models` and filter for ids ending `:free` rather
 than guessing.
 
-Operators still choose their own model per provider in Admin -> API Settings
+Operators still choose their own model per provider in Admin -> AI settings
 (APISettings.default_model); this is only the fallback used when nothing is
 configured, and the guidance shown alongside that field.
 

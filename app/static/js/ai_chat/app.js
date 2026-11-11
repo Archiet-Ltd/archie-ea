@@ -616,7 +616,7 @@
                        that field surfaced, so this reads as a failure the
                        same way the streamed path does rather than as an
                        ordinary answer that happens to mention Admin
-                       -> API Settings. */
+                       -> AI settings. */
                     answeredBy: data.answered_by || null,
                     paused: !!data.paused,
                     genomeHtml: (data.genome_answer && data.genome_answer.html) || null,
