@@ -798,8 +798,11 @@ class AIChatApprovalService:
         if state == "applied":
             return {**base, "success": True, "message": verdict.get("message"), "result": {"message": verdict.get("summary")}}
         if state == "declined":
-            return {**base, "success": False, "code": "DECLINED", "message": verdict.get("message"),
-                    "error": verdict.get("message") or "The change was declined."}
+            declined = {**base, "success": False, "code": "DECLINED", "message": verdict.get("message"),
+                        "error": verdict.get("message") or "The change was declined."}
+            if verdict.get("charter_refused"):
+                declined["charter_refused"] = True
+            return declined
         if state is None:
             # settle_after_review answered with an error (not found, not allowed): pass it on unchanged.
             return {**verdict, "approval_id": approval_id}

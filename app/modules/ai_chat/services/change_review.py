@@ -68,6 +68,7 @@ SWEEP_INTERVAL_MINUTES = 5  # how often the sweep runs (the scheduler reads this
 SWEEP_QUIET_MINUTES = SWEEP_INTERVAL_MINUTES - 1
 RECENT_MINUTES = 10  # an identical change applied this recently makes a new one a duplicate
 NO_REVIEWER_REASON = "No independent reviewer was available."
+CHARTER_CHECK_NAME = "The assistant's charter allows it"
 CHARTER_REFUSED_REASON = (
     "Your assistant is not set up to make this kind of change, so nothing was changed. "
     "You can make it yourself on its own page."
@@ -629,7 +630,7 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
             except Exception:  # noqa: BLE001 - a charter that cannot be read refuses, as the executor does
                 db.session.rollback()
                 permitted = False
-            if not add("The assistant's charter allows it", permitted,
+            if not add(CHARTER_CHECK_NAME, permitted,
                        "Your assistant is set up to make this kind of change." if permitted
                        else CHARTER_REFUSED_REASON):
                 return checks, Target(False)
@@ -968,8 +969,12 @@ def verdict(approval: AIChatCRUDApproval, state: str, summary: str, reasons: Lis
     }
 
 
-def _decline(service, approval: AIChatCRUDApproval, state: Dict[str, Any], reasons: List[str]) -> Dict[str, Any]:
-    """Decline the change with its reasons: the data is left as it was."""
+def _decline(
+    service, approval: AIChatCRUDApproval, state: Dict[str, Any], reasons: List[str], charter_refused: bool = False
+) -> Dict[str, Any]:
+    """Decline the change with its reasons: the data is left as it was.
+
+    ``charter_refused`` is carried in the answer when the assistant's charter is what refused it."""
     reason_text = _short(" ".join(reasons), 900)
     claimed = service._reject_pending_approval(approval.id, approval.organization_id, reason=reason_text)
     db.session.commit()
@@ -985,7 +990,10 @@ def _decline(service, approval: AIChatCRUDApproval, state: Dict[str, Any], reaso
     if approval.entity_type == "connectors":
         service._discard_staged_connector_credential(approval)
     db.session.commit()
-    return verdict(approval, "declined", approval.summary, reasons)
+    answer = verdict(approval, "declined", approval.summary, reasons)
+    if charter_refused:
+        answer["charter_refused"] = True
+    return answer
 
 
 def decline(service, approval: AIChatCRUDApproval, reason: str) -> Dict[str, Any]:
@@ -1048,7 +1056,8 @@ def settle(
             for c in checks))
     failed = next((c for c in checks if not c.passed), None)
     if failed is not None:
-        return _decline(service, approval, state, [failed.reason])
+        return _decline(service, approval, state, [failed.reason],
+                        charter_refused=failed.name == CHARTER_CHECK_NAME)
 
     # 3. The reviewer: never the model that drafted. It stays the same across the rounds of one change.
     drafter_provider, drafter_model = split_ref(approval.drafter_model)
