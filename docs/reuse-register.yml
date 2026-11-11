@@ -1069,3 +1069,22 @@ entries:
         reason: the programme view's own inline force graph, to be moved onto impact_graph.js in a later brief
       - path: app/templates/stakeholders/map.html
         reason: the stakeholder map's own inline force graph, to be moved onto impact_graph.js in a later brief
+
+  - id: diagram
+    concept: Drawing a notation of the model (ArchiMate, BPMN 2.0, UML sequence, use case and class, ERD) on a screen
+    status: undetermined
+    candidates:
+      - app/static/js/archimate/composer_renderer.js (ComposerRenderer, JointJS; proposed canonical engine)
+      - app/static/js/bpmn/bpmn_editor.js (BPMN sibling on JointJS; flow stored on BusinessProcess.bpmn_flow)
+      - app/static/js/data/erd.js (ERD sibling on JointJS; DataEntity records)
+      - app/static/js/codegen/uml_shapes.js (class diagram on JointJS)
+      - app/static/js/codegen/workflow_designer.js (code workflow designer, frozen)
+      - app/static/js/codegen/workflow_builder.js (not loaded by any template)
+      - app/static/js/archimate_diagram_renderer.js (not loaded by any template)
+      - app/static/js/solution_composer_cytoscape.js (not loaded by any template)
+      - app/services/mermaid_diagram_generator.py (called only from a test)
+      - app/static/vendor/mermaid.min.js (loaded by applications/dashboard.html only)
+    note: >
+      Searched before writing: joint, d3, mermaid, plantuml, cytoscape, dagre, bpmn, UMLModel, SavedDiagram across
+      app/. docs/adr/0016-one-drawing-engine.md names JointJS with ComposerRenderer as the engine and the model as
+      the store; promote this entry to active when that record lands.
