@@ -21,6 +21,7 @@ from tests.chat_opening_fixture import (
 )
 from app.modules.ai_chat.services.failure_messages import FEATURE_INTROS
 from tests.render_context import app_template_context
+from app.basecoat_kit import register_basecoat_helpers
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -43,6 +44,7 @@ def html():
     env = Environment(loader=ChoiceLoader([
         DictLoader({'layouts/admin_base.html': base}),
         FileSystemLoader(ROOT / 'app/templates')]), autoescape=True)
+    register_basecoat_helpers(env)
     return env.get_template('ai_chat/index.html').render(
         **app_template_context(),
         llm_configured=True, domain_config={},
@@ -261,7 +263,10 @@ def test_ordinary_send_click_uses_same_stream_without_navigation(launch):
     page.locator('#user-input').fill('Send click fixture.')
     page.locator('#send-btn').click()
     expect(page.locator('#messages-container .message-content').last).to_contain_text('Fixture response.')
+    # The time already waited is measured in the browser, so it is checked as a short wait, not one number.
+    waited = payloads[0].pop('waited_seconds') if payloads else None
+    assert isinstance(waited, (int, float)) and 0 <= waited < 60, waited
     assert payloads == [{'message': 'Send click fixture.', 'domain': 'general',
                          'element_id': None, 'context_type': None, 'persona': None,
-                         'model': None, 'thread_id': None}]
+                         'model': None, 'thread_id': None, 'retry': False, 'failed_turn_id': None}]
     assert page.url == initial_url

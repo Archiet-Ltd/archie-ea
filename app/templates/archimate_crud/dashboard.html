@@ -228,11 +228,10 @@
 
     <!-- Create/Edit Modal -->
     {% call modal(id='archimate-form-modal', title='', labelledby='archimate-form-modal-title', size='lg') %}
-        <div class="flex items-center justify-between mb-4" data-modal-header>
+        <div class="mb-4 pr-8" data-modal-header>
             <h2 id="archimate-form-modal-title" class="text-xl font-bold" x-text="editingElement ? 'Edit Element' : 'Create Element'"></h2>
-            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': "Platform.modal.close('archimate-form-modal')"}) }}
         </div>
-        <div x-cloak x-show="formError" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="formError"></div>
+        <div id="archimate-form-error" role="alert" x-cloak x-show="formError" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="formError"></div>
         <form @submit.prevent="submitForm()" class="space-y-4">
             <div x-cloak x-show="!editingElement">
                 {% call native_select(aria_label='Element Type', attrs_dict={'x-model': 'formData.element_type', '@change': 'resetTypedFields()'}) %}
@@ -251,25 +250,41 @@
                 <div>
                     <label class="block text-sm font-medium text-muted-foreground mb-1" x-text="fld.label + (fld.required ? ' *' : '')"></label>
                     <template x-if="fld.type === 'select'">
-                        {% call native_select(attrs_dict={'x-model': 'formData[fld.name]'}) %}
-                            <option value="">Select...</option>
+                        {% call native_select(attrs_dict={'x-model': 'formData[fld.name]', ':aria-label': 'fld.label'}) %}
+                            <template x-if="fld.allow_empty !== false"><option value="">Not set</option></template>
                             <template x-for="opt in fld.options" :key="opt.value">
-                                <option :value="opt.value" x-text="opt.label"></option>
+                                <option :value="opt.value" :selected="String(formData[fld.name]) === String(opt.value)" x-text="opt.label"></option>
                             </template>
                         {% endcall %}
                     </template>
                     <template x-if="fld.type === 'textarea'">
                         {{ textarea(attrs_dict={'x-model': 'formData[fld.name]', ':placeholder': 'fld.placeholder', ':aria-label': 'fld.label'}) }}
                     </template>
-                    <template x-if="fld.type !== 'select' && fld.type !== 'textarea'">
+                    <template x-if="fld.type === 'date'">
+                        {{ input(type='date', attrs_dict={'x-model': 'formData[fld.name]', ':aria-label': 'fld.label'}) }}
+                    </template>
+                    <template x-if="fld.type === 'capability'">
+                        <div class="space-y-2" x-init="loadCapabilityChoices()">
+                            {{ input(attrs_dict={'x-model': 'capabilityQuery', '@input.debounce.300ms': 'loadCapabilityChoices()', ':placeholder': 'fld.placeholder', 'aria-label': 'Search capabilities'}) }}
+                            {% call native_select(attrs_dict={'x-model': 'formData[fld.name]', '@change': 'clearCapabilityError()', ':aria-label': 'fld.label'}) %}
+                                <option value="">Not set</option>
+                                <template x-for="opt in capabilityChoices" :key="opt.value">
+                                    <option :value="opt.value" :selected="String(formData[fld.name]) === String(opt.value)" x-text="opt.label"></option>
+                                </template>
+                            {% endcall %}
+                        </div>
+                    </template>
+                    <template x-if="fld.type !== 'select' && fld.type !== 'textarea' && fld.type !== 'date' && fld.type !== 'capability'">
                         {{ input(attrs_dict={'x-model': 'formData[fld.name]', ':placeholder': 'fld.placeholder', ':aria-label': 'fld.label'}) }}
                     </template>
+                    <p x-cloak x-show="fld.effect && formData[fld.name]" class="mt-1 text-xs text-muted-foreground"
+                       x-text="'Saving sets the ' + fld.effect + ' to ' + String(formData[fld.name]).charAt(0).toUpperCase() + String(formData[fld.name]).slice(1) + '.'"></p>
                 </div>
             </template>
             <div class="flex gap-2 pt-4 border-t">
                 {% call button(variant='default', type='submit', attrs_dict={':disabled': 'saving'}) %}<span x-text="saving ? 'Saving...' : (editingElement ? 'Update' : 'Create')">Create</span>{% endcall %}
-                {{ button(text='Cancel', variant='ghost', attrs_dict={'@click': "Platform.modal.close('archimate-form-modal')"}) }}
-                <template x-if="editingElement">
+                {{ button(text='Cancel', variant='ghost', attrs_dict={'@click': "cancelForm()"}) }}
+                <template x-if="editingElement && !editPageDeepLink">
                     {{ button(text='Full Edit Page →', variant='link', attrs_dict={':href': 'editPageUrl(editingElement)'}) }}
                 </template>
             </div>
@@ -442,6 +457,8 @@ document.addEventListener('DOMContentLoaded', function() {
   window.__APP_CONFIG__.layerConfig = {{ layer_config | tojson | safe }};
   window.__APP_CONFIG__.initialLayer = {{ (initial_layer if initial_layer is defined else None) | tojson | safe }};
   window.__APP_CONFIG__.initialElementType = {{ (initial_element_type if initial_element_type is defined else None) | tojson | safe }};
+  window.__APP_CONFIG__.createElementType = {{ (create_element_type if create_element_type is defined else None) | tojson | safe }};
+  window.__APP_CONFIG__.editingElement = {{ (editing_element if editing_element is defined else None) | tojson | safe }};
   window.__APP_CONFIG__.fieldConfigsUrl = {{ url_for('archimate_crud.api_field_configs') | tojson | safe }};
 </script>
 <script src="{{ url_for('static', filename='js/archimate_crud/dashboard.js') }}"></script>

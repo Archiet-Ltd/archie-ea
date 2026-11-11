@@ -312,7 +312,7 @@ Enterprise sign-in, access control, proven tenant isolation, audit and billing, 
 passes the checks your security team runs first.
 
 **Today:** single sign-on through SAML or OpenID Connect, every record scoped to your organisation, a
-verifiable audit log, and plans you can buy, change and cancel yourself.
+verifiable audit log, and [[if payment-open]]plans you can buy, change and cancel yourself[[else]]a free plan to start on, with paid plans set up in a conversation with us[[/if]].
 
 For certifications and what we do and do not claim today, see [Security](/security).
 

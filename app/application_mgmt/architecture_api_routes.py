@@ -15,7 +15,7 @@ import json
 import logging
 from datetime import datetime
 
-from flask import current_app, jsonify, request, send_file
+from flask import abort, current_app, jsonify, request, send_file
 from flask_login import current_user, login_required
 
 logger = logging.getLogger(__name__)
@@ -696,20 +696,37 @@ def api_upload_architecture_document(id):
 
 
 @application_mgmt.route(
-    "/api/applications/<string:id>/architecture/documents/<string:doc_id>",
+    "/api/applications/<int:id>/architecture/documents/<int:doc_id>",
     methods=["GET"],
 )
 @login_required
 def api_download_architecture_document(id, doc_id):
-    """Download architecture document file."""
+    """Download an architecture document of the signed-in organisation; any other answers 404."""
+    import os
+
+    from app.middleware.tenant_context import current_org_id
     from ..models.miscellaneous import ArchitectureDocument
 
-    doc = ArchitectureDocument.query.filter_by(
-        id=doc_id, application_id=id
-    ).first_or_404()
+    org_id = current_org_id()
+    # The document has no organisation column of its own: it belongs to the organisation its application does.
+    doc = (
+        ArchitectureDocument.query.join(
+            ApplicationComponent, ApplicationComponent.id == ArchitectureDocument.application_id
+        )
+        .filter(
+            ArchitectureDocument.id == doc_id,
+            ArchitectureDocument.application_id == id,
+            ApplicationComponent.organization_id == org_id,
+        )
+        .first()
+        if org_id is not None
+        else None
+    )
+    if doc is None:
+        abort(404)
 
     return send_file(
-        doc.file_path,
+        os.path.abspath(doc.file_path),
         mimetype=doc.mime_type,
         as_attachment=True,
         download_name=doc.filename,

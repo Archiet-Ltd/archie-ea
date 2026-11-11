@@ -36,6 +36,8 @@ in it.
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -135,7 +137,25 @@ def _resolve_org_id(obj: Any) -> Optional[int]:
         return None
 
 
-def create_backbone_element(*, element_type, layer, name, description=None, organization_id, session=None, provenance=None, flush=True, keep_whole=False):
+_new_element_origin = ContextVar("new_element_origin", default=None)
+
+
+@contextmanager
+def new_elements_originate_from(origin):
+    """Give every element the backbone creates inside the block this origin from its first write.
+
+    ``origin`` maps the origin columns (``source_kind``, ``source_ref``, ``source_label``,
+    ``source_recorded_at``) to their values. An origin set after the insert is a second change in
+    the history and the insert, the one a count of records added reads, would name none.
+    """
+    token = _new_element_origin.set(origin)
+    try:
+        yield
+    finally:
+        _new_element_origin.reset(token)
+
+
+def create_backbone_element(*, element_type, layer, name, description=None, organization_id, session=None, provenance=None, flush=True, keep_whole=False, origin=None):
     """Create an ArchiMate element for the backbone.
 
     Returns the ArchiMateElement. Raises ValueError when name is blank/missing,
@@ -186,6 +206,7 @@ def create_backbone_element(*, element_type, layer, name, description=None, orga
         description=description,
         scope="enterprise",
         custom_properties=properties,
+        **(origin or _new_element_origin.get() or {}),
     )
     session.add(element)
     if flush:

@@ -729,7 +729,7 @@ _ADMIN_LINKS = [
     _link("Users", "admin.registered_users", "users"),
     # Cross-tenant: the route is @platform_admin_required, not merely admin.
     _link("Organizations", "admin.organizations_list", "building-2", requires="platform_admin"),
-    _link("API Settings", "admin.api_settings", "key", requires="org_admin"),
+    _link("AI settings", "admin.api_settings", "key", requires="org_admin"),
     # NAV-1 (27 Aug 2026): repointed from `solution_prompt_admin.
     # solution_prompts_page` to `admin.solution_prompts_page`. Both blueprints
     # register the SAME rule, /admin/solution-prompts, and the admin (v2,

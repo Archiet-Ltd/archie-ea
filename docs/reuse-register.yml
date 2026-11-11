@@ -366,6 +366,23 @@ entries:
       - path: app/services/architecture_change_impact_service.py
         reason: delegates the walk to cross_layer_impact
 
+  - id: product-page
+    concept: What makes up one Product (its elements by ArchiMate layer, linked material, cost, gaps and risks)
+    status: active
+    canonical:
+      path: app/modules/architecture/routes/archimate_crud/product_page.py
+      symbols: [members, build, linked_material, cost_of, gaps_and_risks, export_payload]
+    reuse: >
+      A Product's page is the element page (archimate_crud/detail.html) extended; the Products list is the element
+      list for the Product type. The members come from impact_graph.build_impact_graph, owners from the one owner
+      record, cost from application_cost_accessor and technology_cost, decisions from ArchitectureDecision,
+      diagrams from SavedDiagram, the footer from result_footer_service.product_footer. Searched before writing:
+      element page, impact answer, owner, cost, export, search. Do not write a second product page, product table
+      or product walk; see docs/adr/0015-product-page.md.
+    must_not_create:
+      - id: product-walk
+        regex: 'def\s+_?(walk|collect|gather|list)_product_(members|elements|graph)\w*\s*\('
+
   - id: capability-maturity
     concept: A capability's current and target maturity
     status: active
