@@ -539,10 +539,12 @@ def consolidation_opportunities():
             if isinstance(savings_forecast, dict) and savings_forecast.get("success")
             else (savings_forecast if isinstance(savings_forecast, dict) else {})
         )
+        ranked = _ranked_opportunities_for_page()
         return render_template(
             "consolidation/opportunities.html",
             opportunities=opportunities,
             savings_forecast=savings,
+            **ranked,
         )
     except Exception as e:
         db.session.rollback()
@@ -552,7 +554,29 @@ def consolidation_opportunities():
             "consolidation/opportunities.html",
             opportunities=[],
             load_error="Consolidation opportunities could not be read.",
+            ranked_items=[], ranked_total=0, ranked_error=None, with_cost=False,
         )
+
+
+def _ranked_opportunities_for_page():
+    """The opportunities the Opportunities page ranks, read through the same service and the same cost rule."""
+    from app.decorators.requires_role import may_see_spend_pages
+    from app.services import opportunity_service
+    from app.utils.tenant import current_organization_id
+
+    org_id = current_organization_id()
+    with_cost = may_see_spend_pages(current_user)
+    if org_id is None:
+        return {"ranked_items": [], "ranked_total": 0, "ranked_error": None, "with_cost": with_cost}
+    try:
+        found = opportunity_service.ranked_opportunities(org_id, with_cost=with_cost)
+        return {"ranked_items": found["items"], "ranked_total": found["total"], "ranked_error": None,
+                "with_cost": with_cost}
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.exception("Opportunities could not be worked out")
+        return {"ranked_items": [], "ranked_total": 0, "with_cost": with_cost,
+                "ranked_error": "The opportunities could not be worked out."}
 
 
 # === POLICY MONITORING ROUTES ===
