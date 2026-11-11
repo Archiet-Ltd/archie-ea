@@ -194,19 +194,26 @@ def resolve_user_by_name(name: str, organization_id: int):  # reuse-ok: the one 
     alone, a last name alone or an ambiguous match resolves to nothing: an owner
     is never guessed.
     """
+    return _users_named(name, organization_id)[0]
+
+
+def _users_named(name, organization_id):
+    """(the one user, how many people share the name): (None, 0) none, (None, n) several."""
     from app.models.user import User
 
     wanted = (name or "").strip().lower()
     if not wanted:
-        return None
+        return None, 0
+    most = 0
     for match in (
         db.func.lower(db.func.concat(User.first_name, " ", User.last_name)),
         db.func.lower(User.email),
     ):
         users = User.query.filter(User.organization_id == organization_id).filter(match == wanted).all()
         if len(users) == 1:
-            return users[0]
-    return None
+            return users[0], 1
+        most = max(most, len(users))
+    return None, most
 
 
 def owner_label(first_name: Optional[str], last_name: Optional[str], email: Optional[str] = None) -> str:
@@ -349,6 +356,41 @@ def apply_staged_application_owners(application, organization_id: Optional[int])
         )
         setattr(application, "legacy_" + field, None)
     return unresolved
+
+
+def application_owner_edit_problem(application, field: str, text: Optional[str], organization_id: int) -> Optional[str]:
+    """Why typing *text* into an owner field would change nothing, or ``None``.
+
+    An owner on record is replaced only by a user of the organisation, so a
+    name that matches nobody, or a cleared field, cannot take its place. The
+    caller refuses the value in words instead of reporting a save that did not
+    happen. With no owner on record, a name is kept as text and a blank clears it.
+    """
+    text = (text or "").strip()
+    if text == (getattr(application, field) or ""):
+        return None
+    ownership_type = APPLICATION_OWNER_FIELDS[field]
+    if application.id is None or not _owner_labels_for(
+        [application.id], organization_id, ownership_type, application=application,
+    ):
+        return None
+    if not text:
+        return (
+            "has an owner on record, so it cannot be cleared here. "
+            "Type another person's full name or email to change it."
+        )
+    found, sharing = _users_named(text, organization_id)
+    if found is None and sharing > 1:
+        return (
+            f"has an owner on record, and {sharing} people in this organisation are called "
+            f"\u201c{text}\u201d. Type the email of the one you mean."
+        )
+    if found is None:
+        return (
+            "has an owner on record, and no one in this organisation is called "
+            f"\u201c{text}\u201d. Type a person's full name or email as it appears in Users."
+        )
+    return None
 
 
 def set_application_owner(

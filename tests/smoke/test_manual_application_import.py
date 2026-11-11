@@ -52,7 +52,7 @@ def test_manual_import_create_reload_and_merge(browser, live_server, seeded):
         entry.get_by_placeholder('APP ID', exact=True).fill(code)
         entry.get_by_placeholder('Application Name *', exact=True).fill(marker)
         entry.get_by_placeholder('Type', exact=True).fill(kind)
-        entry.locator('select[name="deployment_status"]').select_option('planned')
+        entry.locator('select[name="deployment_status"]').select_option('design')
         expect(dialog.locator('#auto-map-after-import-manual')).not_to_be_checked()
         dialog.locator('#duplicate-mode-manual').select_option('update')
         with page.expect_response(lambda response: response.url == endpoint
@@ -91,7 +91,7 @@ def test_manual_import_create_reload_and_merge(browser, live_server, seeded):
         created = persisted()
         assert created['code'] == code
         assert created['kind'] == 'ERP'
-        assert created['status'] == 'planned'
+        assert created['status'] == 'design'
         submit('CRM', 0, 1)
         merged = persisted()
         assert merged == dict(created, kind='CRM')

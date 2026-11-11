@@ -194,7 +194,7 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
     # is NULL, and NULL renders as an em dash / no badge.
     deployment_status = Column(
         db.String(50)
-    )  # development, testing, staging, production, done
+    )  # a value from app/services/application_status.py; the validator below refuses any other
     criticality = Column(
         db.String(20)
     )  # mission_critical, important, supporting, optional
@@ -622,6 +622,13 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
         ),
         {"extend_existing": True},
     )
+
+    @validates("deployment_status")
+    def validate_deployment_status(self, key, value):
+        """Store only a status on the one list; the value already stored passes as it is."""
+        from app.services.application_status import status_to_store
+
+        return status_to_store(self.deployment_status, value)
 
     def __repr__(self):
         return f"<ApplicationComponent {self.name}>"
