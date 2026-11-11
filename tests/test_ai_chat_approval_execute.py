@@ -144,3 +144,47 @@ def test_approve_with_a_failing_review_does_not_execute_and_says_why(
     with tenant_ctx(org.id):
         db.session.refresh(appc)
         assert appc.name == "Kept name"
+
+
+def test_a_requesters_own_approve_with_a_failing_review_does_not_execute_and_says_why(
+    admin_client, app, tenant_ctx, db_session, monkeypatch
+):
+    """With no second person, the independent review is the control: the requester presses Approve, the
+    reviewer fails the change, nothing is written, and the person is told the reviewer's reason."""
+    org, client, user = admin_client
+    from app import db
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    with tenant_ctx(org.id):
+        appc = ApplicationComponent(name="Own kept name")
+        db.session.add(appc)
+        db.session.commit()
+        app_id = appc.id
+        created = AIChatApprovalService(user.id).create_pending_approval(
+            operation_type="update",
+            entity_type="application",
+            original_command="rename this application",
+            operation_payload={"name": "Own rejected name"},
+            summary="Rename Own kept name to Own rejected name",
+            entity_id=app_id,
+        )
+        approval_id = created["approval_id"]
+
+    from tests.test_change_review import FakeReviewer, _fail
+
+    reason = "The new name does not match what the person asked for."
+    FakeReviewer([_fail(1, reason)] * 3, revisions=[{"arguments": {"name": "Own rejected name"},
+                                                    "summary": "same"}] * 2).install(monkeypatch)
+
+    _login(client, user.id)
+    resp = client.post(f"/ai-chat/approvals/{approval_id}/approve")
+    body = resp.get_json()
+    assert body["success"] is False, body
+    assert reason in str(body), body
+
+    with tenant_ctx(org.id):
+        db.session.refresh(appc)
+        assert appc.name == "Own kept name"
+        assert db.session.get(AIChatCRUDApproval, approval_id).status == ApprovalStatus.REJECTED
