@@ -21,13 +21,14 @@ import re
 import warnings
 
 TESTS = pathlib.Path(__file__).resolve().parent
-# The two redirect tests, and the sibling guard that plants the address in a scratch page to prove
-# it sees a link (it opens nothing).
+# The two redirect tests.
 REDIRECT_TESTS = {
     "test_ai_chat_estate_answer.py",
     "test_ask_in_the_chat_journey.py",
-    "test_ask_lives_only_in_the_chat.py",
 }
+# The sibling guard plants the address in a scratch page to prove it sees a link. That one call, and
+# nothing else in the file, may carry the address: it writes the page and opens nothing.
+SCRATCH_WRITES = {"test_ask_lives_only_in_the_chat.py": {"write_text"}}
 # The page's own address; the JSON interface under /api/v1 is a different thing.
 RETIRED_ADDRESS = re.compile(r"(?<!v1)/intelligence/ask(?![\w./-])")
 OPENING_CALLS = {
@@ -98,12 +99,17 @@ def _opens_page(call):
     return name in OPENING_CALLS or any(k.arg == "follow_redirects" for k in call.keywords)
 
 
+def _writes_scratch_page(call, filename):
+    func = call.func
+    return isinstance(func, ast.Attribute) and func.attr in SCRATCH_WRITES.get(filename, ())
+
+
 def _is_absence_check(call):
     func = call.func
     return isinstance(func, ast.Attribute) and func.attr.startswith("not_to_")
 
 
-def _names_address(source):
+def _names_address(source, filename=""):
     """Each use of the retired address in one file's source: 'opens' or 'names'."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -131,6 +137,9 @@ def _names_address(source):
                 verdict = None
                 break
             if isinstance(cursor, ast.Call) and cursor is not node:
+                if _writes_scratch_page(cursor, filename):
+                    verdict = None
+                    break
                 if _is_absence_check(cursor):
                     verdict = None
                     break
@@ -151,7 +160,7 @@ def offenders(root: pathlib.Path):
         if path.name in REDIRECT_TESTS or path == pathlib.Path(__file__).resolve():
             continue
         try:
-            uses = _names_address(path.read_text(encoding="utf-8", errors="replace"))
+            uses = _names_address(path.read_text(encoding="utf-8", errors="replace"), path.name)
         except SyntaxError:
             found.append(str(path.relative_to(root)) + " (unreadable)")
             continue
@@ -164,8 +173,8 @@ def test_no_test_drives_the_retired_ask_page():
     assert offenders(TESTS) == []
 
 
-def _plant(tmp_path, source):
-    (tmp_path / "test_planted.py").write_text(source, encoding="utf-8")
+def _plant(tmp_path, source, name="test_planted.py"):
+    (tmp_path / name).write_text(source, encoding="utf-8")
     return offenders(tmp_path)
 
 
@@ -197,3 +206,20 @@ def test_an_absence_assertion_is_accepted(tmp_path):
     assert _plant(tmp_path, 'ASK = "/intelligence/ask"\ndef test_x(hrefs):\n    assert [h for h in hrefs if ASK in h] == []\n') == []
     assert _plant(tmp_path, 'def test_x(page, expect):\n    expect(page).not_to_have_url("/intelligence/" + "ask")\n') == []
     assert _plant(tmp_path, 'def test_x(client):\n    client.get("/api/v1/intelligence/ask")\n') == []
+
+
+SIBLING = "test_ask_lives_only_in_the_chat.py"
+SCRATCH = 'PAGE = "/intelligence" + "/ask"\ndef test_x(tmp_path):\n    (tmp_path / "p.html").write_text(\'<a href="\' + PAGE + \'">Ask</a>\')\n'
+
+
+def test_the_sibling_guard_may_write_the_address_into_a_scratch_page(tmp_path):
+    assert _plant(tmp_path, SCRATCH, SIBLING) == []
+
+
+def test_the_scratch_write_is_allowed_only_in_the_sibling_guard(tmp_path):
+    assert _plant(tmp_path, SCRATCH) == ["test_planted.py"]
+
+
+def test_the_sibling_guard_may_not_open_the_address(tmp_path):
+    source = SCRATCH + 'def test_y(client):\n    client.get("/intelligence/ask")\n'
+    assert _plant(tmp_path, source, SIBLING) == [SIBLING]
