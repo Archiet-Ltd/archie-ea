@@ -100,7 +100,7 @@ class MigrationRoadmapAdvisor:
         except Exception as exc:  # noqa: BLE001
             logger.error("Roadmap advisor LLM call failed for sol %s: %s", solution_id, exc)
             return {"success": False,
-                    "error": "The AI provider is unavailable. Check API settings and try again."}
+                    "error": "The AI provider is unavailable. Check AI settings and try again."}
 
         parsed = cls._parse(raw)
         if parsed is None:

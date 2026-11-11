@@ -62,7 +62,14 @@ def _register(page, base, name):
 
 
 def _rows(page, name):
-    return page.get_by_test_id("applications-table").locator("tbody tr").filter(
+    """The application's own rows. The Evidence footer under each application is a second table row
+    (data-footer-for) naming the same record, so it is counted separately by _footer_rows."""
+    return page.get_by_test_id("applications-table").locator("tbody tr:not([data-footer-for])").filter(
+        has_text=re.compile(re.escape(name), re.IGNORECASE))
+
+
+def _footer_rows(page, name):
+    return page.get_by_test_id("applications-table").locator("tbody tr[data-footer-for]").filter(
         has_text=re.compile(re.escape(name), re.IGNORECASE))
 
 
@@ -111,6 +118,7 @@ def test_register_an_application_and_list_everything_that_consumes_it(browser, l
     _open_portfolio(page, live_server)
     page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(_rows(page, app_a)).to_have_count(1, timeout=PAGE_TIMEOUT)
+    expect(_footer_rows(page, app_a)).to_have_count(1, timeout=PAGE_TIMEOUT)
 
     # The same application again, in another letter case, is refused in the dialog.
     response, dialog = _submit_new_application(page, app_a.upper())

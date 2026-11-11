@@ -65,7 +65,7 @@ class GeminiFileSearchService:
         if not resolved.key:
             raise ValueError(
                 "Gemini API key not configured. Set GEMINI_API_KEY or add a Gemini "
-                "entry under Admin -> API Settings."
+                "entry under Admin -> AI settings."
             )
         return resolved
 

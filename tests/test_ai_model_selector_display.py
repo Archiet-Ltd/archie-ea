@@ -20,6 +20,7 @@ from tests.chat_opening_fixture import (
     APPLICATIONS, APPLICATIONS_PATH, close_chat_options, open_chat_options,
 )
 from tests.render_context import app_template_context
+from app.basecoat_kit import register_basecoat_helpers
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -42,6 +43,7 @@ def html():
     env = Environment(loader=ChoiceLoader([
         DictLoader({'layouts/admin_base.html': base}),
         FileSystemLoader(ROOT / 'app/templates')]), autoescape=True)
+    register_basecoat_helpers(env)
     return env.get_template('ai_chat/index.html').render(
         **app_template_context(),
         llm_configured=True, domain_config={},

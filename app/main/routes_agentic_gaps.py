@@ -9,7 +9,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-from flask import jsonify, redirect, request, url_for
+from flask import g, jsonify, redirect, request, url_for
 from werkzeug.exceptions import HTTPException
 from flask_login import current_user, login_required
 
@@ -23,6 +23,7 @@ from app.services.archimate.agentic_gap_implementation_service import (
 # Import main blueprint - use relative import to avoid circular dependency
 from .views import main
 from app.utils.pagination import safe_int_arg
+from app.services.gap_register_service import effective_severity
 
 logger = logging.getLogger(__name__)
 
@@ -697,10 +698,12 @@ def get_reuse_candidates(gap_id):
         from app.models.roadmap_models import ImplementationGap
         from app.models.unified_capability import UnifiedCapability
 
-        gap = ImplementationGap.query.get(gap_id)
+        gap = ImplementationGap.query.filter_by(id=gap_id).first()
         if not gap:
             # Try looking up as capability_id instead
-            capability = UnifiedCapability.query.get(gap_id)
+            capability = UnifiedCapability.visible_to_organization(
+                gap_id, g.current_org_id
+            )
             if capability:
                 gap_dict = {
                     "id": capability.id,
@@ -718,7 +721,7 @@ def get_reuse_candidates(gap_id):
                 "capability_id": gap.source_capability_id,
                 "capability_name": gap.name,
                 "gap_type": gap.gap_type,
-                "severity": gap.priority,
+                "severity": effective_severity(gap) or gap.priority,
                 "gap_description": gap.description,
             }
 
@@ -783,9 +786,11 @@ def get_reuse_recommendation():
         from app.models.roadmap_models import ImplementationGap
         from app.models.unified_capability import UnifiedCapability
 
-        gap = ImplementationGap.query.get(gap_id)
+        gap = ImplementationGap.query.filter_by(id=gap_id).first()
         if not gap:
-            capability = UnifiedCapability.query.get(gap_id)
+            capability = UnifiedCapability.visible_to_organization(
+                gap_id, g.current_org_id
+            )
             if capability:
                 gap_dict = {
                     "id": capability.id,
@@ -803,7 +808,7 @@ def get_reuse_recommendation():
                 "capability_id": gap.source_capability_id,
                 "capability_name": gap.name,
                 "gap_type": gap.gap_type,
-                "severity": gap.priority,
+                "severity": effective_severity(gap) or gap.priority,
                 "gap_description": gap.description,
             }
 

@@ -120,6 +120,7 @@ ENDPOINT_OVERRIDES: dict = {
     "main.indexnow_key_file": ("A", "infra", "search engine key file"),
     "main.index": ("W1", "PG-PUB", "home"),
     "main.public_module": ("W1", "PG-PUB", "module pages; the page's own wave decides what it shows"),
+    "main.public_share": ("W1", "PG-PUB", "the page one module recording is shared from; opens with the module page it shows"),
     "risk.risk_loss_save": ("W1", "PG-RISK", "the yearly loss a risk is given, saved from the risk page that opens in wave 1"),
 }
 
@@ -409,8 +410,9 @@ GROUP_BLURBS: dict = {
 }
 
 
-# The one groups that answer a page with no entry of its own, so they always have a page.
-ALWAYS_PAGE = ("PG-EA",)
+# The one groups that answer a page with no entry of its own, so they always have a page, and the group whose
+# address opens for a signed-in person at wave 1 while a visitor is still offered the waiting list.
+ALWAYS_PAGE = ("PG-EA", "PG-REC")
 # Groups that are not capabilities a customer buys: no early-access page, however their addresses are closed.
 NO_PAGE_GROUPS = ("infra", "PG-PUB", "PG-OPS", "PG-RT", "PG-RTP", "PG-NEW")
 GENERIC_TITLES = ("this page", "this capability", "capability", "page", "not available")

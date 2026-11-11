@@ -222,3 +222,25 @@ def test_a_company_name_left_unticked_leaves_the_organisations_name_alone(read):
     confirm.confirm(org, person, decisions)
     db.session.expire_all()
     assert _o(read, "first").name == "Casey Startup's Workspace"
+
+
+def test_an_element_made_from_a_website_fact_names_its_source_in_its_first_history_record(read):
+    """The record the Overview counts as added is the insert, so the source is on it, not on a later update."""
+    from datetime import datetime
+
+    from app.modules.dashboard.services import overview_figures as figures
+    from app.modules.organization.website_crawl import confirm
+
+    org, person = _o(read, "first"), _p(read, "first")
+    decisions, _facts = _decisions(org)
+    confirm.confirm(org, person, decisions)
+    from app import db
+
+    db.session.commit()
+    now = datetime.utcnow()
+    changes = figures._history(org.id, now)
+    inserted = [c for c in changes if c.action == "insert" and c.table_name == "archimate_elements"]
+    assert inserted
+    assert all(figures._is_connected(c) for c in inserted), [c.label for c in inserted if not figures._is_connected(c)]
+    other = figures._history(read["second"], now)
+    assert not [c for c in other if c.table_name == "archimate_elements"]

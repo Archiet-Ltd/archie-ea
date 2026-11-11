@@ -12,6 +12,11 @@
 {% from 'macros/shadcn_compat.html' import shadcn_select %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/element_table.html' import element_table %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'components/form_field.html' import form_field, form_footer %}
+{% from 'components/provenance.html' import result_footer %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
@@ -24,7 +29,9 @@
 {% set layer_label = layer | plain_layer(current_user) %}
 {% set conn = page.connections %}
 {% set connection_count = (conn.depends_on | length + conn.used_by | length + conn.other | length) if conn.available else none %}
-{% set edit_url = url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id) %}
+{# An element held with no record of its own is addressed by the element's id, and says so: the two number spaces overlap. #}
+{% set id_scope = {'ae': 1} if element.__class__.__name__ == 'ArchiMateElement' else {} %}
+{% set edit_url = url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id, **id_scope) %}
 {% set flag_help = {
     'Critical path member': 'Part of a chain that has to keep running for the business to run.',
     'Is customized': 'Changed from the standard definition this element started from.',
@@ -88,10 +95,12 @@
                 </p>
                 {% endif %}
             </div>
+            {% if can_change_model() %}
             <span class="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
             {% call button(variant='outline', on_click='deleteElement()', testid='delete-element', aria_label='Delete ' ~ elem_name, class='gap-2 text-destructive-emphasis col-span-2 sm:col-span-1') %}
                 <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>Delete
             {% endcall %}
+            {% endif %}
         </div>
     {% endmacro %}
 
@@ -203,6 +212,127 @@
         {% endif %}
     </section>
 
+    {# ── Product: everything that makes it up, by ArchiMate layer (product_page.py) ── #}
+    {% if product %}
+    <section class="rounded-lg border border-border bg-card p-6" data-testid="product-summary" aria-labelledby="product-summary-heading">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <h2 id="product-summary-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">What this product is made of</h2>
+            {% call button(variant='outline', href=product.export_url, testid='product-export', class='gap-2') %}
+                <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export every section
+            {% endcall %}
+        </div>
+        <p class="mt-3 max-w-[720px] text-sm text-foreground" data-testid="product-summary-text">{{ product.summary }}</p>
+        {% if product.truncated %}
+        <p class="mt-2 text-sm text-muted-foreground" data-testid="product-truncated">This product reaches more elements than the page can show at once. The first {{ product.member_total }} are listed.</p>
+        {% endif %}
+        {{ result_footer(product.footer) }}
+        {% if 'intelligence_ui.answer_for_element' in flask.current_app.view_functions %}
+        <p class="mt-3 text-sm"><a href="{{ url_for('intelligence_ui.answer_for_element', element_id=source_ae_id) }}" class="font-medium text-primary underline hover:underline" data-testid="product-cited-answer">Open what breaks if this product fails, with its citations</a></p>
+        {% endif %}
+    </section>
+
+    <div id="layers" class="space-y-6" data-testid="product-layers">
+        {% for sec in product.sections %}
+        <section class="rounded-lg border border-border bg-card" data-testid="product-layer" data-layer="{{ sec.key }}" aria-labelledby="layer-{{ sec.key }}-heading" x-data="{ addOpen: false }">
+            <div class="flex flex-wrap items-center justify-between gap-3 p-6 pb-0">
+                <div class="flex items-center gap-2">
+                    <h2 id="layer-{{ sec.key }}-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">{{ sec.label }}</h2>
+                    {% call badge(variant='outline') %}<span data-testid="layer-count">{{ sec.count }}</span>{% endcall %}
+                </div>
+                {% if sec.add %}
+                {% call button(variant='outline', testid='product-add-' ~ sec.key, class='gap-2', attrs_dict={'@click': 'addOpen = true'}) %}
+                    <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add
+                {% endcall %}
+                {% endif %}
+            </div>
+            <div class="p-6">
+                {% if sec.rows %}
+                {% call(row) element_table(rows=sec.rows, columns=[('Type', ''), ('Relationship', ''), ('Owner', '')], caption=sec.label ~ ' elements of this product', testid='product-layer-table-' ~ sec.key, row_testid='product-element-row', link_testid='product-element-link', page_size=25, toolbar=false) %}
+                    {% call table_cell() %}{{ row.type_label }}{% endcall %}
+                    {% call table_cell() %}{{ row.relationship }}{% endcall %}
+                    {% call table_cell() %}{{ row.owner }}{% endcall %}
+                {% endcall %}
+                {% else %}
+                <p class="text-sm text-muted-foreground" data-testid="layer-empty">{{ sec.empty_reason }}{% if sec.add %} Use Add to join one with the relationship already chosen.{% endif %}</p>
+                {% endif %}
+            </div>
+            {% if sec.add %}
+            {% call dialog(title='Add to ' ~ sec.label, description='The new element is joined to ' ~ elem_name ~ ' by ' ~ sec.add.relationship | lower ~ '.', open_expr='addOpen', close_expr='addOpen = false', start_hidden=false) %}
+            <form method="post" action="{{ sec.add.url }}" class="space-y-4" data-testid="product-add-form-{{ sec.key }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="section" value="{{ sec.key }}">
+                <label for="add-{{ sec.key }}-type" class="block text-sm font-medium text-muted-foreground">Type</label>
+                {{ native_select(id='add-' ~ sec.key ~ '-type', name='element_type', options=sec.add.types, aria_label='Type') }}
+                {{ form_field(id='add-' ~ sec.key ~ '-name', name='name', label='Name', required=true, placeholder='What is it called?') }}
+                {{ form_footer(submit_text='Add to ' ~ sec.label | lower, cancel_attrs={'@click': 'addOpen = false'}, submit_attrs={'data-testid': 'product-add-submit-' ~ sec.key}) }}
+            </form>
+            {% endcall %}
+            {% endif %}
+        </section>
+        {% endfor %}
+    </div>
+
+    <section class="rounded-lg border border-border bg-card p-6" data-testid="product-linked" aria-labelledby="product-linked-heading">
+        <h2 id="product-linked-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Linked material</h2>
+        <div class="mt-4 grid gap-6 md:grid-cols-2">
+            <div data-testid="linked-diagrams">
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Diagrams</h3>
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for d in product.linked.diagrams %}<li><a href="{{ d.href }}" class="text-primary underline hover:underline" data-testid="linked-diagram-link">{{ d.name }}</a></li>
+                    {% else %}<li class="text-muted-foreground">No diagram shows this product or its elements yet.</li>{% endfor %}
+                </ul>
+            </div>
+            <div data-testid="linked-decisions">
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Decision records</h3>
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for d in product.linked.decisions %}<li><a href="{{ d.href }}" class="text-primary underline hover:underline" data-testid="linked-decision-link">{{ d.name }}</a> <span class="text-muted-foreground">{{ d.status }}</span></li>
+                    {% else %}<li class="text-muted-foreground">No decision has been recorded about this product or its elements.</li>{% endfor %}
+                </ul>
+            </div>
+            <div data-testid="linked-repositories">
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Repositories</h3>
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for r in product.linked.repositories %}<li>{% if r.href %}<a href="{{ r.href }}" class="text-primary underline hover:underline" rel="noopener noreferrer" data-testid="linked-repository-link">{{ r.label }}</a>{% else %}{{ r.label }}{% endif %}{% if r.via %} <span class="text-muted-foreground">for {{ r.via }}</span>{% endif %}</li>
+                    {% else %}<li class="text-muted-foreground">No repository is connected to this product or its elements.</li>{% endfor %}
+                </ul>
+            </div>
+            <div data-testid="linked-documents">
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Documents</h3>
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for d in product.linked.documents %}<li><a href="{{ d.href }}" class="text-primary underline hover:underline" data-testid="linked-document-link">{{ d.name }}</a>{% if d.via %} <span class="text-muted-foreground">for {{ d.via }}</span>{% endif %}</li>
+                    {% else %}<li class="text-muted-foreground">No document is attached to the applications in this product.</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="rounded-lg border border-border bg-card p-6" data-testid="product-cost" aria-labelledby="product-cost-heading">
+        <h2 id="product-cost-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Cost, gaps and risks</h2>
+        <div class="mt-4 grid gap-6 md:grid-cols-2">
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Yearly cost</h3>
+                {% if product.cost.total is not none %}
+                <p class="mt-2 text-sm font-medium" data-testid="product-cost-total">{{ product.cost.total | currency(product.cost.currency) }} a year across {{ product.cost.counted }} cost line{{ '' if product.cost.counted == 1 else 's' }}</p>
+                {% elif product.cost.counted == 0 %}
+                <p class="mt-2 text-sm text-muted-foreground" data-testid="product-cost-total">No application or technology in this product has a yearly cost recorded, so no total is shown.</p>
+                {% else %}
+                <p class="mt-2 text-sm text-muted-foreground" data-testid="product-cost-total">No total is shown because {{ product.cost.missing | join(', ') }} {{ 'has' if product.cost.missing | length == 1 else 'have' }} no yearly cost recorded.</p>
+                {% endif %}
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for c in product.cost.lines %}<li data-testid="product-cost-line">{{ c.name }}: {{ c.amount | currency(product.cost.currency) }}</li>{% endfor %}
+                </ul>
+            </div>
+            <div data-testid="product-problems">
+                <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Open gaps and risks</h3>
+                <ul class="mt-2 space-y-1 text-sm" role="list">
+                    {% for p in product.problems %}<li data-testid="product-problem">{% if p.href %}<a href="{{ p.href }}" class="text-primary underline hover:underline">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %} <span class="text-muted-foreground">{{ p.kind }}, {{ p.status | lower }}</span></li>
+                    {% else %}<li class="text-muted-foreground">No open gap or risk is recorded against this product's elements.</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
     {# ── 4. Connections ── #}
     <section id="connections" class="rounded-lg border border-border bg-card" data-testid="connections" aria-labelledby="connections-heading">
         <div class="flex flex-wrap items-center justify-between gap-3 p-6 pb-0">
@@ -305,7 +435,7 @@
                 {% endif %}
                 {% for field in display_fields if field.label not in flag_help %}
                 <div><dt class="text-muted-foreground">{{ field.label }}</dt>
-                <dd class="break-words font-medium">{{ field.value }}</dd></div>
+                <dd class="break-words font-medium">{% if field.href %}<a href="{{ field.href }}" class="text-primary hover:underline">{{ field.value }}</a>{% else %}{{ field.value }}{% endif %}</dd></div>
                 {% endfor %}
             </dl>
 
@@ -434,7 +564,7 @@ function archimateDetail() {
             if (!(await Platform.modal.confirm('Delete "' + {{ elem_name | tojson }} + '"? This cannot be undone.'))) return;
             try {
                 const data = await Platform.fetch(
-                    '{{ url_for("archimate_crud.delete_element", layer=layer, element_type=element_type, element_id=element.id) }}',
+                    '{{ url_for("archimate_crud.delete_element", layer=layer, element_type=element_type, element_id=element.id, **id_scope) }}',
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -442,7 +572,7 @@ function archimateDetail() {
                     }
                 );
                 if (data.success) {
-                    window.location.href = '{{ url_for("archimate_crud.list_elements", layer=layer, element_type=element_type) }}';
+                    window.location.href = {{ after_delete_url | tojson }};
                 } else {
                     Platform.toast.error('Error: ' + (data.error || 'Unknown error'));
                 }
