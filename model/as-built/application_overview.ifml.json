@@ -12,29 +12,29 @@
             "method": "POST",
             "route": {
               "file": "app/modules/applications/routes/crud_routes.py",
-              "line": 384,
+              "line": 390,
               "rule": "/applications/<int:id>/retire"
             }
           },
-          "component": "form-line-91",
-          "id": "form-line-91.submit",
-          "line": 91,
+          "component": "form-line-94",
+          "id": "form-line-94.submit",
+          "line": 94,
           "type": "submit"
         },
         {
           "action": {
             "dynamic": false,
-            "endpoint": "application_mgmt.update_overview",
+            "endpoint": "unified_applications.update_overview",
             "method": "POST",
             "route": {
-              "file": "app/application_mgmt/detail_overview_routes.py",
-              "line": 197,
-              "rule": "/dashboard/applications/<int:id>/overview-update"
+              "file": "app/modules/applications/routes/update_routes.py",
+              "line": 107,
+              "rule": "/applications/<int:id>/overview-update"
             }
           },
           "component": "overview-edit-form",
           "id": "overview-edit-form.submit",
-          "line": 275,
+          "line": 278,
           "type": "submit"
         },
         {
@@ -44,13 +44,13 @@
             "method": "POST",
             "route": {
               "file": "app/modules/applications/routes/crud_routes.py",
-              "line": 479,
+              "line": 485,
               "rule": "/applications/<int:id>/generate-archimate"
             }
           },
-          "component": "form-line-551",
-          "id": "form-line-551.submit",
-          "line": 551,
+          "component": "form-line-556",
+          "id": "form-line-556.submit",
+          "line": 556,
           "type": "submit"
         },
         {
@@ -60,9 +60,9 @@
             "method": "POST",
             "route": null
           },
-          "component": "form-line-713",
-          "id": "form-line-713.submit",
-          "line": 713,
+          "component": "form-line-718",
+          "id": "form-line-718.submit",
+          "line": 718,
           "type": "submit"
         },
         {
@@ -72,9 +72,9 @@
             "method": "POST",
             "route": null
           },
-          "component": "form-line-922",
-          "id": "form-line-922.submit",
-          "line": 922,
+          "component": "form-line-927",
+          "id": "form-line-927.submit",
+          "line": 927,
           "type": "submit"
         },
         {
@@ -84,13 +84,13 @@
             "method": "POST",
             "route": {
               "file": "app/modules/applications/routes/crud_routes.py",
-              "line": 479,
+              "line": 485,
               "rule": "/applications/<int:id>/generate-archimate"
             }
           },
-          "component": "form-line-1020",
-          "id": "form-line-1020.submit",
-          "line": 1020,
+          "component": "form-line-1025",
+          "id": "form-line-1025.submit",
+          "line": 1025,
           "type": "submit"
         },
         {
@@ -104,9 +104,9 @@
               "rule": "/dashboard/applications/<int:id>/vendor-footprint"
             }
           },
-          "component": "form-line-1046",
-          "id": "form-line-1046.submit",
-          "line": 1046,
+          "component": "form-line-1051",
+          "id": "form-line-1051.submit",
+          "line": 1051,
           "type": "submit"
         },
         {
@@ -116,13 +116,13 @@
             "method": "POST",
             "route": {
               "file": "app/modules/applications/routes/crud_routes.py",
-              "line": 479,
+              "line": 485,
               "rule": "/applications/<int:id>/generate-archimate"
             }
           },
-          "component": "form-line-1065",
-          "id": "form-line-1065.submit",
-          "line": 1065,
+          "component": "form-line-1070",
+          "id": "form-line-1070.submit",
+          "line": 1070,
           "type": "submit"
         }
       ],
@@ -130,96 +130,52 @@
       "template": "app/templates/applications/dashboard.html",
       "viewComponents": [
         {
-          "id": "form-line-91",
-          "line": 91,
+          "id": "form-line-94",
+          "line": 94,
           "type": "Form"
         },
         {
           "id": "overview-edit-form",
-          "line": 275,
+          "line": 278,
           "type": "Form"
         },
         {
-          "id": "form-line-551",
-          "line": 551,
+          "id": "form-line-556",
+          "line": 556,
           "type": "Form"
         },
         {
-          "id": "form-line-713",
-          "line": 713,
+          "id": "form-line-718",
+          "line": 718,
           "type": "Form"
         },
         {
-          "id": "form-line-922",
-          "line": 922,
+          "id": "form-line-927",
+          "line": 927,
           "type": "Form"
         },
         {
-          "id": "form-line-1020",
-          "line": 1020,
+          "id": "form-line-1025",
+          "line": 1025,
           "type": "Form"
         },
         {
-          "id": "form-line-1046",
-          "line": 1046,
+          "id": "form-line-1051",
+          "line": 1051,
           "type": "Form"
         },
         {
-          "id": "form-line-1065",
-          "line": 1065,
+          "id": "form-line-1070",
+          "line": 1070,
           "type": "Form"
         }
       ]
     },
     {
-      "events": [
-        {
-          "action": {
-            "dynamic": false,
-            "endpoint": "application_mgmt.update_overview",
-            "method": "POST",
-            "route": {
-              "file": "app/application_mgmt/detail_overview_routes.py",
-              "line": 197,
-              "rule": "/dashboard/applications/<int:id>/overview-update"
-            }
-          },
-          "component": "form-line-26",
-          "id": "form-line-26.submit",
-          "line": 26,
-          "type": "submit"
-        },
-        {
-          "action": {
-            "dynamic": false,
-            "endpoint": "unified_applications.application_delete",
-            "method": "POST",
-            "route": {
-              "file": "app/modules/applications/routes/crud_routes.py",
-              "line": 960,
-              "rule": "/applications/<int:id>/delete"
-            }
-          },
-          "component": "delete-app-form",
-          "id": "delete-app-form.submit",
-          "line": 149,
-          "type": "submit"
-        }
-      ],
+      "events": [],
       "id": "app/templates/application_mgmt/partials/_views_crud_tab.html",
       "template": "app/templates/application_mgmt/partials/_views_crud_tab.html",
-      "viewComponents": [
-        {
-          "id": "form-line-26",
-          "line": 26,
-          "type": "Form"
-        },
-        {
-          "id": "delete-app-form",
-          "line": 149,
-          "type": "Form"
-        }
-      ]
+      "viewComponents": []
     }
   ]
 }

@@ -425,9 +425,10 @@ def test_the_real_tree_reports_the_two_hand_written_deployment_status_lists_the_
     constraints = {"c": {"column": "deployment_status", "canonicalSource": "app/services/application_status.py"}}
     text = "\n".join(mc.check_one_source(constraints, sources, REPO_ROOT))
     assert scope["vocabularies"][0]["column"] == "deployment_status"
-    assert "app/modules/my_applications/templates/my_applications/app_form.html:" in text
-    assert "app/modules/my_applications/crud_routes.py:35 (allowed-list)" in text
-    assert "app/static/js/application_mgmt/application_import.js:" in text and "planned,development,testing,production" in text
+    # The my_applications form and route now read the one list; the two places still written out are named.
+    assert "app/templates/applications/edit.html:" in text and "(template-field)" in text
+    assert "app/modules/my_applications/templates/my_applications/app_form.html:" not in text
+    assert "app/static/js/application_mgmt/application_import.js:" in text and "(raw-select)" in text
 
 
 def test_the_check_says_which_forms_it_reads_and_which_it_does_not(monkeypatch, tmp_path, capsys):
