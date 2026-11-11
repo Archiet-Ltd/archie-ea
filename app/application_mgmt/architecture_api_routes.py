@@ -15,7 +15,7 @@ import json
 import logging
 from datetime import datetime
 
-from flask import current_app, jsonify, request, send_file
+from flask import abort, current_app, jsonify, request, send_file
 from flask_login import current_user, login_required
 
 logger = logging.getLogger(__name__)
@@ -41,6 +41,7 @@ from ..models.physical_layer import (
 from ..models.strategy_layer import CourseOfAction, ValueStream
 from ..models.technology_layer import Device, Node, SystemSoftware
 from ..models.application_layer import ApplicationInterface, ApplicationService, DataObject
+from app.core.auth.decorators import require_permission
 from app.utils.deprecation import deprecated_route
 from . import application_mgmt
 from .routes import (
@@ -717,33 +718,53 @@ def api_download_architecture_document(id, doc_id):
 
 
 @application_mgmt.route(
-    "/api/applications/<string:id>/architecture/documents/<string:doc_id>",
+    "/api/applications/<int:id>/architecture/documents/<int:doc_id>",
     methods=["DELETE"],
 )
 @login_required
+@require_permission("delete", "application")
 def api_delete_architecture_document(id, doc_id):
-    """Delete architecture document."""
+    """Delete an architecture document of one of the active organisation's applications."""
     import os
+
+    from app.middleware.tenant_context import current_org_id
 
     from ..models.miscellaneous import ArchitectureDocument
 
-    doc = ArchitectureDocument.query.filter_by(
-        id=doc_id, application_id=id
-    ).first_or_404()
+    org_id = current_org_id()
+    if org_id is None:
+        abort(404)
+
+    doc = (
+        ArchitectureDocument.query.join(
+            ApplicationComponent, ApplicationComponent.id == ArchitectureDocument.application_id
+        )
+        .filter(
+            ArchitectureDocument.id == doc_id,
+            ArchitectureDocument.application_id == id,
+            ApplicationComponent.organization_id == org_id,
+        )
+        .first_or_404()
+    )
 
     try:
-        if os.path.exists(doc.file_path):
-            os.remove(doc.file_path)
-
+        file_path = doc.file_path
         db.session.delete(doc)
         db.session.commit()
-
-        return jsonify({"success": True, "message": "Document deleted"})
-
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting document: {e}")
         return jsonify({"error": "An internal error occurred"}), 500
+
+    # The stored file goes only once the record is gone, so a failed commit never leaves a
+    # record pointing at a missing file.
+    try:
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+    except OSError:
+        current_app.logger.warning("Document record deleted; stored file could not be removed")
+
+    return jsonify({"success": True, "message": "Document deleted"})
 
 
 @application_mgmt.route(
