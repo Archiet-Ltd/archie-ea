@@ -191,23 +191,17 @@
             this.exportError = '';
             const url = '/strategic/api/scenarios/export.csv?ids=' + this.selectedScenarios.map(encodeURIComponent).join(',');
             /* The reply is read here, so a refusal is worded in the dialog and the tab stays on the page. */
-            return fetch(url, { credentials: 'same-origin' }).then(response => {
-                if (response.ok) {
-                    return response.blob().then(blob => {
-                        const link = document.createElement('a');
-                        link.href = URL.createObjectURL(blob);
-                        link.download = 'scenario-comparison.csv';
-                        document.body.appendChild(link);
-                        link.click();
-                        link.remove();
-                        URL.revokeObjectURL(link.href);
-                    });
-                }
-                return response.json().catch(() => ({})).then(body => {
-                    this.exportError = (body && body.error) || 'The file could not be written. Try again in a moment.';
-                });
-            }).catch(() => {
-                this.exportError = 'The file could not be written. Try again in a moment.';
+            return Platform.fetch.get(url, null, { silent: true }).then(text => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+                link.download = 'scenario-comparison.csv';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(link.href);
+            }).catch(err => {
+                /* a refusal carries the server's sentence; anything else is a failure to reach it */
+                this.exportError = (err && err.type === 'HttpError' && err.message) || 'The file could not be written. Try again in a moment.';
             });
         },
 
