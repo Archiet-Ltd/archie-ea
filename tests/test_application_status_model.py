@@ -435,12 +435,13 @@ def test_a_batch_row_with_banana_leaves_the_stored_status_and_records_the_senten
                                     {"name": new_name, "Application Status": BANANA}, new_name)
     with tenant_ctx(orgs["org_a"].id):
         service = BatchApprovalService()
-        service._commit_application(staged)
-        service._commit_application(fresh)
+        refusals = []
+        service._commit_application(staged, status_refusals=refusals)
+        service._commit_application(fresh, status_refusals=refusals)
         db_session.flush()
     assert _stored(db_session, orgs["org_a"], [existing.name, new_name]) == {
         existing.name: "development", new_name: None}
-    assert [r["reason"] for r in service.status_refusals] == [_sentence(), _sentence()]
+    assert [r["reason"] for r in refusals] == [_sentence(), _sentence()]
 
 
 def test_the_batch_preview_reads_a_status_column_under_any_heading(orgs, client, login_as,
@@ -549,3 +550,84 @@ def test_another_organisations_job_and_batch_answer_not_found(orgs, client, logi
 
     login_as(client, orgs["user_a"])
     assert client.get(f"/batch-import/batches/{batch.id}/review").status_code == 200
+
+
+# --- a commit's refused rows belong to that commit alone -------------------------
+
+
+def _approved_batch(db_session, user, rows):
+    """A batch ready to commit: rows is a list of (name, status word)."""
+    from app.models.batch_import import (
+        AppProcessingStatus, BatchImportApplication, BatchImportBatch, BatchImportJob,
+        BatchJobStatus, BatchStatus,
+    )
+
+    job = BatchImportJob(user_id=user.id, filename="portfolio.csv", total_applications=len(rows),
+                         total_batches=1, status=BatchJobStatus.AWAITING_CONFIRMATION)
+    db_session.add(job)
+    db_session.flush()
+    batch = BatchImportBatch(job_id=job.id, batch_number=1, total_applications=len(rows),
+                             status=BatchStatus.APPROVED)
+    db_session.add(batch)
+    db_session.flush()
+    for number, (name, word) in enumerate(rows, start=2):
+        db_session.add(BatchImportApplication(
+            batch_id=batch.id, row_number=number, application_name=name,
+            source_data={"name": name, "Status": word}, status=AppProcessingStatus.COMPLETED))
+    db_session.flush()
+    return batch
+
+
+def _checkpoint_refusals(db_session, batch):
+    from app.models.batch_import import BatchImportCheckpoint, CheckpointType
+
+    db_session.expire_all()
+    rows = BatchImportCheckpoint.query.filter_by(
+        batch_id=batch.id, checkpoint_type=CheckpointType.BATCH_COMMITTED).all()
+    assert len(rows) == 1
+    return rows[0].checkpoint_data["status_refusals"]
+
+
+def test_a_commit_carries_only_its_own_refused_rows_on_one_service(orgs, db_session, tenant_ctx):
+    from app.modules.import_batch.services.batch_approval_service import BatchApprovalService
+
+    tag = _tag()
+    first = _approved_batch(db_session, orgs["user_a"], [(f"Refused {tag}", BANANA)])
+    second = _approved_batch(db_session, orgs["user_a"], [(f"Clean {tag}", "Live")])
+    with tenant_ctx(orgs["org_a"].id):
+        service = BatchApprovalService()
+        service.commit_batch(first.id, orgs["user_a"].id)
+        service.commit_batch(second.id, orgs["user_a"].id)
+    assert [r["reason"] for r in _checkpoint_refusals(db_session, first)] == [_sentence()]
+    assert _checkpoint_refusals(db_session, second) == []
+
+
+def test_one_organisations_refused_rows_never_reach_another_organisations_commit(
+    orgs, client, login_as, db_session
+):
+    tag = _tag()
+    secret = f"Secret {tag}"
+    a_first = _approved_batch(db_session, orgs["user_a"], [(secret, BANANA)])
+    b_clean = _approved_batch(db_session, orgs["user_b"], [(f"Clean {tag}", "Live")])
+    a_second = _approved_batch(db_session, orgs["user_a"], [(f"Own {tag}", "Live"),
+                                                            (f"Own refused {tag}", "mango")])
+
+    login_as(client, orgs["user_a"])
+    resp = client.post(f"/api/batch-import/batches/{a_first.id}/commit")
+    assert resp.status_code == 200
+    assert [r["name"] for r in _checkpoint_refusals(db_session, a_first)] == [secret]
+    a_first_body = resp.get_json()
+
+    login_as(client, orgs["user_b"])
+    resp = client.post(f"/api/batch-import/batches/{b_clean.id}/commit")
+    assert resp.status_code == 200
+    assert _checkpoint_refusals(db_session, b_clean) == []
+    assert secret not in resp.get_data(as_text=True)
+    assert resp.get_json()["status_refusals"] == []
+
+    login_as(client, orgs["user_a"])
+    resp = client.post(f"/api/batch-import/batches/{a_second.id}/commit")
+    assert resp.status_code == 200
+    assert [r["name"] for r in _checkpoint_refusals(db_session, a_second)] == [f"Own refused {tag}"]
+    assert [r["name"] for r in resp.get_json()["status_refusals"]] == [f"Own refused {tag}"]
+    assert [r["name"] for r in a_first_body["status_refusals"]] == [secret]

@@ -1445,7 +1445,9 @@ def commit_batch(batch_id):
         if batch.job.user_id != current_user.id:
             return jsonify({"success": False, "error": "Not found"}), 404
 
-        batch = approval_service.commit_batch(batch_id, current_user.id)
+        batch, status_refusals = approval_service.commit_batch_with_refusals(
+            batch_id, current_user.id
+        )
 
         batch_data = batch.to_dict()
         return jsonify(
@@ -1453,6 +1455,7 @@ def commit_batch(batch_id):
                 "success": True,
                 "data": batch_data,
                 "batch": batch_data,
+                "status_refusals": status_refusals,
                 "committed_count": batch_data.get("elements_approved", 0),
                 "message": "Batch committed",
             }
