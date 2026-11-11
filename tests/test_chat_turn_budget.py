@@ -309,3 +309,16 @@ def test_two_organisations_each_keep_their_own_chain(app, two_orgs, monkeypatch)
 
 from tests.test_llm_deepseek import production_shape, stub  # noqa: E402,F401
 from tests.test_llm_org_keys import two_orgs  # noqa: E402,F401
+
+
+def test_the_lookup_limit_is_read_only_from_what_the_server_gives_the_page():
+    """The browser's lookup limit comes from the turn budget's one place: no script or template restates it."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    limit_ms = int((model_defaults.PROVIDER_FIRST_TOKEN_SECONDS + model_defaults.CHAT_TURN_MARGIN_SECONDS) * 1000)
+    for name in ("app/static/js/ai_chat/transport.js", "app/templates/ai_chat/index.html"):
+        source = (root / name).read_text()
+        assert str(limit_ms) not in source, "%s restates the lookup limit %d" % (name, limit_ms)
+    views = (root / "app/modules/ai_chat/routes/chat_views.py").read_text()
+    assert "PROVIDER_FIRST_TOKEN_SECONDS + model_defaults.CHAT_TURN_MARGIN_SECONDS" in views
