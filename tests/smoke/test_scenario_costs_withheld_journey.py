@@ -5,7 +5,9 @@ In the Lantern Quay Systems demonstration organisation (RELEASE_WAVE 3):
   money figure and each says the cost figures are withheld for the role, while a portfolio manager of the same
   organisation reads the same scenario with its running cost;
 - a person of another organisation lists none of it;
-- when every chosen scenario has been deleted since the list loaded, Export says so in the dialog and the tab stays on the page.
+- when every chosen scenario has been deleted since the list loaded, Export says so in the dialog and the tab stays on the page;
+- an architect who may read costs saves a full replacement, and Compare gives the running cost the run card showed, says
+  the new total is not worked out, and gives the run card's reason beside it.
 """
 import csv
 import io
@@ -16,12 +18,14 @@ from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, boot_live_server
 from .fresh_org import create_fresh_org, sign_in
-from .test_simulation_journey import DEMO_EMAIL, ELEMENT, VIEWPORT_IDS, VIEWPORTS, _pick, demo  # noqa: F401
+from .test_simulation_journey import DEMO_EMAIL, ELEMENT, VIEWPORT_IDS, VIEWPORTS, _cost_reader, _pick, demo  # noqa: F401
 from .test_simulation_screen_and_saved_scenarios_journey import _context, _member, _shot, _sign_in_as
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 NAME = "Retire the ledger without cost rights"
+REPLACED = "Replace the ledger with cost rights"
+RUNNING_COST = "Yearly running cost of all applications"
 WITHHELD = "withheld for your role"
 MONEY = re.compile(r"[£$€]\s?\d")
 VIEWER = "cost.viewer@lantern-quay.example.com"
@@ -154,3 +158,51 @@ def test_export_of_scenarios_that_were_deleted_meanwhile_says_so_in_the_dialog(b
     finally:
         context.close()
         _forget(app)
+
+
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
+def test_an_architect_with_cost_rights_reads_why_a_replacement_s_new_total_is_not_worked_out(browser, server, app, demo, viewport, scheme):
+    from app import db
+    from app.models.saved_scenario import SavedScenario
+
+    def forget():
+        with app.app_context():
+            SavedScenario.query.filter_by(name=REPLACED).delete()
+            db.session.commit()
+            db.session.remove()
+
+    forget()
+    context = _context(browser, viewport, scheme)
+    try:
+        page = _sign_in_as(context, server, _cost_reader(app))
+        page.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _pick(page, change="Full Replacement")
+        page.get_by_role("button", name="Run scenario").click()
+        panel = page.get_by_test_id("simulation-panel")
+        expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
+        card = panel.get_by_test_id("simulation-figure").filter(has_text=RUNNING_COST).first
+        now = card.locator("td").nth(1).inner_text().strip()
+        reason = card.locator("td").nth(4).inner_text().strip()
+        assert MONEY.search(now), now
+        assert reason.startswith("The replacement's running cost is not known, so the new total cannot be worked out."), reason
+        page.get_by_role("button", name="Save Scenario for Comparison", exact=True).click()
+        dialog = page.get_by_role("dialog", name="Save scenario")
+        dialog.get_by_label("Scenario name").fill(REPLACED)
+        dialog.get_by_role("button", name="Save scenario").click()
+        expect(dialog).to_be_hidden()
+
+        page.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_role("button", name="Compare Scenarios").click()
+        compare = page.get_by_role("dialog", name="Compare Impact Scenarios")
+        compare.get_by_text(REPLACED, exact=True).first.click()
+        rows = compare.get_by_test_id("compare-figure-row")
+        expect(rows.first).to_be_visible()
+        cells = {rows.nth(i).get_by_role("cell").nth(0).inner_text().strip(): rows.nth(i).get_by_role("cell").nth(1).inner_text().strip()
+                 for i in range(rows.count())}
+        # the figure the run card showed, the unknown new total, and the run card's reason for it
+        assert cells.get(RUNNING_COST) == now + " to Not worked out (" + reason + ")", cells
+        expect(compare.get_by_text(WITHHELD).locator("visible=true")).to_have_count(0)
+        _shot(page, "cost-admitted-architect-compare", viewport, scheme)
+    finally:
+        context.close()
+        forget()
