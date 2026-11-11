@@ -79,7 +79,7 @@
                 {% endcall %}
                 {% call table_cell() %}{{ item.status }}{% endcall %}
                 {% call table_cell(class='tabular-nums', attrs={'data-testid': 'compliance-figure'}) %}{{ item.figure }}{% endcall %}
-                {% call table_cell(class='text-muted-foreground') %}{{ item.next_step or 'Every control is in place' }}{% endcall %}
+                {% call table_cell(class='max-w-52 whitespace-normal text-muted-foreground') %}{{ item.next_step or 'Every control is in place' }}{% endcall %}
                 {% call table_cell(class='text-muted-foreground') %}{{ item.last_review or 'Not reviewed yet' }}{% endcall %}
                 {% call table_cell(class='min-w-64 whitespace-normal') %}{{ result_footer(item.footer) }}{% endcall %}
             {% endcall %}

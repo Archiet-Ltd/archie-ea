@@ -99,6 +99,7 @@ class ComplianceInheritanceService:
             recorded = mapping.updated_at or mapping.created_at
             if recorded and (row["newest_record"] is None or recorded > row["newest_record"]):
                 row["newest_record"] = recorded
+                row["newest_element_id"] = mapping.archimate_element_id
             bucket = "implemented" if credit == 1.0 else "partial" if credit else "missing"
             row[bucket] += 1
             if bucket != "implemented":
@@ -197,6 +198,7 @@ class ComplianceInheritanceService:
                     row["newest_record"] is None or part["newest_record"] > row["newest_record"]
                 ):
                     row["newest_record"] = part["newest_record"]
+                    row["newest_element_id"] = part["newest_element_id"]
                 row["findings"].extend(part["findings"])
                 if part["last_review"] and (
                     row["last_review"] is None or part["last_review"] > row["last_review"]
@@ -249,6 +251,7 @@ class ComplianceInheritanceService:
             "last_review": None,
             "with_evidence": 0,
             "newest_record": None,
+            "newest_element_id": None,
         }
 
     @staticmethod
