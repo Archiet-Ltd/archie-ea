@@ -222,7 +222,7 @@ def _no_raw_tokens(text):
 
 def _names_once(text):
     """No record's name is written twice in a row (a name beside a link that already shows it)."""
-    repeat = re.search(r"\b(\w[\w ]{2,}?)\s+\1\b", text)
+    repeat = re.search(r"\b(\w[\w ]{2,}?)\s+\1\b", text, re.IGNORECASE)
     assert not repeat, "a name is shown twice in a row: %r in %r" % (repeat.group(0), text)
 
 

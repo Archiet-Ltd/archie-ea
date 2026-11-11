@@ -263,6 +263,11 @@ def test_a_key_from_an_earlier_turn_is_unknown_and_never_renders(app, db_session
     assert result["response"].startswith(cf.PLAIN_LINE)
     new_phrase = [f for f in result["figures"]][0]["reads"]
     assert new_phrase.endswith("connections downstream") and "[ref:%d]" % root.id in result["response"]
+    assert result["response"] == (
+        "I could not confirm one or more figures in this answer from the records I read, so I left them out."
+        "\n\nWhat the records show:\n- [ref:%d]: 2 connections downstream\n\n"
+        "Ask me to list the records behind this question to see the exact figure." % root.id
+    ), "the answer as the person reads it, the name shown once"
     assert all(f["key"] != old_key for f in result["figures"])
     assert not any("Other" in str(m) for call in seen for m in call), "the other organisation's records never appear"
 
@@ -440,6 +445,19 @@ def test_a_name_written_beside_its_marker_is_reduced_to_the_marker(make_org):
         assert cf.collapse_repeated_names("Billing [ref:31] has it.", table) == "Billing [ref:31] has it.", \
             "a different record's name is left"
         assert cf.collapse_repeated_names("The Orders Hubs [ref:31] are.", table) == "The Orders Hubs [ref:31] are."
+
+
+def test_a_name_written_beside_its_marker_in_another_case_is_reduced_too(make_org):
+    org_a, org_b = make_org("case-a"), make_org("case-b")
+    for org in (org_a, org_b):
+        grounding = _turn(org.id, ("ask_impact", _impact(31, "Orders Hub", 13), IMPACT),
+                          ("ask_impact", _impact(32, "Billing", 4), IMPACT))
+        table = grounding.figure_table
+        assert cf.collapse_repeated_names("orders hub [ref:31] has it.", table) == "[ref:31] has it."
+        assert cf.collapse_repeated_names("The ORDERS  HUB [ref:31] has it.", table) == "The [ref:31] has it."
+        assert cf.collapse_repeated_names("billing [ref:31] has it.", table) == "billing [ref:31] has it.", \
+            "a different record's name is left in any case"
+        assert cf.collapse_repeated_names("orders hubs [ref:31] are.", table) == "orders hubs [ref:31] are."
 
 
 def test_the_records_block_heading_is_the_marker_alone(make_org):

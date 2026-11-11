@@ -561,10 +561,11 @@ def _whole_name_pattern(names: Tuple[str, ...], ignore_case: bool = True):
     return re.compile(r"(?<![\w])(?:" + "|".join(parts) + r")(?![\w])", re.IGNORECASE if ignore_case else 0)
 
 
-def name_spans(text: str, names: Iterable[str]) -> List[Tuple[int, int, str]]:
+def name_spans(text: str, names: Iterable[str], ignore_case: bool = False) -> List[Tuple[int, int, str]]:
     """``(start, end, matched text)`` of each whole name of *names* in *text*, none inside another.
-    A name matches as written, so the word "billing" in prose is not a record called Billing."""
-    pattern = _whole_name_pattern(tuple(sorted(set(names))), ignore_case=False)
+    A name matches as written, so the word "billing" in prose is not a record called Billing;
+    *ignore_case* is for a name written directly beside its own marker."""
+    pattern = _whole_name_pattern(tuple(sorted(set(names))), ignore_case=ignore_case)
     return [(m.start(), m.end(), m.group(0)) for m in pattern.finditer(text)] if pattern else []
 
 
@@ -888,7 +889,7 @@ SEARCH_QUESTION = re.compile(r"\b(find|search|searching|list|which|show|match|ma
 
 def collapse_repeated_names(text: str, table: FigureTable) -> str:
     """*text* with "Name [ref:id]" reduced to "[ref:id]" when the words before the marker are
-    exactly that record's name (as written), because the marker is shown as the linked name."""
+    exactly that record's name (in any case), because the marker is shown as the linked name."""
     out: List[str] = []
     last = 0
     for match in REF.finditer(text):
@@ -896,9 +897,9 @@ def collapse_repeated_names(text: str, table: FigureTable) -> str:
         if not name:
             continue
         before = text[last:match.start()]
-        tail = re.search(r"(?<![\w])" + r"\s+".join(re.escape(w) for w in name.split()) + r"\s*$", before)
+        tail = [s for s in name_spans(before, [name], ignore_case=True) if not before[s[1]:].strip()]
         if tail:
-            before = before[:tail.start()]
+            before = before[:tail[-1][0]]
         out.append(before)
         out.append(match.group(0))
         last = match.end()
