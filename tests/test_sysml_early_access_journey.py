@@ -180,3 +180,30 @@ def test_the_page_is_readable_in_both_themes_and_widths(browser, site_url, schem
     assert reading["clipped"] == 0
     _shot(page, f"sysml-{scheme}-{viewport['width']}")
     context.close()
+
+
+def test_the_hub_row_opens_the_waiting_list_page_which_is_in_the_sitemap_and_its_closing_link_leads_to_the_enquiry(
+    browser, site_url
+):
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    page.goto(site_url + "/early-access")
+    row = page.get_by_test_id("early-access-hub").locator("li", has=page.get_by_role("link", name=LABEL))
+    blurb = row.inner_text().split(":", 1)[1].strip()
+    assert blurb
+    _shot(page, "hub")
+    row.get_by_role("link", name=LABEL).click()
+    expect(page).to_have_url(site_url + PATH)
+    module = page.get_by_test_id("waiting-list-module")
+    expect(module).to_have_count(1)
+    assert blurb in " ".join(module.inner_text().split())
+    assert page.get_by_test_id("early-access-page").count() == 0
+    assert PATH in re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", page.request.get(site_url + "/sitemap.xml").text())
+
+    closing = page.get_by_test_id("landing-closing").get_by_role("link", name="Talk to us")
+    expect(closing).to_have_attribute("href", "/contact?from=sysml-to-archimate")
+    closing.click()
+    expect(page).to_have_url(site_url + "/contact?from=sysml-to-archimate")
+    expect(page.get_by_test_id("offer-inquiry-topic")).to_have_text(f"Your enquiry is about: {LABEL}.")
+    _shot(page, "contact")
+    context.close()
