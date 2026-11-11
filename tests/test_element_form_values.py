@@ -2,7 +2,8 @@
 
 Eight fields the form offers have no column on their element's record (an actor type on a role, a protocol
 on an application service, a domain on a business function). Their values are kept in the element's
-custom_properties under the field's own key, read back into the form, and shown on the element's page with the field's label.
+custom_properties under the field's own key with a prefix, so a property a model file brought in is never
+taken for the form's value, read back into the form, and shown on the element's page with the field's label.
 An empty date, number or choice is stored as NULL, so any element can be renamed with its optional fields
 empty, and a stored date reaches its box as 2027-03-15.
 """
@@ -188,7 +189,7 @@ def test_fifteen_fields_without_a_column_are_kept_and_shown_on_the_page(app, db_
         record = crud.MODEL_REGISTRY[element_type].query.filter_by(id=element_id).first()
         row = ArchiMateElement.query.filter_by(id=record.archimate_element_id).first()
         for key, value in values.items():
-            assert row.custom_properties[key] == value, (element_type, key)
+            assert row.custom_properties[crud._form_property_key(key)] == value, (element_type, key)
 
         # Renamed, then reopened: the form shows it.
         resp = _rename(client, element_type, element_id, "Renamed %s" % element_type,
@@ -212,7 +213,7 @@ def test_fifteen_fields_without_a_column_are_kept_and_shown_on_the_page(app, db_
                 {**{f.name: "" for f in _offered(element_type)}, **must})
         db_session.expire_all()
         row = ArchiMateElement.query.filter_by(id=record.archimate_element_id).first()
-        assert not any(k in (row.custom_properties or {}) for k in names), element_type
+        assert not any(crud._form_property_key(k) in (row.custom_properties or {}) for k in names), element_type
 
 
 def test_stored_value_on_the_page_is_not_visible_to_another_organisation(app, db_session, client, make_org):

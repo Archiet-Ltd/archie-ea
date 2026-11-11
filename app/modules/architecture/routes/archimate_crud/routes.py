@@ -3142,9 +3142,19 @@ def _model_graph_row(element):
     return ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
 
 
+# A form value the record has no column for is kept in custom_properties under the field's name with this prefix.
+# A property a model file brought in keeps its own name, so the two can never be taken for each other.
+_FORM_PROPERTY_PREFIX = "form_field."
+
+
+def _form_property_key(name):
+    return _FORM_PROPERTY_PREFIX + name
+
+
 def _store_custom_fields(element, data, element_type, ae_row=None):
     """Keep each posted form value the element's record has no column for in the model-graph row's
-    custom_properties, under the field's own key. An empty value removes the key."""
+    custom_properties, under the field's prefixed key. An empty value removes that key. No other key of
+    custom_properties is read or changed, so a property a model file brought in is left as it was."""
     names = [n for n in _custom_field_names(element, element_type) if n in data]
     ae_row = ae_row or _model_graph_row(element)
     if not names or ae_row is None:
@@ -3154,15 +3164,16 @@ def _store_custom_fields(element, data, element_type, ae_row=None):
         value = data[name]
         value = value.strip() if isinstance(value, str) else value
         if value in (None, ""):
-            props.pop(name, None)
+            props.pop(_form_property_key(name), None)
         else:
-            props[name] = value
+            props[_form_property_key(name)] = value
     ae_row.custom_properties = props
 
 
 def _custom_field_value(element, ae_row, name):
-    """The stored value of a form field that lives in custom_properties, or None."""
-    return (getattr(ae_row, "custom_properties", None) or {}).get(name)
+    """The stored value of a form field that lives in custom_properties, or None. Only the form's own key is
+    read: an imported property of the same name is not the form's value."""
+    return (getattr(ae_row, "custom_properties", None) or {}).get(_form_property_key(name))
 
 
 def _with_custom_fields(display_fields, element, element_type):
@@ -3184,12 +3195,13 @@ def _with_custom_fields(display_fields, element, element_type):
         value = _custom_field_value(record, ae_row, name)
         if value in (None, ""):
             continue
-        labels = {opt["value"]: opt["label"] for opt in field.get("options") or []}
-        shown.append({"label": field["label"], "value": str(labels.get(value, value)), "technical": False})
+        labels = {str(opt["value"]): opt["label"] for opt in field.get("options") or []}
+        # A stored value that is not text (a list or a mapping an import left) is shown as readable text.
+        text = value if isinstance(value, str) else str(_readable(value))
+        shown.append({"label": field["label"], "value": str(labels.get(text, text)), "technical": False})
     if not shown:
         return display_fields
-    keys = {f["name"] for f in config["fields"]}
-    rest = {k: v for k, v in (ae_row.custom_properties or {}).items() if k not in keys}
+    rest = {k: v for k, v in (ae_row.custom_properties or {}).items() if not k.startswith(_FORM_PROPERTY_PREFIX)}
     kept = [f for f in display_fields if f["label"] != "Custom properties"]
     if rest and len(kept) != len(display_fields):
         kept.append({"label": "Custom properties", "value": str(_readable(rest)), "technical": False})
@@ -3202,6 +3214,8 @@ def _form_text(value):
         return ""
     if isinstance(value, (datetime, date)):
         return value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
+    if isinstance(value, (dict, list, tuple, set)):
+        return _readable(value)
     return value
 
 
