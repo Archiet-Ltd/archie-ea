@@ -176,3 +176,39 @@ def test_the_second_overview_save_the_exact_name_and_the_unrecorded_coverage(pag
     page.evaluate("document.documentElement.classList.add('dark')")
     expect(page.locator("tr").filter(has_text=mine["blank"]).first).to_contain_text("Not recorded")
     _shot(page, "page-coverage-not-recorded-dark-390")
+
+
+def test_a_shared_owner_name_on_the_overview_says_how_many_share_it_and_the_email_saves(page, live_server, orgs):
+    """The Overview owner field, typed "Sam Same": the page says two people have that name, lists their
+    emails and asks for one; the email typed in its place saves, and the page reads Sam Same."""
+    mine, theirs = orgs
+    url = "%s/applications/%d" % (live_server, mine["app_id"])
+    for width, height in ((1440, 900), (390, 844)):
+        page.set_viewport_size({"width": width, "height": height})
+        if width == 1440:
+            sign_in(page, live_server, mine["emails"][ARCHITECT])
+        page.goto(url + "?edit=1&tab=overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        owner = page.locator("#edit-businessOwner")
+        owner.fill("Sam Same")
+        page.get_by_role("button", name=re.compile("Save")).first.click()
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        body = page.locator("main").inner_text()
+        assert "2 people in this organisation are called \u201cSam Same\u201d" in body, body
+        assert "Type the email of the one you mean" in body, body
+        for email in mine["twins"]:
+            assert email in body, body
+        for email in theirs["twins"]:
+            assert email not in body, "the other organisation's person was offered"
+        assert page.evaluate("document.documentElement.scrollWidth") <= width
+        page.get_by_text("Type the email of the one you mean").first.scroll_into_view_if_needed()
+        _shot(page, "overview-shared-owner-name-%d" % width)
+
+    # The email of the one meant saves, and the Overview reads that person's name.
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.locator("#edit-businessOwner").fill(mine["twins"][1])
+    with page.expect_navigation(wait_until="networkidle", timeout=PAGE_TIMEOUT):
+        page.get_by_role("button", name=re.compile("Save")).first.click()
+    assert "edit=1" not in page.url, page.url
+    saved = page.locator("main").inner_text()
+    assert "Sam Same" in saved and "more than one person" not in saved, saved
+    _shot(page, "overview-shared-owner-saved-1440")

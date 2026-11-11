@@ -63,9 +63,9 @@ def _validate_overview(app, form):
                 # Never recorded as a person with no account: the person is asked which one.
                 errors[key] = (
                     f"{label} matches more than one person: {len(alike)} people in this organisation "
-                    f"are called \u201c{text}\u201d: "
-                    + ", ".join(f"{owners.owner_label(u.first_name, u.last_name, u.email)} ({u.email})" for u in alike)
-                    + ". Type the email of the one you mean."
+                    f"are called \u201c{text}\u201d ("
+                    + ", ".join(u.email for u in alike)
+                    + "). Type the email of the one you mean."
                 )
             elif changed:
                 # A blank with no owner on record clears the text kept on the
