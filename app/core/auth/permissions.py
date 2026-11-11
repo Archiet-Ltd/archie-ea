@@ -324,12 +324,8 @@ def note_route_granted_write() -> None:
     """
     try:
         from flask import g, has_request_context
-        from flask_login import current_user
 
         if has_request_context():
-            # The organisation role is the ceiling: a route's own check never grants a viewer a change.
-            if is_read_only_member(current_user):
-                return
             g.route_granted_write = True
     except Exception:  # fabricated-ok: outside a request there is nothing to record
         pass

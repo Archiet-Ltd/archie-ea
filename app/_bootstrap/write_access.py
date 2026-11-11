@@ -140,12 +140,12 @@ def refuse_read_only(user=None):
     from flask import g, request
     from flask_login import current_user
 
-    from app.core.auth.permissions import holds_governance_write, is_read_only_member, may_write
+    from app.core.auth.permissions import holds_governance_write, may_write
 
     person = user or current_user
     if may_write(person):
         return None
-    if holds_governance_write(person) and not is_read_only_member(person):
+    if holds_governance_write(person):
         g.write_admitted_for_route_check = True
         return None
     return _refusal(_reason_for(request.endpoint))
@@ -184,14 +184,15 @@ def _route_answers_for_itself(app, endpoint):
 
     from app.core.auth.permissions import _READ_ACTIONS, is_read_only_member
 
-    # Whichever check would refuse a person whose role is viewer, the read-only reason answers.
+    # A route that shows everyone but an administrator "not found" keeps that answer.
+    if getattr(view, "answers_non_platform_admins", False):
+        return True
+    # Whichever other check would refuse a person whose role is viewer, the read-only reason answers.
     if is_read_only_member(current_user):
         return False
     matrix = getattr(view, "matrix_guard", None)
     # Only a write cell of the matrix answers for itself; a read cell never opens a write.
     if matrix and matrix[0] not in _READ_ACTIONS:
-        return True
-    if getattr(view, "answers_non_platform_admins", False):
         return True
     # A route behind a role check refuses, in its own words, a person that check refuses.
     roles = getattr(view, "role_guard", None)

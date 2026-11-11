@@ -510,6 +510,18 @@ def require_roles(*allowed_roles):
                 )
                 abort(403)
 
+            # The organisation role is the ceiling: a platform role or a persona that admits a viewer to
+            # a route that writes does not let the viewer write.
+            from flask import request
+
+            from app._bootstrap.write_access import WRITE_METHODS
+            from app.core.auth.permissions import is_read_only_member
+
+            if request.method in WRITE_METHODS and is_read_only_member(current_user):
+                from app._bootstrap.write_access import _reason_for, _refusal
+
+                return _refusal(_reason_for(request.endpoint))
+
             # The route's own role check admitted the person; the write guard reads this note.
             from app.core.auth.permissions import note_route_granted_write
 
