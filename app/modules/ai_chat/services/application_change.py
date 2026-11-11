@@ -91,15 +91,31 @@ def may_edit_applications(user) -> bool:
     return bool(can(user, "edit", "application"))
 
 
+def _named_exactly(organization_id: int, name: str):
+    """The application of this organisation called exactly ``name`` (any case, spacing folded), else ``None``.
+
+    The same exact-name lookup the capability questions use."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.utils.duplicate_guard import find_duplicate_by_name
+
+    return find_duplicate_by_name(ApplicationComponent, name, organization_id=organization_id)
+
+
+def _closest_names(organization_id: int, name: str):
+    """Names of applications a partial name fits: what the chat offers when nothing is called exactly that."""
+    from app.modules.intelligence.services.query_catalogue import _resolve_application
+
+    application, others = _resolve_application(organization_id, name)
+    return [application.name] if application is not None else [a.name for a in others]
+
+
 def names_an_application(request: Dict[str, str], organization_id: Optional[int]) -> bool:
     """Whether the request's subject is an application of this organisation (or says
     which of several it means), so the chat takes it as a change to an application."""
     if not organization_id:
         return False
-    from app.modules.intelligence.services.query_catalogue import _resolve_application
-
-    application, others = _resolve_application(int(organization_id), request["application"])
-    return application is not None or bool(others)
+    return (_named_exactly(int(organization_id), request["application"]) is not None
+            or bool(_closest_names(int(organization_id), request["application"])))
 
 
 def propose(request: Dict[str, str], user, organization_id: int) -> Dict[str, Any]:
@@ -109,8 +125,6 @@ def propose(request: Dict[str, str], user, organization_id: int) -> Dict[str, An
     """
     from app.modules.ai_chat.tools.executor import record_refused_tool_call
     from app.modules.applications.routes.update_routes import _validate_overview
-    from app.modules.intelligence.services.query_catalogue import _resolve_application
-
     base = {"label": request["label"], "typed_application": request["application"]}
     if not may_edit_applications(user):
         record_refused_tool_call(
@@ -119,9 +133,10 @@ def propose(request: Dict[str, str], user, organization_id: int) -> Dict[str, An
         )
         return dict(base, state="refused")
 
-    application, others = _resolve_application(organization_id, request["application"])
+    application = _named_exactly(organization_id, request["application"])
     if application is None:
-        return dict(base, state="ambiguous" if others else "unknown", others=[a.name for a in others])
+        # A partial name is never taken for an application: the person is shown the closest names.
+        return dict(base, state="unknown", others=_closest_names(organization_id, request["application"]))
 
     value = request["value"]
     if request["key"] == "deployment_status":

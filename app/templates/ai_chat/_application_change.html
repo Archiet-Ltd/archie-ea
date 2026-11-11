@@ -56,7 +56,7 @@
         {% elif result.state == 'unknown' %}
         {% call card_header() %}
             {% call card_title(class='text-base') %}I could not find an application called &ldquo;{{ result.typed_application }}&rdquo;{% endcall %}
-            {% call card_description() %}Nothing was changed. Ask again with the name of an application in your model.{% endcall %}
+            {% call card_description() %}{% if result.others %}Closest names: {{ result.others | join(', ') }}. {% endif %}Nothing was changed. Ask again with the full name of an application in your model.{% endcall %}
         {% endcall %}
 
         {% elif result.state == 'ambiguous' %}

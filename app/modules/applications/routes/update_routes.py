@@ -54,7 +54,9 @@ def _validate_overview(app, form):
             problem = owners.application_owner_edit_problem(
                 app, "business_owner", text, app.organization_id,
             )
-            alike = owners.users_named_alike(text, app.organization_id) if text else []
+            # A name left as it is stays as it is: only a changed name has to say which person.
+            changed = text != (app.business_owner or "")
+            alike = owners.users_named_alike(text, app.organization_id) if text and changed else []
             if problem:
                 errors[key] = f"{label} {problem}"
             elif alike:
@@ -64,7 +66,7 @@ def _validate_overview(app, form):
                     + ", ".join(f"{owners.owner_label(u.first_name, u.last_name, u.email)} ({u.email})" for u in alike)
                     + ". Type the email address of the one you mean."
                 )
-            elif text != (app.business_owner or ""):
+            elif changed:
                 # A blank with no owner on record clears the text kept on the
                 # application. A name is recorded as that user's owner record,
                 # or, when it matches no user, as a named person without an
@@ -527,7 +529,7 @@ def update_strategy_layer(id):
                         cap_obj.name = cap_name
                         cap_obj.level = cap_level or 1
                         cap_obj.maturity_level = cap_maturity or "initial"
-                        cap_obj.coverage_percentage = cap_coverage or 0
+                        cap_obj.coverage_percentage = None if cap_coverage in (None, "") else cap_coverage
 
                         if old_name != cap_name:
                             changed_fields.append(f"capability_{cap_id}")

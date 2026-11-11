@@ -2147,6 +2147,8 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     if capability_mappings:
         cap_table["columns"] = ["Capability", "Category", "Support", "Coverage", "Maturity", "Strategic", "Compliance"]
         cap_rows = []
+        from app.utils.recorded_figures import coverage_text
+
         for mapping, cap in capability_mappings:
             # DEF-003 follow-up: `mapping` is either an ApplicationCapabilityMapping
             # (legacy) or a UnifiedApplicationCapabilityMapping (canonical, from the
@@ -2170,7 +2172,7 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
                 "detail_url": None,
                 "category": cap.category or "",
                 "support_level": support.replace("_", " ").title() if support else "",
-                "coverage": f"{coverage_pct}%" if coverage_pct is not None else "",
+                "coverage": coverage_text(coverage_pct),
                 "maturity": f"L{maturity}" if maturity is not None else "",
                 "strategic": "Yes" if is_strategic else "No",
                 "compliance": compliance.replace("_", " ").title() if compliance else "\u2014",

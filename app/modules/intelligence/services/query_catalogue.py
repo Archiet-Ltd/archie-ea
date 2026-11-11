@@ -878,6 +878,7 @@ def _resolve_application(organization_id: int, name: Optional[str]):
     application's name. Never a guess between several.
     """
     from app.models.application_portfolio import ApplicationComponent
+    from app.utils.tenant_users import escape_like_literal
 
     wanted = " ".join((name or "").split())
     if not wanted:
@@ -886,7 +887,7 @@ def _resolve_application(organization_id: int, name: Optional[str]):
     exact = base.filter(db.func.lower(ApplicationComponent.name) == wanted.lower()).all()
     if len(exact) == 1:
         return exact[0], []
-    found = exact or base.filter(ApplicationComponent.name.ilike(f"%{wanted}%")).order_by(ApplicationComponent.name).all()
+    found = exact or base.filter(ApplicationComponent.name.ilike(f"%{escape_like_literal(wanted)}%", escape="\\")).order_by(ApplicationComponent.name).all()
     if len(found) == 1:
         return found[0], []
     return None, found[:5]
@@ -899,6 +900,7 @@ def _capabilities_of_application(organization_id: int, service: Optional[str] = 
     to its own fact sheet; an application with none says so and points to where
     one is mapped."""
     from app.services.application_capabilities import application_capability_links
+    from app.utils.recorded_figures import coverage_text
 
     application, others = _resolve_application(organization_id, service)
     if application is None:
@@ -928,7 +930,7 @@ def _capabilities_of_application(organization_id: int, service: Optional[str] = 
         support = (getattr(mapping, "support_level", None) or "").replace("_", " ").capitalize()
         coverage = getattr(mapping, "coverage_percentage", None)
         line = " · ".join(part for part in (
-            f"{support} support" if support else "", f"{coverage}% coverage" if coverage is not None else "") if part) or None
+            f"{support} support" if support else "", f"{coverage_text(coverage)} coverage" if coverage is not None else "Coverage: " + coverage_text(coverage)) if part) or None
         rows.append({
             "id": capability_id, "name": capability.name, "support_level": support or None,
             "coverage_percentage": coverage, "source_table": "application_capability_mapping",
