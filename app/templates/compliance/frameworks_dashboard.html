@@ -86,7 +86,7 @@
     <div class="bg-card text-card-foreground rounded-lg border border-border p-5 space-y-3">
         <h2 class="text-base font-semibold text-foreground">Findings</h2>
         <p class="text-sm text-muted-foreground" data-testid="not-in-place-count">{{ not_in_place_text }}. A control is not in place until it is implemented or verified.</p>
-        {% call(f) list_table(rows=finding_rows, columns=[('Control', ''), {'label': 'Status', 'class': 'hidden md:table-cell'}, {'label': 'Application', 'class': 'hidden md:table-cell'}, {'label': 'Capability', 'class': 'hidden md:table-cell'}], caption='Controls not in place', testid='compliance-findings-table', row_testid='compliance-finding-row',
+        {% call(f) list_table(rows=finding_rows, columns=[('Control', ''), {'label': 'Status', 'class': 'hidden md:table-cell'}, {'label': 'Application', 'class': 'hidden md:table-cell'}, {'label': 'Capability', 'class': 'hidden md:table-cell'}], caption='Controls not in place', testid='compliance-findings-table', row_testid='compliance-finding-row', row_id_prefix='control-',
                               empty_message='No control is missing. Map controls to applications to see where the estate falls short.') %}
           {% call table_cell(class='font-medium max-w-md whitespace-normal') %}<a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', control=f.control_id) }}" class="text-primary hover:underline">{{ f.control_code }}: {{ f.control_title }}</a>
             {# On a phone the status, application and capability sit under the control instead of in columns too narrow to read. #}
