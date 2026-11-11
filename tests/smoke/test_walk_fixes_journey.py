@@ -23,7 +23,7 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
-from .fresh_org import add_administrator, sign_in
+from .fresh_org import add_administrator, create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -185,6 +185,104 @@ def test_saved_layered_view_opens_readable_and_the_phone_toolbar_shows_quality_a
         context.close()
 
 
+def _wait_composer_settled(page):
+    """Read the composer until its shapes are drawn, the load has finished and the figures stop changing.
+
+    A drawing that never gets a warnings count stays at zero, so the wait ends at its limit and the
+    caller's comparison reports the difference."""
+    previous = None
+    state = None
+    for _ in range(40):
+        state = page.evaluate(COMPOSER_STATE)
+        figures = (state["elements"], state["warnings"], state["score"])
+        if state["elements"] > 1 and not state["loading"] and state["warnings"] > 0 and figures == previous:
+            break
+        previous = figures
+        page.wait_for_timeout(3000)
+    return page.evaluate(COMPOSER_STATE)
+
+
+def _toolbar_figures(page):
+    """The quality figure and the warnings count a person reads on the toolbar."""
+    quality = page.get_by_role("button", name="Diagram quality score, open details")
+    expect(quality).to_be_visible(timeout=PAGE_TIMEOUT)
+    warnings = page.get_by_test_id("composer-view-actions").get_by_text(re.compile(r"^\d+ warnings?$"))
+    expect(warnings).to_be_visible(timeout=PAGE_TIMEOUT)
+    return (int(re.search(r"Quality (\d+)%", quality.inner_text()).group(1)),
+            int(warnings.inner_text().split()[0]))
+
+
+def test_one_drawing_shows_the_same_quality_and_warnings_as_viewpoint_saved_view_and_snapshot(
+        browser, live_server, demo):
+    name = "Same figures %s" % uuid.uuid4().hex[:6]
+    context = _context(browser, "dark", 390, 844)
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, DEMO_EMAIL)
+        page.goto(live_server + "/archimate/composer?viewpoint=layered", wait_until="domcontentloaded",
+                  timeout=PAGE_TIMEOUT)
+        as_viewpoint = _wait_composer_settled(page)
+        assert as_viewpoint["warnings"] > 0, as_viewpoint
+        viewpoint_figures = _toolbar_figures(page)
+        _shot(page, "same-drawing-viewpoint")
+
+        page.locator("#composer-canvas").click(position={"x": 5, "y": 5})
+        page.keyboard.press("Control+s")
+        name_box = page.locator('[aria-label="Viewpoint name"]')
+        expect(name_box).to_be_visible(timeout=PAGE_TIMEOUT)
+        name_box.fill(name)
+        with page.expect_response(
+                lambda r: "/archimate/api/saved-viewpoints" in r.url and r.request.method in ("POST", "PUT"),
+                timeout=PAGE_TIMEOUT) as saved:
+            page.get_by_role("button", name=re.compile("^Save$")).click()
+        assert saved.value.status < 400, saved.value.text()[:300]
+        expect(name_box).to_be_hidden(timeout=PAGE_TIMEOUT)
+
+        # A snapshot of the saved view, made from the Save menu a person uses.
+        page.get_by_test_id("menu-save").click()
+        page.get_by_text("Save a snapshot to compare against later", exact=True).click()
+        prompt = page.get_by_role("dialog").get_by_role("textbox")
+        expect(prompt).to_be_visible(timeout=PAGE_TIMEOUT)
+        prompt.fill("first")
+        with page.expect_response(lambda r: r.url.endswith("/snapshots") and r.request.method == "POST",
+                                  timeout=PAGE_TIMEOUT) as made:
+            page.get_by_role("dialog").get_by_role("button", name="OK", exact=True).click()
+        assert made.value.status < 400, made.value.text()[:300]
+
+        page.goto(live_server + "/archimate/diagrams", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.locator("tbody tr", has_text=name)
+        expect(row).to_have_count(1, timeout=PAGE_TIMEOUT)
+        row.get_by_role("link", name="Open").click()
+        page.wait_for_url(re.compile(r"/archimate/composer\?.*viewpoint_id=\d+"), timeout=PAGE_TIMEOUT)
+        as_saved = _wait_composer_settled(page)
+        assert as_saved["elements"] == as_viewpoint["elements"], (as_viewpoint, as_saved)
+        saved_figures = _toolbar_figures(page)
+        _shot(page, "same-drawing-saved-view")
+        assert saved_figures == viewpoint_figures, ("saved view", saved_figures, "viewpoint", viewpoint_figures)
+
+        # Open the snapshot from the version history the Save menu offers.
+        page.get_by_test_id("menu-save").click()
+        page.get_by_text("Open a snapshot", exact=True).click()
+        history = page.get_by_role("dialog", name="Version history snapshots")
+        history.get_by_role("button", name=re.compile(r"^first")).click()
+        # Redrawing 500 shapes keeps the page busy: read the status line until the snapshot is shown.
+        status = ""
+        for _ in range(60):
+            status = page.evaluate(
+                "() => Alpine.$data(document.querySelector('[x-data=\"composerApp()\"]')).statusText")
+            if status.startswith("Viewing snapshot: first"):
+                break
+            page.wait_for_timeout(3000)
+        assert status.startswith("Viewing snapshot: first"), status
+        as_snapshot = _wait_composer_settled(page)
+        snapshot_figures = _toolbar_figures(page)
+        _shot(page, "same-drawing-snapshot")
+        assert as_snapshot["elements"] == as_viewpoint["elements"], (as_viewpoint, as_snapshot)
+        assert snapshot_figures == viewpoint_figures, ("snapshot", snapshot_figures, "viewpoint", viewpoint_figures)
+    finally:
+        context.close()
+
+
 # --- the vendor capability matrix --------------------------------------------------------------------
 
 MATRIX = "/dashboards/vendor-capability-matrix"
@@ -204,17 +302,43 @@ def test_matrix_shows_a_dash_before_a_figure_and_explains_an_empty_category_list
         assert _strong_fits(page) == "—", _strong_fits(page)
         _shot(page, "matrix-before-figure")
 
-        # With no category to pick, the page says why and offers the next step, which lands on content.
-        page.route("**/vendor-capability-matrix?only_categories=1", lambda route: route.fulfill(
-            status=200, content_type="application/json", body="[]"))
+        # In the demo organisation no vendor product is recorded, so there is no category to pick: the page
+        # says why, and its next step lands on a page with content and an action, never an empty catalogue.
         _goto(page, live_server, MATRIX)
-        expect(page.get_by_test_id("no-categories")).to_contain_text("No vendor products are recorded")
+        expect(page.get_by_test_id("no-categories")).to_contain_text("No vendor products are recorded", timeout=PAGE_TIMEOUT)
         assert _strong_fits(page) == "—"
+        explanation = page.get_by_test_id("no-categories-next").locator("xpath=..").inner_text()
+        assert "start by adding the vendor on the Vendors list" in explanation, explanation
         _shot(page, "matrix-no-categories")
         page.get_by_test_id("no-categories-next").click()
-        page.wait_for_url(re.compile(r"/applications/vendors/catalogue"), timeout=PAGE_TIMEOUT)
-        assert page.locator("main h1").first.inner_text().strip()
-        assert len(page.locator("main").inner_text().strip()) > 80
+        page.wait_for_url(re.compile(r"/applications/vendors$"), timeout=PAGE_TIMEOUT)
+        assert page.locator("main h1").first.inner_text().strip() == "Vendors"
+        assert page.get_by_test_id("vendor-row").count() > 0
+        expect(page.get_by_test_id("add-vendor")).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert "catalogue has no reviewed products" not in page.locator("main").inner_text()
+        _shot(page, "matrix-next-step-lands")
+    finally:
+        context.close()
+
+
+def test_matrix_next_step_in_another_organisation_lands_on_its_own_empty_vendors_list(
+        browser, live_server, demo, app):
+    """A second, empty organisation reads its own list: none of the demo organisation's vendors, and a way on."""
+    vendor_name = _demo_vendor_name(app, demo["org_id"])
+    assert vendor_name
+    other = create_fresh_org("enterprise_architect")
+    context = _context(browser, "dark", 390, 844)
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, other["emails"]["enterprise_architect"])
+        _goto(page, live_server, MATRIX)
+        expect(page.get_by_test_id("no-categories")).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("no-categories-next").click()
+        page.wait_for_url(re.compile(r"/applications/vendors$"), timeout=PAGE_TIMEOUT)
+        text = page.locator("main").inner_text()
+        assert page.get_by_test_id("vendor-row").count() == 0
+        assert vendor_name not in text
+        assert len(text.strip()) > 40, text
     finally:
         context.close()
 
@@ -298,6 +422,8 @@ def test_named_controls_show_a_focus_ring_when_tabbed_to(browser, live_server, d
         _shot(page, "focus-impact-analysis")
 
         # Gaps, Team and Connectors are an administrator's pages; read them at both widths.
+        # Leave the page first so its keep-alive request cannot race the second sign-in.
+        page.goto("about:blank")
         context.clear_cookies()
         sign_in(page, live_server, demo["admin_email"])
         for path, named in (("/enterprise/implementation/gap-analysis", ["New gap", "Gap", "Status"]),
@@ -433,6 +559,9 @@ def test_old_vendor_addresses_land_on_the_page_their_name_promises(browser, live
                 assert vendor_name in text, (address, vendor_name)
             elif kind == "mapping":
                 assert page.get_by_test_id("mapping-answer").is_visible(), address
+                # Under the Vendors heading the person reads what this tab is for and the list it holds.
+                assert "Pick or type the vendor for each system" in text, (address, text[:300])
+                assert "Systems with no vendor recorded" in page.get_by_test_id("mapping-answer").inner_text(), address
                 rows = page.get_by_test_id("mapping-row").count()
                 assert rows > 0 or re.search(r"Every one of your [1-9]\d* systems", text), (address, text[:300])
             else:
