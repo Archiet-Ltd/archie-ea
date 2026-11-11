@@ -30,8 +30,8 @@ _ORG_SLUG = "lantern-quay"
 # ── demo user ──────────────────────────────────────────────────────────────
 
 _DEMO_USER_EMAIL = "demo@lantern-quay.example.com"
-_DEMO_USER_FIRST = "Demo"
-_DEMO_USER_LAST = "User"
+_DEMO_USER_FIRST = "Alex"
+_DEMO_USER_LAST = "Brooks"
 
 # ── five organisational units ──────────────────────────────────────────────
 
@@ -813,52 +813,52 @@ _ARB_REVIEWS = [
 # ApplicationOwner junction table has valid user_id FKs.
 _OWNER_USERS = [
     ("Ivo", "Reed", "ivo.reed@lantern-quay.example.com"),
-    ("Morgan", "Calibrator", "morgan.calibrator@lantern-quay.example.com"),
-    ("Riley", "Logistics", "riley.logistics@lantern-quay.example.com"),
-    ("Casey", "Inventory", "casey.inventory@lantern-quay.example.com"),
-    ("Jordan", "FieldEng", "jordan.fieldeng@lantern-quay.example.com"),
-    ("Avery", "Compliance", "avery.compliance@lantern-quay.example.com"),
-    ("Taylor", "Procurement", "taylor.procurement@lantern-quay.example.com"),
-    ("Quinn", "Production", "quinn.production@lantern-quay.example.com"),
-    ("Blake", "Quality", "blake.quality@lantern-quay.example.com"),
-    ("Drew", "DataAnalyst", "drew.dataanalyst@lantern-quay.example.com"),
-    ("Sage", "ITOps", "sage.itops@lantern-quay.example.com"),
-    ("Finley", "Support", "finley.support@lantern-quay.example.com"),
-    ("Rowan", "SharedSvc", "rowan.sharedsvc@lantern-quay.example.com"),
-    ("Ellis", "DataSteward", "ellis.datasteward@lantern-quay.example.com"),
-    ("Cameron", "SysAdmin", "cameron.sysadmin@lantern-quay.example.com"),
-    ("Ainsley", "NetEng", "ainsley.neteng@lantern-quay.example.com"),
-    ("Bryn", "BusinessArch", "bryn.businessarch@lantern-quay.example.com"),
+    ("Morgan", "Hale", "morgan.hale@lantern-quay.example.com"),
+    ("Riley", "Fenwick", "riley.fenwick@lantern-quay.example.com"),
+    ("Casey", "Marsh", "casey.marsh@lantern-quay.example.com"),
+    ("Jordan", "Whitlock", "jordan.whitlock@lantern-quay.example.com"),
+    ("Avery", "Lindqvist", "avery.lindqvist@lantern-quay.example.com"),
+    ("Taylor", "Brennan", "taylor.brennan@lantern-quay.example.com"),
+    ("Quinn", "Aldridge", "quinn.aldridge@lantern-quay.example.com"),
+    ("Blake", "Sutherland", "blake.sutherland@lantern-quay.example.com"),
+    ("Drew", "Holloway", "drew.holloway@lantern-quay.example.com"),
+    ("Sage", "Okafor", "sage.okafor@lantern-quay.example.com"),
+    ("Finley", "Barrett", "finley.barrett@lantern-quay.example.com"),
+    ("Rowan", "Pryce", "rowan.pryce@lantern-quay.example.com"),
+    ("Ellis", "Kowalski", "ellis.kowalski@lantern-quay.example.com"),
+    ("Cameron", "Doyle", "cameron.doyle@lantern-quay.example.com"),
+    ("Ainsley", "Cormac", "ainsley.cormac@lantern-quay.example.com"),
+    ("Bryn", "Tanaka", "bryn.tanaka@lantern-quay.example.com"),
 ]
 
 # The one demo user who can look but not change the model: a business analyst
 # on the Viewer platform role, so the demonstration carries a read-only persona
 # beside its sixteen architects. Matches an entry of _OWNER_USERS.
-_DEMO_READER_EMAIL = "drew.dataanalyst@lantern-quay.example.com"
+_DEMO_READER_EMAIL = "drew.holloway@lantern-quay.example.com"
 _DEMO_READER_PERSONA = "business_analyst"
 
 # The one business architect in the demonstration, so what that persona does and
 # does not see (Connections yes, Billing no) can be walked signed in as them.
-_DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.businessarch@lantern-quay.example.com"
+_DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.tanaka@lantern-quay.example.com"
 
 # Map from display name (as used in BusinessActor elements) to User email.
 _OWNER_NAME_TO_EMAIL = {
     "Ivo Reed": "ivo.reed@lantern-quay.example.com",
-    "Calibration Specialist": "morgan.calibrator@lantern-quay.example.com",
-    "Logistics Planner": "riley.logistics@lantern-quay.example.com",
-    "Inventory Controller": "casey.inventory@lantern-quay.example.com",
-    "Field Service Engineer": "jordan.fieldeng@lantern-quay.example.com",
-    "Regulatory Compliance Officer": "avery.compliance@lantern-quay.example.com",
-    "Procurement Officer": "taylor.procurement@lantern-quay.example.com",
-    "Production Supervisor": "quinn.production@lantern-quay.example.com",
-    "Quality Assurance Lead": "blake.quality@lantern-quay.example.com",
-    "Data Analyst": "drew.dataanalyst@lantern-quay.example.com",
-    "IT Operations Lead": "sage.itops@lantern-quay.example.com",
-    "Support Team Lead": "finley.support@lantern-quay.example.com",
-    "Shared Services Director": "rowan.sharedsvc@lantern-quay.example.com",
-    "Data Steward": "ellis.datasteward@lantern-quay.example.com",
-    "System Administrator": "cameron.sysadmin@lantern-quay.example.com",
-    "Network Engineer": "ainsley.neteng@lantern-quay.example.com",
+    "Calibration Specialist": "morgan.hale@lantern-quay.example.com",
+    "Logistics Planner": "riley.fenwick@lantern-quay.example.com",
+    "Inventory Controller": "casey.marsh@lantern-quay.example.com",
+    "Field Service Engineer": "jordan.whitlock@lantern-quay.example.com",
+    "Regulatory Compliance Officer": "avery.lindqvist@lantern-quay.example.com",
+    "Procurement Officer": "taylor.brennan@lantern-quay.example.com",
+    "Production Supervisor": "quinn.aldridge@lantern-quay.example.com",
+    "Quality Assurance Lead": "blake.sutherland@lantern-quay.example.com",
+    "Data Analyst": "drew.holloway@lantern-quay.example.com",
+    "IT Operations Lead": "sage.okafor@lantern-quay.example.com",
+    "Support Team Lead": "finley.barrett@lantern-quay.example.com",
+    "Shared Services Director": "rowan.pryce@lantern-quay.example.com",
+    "Data Steward": "ellis.kowalski@lantern-quay.example.com",
+    "System Administrator": "cameron.doyle@lantern-quay.example.com",
+    "Network Engineer": "ainsley.cormac@lantern-quay.example.com",
 }
 
 _APP_OWNERS = [
@@ -994,14 +994,55 @@ _CAPABILITY_OWNERS = {
 # inventory row, which is left without an accountable person on purpose so the
 # matrix shows its "no one is accountable" flag with real data.
 _RACI_ROWS = [
-    ("LQ-CAP-CALIBRATION", {"quinn.production": "R", "ivo.reed": "A", "blake.quality": "C", "bryn.businessarch": "I"}),
-    ("LQ-CAP-WATER-QUALITY", {"blake.quality": "R", "ivo.reed": "A", "sage.itops": "C", "bryn.businessarch": "I"}),
-    ("LQ-CAP-FIELD-SERVICE", {"riley.logistics": "R", "quinn.production": "A", "sage.itops": "C"}),
-    ("LQ-CAP-INVENTORY", {"riley.logistics": "R", "blake.quality": "C", "bryn.businessarch": "I"}),
-    ("LQ-CAP-FULFILMENT", {"quinn.production": "R", "riley.logistics": "A", "ivo.reed": "I"}),
-    ("LQ-CAP-COMPLIANCE", {"bryn.businessarch": "R", "blake.quality": "A", "ivo.reed": "C"}),
-    ("LQ-CAP-INCIDENT", {"sage.itops": "R", "ivo.reed": "A", "riley.logistics": "C"}),
+    ("LQ-CAP-CALIBRATION", {"quinn.aldridge": "R", "ivo.reed": "A", "blake.sutherland": "C", "bryn.tanaka": "I"}),
+    ("LQ-CAP-WATER-QUALITY", {"blake.sutherland": "R", "ivo.reed": "A", "sage.okafor": "C", "bryn.tanaka": "I"}),
+    ("LQ-CAP-FIELD-SERVICE", {"riley.fenwick": "R", "quinn.aldridge": "A", "sage.okafor": "C"}),
+    ("LQ-CAP-INVENTORY", {"riley.fenwick": "R", "blake.sutherland": "C", "bryn.tanaka": "I"}),
+    ("LQ-CAP-FULFILMENT", {"quinn.aldridge": "R", "riley.fenwick": "A", "ivo.reed": "I"}),
+    ("LQ-CAP-COMPLIANCE", {"bryn.tanaka": "R", "blake.sutherland": "A", "ivo.reed": "C"}),
+    ("LQ-CAP-INCIDENT", {"sage.okafor": "R", "ivo.reed": "A", "riley.fenwick": "C"}),
 ]
+
+
+def _rename_retired_people(org_id) -> int:
+    """Rename, in place, demonstration people seeded under earlier names, so a re-run leaves exactly
+    the people a fresh seed creates. Ids are kept, so ownership, responsibilities and links survive.
+    An earlier person is the one demo-domain account with the same first name and a different address."""
+    from app.models.vendor.vendor_organization import EnterpriseInitiative
+    from app.models.user import User
+
+    domain = _DEMO_USER_EMAIL.split("@", 1)[1]
+    users = db.session.query(User).filter(User.organization_id == org_id).all()
+    current = {email for _, _, email in _OWNER_USERS} | {_DEMO_USER_EMAIL}
+    renamed = 0
+
+    def _rename_text(old_name, new_name):
+        for initiative in db.session.query(EnterpriseInitiative).filter(
+            EnterpriseInitiative.organization_id == org_id,
+            EnterpriseInitiative.program_manager == old_name,
+        ):
+            initiative.program_manager = new_name
+
+    demo = next((u for u in users if u.email == _DEMO_USER_EMAIL), None)
+    if demo is not None and (demo.first_name, demo.last_name) != (_DEMO_USER_FIRST, _DEMO_USER_LAST):
+        demo.first_name, demo.last_name = _DEMO_USER_FIRST, _DEMO_USER_LAST
+        renamed += 1
+    for first, last, email in _OWNER_USERS:
+        if any(u.email == email for u in users):
+            continue
+        earlier = [
+            u for u in users
+            if u.first_name == first and u.email.endswith("@" + domain) and u.email not in current
+        ]
+        if len(earlier) != 1:
+            continue
+        person = earlier[0]
+        _rename_text("%s %s" % (person.first_name, person.last_name), "%s %s" % (first, last))
+        person.email, person.last_name = email, last
+        renamed += 1
+    if renamed:
+        db.session.flush()
+    return renamed
 
 
 def _seed_raci(org_id) -> dict:
@@ -1012,7 +1053,7 @@ def _seed_raci(org_id) -> dict:
     caps = _resolve_caps(org_id)
     users = {email.split("@")[0]: u for email, u in _resolve_users(org_id).items()}
     existing = {
-        (a.stakeholder_type, a.stakeholder_id, a.capability_id)
+        (a.stakeholder_type, a.stakeholder_id, a.capability_id): a
         for a in db.session.query(EnterpriseRaciAssignment)
         .filter(EnterpriseRaciAssignment.organization_id == org_id)
     }
@@ -1023,7 +1064,14 @@ def _seed_raci(org_id) -> dict:
             continue
         for handle, letter in cells.items():
             user = users.get(handle)
-            if user is None or ("user", user.id, cap.id) in existing:
+            if user is None:
+                raise RuntimeError(
+                    "The responsibility matrix names %s for %s, and no such person exists in the "
+                    "demonstration organisation." % (handle, code)
+                )
+            kept = existing.get(("user", user.id, cap.id))
+            if kept is not None:
+                kept.stakeholder_name = f"{user.first_name} {user.last_name}"
                 continue
             db.session.add(EnterpriseRaciAssignment(
                 organization_id=org_id,
@@ -1411,22 +1459,22 @@ _INITIATIVES = [
      750000, 485000, 790000, 55, "Chief Operations Officer", "Ivo Reed", "modernization",
      ("Calibration Automation Phase 1", "Calibration Automation Phase 2")),
     ("Field Service Transformation", "LQ-INI-FIELD-SVC", "implementation", "active", "green",
-     420000, 210000, 415000, 50, "Chief Operations Officer", "Jordan FieldEng", "transformation",
+     420000, 210000, 415000, 50, "Chief Operations Officer", "Jordan Whitlock", "transformation",
      ("Field Tester Rollout",)),
     ("Event Backbone Hardening", "LQ-INI-EVENT-BACKBONE", "design", "active", "red",
-     600000, 540000, 720000, 30, "Chief Technology Officer", "Sage ITOps", "migration",
+     600000, 540000, 720000, 30, "Chief Technology Officer", "Sage Okafor", "migration",
      ("Event Backbone Migration",)),
     ("Supplier Optimisation", "LQ-INI-SUPPLIER", "planning", "planning", "green",
-     240000, 30000, 240000, 10, "Chief Financial Officer", "Taylor Procurement", "consolidation",
+     240000, 30000, 240000, 10, "Chief Financial Officer", "Taylor Brennan", "consolidation",
      ("Supplier Consolidation Programme",)),
     ("Predictive Operations", "LQ-INI-PREDICTIVE", "planning", "planning", "yellow",
-     310000, 45000, 330000, 8, "Chief Technology Officer", "Drew DataAnalyst", "transformation",
+     310000, 45000, 330000, 8, "Chief Technology Officer", "Drew Holloway", "transformation",
      ("Predictive Maintenance Pilot",)),
     ("Compliance System Upgrade", "LQ-INI-COMPLIANCE", "testing", "active", "green",
-     180000, 150000, 175000, 80, "Chief Operations Officer", "Avery Compliance", "upgrade",
+     180000, 150000, 175000, 80, "Chief Operations Officer", "Avery Lindqvist", "upgrade",
      ("Compliance System Upgrade",)),
     ("Inventory Accuracy Drive", "LQ-INI-INVENTORY", "deployment", "active", "green",
-     95000, 88000, 95000, 90, "Chief Operations Officer", "Casey Inventory", "upgrade",
+     95000, 88000, 95000, 90, "Chief Operations Officer", "Casey Marsh", "upgrade",
      ("Inventory Accuracy Drive",)),
 ]
 
@@ -2885,7 +2933,7 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
 # of implemented, in progress and planned: the controls still planned are the findings.
 _ISO_STATUS_BY_APP = {
     "Event Relay": ("implemented", "implemented", "verified"),
-    "Calibration Ledger": ("implemented", "in_progress", "planned"),
+    "Calibration Ledger": ("implemented", "in_progress", "verified"),
     "Dispatch Planner": ("verified", "implemented", "in_progress"),
     "Inventory Manager": ("in_progress", "planned", "planned"),
     "Field Service Scheduler": ("implemented", "implemented", "implemented"),
@@ -2895,6 +2943,53 @@ _ISO_STATUS_BY_APP = {
     "Quality Monitor": ("implemented", "implemented", "in_progress"),
     "Sensor Data Hub": ("planned", "planned", "in_progress"),
 }
+
+
+def _compliance_evidence_document(org_id, app, rows) -> str:
+    """The evidence register of one application, kept as a document of the application, and the address that opens it.
+
+    The register is an ApplicationDocument with its file in the upload folder, the store the application's documents
+    tab reads, and the address is the one that serves the file inside the app, so the link on a finished control
+    opens a page with its content. One document per application, one section per finished control.
+    """
+    import os
+
+    from flask import current_app, url_for
+
+    from app.models.miscellaneous import ApplicationDocument
+
+    title = "ISO 27001 control evidence"
+    lines = ["%s: %s" % (title, app.name), ""]
+    for control, status in rows:
+        lines += [
+            "%s  %s" % (control.control_code, control.title),
+            "Status: %s" % status.replace("_", " "),
+            "Evidence: %s" % ("the control is assessed and the result is recorded against %s." % app.name
+                              if status == "verified" else
+                              "the control is in place for %s and its owner keeps the working record." % app.name
+                              if status == "implemented" else
+                              "the work to put the control in place for %s is under way; this is the plan so far." % app.name),
+            "",
+        ]
+    body = "\n".join(lines)
+    file_name = "iso27001-control-evidence-%s.txt" % "-".join(app.name.lower().split())
+    document = ApplicationDocument.query.filter_by(
+        organization_id=org_id, application_component_id=app.id, title=title).first()
+    if document is None:
+        document = ApplicationDocument(
+            organization_id=org_id, application_component_id=app.id, title=title,
+            description="What shows each ISO 27001 control the application has in hand.",
+            file_name=file_name, file_extension="TXT", uploaded_by="Seeded demonstration")
+        db.session.add(document)
+        db.session.flush()
+    folder = current_app.config.get("UPLOAD_FOLDER") or os.path.join(current_app.root_path, "uploads", "documents")
+    os.makedirs(folder, exist_ok=True)
+    document.file_path = os.path.join(folder, "%s_%s" % (document.id, file_name))
+    with open(document.file_path, "w", encoding="utf-8") as handle:
+        handle.write(body)
+    document.file_size = len(body.encode("utf-8"))
+    with current_app.test_request_context():
+        return url_for("unified_applications.download_document_file", doc_id=document.id, view=1)
 
 
 def _seed_compliance(org_id) -> int:
@@ -2918,13 +3013,23 @@ def _seed_compliance(org_id) -> int:
         statuses = _ISO_STATUS_BY_APP.get(app_name)
         if statuses is None:
             continue
-        for index, control in enumerate(controls):
-            if ApplicationComplianceControl.query.filter_by(
+        plan = [(control, statuses[index % len(statuses)]) for index, control in enumerate(controls)]
+        finished = [(c, st) for c, st in plan if st in ("implemented", "verified", "in_progress")]
+        evidence = _compliance_evidence_document(org_id, app, finished) if finished else None
+        for control, status in plan:
+            kept = ApplicationComplianceControl.query.filter_by(
                 organization_id=org_id, application_id=app.id, control_id=control.id
-            ).first():
+            ).first()
+            wanted = evidence if status in ("implemented", "verified", "in_progress") else None
+            if kept is not None:
+                # a mapping that exists is brought to the status the seed gives it, so a re-seeded organisation
+                # reads the same as a fresh one
+                kept.implementation_status = status
+                kept.evidence_url = wanted
+                if status == "verified" and kept.verified_date is None:
+                    kept.verified_date = _dt.datetime.utcnow()
                 continue
-            status = statuses[index % len(statuses)]
-            link = ApplicabilityService.link_requirement(org_id, app.id, control.id, status)
+            link = ApplicabilityService.link_requirement(org_id, app.id, control.id, status, evidence_url=wanted)
             if status == "verified":
                 link.verified_date = _dt.datetime.utcnow()
             created += 1
@@ -3070,6 +3175,8 @@ def _seed_demo_company() -> dict:
                 if architect_role is not None:
                     existing_user.role = architect_role
                     db.session.flush()
+
+        stats["people_renamed"] = _rename_retired_people(org_id)
 
         # ── 3. ArchiMate elements ───────────────────────────────────────
         existing_elements = _resolve_elements(org_id)
