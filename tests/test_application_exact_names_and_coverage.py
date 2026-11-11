@@ -204,3 +204,4 @@ def test_unrecorded_coverage_reads_not_recorded_and_a_recorded_zero_reads_zero(
     for label, row in (("chat", chat), ("page", table)):
         assert "Not recorded" in row[blank.name] and "0%" not in row[blank.name], label
         assert "0%" in row[zero.name] and "Not recorded" not in row[zero.name], label
+    assert "Coverage: Not recorded" in chat[blank.name] and "Coverage: 0%" in chat[zero.name]

@@ -84,7 +84,7 @@ def _empty_steps(answer, organization_id):
     the one thing the question asked about when that is what is missing, or the
     general next steps (connect a source, or see them working with a sample) when
     the records hold nothing at all yet. ``None`` once there is anything to show
-    instead, or a finding that needs no next step (CLAUDE.md "never invent data" —
+    instead, or a finding that needs no next step (the rule is never to invent data:
     no button is shown unless the person it opens for could actually use it)."""
     if answer["records"] or answer.get("complete"):
         return None

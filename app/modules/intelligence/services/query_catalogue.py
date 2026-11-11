@@ -930,7 +930,7 @@ def _capabilities_of_application(organization_id: int, service: Optional[str] = 
         support = (getattr(mapping, "support_level", None) or "").replace("_", " ").capitalize()
         coverage = getattr(mapping, "coverage_percentage", None)
         line = " · ".join(part for part in (
-            f"{support} support" if support else "", f"{coverage_text(coverage)} coverage" if coverage is not None else "Coverage: " + coverage_text(coverage)) if part) or None
+            f"{support} support" if support else "", f"Coverage: {coverage_text(coverage)}") if part) or None
         rows.append({
             "id": capability_id, "name": capability.name, "support_level": support or None,
             "coverage_percentage": coverage, "source_table": "application_capability_mapping",
