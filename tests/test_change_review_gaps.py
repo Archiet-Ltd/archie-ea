@@ -59,7 +59,7 @@ def _install_unreachable_reviewer(monkeypatch):
     calls = []
 
     def select_reviewer(self, drafter_provider, drafter_model):
-        return router.ReviewerChoice("deepseek", "deepseek-reasoner", True)
+        return router.ReviewerChoice("deepseek", "deepseek-v4-pro", True)
 
     def call_model(self, choice, prompt, timeout=90.0):
         calls.append(prompt)
@@ -378,7 +378,7 @@ def test_a_key_and_a_card_number_never_reach_the_reviewer_or_the_reviser(
 
     monkeypatch.setattr(LLMService, "_call_llm_with_failover", staticmethod(fake_call))
     monkeypatch.setattr(router.LLMModelRouter, "select_reviewer",
-                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-reasoner", True))
+                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-v4-pro", True))
 
     from app.modules.ai_chat.services.agent_runner import AgentRunner
     from app.modules.ai_chat.services.change_review import ReviewBudget
@@ -387,7 +387,7 @@ def test_a_key_and_a_card_number_never_reach_the_reviewer_or_the_reviser(
     runner = AgentRunner(user_id=user.id, chat_session_id="scrub-%s" % uuid.uuid4().hex[:6])
     runner._turn_id = "t"
     runner._review_budget = ReviewBudget()
-    runner._drafter = ("deepseek", "deepseek-chat",
+    runner._drafter = ("deepseek", "deepseek-flash",
                        "Move %s to production. My api_key=%s and my card is %s." % (ledger.name, secret, card))
     with tenant_ctx(org.id):
         runner._queue_approval(ToolCall(id="1", name="update_application_status", arguments=dict(arguments)))
@@ -412,7 +412,7 @@ def test_data_in_a_prompt_cannot_close_its_own_fence(db_session, make_org, tenan
     runner = AgentRunner(user_id=user.id, chat_session_id="fence-%s" % uuid.uuid4().hex[:6])
     runner._turn_id = "t"
     runner._review_budget = ReviewBudget()
-    runner._drafter = ("deepseek", "deepseek-chat", "Move %s to production. %s" % (ledger.name, trap))
+    runner._drafter = ("deepseek", "deepseek-flash", "Move %s to production. %s" % (ledger.name, trap))
     with tenant_ctx(org.id):
         runner._queue_approval(ToolCall(id="1", name="update_application_status", arguments={
             "application_name": ledger.name, "new_status": "production", "rationale": "r"}))
@@ -756,7 +756,7 @@ def test_a_reply_the_reviewer_leaves_unreadable_applies_nothing(db_session, make
     user = _user(db_session, org.id)
     ledger = _application(db_session, org.id, "Ledger %s" % uuid.uuid4().hex[:6], "development")
     monkeypatch.setattr(router.LLMModelRouter, "select_reviewer",
-                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-reasoner", True))
+                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-v4-pro", True))
     monkeypatch.setattr(router.LLMModelRouter, "call_model", lambda self, c, p, timeout=90.0: "I approve!")
     with tenant_ctx(org.id):
         _id, verdict = _ask_for_status(user, ledger.name, "production")

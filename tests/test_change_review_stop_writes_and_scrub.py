@@ -252,11 +252,11 @@ def test_no_secret_shape_reaches_the_reviewer_the_reviser_or_the_chat_path(
 
     monkeypatch.setattr(LLMService, "_call_llm_with_failover", staticmethod(fake_call))
     monkeypatch.setattr(router.LLMModelRouter, "select_reviewer",
-                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-reasoner", True))
+                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-v4-pro", True))
     runner = AgentRunner(user_id=user.id, chat_session_id="scrub-%s" % uuid.uuid4().hex[:6])
     runner._turn_id = "t"
     runner._review_budget = ReviewBudget()
-    runner._drafter = ("deepseek", "deepseek-chat", "Move %s to production. %s" % (ledger.name, words))
+    runner._drafter = ("deepseek", "deepseek-flash", "Move %s to production. %s" % (ledger.name, words))
     with tenant_ctx(org.id):
         runner._queue_approval(ToolCall(id="1", name="update_application_status", arguments=dict(arguments)))
     assert len(sent) == 2, "one review and one revision were sent"

@@ -230,11 +230,11 @@ def test_a_password_key_and_url_token_in_an_ordinary_field_never_reach_the_revie
 
     monkeypatch.setattr(LLMService, "_call_llm_with_failover", staticmethod(fake_call))
     monkeypatch.setattr(router.LLMModelRouter, "select_reviewer",
-                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-reasoner", True))
+                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-v4-pro", True))
     runner = AgentRunner(user_id=user.id, chat_session_id="rec-%s" % uuid.uuid4().hex[:6])
     runner._turn_id = "t"
     runner._review_budget = ReviewBudget()
-    runner._drafter = ("deepseek", "deepseek-chat", "Move %s to production." % ledger.name)
+    runner._drafter = ("deepseek", "deepseek-flash", "Move %s to production." % ledger.name)
     with tenant_ctx(org.id):
         runner._queue_approval(ToolCall(id="1", name="update_application_status", arguments=dict(args)))
     assert sent, "the reviewer was called"

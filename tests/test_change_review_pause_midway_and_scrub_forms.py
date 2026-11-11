@@ -228,7 +228,7 @@ def _loop_stub(monkeypatch, replies, on_call=None):
 
     monkeypatch.setattr(LLMService, "_call_llm_with_failover", staticmethod(fake_call))
     monkeypatch.setattr(router.LLMModelRouter, "select_reviewer",
-                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-reasoner", True))
+                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-v4-pro", True))
     return sent
 
 
@@ -255,7 +255,7 @@ def test_pasted_json_and_named_keys_never_reach_the_reviewer_or_the_reviser_and_
     runner = AgentRunner(user_id=user.id, chat_session_id="midway-%s" % uuid.uuid4().hex[:6])
     runner._turn_id = "t"
     runner._review_budget = ReviewBudget()
-    runner._drafter = ("deepseek", "deepseek-chat", "Move %s to production. %s" % (ledger.name, rationale))
+    runner._drafter = ("deepseek", "deepseek-flash", "Move %s to production. %s" % (ledger.name, rationale))
     with tenant_ctx(org.id):
         runner._queue_approval(ToolCall(id="1", name="update_application_status", arguments=dict(arguments)))
     assert len(sent) == 2, "one review and one revision were sent"
@@ -304,7 +304,7 @@ def test_a_pause_pressed_during_a_review_holds_the_change_and_it_is_applied_once
         return json.dumps(PASS_ALL)
 
     monkeypatch.setattr(router.LLMModelRouter, "select_reviewer",
-                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-reasoner", True))
+                        lambda self, p, m: router.ReviewerChoice("deepseek", "deepseek-v4-pro", True))
     monkeypatch.setattr(router.LLMModelRouter, "call_model", call_model)
 
     with tenant_ctx(org.id):

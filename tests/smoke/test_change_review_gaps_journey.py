@@ -2,7 +2,7 @@
 hand, or asked for by an account that has since been switched off.
 
 One technical founder signs up through the self-serve form (a workspace of one) and uses the assistant.
-DeepSeek is the only provider, stubbed on a loopback port: deepseek-chat drafts, deepseek-reasoner reviews, and
+DeepSeek is the only provider, stubbed on a loopback port: deepseek-flash drafts, deepseek-v4-pro reviews, and
 the reviewer fails any change to an application called "Old Ledger".
 
 * applied: the chat says Applied, the record names both models, the application page reads Production.
@@ -47,7 +47,7 @@ def _review_reply(text):
 
 
 def _respond(model, text, has_tools):
-    if model == "deepseek-reasoner" and not has_tools:
+    if model == "deepseek-v4-pro" and not has_tools:
         return _review_reply(text)
     if "independent reviewer rejected it" in text:
         draft = re.search(r"=== BEGIN YOUR_DRAFT ===.*?\n\n(\{.*?\})\n=== END YOUR_DRAFT ===", text, re.S)
@@ -219,7 +219,7 @@ def _ask(page, base, stub, tool_args, question):
 
 
 def _reviews(stub):
-    return [r for r in stub.requests if r["model"] == "deepseek-reasoner"]
+    return [r for r in stub.requests if r["model"] == "deepseek-v4-pro"]
 
 
 def _status_args(name):
@@ -265,8 +265,8 @@ def test_a_change_that_passes_review_is_applied_and_its_record_shows_both_models
         page.wait_for_url(re.compile(r"/ai-chat/approvals/inbox\?approval=\d+"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("review-record-verdict")).to_have_text("Applied")
         facts = page.get_by_test_id("review-record-facts")
-        expect(facts.get_by_test_id("property-drafter")).to_have_text("deepseek-chat (DeepSeek)")
-        expect(facts.get_by_test_id("property-reviewer")).to_have_text("deepseek-reasoner (DeepSeek)")
+        expect(facts.get_by_test_id("property-drafter")).to_have_text("deepseek-flash (DeepSeek)")
+        expect(facts.get_by_test_id("property-reviewer")).to_have_text("deepseek-v4-pro (DeepSeek)")
         checks = page.get_by_test_id("review-record-checks").inner_text()
         assert "The thing it changes exists: passed. Found %s." % name in checks, checks
         _shot(page, shots, "change-applied-record", theme)

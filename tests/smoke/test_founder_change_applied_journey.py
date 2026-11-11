@@ -2,7 +2,7 @@
 
 The person: a technical founder alone in a new workspace, made through the self-serve sign-up (the
 form, not a seeded user). The goal: keep the model current by asking the chat. DeepSeek is the only
-provider, as in production, stubbed on a loopback port: deepseek-chat drafts, deepseek-reasoner reviews.
+provider, as in production, stubbed on a loopback port: deepseek-flash drafts, deepseek-v4-pro reviews.
 
 Journey one: the founder asks to move an application to production. The same message says "Applied",
 the link opens the record (drafter and reviewer named), and the application's own page reads
@@ -40,7 +40,7 @@ def _review_reply(_text):
 
 
 def _respond(model, text, has_tools):
-    if model == "deepseek-reasoner" and not has_tools:
+    if model == "deepseek-v4-pro" and not has_tools:
         return _review_reply(text)
     return None
 
@@ -145,7 +145,7 @@ def _ask(page, base, stub, tool, tool_args, question):
 
 
 def _reviews(stub):
-    return [r for r in stub.requests if r["model"] == "deepseek-reasoner"]
+    return [r for r in stub.requests if r["model"] == "deepseek-v4-pro"]
 
 
 @pytest.mark.parametrize("width,theme", VIEWS)
@@ -174,8 +174,8 @@ def test_a_founder_who_signed_up_gets_an_application_moved_to_production(
         page.wait_for_url(re.compile(r"/ai-chat/approvals/inbox\?approval=\d+"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("review-record-verdict")).to_have_text("Applied")
         facts = page.get_by_test_id("review-record-facts")
-        expect(facts.get_by_test_id("property-drafter")).to_have_text("deepseek-chat (DeepSeek)")
-        expect(facts.get_by_test_id("property-reviewer")).to_have_text("deepseek-reasoner (DeepSeek)")
+        expect(facts.get_by_test_id("property-drafter")).to_have_text("deepseek-flash (DeepSeek)")
+        expect(facts.get_by_test_id("property-reviewer")).to_have_text("deepseek-v4-pro (DeepSeek)")
         checks = page.get_by_test_id("review-record-checks").inner_text()
         assert "The assistant's charter allows it: passed." in checks, checks
         _shot(page, shots, "founder-change-record", theme)

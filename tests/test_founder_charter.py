@@ -28,7 +28,7 @@ _FOUNDER_CHANGES = [
 ]
 
 
-def _ask(user, persona, tool, arguments, drafter=("deepseek", "deepseek-chat")):
+def _ask(user, persona, tool, arguments, drafter=("deepseek", "deepseek-flash")):
     """What the assistant does when its model calls a write tool in a chat turn under a persona."""
     from app.modules.ai_chat.services.agent_runner import AgentRunner
     from app.modules.ai_chat.services.change_review import ReviewBudget
@@ -66,8 +66,8 @@ def test_a_founder_status_change_is_applied_in_the_same_turn_and_names_both_mode
         assert _status_of(atlas.id) == "production"
         row = _row(approval_id)
         assert row.persona == "cto_founder"
-        assert row.drafter_model == "deepseek/deepseek-chat"
-        assert row.reviewer_model == "deepseek/deepseek-reasoner"
+        assert row.drafter_model == "deepseek/deepseek-flash"
+        assert row.reviewer_model == "deepseek/deepseek-v4-pro"
         assert "The assistant's charter allows it" in [c["name"] for c in row.review_reasons["checks"]]
     assert len(reviewer.review_prompts) == 1
 

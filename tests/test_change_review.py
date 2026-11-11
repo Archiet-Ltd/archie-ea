@@ -49,7 +49,7 @@ def _application(db_session, org_id, name, deployment_status="development", life
 class FakeReviewer:
     """Stands in for the model calls behind the router; records every prompt it is sent."""
 
-    def __init__(self, reviews, revisions=(), choice=("deepseek", "deepseek-reasoner", True)):
+    def __init__(self, reviews, revisions=(), choice=("deepseek", "deepseek-v4-pro", True)):
         self.reviews = list(reviews)
         self.revisions = list(revisions)
         self.choice = choice
@@ -80,7 +80,7 @@ class FakeReviewer:
         return self
 
 
-def _ask_for_status(user, app_name, new_status, drafter=("deepseek", "deepseek-chat")):
+def _ask_for_status(user, app_name, new_status, drafter=("deepseek", "deepseek-flash")):
     """What the assistant does when its model calls update_application_status in a chat turn."""
     from app.modules.ai_chat.services.agent_runner import AgentRunner
     from app.modules.ai_chat.services.change_review import ReviewBudget
@@ -144,8 +144,8 @@ def test_a_person_alone_in_a_workspace_gets_the_change_applied_in_the_same_turn(
         row = _row(approval_id)
         assert row.status == ApprovalStatus.APPROVED
         assert row.approved_by_id is None, "the server applied it; no person is recorded as approving"
-        assert row.drafter_model == "deepseek/deepseek-chat"
-        assert row.reviewer_model == "deepseek/deepseek-reasoner"
+        assert row.drafter_model == "deepseek/deepseek-flash"
+        assert row.reviewer_model == "deepseek/deepseek-v4-pro"
         assert row.review_rounds == 1
         assert row.rubric_version == "1"
         assert row.before_snapshot["fields"] == {"deployment_status": "development"}
@@ -166,7 +166,7 @@ def test_a_person_alone_in_a_workspace_gets_the_change_applied_in_the_same_turn(
         assert "self_approval_refused" not in names
 
     # The reviewer read the drafter's request and this organisation's application, and nothing else.
-    assert reviewer.selected_for == [("deepseek", "deepseek-chat")]
+    assert reviewer.selected_for == [("deepseek", "deepseek-flash")]
     assert atlas.name in reviewer.review_prompts[0][1]
 
 
@@ -181,8 +181,8 @@ def test_the_record_page_reads_rounds_models_and_reasons(db_session, make_org, t
         approval_id, _verdict = _ask_for_status(founder, atlas.name, "production")
         record = AIChatApprovalService(founder.id).get_review_record(approval_id)["record"]
     assert record["verdict"] == "Applied"
-    assert record["drafter"] == "deepseek-chat (DeepSeek)"
-    assert record["reviewer"] == "deepseek-reasoner (DeepSeek)"
+    assert record["drafter"] == "deepseek-flash (DeepSeek)"
+    assert record["reviewer"] == "deepseek-v4-pro (DeepSeek)"
     assert record["same_provider_note"] == "Both models came from DeepSeek because no other provider is set up."
     assert record["rounds"] == 1
     assert record["review_rounds"][0]["criteria"][4]["name"] == "Consistent"
@@ -221,7 +221,7 @@ def test_a_declined_change_leaves_the_data_unchanged_and_names_the_reasons(
         assert "executed" not in names
     # The identical revision ended the loop: one review, one revision, no second review.
     assert len(reviewer.review_prompts) == 1 and len(reviewer.revision_prompts) == 1
-    assert reviewer.revision_prompts[0][0] == "deepseek/deepseek-chat", "the drafter revises its own draft"
+    assert reviewer.revision_prompts[0][0] == "deepseek/deepseek-flash", "the drafter revises its own draft"
 
 
 def test_a_revision_is_reviewed_again_and_applied_when_it_passes(db_session, make_org, tenant_ctx, monkeypatch):
@@ -268,7 +268,7 @@ def test_a_change_no_model_drafted_gets_one_review_and_no_revision(db_session, m
     founder = _user(db_session, org.id)
     atlas = _application(db_session, org.id, "Atlas %s" % uuid.uuid4().hex[:6], "development")
     reviewer = FakeReviewer([_fail(6, "The summary does not say what changes.")],
-                            choice=("deepseek", "deepseek-reasoner", False)).install(monkeypatch)
+                            choice=("deepseek", "deepseek-v4-pro", False)).install(monkeypatch)
     with tenant_ctx(org.id):
         _approval_id, verdict = _ask_for_status(founder, atlas.name, "production", drafter=None)
     assert verdict["state"] == "declined"
@@ -429,12 +429,12 @@ def test_with_one_provider_the_reviewer_is_its_other_model(db_session, make_org,
     org = make_org("one-provider")
     router = LLMModelRouter()
     with tenant_ctx(org.id):
-        chat = router.select_reviewer("deepseek", "deepseek-chat")
-        reasoner = router.select_reviewer("deepseek", "deepseek-reasoner")
+        chat = router.select_reviewer("deepseek", "deepseek-flash")
+        reasoner = router.select_reviewer("deepseek", "deepseek-v4-pro")
         no_model = router.select_reviewer(None, None)
-    assert (chat.provider, chat.model, chat.same_provider) == ("deepseek", "deepseek-reasoner", True)
-    assert (reasoner.provider, reasoner.model, reasoner.same_provider) == ("deepseek", "deepseek-chat", True)
-    assert (no_model.provider, no_model.model) == ("deepseek", "deepseek-reasoner")
+    assert (chat.provider, chat.model, chat.same_provider) == ("deepseek", "deepseek-v4-pro", True)
+    assert (reasoner.provider, reasoner.model, reasoner.same_provider) == ("deepseek", "deepseek-flash", True)
+    assert (no_model.provider, no_model.model) == ("deepseek", "deepseek-v4-pro")
 
 
 def test_with_a_second_provider_the_reviewer_comes_from_it(db_session, make_org, tenant_ctx, only_deepseek):
@@ -447,11 +447,11 @@ def test_with_a_second_provider_the_reviewer_comes_from_it(db_session, make_org,
     db_session.flush()
     router = LLMModelRouter()
     with tenant_ctx(org.id):
-        for_deepseek = router.select_reviewer("deepseek", "deepseek-chat")
+        for_deepseek = router.select_reviewer("deepseek", "deepseek-flash")
         for_openai = router.select_reviewer("openai", "gpt-4o")
     assert (for_deepseek.provider, for_deepseek.same_provider) == ("openai", False)
-    assert for_deepseek.model and for_deepseek.model != "deepseek-chat"
-    assert (for_openai.provider, for_openai.model, for_openai.same_provider) == ("deepseek", "deepseek-reasoner", False)
+    assert for_deepseek.model and for_deepseek.model != "deepseek-flash"
+    assert (for_openai.provider, for_openai.model, for_openai.same_provider) == ("deepseek", "deepseek-v4-pro", False)
 
 
 def test_with_no_provider_there_is_no_reviewer(db_session, make_org, tenant_ctx, monkeypatch):
@@ -461,7 +461,7 @@ def test_with_no_provider_there_is_no_reviewer(db_session, make_org, tenant_ctx,
         monkeypatch.delenv(name + "_API_KEY", raising=False)
     org = make_org("no-provider")
     with tenant_ctx(org.id):
-        assert LLMModelRouter().select_reviewer("deepseek", "deepseek-chat") is None
+        assert LLMModelRouter().select_reviewer("deepseek", "deepseek-flash") is None
 
 
 def test_the_real_router_reviews_a_deepseek_chat_draft_with_deepseek_reasoner(
@@ -490,9 +490,9 @@ def test_the_real_router_reviews_a_deepseek_chat_draft_with_deepseek_reasoner(
             assert verdict["state"] == "applied", verdict
             assert _status_of(atlas.id) == "production"
             row = _row(approval_id)
-            assert (row.drafter_model, row.reviewer_model) == ("deepseek/deepseek-chat", "deepseek/deepseek-reasoner")
+            assert (row.drafter_model, row.reviewer_model) == ("deepseek/deepseek-flash", "deepseek/deepseek-v4-pro")
     finally:
         stub.close()
-    assert [r["model"] for r in stub.requests] == ["deepseek-reasoner"]
+    assert [r["model"] for r in stub.requests] == ["deepseek-v4-pro"]
     assert atlas.name in stub.requests[0]["text"]
-    assert spend == [("deepseek", "deepseek-reasoner")], "the platform's spend ledger records the review"
+    assert spend == [("deepseek", "deepseek-v4-pro")], "the platform's spend ledger records the review"

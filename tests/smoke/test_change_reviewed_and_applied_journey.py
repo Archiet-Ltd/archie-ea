@@ -1,14 +1,14 @@
 """The one person in a small workspace asks the assistant to move an application to production.
 
 The server is set up as production is: DeepSeek only (LLM_PROVIDER_ORDER=deepseek, a key, a spend
-ceiling), with DeepSeek as a stub on a loopback port. deepseek-chat drafts the change; the router
-picks deepseek-reasoner to review it, because no second provider is set up.
+ceiling), with DeepSeek as a stub on a loopback port. deepseek-flash drafts the change; the router
+picks deepseek-v4-pro to review it, because no second provider is set up.
 
 Journey one: the person (an application manager, whose assistant may change an application's status)
 asks to move Atlas to production. In the same message the assistant shows
 "Applied" with no Approve button anywhere. The link under it opens the change's record, which reads
-the checks, one review with all six criteria and their reasons, deepseek-chat as the drafter and
-deepseek-reasoner as the reviewer, and says both came from DeepSeek. The application's own page then
+the checks, one review with all six criteria and their reasons, deepseek-flash as the drafter and
+deepseek-v4-pro as the reviewer, and says both came from DeepSeek. The application's own page then
 reads Production.
 
 Journey two: the same person asks to move an application the portfolio shows as decommissioned to
@@ -40,7 +40,7 @@ CHAT_REPLY = "I asked for that change; the result is shown below."
 
 
 def _review_reply(text):
-    """What the stubbed deepseek-reasoner answers: pass everything, except a move of a decommissioned app."""
+    """What the stubbed deepseek-v4-pro answers: pass everything, except a move of a decommissioned app."""
     failing = "Old Ledger" in text
     return json.dumps({"criteria": [
         {"id": n, "passed": not (failing and n == 5),
@@ -50,7 +50,7 @@ def _review_reply(text):
 
 
 def _respond(model, text, has_tools):
-    if model == "deepseek-reasoner" and not has_tools:
+    if model == "deepseek-v4-pro" and not has_tools:
         return _review_reply(text)
     if "independent reviewer rejected it" in text:
         # The drafter is asked to revise: it returns its own draft unchanged, which ends the review.
@@ -186,7 +186,7 @@ def test_the_one_person_in_a_workspace_gets_an_application_moved_to_production_w
         _shot(page, shots, "change-applied-in-chat")
 
         # The reviewer was the other DeepSeek model, and it read Atlas's request.
-        reviews = [r for r in stub.requests if r["model"] == "deepseek-reasoner"]
+        reviews = [r for r in stub.requests if r["model"] == "deepseek-v4-pro"]
         assert reviews and atlas_name in reviews[-1]["text"]
 
         # The link opens the record of how it was checked.
@@ -196,8 +196,8 @@ def test_the_one_person_in_a_workspace_gets_an_application_moved_to_production_w
         expect(record).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("review-record-verdict")).to_have_text("Applied")
         facts = page.get_by_test_id("review-record-facts")
-        expect(facts.get_by_test_id("property-drafter")).to_have_text("deepseek-chat (DeepSeek)")
-        expect(facts.get_by_test_id("property-reviewer")).to_have_text("deepseek-reasoner (DeepSeek)")
+        expect(facts.get_by_test_id("property-drafter")).to_have_text("deepseek-flash (DeepSeek)")
+        expect(facts.get_by_test_id("property-reviewer")).to_have_text("deepseek-v4-pro (DeepSeek)")
         expect(facts.get_by_test_id("property-rounds")).to_have_text("1")
         expect(facts.get_by_test_id("property-rubric")).to_have_text("1")
         expect(page.get_by_test_id("review-record-same-provider")).to_contain_text("Both models came from DeepSeek")
