@@ -32,6 +32,7 @@ import time
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
+from app.commands.seed_demo_company import _DEMO_USER_FIRST, _DEMO_USER_LAST
 from app.services.public_pages import DEMO_PERSONA
 
 MAX_IMAGE_BYTES = 200 * 1024
@@ -413,7 +414,7 @@ def record_clip(browser, base_url, name, steps, *, size=(1440, 900), dark=False,
 NOT_IN_STANDARD_FRAME = re.compile(
     r"\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{4}\b|\b\d{4}-\d{2}-\d{2}\b|"
     r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2}, \d{4}\b|"
-    r"\bDemo User\b|\bdemo@|\bBuild [0-9a-f]{7,}\b")
+    r"\b" + re.escape(f"{_DEMO_USER_FIRST} {_DEMO_USER_LAST}") + r"\b|\bdemo@|\bBuild [0-9a-f]{7,}\b")
 
 # Page furniture the standard leaves out of a content crop (never data).
 STANDARD_HIDE = ["[data-testid='two-factor-banner']", "nav[aria-label='Breadcrumb']", "[aria-label='Breadcrumb']",

@@ -21,13 +21,15 @@ from app.services.public_pages import (
     load_page,
     get_page_screenshot,
 )
+from app.commands.seed_demo_company import _DEMO_USER_FIRST, _DEMO_USER_LAST
 from scripts.capture import clip_kit
 
 DESKTOP_CSS_MAX = clip_kit.STANDARD_DESKTOP["content_max"]
 PHONE_CSS_MAX = clip_kit.STANDARD_PHONE["content_max"]
 
 
-@pytest.mark.parametrize("text", ["Updated 7 Nov 2026", "2026-11-07", "Nov 7, 2026", "Demo User", "demo@lantern.example",
+@pytest.mark.parametrize("text", ["Updated 7 Nov 2026", "2026-11-07", "Nov 7, 2026", f"{_DEMO_USER_FIRST} {_DEMO_USER_LAST}",
+                                  "demo@lantern.example",
                                   "Build d65ba903"])
 def test_recipe_refuses_a_date_a_name_or_a_build_id(text):
     assert clip_kit.NOT_IN_STANDARD_FRAME.search(text)
