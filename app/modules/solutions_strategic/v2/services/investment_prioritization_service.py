@@ -400,20 +400,28 @@ class InvestmentPrioritizationService:
     def _work_cost_by_capability(self, capability_ids: List[int]) -> Dict[int, Dict]:
         """Estimated cost of the work packages linked to each capability.
 
-        A package with no estimate (0 is the column default) adds no figure.
+        A package is linked to its primary capability and to every capability
+        in its list of capabilities. A package that changes several shares its
+        estimate equally between them, so the total over all capabilities is
+        never more than the estimates recorded. A package with no estimate
+        (0 is the column default) adds no figure.
         """
         from app.models.unified_work_package import UnifiedWorkPackage
+        from app.services.work_package_service import _capability_ids_of
 
         if not capability_ids:
             return {}
+        wanted = set(capability_ids)
         result = {}
-        for wp in UnifiedWorkPackage.query.filter(
-            UnifiedWorkPackage.capability_id.in_(capability_ids),
-            UnifiedWorkPackage.estimated_cost > 0,
-        ).all():
-            entry = result.setdefault(wp.capability_id, {"cost": 0.0, "count": 0})
-            entry["cost"] += float(wp.estimated_cost)
-            entry["count"] += 1
+        for wp in UnifiedWorkPackage.query.filter(UnifiedWorkPackage.estimated_cost > 0).all():
+            linked = [i for i in _capability_ids_of(wp) if i in wanted]
+            if not linked:
+                continue
+            share = float(wp.estimated_cost) / len(linked)
+            for cap_id in linked:
+                entry = result.setdefault(cap_id, {"cost": 0.0, "count": 0})
+                entry["cost"] += share
+                entry["count"] += 1
         return result
 
     def _calculate_strategic_score(self, capability) -> int:
