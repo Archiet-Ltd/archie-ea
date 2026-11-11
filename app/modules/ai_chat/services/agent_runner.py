@@ -739,6 +739,7 @@ class AgentRunner:
         waited_seconds: float = 0.0,
         already_done: Optional[list] = None,
         retry: bool = False,
+        failed_turn_id: Optional[str] = None,
     ) -> dict:
         """
         Execute the full ReAct loop for one user message.
@@ -747,7 +748,8 @@ class AgentRunner:
         [{"tool": str, "arguments": dict}, ...]; a retry does not make the same change a second time.
 
         `retry` marks a question asked again after a failed turn. The changes that turn recorded are then
-        read from the approval record (never from the browser): the model is told each one's real state, a
+        read from the approval record (never from the browser) for the one turn that failed, named by
+        `failed_turn_id` (the `turn_id` that turn returned): the model is told each one's real state, a
         change asking for the same target and fields is not recorded a second time, and the ones still
         waiting are returned in `pending_approvals` so the failure card can name them.
 
@@ -785,7 +787,7 @@ class AgentRunner:
             from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
 
             self._recorded = AIChatApprovalService(self.user_id).recorded_changes(
-                [self.chat_session_id, "chat_user_%s" % self.user_id]
+                [self.chat_session_id, "chat_user_%s" % self.user_id], failed_turn_id
             )
         # Changes a caller in this process says an earlier try already made are matched the same way.
         self._recorded += [
@@ -931,7 +933,7 @@ class AgentRunner:
         pending_approvals = [
             {
                 "approval_id": c["approval_id"], "tool": c["tool"], "arguments": c["arguments"],
-                "summary": c["summary"],
+                "summary": c["summary"], "plain": self._approval_plain(c["tool"], c["arguments"]),
             }
             for c in self._recorded if not c["applied"]
         ]
@@ -1100,6 +1102,7 @@ class AgentRunner:
                         "tool": tc.name,
                         "arguments": tc.arguments,
                         "summary": self._approval_summary(tc),
+                        "plain": self._approval_plain(tc.name, tc.arguments),
                     })
                     result = {
                         "success": False,
@@ -1814,12 +1817,22 @@ class AgentRunner:
         "create_application": "create an application",
         "create_vendor": "create a vendor",
         "create_solution": "create a solution",
+        "create_goal": "create a goal",
         "update_application_status": "change an application's status",
         "submit_for_arb_review": "submit a solution for ARB review",
         "generate_blueprint_narrative": "generate blueprint narrative text",
         "delete_capability": "delete a capability",
         "delete_application": "delete an application",
     }
+
+    @classmethod
+    def _approval_plain(cls, tool: str, arguments: dict) -> str:
+        """The change as a person reads it: the tool's label from the table above, then the record's name
+        when the change has one ("Create a goal: Billing"). The summary below keeps the full detail."""
+        label = cls._TOOL_LABELS.get(tool, str(tool).replace("_", " "))
+        name = next((arguments[k] for k in ("name", "title") if isinstance((arguments or {}).get(k), str)), "")
+        sentence = label[:1].upper() + label[1:]
+        return "%s: %s" % (sentence, name.strip()) if name.strip() else sentence
 
     @classmethod
     def _approval_summary(cls, tc: "ToolCall") -> str:
@@ -2191,6 +2204,7 @@ class AgentRunner:
         ``answered_by`` names the provider and model that produced the reply,
         read from the entry that answered (``model_used``), never the first one
         tried. A refused or failed turn carries none, so no model is named."""
+        result["turn_id"] = self._turn_id
         self._apply_genome_post_check(result, provider_used)
         self._apply_citation_gate(result)
         if (result.get("citation_gate") or {}).get("refused"):

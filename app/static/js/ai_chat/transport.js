@@ -76,7 +76,8 @@
         /* The lookup has one total limit, set by the server from the same budget and margin as the
            turn: whatever bytes arrive, the request ends then and the chat shows the failure card. */
         var limit = new AbortController();
-        var timer = setTimeout(function () { limit.abort(); }, window.chatLookupAbortMs || 33000);
+        /* The page carries the limit; with none given the lookup is not cut short by a number written here. */
+        var timer = window.chatLookupAbortMs > 0 ? setTimeout(function () { limit.abort(); }, window.chatLookupAbortMs) : null;
         var resp, data;
         try {
             resp = await apiFetch('/ai-chat/estate-answer', {
@@ -282,7 +283,8 @@
                             genomeHtml: (ev.genome_answer && ev.genome_answer.html) || null,
                             paused: !!ev.paused,
                             notSetUp: !!ev.not_set_up,
-                            error: ev.error || null
+                            error: ev.error || null,
+                            turnId: ev.turn_id || null
                         };
                     } else if (ev.error) {
                         throw new Error(ev.error);
@@ -322,7 +324,8 @@
             genomeHtml: meta.genomeHtml || null,
             paused: !!meta.paused,
             notSetUp: !!meta.notSetUp,
-            error: meta.error || null
+            error: meta.error || null,
+            turnId: meta.turnId || null
         });
         return true;
     }

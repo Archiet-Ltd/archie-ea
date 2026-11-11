@@ -91,7 +91,7 @@ def test_a_retry_after_two_recorded_changes_leaves_both_rows_alone_and_the_model
         # The same question again, the model asks for both changes again.
         retried = _runner(monkeypatch, user, "thread-1")
         shown = _model_says(monkeypatch, retried, [_tool_call(3, BILLING), _tool_call(4, PAYROLL), STOP])
-        again = retried.run("Add the goals Billing and Payroll.", retry=True)
+        again = retried.run("Add the goals Billing and Payroll.", retry=True, failed_turn_id=stopped["turn_id"])
 
         assert _rows(org.id) == before  # nothing written twice, nothing changed
         told = _told(shown[-1])  # what the model saw when it was asked to stop
@@ -108,11 +108,11 @@ def test_the_first_turn_of_a_new_chat_is_found_once_the_chat_has_its_own_id(
     with tenant_ctx(org.id):
         first = _runner(monkeypatch, user, "chat_user_%d" % user.id)  # recorded before the chat had an id
         _model_says(monkeypatch, first, [_tool_call(1, BILLING), STOP])
-        first.run("Add the goal Billing.")
+        stopped = first.run("Add the goal Billing.")
         before = _rows(org.id)
         retried = _runner(monkeypatch, user, "thread-new")  # the Retry carries the chat's id
         shown = _model_says(monkeypatch, retried, [_tool_call(2, BILLING), "Done."])
-        retried.run("Add the goal Billing.", retry=True)
+        retried.run("Add the goal Billing.", retry=True, failed_turn_id=stopped["turn_id"])
         assert _rows(org.id) == before
         assert NOT_APPLIED in _told(shown[-1])
 
@@ -122,11 +122,11 @@ def test_a_reworded_retry_of_the_same_change_writes_nothing_new(app, db_session,
     with tenant_ctx(org.id):
         first = _runner(monkeypatch, user, "thread-2")
         _model_says(monkeypatch, first, [_tool_call(1, BILLING), STOP])
-        first.run("Add the goal Billing.")
+        stopped = first.run("Add the goal Billing.")
         before = _rows(org.id)
         retried = _runner(monkeypatch, user, "thread-2")
         _model_says(monkeypatch, retried, [_tool_call(2, dict(BILLING, name="Billing goal", description="reworded")), "Done."])
-        retried.run("Add the goal Billing.", retry=True)
+        retried.run("Add the goal Billing.", retry=True, failed_turn_id=stopped["turn_id"])
         assert _rows(org.id) == before
 
 
@@ -135,10 +135,10 @@ def test_a_different_change_on_a_retry_is_still_recorded(app, db_session, make_o
     with tenant_ctx(org.id):
         first = _runner(monkeypatch, user, "thread-3")
         _model_says(monkeypatch, first, [_tool_call(1, BILLING), STOP])
-        first.run("Add the goal Billing.")
+        stopped = first.run("Add the goal Billing.")
         retried = _runner(monkeypatch, user, "thread-3")
         _model_says(monkeypatch, retried, [_tool_call(2, PAYROLL), "Done."])
-        retried.run("Add the goals Billing and Payroll.", retry=True)
+        retried.run("Add the goals Billing and Payroll.", retry=True, failed_turn_id=stopped["turn_id"])
         assert _rows(org.id) == [(TOOL, "pending", "Billing"), (TOOL, "pending", "Payroll")]
 
 
@@ -149,13 +149,13 @@ def test_an_applied_change_is_reported_as_already_made(app, db_session, make_org
     with tenant_ctx(org.id):
         first = _runner(monkeypatch, user, "thread-4")
         _model_says(monkeypatch, first, [_tool_call(1, BILLING), STOP])
-        first.run("Add the goal Billing.")
+        stopped = first.run("Add the goal Billing.")
         row = AIChatCRUDApproval.query.filter_by(organization_id=org.id).one()
         row.status = ApprovalStatus.APPROVED
         db_session.flush()
         retried = _runner(monkeypatch, user, "thread-4")
         shown = _model_says(monkeypatch, retried, [_tool_call(2, BILLING), "Done."])
-        again = retried.run("Add the goal Billing.", retry=True)
+        again = retried.run("Add the goal Billing.", retry=True, failed_turn_id=stopped["turn_id"])
         assert "already made before the retry" in _told(shown)
         assert again["pending_approvals"] == []  # an applied change is not waiting
 
@@ -167,12 +167,12 @@ def test_a_forged_list_naming_another_organisations_change_changes_nothing(
     with tenant_ctx(org_a.id):
         first = _runner(monkeypatch, user_a, "thread-5")
         _model_says(monkeypatch, first, [_tool_call(1, BILLING), STOP])
-        first.run("Add the goal Billing.")
+        stopped_a = first.run("Add the goal Billing.")
     with tenant_ctx(org_b.id):
         # Person B names A's change in the list the browser used to send, and asks for the same thing.
         runner = _runner(monkeypatch, user_b, "thread-5")
         shown = _model_says(monkeypatch, runner, [_tool_call(2, BILLING), "Done."])
-        runner.run("Add the goal Billing.", already_done=None, retry=True)
+        runner.run("Add the goal Billing.", already_done=None, retry=True, failed_turn_id=stopped_a["turn_id"])
         told = _told(shown)
         assert NOT_APPLIED not in told and "already made" not in told, told
         assert _rows(org_b.id) == [(TOOL, "pending", "Billing")]  # B's own change was recorded
@@ -222,3 +222,31 @@ def test_a_message_that_carries_a_list_of_changes_is_run_without_it(app, client,
         assert response.status_code == 200, response.get_data(as_text=True)
     assert [k.get("retry") for k in seen] == [False, True]
     assert all("already_done" not in k for k in seen), seen
+
+
+def test_a_change_with_no_name_is_the_same_only_when_its_values_are_the_same():
+    asked = {"solution_id": 1, "status": "open"}
+    assert AIChatApprovalService.same_change(TOOL, dict(asked), TOOL, {"solution_id": 1, "status": "open"}) is True
+    assert AIChatApprovalService.same_change(TOOL, dict(asked), TOOL, {"solution_id": 1, "status": "closed"}) is False
+    assert AIChatApprovalService.same_change(TOOL, dict(asked), TOOL, {"solution_id": 1}) is False
+
+
+def test_the_route_hands_the_runner_only_the_turn_a_retry_names(app, client, db_session, make_org, monkeypatch):
+    from tests.test_ai_write_approval import _login
+
+    app.config["AI_CHAT_ENABLED"] = True
+    _org, user = _person(db_session, make_org, "named")
+    seen = []
+
+    def spy(self, *args, **kwargs):
+        seen.append(kwargs)
+        return {"response": "Done.", "actions_taken": [], "pending_approvals": [], "sources": [], "turn_id": "turn-9"}
+
+    monkeypatch.setattr(AgentRunner, "run", spy)
+    _login(client, user.id)
+    body = {"message": "Add the goal Billing.", "domain": "general", "retry": True}
+    for extra in ({"failed_turn_id": "turn-1"}, {"failed_turn_id": ["x"]}, {}):
+        response = client.post("/ai-chat/message", json=dict(body, **extra))
+        assert response.status_code == 200, response.get_data(as_text=True)
+        assert response.get_json()["turn_id"] == "turn-9"
+    assert [k.get("failed_turn_id") for k in seen] == ["turn-1", None, None]

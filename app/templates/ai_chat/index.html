@@ -459,7 +459,7 @@
     window.csrfToken = '{{ csrf_token() }}';
     window.chatIsAdmin = {{ 'true' if current_user.is_admin() else 'false' }};
     window.chatNotSetUpSentence = {{ (not_set_up_sentence | default('')) | tojson }};
-    window.chatLookupAbortMs = {{ lookup_abort_ms | default(33000) | int }};
+    window.chatLookupAbortMs = {{ lookup_abort_ms | int }};
     window.chatOwnKeyAdmin = {{ 'true' if own_key_admin else 'false' }};
 </script>
 

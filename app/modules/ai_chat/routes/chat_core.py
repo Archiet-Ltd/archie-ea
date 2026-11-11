@@ -315,6 +315,13 @@ def _is_retry(data) -> bool:
     return bool(isinstance(data, dict) and data.get("retry") is True)
 
 
+def _failed_turn_id(data):
+    """The id of the turn that failed, which a Retry names. It only narrows the signed-in person's own
+    approval rows to that turn; it names no change and grants nothing."""
+    value = data.get("failed_turn_id") if isinstance(data, dict) else None
+    return value.strip()[:64] if isinstance(value, str) and value.strip() else None
+
+
 def _load_history(thread_id, user_id):
     """Prior turns of *thread_id*, oldest first, or [] when there are none.
 
@@ -429,9 +436,10 @@ def send_message():
         data = dict(data)
         data.pop("waited_seconds", None)
     is_retry = _is_retry(data)
+    failed_turn_id = _failed_turn_id(data)
     if isinstance(data, dict):
         # "completed_actions" is no longer read: a browser's list of changes is not evidence of any.
-        data = {k: v for k, v in data.items() if k not in ("retry", "completed_actions")}
+        data = {k: v for k, v in data.items() if k not in ("retry", "completed_actions", "failed_turn_id")}
 
     # T-031: marshmallow schema validation
     _schema = ChatMessageSchema()
@@ -663,6 +671,7 @@ def send_message():
             history=_load_history(incoming_thread_id, current_user.id),
             waited_seconds=waited_seconds,
             retry=is_retry,
+            failed_turn_id=failed_turn_id,
         )
 
         # ENH-018: Populate junction tables if agent result includes design_output
@@ -713,6 +722,8 @@ def send_message():
                 "domain": domain,
                 "actions_taken": agent_result.get("actions_taken", []),
                 "pending_approvals": agent_result.get("pending_approvals", []),
+                # The id of this turn; a Retry of it names it, so only its own changes are read back.
+                "turn_id": agent_result.get("turn_id"),
                 "requires_approval": bool(agent_result.get("pending_approvals")),
                 # The records the read tools actually returned this turn, so the
                 # reader can check the answer against the rows rather than
@@ -896,9 +907,10 @@ def send_message_stream():
         data = dict(data)
         data.pop("waited_seconds", None)
     is_retry = _is_retry(data)
+    failed_turn_id = _failed_turn_id(data)
     if isinstance(data, dict):
         # "completed_actions" is no longer read: a browser's list of changes is not evidence of any.
-        data = {k: v for k, v in data.items() if k not in ("retry", "completed_actions")}
+        data = {k: v for k, v in data.items() if k not in ("retry", "completed_actions", "failed_turn_id")}
 
     _schema = ChatMessageSchema()
     _validated, _err = _load_and_validate(_schema, data)
@@ -1030,6 +1042,7 @@ def send_message_stream():
                     history=history_for_thread,
                     waited_seconds=waited_seconds,
                     retry=is_retry,
+                    failed_turn_id=failed_turn_id,
                 )
                 # Persist this turn (thread-backed history rail). Always on;
                 # never breaks the stream. thread_id rides back on the done event.

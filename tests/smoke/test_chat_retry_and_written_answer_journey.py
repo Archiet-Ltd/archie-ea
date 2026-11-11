@@ -67,7 +67,7 @@ def test_a_turn_that_stopped_after_making_a_change_says_so_and_retry_does_not_se
         sent.append(body)
         if len(sent) == 1:
             events = _events({"type": "done", "response": BUSY, "error": "stopped", "actions_taken": [change],
-                              "pending_approvals": [], "sources": []})
+                              "pending_approvals": [], "sources": [], "turn_id": "turn-one"})
         else:
             events = _events({"type": "token", "text": ANSWER}, {"type": "done", "response": ANSWER, "sources": [],
                               "actions_taken": [], "pending_approvals": []})
@@ -82,12 +82,15 @@ def test_a_turn_that_stopped_after_making_a_change_says_so_and_retry_does_not_se
     text = card.inner_text()
     assert BUSY in text, text
     assert "Created the goal Billing." in text and "not repeated on Retry" in text, text
-    assert sent[0]["completed_actions"] == []
+    # A first try is not a Retry and names no earlier turn; the browser never sends a list of changes.
+    assert sent[0]["retry"] is False and sent[0]["failed_turn_id"] is None and "completed_actions" not in sent[0], sent[0]
     shoot(page, "retry-after-a-change")
     card.get_by_role("button", name="Retry").click()
     expect(page.locator("#messages-container .message-content", has_text=ANSWER).last).to_be_visible(timeout=PAGE_TIMEOUT)
     assert len(sent) == 2
-    assert sent[1]["completed_actions"] == [{"tool": "create_goal", "arguments": {"name": "Billing"}}], sent[1]
+    # Retry says only that it is one and which turn failed; what that turn changed is read by the server.
+    assert sent[1]["retry"] is True and sent[1]["failed_turn_id"] == "turn-one", sent[1]
+    assert "completed_actions" not in sent[1], sent[1]
 
 
 def test_a_dropped_stream_hands_the_plain_request_the_time_already_spent(page, live_server):

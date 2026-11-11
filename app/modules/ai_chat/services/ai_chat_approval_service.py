@@ -1441,11 +1441,13 @@ class AIChatApprovalService:
         )
         return [approval.to_dict() for approval in approvals]
 
-    def recorded_changes(self, chat_session_ids) -> List[Dict[str, Any]]:
-        """The changes the latest assistant turn of this conversation recorded for the signed-in person.
+    def recorded_changes(self, chat_session_ids, turn_id) -> List[Dict[str, Any]]:
+        """The changes one assistant turn, the one that failed, recorded for the signed-in person.
 
-        Read from the one approval record, filtered by the person's organisation, the person and the
-        conversation, never from anything the browser sends. ``chat_session_ids`` is the conversation's id, or
+        Read from the one approval record, filtered by the person's organisation, the person, the
+        conversation and the turn (``agent_turn_id``). The turn's id is only a filter: it narrows what the
+        person's own rows already allow and names no change itself. With no turn id nothing is returned;
+        the latest turn is never guessed. ``chat_session_ids`` is the conversation's id, or
         every id the conversation's changes may carry (the first turn of a new chat is recorded under the
         person's own stable id, before the conversation has one). Each is
         ``{"approval_id", "tool", "arguments", "summary", "applied"}``; ``applied`` is False while the
@@ -1454,11 +1456,12 @@ class AIChatApprovalService:
         """
         actor, actor_error = self._acting_user()
         ids = [i for i in ([chat_session_ids] if isinstance(chat_session_ids, str) else chat_session_ids or []) if i]
-        if actor_error or not ids:
+        if actor_error or not ids or not isinstance(turn_id, str) or not turn_id.strip():
             return []
         rows = (
             AIChatCRUDApproval.query.filter(
                 AIChatCRUDApproval.user_id == actor.id,
+                AIChatCRUDApproval.agent_turn_id == turn_id.strip()[:64],
                 AIChatCRUDApproval.organization_id == actor.organization_id,
                 AIChatCRUDApproval.chat_session_id.in_(ids),
                 AIChatCRUDApproval.operation_type == "tool_use",
@@ -1467,13 +1470,8 @@ class AIChatApprovalService:
             .order_by(AIChatCRUDApproval.created_at.desc(), AIChatCRUDApproval.id.desc())
             .all()
         )
-        if not rows:
-            return []
-        latest_turn = rows[0].agent_turn_id
         changes = []
         for row in reversed(rows):
-            if row.agent_turn_id != latest_turn:
-                continue
             try:
                 arguments = json.loads(row.operation_payload)
             except (json.JSONDecodeError, TypeError):
@@ -1494,7 +1492,7 @@ class AIChatApprovalService:
         """Whether a change a retry asks for is one already recorded: the same tool on the same target record
         (its ``*_id`` fields), changing the same thing. A reworded name still matches (one name's words are
         inside the other's); the description, summary and rationale wording never matters. Where there is no
-        name, the same fields changed match."""
+        name, the same fields changed to the same values match."""
         if tool != recorded_tool:
             return False
 
@@ -1514,7 +1512,10 @@ class AIChatApprovalService:
         if compared:
             return True
         ignored = ("description", "summary", "original_command", "rationale")
-        fields = lambda args: {k for k in args if k not in ignored and k not in target(args)}  # noqa: E731
+        fields = lambda args: {  # noqa: E731
+            k: json.dumps(v, sort_keys=True, default=str)
+            for k, v in args.items() if k not in ignored and k not in target(args)
+        }
         return fields(arguments) == fields(recorded_arguments)
 
     def check_for_confirmation_command(self, message: str) -> Optional[Dict[str, Any]]:
