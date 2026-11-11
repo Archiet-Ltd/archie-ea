@@ -127,3 +127,23 @@ def test_the_portfolio_caption_takes_its_count_from_the_figures_captured_with_th
 def test_the_page_serves_the_description_kept_with_the_picture():
     for slug in STANDARD_MODULE_IMAGES:
         assert module_image_alt(slug) and module_image_alt(slug, "phone")
+
+
+def _vendors_line(renewal):
+    text = "16 vendors supply 19 of your 19 systems. %s Spend 1,000" % renewal
+    return describe("vendors", "desktop", Frame(text, {"tbody tr": 16}), text)
+
+
+def test_the_vendors_description_reads_the_contracts_sentence_the_page_now_writes():
+    alt, facts = _vendors_line("7 contracts with 7 vendors renew within 90 days.")
+    assert facts["renewing"] == 7 and facts["vendors_renewing"] == 7 and facts["window_days"] == 90
+    assert "seven contracts renew within ninety days" in alt
+    alt, facts = _vendors_line("1 contract with 1 vendor renews within 90 days (1 names no vendor).")
+    assert facts["renewing"] == 1 and "one contract renew" in alt
+    assert not _stray(alt, facts)
+
+
+def test_the_vendors_description_says_so_when_no_contract_renews():
+    alt, facts = _vendors_line("No contract renews within 90 days.")
+    assert facts["renewing"] == 0 and facts["window_days"] == 90 and "no contracts renew" in alt
+    assert not _stray(alt, facts)

@@ -191,18 +191,21 @@ def _risk_register(variant, target, text):
 
 
 def _vendors(variant, target, text):
-    line = _find(text, r"(\d+) vendors? supply (\d+) of your (\d+) systems?\. (?:(\d+) renew|No vendor renews) within (\d+) days",
+    line = _find(text, r"(\d+) vendors? (?:supply|supplies) (\d+) of your (\d+) systems?\. "
+                       r"(?:(\d+) contracts?(?: with (\d+) vendors?)? renews? within (\d+) days|No contract renews within (\d+) days)",
                  "the line counting vendors, systems and renewals")
     rows = target.locator("tbody tr").count()
     facts = {"vendors": int(line.group(1)), "systems_supplied": int(line.group(2)), "systems": int(line.group(3)),
-             "renewing": int(line.group(4) or 0), "window_days": int(line.group(5)), "listed": rows}
+             "renewing": int(line.group(4) or 0), "window_days": int(line.group(6) or line.group(7)), "listed": rows}
+    if line.group(5):
+        facts["vendors_renewing"] = int(line.group(5))
     supplied = ("all %s" % plural(facts["systems"], "system") if facts["systems_supplied"] == facts["systems"]
                 else "%s of the organisation's %s" % (number_words(facts["systems_supplied"]),
                                                       plural(facts["systems"], "system")))
+    renewing = plural(facts["renewing"], "contract") if facts["renewing"] else "no contracts"
     return ("The vendor register: a line saying %s supply %s and %s renew within %s "
             "days, above %s and the systems each supplies." % (
-                plural(facts["vendors"], "vendor"), supplied,
-                number_words(facts["renewing"]) if facts["renewing"] else "no vendors", number_words(facts["window_days"]),
+                plural(facts["vendors"], "vendor"), supplied, renewing, number_words(facts["window_days"]),
                 plural(rows, "vendor")), facts)
 
 
