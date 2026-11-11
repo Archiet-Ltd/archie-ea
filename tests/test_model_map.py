@@ -8,9 +8,16 @@ import datetime as dt
 import re
 import uuid
 
+import pathlib
+
 import pytest
 
+# Element dates are stamped by the history trigger; the shared fixture installs it on the test database.
+from tests.test_entity_history_trigger import _entity_history_trigger  # noqa: F401
+
 pytestmark = pytest.mark.usefixtures("db_session")
+
+_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
 def _element(db_session, org, name, layer="Application", kind="ApplicationComponent", **cols):
@@ -194,3 +201,52 @@ def test_the_element_list_toolbar_links_to_the_model_map(app, db_session, make_o
     html = client.get("/architecture/elements").get_data(as_text=True)
     assert 'data-testid="open-model-map"' in html
     assert "/archimate/model-map" in html
+
+
+_LAYER_KEYS = ("strategy", "business", "application", "technology", "physical", "motivation", "implementation", "other")
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_no_two_layers_share_a_colour_in_either_theme(theme):
+    css = (_ROOT / "app/static/css/shadcn_tokens.css").read_text()
+    pattern = r"(--notation-[a-z]+(?:-stroke)?):\s*([^;]+);"
+    blocks = {}
+    for head in (":root", ".dark"):
+        for m in re.finditer(r"\n  %s \{" % re.escape(head), css):
+            body = css[m.start():css.index("\n  }", m.start())]
+            if "--notation-business" in body:
+                blocks[head] = body
+    tokens = dict(re.findall(pattern, blocks[":root"]))
+    if theme == "dark":  # a token the dark block does not restate keeps its light value
+        tokens.update(re.findall(pattern, blocks[".dark"]))
+    fills = {k: tokens["--notation-" + k].strip() for k in _LAYER_KEYS}
+    strokes = {k: tokens["--notation-%s-stroke" % k].strip() for k in _LAYER_KEYS}
+    assert len(set(fills.values())) == len(_LAYER_KEYS), fills
+    assert len(set(strokes.values())) == len(_LAYER_KEYS), strokes
+
+
+def test_the_legend_and_the_nodes_read_the_same_layer_tokens(app, db_session, make_org, login_as):
+    a, _b, _mine, _theirs = _seed_two_orgs(db_session, make_org)
+    _element(db_session, a, "Rack", "Physical", "Equipment")
+    _element(db_session, a, "Programme", "Implementation", "WorkPackage")
+    _element(db_session, a, "Plan", "Strategy", "CourseOfAction")
+    _element(db_session, a, "Process", "Business", "BusinessProcess")
+    client = _signed_in(app, db_session, login_as, a)
+    html = client.get("/archimate/model-map").get_data(as_text=True)
+    dots = {}
+    for layer, markup in re.findall(r'<li[^>]*data-layer="(\w+)"[^>]*>(.*?)</li>', html, flags=re.S):
+        dots[layer] = re.search(r'class="([^"]*bg-notation-[^"]*)"', markup).group(1)
+    assert set(dots) == {"strategy", "business", "application", "technology", "physical", "motivation", "implementation"}
+    for layer, classes in dots.items():
+        assert ("bg-notation-%s " % layer) in (classes + " ") and "border-notation-%s-stroke" % layer in classes
+    assert len(set(dots.values())) == len(dots)
+    script = (_ROOT / "app/static/js/impact_graph.js").read_text()
+    model_part = script.split("function modelMap()")[1].split("function render(data)")[0] + script.split("function tokenFill")[0]
+    assert "--notation-" in script and "--layer-" not in model_part and "--chart-4" not in model_part
+
+
+def test_the_graph_canvas_has_no_inline_style_and_one_force_simulation():
+    html = (_ROOT / "app/templates/architecture/impact_graph.html").read_text()
+    assert "style=" not in html
+    script = (_ROOT / "app/static/js/impact_graph.js").read_text()
+    assert script.count("d3.forceSimulation(") == 1

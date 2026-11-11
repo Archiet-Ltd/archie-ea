@@ -19,21 +19,55 @@
 
     var ENDPOINT = svgEl.getAttribute('data-endpoint');
     var PAGE_TMPL = svgEl.getAttribute('data-page');   // …/elements/0/impact
-    var LAYER = {
-        business: '#B9770E', application: '#1E7FB4', technology: '#2E8B57',
-        motivation: '#7C5CBF', strategy: '#C2683A', implementation: '#B4487F',
-        physical: '#2E8B57', other: '#64748B'
-    };
-    function colour(layer) { return LAYER[(layer || 'other').toLowerCase()] || LAYER.other; }
+    // A layer is drawn in its ArchiMate notation tokens (fill and stroke): the same tokens the composer and
+    // the legend use, so the dark theme is the same palette on dark tokens. The layer name is the token name.
+    var LAYERS = ['strategy', 'business', 'application', 'technology', 'physical', 'motivation', 'implementation', 'other'];
+    function notation(layer, part) {
+        var key = (layer || 'other').toLowerCase();
+        if (LAYERS.indexOf(key) < 0) key = 'other';
+        return 'hsl(var(--notation-' + key + part + '))';
+    }
+    function tokenFill(layer) { return notation(layer, ''); }
+    function tokenStroke(layer) { return notation(layer, '-stroke'); }
 
-    // ── Whole-model mode ────────────────────────────────────────────────────────────────────
-    // Layer colours come from the layer tokens, so the dark theme is the same palette on dark tokens.
-    var LAYER_TOKEN = {
-        strategy: '--layer-strategy', business: '--layer-business', application: '--layer-application',
-        technology: '--layer-technology', physical: '--chart-4', motivation: '--layer-motivation',
-        implementation: '--layer-implementation', other: '--muted-foreground'
-    };
-    function tokenFill(layer) { return 'hsl(var(' + (LAYER_TOKEN[layer] || LAYER_TOKEN.other) + '))'; }
+    // The one force simulation, used by the whole-model map and by the impact graph. Besides keeping circles
+    // apart it keeps labels apart: where two labels would overlap it nudges the two elements up and down.
+    function startSimulation(nodes, edges, o) {
+        var ROW = 14;
+        function labels(alpha) {
+            if (!o.label) return;
+            for (var i = 0; i < nodes.length; i++) {
+                var a = nodes[i], la = o.label(a);
+                for (var j = i + 1; j < nodes.length; j++) {
+                    var b = nodes[j], lb = o.label(b);
+                    var dy = b.y - a.y;
+                    if (Math.abs(dy) >= ROW) continue;
+                    if (a.x + la.dx >= b.x + lb.dx + lb.w || b.x + lb.dx >= a.x + la.dx + la.w) continue;
+                    var push = (ROW - Math.abs(dy)) * 0.5 * alpha * 2;
+                    var dir = dy === 0 ? (i % 2 ? 1 : -1) : (dy > 0 ? 1 : -1);
+                    a.vy -= dir * push; b.vy += dir * push;
+                }
+            }
+        }
+        var sim = d3.forceSimulation(nodes)
+            .force('link', d3.forceLink(edges).id(function (d) { return d.id; }).distance(o.distance).strength(o.linkStrength))
+            .force('charge', d3.forceManyBody().strength(o.charge))
+            .force('center', d3.forceCenter(o.width / 2, o.height / 2))
+            .force('collide', d3.forceCollide().radius(o.collide))
+            .force('labels', labels)
+            .on('tick', o.tick);
+        if (o.gravity) {
+            // gravity keeps unconnected elements in view instead of drifting off the canvas
+            sim.force('x', d3.forceX(o.width / 2).strength(o.gravity)).force('y', d3.forceY(o.height / 2).strength(o.gravity));
+        }
+        if (o.alphaDecay) sim.alphaDecay(o.alphaDecay);
+        if (o.end) sim.on('end', o.end);
+        return sim;
+    }
+    function labelBox(d, offset, shown) {
+        var n = shown ? shown(d).length : 0;
+        return { dx: offset, w: Math.min(n, 26) * 6.2 };
+    }
 
     function modelMap() {
         var svg = d3.select(svgEl);
@@ -101,6 +135,10 @@
                 .attr('stroke', 'currentColor').attr('class', 'text-border').attr('stroke-width', 1);
 
             var radius = function (d) { return d.cluster ? 18 + Math.sqrt(d.count) : 7; };
+            var labelText = function (d) {
+                var n = d.cluster ? d.name + ' · ' + d.count : d.name;
+                return n.length > 26 ? n.slice(0, 25) + '…' : n;
+            };
             var many = nodes.length > 150;
             var node = nodeG.selectAll('g').data(nodes).enter().append('g')
                 .attr('tabindex', 0).attr('role', 'link').attr('data-node-id', function (d) { return d.id; })
@@ -115,13 +153,10 @@
             node.append('title').text(describe);
             node.append('circle').attr('r', radius)
                 .style('fill', function (d) { return tokenFill(d.layer); })
-                .style('stroke', 'hsl(var(--card))').attr('stroke-width', 1.5);
+                .style('stroke', function (d) { return tokenStroke(d.layer); }).attr('stroke-width', 2);
             if (clusters || !many) {
                 node.append('text')
-                    .text(function (d) {
-                        var n = d.cluster ? d.name + ' · ' + d.count : d.name;
-                        return n.length > 26 ? n.slice(0, 25) + '…' : n;
-                    })
+                    .text(labelText)
                     .attr('x', function (d) { return radius(d) + 4; }).attr('y', 4).attr('font-size', 11)
                     .attr('fill', 'currentColor').attr('class', 'text-foreground')
                     .style('paint-order', 'stroke').attr('stroke', 'var(--card)').attr('stroke-width', 3);
@@ -147,17 +182,15 @@
                     .attr('x2', function (d) { return d.target.x; }).attr('y2', function (d) { return d.target.y; });
                 node.attr('transform', function (d) { return 'translate(' + d.x + ',' + d.y + ')'; });
             }
-            sim = d3.forceSimulation(nodes)
-                .force('link', d3.forceLink(edges).id(function (d) { return d.id; }).distance(clusters ? 120 : 40).strength(0.5))
-                .force('charge', d3.forceManyBody().strength(clusters ? -400 : (many ? -30 : -120)))
-                .force('center', d3.forceCenter(width / 2, height / 2))
-                .force('collide', d3.forceCollide().radius(function (d) { return radius(d) + 2; }))
-                // gravity keeps unconnected elements in view instead of drifting off the canvas
-                .force('x', d3.forceX(width / 2).strength(0.06))
-                .force('y', d3.forceY(height / 2).strength(0.06))
-                .alphaDecay(many ? 0.06 : 0.04)
-                .on('tick', paint)
-                .on('end', function () { fit(nodes); svgEl.setAttribute('data-settled', '1'); });
+            sim = startSimulation(nodes, edges, {
+                width: width, height: height, tick: paint,
+                distance: clusters ? 120 : 40, linkStrength: 0.5,
+                charge: clusters ? -400 : (many ? -30 : -120),
+                collide: function (d) { return radius(d) + 2; },
+                gravity: 0.06, alphaDecay: many ? 0.06 : 0.04,
+                label: (clusters || !many) ? function (d) { return labelBox(d, radius(d) + 4, labelText); } : null,
+                end: function () { fit(nodes); svgEl.setAttribute('data-settled', '1'); }
+            });
             paint();
             // When the layout settles, zoom to show every element with a margin.
             function fit(list) {
@@ -291,9 +324,9 @@
 
         node.append('circle')
             .attr('r', function (d) { return d.is_center ? 13 : 8; })
-            .attr('fill', function (d) { return colour(d.layer); })
-            .attr('stroke', function (d) { return d.is_center ? '#111827' : '#ffffff'; })
-            .attr('stroke-width', function (d) { return d.is_center ? 3 : 1.5; });
+            .style('fill', function (d) { return tokenFill(d.layer); })
+            .style('stroke', function (d) { return tokenStroke(d.layer); })
+            .attr('stroke-width', function (d) { return d.is_center ? 3 : 2; });
 
         node.append('text')
             .text(function (d) { return d.name.length > 26 ? d.name.slice(0, 25) + '…' : d.name; })
@@ -310,16 +343,17 @@
             window.location.href = PAGE_TMPL.replace(/\/0\/impact$/, '/' + d.id + '/impact');
         });
 
-        sim = d3.forceSimulation(data.nodes)
-            .force('link', d3.forceLink(data.edges).id(function (d) { return d.id; }).distance(90).strength(0.6))
-            .force('charge', d3.forceManyBody().strength(-260))
-            .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('collide', d3.forceCollide().radius(function (d) { return d.is_center ? 26 : 16; }))
-            .on('tick', function () {
-                link.attr('x1', function (d) { return d.source.x; }).attr('y1', function (d) { return d.source.y; })
-                    .attr('x2', function (d) { return d.target.x; }).attr('y2', function (d) { return d.target.y; });
-                node.attr('transform', function (d) { return 'translate(' + d.x + ',' + d.y + ')'; });
-            });
+        function paint() {
+            link.attr('x1', function (d) { return d.source.x; }).attr('y1', function (d) { return d.source.y; })
+                .attr('x2', function (d) { return d.target.x; }).attr('y2', function (d) { return d.target.y; });
+            node.attr('transform', function (d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+        }
+        sim = startSimulation(data.nodes, data.edges, {
+            width: width, height: height, tick: paint,
+            distance: 90, linkStrength: 0.6, charge: -260,
+            collide: function (d) { return d.is_center ? 26 : 16; },
+            label: function (d) { return labelBox(d, d.is_center ? 17 : 12, function (n) { return n.name; }); }
+        });
     }
 
     function load(depth) {

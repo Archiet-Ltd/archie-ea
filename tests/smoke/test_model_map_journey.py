@@ -305,3 +305,57 @@ def test_the_map_with_an_element_selected_and_the_empty_map_at_each_width_and_th
             page.screenshot(path=str(pathlib.Path(folder) / ("model-map-empty-%d-%s.png" % (width, scheme))))
     finally:
         context.close()
+
+
+_NODE_FILLS = """() => {
+    const out = {};
+    document.querySelectorAll('#impact-svg g[data-node-id]').forEach(g => {
+        const c = g.querySelector('circle');
+        out[g.getAttribute('data-node-id')] = {layer: g.getAttribute('data-layer'),
+            fill: getComputedStyle(c).fill, stroke: getComputedStyle(c).stroke};
+    });
+    const dots = {};
+    document.querySelectorAll('[data-testid="model-map-legend"] li[data-layer]').forEach(li => {
+        const d = li.querySelector('span span');
+        dots[li.getAttribute('data-layer')] = {fill: getComputedStyle(d).backgroundColor,
+            stroke: getComputedStyle(d).borderTopColor};
+    });
+    return {nodes: out, dots: dots};
+}"""
+
+
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
+def test_business_and_technology_are_told_apart_in_the_map_and_its_legend(browser, live_server, seeded, mapped, width, scheme):
+    context = browser.new_context(viewport={"width": width, "height": 900}, color_scheme=scheme)
+    context.add_init_script("localStorage.setItem('theme', %r);" % scheme)
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, seeded["emails"]["enterprise_architect"])
+        page.goto(live_server + "/archimate/model-map", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _wait_drawn(page)
+        if width < 700:
+            page.get_by_role("button", name="Show or hide the legend").click()
+        legend = page.get_by_test_id("model-map-legend")
+        expect(legend).to_be_visible()
+        seen = page.evaluate(_NODE_FILLS)
+        names = mapped["graph"]["names"]
+        by_layer = {}
+        for node in seen["nodes"].values():
+            by_layer.setdefault(node["layer"], node)
+        # the seeded model holds Business, Application and Technology elements at least
+        assert {"business", "application", "technology"} <= set(by_layer), set(by_layer)
+        assert set(by_layer) == set(seen["dots"]), (set(by_layer), set(seen["dots"]))
+        # no two layers share a colour, in the drawing or in the legend
+        for kind in ("fill", "stroke"):
+            assert len({n[kind] for n in by_layer.values()}) == len(by_layer), (kind, by_layer)
+            assert len({d[kind] for d in seen["dots"].values()}) == len(seen["dots"]), (kind, seen["dots"])
+        # and the legend dot is the colour its nodes are drawn in
+        for layer, node in by_layer.items():
+            assert seen["dots"][layer]["fill"] == node["fill"], layer
+        assert names["ops"] and names["portal"]
+        business = page.locator("#impact-svg g[data-layer='business'] circle").first
+        technology = page.locator("#impact-svg g[data-layer='technology'] circle").first
+        assert business.evaluate("e => getComputedStyle(e).fill") != technology.evaluate("e => getComputedStyle(e).fill")
+        _shot(page, "layers", scheme)
+    finally:
+        context.close()

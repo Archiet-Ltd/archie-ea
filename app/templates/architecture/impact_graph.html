@@ -69,16 +69,14 @@
   <div class="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
     <div class="rounded-lg border border-border bg-card overflow-hidden relative">
       {% if model_map %}
-      <svg id="impact-svg" class="w-full block touch-none"
-           style="height:600px"  {# inline-style-ok: fixed graph canvas height #}
+      <svg id="impact-svg" class="w-full block touch-none h-[420px] lg:h-[600px]"
            role="group" aria-label="Model map. Tab to an element to hear its name, type and source; arrow keys move between elements; Enter opens it."
            data-mode="model"
            data-layer="{{ map_layer }}"
            data-endpoint="{{ url_for('archimate.api_model_map') }}"
            data-page="{{ url_for('archimate.model_map_page') }}"></svg>
       {% else %}
-      <svg id="impact-svg" class="w-full block"
-           style="height:600px"  {# inline-style-ok: fixed graph canvas height #}
+      <svg id="impact-svg" class="w-full block h-[420px] lg:h-[600px]"
            data-element-id="{{ element.id }}"
            data-center-name="{{ element.name | e }}"
            data-endpoint="{{ url_for('archimate.api_element_impact_graph', element_id=element.id) }}"
@@ -102,7 +100,7 @@
         <ul id="model-map-legend" class="space-y-1.5 text-sm mt-3 lg:block" :class="open ? '' : 'hidden lg:block'" data-testid="model-map-legend">
           {% for c in map_counts if c.count %}
           <li class="flex items-center justify-between gap-2" data-layer="{{ c.layer }}" data-testid="model-map-legend-{{ c.layer }}">
-            <span class="flex items-center gap-2 min-w-0"><span class="inline-block h-3 w-3 shrink-0 rounded-full bg-{{ 'layer-' ~ c.layer if c.layer not in ('physical', 'other') else ('chart-4' if c.layer == 'physical' else 'muted-foreground') }}"></span><span class="truncate">{{ c.label }}</span></span>
+            <span class="flex items-center gap-2 min-w-0"><span class="inline-block h-3 w-3 shrink-0 rounded-full border-2 bg-notation-{{ c.layer }} border-notation-{{ c.layer }}-stroke"></span><span class="truncate">{{ c.label }}</span></span>
             <span class="tabular-nums text-muted-foreground" data-testid="model-map-count-{{ c.layer }}">{{ c.count }}</span>
           </li>
           {% endfor %}
@@ -118,12 +116,9 @@
       {% else %}
       <h2 class="text-sm font-semibold text-foreground mb-3">Legend</h2>
       <ul class="space-y-1.5 text-sm">
-        <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded-full" style="background:#B9770E">{# inline-style-ok #}</span> Business</li>
-        <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded-full" style="background:#1E7FB4">{# inline-style-ok #}</span> Application</li>
-        <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded-full" style="background:#2E8B57">{# inline-style-ok #}</span> Technology</li>
-        <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded-full" style="background:#7C5CBF">{# inline-style-ok #}</span> Motivation</li>
-        <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded-full" style="background:#C2683A">{# inline-style-ok #}</span> Strategy</li>
-        <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded-full" style="background:#64748B">{# inline-style-ok #}</span> Other</li>
+        {% for layer, label in [('strategy', 'Strategy'), ('business', 'Business'), ('application', 'Application'), ('technology', 'Technology'), ('physical', 'Physical'), ('motivation', 'Motivation'), ('implementation', 'Implementation and migration'), ('other', 'Other')] %}
+        <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 shrink-0 rounded-full border-2 bg-notation-{{ layer }} border-notation-{{ layer }}-stroke"></span> {{ label }}</li>
+        {% endfor %}
       </ul>
       <div class="mt-4 pt-4 border-t border-border">
         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Selected</h3>
