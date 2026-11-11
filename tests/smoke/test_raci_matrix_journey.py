@@ -260,3 +260,19 @@ def test_a_stakeholder_kept_on_the_matrix_is_always_one_of_the_organisations_own
         assert data["data"]["assignments"] == [], data
     finally:
         context.close()
+
+
+def test_the_seeded_matrix_names_every_seeded_person_and_leaves_no_capability_unowned(browser, live_server, demo_org):
+    """The demonstration's matrix has a column for each person it assigns, and the capabilities it assigns an
+    accountable person to do not say that no one is accountable."""
+    context, page = _open(browser, live_server, ARCHITECT)
+    try:
+        heads = [t.strip() for t in page.locator("[data-testid=raci-matrix] thead th").all_inner_texts()]
+        for person in ("Ivo Reed", "Quinn Aldridge", "Blake Sutherland", "Sage Okafor", "Riley Fenwick", "Bryn Tanaka"):
+            assert any(person in head for head in heads), (person, heads)
+        for capability in ("Field Service", "Order Fulfilment", "Regulatory Compliance"):
+            expect(_row(page, capability).locator("[data-testid=raci-flag]")).to_have_count(0)
+            letters = [t.strip() for t in _row(page, capability).locator("[data-raci-cell]").all_inner_texts()]
+            assert "A" in letters and "R" in letters, (capability, letters)
+    finally:
+        context.close()

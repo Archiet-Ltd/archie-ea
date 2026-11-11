@@ -1,7 +1,7 @@
 """The demo architect can act, and the catalogues behind every result are loaded.
 
 Before this change every demo architect -- the primary demo user and the
-sixteen owner accounts the seed creates for it, bryn.businessarch among them
+sixteen owner accounts the seed creates for it, the business architect among them
 -- was seeded on the read-only Viewer platform role. Score portfolio failed
 with a generic "try again" message that hid the real refusal, Run detection
 and Place with a rationale left the page for a raw PERMISSION_DENIED screen,
@@ -71,7 +71,7 @@ def demo(live_server, app):
             architect = User.query.filter_by(email=DEMO_EMAIL, organization_id=org_id).one()
             architect.password = PASSWORD
             reader = User.query.filter_by(
-                email="drew.dataanalyst@lantern-quay.example.com", organization_id=org_id,
+                email="drew.holloway@lantern-quay.example.com", organization_id=org_id,
             ).one()
             reader.password = PASSWORD
             db.session.commit()

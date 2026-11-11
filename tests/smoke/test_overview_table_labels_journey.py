@@ -30,7 +30,7 @@ APPS_A = [
     {"name": "Order Desk", "type": "Web application", "domain": AREAS[0], "status": "2.2 tactical",
      "owner_record": True, "also_owns_as": ("business", "technical"), "cost": 120000},
     {"name": "Checkout", "type": "Payments service", "domain": AREAS[1], "status": "2.1 strategic",
-     "owner_text": "Drew DataAnalyst, Cameron SystemsArchitect, Alexandra ReleaseCoordinator", "cost": 80000},
+     "owner_text": "Drew Holloway-Ashworth, Cameron Doyle-Featherstone, Alexandra Reyes-Montgomery", "cost": 80000},
     {"name": "Payroll Run", "type": "Batch job", "domain": AREAS[2], "status": "3. sunset", "owner_text": "Dana Reed"},
     {"name": "Stock Control", "type": "Database", "domain": AREAS[3], "status": "operational"},
     {"name": "Access Gate", "type": "Identity service", "domain": AREAS[4], "status": "1. undetermined"},
@@ -163,7 +163,7 @@ def test_the_applications_table_shows_every_column_in_words_with_each_owner_once
         # a long list of owners is cut short with the full list a hover away, and says so
         team = rows.filter(has_text="Checkout").locator("td").nth(2)
         title = team.get_attribute("title")
-        for member in ("Drew DataAnalyst", "Cameron SystemsArchitect", "Alexandra ReleaseCoordinator"):
+        for member in ("Drew Holloway-Ashworth", "Cameron Doyle-Featherstone", "Alexandra Reyes-Montgomery"):
             assert member in title, title
         assert team.evaluate("e => getComputedStyle(e).textOverflow") == "ellipsis"
         assert team.evaluate("e => e.scrollWidth > e.clientWidth")

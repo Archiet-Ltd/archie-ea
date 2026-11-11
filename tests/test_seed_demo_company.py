@@ -341,7 +341,7 @@ class TestAskQuestions:
         # their order between themselves is not part of the contract.
         assert {(o["name"], o["role"]) for o in result["owners"][:2]} == {
             ("Ivo Reed", "Primary"),
-            ("Cameron SysAdmin", "Technical"),
+            ("Cameron Doyle", "Technical"),
         }
         assert "no_ownership_records" not in result.get("reasons", [])
 
@@ -404,7 +404,7 @@ def test_demo_reader_cannot_access_write_route(app, db_session, make_org, client
 
     org_id = _get_lantern_org_id()
     reader = User.query.filter_by(
-        email="drew.dataanalyst@lantern-quay.example.com", organization_id=org_id,
+        email="drew.holloway@lantern-quay.example.com", organization_id=org_id,
     ).first()
     assert reader is not None, "demo reader not found — was the seeder run?"
     assert reader.role is not None and reader.role.name == "Viewer"
@@ -465,7 +465,7 @@ def test_demo_has_exactly_one_business_architect_and_a_rerun_keeps_it(app, db_se
         .filter(User.organization_id == org_id, User.enterprise_role == "business_architect")
         .all()
     )
-    assert [p.email for p in people] == ["bryn.businessarch@lantern-quay.example.com"]
+    assert [p.email for p in people] == ["bryn.tanaka@lantern-quay.example.com"]
     assert people[0].role.name == "Architect"
     assert not people[0].is_org_admin
 
@@ -1095,3 +1095,198 @@ def test_demo_weekly_briefing_has_content_in_every_section(app, db_session, make
     assert sections["risks"]["total"] >= 2
     assert sections["conformance"]["total"] >= 3
     assert "3 reviews past the time limit" in briefing["headline"]
+
+
+def test_every_person_in_the_demonstration_has_an_ordinary_name():
+    """Recordings and screenshots show these names, so none may read as a placeholder: a first name followed by a
+    surname, never a job title, a team or a joined-up word."""
+    from app.commands import seed_demo_company as seed
+    from tests._published_text_rules import PLACEHOLDER_PERSON_NAME
+
+    people = [(first, last) for first, last, _ in seed._OWNER_USERS] + [(seed._DEMO_USER_FIRST, seed._DEMO_USER_LAST)]
+    assert len(people) == 18
+    for first, last in people:
+        assert not PLACEHOLDER_PERSON_NAME.search("%s %s" % (first, last)), "%s %s reads as a placeholder" % (first, last)
+        assert last not in {"User", "Demo", "Test"}, "%s %s reads as a placeholder" % (first, last)
+        assert first != "Demo", "%s %s reads as a placeholder" % (first, last)
+
+
+def test_every_seeded_responsibility_assignment_is_kept_on_a_fresh_database(app, db_session, make_org):
+    """Each row of the responsibility matrix names a person the seed creates, so none is skipped."""
+    from app.commands import seed_demo_company as seed
+    from app.models.organization_model import EnterpriseRaciAssignment
+
+    expected = sum(len(cells) for _, cells in seed._RACI_ROWS)
+    assert expected == 23
+    stats = _seed_once()
+    org_id = _get_lantern_org_id()
+    assert stats["raci_assignments_created"] == expected
+    kept = db_session.query(EnterpriseRaciAssignment).filter_by(organization_id=org_id).all()
+    assert len(kept) == expected
+    assert len({a.stakeholder_id for a in kept}) > 1
+
+
+def test_the_seed_fails_loudly_when_a_responsibility_row_names_nobody(app, db_session, make_org, monkeypatch):
+    from app.commands import seed_demo_company as seed
+
+    monkeypatch.setattr(seed, "_RACI_ROWS", seed._RACI_ROWS + [("LQ-CAP-INCIDENT", {"nobody.here": "C"})])
+    with pytest.raises(RuntimeError, match="nobody.here"):
+        _seed_once()
+
+
+def test_a_rerun_renames_earlier_people_in_place_and_leaves_exactly_the_new_people(app, db_session, make_org, tenant_ctx):
+    """An organisation seeded under earlier names ends up with the people a fresh seed creates, with the same ids,
+    so ownership and responsibilities survive; another organisation's people are not touched."""
+    from app import db
+    from app.commands import seed_demo_company as seed
+    from app.models.application_owner import ApplicationOwner
+    from app.models.organization_model import EnterpriseRaciAssignment
+    from app.models.user import User
+    from app.models.vendor.vendor_organization import EnterpriseInitiative
+
+    bystander_id = make_org("bystander").id
+    domain = seed._DEMO_USER_EMAIL.split("@", 1)[1]
+    with tenant_ctx(bystander_id):
+        outsider = User(email="morgan.elsewhere@%s" % domain, first_name="Morgan", last_name="Elsewhere",
+                        organization_id=bystander_id, confirmed=True)
+        db.session.add(outsider)
+        db.session.flush()
+        outsider_id = outsider.id
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    with tenant_ctx(org_id):
+        fresh = {u.email: (u.first_name, u.last_name, u.id) for u in User.query.filter_by(organization_id=org_id)}
+        owners_before = sorted(((o.application_id, o.user_id) for o in ApplicationOwner.query.filter_by(organization_id=org_id)), key=repr)
+        for user in User.query.filter_by(organization_id=org_id):
+            if user.email == seed._DEMO_USER_EMAIL:
+                user.first_name, user.last_name = "Earlier", "Account"
+            elif user.email != "ivo.reed@%s" % domain:
+                user.email = "%s.earlier@%s" % (user.first_name.lower(), domain)
+                old_name = "%s Earlier" % user.first_name
+                user.last_name = "Earlier"
+                for initiative in EnterpriseInitiative.query.filter_by(organization_id=org_id, program_manager="%s %s" % (user.first_name, fresh_last(fresh, user.id))):
+                    initiative.program_manager = old_name
+                for assignment in EnterpriseRaciAssignment.query.filter_by(organization_id=org_id, stakeholder_id=user.id):
+                    assignment.stakeholder_name = old_name
+        db.session.flush()
+        assert {u.email for u in User.query.filter_by(organization_id=org_id)} != set(fresh)
+
+    again = _seed_once()
+    assert again["people_renamed"] == len(fresh) - 1
+
+    with tenant_ctx(org_id):
+        now = {u.email: (u.first_name, u.last_name, u.id) for u in User.query.filter_by(organization_id=org_id)}
+        assert now == fresh
+        assert sorted(((o.application_id, o.user_id) for o in ApplicationOwner.query.filter_by(organization_id=org_id)), key=repr) == owners_before
+        names = {"%s %s" % (first, last) for first, last, _ in fresh.values()}
+        assert {i.program_manager for i in EnterpriseInitiative.query.filter_by(organization_id=org_id)} <= names
+        assert {a.stakeholder_name for a in EnterpriseRaciAssignment.query.filter_by(organization_id=org_id)} <= names
+        assert EnterpriseRaciAssignment.query.filter_by(organization_id=org_id).count() == 23
+    with tenant_ctx(bystander_id):
+        kept = db.session.get(User, outsider_id)
+        assert (kept.email, kept.last_name) == ("morgan.elsewhere@%s" % domain, "Elsewhere")
+
+
+def fresh_last(fresh, user_id):
+    return next(last for _, last, uid in fresh.values() if uid == user_id)
+
+
+def test_no_retired_demonstration_name_or_address_remains_in_the_code():
+    """The people the demonstration used to carry are gone from the application, the scripts and the tests."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    # written in pieces so this file is not itself a hit
+    retired = [".".join(pair) for pair in (
+        ("morgan", "calibrator"), ("riley", "logistics"), ("casey", "inventory"), ("jordan", "fieldeng"),
+        ("avery", "compliance"), ("taylor", "procurement"), ("quinn", "production"), ("blake", "quality"),
+        ("drew", "dataanalyst"), ("sage", "itops"), ("finley", "support"), ("rowan", "sharedsvc"),
+        ("ellis", "datasteward"), ("cameron", "sysadmin"), ("ainsley", "neteng"), ("bryn", "businessarch"))]
+    retired += ["Demo" + " User"] + [
+        "%s %s" % (a, b) for a, b in (
+            ("Morgan", "Calibrator"), ("Jordan", "FieldEng"), ("Sage", "ITOps"), ("Cameron", "SysAdmin"),
+            ("Bryn", "BusinessArch"), ("Drew", "DataAnalyst"), ("Rowan", "SharedSvc"), ("Ellis", "DataSteward"),
+            ("Ainsley", "NetEng"), ("Riley", "Logistics"), ("Casey", "Inventory"), ("Avery", "Compliance"),
+            ("Taylor", "Procurement"), ("Quinn", "Production"), ("Blake", "Quality"), ("Finley", "Support"))]
+    hits = []
+    for folder in ("app", "scripts", "tests"):
+        for path in (root / folder).rglob("*"):
+            if path.suffix not in {".py", ".html", ".js", ".json", ".yml", ".md", ".txt", ".sh"} or not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            hits += ["%s: %s" % (path.relative_to(root), word) for word in retired if word in text]
+    assert not hits, hits
+
+
+def test_every_compliance_mapping_that_is_under_way_or_finished_points_at_its_evidence(app, db_session, make_org, tenant_ctx):
+    """A control the demonstration reports as implemented, verified or in progress names the document that shows it,
+    so the control page does not say the evidence is missing for work the demonstration says is done."""
+    from app.models.application_compliance import ApplicationComplianceControl
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    with tenant_ctx(org_id):
+        rows = ApplicationComplianceControl.query.filter_by(organization_id=org_id).all()
+        assert len(rows) > 100
+        under_way = [r for r in rows if r.implementation_status in ("implemented", "verified", "in_progress")]
+        assert under_way
+        assert [r.id for r in under_way if not r.evidence_url] == []
+        assert all(r.evidence_url is None for r in rows if r.implementation_status == "planned")
+        # the address opens a document inside the app, never a host outside it
+        outside = [r.evidence_url for r in under_way if not r.evidence_url.startswith("/applications/documents/")]
+        assert outside == []
+
+
+def test_every_evidence_address_names_a_seeded_document_with_content_of_the_same_organisation(app, db_session, make_org, tenant_ctx):
+    """The address behind an Evidence document link is the document of that application, it exists in the
+    organisation's own documents, its file is there and it lists the control the mapping is for."""
+    import re
+
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.compliance_models import ComplianceControl
+    from app.models.miscellaneous import ApplicationDocument
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    other = make_org("other-evidence")
+    with tenant_ctx(org_id):
+        rows = ApplicationComplianceControl.query.filter(
+            ApplicationComplianceControl.organization_id == org_id,
+            ApplicationComplianceControl.evidence_url.isnot(None)).all()
+        assert rows
+        for row in rows:
+            doc_id = int(re.match(r"^/applications/documents/(\d+)/download\?view=1$", row.evidence_url).group(1))
+            doc = ApplicationDocument.query.filter_by(id=doc_id).one()
+            assert doc.organization_id == org_id and doc.organization_id != other.id
+            assert doc.application_component_id == row.application_id
+            text = open(doc.file_path, encoding="utf-8").read()
+            assert ComplianceControl.query.get(row.control_id).control_code in text
+
+
+def test_seeding_again_changes_no_compliance_figure(app, db_session, make_org, tenant_ctx):
+    """Seed, change nothing, seed again: the status of every mapping and the evidence it names are those of a
+    fresh seed. A mapping left at an earlier status is brought to the seed's."""
+    from app.models.application_compliance import ApplicationComplianceControl
+
+    def figures(org_id):
+        rows = ApplicationComplianceControl.query.filter_by(organization_id=org_id).all()
+        return sorted((str(r.application_id), str(r.control_id), r.implementation_status or "", r.evidence_url or "") for r in rows)
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    with tenant_ctx(org_id):
+        fresh = figures(org_id)
+        # an organisation seeded earlier: one mapping at an old status, one pointing outside the app
+        rows = ApplicationComplianceControl.query.filter_by(organization_id=org_id).order_by(ApplicationComplianceControl.id).all()
+        old = [r for r in rows if r.implementation_status == "verified"][0]
+        old.implementation_status = "planned"
+        old.evidence_url = "https://evidence.example.com/old.pdf"
+        db_session.flush()
+        assert figures(org_id) != fresh
+    _seed_once()
+    with tenant_ctx(org_id):
+        assert figures(org_id) == fresh
+    _seed_once()
+    with tenant_ctx(org_id):
+        assert figures(org_id) == fresh
