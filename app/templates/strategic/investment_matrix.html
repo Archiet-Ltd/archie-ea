@@ -26,7 +26,7 @@
 {%- set record_urls = {} -%}
 {%- set has_record_page = 'archimate_crud.detail_element' in flask.current_app.view_functions -%}
 {%- for c in capability_scores if has_record_page and c.archimate_element_id -%}
-{%- set _ = record_urls.update({c.capability_id|string: url_for('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=c.archimate_element_id)}) -%}
+{%- set _ = record_urls.update({c.capability_id|string: url_for('archimate_crud.detail_element', layer='strategy', element_type='Capability', element_id=c.archimate_element_id, ae=1)}) -%}
 {%- endfor -%}
 {%- set add_capabilities_url = url_for('unified_low_priority.capability_map_capabilities') if 'unified_low_priority.capability_map_capabilities' in flask.current_app.view_functions else '' -%}
 <script>

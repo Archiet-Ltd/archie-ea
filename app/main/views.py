@@ -280,7 +280,7 @@ def product_inquiry_submit():
         abort(404)
 
     if page.cta == "inquiry":
-        offer = page.front_matter.get("offer")
+        offer = page.enquiry_offer(page.enquiry_source(request.form.get("source")))
         consent_text = page.front_matter.get("inquiry_consent_text")
     else:
         offer = page.feature_interest_offer

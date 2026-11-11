@@ -18,8 +18,8 @@ subscription. By subscribing, you confirm you are buying for your organisation's
 
 ## Cancelling
 
-An organisation administrator can cancel at any time from the billing page or by
-[contacting us](/contact). Cancelling stops the subscription from renewing. You keep full access
+An organisation administrator can cancel at any time [[if payment-open]]from the billing page or by
+[contacting us](/contact)[[else]]by [contacting us](/contact), because paid plans are set up with us and not bought online[[/if]]. Cancelling stops the subscription from renewing. You keep full access
 until the end of the period you have already paid for, and you can export your data for 30 days
 after it ends.
 

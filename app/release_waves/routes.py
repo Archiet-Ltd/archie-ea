@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from email_validator import EmailNotValidError, validate_email
 from flask import Blueprint, abort, make_response, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -60,7 +62,7 @@ def coming_groups() -> list[dict]:
             continue
         info = doc["groups"].get(code)
         if has_page(info) and info["title"] not in seen:
-            seen[info["title"]] = {"slug": code_slug(code), "title": info["title"], "blurb": info["blurb"]}
+            seen[info["title"]] = {"code": code, "slug": code_slug(code), "title": info["title"], "blurb": info["blurb"]}
     return [seen[k] for k in sorted(seen)]
 
 
@@ -113,6 +115,41 @@ def coming_soon_entries() -> list[dict]:
 def early_access_paths() -> list[str]:
     """Every public early-access address: the hub and the page of each capability it lists."""
     return [EARLY_ACCESS_PREFIX] + [f"{EARLY_ACCESS_PREFIX}/{group['slug']}" for group in coming_groups()]
+
+
+def coming_pages() -> list[dict]:
+    """The waiting-list pages the public menu lists as coming, other than a capability group already listed.
+
+    Each carries the menu's own label and address and its one-line description without the menu's lead-in words."""
+    from app.services.public_pages import load_page
+    from app.services.site_registry import site_registry
+
+    rules = wave_map()["rules"]
+    taken = {g["code"] for g in coming_groups()}
+    pages = []
+    for item in site_registry()["product"]["coming_soon"]["items"]:
+        # one capability, one row: the menu item and the group name it by the screen's route, not by its title
+        screen = (item.get("signed_in") or {}).get("href")
+        if screen in rules and rules[screen][1] in taken:
+            continue
+        blurb = re.sub(r"^(Coming soon|Early access):\s*", "", item.get("blurb") or "")
+        title = item["label"]
+        module = re.fullmatch(r"/modules/([\w-]+)", item["href"])
+        if module:
+            # a module page is listed only once it is published, under the heading it opens with
+            found = load_page("module", slug=module.group(1))
+            if found is None or found.is_held:
+                continue
+            title = found.heading
+        pages.append({"href": item["href"], "title": title, "blurb": blurb})
+    return sorted(pages, key=lambda p: p["title"])
+
+
+def coming_entries() -> list[dict]:
+    """Every capability the hub lists, once, in one alphabetical list, each with its address, title and blurb."""
+    entries = [{"href": url_for("early_access.page", slug=g["slug"]), "title": g["title"], "blurb": g["blurb"]} for g in coming_groups()]
+    entries += coming_pages()
+    return sorted(entries, key=lambda e: e["title"].lower())
 
 
 def _page(slug: str, *, thanks: bool = False, error: str | None = None, title: str | None = None, blurb: str | None = None):
@@ -208,7 +245,7 @@ def simulations():
 
 @early_access_bp.route("/early-access")
 def hub():
-    return render_template("public/early_access_hub.html", groups=coming_groups(), indexable=True)
+    return render_template("public/early_access_hub.html", entries=coming_entries(), indexable=True)
 
 
 @early_access_bp.route("/early-access/<slug>")

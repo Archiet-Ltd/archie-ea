@@ -62,4 +62,4 @@ def test_production_environment_selects_deepseek_chat(db_session, tenant_ctx, ma
     org = make_org("env-deepseek")
     with tenant_ctx(org.id):
         provider, model = LLMService._get_configured_provider()
-    assert (provider, model) == ("deepseek", "deepseek-chat")
+    assert (provider, model) == ("deepseek", "deepseek-flash")

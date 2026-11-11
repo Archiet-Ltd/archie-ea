@@ -419,13 +419,21 @@ def test_a_visitor_with_an_old_link_and_one_from_the_hub_each_read_the_capabilit
             '[data-testid="early-access-hub"] li',
             "els => els.map(e => [e.querySelector('a').getAttribute('href'), e.querySelector('a').innerText.trim(), e.innerText.trim()])")
         assert len(listed) >= 10
+        sitemap_xml = page.request.get(wave_server + "/sitemap.xml").text()
+        sitemap_paths = re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml)
         blurbs = set()
         for href, title, line in listed:
             blurb = line[len(title):].lstrip(": ").strip()
             assert blurb and blurb not in blurbs, (title, blurb)
             blurbs.add(blurb)
             status, early, heading = _lands_with_content(page, wave_server, href)
-            assert status == 200 and early and heading == title, (href, title, heading)
-            assert blurb in re.sub(r"\s+", " ", page.inner_text('[data-testid="early-access-page"]')), (href, blurb)
+            assert status == 200 and heading == title, (href, title, heading)
+            # a row opens an early-access page (not in the sitemap), or a waiting-list module page (in the sitemap)
+            waiting = page.locator('[data-testid="waiting-list-module"]').count() > 0
+            assert early or waiting, "%s opens neither an early-access page nor a waiting-list module page" % href
+            marker = "early-access-page" if early else "waiting-list-module"
+            assert blurb in re.sub(r"\s+", " ", page.inner_text('[data-testid="%s"]' % marker)), (href, blurb)
+            if waiting and not early:
+                assert urlsplit(page.url).path in sitemap_paths, (href, "a waiting-list module page is in the sitemap")
     finally:
         page.close()

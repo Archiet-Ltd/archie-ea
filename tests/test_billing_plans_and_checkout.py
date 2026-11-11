@@ -5,6 +5,7 @@ is replaced with a recorded response, and the provider's API base is pointed at
 a closed local port so an unreplaced call fails instead of going out.
 """
 
+import re
 import hashlib
 import hmac
 import json
@@ -780,7 +781,7 @@ def test_admin_under_the_limit_adds_into_their_own_organisation(app, db_session,
     assert created.organization_id == org.id
 
 
-def test_pricing_page_has_a_buy_button_per_plan(app, client):
+def test_pricing_page_has_a_buy_button_per_plan(app, client, billing):
     with app.app_context():
         resp = client.get("/pricing")
     html = resp.get_data(as_text=True)
@@ -793,6 +794,15 @@ def test_pricing_page_has_a_buy_button_per_plan(app, client):
     assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dyear" in html
     assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dmonth" in html
     assert 'data-testid="buy-enterprise"' in html
+
+
+def test_pricing_page_offers_no_buy_while_payment_is_closed(app, client, no_billing):
+    html = client.get("/pricing").get_data(as_text=True)
+    assert 'data-testid="plan-card-startup"' in html
+    for key in ("startup", "team"):
+        assert re.search(r'data-testid="buy-%s"[^>]*>Start free</a>' % key, html)
+        assert 'data-testid="talk-%s"' % key in html
+    assert not re.search(r"\bBuy\b", re.sub(r"<[^>]+>", " ", html.split("<main", 1)[1].split("</main>", 1)[0]))
 
 
 def test_pricing_contact_sales_button_points_at_the_contact_page(app, client):

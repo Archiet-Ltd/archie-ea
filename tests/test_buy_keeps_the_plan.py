@@ -18,7 +18,7 @@ from tests.test_account_mail_flows import (  # noqa: F401  (fixtures and helpers
     mail_on,
     outbox,
 )
-from tests.test_billing_plans_and_checkout import no_billing  # noqa: F401
+from tests.test_billing_plans_and_checkout import billing, no_billing  # noqa: F401
 from tests.test_team_invite_acceptance import PASSWORD, _make_org, _make_user
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def _follow_to_billing(client, resp):
     return resp
 
 
-def test_pricing_buttons_lead_to_registration_with_plan_and_interval(app, client):
+def test_pricing_buttons_lead_to_registration_with_plan_and_interval(app, client, billing):
     """The registration URL below travels inside the click-tracking redirect's
     "next" parameter (app/main/views.py::track_plan_click), so a click both
     logs the plan and still keeps it through sign-up."""
