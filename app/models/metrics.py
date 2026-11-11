@@ -40,6 +40,7 @@ class ApplicationMetricsSnapshot(db.Model):
     def create_snapshot(cls, notes=None):
         """Create a new snapshot with current metrics"""
         from app.models.application_layer import ApplicationComponent
+        from app.services.application_status import words_for_status
 
         total = ApplicationComponent.query.count()
         production = ApplicationComponent.query.filter(
@@ -53,8 +54,13 @@ class ApplicationMetricsSnapshot(db.Model):
         critical = ApplicationComponent.query.filter(
             ApplicationComponent.business_criticality.in_(["High", "Critical"])
         ).count()
+        # Planned is the list's first stage, Design, and the older words that now
+        # mean it. Development, testing and staging are counted as in development
+        # above, so the planned, in-development and production counts never overlap.
         planned = ApplicationComponent.query.filter(
-            ApplicationComponent.deployment_status.in_(["planned", "not_started"])
+            db.func.lower(db.func.trim(ApplicationComponent.deployment_status)).in_(
+                [*words_for_status("design"), "not_started"]
+            )
         ).count()
         high_crit = ApplicationComponent.query.filter(
             ApplicationComponent.business_criticality == "High"

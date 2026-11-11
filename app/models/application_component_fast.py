@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 from datetime import datetime
 
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 
 from app import db
 from app.models.mixins import TenantMixin
@@ -97,6 +97,13 @@ if _FAST_INIT:
         # Timestamps
         created_at = db.Column(db.DateTime, default=datetime.utcnow)
         updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+        @validates("deployment_status")
+        def validate_deployment_status(self, key, value):
+            """Store only a status on the one list, as the full model does."""
+            from app.services.application_status import status_to_store
+
+            return status_to_store(self.deployment_status, value)
 
 else:
     # Import the full model from the main module

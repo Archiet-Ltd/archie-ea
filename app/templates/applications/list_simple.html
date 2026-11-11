@@ -626,7 +626,7 @@
 {#- Values MUST stay inside VALID_CRITICALITY in app/schemas/api_schemas.py; any other
     value is rejected by the create schema. -#}
 {%- set criticality_choices = [('critical', 'Critical'), ('high', 'High'), ('medium', 'Medium'), ('low', 'Low')] -%}
-{%- set deployment_choices = [('production', 'Production'), ('staging', 'Staging'), ('development', 'Development'), ('retired', 'Retired'), ('planned', 'Planned')] -%}
+{%- set deployment_choices = status_options() -%}
 {%- set create_status_choices = [] -%}
 {%- for opt in filter_options.lifecycle_statuses -%}{%- set _ = create_status_choices.append((opt.value, opt.label)) -%}{%- endfor -%}
 {% call modal(id='modal-create', title='New Application', description='Register a new application in the portfolio.') %}

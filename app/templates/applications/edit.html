@@ -134,12 +134,9 @@
           <label for="deployment_status" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Status</label>
           {% call native_select(id=("deployment_status"), name=("deployment_status"), size='sm', class="w-full") %}
             <option value="" {% if not application.deployment_status %}selected{% endif %}>Not set</option>
-            {% for val in ['production', 'development', 'testing', 'staging', 'retired'] %}
-            <option value="{{ val }}" {% if application.deployment_status and application.deployment_status | lower == val | lower %}selected{% endif %}>{{ val | title }}</option>
+            {% for val, label in status_options(application.deployment_status) %}
+            <option value="{{ val }}" {% if application.deployment_status and (application.deployment_status == val or match_status(application.deployment_status) == val) %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
-            {% if application.deployment_status and application.deployment_status | lower not in ['production','development','testing','staging','retired'] %}
-            <option value="{{ application.deployment_status }}" selected>{{ application.deployment_status | title }}</option>
-            {% endif %}
           {% endcall %}
         </div>
         {# F-09, Capgemini dry-run: Lifecycle Status is shown on the detail

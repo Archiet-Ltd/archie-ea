@@ -192,6 +192,12 @@ def application_create():
     )
     if not is_valid:
         validation_errors.append(error)
+    else:
+        from app.services.application_status import status_for_write
+
+        validated_status, status_refusal = status_for_write(validated_status)
+        if status_refusal:
+            validation_errors.append(status_refusal)
 
     business_owner = data.get("business_owner")
     is_valid, validated_owner, error = validate_string(
@@ -798,10 +804,16 @@ def application_edit(id):
                 is_valid, validated_status, error = validate_string(
                     deployment_status, max_length=50, field_name="deployment_status"
                 )
+                from app.services.application_status import same_status, status_for_write
+
                 if not is_valid:
                     validation_errors.append(error)
-                else:
-                    app.deployment_status = validated_status
+                elif not same_status(validated_status, app.deployment_status):
+                    stored_status, status_refusal = status_for_write(validated_status)
+                    if status_refusal:
+                        validation_errors.append(status_refusal)
+                    else:
+                        app.deployment_status = stored_status
 
             # Validate business_purpose
             business_purpose = request.form.get("business_purpose")

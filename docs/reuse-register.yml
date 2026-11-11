@@ -1061,3 +1061,31 @@ entries:
     known_exceptions:
       - path: app/services/adm_requirement_service.py
         reason: links an ADM requirement to a solution, a different concept with the same verb
+
+  - id: force-graph
+    concept: The force-directed node-link graph (the impact graph and the whole-model map)
+    status: active
+    canonical:
+      path: app/static/js/impact_graph.js
+      symbols: [modelMap]
+    reuse: >
+      Draw a force-directed graph of model elements with app/static/js/impact_graph.js: its impact mode centres on one
+      element and its whole-model mode (the svg carries data-mode="model") draws every element, coloured by the layer
+      tokens, from app/services/model_map.py. Give the page a mode of this renderer; do not write a second d3 force
+      layout. app/templates/capability_map/network.html still draws its own inline force graph and is a known exception
+      to migrate in a later brief. The composer's diagram engine (JointJS) draws diagrams people compose and is a
+      different concept.
+    must_not_create:
+      - id: second-force-simulation
+        regex: 'd3\.forceSimulation\('
+        scope: [app]
+        suffixes: [.js, .html]
+    known_exceptions:
+      - path: app/templates/capability_map/network.html
+        reason: its own inline force graph, to be migrated onto impact_graph.js in a later brief
+      - path: app/static/js/archimate_diagram_renderer.js
+        reason: an older force layout inside the diagram renderer, to be moved onto impact_graph.js in a later brief
+      - path: app/templates/solutions/program_view.html
+        reason: the programme view's own inline force graph, to be moved onto impact_graph.js in a later brief
+      - path: app/templates/stakeholders/map.html
+        reason: the stakeholder map's own inline force graph, to be moved onto impact_graph.js in a later brief
