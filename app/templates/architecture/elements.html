@@ -130,7 +130,7 @@
                 <table class="dense-table" x-show="debtLoaded && debtScores.length > 0" x-cloak class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-border">
-                            <th class="px-4 py-2 text-left font-medium text-muted-foreground">Element</th>
+                            <th data-no-pin class="px-4 py-2 text-left font-medium text-muted-foreground">Element</th>
                             <th class="px-4 py-2 text-left font-medium text-muted-foreground">Layer</th>
                             <th class="px-4 py-2 text-center font-medium text-muted-foreground w-24">Debt Score</th>
                             <th class="px-4 py-2 text-left font-medium text-muted-foreground hidden lg:table-cell">Factors</th>
@@ -139,7 +139,7 @@
                     <tbody class="divide-y divide-border">
                         <template x-for="item in (debtShowAll ? debtScores : debtScores.slice(0, 20))" :key="item.app_id || item.id || item.name">
                             <tr class="hover:bg-muted/30">
-                                <td class="px-4 py-2 font-medium text-foreground" >
+                                <td data-no-pin class="px-4 py-2 font-medium text-foreground" >
                                     <span x-text="item.app_name || item.name || item.element_name || 'Unnamed'"></span>
                                     <span class="block text-xs font-normal text-muted-foreground break-words lg:hidden" data-testid="debt-detail-compact" :title="item.detail_full || item.detail || item.reason"><span aria-hidden="true" data-testid="debt-detail-text" x-text="item.detail || item.reason"></span><span class="sr-only" data-testid="debt-detail-full" x-text="item.detail_full || item.detail || item.reason"></span></span>
                                 </td>

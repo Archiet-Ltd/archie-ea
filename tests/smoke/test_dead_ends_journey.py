@@ -34,6 +34,7 @@ from .fresh_org import api, create_fresh_org, sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 VIEWPORTS = (("light", 1440, 900), ("dark", 390, 844))
+ALL_VIEWPORTS = (("light", 1440, 900), ("dark", 1440, 900), ("light", 390, 844), ("dark", 390, 844))
 
 
 def _seed(org_id, tag):
@@ -367,13 +368,13 @@ def test_tech_debt_table_keeps_every_debt_score_reachable_with_a_long_support_va
         {"name": LONG_NAME_PREFIX + tag, "end_of_life_date": "2040-01-01", "version": "10.2",
          "support_level": "Supported"},
     ]
-    for scheme, width, height in VIEWPORTS:
+    for scheme, width, height in ALL_VIEWPORTS:
         context = browser.new_context(viewport={"width": width, "height": height}, color_scheme=scheme)
         page = context.new_page()
         try:
             sign_in(page, live_server, org["emails"]["enterprise_architect"])
             page.goto(live_server + "/architecture/elements", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-            if scheme == "light":
+            if (scheme, width) == ("light", 1440):
                 status, payload = api(page, "POST", "/applications/import-manual", {"applications": rows})
                 assert status == 200, (status, payload)
             page.reload(wait_until="domcontentloaded")
@@ -422,7 +423,12 @@ def test_tech_debt_table_keeps_every_debt_score_reachable_with_a_long_support_va
                 assert bbox and bbox["x"] >= wbox["x"] - 1 and bbox["x"] + bbox["width"] <= wbox["x"] + wbox["width"] + 1, (bbox, wbox)
                 assert bbox["x"] >= 0 and bbox["x"] + bbox["width"] <= width, (bbox, width)
                 assert long_badge.inner_text().strip() == "0%"
-                wrapper.screenshot(path=os.path.join(walk, "%s%d-tech-debt-long-name-scrolled.png" % (scheme, width)))
+                # Nothing is drawn over the score: the badge is the top element at its own centre.
+                covered_by = page.evaluate(
+                    "([x, y]) => { const e = document.elementFromPoint(x, y); return e && e.closest('[data-partly-scored]') ? null : (e && e.textContent.slice(0, 60)); }",
+                    [bbox["x"] + bbox["width"] / 2, bbox["y"] + bbox["height"] / 2])
+                assert covered_by is None, "the Debt Score is covered by: %r" % covered_by
+                page.screenshot(path=os.path.join(walk, "%s%d-tech-debt-long-name-scrolled.png" % (scheme, width)), clip=wbox)
                 wrapper.evaluate("e => { e.scrollLeft = 0; }")
 
             def badge_of(name):
