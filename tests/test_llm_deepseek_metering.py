@@ -17,7 +17,7 @@ from tests.test_llm_deepseek import _clear_ledger, _ledger, production_shape, st
 def _stream_turn(app, base_url, key=KEY):
     runner = AgentRunner(user_id=1)
     with app.app_context():
-        return runner._call_llm("deepseek", "deepseek-chat", key, "system prompt", [{"role": "user", "content": "hi"}],
+        return runner._call_llm("deepseek", "deepseek-flash", key, "system prompt", [{"role": "user", "content": "hi"}],
                                 [], stream=True, base_url=base_url)
 
 
@@ -47,7 +47,7 @@ def test_a_stream_without_usage_records_a_non_zero_estimate(app, production_shap
 def _org_row(db, key, org=1):
     from app.models.models import APISettings
 
-    row = APISettings(provider="deepseek", enabled=True, default_model="deepseek-chat", organization_id=org)
+    row = APISettings(provider="deepseek", enabled=True, default_model="deepseek-flash", organization_id=org)
     row.api_key = key
     db.session.add(row)
     db.session.commit()
@@ -122,15 +122,15 @@ def test_no_order_configured_an_organisations_own_openai_key_leads(app, monkeypa
 def test_one_configured_price_leaves_the_other_direction_at_the_list_price(monkeypatch):
     monkeypatch.setenv("LLM_PRICE_PER_MTOK_IN_DEEPSEEK", "0.5")
     monkeypatch.delenv("LLM_PRICE_PER_MTOK_OUT_DEEPSEEK", raising=False)
-    assert LLMService.price_per_mtok("deepseek", "deepseek-chat") == (0.5, 0.42)
+    assert LLMService.price_per_mtok("deepseek", "deepseek-flash") == (0.5, 1.2)
     monkeypatch.delenv("LLM_PRICE_PER_MTOK_IN_DEEPSEEK")
     monkeypatch.setenv("LLM_PRICE_PER_MTOK_OUT_DEEPSEEK", "0.9")
-    assert LLMService.price_per_mtok("deepseek", "deepseek-chat") == (0.28, 0.9)
+    assert LLMService.price_per_mtok("deepseek", "deepseek-flash") == (0.3, 0.9)
 
 
 def test_the_real_guard_allows_deepseek(app):
     with app.app_context():
-        provider, model, _org = LLMService._guard_provider_call("deepseek", "deepseek-chat")
+        provider, model, _org = LLMService._guard_provider_call("deepseek", "deepseek-flash")
     assert provider == "deepseek"
 
 

@@ -1348,12 +1348,25 @@ class AgentRunner:
 
     @staticmethod
     def _provider_extra_body(provider_name: str) -> Optional[dict]:
-        """OpenRouter's data-policy setting: only endpoints that neither train on nor log prompts."""
+        """OpenRouter's data-policy setting: only endpoints that neither train on nor log prompts.
+
+        DeepSeek's mode (non-thinking: the tool loop does not keep reasoning text) is set by ``_deepseek_call``.
+        """
         if provider_name == "openrouter":
             from app.modules.ai_chat.services.llm_service_impl import OPENROUTER_PROVIDER_POLICY
 
             return {"provider": dict(OPENROUTER_PROVIDER_POLICY)}
         return None
+
+    @staticmethod
+    def _deepseek_call(provider_name: str, model: str, extra_body: Optional[dict]) -> tuple:
+        """The model name and request extras to send: DeepSeek's served name and mode, others unchanged."""
+        if provider_name != "deepseek":
+            return model, extra_body
+        from app.modules.ai_chat.services.model_defaults import deepseek_request_for
+
+        served, mode = deepseek_request_for(model, tools=True)
+        return served, {**(extra_body or {}), **mode}
 
     def _call_openai(self, model, api_key, system_prompt, messages, tools, base_url=None, provider=None) -> dict:
         from openai import OpenAI
@@ -1371,14 +1384,15 @@ class AgentRunner:
         # Newer OpenAI models (o1, o3, gpt-5.x) require max_completion_tokens; all other models
         # accept it too (it supersedes the deprecated max_tokens parameter).
         _token_limit = 8192 if ("gpt-4" in model or "gpt-5" in model) else 4096
+        sent_model, extra_body = self._deepseek_call(provider_name, model, self._provider_extra_body(provider_name))
         response = client.chat.completions.create(
-            model=model,
+            model=sent_model,
             messages=full_messages,
             tools=tools,
             tool_choice="auto",
             temperature=0.0,
             max_completion_tokens=_token_limit,
-            extra_body=self._provider_extra_body(provider_name),
+            extra_body=extra_body,
         )
 
         msg = response.choices[0].message
@@ -1412,8 +1426,9 @@ class AgentRunner:
 
         # Newer OpenAI models (o1, o3, gpt-5.x) require max_completion_tokens.
         _token_limit = 8192 if ("gpt-4" in model or "gpt-5" in model) else 4096
+        sent_model, extra_body = self._deepseek_call(provider_name, model, self._provider_extra_body(provider_name))
         with client.chat.completions.create(
-            model=model,
+            model=sent_model,
             messages=full_messages,
             tools=tools,
             tool_choice="auto",
@@ -1421,7 +1436,7 @@ class AgentRunner:
             max_completion_tokens=_token_limit,
             stream=True,
             stream_options={"include_usage": True},
-            extra_body=self._provider_extra_body(provider_name),
+            extra_body=extra_body,
         ) as stream:
             for chunk in stream:
                 if getattr(chunk, "usage", None):
@@ -1689,7 +1704,7 @@ class AgentRunner:
         elif any(t in reason_l for t in ("no api key", "not configured", "no provider", "no keys")):
             msg = (
                 "AI features aren't configured yet — add an API key under "
-                "Admin → API Settings to enable the assistant."
+                "Admin → AI settings to enable the assistant."
             )
         elif any(t in reason_l for t in _QUOTA_PHRASES):
             msg = (
@@ -1699,7 +1714,7 @@ class AgentRunner:
         else:
             msg = (
                 "The AI request couldn't be completed. See the error detail below "
-                "or check Admin → API Settings."
+                "or check Admin → AI settings."
             )
         return {
             "response": msg,

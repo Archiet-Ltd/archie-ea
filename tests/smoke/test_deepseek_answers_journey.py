@@ -79,11 +79,11 @@ def test_the_cto_gets_a_cited_estate_answer_and_a_model_reply_through_deepseek(b
         page.locator("#user-input").press("Enter")
         expect(page.get_by_text(REPLY)).to_be_visible(timeout=PAGE_TIMEOUT * 2)
         assert stub.requests, "the model question never reached DeepSeek"
-        assert {r["model"] for r in stub.requests} == {"deepseek-chat"}
+        assert {r["model"] for r in stub.requests} == {"deepseek-flash"}
         # After the reply the scope line names who answered, with the same spelling as before it.
-        expect(page.get_by_test_id("chat-scope")).to_contain_text("deepseek-chat", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("chat-scope")).to_contain_text("deepseek-flash", timeout=PAGE_TIMEOUT)
         after = page.get_by_test_id("chat-scope").inner_text()
-        assert "DeepSeek" in after and "Deepseek" not in after and "deepseek-chat" in after, after
+        assert "DeepSeek" in after and "Deepseek" not in after and "deepseek-flash" in after, after
         assert "No enabled LLM provider" not in page.locator("body").inner_text()
     finally:
         context.close()
@@ -108,7 +108,7 @@ def test_at_the_ceiling_the_chat_says_answers_are_paused_not_that_no_model_is_co
     with app.app_context():
         with db.engine.begin() as connection:
             connection.execute(text("DELETE FROM llm_spend_ledger"))
-        LLMService.record_spend("deepseek", "deepseek-chat", 100000, 100000)  # well over the ceiling
+        LLMService.record_spend("deepseek", "deepseek-flash", 100000, 100000)  # well over the ceiling
     email, _org = _empty_organisation_user(paused_server)
     context = browser.new_context(viewport={"width": 1440, "height": 900})
     context.set_default_timeout(PAGE_TIMEOUT)
@@ -137,7 +137,7 @@ def test_after_a_paused_turn_the_scope_line_still_says_answers_are_paused(browse
     with app.app_context():
         with db.engine.begin() as connection:
             connection.execute(text("DELETE FROM llm_spend_ledger"))
-        LLMService.record_spend("deepseek", "deepseek-chat", 100000, 100000)  # well over the ceiling
+        LLMService.record_spend("deepseek", "deepseek-flash", 100000, 100000)  # well over the ceiling
     email, _org = _empty_organisation_user(paused_server)
     context = browser.new_context(viewport={"width": width, "height": 900})
     context.set_default_timeout(PAGE_TIMEOUT)

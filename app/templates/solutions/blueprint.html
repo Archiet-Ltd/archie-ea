@@ -1748,13 +1748,13 @@ function codegenModal() {
                     // has no parsed body to quote, and bare statusText tells the user
                     // nothing actionable about the real cause.
                     if (httpErr.status && !httpErr.data) {
-                        throw new Error('Server error (' + httpErr.status + '). The LLM service may be unavailable or timed out. Check Admin \u2192 API Settings to verify an LLM API key is configured.');
+                        throw new Error('Server error (' + httpErr.status + '). The LLM service may be unavailable or timed out. Check Admin \u2192 AI settings to verify an LLM API key is configured.');
                     }
                     throw httpErr;
                 }
                 if (!data || typeof data !== 'object') {
                     // 200 with a non-JSON body — same class of failure as above.
-                    throw new Error('Server error. The LLM service may be unavailable or timed out. Check Admin \u2192 API Settings to verify an LLM API key is configured.');
+                    throw new Error('Server error. The LLM service may be unavailable or timed out. Check Admin \u2192 AI settings to verify an LLM API key is configured.');
                 }
                 if (!data.success) throw new Error(data.error || 'Generation failed');
                 if (!data.code || !data.code.trim()) throw new Error('LLM returned an empty response. Please try again.');

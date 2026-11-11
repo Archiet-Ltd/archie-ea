@@ -730,10 +730,12 @@ def api_upload_architecture_document(id):
 @require_permission("read", "application")
 def api_download_architecture_document(id, doc_id):
     """Download the file of a document of one of the active organisation's applications."""
+    import os
+
     doc = _own_document_or_404(id, doc_id)
 
     return send_file(
-        doc.file_path,
+        os.path.abspath(doc.file_path),
         mimetype=doc.mime_type,
         as_attachment=True,
         download_name=doc.filename,

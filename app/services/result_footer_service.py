@@ -664,6 +664,51 @@ def roadmap_summary_footer(organization_id: int, capability_count: int, domain_c
     ], now)
 
 
+def connector_repository(element) -> Optional[Dict[str, Any]]:
+    """The repository a connector read this element from: its label in words ("GitHub: acme/shop") and the
+    address of the repository, or None when the element did not come from a repository."""
+    if getattr(element, "source_kind", None) != "connector":
+        return None
+    try:
+        ref = json.loads(getattr(element, "source_ref", None) or "")
+    except (TypeError, ValueError):
+        return None
+    if not (isinstance(ref, dict) and ref.get("system") and ref.get("repository")):
+        return None
+    label = _connector_label({"source_ref": element.source_ref, "source_label": element.source_label})
+    href = None
+    if str(ref["system"]).strip().lower() == "github":
+        href = "https://github.com/%s" % str(ref["repository"]).strip("/")
+    return {"label": label, "href": href}
+
+
+def product_footer(organization_id: int, product_id: int, member_ids: List[int], now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for a product's summary: the product, the first few elements it is made of, and the count of the rest."""
+    listed = member_ids[:_MAX_LISTED]
+    known = element_facts(organization_id, [product_id] + listed)
+
+    def element(element_id, subject):
+        info = known.get(element_id)
+        if info is None:
+            return None
+        return fact(info["name"], href=page_link("archimate.element_impact_graph_page", element_id=element_id),
+                    source_kind=info["source_kind"] or "unknown", source_label=info["source_label"],
+                    as_of=info["as_of"], subject=subject)
+
+    facts = [element(product_id, "Product") or fact(NOT_IN_MODEL, missing=True)]
+    for element_id in listed:
+        one = element(element_id, "Connected element")
+        if one is not None:
+            facts.append(one)
+    rest = len(member_ids) - len(listed)
+    if rest > 0:
+        facts.append(fact("%d more connected element%s" % (rest, "" if rest == 1 else "s"), source_kind="derived",
+                          subject="Connected elements"))
+    if not member_ids:
+        facts.append(fact("Connected elements: none recorded", missing=True))
+    return build_footer(facts, now)
+
+
 def impact_footer(organization_id: int, analysis: Dict[str, Any], now: Optional[datetime] = None) -> Dict[str, Any]:
     """Footer for an impact analysis: the element being changed, the elements it reaches and the cost at risk.
 

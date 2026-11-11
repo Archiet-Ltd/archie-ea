@@ -223,7 +223,7 @@ class EnhancedArchiMateExtractor:
                     logger.error("❌ No paid provider available for fallback")
                     raise ValueError(
                         f"Hugging Face failed and no paid provider available. "
-                        f"Error: {e}. Please configure a paid provider (Claude/GPT - 4) in API Settings."
+                        f"Error: {e}. Please configure a paid provider (Claude/GPT - 4) in AI settings."
                     )
             else:
                 # Re-raise non-Hugging Face errors
