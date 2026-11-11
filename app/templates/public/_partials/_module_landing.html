@@ -4,6 +4,7 @@
    is for, example questions, steps, the page's own screen or recording when one exists (never an empty frame), the page's written detail, FAQ and the
    closing action. Expects `page`, `landing` (landing.module set), optional `screenshot` / `recording`. -#}
 {% set m = landing.module %}
+<div{% if page.cta == 'waiting_list' %} data-testid="waiting-list-module"{% endif %}>
 {% set primary_label, primary_url = landing.primary_action %}
 {% set secondary_label, secondary_url = landing.secondary_action %}
 {% set hero = {
@@ -66,6 +67,8 @@
 {% endif %}
 
 {% with closing_testid = 'landing-closing', closing_waiting = (page.cta == 'waiting_list'),
-        closing_primary = (primary_label, primary_url, 'module-cta'), closing_secondary = ('Get in touch', '/contact', none) %}
+        closing_primary = (primary_label, primary_url, 'module-cta'),
+        closing_secondary = ((secondary_label, secondary_url, none) if page.cta == 'waiting_list' else ('Get in touch', '/contact', none)) %}
 {% include 'public/_partials/_section_closing.html' %}
 {% endwith %}
+</div>
