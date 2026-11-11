@@ -158,3 +158,23 @@ def test_the_judge_scores_four_items_and_needs_no_failure_on_a_and_b():
     prompt = gold_replay.judge_prompt("What breaks?", "Orders Hub has 13.")
     for item in gold_replay.JUDGE_ITEMS.values():
         assert item in prompt
+
+
+def test_a_replay_leaves_no_organisation_in_the_database(app):
+    from app import db
+    from app.models.organization import Organization
+
+    def gold_organisations():
+        return db.session.execute(
+            db.select(db.func.count()).select_from(Organization).where(Organization.name.like("Gold % %"))
+        ).scalar_one()
+
+    with app.app_context():
+        before = gold_organisations()
+    done = subprocess.run(
+        [sys.executable, "-m", "app.modules.intelligence.services.gold_replay", "--set", "figures", "--only", "1"],
+        cwd=ROOT, capture_output=True, text=True, timeout=1200, env={**os.environ, "PYTHONPATH": ROOT},
+    )
+    assert done.returncode == 0, done.stdout[-600:] + done.stderr[-600:]
+    with app.app_context():
+        assert gold_organisations() == before, "the replay's two organisations are gone when it ends"

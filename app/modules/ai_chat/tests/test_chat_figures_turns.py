@@ -178,7 +178,7 @@ def test_one_revision_is_sent_with_each_violation_named(app, db_session, make_or
     assert "Use its reference from the tool results, or leave it out." in sent
     assert "[fig:F99] does not exist in this turn." in sent
     assert len(seen) == 3, "exactly one revision"
-    assert result["response"] == "Rev Root [ref:%d] is hit, 2 connections downstream in all." % root.id
+    assert result["response"] == "[ref:%d] is hit, 2 connections downstream in all." % root.id
     assert result["figure_check"]["revision_ran"] is True and result["figure_check"]["revision_fixed"] is True
     assert result["figure_check"]["first_draft_violations"] == {"written_number": 1, "unknown_reference": 1}
 
@@ -196,7 +196,7 @@ def test_a_revision_that_calls_a_tool_can_fix_a_no_tool_draft(app, db_session, m
 
     assert "No tool was called in this turn." in str(seen[1][-1]["content"])
     assert "You may also call a tool." in str(seen[1][-1]["content"])
-    assert result["response"] == "Delta 01 [ref:%d] is one of 3 applications match this search." % first.id
+    assert result["response"] == "[ref:%d] is one of 3 applications match this search." % first.id
     assert "999" not in result["response"]
 
 
@@ -213,7 +213,7 @@ def test_a_draft_that_ignores_the_contract_twice_shows_the_records_block(app, db
     parts = result["response"].split("\n\n")
     assert parts[0] == NOT_CONFIRMED
     assert parts[1].startswith(cf.RECORDS_HEADING)
-    assert "- Ign Root [ref:%d]: 2 connections downstream" % root.id in parts[1]
+    assert "- [ref:%d]: 2 connections downstream" % root.id in parts[1]
     assert parts[2] == cf.NEXT_STEP
     assert "2 connections" in result["response"] and "reaches 2" not in result["response"]
     assert result["figure_check"]["fallback"]["clauses_removed"] >= 1
@@ -265,7 +265,7 @@ def test_the_existing_nudge_and_a_figure_violation_go_in_one_message(app, db_ses
 
     message = str(seen[1][-1]["content"])
     assert "call the answer tool for this question" in message and "Your answer cannot be shown as written" in message
-    assert result["response"] == "Ndg Root [ref:%d] has 2 connections downstream." % root.id
+    assert result["response"] == "[ref:%d] has 2 connections downstream." % root.id
 
 
 # --------------------------------------------------------------------------- #

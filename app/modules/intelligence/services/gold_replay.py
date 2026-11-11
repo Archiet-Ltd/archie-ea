@@ -31,6 +31,7 @@ expected rendering is missing from the delivered text, in prose or in the record
 from __future__ import annotations
 
 import argparse
+import contextlib
 import importlib.util
 import json
 import os
@@ -600,13 +601,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     app = create_app("testing")
     document, fixture = load_set(args.set)
-    with app.app_context():
+    with app.app_context(), _rolled_back(db):
         estates = Estates(fixture, _create_org, _create_user)
-        try:
-            runs = run_set(app, estates, document, only=set(args.only) if args.only else None)
-        finally:
-            # Only what this run wrote: its two organisations, by key.
-            _remove(db, estates)
+        runs = run_set(app, estates, document, only=set(args.only) if args.only else None)
     summary = summarise(runs)
     failed = [r for r in runs if r["lost"] or r["wrong"]]
     judged = None
@@ -631,22 +628,37 @@ def main(argv: Optional[List[str]] = None) -> int:
     return 1 if failed else 0
 
 
-def _remove(db, estates: Estates) -> None:
-    """Delete the two organisations this run created, and what is theirs, by organisation id."""
-    from sqlalchemy import text
+@contextlib.contextmanager
+def _rolled_back(db):
+    """Everything the run writes (its two organisations and what is theirs) goes into one outer
+    transaction that is rolled back when the run ends, pass or fail. A commit inside the run is a
+    savepoint release, so no row, including the append-only change ledger, is left in the database."""
+    factory = db.session.session_factory
+    original_class, original_options = factory.class_, dict(factory.kw)
+    connections = {}
+    with contextlib.ExitStack() as resources:
+        for engine in dict.fromkeys(db.engines.values()):
+            connection = resources.enter_context(engine.connect())
+            resources.callback(connection.begin().rollback)
+            connections[engine] = connection
 
-    db.session.rollback()
-    tables = ("application_capability_mapping", "business_capability", "archimate_relationships",
-              "archimate_elements", "application_components", "users", "organizations")
-    for org_id in estates.org.values():
-        for table in tables:
+        class RollbackSession(original_class):
+            def get_bind(self, mapper=None, clause=None, bind=None, **kwargs):
+                resolved = super().get_bind(mapper=mapper, clause=clause, bind=bind, **kwargs)
+                return connections.get(resolved, resolved)
+
+        try:
+            db.session.remove()
+            factory.class_ = RollbackSession
+            db.session.configure(join_transaction_mode="create_savepoint")
+            yield
+        finally:
             try:
-                db.session.execute(text("DELETE FROM %s WHERE organization_id = :o" % table
-                                        if table != "organizations" else "DELETE FROM organizations WHERE id = :o"),
-                                   {"o": org_id})
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
+                db.session.remove()
+            finally:
+                factory.class_ = original_class
+                factory.kw.clear()
+                factory.kw.update(original_options)
 
 
 if __name__ == "__main__":

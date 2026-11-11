@@ -220,6 +220,12 @@ def _no_raw_tokens(text):
     assert "[fig:" not in text and "fig:F" not in text, text
 
 
+def _names_once(text):
+    """No record's name is written twice in a row (a name beside a link that already shows it)."""
+    repeat = re.search(r"\b(\w[\w ]{2,}?)\s+\1\b", text)
+    assert not repeat, "a name is shown twice in a row: %r in %r" % (repeat.group(0), text)
+
+
 def _plan(**asked):
     SCRIPT.update(plan=asked, seen=[], stale=None, remembered=None)
 
@@ -571,7 +577,7 @@ def _landing(context, server, href):
 def test_a_cto_asks_which_of_two_services_breaks_more_and_each_count_shows_beside_its_own_service(
     browser, server, name, viewport
 ):
-    """J8. The model looks both up and writes each count beside the other service."""
+    """An enterprise architect asks which of two services matters more. The model looks both up and writes each count beside the other service."""
     org = _estate("enterprise_architect", "A")
     _estate("enterprise_architect", "B")
     hub, billing = org["ids"]["elements"]["Orders Hub"], org["ids"]["elements"]["Billing"]
@@ -589,6 +595,7 @@ def test_a_cto_asks_which_of_two_services_breaks_more_and_each_count_shows_besid
         expect(reply).to_contain_text(NEXT_STEP, timeout=PAGE_TIMEOUT * 2)
         text = reply.inner_text()
         _no_raw_tokens(text)
+        _names_once(text)
         assert SCRIPT["seen"] == ["lookup", "lookup", "draft", "revision"], SCRIPT["seen"]
         assert NOT_CONFIRMED in text and "What the records show:" in text
         hub_line, billing_line = _line_with(text, "13 connections"), _line_with(text, "4 connections")
@@ -609,7 +616,7 @@ def test_a_cto_asks_which_of_two_services_breaks_more_and_each_count_shows_besid
 def test_a_ctos_follow_up_shows_the_figure_read_again_never_one_left_over_from_the_last_answer(
     browser, server, name, viewport
 ):
-    """J9. The follow-up writes the key it used in the first answer."""
+    """An enterprise architect asks a follow-up. The follow-up writes the key it used in the first answer."""
     org = _estate("enterprise_architect", "A")
     hub = org["ids"]["elements"]["Orders Hub"]
     first, second = "Tell me how exposed Orders Hub is.", "Why is that so high?"
@@ -629,6 +636,7 @@ def test_a_ctos_follow_up_shows_the_figure_read_again_never_one_left_over_from_t
         expect(reply).to_contain_text(NEXT_STEP, timeout=PAGE_TIMEOUT * 2)
         text = reply.inner_text()
         _no_raw_tokens(text)
+        _names_once(text)
         later = text[text.rindex(NOT_CONFIRMED):]
         assert "What the records show:" in later and "13 connections downstream" in later, later
         assert SCRIPT["seen"][-3:] == ["lookup", "draft", "revision"], SCRIPT["seen"]
@@ -645,7 +653,7 @@ def test_a_ctos_follow_up_shows_the_figure_read_again_never_one_left_over_from_t
 def test_a_cto_asks_what_a_service_costs_and_a_model_that_names_it_without_linking_it_still_leaves_the_cost(
     browser, server, name, viewport
 ):
-    """J10. The model names the record, writes no link, and writes the digits itself."""
+    """An enterprise architect asks what a service costs. The model names the record, writes no link, and writes the digits itself."""
     org = _estate("enterprise_architect", "A")
     app_id = org["ids"]["applications"]["Field Service Management"]
     ask = "What does Field Service Management cost?"
@@ -660,10 +668,12 @@ def test_a_cto_asks_what_a_service_costs_and_a_model_that_names_it_without_linki
         expect(reply).to_contain_text(NEXT_STEP, timeout=PAGE_TIMEOUT * 2)
         text = reply.inner_text()
         _no_raw_tokens(text)
+        _names_once(text)
         assert SCRIPT["seen"] == ["lookup", "draft", "revision"], SCRIPT["seen"]
         assert NOT_CONFIRMED in text and "What the records show:" in text and "Not recorded" not in text
         line = _line_with(text, "an annual cost of")
         assert len(line) == 1 and "Field Service Management" in line[0] and "£110,000" in line[0], text
+        assert "match this search" not in text, "a cost question is not shown a search count"
         for other in ("£470,000", "£250,000", "£90,000"):
             assert other not in text, "another row's cost"
         _walk(page, "j10-named-not-linked", name)
@@ -682,7 +692,7 @@ def test_a_cto_asks_what_a_service_costs_and_a_model_that_names_it_without_linki
 def test_a_ctos_application_count_stays_on_the_page_when_the_model_writes_a_count_as_text_in_a_turn_that_looked_something_up(
     browser, server, name, viewport
 ):
-    """J11. The model writes 999 applications, and Orders Hub's count as a reference."""
+    """An enterprise architect asks for a count and for one service's exposure. The model writes 999 applications, and Orders Hub's count as a reference."""
     org = _estate("enterprise_architect", "A")
     _estate("enterprise_architect", "B")
     hub = org["ids"]["elements"]["Orders Hub"]
@@ -697,6 +707,7 @@ def test_a_ctos_application_count_stays_on_the_page_when_the_model_writes_a_coun
         expect(reply).to_contain_text(NEXT_STEP, timeout=PAGE_TIMEOUT * 2)
         text = reply.inner_text()
         _no_raw_tokens(text)
+        _names_once(text)
         assert "999" not in text, text
         assert SCRIPT["seen"] == ["lookup", "draft", "revision"], SCRIPT["seen"]
         hub_line = _line_with(text, "13 connections downstream")

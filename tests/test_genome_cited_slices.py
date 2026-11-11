@@ -307,3 +307,16 @@ def test_a_persona_whose_charter_lists_only_writes_can_still_read_the_model(two_
             ToolCall(id="t", name="create_programme", arguments={}))
     assert result["success"] is True and result["result"]["nodes"]
     assert refused.get("code") == "CHARTER_REFUSED"
+
+
+def test_a_name_written_beside_its_marker_is_shown_once_in_a_model_answer():
+    from app.modules.ai_chat.services import genome_answer
+
+    nodes = {"business:cap:7": {"name": "Payments", "link": "/c/7"}}
+    segments = genome_answer._segments("Nothing supports Payments [ref:business:cap:7] today.", nodes)
+    assert segments[0] == {"text": "Nothing supports "}
+    assert segments[1]["name"] == "Payments" and segments[2] == {"text": " today."}
+    other = genome_answer._segments("Group Payments [ref:business:cap:7].", nodes)
+    assert other[0] == {"text": "Group "}, "only the record's own name is folded into the link"
+    word = genome_answer._segments("Repayments [ref:business:cap:7].", nodes)
+    assert word[0] == {"text": "Repayments "}, "a longer word that ends in the name is kept"

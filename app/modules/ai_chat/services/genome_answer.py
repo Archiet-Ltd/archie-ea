@@ -8,6 +8,7 @@ were read and, when a slice was cut to its budget, the fixed partial note.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -56,9 +57,14 @@ def _segments(line: str, nodes: Dict[str, dict]) -> List[dict]:
     """Plain text and links, in order, for one line of checked text."""
     out, pos = [], 0
     for m in REF_MARKER.finditer(line):
-        if m.start() > pos:
-            out.append({"text": line[pos:m.start()]})
         node = nodes.get(m.group(1)) or {}
+        before = line[pos:m.start()]
+        name = (node.get("name") or "").strip()
+        if name and before.rstrip().endswith(name) and not re.search(r"\w$", before.rstrip()[:-len(name)]):
+            # The link shows the node's name; the name the model wrote beside it is not shown twice.
+            before = before.rstrip()[:-len(name)]
+        if before:
+            out.append({"text": before})
         prov = node.get("provenance") or {}
         out.append({
             "node_id": m.group(1),

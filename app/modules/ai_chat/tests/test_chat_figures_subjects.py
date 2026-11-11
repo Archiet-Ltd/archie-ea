@@ -92,7 +92,7 @@ def _two_lookups(org_id):
 
 
 # --------------------------------------------------------------------------- #
-# AM1 and AM2: binding                                                         #
+# Binding: a subject figure belongs to its own record                          #
 # --------------------------------------------------------------------------- #
 
 
@@ -103,9 +103,9 @@ def test_a_subject_figure_renders_beside_its_subject(make_org):
                           ("ask_impact", _impact(32, "Billing", billing), IMPACT))
         key = _key(grounding, 31)
         for text in ("Orders Hub [ref:31] has [fig:%s]." % key,
-                     "Orders Hub has [fig:%s], so a failure reaches them." % key,
-                     "orders hub has [fig:%s]." % key):
+                     "Orders Hub has [fig:%s], so a failure reaches them." % key):
             assert _reasons(text, grounding, org.id) == [], text
+        assert _reasons("orders hub has [fig:%s]." % key, grounding, org.id) == ["unbound"], "a name is matched as written"
         assert cf.render("Orders Hub [ref:31] has [fig:%s]." % key, grounding.figure_table)[0] == (
             "Orders Hub [ref:31] has %d connections downstream." % orders)
 
@@ -183,7 +183,7 @@ def test_a_tool_with_top_level_figures_declares_its_subject_or_none():
 
 
 # --------------------------------------------------------------------------- #
-# AM3: earlier turns                                                           #
+# Earlier turns: a key from an earlier answer is unknown                       #
 # --------------------------------------------------------------------------- #
 
 
@@ -262,13 +262,13 @@ def test_a_key_from_an_earlier_turn_is_unknown_and_never_renders(app, db_session
     assert "[fig:" not in result["response"]
     assert result["response"].startswith(cf.PLAIN_LINE)
     new_phrase = [f for f in result["figures"]][0]["reads"]
-    assert new_phrase.endswith("connections downstream") and "Turn Root [ref:%d]" % root.id in result["response"]
+    assert new_phrase.endswith("connections downstream") and "[ref:%d]" % root.id in result["response"]
     assert all(f["key"] != old_key for f in result["figures"])
     assert not any("Other" in str(m) for call in seen for m in call), "the other organisation's records never appear"
 
 
 # --------------------------------------------------------------------------- #
-# AM6 and AM7: the records block                                               #
+# The records block                                                            #
 # --------------------------------------------------------------------------- #
 
 
@@ -277,7 +277,7 @@ def _block(grounding, removed, shown=(), tools_called=1):
 
 
 def _headings(block):
-    return [re.match(r"- (.+?\[ref:\d+\]|[^:]+):", line).group(1) for line in _lines(block)]
+    return [re.match(r"- (\[ref:\d+\]|[^:]+):", line).group(1) for line in _lines(block)]
 
 
 def _lines(block):
@@ -292,7 +292,7 @@ def test_the_records_block_holds_a_record_a_removed_clause_names_without_citing(
     org = make_org("blk-named")
     grounding = _turn(org.id, ("find_investments", INVESTMENTS, RECORDS))
     block = _block(grounding, ["Field Service Management has an annual cost of £110,000."])
-    assert _lines(block) == ["- Field Service Management [ref:13]: an estimated cost of £110,000; "
+    assert _lines(block) == ["- [ref:13]: an estimated cost of £110,000; "
                              "a priority score of 60 out of 100"]
 
 
@@ -301,7 +301,7 @@ def test_a_record_named_only_in_kept_text_gets_no_line(make_org):
     grounding = _turn(org.id, ("find_investments", INVESTMENTS, RECORDS))
     kept = "Field Service Management is the cheapest of the three."
     block = _block(grounding, ["ERP Upgrade [ref:12] costs 5."])
-    assert kept not in block and _headings(block) == ["ERP Upgrade [ref:12]"]
+    assert kept not in block and _headings(block) == ["[ref:12]"]
 
 
 def test_a_name_inside_a_longer_name_adds_no_line_of_its_own(make_org):
@@ -309,7 +309,7 @@ def test_a_name_inside_a_longer_name_adds_no_line_of_its_own(make_org):
     rows = _records([(20, "Orders Hub", 100, 50), (21, "Orders Hub Legacy", 200, 40)])
     grounding = _turn(org.id, ("find_investments", rows, RECORDS))
     block = _block(grounding, ["Orders Hub Legacy costs a lot."])
-    assert _headings(block) == ["Orders Hub Legacy [ref:21]"]
+    assert _headings(block) == ["[ref:21]"]
 
 
 def test_names_that_are_not_records_add_no_record_line(make_org):
@@ -334,7 +334,7 @@ def test_a_record_cited_and_named_gets_one_line(make_org):
     org = make_org("blk-both")
     grounding = _turn(org.id, ("find_investments", INVESTMENTS, RECORDS))
     block = _block(grounding, ["ERP Upgrade [ref:12] has an annual cost of £470,000.", "ERP Upgrade is big."])
-    assert _headings(block) == ["ERP Upgrade [ref:12]"]
+    assert _headings(block) == ["[ref:12]"]
 
 
 def test_two_records_with_one_name_each_get_their_own_line(make_org):
@@ -342,9 +342,9 @@ def test_two_records_with_one_name_each_get_their_own_line(make_org):
     rows = _records([(31, "Billing", 10, 1), (32, "Billing", 20, 2)])
     grounding = _turn(org.id, ("find_investments", rows, RECORDS))
     block = _block(grounding, ["Billing costs something."])
-    assert _headings(block) == ["Billing [ref:31]", "Billing [ref:32]"]
+    assert _headings(block) == ["[ref:31]", "[ref:32]"]
     cited = _block(grounding, ["Billing [ref:32] costs something."])
-    assert _headings(cited) == ["Billing [ref:32]"]
+    assert _headings(cited) == ["[ref:32]"]
 
 
 def test_records_block_lines_follow_the_order_they_first_appear(make_org):
@@ -352,7 +352,7 @@ def test_records_block_lines_follow_the_order_they_first_appear(make_org):
     grounding = _turn(org.id, ("find_investments", INVESTMENTS, RECORDS))
     block = _block(grounding, ["Phase 21 Rollout costs more than Field Service Management.", "ERP Upgrade is high."])
     assert _headings(block) == [
-        "Phase 21 Rollout [ref:14]", "Field Service Management [ref:13]", "ERP Upgrade [ref:12]"]
+        "[ref:14]", "[ref:13]", "[ref:12]"]
 
 
 def test_a_named_records_figures_already_shown_are_left_out(make_org):
@@ -360,7 +360,7 @@ def test_a_named_records_figures_already_shown_are_left_out(make_org):
     grounding = _turn(org.id, ("find_investments", INVESTMENTS, RECORDS))
     keys = {e["field"]: e["key"] for e in grounding.figure_table.entries if e["record_id"] == 13}
     block = _block(grounding, ["Field Service Management is dear."], shown={keys["result[].cost"]})
-    assert _lines(block) == ["- Field Service Management [ref:13]: a priority score of 60 out of 100"]
+    assert _lines(block) == ["- [ref:13]: a priority score of 60 out of 100"]
     assert _block(grounding, ["Field Service Management is dear."], shown=set(keys.values())) == ""
 
 
@@ -392,7 +392,7 @@ def test_a_removed_clause_naming_a_record_adds_no_organisation_summary_line(make
     org = make_org("blk-org-none")
     grounding = _with_summary(org.id, ("find_investments", INVESTMENTS, RECORDS))
     block = _block(grounding, ["ERP Upgrade has an annual cost of £999."], tools_called=1)
-    assert "Your organisation" not in block and "- ERP Upgrade [ref:12]" in block
+    assert "Your organisation" not in block and "- [ref:12]" in block
     labelled = _with_summary(org.id, ("tiers", {"success": True, "tiers": [{"tier": "High", "count": 5}]}, TIERS))
     assert "Your organisation" not in _block(labelled, ["High is crowded."]), "a row label counts as a record"
     assert "- Your organisation: 20 applications" in _block(grounding, ["Roughly 70."], tools_called=0)
@@ -419,5 +419,81 @@ def test_a_sentence_naming_a_record_without_its_marker_is_taken_out_and_its_figu
     assert not result["response"].startswith("Not recorded"), "the answer is not refused whole"
     assert "Turn Root sits under" not in result["response"]
     assert "It matters." in result["response"]
-    assert "- Turn Root [ref:%d]: 2 connections downstream" % root.id in result["response"]
+    assert "- [ref:%d]: 2 connections downstream" % root.id in result["response"]
     assert result["response"].count(cf.PLAIN_LINE) == 1
+
+
+# --------------------------------------------------------------------------- #
+# A record's name is shown once; a common word never names a record            #
+# --------------------------------------------------------------------------- #
+
+
+def test_a_name_written_beside_its_marker_is_reduced_to_the_marker(make_org):
+    org_a, org_b = make_org("once-a"), make_org("once-b")
+    for org in (org_a, org_b):
+        grounding = _turn(org.id, ("ask_impact", _impact(31, "Orders Hub", 13), IMPACT),
+                          ("ask_impact", _impact(32, "Billing", 4), IMPACT))
+        table = grounding.figure_table
+        assert cf.collapse_repeated_names("Orders Hub [ref:31] has it.", table) == "[ref:31] has it."
+        assert cf.collapse_repeated_names("Both Orders Hub  [ref:31] and Billing [ref:32].", table) == \
+            "Both [ref:31] and [ref:32]."
+        assert cf.collapse_repeated_names("Billing [ref:31] has it.", table) == "Billing [ref:31] has it.", \
+            "a different record's name is left"
+        assert cf.collapse_repeated_names("The Orders Hubs [ref:31] are.", table) == "The Orders Hubs [ref:31] are."
+
+
+def test_the_records_block_heading_is_the_marker_alone(make_org):
+    org = make_org("once-block")
+    grounding = _turn(org.id, ("ask_impact", _impact(31, "Orders Hub", 13), IMPACT))
+    block = _block(grounding, ["Orders Hub [ref:31] has a number."])
+    assert _lines(block) == ["- [ref:31]: 13 connections downstream"]
+
+
+def test_the_word_billing_in_prose_does_not_name_a_record_called_billing(make_org):
+    org_a, org_b = make_org("word-a"), make_org("word-b")
+    for org in (org_a, org_b):
+        grounding = _turn(org.id, ("ask_impact", _impact(31, "Orders Hub", 13), IMPACT),
+                          ("ask_impact", _impact(32, "Billing", 4), IMPACT))
+        key = _key(grounding, 31)
+        text = "Orders Hub [ref:31] has [fig:%s], so billing stops." % key
+        assert _reasons(text, grounding, org.id) == []
+        assert not cf.names_record_without_citing(text, grounding.figure_table)
+        assert cf.names_record_without_citing("Billing has a lot.", grounding.figure_table)
+
+
+def test_a_sentence_with_the_word_billing_and_its_figure_survives_in_log_and_enforce(make_org, monkeypatch):
+    from app.modules.ai_chat.services.agent_runner import AgentRunner
+
+    for mode in ("log", "enforce"):
+        org = make_org("word-turn-" + mode)
+        grounding = _turn(org.id, ("ask_impact", _impact(31, "Orders Hub", 13), IMPACT),
+                          ("ask_impact", _impact(32, "Billing", 4), IMPACT))
+        key = _key(grounding, 31)
+        monkeypatch.setattr(AgentRunner, "_gate_mode", staticmethod(lambda: mode))
+        runner = AgentRunner(user_id=1, chat_session_id="thread-word")
+        runner._grounding = grounding
+        runner._question_text = "How exposed is Orders Hub?"
+        sentence = "Orders Hub [ref:31] has [fig:%s], so billing stops." % key
+        violations, text, removed = runner._clause_removal(sentence, mode)
+        assert violations == [] and removed == [] and text == sentence, mode
+        rendered = cf.render(cf.collapse_repeated_names(text, grounding.figure_table), grounding.figure_table)[0]
+        assert rendered == "[ref:31] has 13 connections downstream, so billing stops.", mode
+
+
+def test_a_lookup_count_is_shown_on_the_organisation_line_only_for_a_search_question(make_org):
+    org = make_org("search-line")
+    result = {"success": True, "total": 20, "result": [{"id": 1, "name": "Field Service Management"}]}
+    declaration = {
+        "fields": [{"path": "total", "kind": "count",
+                    "reads": {"one": "{value} application matches this search",
+                              "other": "{value} applications match this search"},
+                    "reads_null": "not counted", "label": "Applications matching", "concept": "demo.list"}],
+        "rows": [{"path": "result[]", "id_field": "id", "name_field": "name"}], "names": ["name"], "subject": "none",
+    }
+    grounding = _turn(org.id, ("find_applications", result, declaration))
+    removed = ["Field Service Management [ref:1] costs a lot."]
+    table = grounding.figure_table
+    cost = cf.records_block(table, removed, (), 1, "What does Field Service Management cost?")[0]
+    search = cf.records_block(table, removed, (), 1, "Find the applications we have.")[0]
+    assert "match this search" not in cost
+    assert "20 applications match this search" in search and "Your organisation" in search

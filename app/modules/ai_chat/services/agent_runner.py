@@ -49,7 +49,7 @@ except Exception:  # registry import failure must not take the turn with it
 # on every turn; changing the text means a new version and a rerun of the gold set.
 FIGURES_PROMPT_VERSION = chat_figures.PROMPT_VERSION
 FIGURES_CONTRACT = """Figures. You never write a figure yourself. A figure is any count, amount of money, score, percentage, duration, date, rank or other quantity about this organisation.
-- Write each figure as its reference, copied exactly from a "fig" entry in a tool result or in the organisation summary, for example [fig:F3]. Entelim replaces the reference with the value, its unit, its scale and what it counts. The entry's "reads" shows what will appear, so do not repeat those words around it. Example: "Orders Hub [ref:185] has [fig:F3]." is shown as "Orders Hub has 13 connections downstream."
+- Write each figure as its reference, copied exactly from a "fig" entry in a tool result or in the organisation summary, for example [fig:F3]. Entelim replaces the reference with the value, its unit, its scale and what it counts. The entry's "reads" shows what will appear, so do not repeat those words around it. Example: "[ref:185] has [fig:F3]." is shown as "Orders Hub has 13 connections downstream." The reference is shown as the record's name, so never write the name beside it.
 - A figure that belongs to a record goes in the same sentence, list item or table row as that record's [ref:<id>].
 - In a table, put the reference alone in its cell.
 - Never work out a new figure: no adding, subtracting, multiplying, dividing, averaging, rounding, converting or ratios. If the person needs a figure no tool returned, call the tool that returns it. If none does, say the records do not hold it.
@@ -2133,11 +2133,12 @@ class AgentRunner:
         draft = text
         violations, text, removed = self._clause_removal(draft, mode)
         first_draft = self._first_draft_figures if self._first_draft_figures is not None else violations
+        text = chat_figures.collapse_repeated_names(text, table)
         rendered, figures = chat_figures.render(text, table) if text.strip() else ("", [])
         block_lines = 0
         if removed:
             block, block_figures = chat_figures.records_block(
-                table, removed, {f["key"] for f in figures}, self._grounding.tool_results,
+                table, removed, {f["key"] for f in figures}, self._grounding.tool_results, question,
             )
             pieces = [rendered] if rendered.strip() else []
             pieces.append(chat_figures.PLAIN_LINE)

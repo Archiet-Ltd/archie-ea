@@ -552,18 +552,19 @@ def names_file_entries() -> Tuple[str, ...]:
 
 
 @functools.lru_cache(maxsize=64)
-def _whole_name_pattern(names: Tuple[str, ...]):
-    """The one name matcher (form 4): whole words, ignoring case, longest name first."""
+def _whole_name_pattern(names: Tuple[str, ...], ignore_case: bool = True):
+    """The one name matcher (form 4): whole words, longest name first. Ignores case unless told not to."""
     ordered = sorted({n for n in names if n and n.strip()}, key=lambda s: (-len(s), s.lower()))
     if not ordered:
         return None
     parts = [r"\s+".join(re.escape(piece) for piece in n.split()) for n in ordered]
-    return re.compile(r"(?<![\w])(?:" + "|".join(parts) + r")(?![\w])", re.IGNORECASE)
+    return re.compile(r"(?<![\w])(?:" + "|".join(parts) + r")(?![\w])", re.IGNORECASE if ignore_case else 0)
 
 
 def name_spans(text: str, names: Iterable[str]) -> List[Tuple[int, int, str]]:
-    """``(start, end, matched text)`` of each whole name of *names* in *text*, none inside another."""
-    pattern = _whole_name_pattern(tuple(sorted(set(names))))
+    """``(start, end, matched text)`` of each whole name of *names* in *text*, none inside another.
+    A name matches as written, so the word "billing" in prose is not a record called Billing."""
+    pattern = _whole_name_pattern(tuple(sorted(set(names))), ignore_case=False)
     return [(m.start(), m.end(), m.group(0)) for m in pattern.finditer(text)] if pattern else []
 
 
@@ -882,8 +883,31 @@ def envelope_figure(entry: Dict[str, Any], shown: str, start: int, end: int) -> 
 # --------------------------------------------------------------------------- #
 
 
+SEARCH_QUESTION = re.compile(r"\b(find|search|searching|list|which|show|match|matching|how many)\b", re.IGNORECASE)
+
+
+def collapse_repeated_names(text: str, table: FigureTable) -> str:
+    """*text* with "Name [ref:id]" reduced to "[ref:id]" when the words before the marker are
+    exactly that record's name (as written), because the marker is shown as the linked name."""
+    out: List[str] = []
+    last = 0
+    for match in REF.finditer(text):
+        name = (table.record_names.get(match.group(1)) or "").strip()
+        if not name:
+            continue
+        before = text[last:match.start()]
+        tail = re.search(r"(?<![\w])" + r"\s+".join(re.escape(w) for w in name.split()) + r"\s*$", before)
+        if tail:
+            before = before[:tail.start()]
+        out.append(before)
+        out.append(match.group(0))
+        last = match.end()
+    out.append(text[last:])
+    return "".join(out)
+
+
 def records_block(table: FigureTable, removed: List[str], shown_keys: Iterable[str],
-                  tools_called: int = 1):
+                  tools_called: int = 1, question: str = ""):
     """``(text, figures)``: "What the records show:" and one line for each record a removed
     clause cites or names, and for each labelled row whose label a removed clause holds, in the
     order they first appear, each with its declared figures from every call of the turn; then
@@ -921,7 +945,7 @@ def records_block(table: FigureTable, removed: List[str], shown_keys: Iterable[s
             bucket.append(entry)
 
     def record_heading(entry: Dict[str, Any]) -> str:
-        return "%s [ref:%s]" % (entry.get("record_name") or "Record", entry["record_id"])
+        return "[ref:%s]" % entry["record_id"]
 
     for entry in table.entries:
         if entry["tool"] == "organisation_summary":
@@ -940,7 +964,8 @@ def records_block(table: FigureTable, removed: List[str], shown_keys: Iterable[s
             add(entry, identity, record_heading(entry))
             if identity not in top_level:
                 top_level.append(identity)
-        else:
+        elif entry["kind"] != "count" or SEARCH_QUESTION.search(question or ""):
+            # A lookup's count is the answer only to a question that searches.
             add(entry, "org", "Your organisation")
             if "org" not in top_level:
                 top_level.append("org")
