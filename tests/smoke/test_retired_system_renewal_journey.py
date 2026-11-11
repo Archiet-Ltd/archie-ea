@@ -84,6 +84,7 @@ def test_the_contract_on_a_retired_system_is_counted_and_explained_from_vendors_
         assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
         answer = _words(page.get_by_test_id("vendors-answer"))
         assert "3 contracts with 2 vendors renew within 90 days" in answer, answer
+        assert "An active contract on one still renews: 1 of the renewals above." in answer, answer
         _shot(page, "vendors-" + suffix)
         page.get_by_test_id("vendor-row").filter(has_text="Holder " + tag).get_by_test_id("vendor-link").click()
         page.wait_for_url(re.compile(r"/vendors?/\d+"), timeout=PAGE_TIMEOUT)
@@ -98,6 +99,8 @@ def test_the_contract_on_a_retired_system_is_counted_and_explained_from_vendors_
         retired = rows.filter(has_text="Contract retired " + tag)
         assert NOTE in _words(retired), _words(retired)
         assert page.get_by_test_id("renewal-system-retired").count() == 1
+        assert page.get_by_test_id("renewal-system-retired").evaluate(
+            "(el) => getComputedStyle(el).maxWidth") != "none", "the retired note is not width-limited"
         _shot(page, "renewals-" + suffix)
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
 
