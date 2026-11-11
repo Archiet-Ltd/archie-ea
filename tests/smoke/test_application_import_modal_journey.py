@@ -29,8 +29,17 @@ def _shot(page, tmp_path, name, dark=False):
     page.evaluate("d => document.documentElement.classList.toggle('dark', d)", dark)
     width = page.viewport_size["width"]
     page.screenshot(path=str(folder / f"{name}-{width}-{'dark' if dark else 'light'}.png"),
-                    full_page=True)
+                    full_page=False)
     page.evaluate("document.documentElement.classList.remove('dark')")
+
+
+def _shots(page, tmp_path, name):
+    """The screen at 1440 wide in the light theme and at 390 wide in the dark one."""
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _shot(page, tmp_path, name)
+    page.set_viewport_size({"width": 390, "height": 844})
+    _shot(page, tmp_path, name, dark=True)
+    page.set_viewport_size({"width": 1440, "height": 900})
 
 
 def _stored(org_id, names):
@@ -87,6 +96,7 @@ def test_the_modal_says_two_stored_and_why_the_third_row_was_refused(
     rows = [(f"Alpha {tag}", "design"), (f"Bravo {tag}", "Mystery"), (f"Charlie {tag}", "Live")]
     filename, mime, payload = _file(kind, rows)
     fresh_org.sign_in(page, live_server, org_a["emails"][PERSONA])
+    page.set_viewport_size({"width": 1440, "height": 900})
     page.goto(live_server + "/applications/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
     page.get_by_test_id("btn-import").click()
     dialog = page.get_by_role("dialog", name="Import Applications", exact=True)
@@ -106,13 +116,21 @@ def test_the_modal_says_two_stored_and_why_the_third_row_was_refused(
     result = page.get_by_role("dialog", name="Import saved", exact=True)
     expect(result).to_be_visible(timeout=PAGE_TIMEOUT)
     expect(result.get_by_text("2 stored", exact=True)).to_be_visible()
+    # A person can see it: the element at the middle of the "2 stored" line is that line,
+    # not another layer drawn over the dialog.
+    covered = result.get_by_text("2 stored", exact=True).evaluate("""el => {
+        const box = el.getBoundingClientRect();
+        const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        return top === null || !el.contains(top);
+    }""")
+    assert not covered, "the result is behind another layer"
     expect(result.get_by_text("1 refused:", exact=True)).to_be_visible()
     # Bravo's row, by its number in the file, with the one sentence.
     row_number = 2 if kind == "json" else 3
     line = result.get_by_text(f"Row {row_number} (Bravo {tag}): ", exact=False)
     expect(line).to_be_visible()
     assert _sentence("Mystery") in line.inner_text()
-    _shot(page, tmp_path, f"import-modal-{kind}")
+    _shots(page, tmp_path, f"import-modal-{kind}")
     # It stays open: nothing closes it but the person.
     page.wait_for_timeout(1500)
     expect(result).to_be_visible()

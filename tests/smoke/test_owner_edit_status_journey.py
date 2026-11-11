@@ -58,6 +58,15 @@ def _seed(org, word):
     return ident
 
 
+def _shots(page, tmp_path, name):
+    """The screen at 1440 wide in the light theme and at 390 wide in the dark one."""
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _shot(page, tmp_path, name)
+    page.set_viewport_size({"width": 390, "height": 844})
+    _shot(page, tmp_path, name, dark=True)
+    page.set_viewport_size({"width": 1440, "height": 900})
+
+
 def _stored(app_id):
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
@@ -95,7 +104,7 @@ def test_the_owner_edit_page_opens_on_the_stored_status_and_a_save_keeps_it(
     assert label in select.locator("option:checked").inner_text()
     options = [o.strip() for o in select.locator("option").all_inner_texts()]
     assert options[:2] == ["Not set", "Design"] and "Decommissioned" in options, options
-    _shot(page, tmp_path, "owner-edit-before-%s" % chosen)
+    _shots(page, tmp_path, "owner-edit-before-%s" % chosen)
 
     page.locator("textarea[name=description]").fill("Changed by its owner")
     with page.expect_navigation(wait_until="networkidle", timeout=PAGE_TIMEOUT):
@@ -107,11 +116,7 @@ def test_the_owner_edit_page_opens_on_the_stored_status_and_a_save_keeps_it(
     assert status is not None and status.lower() == chosen.lower(), status
     page.goto(url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
     expect(page.locator("#deployment_status")).to_have_value(chosen)
-    _shot(page, tmp_path, "owner-edit-after-%s" % chosen)
-
-    page.set_viewport_size({"width": 390, "height": 844})
-    page.reload(wait_until="networkidle", timeout=PAGE_TIMEOUT)
-    _shot(page, tmp_path, "owner-edit-after-%s" % chosen, dark=True)
+    _shots(page, tmp_path, "owner-edit-after-%s" % chosen)
 
     # The other organisation's application is not reachable by id from this one.
     response = page.goto("%s/my-applications/app/%d/edit" % (live_server, other_id),

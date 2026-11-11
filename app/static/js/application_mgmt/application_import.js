@@ -455,10 +455,12 @@ async function processExcelImport() {
       .filter(note => note.category === 'error' || note.category === 'warning')
       .forEach(note => resultLines.push(note.message));
     if (refused.length > 0) {
-      Platform.toast.warning(`${refused.length} row${refused.length === 1 ? '' : 's'} refused; the reasons are listed.`);
+      Platform.toast.warning(`${refused.length} row${refused.length === 1 ? '' : 's'} refused`);
     }
 
-    // Stays open until the person closes it, then the list is reloaded.
+    // The import dialog is closed first, so nothing is drawn over the result. The result
+    // stays open until the person closes it, then the list is reloaded.
+    closeApplicationImportModal();
     const resultId = Platform.modal.create({
       title: data.stored > 0 ? 'Import saved' : 'Nothing was imported',
       size: 'md',
