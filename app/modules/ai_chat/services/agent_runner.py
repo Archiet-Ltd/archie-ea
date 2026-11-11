@@ -314,7 +314,8 @@ def read_before(work: Callable, deadline: float, closer: Optional[Callable] = No
     """Run ``work(read)`` on a helper thread and return its result, or raise TimeoutError by ``deadline``
     (a time.monotonic() value): no first token (``read.first``) within PROVIDER_FIRST_TOKEN_SECONDS, or no
     end by the deadline, abandons the read (``closer`` is called, its later output is dropped). The one
-    wall clock for every provider read, whatever bytes arrive; the request context is copied in."""
+    wall clock for every provider read, whatever bytes arrive; the request context is copied in and the read
+    uses its own database session."""
     import contextvars
 
     from app.modules.ai_chat.services import model_defaults
@@ -322,9 +323,33 @@ def read_before(work: Callable, deadline: float, closer: Optional[Callable] = No
     read = _ProviderRead()
     context = contextvars.copy_context()
 
+    from flask import current_app, g, has_app_context
+
+    app = current_app._get_current_object() if has_app_context() else None
+    organization_id = getattr(g, "current_org_id", None) if app is not None else None
+
+    def own_session():
+        # The helper has its own app context, so its own database session: a session is not safe to share
+        # between threads, and the request's may be closed by the time an abandoned read ends. What the
+        # read logs (the provider call's interaction record) is committed here, so the log stays complete.
+        from app import db
+
+        with app.app_context():
+            if organization_id is not None:
+                g.current_org_id = organization_id
+            try:
+                result = work(read)
+                db.session.commit()
+                return result
+            except BaseException:
+                db.session.rollback()
+                raise
+            finally:
+                db.session.remove()
+
     def target():
         try:
-            read.result = context.run(work, read)
+            read.result = context.run(own_session if app is not None else (lambda: work(read)))
         except BaseException as exc:  # handed to the waiting thread
             read.error = exc
         finally:
