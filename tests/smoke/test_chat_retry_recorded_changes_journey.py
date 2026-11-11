@@ -183,6 +183,9 @@ def test_retry_after_two_recorded_changes_says_both_are_not_applied_and_writes_n
     first = _card(page, 1)
     text = first.inner_text()
     assert CARD_NOTE in text and "Billing" in text and "Payroll" in text, text
+    # Each change reads as a plain sentence, not the approval record's field listing.
+    assert "Create a goal: Billing" in text and "Create a goal: Payroll" in text, text
+    assert "solution id" not in text.lower() and "name:" not in text.lower(), text
     for word in ("approve", "reviewer", "pending"):
         assert word not in text.lower(), text
     rows = [("pending", "Billing"), ("pending", "Payroll")]
@@ -237,3 +240,37 @@ def test_a_second_organisation_that_forges_the_first_ones_list_is_told_nothing_a
     assert NOT_APPLIED not in told and "already made" not in told, told
     assert _approvals(app, second["org_id"]) == [("pending", "Billing")]  # the second organisation's own change
     assert _approvals(app, first["org_id"]) == [("pending", "Billing")]  # the first one's row is untouched
+
+
+def test_retry_of_an_unrelated_question_does_not_name_a_change_an_earlier_chat_recorded(
+        page, provider_server, provider, app):
+    org = create_fresh_org("platform_admin", org_admin=True, platform_role="Administrator")
+    sign_in(page, provider_server, org["emails"]["platform_admin"])
+    unrelated = "Which applications depend on SAP?"
+    answer = "Nothing in the estate depends on SAP."
+    # The first chat records Billing and finishes normally; the second chat's question then fails once.
+    provider.script = [("tool", "a1", BILLING), ("text", "Billing is queued for approval."), ("400",), ("text", answer)]
+    open_chat(page, provider_server)
+    page.fill("#user-input", "Add the goal Billing to solution 1 please.")
+    page.press("#user-input", "Enter")
+    expect(page.locator("#messages-container .message-content", has_text="Billing is queued").last).to_be_visible(timeout=75000)
+    assert _approvals(app, org["org_id"]) == [("pending", "Billing")]
+
+    # New chat reloads the page: wait for the fresh, empty conversation before asking.
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+        page.get_by_role("button", name="Start a new chat").click()
+    expect(page.locator("#user-input")).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(page.locator("#messages-container")).not_to_contain_text("Billing is queued", timeout=PAGE_TIMEOUT)
+    page.fill("#user-input", unrelated)
+    page.press("#user-input", "Enter")
+    card = _card(page, 1)
+    text = card.inner_text()
+    assert "Billing" not in text and "Recorded, not applied" not in text, text
+    _shoot(page, "retry-unrelated-first-card")
+
+    card.get_by_role("button", name="Retry").click()
+    expect(page.locator("#messages-container .message-content", has_text=answer).last).to_be_visible(timeout=75000)
+    shown = page.locator("#messages-container").inner_text()
+    assert "Billing" not in shown and "awaiting approval" not in shown, shown
+    assert _approvals(app, org["org_id"]) == [("pending", "Billing")]  # still only the first chat's own row
+    _shoot(page, "retry-unrelated-answer")

@@ -806,7 +806,11 @@ class AgentRunner:
         import uuid as _uuid
         from app.modules.ai_chat.services import model_defaults
 
-        self._turn_id = str(_uuid.uuid4())
+        # A Retry is the same question asked again: it continues the turn that failed, so a change it records
+        # and the ones it carries forward are all found by a further Retry. The id only ever narrows the
+        # signed-in person's own rows.
+        self._turn_id = (failed_turn_id.strip()[:64] if retry and isinstance(failed_turn_id, str)
+                         and failed_turn_id.strip() else str(_uuid.uuid4()))
         self._recorded = []
         if retry:
             from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
