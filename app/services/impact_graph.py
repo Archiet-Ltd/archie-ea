@@ -53,6 +53,11 @@ def _canonical_type(rel_type: Optional[str]) -> str:
     return _ALIASES.get(key, key)
 
 
+def canonical_relationship_type(rel_type: Optional[str]) -> str:
+    """The lower-case name of a relationship type, whichever spelling it was stored in."""
+    return _canonical_type(rel_type)
+
+
 def dependency_ends(rel_type: Optional[str], source_id: int, target_id: int) -> Optional[Tuple[int, int]]:
     """``(dependent_id, provider_id)`` for one relationship, or None.
 

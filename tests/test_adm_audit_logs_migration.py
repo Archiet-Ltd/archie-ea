@@ -22,7 +22,7 @@ from tests.test_schema_migrations import (
 )
 
 REVISION = "20261031_adm_audit_logs"
-PARENT = "20261031_rc_w1_01_refresh_merge"
+PARENT = "20261031_provenance_index"
 RETIRED = ("adm_audit_summaries", "adm_data_retention_policies")
 
 # An ADM action through the audit service, in a fresh process against `url`.
@@ -102,6 +102,7 @@ def test_upgrading_a_database_that_already_has_the_audit_table_changes_nothing(s
     _flask(url, ["schema-upgrade"])
     _act(url)
     before = _snapshot(url)
+    head = _count(url, "SELECT version_num FROM alembic_version")
 
     # Production's shape: the table and a row exist, the revision is not yet recorded.
     engine = create_engine(url)
@@ -113,7 +114,8 @@ def test_upgrading_a_database_that_already_has_the_audit_table_changes_nothing(s
     assert code == 0, output
     assert _snapshot(url) == before
     assert _count(url, "SELECT count(*) FROM adm_audit_logs") == 1
-    assert _count(url, "SELECT version_num FROM alembic_version") == REVISION
+    # The upgrade runs the audit revision and every later one, so it ends at the head it began at.
+    assert _count(url, "SELECT version_num FROM alembic_version") == head
 
 
 # What production's table does when the thing an audit row points at is removed.
