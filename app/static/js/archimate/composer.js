@@ -781,8 +781,9 @@ function composerApp() {
         elementCount: 0,
         relCount: 0,
 
-        /* Wave 10: Quality score + stale tracking */
-        qualityScore: null,
+        /* Stale tracking */
+        layerCards: [],
+        layerCardsTotal: 0,
         staleCount: 0,
         _staleElementIds: [],
 
@@ -2551,13 +2552,6 @@ function composerApp() {
                     }
                 }
             }, 10000);
-
-            /* ── Wave 10: Load quality score for solution ── */
-            if (self.solutionId) {
-                Platform.fetch('/api/solutions/' + self.solutionId + '/quality-score', { silent: true })
-                    .then(function(data) { if (data) self.qualityScore = data; })
-                    .catch(function() { /* swallow-ok: unrequested enrichment fetched on canvas open; qualityScore stays null so the toolbar badge (x-if="qualityScore") is simply absent — it never shows a made-up percentage — and a network failure or non-ok response while opening the canvas must not interrupt the modelling task with a toast about a badge */ });
-            }
 
             /* ── Check for saved viewpoint_id in URL ── */
             let urlParams = new URLSearchParams(window.location.search);

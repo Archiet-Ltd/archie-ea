@@ -3,9 +3,9 @@
 
    Usage: {% from 'components/diagram/legend.html' import diagram_legend with context %}
           {{ diagram_legend() }} #}
-{% macro diagram_legend() %}
+{% macro diagram_legend(overview_flag='', overview_hint='') %}
 <div class="hidden min-h-12 shrink-0 items-center md:flex border-t border-border bg-card px-4 py-2" data-testid="diagram-legend">
-  <ul class="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs" aria-label="Relationship key" x-show="legendTypes.length > 0" x-cloak>
+  <ul class="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs" aria-label="Relationship key" x-show="legendTypes.length > 0{% if overview_flag %} && !({{ overview_flag }}){% endif %}" x-cloak>
     <template x-for="rel in legendTypes" :key="rel.type">
       <li class="flex items-center gap-2" :data-testid="'legend-' + rel.type">
         <span class="flex shrink-0 text-foreground" x-html="relGlyph(rel.type)"></span>
@@ -13,7 +13,10 @@
       </li>
     </template>
   </ul>
-  <p class="text-xs text-muted-foreground" x-show="legendTypes.length === 0" x-cloak data-testid="legend-empty">
+{% if overview_flag %}
+  <p class="text-xs text-muted-foreground" x-show="{{ overview_flag }}" x-cloak data-testid="legend-overview">{{ overview_hint }}</p>
+{% endif %}
+  <p class="text-xs text-muted-foreground" x-show="legendTypes.length === 0{% if overview_flag %} && !({{ overview_flag }}){% endif %}" x-cloak data-testid="legend-empty">
     No relationships yet. Choose Connect, then click two elements to relate them.
   </p>
 </div>

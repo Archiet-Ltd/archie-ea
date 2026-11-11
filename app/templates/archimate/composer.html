@@ -1368,9 +1368,9 @@
         </div>
     </div>
 
-    {{ diagram_legend() }}
+    {{ diagram_legend(overview_flag='layerCards.length > 0', overview_hint='Choose a layer card to open its most connected elements. Relationships show once a layer is open.') }}
 
-    {{ diagram_status_line() }}
+    {{ diagram_status_line(overview_counts="layerCards.length ? (layerCardsTotal + ' elements in ' + layerCards.length + (layerCards.length === 1 ? ' layer' : ' layers')) : ''") }}
 
     {{ diagram_properties_sheet() }}
 

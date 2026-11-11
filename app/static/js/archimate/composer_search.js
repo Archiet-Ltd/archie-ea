@@ -93,6 +93,7 @@ let ComposerSearch = (function() {
 
                 if (data.viewpoint_name) self.activeViewpointName = data.viewpoint_name;
 
+                self.layerCards = [];
                 /* A model too large to draw readably opens as one card per layer. */
                 if (data.overview) {
                     self._drawLayerOverview(data);
@@ -174,6 +175,7 @@ let ComposerSearch = (function() {
             })
             .catch(function(err) {
                 UndoStack.resume();
+                self.layerCards = [];
                 _toast('error', 'Failed to switch viewpoint');
                 // Platform.fetch already logged the error; we keep the inline error state
                 self.viewpointLoading = false;
@@ -201,10 +203,10 @@ let ComposerSearch = (function() {
                 card.attr('nameLabel/text', row.title);
                 card.attr('nameLabel/fontSize', 20);
                 card.attr('nameLabel/y', 28);
-                card.attr('nameLabel/textWrap', { width: -24, maxLineCount: 1, ellipsis: true });
+                card.attr('nameLabel/textWrap', { width: -24, maxLineCount: 2, ellipsis: true });
                 card.attr('typeLabel/text', row.count + plural);
                 card.attr('typeLabel/fontSize', 20);
-                card.attr('typeLabel/y', 72);
+                card.attr('typeLabel/y', row.title.length > 14 ? 96 : 72);
                 card.set('elName', row.title);
                 card.set('isLayerSummary', true);
                 card.set('summaryLayer', row.layer);
@@ -213,6 +215,12 @@ let ComposerSearch = (function() {
             });
             self.graph.resetCells(cards);
             self.canvasElements = {};
+            /* The same cards as buttons, so a keyboard or screen reader opens a layer too. */
+            self.layerCards = data.overview.map(function(row) {
+                return { layer: row.layer, title: row.title, count: row.count,
+                         label: row.title + ', ' + row.count + (row.count === 1 ? ' element' : ' elements') };
+            });
+            self.layerCardsTotal = data.store_total;
             self.elementCount = 0;
             self.relCount = 0;
             self.openedLayer = '';
@@ -238,6 +246,7 @@ let ComposerSearch = (function() {
             this.vpDropdownOpen = false;
             this.activeViewpoint = null;
             this.activeViewpointName = '';
+            this.layerCards = [];
             this.scopeFallback = false;
             this.mode = 'edit';
             this._clearNeighborFocus();
