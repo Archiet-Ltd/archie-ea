@@ -197,9 +197,15 @@ def test_gaps_with_no_work_package_are_the_open_ones_and_equal_the_boards_figure
     assert render.call_args.kwargs["unclosed_count"] == len(listed) == 2
 
     html = client.get("/enterprise/implementation/gap-analysis").get_data(as_text=True)
-    section = html[html.index("gaps-not-addressed"):]
-    assert open_bare[0].name in section and open_bare[1].name in section
-    assert closed_bare.name not in section
+    section = html[html.index('data-testid="gaps-not-addressed"'):]
+    # What a person reads: the section says how many gaps have no work package, and lists exactly those rows.
+    assert 'data-testid="gaps-not-addressed-total">2 gaps have no work package.<' in section
+    assert section.count('data-testid="not-addressed-gap-row"') == len(listed) == 2
+    for gap in open_bare:
+        assert 'data-testid="not-addressed-gap-link-%d"' % gap.id in section
+        assert gap.name in section
+    for gap in covered + [closed_bare]:
+        assert 'data-testid="not-addressed-gap-link-%d"' % gap.id not in section
 
 
 def test_the_boards_gap_signals_figure_opens_the_roadmap_that_counts_them(db_session, make_org, client, login_as):

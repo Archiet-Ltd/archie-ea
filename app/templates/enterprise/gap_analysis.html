@@ -169,7 +169,8 @@
 {%- set na_total = not_addressed_gaps|length -%}
 {%- set na_shown = not_addressed_gaps[:page_size] -%}
 {% call section('Gaps with no work package', description='Each stays an open risk in the move to the target architecture until a work package covers it', testid='gaps-not-addressed') %}
-<p class="text-sm text-muted-foreground" data-testid="gaps-not-addressed-total">{% if na_total > na_shown|length %}Showing gaps 1 to {{ na_shown|length }} of {{ na_total }} with no work package.{% else %}{{ na_total }} {{ 'gap has' if na_total == 1 else 'gaps have' }} no work package.{% endif %}</p>
+<p class="text-sm text-muted-foreground" data-testid="gaps-not-addressed-total">{% if na_total > na_shown|length %}Showing gaps 1 to {{ na_shown|length }} of {{ na_total }} with no work package.{% else %}{{ na_total }} {{ 'gap has' if na_total == 1 else 'gaps have' }} no work package.{% endif %}
+{%- if na_total > na_shown|length %} <a href="{{ url_for('enterprise.gap_analysis', status='open', work='none') }}" class="font-medium text-primary hover:underline" data-testid="gaps-not-addressed-all">See all {{ na_total }} gaps with no work package</a>{% endif %}</p>
 {% call(gap) list_table(rows=na_shown, columns=([{'label': 'Gap', 'sortable': true}] + ([{'label': 'Severity', 'sortable': true}] if show.severity else []) + ([('Status', '')] if show.status else [])),
                         caption='Gaps with no work package', testid='gaps-not-addressed-table', row_testid='not-addressed-gap-row',
                         search_placeholder='Filter gaps...', empty_message='Every gap has a work package.') %}
