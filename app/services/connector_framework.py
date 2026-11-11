@@ -691,6 +691,7 @@ CONNECTOR_TYPE_LABELS = {
     "m365": "Microsoft 365",
     "ea_tool": "Enterprise Architecture tool",
     "github": "GitHub",
+    "sharepoint_read": "SharePoint (read)",
     "devops": "Code push (GitHub / Azure DevOps)",
     "lucidchart": "Lucidchart",
 }

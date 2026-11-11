@@ -139,10 +139,44 @@ def test_each_permitted_type_passes(app, connector_type):
         assert assert_connector_permitted(connector_type) is None
 
 
-def test_permitted_set_has_exactly_the_expected_seven_members():
+def test_permitted_set_has_exactly_the_expected_eight_members():
     assert PERMITTED_CONNECTOR_TYPES == frozenset(
-        {"servicenow", "jira", "m365", "devops", "lucidchart", "ea_tool", "github"}
+        {
+            "servicenow",
+            "jira",
+            "m365",
+            "devops",
+            "lucidchart",
+            "ea_tool",
+            "github",
+            "sharepoint_read",
+        }
     )
+
+
+def test_crosswalk_accepts_sharepoint_read_and_refuses_an_unknown_type(
+    db_session, make_org, tenant_ctx
+):
+    from app.models.archimate_core import ArchiMateElement
+    from app.modules.intelligence.services.crosswalk_service import CrosswalkService
+
+    org = make_org("allowlist-sharepoint")
+    with tenant_ctx(org.id):
+        element = ArchiMateElement(
+            name="Orders Hub",
+            type="ApplicationComponent",
+            layer="Application",
+            organization_id=org.id,
+        )
+        db_session.add(element)
+        db_session.flush()
+
+        link = CrosswalkService.write_link("sharepoint_read", "t:s:l:1", element.id)
+        assert link.source_system == "sharepoint_read"
+        assert link.element_id == element.id
+
+        with pytest.raises(ConnectorNotPermitted):
+            CrosswalkService.write_link("nonesuch", "t:s:l:1", element.id)
 
 
 def test_github_justification_is_recorded_in_module_source():

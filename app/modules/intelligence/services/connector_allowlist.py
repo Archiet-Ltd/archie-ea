@@ -62,8 +62,21 @@ logger = logging.getLogger("archie.intelligence.connector_allowlist")
 #     security data -- so adding a gate here would restrict something that
 #     was never restricted, for data that isn't the concern this gate exists
 #     to address.
+#   - sharepoint_read: reads one chosen list on the customer's own SharePoint
+#     site (application names, descriptions, owners as text, annual cost and
+#     lifecycle) with the customer's own read access. It reads no documents,
+#     no files and no other lists, and it never writes to SharePoint.
 PERMITTED_CONNECTOR_TYPES = frozenset(
-    {"servicenow", "jira", "m365", "devops", "lucidchart", "ea_tool", "github"}
+    {
+        "servicenow",
+        "jira",
+        "m365",
+        "devops",
+        "lucidchart",
+        "ea_tool",
+        "github",
+        "sharepoint_read",
+    }
 )
 
 # Sources known to require a compliance review before they can be connected
