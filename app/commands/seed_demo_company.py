@@ -2945,16 +2945,26 @@ _ISO_STATUS_BY_APP = {
 }
 
 
-def _compliance_evidence_document(org_id, app, rows) -> str:
-    """The evidence register of one application, kept as a document of the application, and the address that opens it.
+def _evidence_text(status, app_name) -> str:
+    """What the evidence for a finished control says, in words a reader needs no context for."""
+    if status == "verified":
+        return "The control is assessed and the result is recorded against %s." % app_name
+    if status == "implemented":
+        return "The control is in place for %s and its owner keeps the working record." % app_name
+    return "The work to put the control in place for %s is under way; this is the plan so far." % app_name
 
-    The register is an ApplicationDocument with its file in the upload folder, the store the application's documents
-    tab reads, and the address is the one that serves the file inside the app, so the link on a finished control
-    opens a page with its content. One document per application, one section per finished control.
+
+def _compliance_evidence_document(org_id, app, rows) -> None:
+    """The evidence register of one application, kept as a document of the application.
+
+    The register is an ApplicationDocument with its file in the folder uploaded documents are saved to and
+    served from (the upload route's folder), so the application's documents tab lists it and downloads it.
+    One document per application, one section per finished control. A control's own evidence page does not
+    depend on the file: the evidence text is kept on the mapping.
     """
     import os
 
-    from flask import current_app, url_for
+    from flask import current_app
 
     from app.models.miscellaneous import ApplicationDocument
 
@@ -2964,11 +2974,7 @@ def _compliance_evidence_document(org_id, app, rows) -> str:
         lines += [
             "%s  %s" % (control.control_code, control.title),
             "Status: %s" % status.replace("_", " "),
-            "Evidence: %s" % ("the control is assessed and the result is recorded against %s." % app.name
-                              if status == "verified" else
-                              "the control is in place for %s and its owner keeps the working record." % app.name
-                              if status == "implemented" else
-                              "the work to put the control in place for %s is under way; this is the plan so far." % app.name),
+            "Evidence: %s" % _evidence_text(status, app.name),
             "",
         ]
     body = "\n".join(lines)
@@ -2982,22 +2988,24 @@ def _compliance_evidence_document(org_id, app, rows) -> str:
             file_name=file_name, file_extension="TXT", uploaded_by="Seeded demonstration")
         db.session.add(document)
         db.session.flush()
-    folder = current_app.config.get("UPLOAD_FOLDER") or os.path.join(current_app.root_path, "uploads", "documents")
+    folder = current_app.config.get("UPLOAD_FOLDER", os.path.join(current_app.root_path, "uploads", "documents"))
     os.makedirs(folder, exist_ok=True)
     document.file_path = os.path.join(folder, "%s_%s" % (document.id, file_name))
     with open(document.file_path, "w", encoding="utf-8") as handle:
         handle.write(body)
     document.file_size = len(body.encode("utf-8"))
-    with current_app.test_request_context():
-        return url_for("unified_applications.download_document_file", doc_id=document.id, view=1)
 
 
 def _seed_compliance(org_id) -> int:
     """Adopt ISO 27001 for the demonstration organisation and map its controls to the applications.
 
     Written through the starter-data adoption and ApplicabilityService.link_requirement, the same paths a
-    person's sign-up and a mapping use. A mapping that exists is left as it is. Returns mappings created.
+    person's sign-up and a mapping use. A mapping that exists keeps its status, its evidence text and its
+    evidence address: the seed fills only what a mapping has none of, so a change a person made in the
+    demonstration survives a second seed. Returns mappings created.
     """
+    from flask import current_app, url_for
+
     from app.models.application_compliance import ApplicationComplianceControl
     from app.models.compliance_models import ComplianceControl, RegulatoryFramework
     from app.modules.account.services.onboarding_service import FRAMEWORK_CATALOGUES, _adopt_frameworks
@@ -3015,24 +3023,30 @@ def _seed_compliance(org_id) -> int:
             continue
         plan = [(control, statuses[index % len(statuses)]) for index, control in enumerate(controls)]
         finished = [(c, st) for c, st in plan if st in ("implemented", "verified", "in_progress")]
-        evidence = _compliance_evidence_document(org_id, app, finished) if finished else None
+        if finished:
+            _compliance_evidence_document(org_id, app, finished)
         for control, status in plan:
-            kept = ApplicationComplianceControl.query.filter_by(
+            mapping = ApplicationComplianceControl.query.filter_by(
                 organization_id=org_id, application_id=app.id, control_id=control.id
             ).first()
-            wanted = evidence if status in ("implemented", "verified", "in_progress") else None
-            if kept is not None:
-                # a mapping that exists is brought to the status the seed gives it, so a re-seeded organisation
-                # reads the same as a fresh one
-                kept.implementation_status = status
-                kept.evidence_url = wanted
-                if status == "verified" and kept.verified_date is None:
-                    kept.verified_date = _dt.datetime.utcnow()
+            if mapping is None:
+                mapping = ApplicabilityService.link_requirement(org_id, app.id, control.id, status)
+                if status == "verified":
+                    mapping.verified_date = _dt.datetime.utcnow()
+                created += 1
+            elif not mapping.implementation_status:
+                mapping.implementation_status = status
+            current = mapping.implementation_status
+            if current not in ("implemented", "verified", "in_progress"):
                 continue
-            link = ApplicabilityService.link_requirement(org_id, app.id, control.id, status, evidence_url=wanted)
-            if status == "verified":
-                link.verified_date = _dt.datetime.utcnow()
-            created += 1
+            if not mapping.notes:
+                mapping.notes = _evidence_text(current, app.name)
+            # an address the seed gave in an earlier version (the bare text file) is the seed's to replace;
+            # an address a person recorded stays
+            held = mapping.evidence_url or ""
+            if not held or held.startswith("/applications/documents/"):
+                with current_app.test_request_context():
+                    mapping.evidence_url = url_for("application_mgmt.compliance_control_evidence", mapping_id=mapping.id)
     db.session.flush()
     return created
 
