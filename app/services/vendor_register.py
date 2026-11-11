@@ -306,7 +306,8 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
     """The one rule for which contracts a cost figure adds up, applied to every contract at once.
 
     An active contract counts for the vendor of the live system it sits on, else for the vendor it names
-    when it sits on no system. A contract on a decommissioned, removed or copied system counts nowhere.
+    when it sits on no system. A contract on a decommissioned or removed system adds no cost to any vendor, but it
+    is still active, so it is listed in ``retired_system`` and renews.
     Returns ``{"by_vendor": {vendor id: [contracts]}, "unassigned": [contracts that name no vendor],
     "left_out": {contract id: reason}, "counted": every counted contract, "superseded": {contract id: reason}
     for counted contracts whose cost is not added because the system they sit on records its own}``. A
@@ -384,10 +385,13 @@ def on_retired_system(contract_id: int, ledger: Dict) -> bool:
 
 def renewals_due_counts(ledger: Dict, today: Optional[date] = None) -> Dict[str, int]:
     """The contracts within 90 days of renewal, counted as the Renewals page counts them: ``contracts`` is
-    every one, ``without_vendor`` those that name no vendor (so no vendor row carries them)."""
+    every one, ``without_vendor`` those that name no vendor (so no vendor row carries them) and
+    ``on_retired_system`` those that sit on a decommissioned or removed system."""
     due = [c for c in renewing_contracts(ledger) if contract_renewal_due(c, today)]
     named = {c.id for cs in ledger["renewing_by_vendor"].values() for c in cs}
-    return {"contracts": len(due), "without_vendor": len([c for c in due if c.id not in named])}
+    retired = {c.id for c in ledger.get("retired_system", [])}
+    return {"contracts": len(due), "without_vendor": len([c for c in due if c.id not in named]),
+            "on_retired_system": len([c for c in due if c.id in retired])}
 
 
 def _stack_by_currency(contracts) -> Dict[str, Dict]:

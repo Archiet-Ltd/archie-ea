@@ -232,6 +232,7 @@ def renewals_dashboard():
         brief_contract=brief_contract,
         brief_error=brief_error,
         today=today,
+        retired_note=vendor_register.RETIRED_SYSTEM_RENEWAL,
         # Template reads summary.{critical,warning,ok,unknown,upcoming,total} -
         # precisely get_renewal_summary()'s return shape.
         summary=get_renewal_summary(org_id),

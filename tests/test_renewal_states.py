@@ -321,3 +321,57 @@ def test_an_active_contract_on_a_retired_system_renews_and_a_vendor_with_two_due
         text = _procurement_context()
     assert "Renewals within 90 days (3)" in text, text
     assert f"C-retired-m{tag}" in text and "the system is retired" in text and "-t" + tag not in text
+
+
+def _org_with_retired_system_contract(db_session, org, label, tag):
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    vendor = VendorOrganization(name=f"Vend-{label}{tag}")
+    db_session.add(vendor)
+    db_session.flush()
+    live = ApplicationComponent(name=f"Live-{label}{tag}", organization_id=org.id,
+                                lifecycle_status="operational", vendor_organization_id=vendor.id)
+    retired = ApplicationComponent(name=f"Gone-{label}{tag}", organization_id=org.id,
+                                   lifecycle_status="5. decommissioned", vendor_organization_id=vendor.id)
+    db_session.add_all([live, retired])
+    db_session.flush()
+    for key, system in (("live", live), ("gone", retired)):
+        db_session.add(VendorContract(
+            contract_name=f"C-{key}-{label}{tag}", organization_id=org.id, vendor_id=vendor.id,
+            application_id=system.id, annual_cost=1000.0, currency="GBP", status="active",
+            start_date=date.today() - timedelta(days=300), renewal_date=date.today() + timedelta(days=20),
+            end_date=date.today() + timedelta(days=200)))
+    db_session.flush()
+
+
+def test_the_vendors_note_about_decommissioned_systems_agrees_with_the_renewal_count(app, db_session, make_org):
+    """A decommissioned system is left out of the systems count, but an active contract on it still renews. The
+    Vendors answer says both, and the number of renewals it says sit on a retired system is the number the
+    ledger holds, not a second count. A second organisation with two such contracts changes nothing."""
+    mine, theirs = make_org("rn-a"), make_org("rn-b")
+    tag = uuid.uuid4().hex[:6]
+    _org_with_retired_system_contract(db_session, mine, "m", tag)
+    _org_with_retired_system_contract(db_session, theirs, "t", tag)
+    _org_with_retired_system_contract(db_session, theirs, "u", tag)
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+
+    vendors = _answer(client.get("/applications/vendors").get_data(as_text=True))
+    assert "2 contracts with 1 vendor renew within 90 days" in vendors, vendors
+    assert "Decommissioned systems are not counted (1)." in vendors, vendors
+    assert "An active contract on one still renews: 1 of the renewals above." in vendors, vendors
+
+
+def test_the_renewals_page_reads_the_retired_system_sentence_from_the_register(app, db_session, make_org, monkeypatch):
+    from app.services import vendor_register
+
+    mine = make_org("rs-a")
+    tag = uuid.uuid4().hex[:6]
+    _org_with_retired_system_contract(db_session, mine, "m", tag)
+    client = _admin_client(app, db_session, mine)
+    _forget_cached_user()
+    monkeypatch.setattr(vendor_register, "RETIRED_SYSTEM_RENEWAL", "Retired host; the contract still runs.")
+
+    renewals = _answer(client.get("/procurement/renewals?days=90").get_data(as_text=True))
+    assert renewals.count("Retired host; the contract still runs.") == 1, renewals
