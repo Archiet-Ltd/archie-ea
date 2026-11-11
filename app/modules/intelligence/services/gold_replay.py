@@ -270,18 +270,22 @@ def named_in(unit: str, names: List[str]) -> List[str]:
 
 
 def record_mismatches(delivered: str, figures: List[Dict[str, Any]], names: List[str],
-                      truth: Dict[str, Any]) -> List[str]:
+                      truth: Dict[str, Any], ref_names: Optional[Dict[str, str]] = None) -> List[str]:
     """Rendered figures whose value is not the gold value of the record the sentence names (the
     record in brackets after the figure, in a sentence that names several), or, in a sentence that
-    names no record, of the organisation. Written apart from the engine's binding on purpose."""
+    names no record, of the organisation. A ``[ref:<id>]`` names the record *ref_names* gives for
+    its id, because the page shows the marker as that name. Written apart from the engine's binding
+    on purpose."""
     wrong: List[str] = []
+    ref_names = ref_names or {}
     for figure in figures:
         reads = figure["reads"]
         bracket = re.search(r" \(([^()]*)\)$", reads)
         phrase = reads[:bracket.start()] if bracket else reads
         if phrase in truth["org"]:
             continue
-        unit = _unit_around(delivered, figure["start"])
+        unit = re.sub(r"\[ref:([^\]\s]+)\]", lambda m: " %s " % ref_names.get(m.group(1), ""),
+                      _unit_around(delivered, figure["start"]))
         found = sorted(set(named_in(unit, names)))
         if bracket:
             compared = bracket.group(1).lower()
@@ -313,7 +317,9 @@ def score(question: Dict[str, Any], behaviour: str, variant: str, result: Dict[s
         reads = re.sub(r" \([^()]*\)$", "", figure["reads"])
         if reads not in truth[variant]["all"]:
             wrong.append(("other organisation: %s" if reads in truth[other]["all"] else "not a true figure: %s") % reads)
-    wrong += record_mismatches(delivered, figures, names, truth[variant])
+    ref_names = {str(i): name for kind in ("elements", "applications")
+                 for name, i in (model.ids.get(kind) or {}).items()}
+    wrong += record_mismatches(delivered, figures, names, truth[variant], ref_names)
     wrong += ["forbidden: %s" % hit for hit in _forbidden_hits(delivered, question["forbidden"][variant])]
     check = result.get("figure_check") or {}
     return Run(

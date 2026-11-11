@@ -128,6 +128,22 @@ def test_a_wrong_figure_is_judged_against_the_record_the_sentence_names():
     assert gold_replay.record_mismatches(overall, [at(overall, "20 applications")], names, truth) == []
 
 
+def test_a_record_named_only_by_its_marker_is_the_record_its_sentence_names():
+    """The page shows [ref:<id>] as the record's name, so the judge reads the marker the same way."""
+    names = ["Orders Hub", "Billing"]
+    truth = {"org": set(),
+             "by_record": {"orders hub": {"13 connections downstream"}, "billing": {"4 connections downstream"}}}
+    refs = {"185": "Orders Hub", "186": "Billing"}
+    right = "[ref:185] has 13 connections downstream. [ref:186] has 4 connections downstream."
+    own = [{"start": right.index(p), "end": right.index(p) + len(p), "reads": p}
+           for p in ("13 connections downstream", "4 connections downstream")]
+    assert gold_replay.record_mismatches(right, own, names, truth, refs) == []
+    swapped = "[ref:186] has 13 connections downstream."
+    figure = [{"start": swapped.index("13"), "end": swapped.index("13") + 25, "reads": "13 connections downstream"}]
+    assert gold_replay.record_mismatches(swapped, figure, names, truth, refs) == [
+        "13 connections downstream is not a figure of billing"]
+
+
 def test_the_fourth_behaviour_names_each_record_and_writes_no_reference():
     document, _fixture = gold_replay.load_set("figures")
     question = next(q for q in document["questions"] if q["id"] == 27)
