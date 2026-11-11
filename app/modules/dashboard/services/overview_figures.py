@@ -346,7 +346,7 @@ def _history(org_id, now):
 
     start = datetime(now.year - 1, 1, 1)
     try:
-        return HistoryService(db.session, org_id).difference(start, now).changes
+        return _in_the_model(HistoryService(db.session, org_id).difference(start, now).changes, org_id)
     except Exception:
         db.session.rollback()
         logger.exception("overview: change history could not be read")
@@ -478,11 +478,68 @@ def _person_names(org_id, changes):
     return HistoryService(db.session, org_id).person_names(c.changed_by_id for c in changes)
 
 
-def _is_connected(change):
+def _is_connected(change, sample=frozenset()):
+    """Whether the change came from a connected source: never when the record is the sample company's."""
+    if (change.table_name, change.record_id) in sample:
+        return False
     return (change.snapshot or {}).get("source_kind") in CONNECTED_KINDS
 
 
-def _bars(inserts, today, days):
+def _models_of_changes():
+    """The stored record behind each table the change history names, for the 'is it still there' check."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.solution_models import Solution
+    from app.models.unified_capability import UnifiedCapability
+
+    return {
+        "unified_capabilities": UnifiedCapability,
+        "archimate_elements": ArchiMateElement,
+        "archimate_relationships": ArchiMateRelationship,
+        "application_component": ApplicationComponent,
+        "business_capability": BusinessCapability,
+        "solution": Solution,
+    }
+
+
+def _sample_records(changes, org_id):
+    """The records the sample company wrote, as (table, id) pairs, loaded now or removed since."""
+    from app.services import sample_company_service
+
+    sample = set(sample_company_service.written_by_the_sample(org_id))
+    return sample | {(c.table_name, c.record_id) for c in changes if (c.snapshot or {}).get("source_kind") == "sample"}
+
+
+def _in_the_model(changes, org_id):
+    """The changes to records this organisation's model still holds.
+
+    The change history is kept for good, so it still lists every record that has since gone. The panels
+    count records in the model, so a record that is gone takes its added and changed rows with it; a
+    deletion is the one row kept, because "removed" is what happened. Everything the sample company
+    wrote goes with it once it is removed, deletions included: the person never did that.
+    """
+    sample = _sample_records(changes, org_id)
+    present = {}
+    for table, model in _models_of_changes().items():
+        ids = {c.record_id for c in changes if c.table_name == table}
+        if ids:
+            present[table] = {
+                row[0]
+                for row in db.session.execute(
+                    db.select(model.id).where(model.id.in_(ids), model.organization_id == org_id)
+                ).all()
+            }
+    kept = []
+    for change in changes:
+        if change.table_name not in present or change.record_id in present[change.table_name]:
+            kept.append(change)
+        elif change.action == "delete" and (change.table_name, change.record_id) not in sample:
+            kept.append(change)
+    return kept
+
+
+def _bars(inserts, today, days, sample=frozenset()):
     """Records added, split into connected and by hand: one bar a day, or a week when the range is long."""
     size = 7 if days > 31 else 1
     first = today - timedelta(days=days - 1)
@@ -496,7 +553,7 @@ def _bars(inserts, today, days):
         if first <= day <= today:
             for bucket in buckets:
                 if bucket[0] <= day <= bucket[1]:
-                    bucket[2 if _is_connected(change) else 3] += 1
+                    bucket[2 if _is_connected(change, sample) else 3] += 1
                     break
     return [
         {"day": "%d %s" % (b[0].day, b[0].strftime("%b")), "connected": b[2], "manual": b[3]}
@@ -536,12 +593,13 @@ def _activity(changes, now, org_id):
     if changes is None:
         return None
     today = now.date()
+    sample = _sample_records(changes, org_id)
     inserts = _without_applications_counted_as_elements(
         [c for c in changes if c.action == "insert" and c.valid_from], org_id
     )
     ranges = {}
     for key, label, days in RANGES:
-        rows = _bars(inserts, today, days)
+        rows = _bars(inserts, today, days, sample)
         ranges[key] = {
             "label": label,
             "rows": rows,

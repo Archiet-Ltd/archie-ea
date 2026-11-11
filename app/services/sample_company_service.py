@@ -139,6 +139,48 @@ def find_restore_point(org_id: int):
     return None
 
 
+def written_by_the_sample(org_id: int) -> set:
+    """What the sample company wrote in this organisation, loaded now or removed since.
+
+    Pairs of (the change history's name for the table, the record's id). The restore point keeps
+    the ids of everything a load brought in, and keeps them after the removal, so the history of a
+    removed sample can still be told from the history of anything the organisation added itself.
+    """
+    from app.models.import_audit import ImportSessionLog
+    from app.services.import_snapshot_service import IMPORT_SOURCE
+
+    history_name = {
+        "archimate_elements": "archimate_elements", "archimate_relationships": "archimate_relationships",
+        "application_components": "application_component", "business_capability": "business_capability",
+        "solutions": "solution",
+    }
+    keys = set()
+    for log in ImportSessionLog.query.filter(
+        ImportSessionLog.organization_id == org_id, ImportSessionLog.import_source == IMPORT_SOURCE
+    ):
+        data = log.snapshot_data or {}
+        if data.get("model_name") != SAMPLE_MODEL_NAME:
+            continue
+        keys |= {("archimate_elements", int(i)) for i in data.get("created_element_ids") or []}
+        keys |= {("archimate_relationships", int(i)) for i in data.get("created_relationship_ids") or []}
+        for item in data.get(_ROWS_KEY) or []:
+            if item["table"] in history_name:
+                keys.add((history_name[item["table"]], int(item["id"])))
+        # each contract also stands as an element of the model, which the removal takes with the rest
+        contracts = [int(i["id"]) for i in data.get(_ROWS_KEY) or [] if i["table"] == "vendor_contracts"]
+        if contracts:
+            from app.models.application_portfolio import VendorContract
+
+            keys |= {
+                ("archimate_elements", int(element_id))
+                for (element_id,) in db.session.query(VendorContract.archimate_element_id).filter(
+                    VendorContract.id.in_(contracts), VendorContract.organization_id == org_id,
+                    VendorContract.archimate_element_id.isnot(None),
+                )
+            }
+    return keys
+
+
 def _remember(log, rows: List[Dict[str, Any]], mirrors: List[int]) -> None:
     """Keep the added rows on the restore point, and the elements mirrored for them."""
     data = dict(log.snapshot_data or {})
