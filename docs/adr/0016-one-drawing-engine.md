@@ -2,6 +2,8 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-11
+- **Register:** entry `diagram` in `docs/reuse-register.yml` (status active); it carries the `must_not_create`
+  lines that stop new use of every frozen implementation below.
 
 ## Context
 
@@ -39,7 +41,7 @@ a sequence view and a use-case view. Class diagrams keep `codegen/uml_shapes.js`
 | UML sequence | a journey's flow steps, plus the application components and services joined to each step | new sibling, read only | No: "edit the model" links to the process and the component | Under the journey |
 | UML use case | the product's BusinessRole elements and the journeys assigned to them | new sibling, read only | No: link to the roles | Roles section |
 | ERD | the product's Data objects and their `DataEntity` records | `data/erd.js` | Yes in the data domain page; read only on the product page | Data section |
-| UML class | repository classes only (`UMLModel` / `UMLElement`, enrichment snapshot) | `codegen/uml_shapes.js` | No | Only when a repository supplies classes; lowest priority |
+| UML class | none yet. The enrichment snapshot of a repository's classes (`uml_enrichment_service.py`) is the intended source, read at request time. `UMLModel` is frozen and is not a source | `codegen/uml_shapes.js` | No | No class diagram is drawn on the product page until a reader of that snapshot exists (last build step) |
 
 Gap found: a flow step carries no link to an application component (a node has only `processId`). The sequence view
 needs that link as an ArchiMate relationship (component serves the process or step), not a field on the flow.
@@ -48,7 +50,7 @@ needs that link as an ArchiMate relationship (component serves the process or st
 
 | Path | Called from | Verdict |
 |---|---|---|
-| `static/js/archimate/composer_renderer.js` (+ `composer*.js`, `composer_shell.js`) | composer, blueprint, solutions detail, workbench, assistant journey, applications list | **Keep** (the engine) |
+| `static/js/archimate/composer_renderer.js` (+ `composer*.js`, `composer_shell.js`) | composer, blueprint, solutions detail, workbench, assistant journey, applications list, `architecture/elements.html` | **Keep** (the engine) |
 | `static/js/bpmn/bpmn_editor.js`, `modules/business_architecture/bpmn_service.py` | `business_architecture/process_diagram.html`; `/processes/<id>/bpmn` routes | **Keep**; extend to load shared chrome |
 | `static/js/data/erd.js`, `modules/architecture/services/data_erd_service.py` | `data_architecture/entity_diagram.html` | **Keep**; extend with a read-only mode |
 | `static/js/codegen/uml_shapes.js`, `modules/codegen/services/uml_enrichment_service.py` | `codegen/workbench.html` | **Keep** for class diagrams |
@@ -60,18 +62,31 @@ needs that link as an ArchiMate relationship (component serves the process or st
 | `services/mermaid_diagram_generator.py` | one test only | **Freeze**, then delete with that test's cases moved |
 | `services/composer_export_formats.py` (`to_mermaid`, Lucid, Archi) | composer export, business case and model canvas exports | **Keep** as export formats, not as an on-screen renderer |
 | `static/vendor/mermaid.min.js`, `applications/dashboard.html` | applications dashboard (`mermaid_diagrams` is passed empty) | **Freeze**: no new Mermaid on screen |
-| `modules/ai_chat/.../visual_generation_service.py`, `structured_deliverable_service.py`, `generate_routes.py` | chat "visual" replies (Mermaid or PlantUML text) | **Freeze**: text for chat, never a product-page diagram |
+| `services/ai_chat_extensions/visual_generation_service.py`, `modules/ai_chat/services/structured_deliverable_service.py`, `modules/ai_chat/routes/generate_routes.py` | chat "visual" replies (Mermaid or PlantUML text) | **Freeze**: text for chat, never a product-page diagram |
 | `modules/solutions_product/services/deterministic_code_generator.py` (`_build_mermaid_diagram`), `product_spec_bundle.py` (`SequenceDiagramDef`) | generated code and spec bundles | **Freeze**: generator output, not a screen |
 | `models/models.py` `UMLModel` (stub: name, `mermaid_source`, `plantuml_source`, `svg_output`) | codegen only | **Freeze**: no new rows for product diagrams |
 | `static/js/solutions/traceability_sankey.js`, `archimate_views/traceability_sankey.js`, `organization/org_chart.js`, `capability_map/network.html`, `solutions/program_view.html`, `stakeholders/map.html` | their own pages | **Freeze**: charts and force graphs, not notations; moves follow register entry `force-graph` |
+
+Each **Freeze** row is stopped by a `must_not_create` line in register entry `diagram` (the charts row also by
+`force-graph`). Loading `workflow_designer.js`, `workflow_shapes.js`, `workflow_builder.js`,
+`archimate_diagram_renderer.js` or `solution_composer_cytoscape.js` from a template fails
+(`frozen-workflow-designer-loaded`, `frozen-diagram-script-loaded`); new Mermaid on screen fails
+(`mermaid-on-screen`); a new import of `mermaid_diagram_generator` fails (`mermaid-diagram-generator-use`); the
+chat visual services, `_build_mermaid_diagram` and `SequenceDiagramDef` in the architecture, business
+architecture and product routes, templates or scripts fail
+(`chat-visual-or-generator-diagram-on-a-page`); a new `d3.sankey`, `d3.tree` or `d3.cluster` fails
+(`new-d3-chart-layout`); a new `UMLModel(` row fails (`uml-model-row-for-product-diagram`); a second BPMN flow
+column on a model fails (`second-bpmn-flow-store`; `BusinessProcess.bpmn_flow` is the one allowed). A second
+library fails `second-diagram-library`.
 
 ## Consequences
 
 - No product-page diagram brief may add a library, a diagram table or an inline `<svg>` drawing; it adds a sibling
   module and derives its data from the model.
 - Build order, each one slice: (1) the product page lists a BPMN diagram per journey (reads `bpmn_flow`, links to
-  the process page); (2) the step-to-component relationship and its writer; (3) the read-only sequence sibling;
-  (4) the use-case sibling; (5) the ERD on the product page, read only; (6) deletion of the four unreferenced
-  files, one change each; (7) class diagram from a repository, last.
+  the process page); (2) the read-only sequence sibling, which ships with the step-to-component relationship and
+  its writer because a person sees nothing until both exist;
+  (3) the use-case sibling; (4) the ERD on the product page, read only; (5) deletion of the four unreferenced
+  files, one change each; (6) class diagram from a repository, last.
 - Derived views carry the "edit the model" link to the element or process that holds the fact, so a diagram cannot
   differ from the model.
