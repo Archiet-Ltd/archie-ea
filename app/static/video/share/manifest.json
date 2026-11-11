@@ -1,0 +1,389 @@
+{
+  "site": "https://entelim.org",
+  "recordings": [
+    {
+      "slug": "applications",
+      "title": "Find who owns any application in seconds",
+      "message": "One true list of every application you run, with its owner and its stage.",
+      "summary": "Opens the application portfolio, where every application shows its owner, lifecycle stage and the capability it supports. Typing a name narrows the list to that application, with its owner on the row.",
+      "captions": [
+        "Find who owns any application in seconds",
+        "20 applications, each with its owner, lifecycle stage and capability",
+        "Calibration Ledger is owned by Morgan Hale, Cameron Doyle"
+      ],
+      "caption_seconds": [
+        [
+          0.0,
+          7.0
+        ],
+        [
+          7.0,
+          16.5
+        ],
+        [
+          16.5,
+          28.5
+        ]
+      ],
+      "transcript": "Find who owns any application in seconds. 20 applications, each with its owner, lifecycle stage and capability. Calibration Ledger is owned by Morgan Hale, Cameron Doyle. One true list of every application you run, with its owner and its stage.",
+      "claims": [
+        "Find who owns any application in seconds.",
+        "20 applications, each with its owner, lifecycle stage and capability.",
+        "Calibration Ledger is owned by Morgan Hale, Cameron Doyle.",
+        "One true list of every application you run, with its owner and its stage."
+      ],
+      "cover": "/static/video/share/applications-cover.jpg",
+      "files": {
+        "wide": {
+          "path": "/static/video/share/applications-wide.mp4",
+          "bytes": 398423,
+          "duration_seconds": 34.1,
+          "width": 1280,
+          "height": 720
+        },
+        "square": {
+          "path": "/static/video/share/applications-square.mp4",
+          "bytes": 360099,
+          "duration_seconds": 34.1,
+          "width": 1080,
+          "height": 1080
+        },
+        "upright": {
+          "path": "/static/video/share/applications-upright.mp4",
+          "bytes": 402492,
+          "duration_seconds": 34.1,
+          "width": 1080,
+          "height": 1920
+        }
+      },
+      "share_url": "https://entelim.org/see/applications",
+      "module_url": "https://entelim.org/modules/applications",
+      "alt": "Recording of the Applications module: the portfolio list, then narrowed by search to one application with its owner.",
+      "source_sha256": "756f146eaeb5116f52bf034850a5bdf35d2525c0b9e2ebad4a3e1221ce44f3e9"
+    },
+    {
+      "slug": "business-model-canvas",
+      "title": "Open a canvas already filled from your own model",
+      "message": "Strategy canvases that fill themselves from what you already model.",
+      "summary": "Opens the canvas library and one canvas whose boxes are already filled with partners, activities, resources, value propositions and customers taken from the organisation's own model. Every entry is an element of that model and opens from the canvas.",
+      "captions": [
+        "Open a canvas already filled from your own model",
+        "Every box is made of elements your team already modelled, so nothing is typed twice",
+        "Partners, activities, resources, offer and customers, each one a real element of the model",
+        "Every entry opens the model element behind it, so the canvas and the model never disagree"
+      ],
+      "caption_seconds": [
+        [
+          0.0,
+          10.7
+        ],
+        [
+          10.7,
+          18.5
+        ],
+        [
+          18.5,
+          25.8
+        ],
+        [
+          25.8,
+          30.2
+        ]
+      ],
+      "transcript": "Open a canvas already filled from your own model. Every box is made of elements your team already modelled, so nothing is typed twice. Partners, activities, resources, offer and customers, each one a real element of the model. Every entry opens the model element behind it, so the canvas and the model never disagree. Strategy canvases that fill themselves from what you already model.",
+      "claims": [
+        "Open a canvas already filled from your own model.",
+        "Every box is made of elements your team already modelled, so nothing is typed twice.",
+        "Partners, activities, resources, offer and customers, each one a real element of the model.",
+        "Every entry opens the model element behind it, so the canvas and the model never disagree.",
+        "Strategy canvases that fill themselves from what you already model."
+      ],
+      "cover": "/static/video/share/business-model-canvas-cover.jpg",
+      "files": {
+        "wide": {
+          "path": "/static/video/share/business-model-canvas-wide.mp4",
+          "bytes": 584534,
+          "duration_seconds": 35.8,
+          "width": 1280,
+          "height": 720
+        },
+        "square": {
+          "path": "/static/video/share/business-model-canvas-square.mp4",
+          "bytes": 541716,
+          "duration_seconds": 35.8,
+          "width": 1080,
+          "height": 1080
+        },
+        "upright": {
+          "path": "/static/video/share/business-model-canvas-upright.mp4",
+          "bytes": 606554,
+          "duration_seconds": 35.8,
+          "width": 1080,
+          "height": 1920
+        }
+      },
+      "share_url": "https://entelim.org/see/business-model-canvas",
+      "module_url": "https://entelim.org/modules/business-model-canvas",
+      "alt": "Recording of the Business Model Canvas module: the canvas library and a canvas filled with elements of the model.",
+      "source_sha256": "e4d7d5c730fbca9b83d2887a11ba521b91b77602efff9eaf253c565803b621a1"
+    },
+    {
+      "slug": "compliance-frameworks",
+      "title": "See which controls apply to which applications, and where they stand",
+      "message": "Show an auditor which controls cover which systems, in one place.",
+      "summary": "Opens the regulatory compliance dashboard, which counts the adopted frameworks, their controls and the applications they are mapped to. Choosing a control from the findings opens it with the applications that carry it and whether each is planned, implemented or verified.",
+      "captions": [
+        "See which controls apply to which applications, and where they stand",
+        "97 controls across 3 frameworks, mapped to the applications that carry them",
+        "Each control lists its applications and whether it is implemented, verified or planned",
+        "10 applications are mapped to this control, each with its own status"
+      ],
+      "caption_seconds": [
+        [
+          0.0,
+          7.3
+        ],
+        [
+          7.3,
+          23.6
+        ],
+        [
+          23.6,
+          30.8
+        ],
+        [
+          30.8,
+          35.3
+        ]
+      ],
+      "transcript": "See which controls apply to which applications, and where they stand. 97 controls across 3 frameworks, mapped to the applications that carry them. Each control lists its applications and whether it is implemented, verified or planned. 10 applications are mapped to this control, each with its own status. Show an auditor which controls cover which systems, in one place.",
+      "claims": [
+        "See which controls apply to which applications, and where they stand.",
+        "97 controls across 3 frameworks, mapped to the applications that carry them.",
+        "Each control lists its applications and whether it is implemented, verified or planned.",
+        "10 applications are mapped to this control, each with its own status.",
+        "Show an auditor which controls cover which systems, in one place."
+      ],
+      "cover": "/static/video/share/compliance-frameworks-cover.jpg",
+      "files": {
+        "wide": {
+          "path": "/static/video/share/compliance-frameworks-wide.mp4",
+          "bytes": 601841,
+          "duration_seconds": 40.9,
+          "width": 1280,
+          "height": 720
+        },
+        "square": {
+          "path": "/static/video/share/compliance-frameworks-square.mp4",
+          "bytes": 595780,
+          "duration_seconds": 40.9,
+          "width": 1080,
+          "height": 1080
+        },
+        "upright": {
+          "path": "/static/video/share/compliance-frameworks-upright.mp4",
+          "bytes": 624019,
+          "duration_seconds": 40.9,
+          "width": 1080,
+          "height": 1920
+        }
+      },
+      "share_url": "https://entelim.org/see/compliance-frameworks",
+      "module_url": "https://entelim.org/modules/compliance-frameworks",
+      "alt": "Recording of the Compliance Frameworks module: the compliance dashboard and one control opened with its applications and their status.",
+      "source_sha256": "96d096ae52e5382352aabaf934f3e8db9732333a382a64850950c063b51f4d87"
+    },
+    {
+      "slug": "digital-twin",
+      "title": "See everything that depends on a system, across every layer",
+      "message": "See what depends on any system, drawn from your own records.",
+      "summary": "Opens the digital twin on Calibration Ledger, the most connected system in the model, with its elements and relationships spread over the business, application and technology layers. The connections open as a list that names each one, from one element to the next.",
+      "captions": [
+        "See everything that depends on a system, across every layer",
+        "18 elements and 17 relationships around Calibration Ledger",
+        "Every connection is named, from one system to the next",
+        "All 17 connections are listed, each one named and recorded as explicit"
+      ],
+      "caption_seconds": [
+        [
+          0.0,
+          8.4
+        ],
+        [
+          8.4,
+          15.6
+        ],
+        [
+          15.6,
+          23.0
+        ],
+        [
+          23.0,
+          27.5
+        ]
+      ],
+      "transcript": "See everything that depends on a system, across every layer. 18 elements and 17 relationships around Calibration Ledger. Every connection is named, from one system to the next. All 17 connections are listed, each one named and recorded as explicit. See what depends on any system, drawn from your own records.",
+      "claims": [
+        "See everything that depends on a system, across every layer.",
+        "18 elements and 17 relationships around Calibration Ledger.",
+        "Every connection is named, from one system to the next.",
+        "All 17 connections are listed, each one named and recorded as explicit.",
+        "See what depends on any system, drawn from your own records."
+      ],
+      "cover": "/static/video/share/digital-twin-cover.jpg",
+      "files": {
+        "wide": {
+          "path": "/static/video/share/digital-twin-wide.mp4",
+          "bytes": 381552,
+          "duration_seconds": 33.1,
+          "width": 1280,
+          "height": 720
+        },
+        "square": {
+          "path": "/static/video/share/digital-twin-square.mp4",
+          "bytes": 355484,
+          "duration_seconds": 33.1,
+          "width": 1080,
+          "height": 1080
+        },
+        "upright": {
+          "path": "/static/video/share/digital-twin-upright.mp4",
+          "bytes": 409758,
+          "duration_seconds": 33.1,
+          "width": 1080,
+          "height": 1920
+        }
+      },
+      "share_url": "https://entelim.org/see/digital-twin",
+      "module_url": "https://entelim.org/modules/digital-twin",
+      "alt": "Recording of the digital twin: the map around Calibration Ledger and the list of its connections.",
+      "source_sha256": "ca1709aee2d45237cd9830b77d64b7b95b37fa9f11642184ad04dfb39abd4a50"
+    },
+    {
+      "slug": "industry-apqc",
+      "title": "Start from your industry's own process framework",
+      "message": "A recognised process framework for your industry, ready to map to your model.",
+      "summary": "Opens the industry process frameworks, one for each industry, and then the banking framework with its categories and process counts. Opening a category lists the processes inside it.",
+      "captions": [
+        "Start from your industry's own process framework",
+        "13 categories and 103 processes, ready to map to your model",
+        "Each category lists the processes inside it"
+      ],
+      "caption_seconds": [
+        [
+          0.1,
+          11.0
+        ],
+        [
+          11.0,
+          18.0
+        ],
+        [
+          18.0,
+          28.9
+        ]
+      ],
+      "transcript": "Start from your industry's own process framework. 13 categories and 103 processes, ready to map to your model. Each category lists the processes inside it. A recognised process framework for your industry, ready to map to your model.",
+      "claims": [
+        "Start from your industry's own process framework.",
+        "13 categories and 103 processes, ready to map to your model.",
+        "Each category lists the processes inside it.",
+        "A recognised process framework for your industry, ready to map to your model."
+      ],
+      "cover": "/static/video/share/industry-apqc-cover.jpg",
+      "files": {
+        "wide": {
+          "path": "/static/video/share/industry-apqc-wide.mp4",
+          "bytes": 448425,
+          "duration_seconds": 34.5,
+          "width": 1280,
+          "height": 720
+        },
+        "square": {
+          "path": "/static/video/share/industry-apqc-square.mp4",
+          "bytes": 413450,
+          "duration_seconds": 34.5,
+          "width": 1080,
+          "height": 1080
+        },
+        "upright": {
+          "path": "/static/video/share/industry-apqc-upright.mp4",
+          "bytes": 461385,
+          "duration_seconds": 34.5,
+          "width": 1080,
+          "height": 1920
+        }
+      },
+      "share_url": "https://entelim.org/see/industry-apqc",
+      "module_url": "https://entelim.org/modules/industry-apqc",
+      "alt": "Recording of the Industry Process Frameworks module: the framework list, the banking framework's categories and one category opened.",
+      "source_sha256": "054b74c8ae8721ed22c5e854a8466e3cded4ee968fd999921c31baecbff77e8c"
+    },
+    {
+      "slug": "risk-register",
+      "title": "See which risk would hit the most of your estate",
+      "message": "Know which risk reaches the most of what you run.",
+      "summary": "Opens the risk register, which ranks every risk by the number of model elements it reaches and names them. Following one named application opens its impact graph, showing what depends on it and what it depends on.",
+      "captions": [
+        "See which risk would hit the most of your estate",
+        "The top risk reaches 56 elements of the model, and the register names them",
+        "8 things depend on this application, and it depends on 8",
+        "Three steps out it depends on 10 things, not 8: the full reach of a failure"
+      ],
+      "caption_seconds": [
+        [
+          0.0,
+          7.2
+        ],
+        [
+          7.2,
+          16.4
+        ],
+        [
+          16.4,
+          23.9
+        ],
+        [
+          23.9,
+          31.4
+        ]
+      ],
+      "transcript": "See which risk would hit the most of your estate. The top risk reaches 56 elements of the model, and the register names them. 8 things depend on this application, and it depends on 8. Three steps out it depends on 10 things, not 8: the full reach of a failure. Know which risk reaches the most of what you run.",
+      "claims": [
+        "See which risk would hit the most of your estate.",
+        "The top risk reaches 56 elements of the model, and the register names them.",
+        "8 things depend on this application, and it depends on 8.",
+        "Three steps out it depends on 10 things, not 8: the full reach of a failure.",
+        "Know which risk reaches the most of what you run."
+      ],
+      "cover": "/static/video/share/risk-register-cover.jpg",
+      "files": {
+        "wide": {
+          "path": "/static/video/share/risk-register-wide.mp4",
+          "bytes": 1401230,
+          "duration_seconds": 37.0,
+          "width": 1280,
+          "height": 720
+        },
+        "square": {
+          "path": "/static/video/share/risk-register-square.mp4",
+          "bytes": 1214224,
+          "duration_seconds": 37.0,
+          "width": 1080,
+          "height": 1080
+        },
+        "upright": {
+          "path": "/static/video/share/risk-register-upright.mp4",
+          "bytes": 1259052,
+          "duration_seconds": 37.0,
+          "width": 1080,
+          "height": 1920
+        }
+      },
+      "share_url": "https://entelim.org/see/risk-register",
+      "module_url": "https://entelim.org/modules/risk-register",
+      "alt": "Recording of the Risk Register module: the ranked risks with the elements each reaches, and the impact graph of one application they name.",
+      "source_sha256": "29db887266226e466cf9600fc6044115551268862264343c9976a4bb5a1e750e"
+    }
+  ]
+}

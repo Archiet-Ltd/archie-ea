@@ -2684,8 +2684,8 @@
 "/enterprise/compliance/violations/<x>":["W5","PG-RTP","prefix",null,null],
 "/enterprise/consolidation":["RT","PG-PLAN","page","/consolidation-list/","W5"],
 "/enterprise/consolidation/candidates":["RT","PG-PLAN","page","/consolidation-list/?tab=candidates","W5"],
-"/enterprise/consolidation/candidates/find":["RT","PG-PLAN","prefix",null,null],
 "/enterprise/consolidation/candidates/<x>/dismiss":["RT","PG-PLAN","prefix",null,null],
+"/enterprise/consolidation/candidates/find":["RT","PG-PLAN","prefix",null,null],
 "/enterprise/consolidation/opportunities":["RT","PG-PLAN","page","/consolidation-list/?tab=opportunities","W5"],
 "/enterprise/data-freshness":["RT","PG-OVR","page","/dashboard/health","W1"],
 "/enterprise/data/models":["RT","PG-DATA","page","/data-governance/models","W5"],
@@ -3561,6 +3561,7 @@
 "endpoint:main.indexnow_key_file":["A","infra","override",null,null],
 "endpoint:main.public_legal_page":["W1","PG-PUB","override",null,null],
 "endpoint:main.public_module":["W1","PG-PUB","override",null,null],
+"endpoint:main.public_share":["W1","PG-PUB","override",null,null],
 "endpoint:main.public_site_page":["W1","PG-PUB","override",null,null],
 "endpoint:risk.risk_loss_save":["W1","PG-RISK","override",null,null]
 }

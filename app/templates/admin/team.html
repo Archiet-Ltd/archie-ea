@@ -119,6 +119,9 @@
         {{ dropdown_menu_item(text='Make ' ~ get_role_display_name(r)|lower, tag='button', type='submit', class='w-full', attrs={'data-testid': 'member-role-' ~ r}) }}
       </form>
       {% endfor %}
+      {% if 'user_role.edit_user_role' in flask.current_app.view_functions and may_open_role_page(member) %}
+      {{ row_action('Set enterprise role', href=url_for('user_role.edit_user_role', user_id=member.id), testid='member-enterprise-role') }}
+      {% endif %}
       {% if member.external_id and not member.is_platform_admin %}
       {{ dropdown_menu_separator() }}
       {{ row_action('Reset single sign-on', action=url_for('team.team_reset_sign_in', user_id=member.id), testid='member-reset-sign-in') }}

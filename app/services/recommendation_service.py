@@ -98,6 +98,7 @@ def _advice_rows(organization_id: int) -> List[Dict[str, Any]]:
     on_system = vendor_register.counted_by_system(ledger) if ledger else {}
     detail = result_footer_service.page_link
 
+    origins = result_footer_service.application_origins(organization_id, apps)
     ownership: List[Dict[str, Any]] = []
     cost: List[Dict[str, Any]] = []
     for app in apps:
@@ -113,7 +114,7 @@ def _advice_rows(organization_id: int) -> List[Dict[str, Any]]:
                 "record_href": href,
                 "record_label": _RECORD_LABELS["Ownership"],
                 "footer": result_footer_service.build_footer([
-                    result_footer_service.application_fact(app, "Record"),
+                    result_footer_service.application_fact(app, "Record", origins),
                     result_footer_service.fact("Owner: none recorded", missing=True),
                 ]),
             })
@@ -131,7 +132,7 @@ def _advice_rows(organization_id: int) -> List[Dict[str, Any]]:
                     "record_href": href,
                     "record_label": _RECORD_LABELS["Cost"],
                     "footer": result_footer_service.build_footer([
-                        result_footer_service.application_fact(app, "Record"),
+                        result_footer_service.application_fact(app, "Record", origins),
                         result_footer_service.fact("Run cost: %s a year, %s" % (_money(amount), source),
                                                    href=href, subject="Cost", as_of=app.updated_at or app.created_at),
                     ]),

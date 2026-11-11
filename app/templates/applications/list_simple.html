@@ -477,6 +477,7 @@
                           attrs_dict={'aria-label': 'Select ' ~ app.name, ':checked': 'selectedIds.has(' ~ app.id ~ ')', '@change': 'toggleRow(' ~ app.id ~ ', $event.target.checked)'}) }}
               <div class="min-w-0">
                 <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="block truncate text-base font-semibold text-foreground hover:underline">{{ app.name }}</a>
+                {% if app.id in repository_ids %}<p class="mt-1 text-xs text-muted-foreground" data-testid="app-type-mobile-{{ app.id }}">Repository</p>{% endif %}
                 {% if app.description %}<p class="mt-1 text-xs text-muted-foreground">{{ app.description[:100] }}{% if app.description | length > 100 %}…{% endif %}</p>{% endif %}
               </div>
             </div>

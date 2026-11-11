@@ -18,13 +18,19 @@
 {% extends 'layouts/public_base.html' %}
 {% from 'macros/pricing_cta.html' import plan_buy_section %}
 {% block body_theme %}theme-marketing{% endblock %}
-{% block title %}{{ page.title }}{% endblock %}
+{% block title %}{{ share_view.title if share_view else page.title }}{% endblock %}
 
 {% block meta_description %}
 {% from 'partials/_seo_meta.html' import seo_meta %}
-{{ seo_meta(page.self_canonical_url, page.description, page.is_held) }}
+{% if share_view %}
+{{ seo_meta(share_view.url, share_view.description, page.is_held, share_view) }}
+<meta property="og:title" content="{{ share_view.title }}">
+<meta name="twitter:title" content="{{ share_view.title }}">
+{% else %}
+{{ seo_meta(page.self_canonical_url, page.description, page.is_held, social) }}
 <meta property="og:title" content="{{ page.title }}">
 <meta name="twitter:title" content="{{ page.title }}">
+{% endif %}
 {% endblock %}
 
 {% block header %}
@@ -32,7 +38,9 @@
 {% endblock %}
 
 {% block content %}
-{% if landing -%}
+{% if share_view -%}
+{% include 'public/_partials/_share_page.html' %}
+{% elif landing -%}
 {% if jsonld %}
 <script type="application/ld+json">{{ jsonld }}</script>
 {% endif %}
