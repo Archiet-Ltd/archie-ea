@@ -1134,6 +1134,165 @@ def _seed_decisions(org_id, user_id) -> dict:
     return {"architecture_decisions_created": created}
 
 
+# ── products ───────────────────────────────────────────────────────────────
+
+# (product, what it is, [(relationship, direction, other element name, type, layer)]). "out" is product to element,
+# "in" is element to product; an element joined to one of the product's own elements goes in _PRODUCT_CHAINS.
+_PRODUCTS = [
+    ("Calibrated Sensor Service",
+     "Calibrated sensors sold to water utilities with a certificate for every batch, and the remote diagnostics and "
+     "maintenance agreement that keep them accurate.",
+     [("Aggregation", "out", "Calibrated sensors with a certificate for every batch", "BusinessService", "business"),
+      ("Aggregation", "out", "Remote diagnostics that cut site visits", "BusinessService", "business"),
+      ("Composition", "out", "Annual calibration and maintenance agreement", "Contract", "business"),
+      ("Association", "out", "Sensor Calibration", "Capability", "strategy"),
+      ("Association", "out", "Operators know their readings can be trusted", "Value", "motivation"),
+      ("Association", "out", "Calibration throughput gap", "Gap", "implementation")]),
+    ("Recertified Assembly Programme",
+     "Recovered sensor assemblies recertified and resold instead of scrapped.",
+     [("Aggregation", "out", "Recovered assemblies recertified instead of scrapped", "BusinessService", "business"),
+      ("Composition", "out", "Recertified assembly resale terms", "Contract", "business"),
+      ("Association", "out", "Asset Lifecycle Management", "Capability", "strategy")]),
+]
+# (product, relationship, source element name, source type, source layer, target element name): one step outward.
+_PRODUCT_CHAINS = [
+    ("Calibrated Sensor Service", "Serving", "Calibration Ledger", "ApplicationComponent", "application",
+     "Calibrated sensors with a certificate for every batch"),
+    ("Calibrated Sensor Service", "Realization", "Calibration Automation Phase 1", "WorkPackage", "implementation",
+     "Calibrated sensors with a certificate for every batch"),
+    ("Recertified Assembly Programme", "Serving", "Inventory Manager", "ApplicationComponent", "application",
+     "Recovered assemblies recertified instead of scrapped"),
+    ("Recertified Assembly Programme", "Realization", "Recertify recovered assembly", "BusinessProcess", "business",
+     "Recovered assemblies recertified instead of scrapped"),
+]
+
+
+# A diagram box is drawn up to 130 high and 180 wide; each step is the box plus a gap, so boxes never overlap.
+_DIAGRAM_ORIGIN = 40
+_DIAGRAM_COLUMN_STEP = 220
+_DIAGRAM_ROW_STEP = 170
+
+
+def _seed_products(org_id) -> dict:
+    """Two Products with linked elements across five layers, a diagram showing each, and the decisions the
+    members already carry. A Product is an ArchiMate element (with its product record); elements already in the
+    model are joined by name and type, and are made only when the model holds none. Idempotent."""
+    from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.models.archimate_core import SavedDiagram, SavedDiagramElement
+    from app.models.archimate_missing_elements import Product
+    from app.services.archimate_backbone import create_backbone_element
+
+    created = 0
+    by_key = {}
+    for e in db.session.query(ArchiMateElement).filter(ArchiMateElement.organization_id == org_id).order_by(
+            ArchiMateElement.id.desc()):
+        by_key[(e.name, e.type)] = e
+    by_name = {}
+    for (name, _type), e in by_key.items():
+        by_name.setdefault(name, e)
+
+    def element(name, type_, layer):
+        nonlocal created
+        found = by_key.get((name, type_)) or by_name.get(name)
+        if found is None:
+            found = create_backbone_element(
+                element_type=type_, layer=layer, name=name, organization_id=org_id,
+                provenance={"created_from": "demo company seed"})
+            by_key[(name, type_)] = found
+            by_name[name] = found
+            created += 1
+        return found
+
+    def join(source, target, rel_type):
+        nonlocal created
+        if not db.session.query(ArchiMateRelationship.id).filter_by(
+                source_id=source.id, target_id=target.id, type=rel_type, organization_id=org_id).first():
+            db.session.add(ArchiMateRelationship(
+                source_id=source.id, target_id=target.id, type=rel_type, organization_id=org_id))
+            created += 1
+
+    made = {}
+    for name, description, links in _PRODUCTS:
+        product = element(name, "Product", "business")
+        made[name] = [product]
+        if not db.session.query(Product.id).filter_by(organization_id=org_id, archimate_element_id=product.id).first():
+            db.session.add(Product(
+                organization_id=org_id, name=name, description=description, archimate_element_id=product.id,
+                product_status="active", product_category="customer_facing"))
+            product.description = product.description or description
+        for rel_type, direction, other_name, other_type, other_layer in links:
+            other = element(other_name, other_type, other_layer)
+            made[name].append(other)
+            if direction == "out":
+                join(product, other, rel_type)
+            else:
+                join(other, product, rel_type)
+    for name, rel_type, src_name, src_type, src_layer, target_name in _PRODUCT_CHAINS:
+        source = element(src_name, src_type, src_layer)
+        target = element(target_name, "BusinessService", "business")
+        made[name].extend([source, target])
+        join(source, target, rel_type)
+    db.session.flush()
+    for name, elements in made.items():
+        title = "%s: what it is made of" % name
+        diagram = db.session.query(SavedDiagram).filter_by(organization_id=org_id, name=title).first()
+        existing = diagram is not None
+        if not existing:
+            diagram = SavedDiagram(organization_id=org_id, name=title, viewpoint_type="layered",
+                                   description="The product and every element that makes it up.")
+            db.session.add(diagram)
+            db.session.flush()
+        placed = {row.element_id: row for row in db.session.query(SavedDiagramElement).filter_by(
+            diagram_id=diagram.id).all()}
+        seen = set()
+        for index, el in enumerate(elements):
+            if el.id in seen:
+                continue
+            seen.add(el.id)
+            x = _DIAGRAM_ORIGIN + _DIAGRAM_COLUMN_STEP * (index % 4)
+            y = _DIAGRAM_ORIGIN + _DIAGRAM_ROW_STEP * (index // 4)
+            row = placed.get(el.id)
+            if row is None:
+                db.session.add(SavedDiagramElement(diagram_id=diagram.id, element_id=el.id, position_x=x, position_y=y))
+            else:
+                row.position_x, row.position_y = x, y
+        if not existing:
+            created += 1
+    db.session.flush()
+    created += _seed_product_document(org_id)
+    return {"product_elements_created": created}
+
+
+_PRODUCT_DOCUMENT = "calibration-ledger-design.pdf"
+
+
+def _seed_product_document(org_id) -> int:
+    """One real design document, file and record, on the Calibration Ledger application. Idempotent."""
+    import os
+    from flask import current_app
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.miscellaneous import ArchitectureDocument
+
+    application = db.session.query(ApplicationComponent).filter_by(
+        organization_id=org_id, name="Calibration Ledger").first()
+    if application is None or db.session.query(ArchitectureDocument).filter_by(
+            application_id=application.id, filename=_PRODUCT_DOCUMENT).first():
+        return 0
+    folder = os.path.abspath(os.path.join(
+        current_app.config.get("UPLOAD_FOLDER", "uploads"), "architecture_docs", str(application.id)))
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, _PRODUCT_DOCUMENT)
+    body = (b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+            b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n")
+    with open(path, "wb") as handle:
+        handle.write(body)
+    db.session.add(ArchitectureDocument(
+        application_id=application.id, filename=_PRODUCT_DOCUMENT, document_type="Design Document",
+        description="How the calibration ledger records and certifies each measurement.", version="1.0",
+        file_path=path, file_size=len(body), mime_type="application/pdf"))
+    return 1
+
+
 # ── capabilities with maturity ─────────────────────────────────────────────
 
 _CAPABILITIES = [
@@ -4198,6 +4357,7 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_data_flows(org_id))
         stats.update(_seed_raci(org_id))
         stats.update(_seed_decisions(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_products(org_id))
 
         # The portfolio opens already scored: run the existing scoring
         # service once over this organisation's applications, rather than
