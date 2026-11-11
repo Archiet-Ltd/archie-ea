@@ -418,7 +418,7 @@ def update_editor_contents():
 
 
 # ============================================================================
-# API Settings
+# AI settings
 # ============================================================================
 
 
@@ -542,7 +542,7 @@ def api_settings():
                     "error",
                 )
         else:
-            flash(f"API settings for {provider} saved successfully.", "success")
+            flash(f"AI settings for {provider} saved successfully.", "success")
 
         db.session.commit()
         return redirect(url_for("admin.api_settings"))
@@ -581,7 +581,7 @@ def delete_api_settings(settings_id):
     provider = settings.provider
     db.session.delete(settings)
     db.session.commit()
-    flash(f"API settings for {provider} deleted successfully.", "success")
+    flash(f"AI settings for {provider} deleted successfully.", "success")
     return redirect(url_for("admin.api_settings"))
 
 

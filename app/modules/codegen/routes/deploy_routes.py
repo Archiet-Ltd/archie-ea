@@ -59,7 +59,7 @@ def deploy_to_github(solution_id):
     from app.models.models import APISettings
     gh_settings = APISettings.query.filter_by(provider="github").first()
     if not gh_settings or not gh_settings.api_key:
-        return jsonify({"error": "No GitHub token configured. Go to Admin > API Settings."}), 400
+        return jsonify({"error": "No GitHub token configured. Go to Admin > AI settings."}), 400
 
     from app.modules.codegen.services.github_service import GitHubService
     gh = GitHubService(gh_settings.api_key)
@@ -325,7 +325,7 @@ def deploy_iac_to_github(solution_id):
     from app.models.models import APISettings
     gh_settings = APISettings.query.filter_by(provider="github").first()
     if not gh_settings or not gh_settings.api_key:
-        return jsonify({"error": "No GitHub token configured. Go to Admin > API Settings and add provider='github'."}), 400
+        return jsonify({"error": "No GitHub token configured. Go to Admin > AI settings and add provider='github'."}), 400
 
     payload = request.get_json(silent=True) or {}
     config = gen.config or {}

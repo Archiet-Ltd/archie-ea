@@ -10396,7 +10396,7 @@ def generate_section_narrative(solution_id, section_id, user_id):
         narrative = LLMService.generate_from_prompt(prompt, use_cache=False)
     except ValueError:
         raise NarrativeGenerationError(
-            "No LLM provider configured. Add an API key in Admin → API Settings.", "NO_LLM"
+            "No LLM provider configured. Add an API key in Admin → AI settings.", "NO_LLM"
         )
     except Exception as e:
         logger.error("Blueprint narrative generation failed for solution %s section %s: %s", solution_id, section_id, e)
@@ -10589,13 +10589,13 @@ def api_blueprint_codegen(solution_id, section_id):
             )
             return jsonify({
                 "success": False,
-                "error": "The LLM returned an empty response. Please try again — if this persists, verify your LLM API key is valid in Admin → API Settings.",
+                "error": "The LLM returned an empty response. Please try again — if this persists, verify your LLM API key is valid in Admin → AI settings.",
                 "error_code": "EMPTY_RESPONSE",
             }), 500
     except ValueError:
         return jsonify({
             "success": False,
-            "error": "No LLM provider configured. Add an API key in Admin → API Settings.",
+            "error": "No LLM provider configured. Add an API key in Admin → AI settings.",
             "error_code": "NO_LLM",
         }), 503
     except Exception as e:
@@ -10636,7 +10636,7 @@ def api_generate_draft(solution_id):
     except ValueError:
         return jsonify({
             "success": False,
-            "error": "No LLM provider configured. Add an API key in Admin → API Settings.",
+            "error": "No LLM provider configured. Add an API key in Admin → AI settings.",
             "error_code": "NO_LLM",
         }), 503
 

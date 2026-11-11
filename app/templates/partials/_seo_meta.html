@@ -7,7 +7,7 @@
    HOLD-verdict page (see PublicPage.is_held). One place, so a future public
    template reuses this instead of hand-rolling its own <head> tags.
 #}
-{% macro seo_meta(canonical_url, description=None, noindex=False) %}
+{% macro seo_meta(canonical_url, description=None, noindex=False, social=None) %}
 <link rel="canonical" href="{{ canonical_url }}">
 {% if noindex %}
 <meta name="robots" content="noindex">
@@ -19,4 +19,18 @@
 {% endif %}
 <meta property="og:url" content="{{ canonical_url }}">
 <meta name="twitter:card" content="summary_large_image">
+{% if social %}
+{#- A recording's link preview: the cover image, and the wide file as a video (plain meta tags, nothing loaded). -#}
+<meta property="og:type" content="video.other">
+<meta property="og:image" content="{{ social.image }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{ social.image_alt }}">
+<meta property="og:video" content="{{ social.video }}">
+<meta property="og:video:type" content="video/mp4">
+<meta property="og:video:width" content="{{ social.video_width }}">
+<meta property="og:video:height" content="{{ social.video_height }}">
+<meta name="twitter:image" content="{{ social.image }}">
+<meta name="twitter:image:alt" content="{{ social.image_alt }}">
+{% endif %}
 {% endmacro %}

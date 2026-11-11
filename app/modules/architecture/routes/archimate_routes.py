@@ -1046,7 +1046,7 @@ def api_composer_extract_from_image():
             "success": False,
             "error": "No vision-capable AI provider is configured, so a diagram "
                      "image cannot be read. Add an Anthropic, OpenAI or Gemini "
-                     "key in Admin → API Settings. A text-only provider cannot do this.",
+                     "key in Admin → AI settings. A text-only provider cannot do this.",
             "error_type": "no_vision_provider",
         }), 503
 

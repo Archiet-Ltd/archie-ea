@@ -462,11 +462,10 @@ class AgentRunner:
                 # This route is keyed by layer and type as well as id, both of
                 # which search_archimate_elements already returns.
                 if row.get("layer") and row.get("type"):
-                    return url_for(
-                        "archimate_crud.detail_element",
-                        layer=str(row["layer"]).lower(),
-                        element_type=str(row["type"]),
-                        element_id=row["id"],
+                    from app.modules.solutions_strategic.v2.services.solution_record_service import element_href
+
+                    return element_href(
+                        str(row["layer"]).lower(), str(row["type"]), row["id"]
                     )
         except Exception:
             # Unregistered endpoint, or no request/app context to build against.
@@ -1690,7 +1689,7 @@ class AgentRunner:
         elif any(t in reason_l for t in ("no api key", "not configured", "no provider", "no keys")):
             msg = (
                 "AI features aren't configured yet — add an API key under "
-                "Admin → API Settings to enable the assistant."
+                "Admin → AI settings to enable the assistant."
             )
         elif any(t in reason_l for t in _QUOTA_PHRASES):
             msg = (
@@ -1700,7 +1699,7 @@ class AgentRunner:
         else:
             msg = (
                 "The AI request couldn't be completed. See the error detail below "
-                "or check Admin → API Settings."
+                "or check Admin → AI settings."
             )
         return {
             "response": msg,

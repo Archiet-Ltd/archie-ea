@@ -1,0 +1,21 @@
+{#- smoke-coverage-ok: covered by tests/smoke/test_share_page_journey.py, tests/smoke/test_module_landing_journey.py and tests/test_public_landing_layout.py.
+   Partial: public/_partials/_section_closing.html -- the closing call to action every public landing page ends on,
+   so the copy exists once. Expects `closing_primary` (label, url, testid), `closing_secondary` (label, url, testid),
+   and optionally `closing_testid` (the band's test id) and `closing_waiting` (true for a module not built yet). -#}
+<section class="home-closing"{% if closing_testid %} data-testid="{{ closing_testid }}"{% endif %}>
+  <div class="container px-4">
+    {% if closing_waiting %}
+    <p class="home-cta-eyebrow">Early access</p>
+    <h2 class="home-h2 mx-auto max-w-3xl">Tell us you need this.</h2>
+    <p class="home-section-lead">It is not built yet. Join the waiting list and we will tell you the day it ships.</p>
+    {% else %}
+    <p class="home-cta-eyebrow">Start today</p>
+    <h2 class="home-h2 mx-auto max-w-3xl">Connect your tools. Get a cited answer.</h2>
+    <p class="home-section-lead">Free for up to three people, with no trial clock. Self-host it free under AGPL-3.0, at any size.</p>
+    {% endif %}
+    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+      <a href="{{ closing_primary[1] }}" class="public-btn public-btn--lg public-btn--primary"{% if closing_primary[2] %} data-testid="{{ closing_primary[2] }}"{% endif %}>{{ closing_primary[0] }}</a>
+      <a href="{{ closing_secondary[1] }}" class="public-btn public-btn--lg public-btn--outline"{% if closing_secondary[2] %} data-testid="{{ closing_secondary[2] }}"{% endif %}>{{ closing_secondary[0] }}</a>
+    </div>
+  </div>
+</section>

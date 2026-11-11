@@ -498,17 +498,9 @@
 </section>
 
 <!-- 11. Closing call to action -->
-<section class="home-closing">
-  <div class="container px-4">
-    <p class="home-cta-eyebrow">Start today</p>
-    <h2 class="home-h2 mx-auto max-w-3xl">Connect your tools. Get a cited answer.</h2>
-    <p class="home-section-lead">Free for up to three people, with no trial clock. Self-host it free under AGPL-3.0, at any size.</p>
-    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--lg public-btn--primary">Start free</a>
-      <a href="/contact" class="public-btn public-btn--lg public-btn--outline">Get in touch</a>
-    </div>
-  </div>
-</section>
+{% with closing_primary = ('Start free', url_for('account.register'), none), closing_secondary = ('Get in touch', '/contact', none) %}
+{% include 'public/_partials/_section_closing.html' %}
+{% endwith %}
 
 <!-- Footer -->
 {% include 'components/public_footer.html' %}
