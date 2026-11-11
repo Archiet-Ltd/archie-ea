@@ -82,7 +82,7 @@ Yes. Add them whenever you need to. If you add seats part-way through a period, 
 
 ### What happens at renewal?
 
-The plan renews for another annual period unless an organisation administrator cancels before then, from the billing page or by contacting us. The $1,500 onboarding is one time and does not recur. The editor count you renew with is the one you have then, so remove editors you no longer need before the renewal date.
+The plan renews for another annual period unless an organisation administrator cancels before then, [[if payment-open]]from the billing page or by contacting us[[else]]by [contacting us](/contact), because the plan is set up with us and not bought online[[/if]]. The $1,500 onboarding is one time and does not recur. The editor count you renew with is the one you have then, so remove editors you no longer need before the renewal date.
 
 ### Is onboarding repeated if we add people later?
 

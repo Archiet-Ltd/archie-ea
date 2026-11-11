@@ -4,6 +4,7 @@
 {% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
+{% from 'components/dialog.html' import dialog %}
 {% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/badge.html' import badge %}
@@ -202,7 +203,7 @@
         <div class="flex items-center gap-3">
           {% if can_change_model() %}
           <template x-if="selectedGapIds.length > 0">
-            {% call button(text='AI Generate', variant='outline', icon='sparkles', on_click='openAiGenerateModal()', attrs_dict={'x-show': 'selectedGapIds.length > 0'}) %}<span x-text="selectedGapIds.length"></span> gaps{% endcall %}
+            {% call button(text='Generate roadmap', variant='outline', icon='sparkles', on_click='openAiGenerateModal()', attrs_dict={'x-show': 'selectedGapIds.length > 0'}) %}<span class="ml-1" x-text="selectedGapIds.length"></span>&nbsp;gaps{% endcall %}
           </template>
           {% call button(text='Add Work Package', variant='default', icon='plus', on_click='openCreateWorkPackageModal(null)') %}{% endcall %}
           {% else %}
@@ -274,7 +275,8 @@
                 <span x-text="formatDate(wp.end_date || wp.target_date)"></span>
               {% endcall %}
               {% call table_cell(attrs_dict={'class': 'text-xs text-muted-foreground', 'data-testid': 'roadmap-wp-gaps'}) %}
-                <template x-if="!wp.gaps || wp.gaps.length === 0"><span>—</span></template>
+                <template x-if="!Array.isArray(wp.gaps)"><span data-testid="roadmap-wp-gaps-unread">Gaps for this package could not be read</span></template>
+                <template x-if="Array.isArray(wp.gaps) && wp.gaps.length === 0"><span data-testid="roadmap-wp-no-gap">Closes no recorded gap</span></template>
                 <template x-for="g in (wp.gaps || [])" :key="g.id">
                   <div x-text="g.name"></div>
                 </template>
@@ -351,7 +353,7 @@
             </div>
             <div class="flex items-center justify-end gap-2 border-t pt-4">
               {% call button(text='Cancel', variant='ghost', on_click="Platform.modal.close('rdm-create-gap-modal')") %}{% endcall %}
-              {% call button(text='Save', variant='default', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Gap'"}) %}{% endcall %}
+              {% call button(text='Save', variant='default', type='submit', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Gap'"}) %}{% endcall %}
             </div>
           </form>
         </div>
@@ -481,7 +483,7 @@
             </div>
             <div class="flex items-center justify-end gap-2 border-t pt-4">
               {% call button(text='Cancel', variant='ghost', on_click="Platform.modal.close('rdm-create-wp-modal')") %}{% endcall %}
-              {% call button(text='Save', variant='default', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Work Package'"}) %}{% endcall %}
+              {% call button(text='Save', variant='default', type='submit', attrs_dict={':disabled': 'isSubmitting', 'x-text': "isEditing ? 'Save Changes' : 'Create Work Package'"}) %}{% endcall %}
             </div>
           </form>
         </div>
@@ -490,72 +492,60 @@
   </div>
 </div>
 
-{# AI Generate Preview Dialog #}
-<div id="rdm-ai-generate-modal" data-modal="rdm-ai-generate-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rdm-ai-modal-title">
-  <div class="modal-backdrop fixed inset-0 bg-overlay/50" data-modal-backdrop aria-hidden="true"></div>
-  <div class="modal-panel flex items-center justify-center p-4 fixed inset-0">
-    <div class="bg-card rounded-lg w-full max-w-2xl border border-border flex flex-col max-h-[90vh]">
-      <div class="flex items-center justify-between p-6 border-b shrink-0">
-        <h2 id="rdm-ai-modal-title" class="text-base font-semibold text-foreground">AI Roadmap Generation Preview</h2>
-        <p class="text-sm text-muted-foreground">Review suggested work packages before confirming. No changes are saved until you click Confirm.</p>
-        <button type="button" data-modal-close="rdm-ai-generate-modal" aria-label="Close modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-        </button>
-      </div>
-      <div class="p-6 overflow-y-auto flex-1">
-        <div x-data="rdmAiModalForm()" x-init="initFromGlobal()">
-          <template x-if="isLoading">
-            <div class="flex items-center justify-center py-10">
-              <div class="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-              <span class="ml-3 text-sm text-muted-foreground">Generating preview…</span>
-            </div>
-          </template>
-          <template x-if="!isLoading && preview.length === 0">
-            <p class="text-center text-sm text-muted-foreground py-6">No preview available. Select gaps and try again.</p>
-          </template>
-          <template x-if="!isLoading && preview.length > 0">
-            <div class="space-y-3">
-              <template x-for="item in preview" :key="item.gap_id">
-                {% call card(class='bg-muted/30') %}
-                  <div class="flex items-start justify-between p-4">
-                    <div>
-                      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Gap</p>
-                      <p class="text-sm font-semibold text-foreground" x-text="item.gap_name"></p>
-                    </div>
-                    <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
-                      :class="priorityClass(item.gap_priority)"
-                      x-text="item.gap_priority"></span>
-                  </div>
-                  <div class="mt-3 border-t border-border pt-3 grid grid-cols-2 gap-3 text-xs px-4 pb-4">
-                    <div>
-                      <p class="font-medium text-muted-foreground">Suggested Work Package</p>
-                      <p class="text-foreground" x-text="item.suggested_work_package.name"></p>
-                    </div>
-                    <div>
-                      <p class="font-medium text-muted-foreground">Target Plateau</p>
-                      <p class="text-foreground" x-text="item.suggested_plateau"></p>
-                    </div>
-                    <div>
-                      <p class="font-medium text-muted-foreground">Start Date</p>
-                      <p class="text-foreground" x-text="formatDate(item.suggested_work_package.estimated_start_date)"></p>
-                    </div>
-                    <div>
-                      <p class="font-medium text-muted-foreground">Target Date</p>
-                      <p class="text-foreground" x-text="formatDate(item.suggested_work_package.target_resolution_date)"></p>
-                    </div>
-                  </div>
-                {% endcall %}
-              </template>
-            </div>
-          </template>
-          <div class="flex items-center justify-end gap-2 border-t py-4 pt-4 mt-4">
-            {% call button(text='Discard', variant='outline', on_click="Platform.modal.close('rdm-ai-generate-modal')") %}{% endcall %}
-            {% call button(text='Confirm & Create', variant='default', attrs_dict={':disabled': 'isConfirming || preview.length === 0', '@click': 'confirmAiGeneration()'}) %}{% endcall %}
-          </div>
-        </div>
-      </div>
+{# Roadmap preview dialog: the pattern library's dialog, driven by the roadmap store #}
+<div id="rdm-ai-generate-modal" x-data>
+{% call dialog(title='Roadmap preview', description='Each gap is placed in a plateau by its severity. Nothing is saved until you click Confirm & Create.', open_expr='$store.rdm.aiOpen', close_expr='$store.rdm.aiOpen = false', title_expr="'Roadmap preview'", start_hidden=false) %}
+<div x-data="rdmAiModalForm()" x-init="initFromGlobal()">
+  <template x-if="isLoading">
+    <div class="flex items-center justify-center py-10">
+      <div class="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+      <span class="ml-3 text-sm text-muted-foreground">Generating preview…</span>
     </div>
+  </template>
+  <template x-if="!isLoading && preview.length === 0">
+    <p class="text-center text-sm text-muted-foreground py-6">No preview available. Select gaps and try again.</p>
+  </template>
+  <template x-if="!isLoading && preview.length > 0">
+    <div class="max-h-80 space-y-3 overflow-y-auto">
+      <template x-for="item in preview" :key="item.gap_id">
+        {% call card(class='bg-muted/30') %}
+          <div class="flex items-start justify-between p-4">
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Gap</p>
+              <p class="text-sm font-semibold text-foreground" x-text="item.gap_name"></p>
+            </div>
+            <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
+              :class="priorityClass(item.gap_priority)"
+              x-text="item.gap_priority"></span>
+          </div>
+          <div class="mt-3 border-t border-border pt-3 grid grid-cols-2 gap-3 text-xs px-4 pb-4">
+            <div>
+              <p class="font-medium text-muted-foreground">Suggested Work Package</p>
+              <p class="text-foreground" x-text="item.suggested_work_package.name"></p>
+            </div>
+            <div>
+              <p class="font-medium text-muted-foreground">Target Plateau</p>
+              <p class="text-foreground" x-text="item.suggested_plateau"></p>
+            </div>
+            <div>
+              <p class="font-medium text-muted-foreground">Start Date</p>
+              <p class="text-foreground" x-text="formatDate(item.suggested_work_package.estimated_start_date)"></p>
+            </div>
+            <div>
+              <p class="font-medium text-muted-foreground">Target Date</p>
+              <p class="text-foreground" x-text="formatDate(item.suggested_work_package.target_resolution_date)"></p>
+            </div>
+          </div>
+        {% endcall %}
+      </template>
+    </div>
+  </template>
+  <div class="flex items-center justify-end gap-2 border-t py-4 pt-4 mt-4">
+    {% call button(text='Discard', variant='outline', on_click="$store.rdm.aiOpen = false") %}{% endcall %}
+    {% call button(text='Confirm & Create', variant='default', attrs_dict={':disabled': 'isConfirming || preview.length === 0', '@click': 'confirmAiGeneration()'}) %}{% endcall %}
   </div>
+</div>
+{% endcall %}
 </div>
 {% endblock %}
 
@@ -578,6 +568,7 @@
       editingWp: null,
       pendingGapForWp: null,
       pendingGapIds: [],
+      aiOpen: false,
     });
   });
 
@@ -622,6 +613,9 @@
 
 
       async init() {
+        // A gap saved in the dialog changes the recorded-gaps figure, so the tile reads the register again.
+        window.addEventListener('rdm-gap-saved', () => this.loadGaps());
+        window.addEventListener('rdm-work-package-saved', () => this.loadWorkPackages());
         this.loading = true;
         try {
           await Promise.all([this.loadGaps(), this.loadPlateaus(), this.loadWorkPackages()]);
@@ -714,7 +708,7 @@
 
       openAiGenerateModal() {
         Alpine.store('rdm').pendingGapIds = [...this.selectedGapIds];
-        Platform.modal.open('rdm-ai-generate-modal');
+        Alpine.store('rdm').aiOpen = true;
       },
 
       toggleAllGaps(event) {
@@ -838,6 +832,7 @@
             store.gaps = [saved, ...store.gaps];
           }
           Platform.modal.close('rdm-create-gap-modal');
+          window.dispatchEvent(new CustomEvent('rdm-gap-saved'));
         } catch (e) {
           Platform.alert(e.message || 'Failed to save gap.');
         } finally {
@@ -967,6 +962,7 @@
             store.workPackages = [saved, ...store.workPackages];
           }
           Platform.modal.close('rdm-create-wp-modal');
+          window.dispatchEvent(new CustomEvent('rdm-work-package-saved'));
         } catch (e) {
           Platform.alert(e.message || 'Failed to save work package.');
         } finally {
@@ -984,22 +980,23 @@
       preview: [],
 
       initFromGlobal() {
-        document.addEventListener('platform:modal:opened', async (e) => {
-          if (e.detail?.id !== 'rdm-ai-generate-modal') return;
-          const gapIds = Alpine.store('rdm').pendingGapIds;
-          if (!gapIds.length) return;
-          this.isLoading = true;
-          this.preview = [];
-          try {
-            const d = await Platform.fetch.post('/capability-map/api/roadmap/ai-generate', { gap_ids: gapIds }, { silent: true });
-            if (!d.success) throw new Error(d.error || 'Generation failed');
-            this.preview = d.preview || [];
-          } catch (e) {
-            Platform.alert(e.message || 'AI generation failed.');
-          } finally {
-            this.isLoading = false;
-          }
-        });
+        this.$watch('$store.rdm.aiOpen', (open) => { if (open) this.loadPreview(); });
+      },
+
+      async loadPreview() {
+        const gapIds = Alpine.store('rdm').pendingGapIds;
+        if (!gapIds.length) return;
+        this.isLoading = true;
+        this.preview = [];
+        try {
+          const d = await Platform.fetch.post('/capability-map/api/roadmap/ai-generate', { gap_ids: gapIds }, { silent: true });
+          if (!d.success) throw new Error(d.error || 'The preview could not be made');
+          this.preview = d.preview || [];
+        } catch (e) {
+          Platform.alert(e.message || 'The preview could not be made.');
+        } finally {
+          this.isLoading = false;
+        }
       },
 
       async confirmAiGeneration() {
@@ -1015,7 +1012,7 @@
             const d = await Platform.fetch.post(url, {
               name: wp.name,
               description: wp.description,
-              priority: wp.priority,
+              priority: wp.priority || undefined,
               start_date: wp.estimated_start_date,
               target_date: wp.target_resolution_date,
               business_capability: 'Enterprise',
@@ -1025,8 +1022,8 @@
           }
           const store = Alpine.store('rdm');
           store.workPackages = [...created.filter(Boolean), ...store.workPackages];
-          Platform.modal.close('rdm-ai-generate-modal');
-          Platform.alert(`${created.length} work package(s) created from AI suggestions.`);
+          Alpine.store('rdm').aiOpen = false;
+          Platform.alert(`${created.length} work package(s) created from the roadmap preview.`);
         } catch (e) {
           Platform.alert(e.message || 'Failed to create work packages.');
         } finally {

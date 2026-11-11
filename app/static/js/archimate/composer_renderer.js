@@ -332,7 +332,7 @@ let ComposerRenderer = (function() {
             accentBar:          { x: 0, y: 0, refWidth: '100%', height: 5, rx: 0, ry: 0, fill: '#94a3b8' },
             iconBox:            { x: 12, y: 12, width: 40, height: 40, rx: 8, ry: 8, fill: 'rgba(255,255,255,0.65)', stroke: 'rgba(0,0,0,0.04)', strokeWidth: 1 },
             typeIcon:           { transform: 'translate(22, 22) scale(1.2)', fill: 'none', stroke: '#1a1a1a', strokeWidth: 1.1, strokeLinecap: 'round', strokeLinejoin: 'round', d: '' },
-            nameLabel:          { x: 12, y: 60, textAnchor: 'start', textVerticalAnchor: 'top', fontSize: 12, fontWeight: 700, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: '#1a1a1a', text: 'Element', textWrap: { width: -24, maxLineCount: 2, ellipsis: true } },
+            nameLabel:          { x: 12, y: 60, textAnchor: 'start', textVerticalAnchor: 'top', fontSize: 12, fontWeight: 700, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: '#1a1a1a', text: 'Element', textWrap: { width: -24, maxLineCount: 1, ellipsis: true } },
             typeLabel:          { x: 12, y: 79, textAnchor: 'start', textVerticalAnchor: 'top', fontSize: 9,  fontWeight: 500, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: 'rgba(26,26,26,0.45)', text: '', textWrap: { width: -24, maxLineCount: 1, ellipsis: true } },
             maturityBadgeBg:    { refX: '100%', x: -50, y: 10, width: 36, height: 18, rx: 9, ry: 9, fill: 'rgba(0,0,0,0.75)', display: 'none' },
             maturityBadgeLabel: { refX: '100%', x: -32, y: 19, textAnchor: 'middle', textVerticalAnchor: 'middle', fontSize: 8, fontWeight: 800, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: '#ffffff', text: '', display: 'none' },

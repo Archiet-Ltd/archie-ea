@@ -45,7 +45,7 @@ def require_llm(f):
             if not LLMService.is_available():
                 error_message = (
                     "AI features are currently unavailable. "
-                    "Please configure an LLM provider in Admin > API Settings "
+                    "Please configure an LLM provider in Admin > AI settings "
                     "or contact your system administrator."
                 )
 

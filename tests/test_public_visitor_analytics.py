@@ -198,8 +198,14 @@ class TestSignupFunnelLogging:
                 "password": "test-password-123",
                 "password2": "test-password-123",
             },
-            follow_redirects=True,
         )
+        assert resp.status_code == 302
+        # This test holds one app context across requests, so the tenant cached for the anonymous POST
+        # would answer the signed-in page too; a browser starts each request with none.
+        from app.middleware.tenant_context import clear_tenant_context_cache
+
+        clear_tenant_context_cache()
+        resp = client.get(resp.headers["Location"])
         assert resp.status_code == 200
         assert (
             PublicVisitorEvent.query.filter_by(event_type="signup_completed").count()
