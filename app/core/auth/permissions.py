@@ -233,6 +233,20 @@ _GOVERNANCE_WRITE_CELLS = tuple(
 )
 
 
+def is_read_only_member(user, organization_id: Optional[int] = None) -> bool:
+    """Whether the person's role in the organisation is viewer, so they change nothing in it.
+
+    The organisation role is the ceiling: a platform role or a persona can narrow what a member
+    may do, never widen it past this. An administrator is never read-only.
+    """
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    org_id = _matrix_org(user, organization_id)
+    if _is_administrator(user, org_id):
+        return False
+    return role_key(user, org_id) == "viewer"
+
+
 def holds_governance_write(user, organization_id: Optional[int] = None) -> bool:
     """Whether ``user`` holds a governance persona that permits some change (a vote, a portfolio role).
 
@@ -310,8 +324,12 @@ def note_route_granted_write() -> None:
     """
     try:
         from flask import g, has_request_context
+        from flask_login import current_user
 
         if has_request_context():
+            # The organisation role is the ceiling: a route's own check never grants a viewer a change.
+            if is_read_only_member(current_user):
+                return
             g.route_granted_write = True
     except Exception:  # fabricated-ok: outside a request there is nothing to record
         pass

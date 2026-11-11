@@ -7,6 +7,8 @@ any state-changing request (POST, PUT, PATCH or DELETE, inside or outside ``/api
 view, so a new route is covered the day it is registered.
 """
 
+import re
+
 WRITE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
 
 # Endpoints a person without write permission may still call, each with the reason. None writes to
@@ -138,12 +140,12 @@ def refuse_read_only(user=None):
     from flask import g, request
     from flask_login import current_user
 
-    from app.core.auth.permissions import holds_governance_write, may_write
+    from app.core.auth.permissions import holds_governance_write, is_read_only_member, may_write
 
     person = user or current_user
     if may_write(person):
         return None
-    if holds_governance_write(person):
+    if holds_governance_write(person) and not is_read_only_member(person):
         g.write_admitted_for_route_check = True
         return None
     return _refusal(_reason_for(request.endpoint))
@@ -178,13 +180,22 @@ def _route_answers_for_itself(app, endpoint):
     if endpoint in ANSWERS_FOR_ITSELF:
         return True
     view = app.view_functions.get(endpoint)
-    if getattr(view, "matrix_guard", None) or getattr(view, "answers_non_platform_admins", False):
+    from flask_login import current_user
+
+    from app.core.auth.permissions import _READ_ACTIONS, is_read_only_member
+
+    # Whichever check would refuse a person whose role is viewer, the read-only reason answers.
+    if is_read_only_member(current_user):
+        return False
+    matrix = getattr(view, "matrix_guard", None)
+    # Only a write cell of the matrix answers for itself; a read cell never opens a write.
+    if matrix and matrix[0] not in _READ_ACTIONS:
+        return True
+    if getattr(view, "answers_non_platform_admins", False):
         return True
     # A route behind a role check refuses, in its own words, a person that check refuses.
     roles = getattr(view, "role_guard", None)
     if roles:
-        from flask_login import current_user
-
         from app._decorators_base import _effective_roles
 
         if current_user.is_authenticated and not (_effective_roles(current_user) & roles):
@@ -224,6 +235,36 @@ def _refuse_ungranted_change(session, _flush_context, _instances):
             raise ChangeNotGrantedByRoute(GENERAL_REASON)
 
 
+_STORES_TO = re.compile(
+    r'^\s*(?:INSERT\s+INTO|UPDATE(?:\s+ONLY)?|DELETE\s+FROM(?:\s+ONLY)?)\s+"?(?:\w+"?\.)?"?(\w+)',
+    re.IGNORECASE,
+)
+
+
+def _table_stored_to(statement):
+    """The table a raw INSERT, UPDATE or DELETE statement changes, or None for anything else."""
+    match = _STORES_TO.match(statement or "")
+    return match.group(1).lower() if match else None
+
+
+def _refuse_ungranted_statement(_conn, _cursor, statement, _parameters, _context, _executemany):
+    """The same route-level check as ``_refuse_ungranted_change``, for a route that writes with raw SQL.
+
+    A statement written by hand never passes through the session's flush, so the flush check cannot
+    see it; this asks the one question at the point the statement is sent.
+    """
+    from flask import g, has_request_context
+
+    if not has_request_context() or not getattr(g, "write_admitted_for_route_check", False):
+        return
+    if getattr(g, "route_granted_write", False):
+        return
+    table = _table_stored_to(statement)
+    if table is not None and table not in BOOKKEEPING_TABLES:
+        g.ungranted_change_refused = True
+        raise ChangeNotGrantedByRoute(GENERAL_REASON)
+
+
 def init_write_access(app):
     from flask import g, request
     from flask_login import current_user
@@ -235,6 +276,10 @@ def init_write_access(app):
     # never stored, whatever route it came through.
     if not event.contains(Session, "before_flush", _refuse_ungranted_change):
         event.listen(Session, "before_flush", _refuse_ungranted_change)
+    from sqlalchemy.engine import Engine
+
+    if not event.contains(Engine, "before_cursor_execute", _refuse_ungranted_statement):
+        event.listen(Engine, "before_cursor_execute", _refuse_ungranted_statement)
 
     @app.errorhandler(ChangeNotGrantedByRoute)
     def _change_not_granted(_error):
