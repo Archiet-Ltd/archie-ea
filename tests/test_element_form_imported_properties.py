@@ -100,7 +100,7 @@ def test_a_save_leaves_an_imported_property_of_the_same_name_untouched(app, db_s
 
 
 def test_a_status_property_never_changes_with_the_status_column(app, db_session, client, make_org):
-    org = _signed_in(client, db_session, make_org, "status-mine")
+    _signed_in(client, db_session, make_org, "status-mine")
     other_org = make_org("status-theirs")
     tag = uuid.uuid4().hex[:6]
     mine = _create(client, "WorkPackage", "Imported package %s" % tag, {"status": "planned"})
