@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from app import db
 from app.models.application_portfolio import ApplicationComponent
+from app.services.application_status import StatusRefused, status_to_store
 from app.models.business_capabilities import BusinessCapability
 from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 from app.models.vendor.vendor_organization import VendorOrganization
@@ -342,6 +343,15 @@ class AIDataInteractionService:
                     "operation": "update_application",
                 }
 
+            # A status off the list is refused before anything is changed.
+            if "deployment_status" in update_data:
+                update_data = {
+                    **update_data,
+                    "deployment_status": status_to_store(
+                        application.deployment_status, update_data["deployment_status"]
+                    ),
+                }
+
             # Update fields
             for field, value in update_data.items():
                 if hasattr(application, field):
@@ -360,6 +370,8 @@ class AIDataInteractionService:
                 "message": f'Application "{application.name}" updated successfully',
             }
 
+        except StatusRefused as e:
+            return {"success": False, "error": str(e), "operation": "update_application"}
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error updating application: {e}")
