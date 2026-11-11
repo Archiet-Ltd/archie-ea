@@ -327,3 +327,4 @@ These are not available yet. Open one to join its waiting list and we will tell 
 
 - [Scenarios](/modules/scenario-modelling): compare what-if plans side by side before you commit.
 - [Software and tool discovery](/modules/software-and-tool-discovery): discover the software and tools you actually pay for and use.
+- [Bring your SysML models](/modules/sysml-to-archimate): read the engineering model beside your applications, owners, costs and risks, with every element traced to its source.
