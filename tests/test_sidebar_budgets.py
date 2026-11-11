@@ -37,7 +37,7 @@ TOP = ["Home", "AI chat", "Approvals"]
 WORK = ["Systems", "Impact", "Changes", "Spend", "Compliance"]
 LAYERS = ["Strategy", "Business", "Application", "Technology", "Physical", "Motivation",
           "Implementation and migration", "Other"]
-MODEL = LAYERS + ["Frameworks", "Canvases", "Composer"]
+MODEL = ["Model map"] + LAYERS + ["Frameworks", "Canvases", "Composer"]
 SECONDARY = ["Connections", "Reports", "Help"]
 
 WORK_CHILDREN = {

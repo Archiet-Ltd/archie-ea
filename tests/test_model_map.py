@@ -5,6 +5,7 @@ element with no recorded origin says it was entered by hand.
 """
 
 import datetime as dt
+import re
 import uuid
 
 import pytest
@@ -166,3 +167,30 @@ def test_the_impact_page_is_still_the_impact_view(app, db_session, make_org, log
     html = client.get("/archimate/elements/%d/impact" % api.id).get_data(as_text=True)
     assert 'data-element-id="%d"' % api.id in html and 'data-mode="model"' not in html
     assert "Impact graph" in html
+
+
+def _github_page(monkeypatch, client, counts):
+    from app.modules.admin import connector_routes
+
+    monkeypatch.setattr(connector_routes, "_github_state", lambda org_id: {
+        "state": "done", "organization": "acme", "has_token": True, "job": None,
+        "counts": {"repositories": 3, "pending": 0, **counts}})
+    return client.get("/admin/connectors/github").get_data(as_text=True)
+
+
+def test_the_github_screen_offers_see_your_model_once_a_model_is_built(app, db_session, make_org, login_as, monkeypatch):
+    client = _signed_in(app, db_session, login_as, make_org("gh"))
+    built = _github_page(monkeypatch, client, {"applications": 3, "components": 4, "relationships": 2})
+    link = re.search(r'<a href="([^"]+)" id="github-see-model"[^>]*class="([^"]*)"', built)
+    assert link and link.group(1) == "/archimate/model-map" and " hidden" not in link.group(2)
+    assert "See your model" in built
+    nothing = _github_page(monkeypatch, client, {"applications": 0, "components": 0, "relationships": 0})
+    hidden = re.search(r'id="github-see-model"[^>]*class="([^"]*)"', nothing)
+    assert hidden and " hidden" in hidden.group(1)
+
+
+def test_the_element_list_toolbar_links_to_the_model_map(app, db_session, make_org, login_as):
+    client = _signed_in(app, db_session, login_as, make_org("list"))
+    html = client.get("/architecture/elements").get_data(as_text=True)
+    assert 'data-testid="open-model-map"' in html
+    assert "/archimate/model-map" in html

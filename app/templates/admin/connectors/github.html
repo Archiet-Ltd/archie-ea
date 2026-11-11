@@ -82,6 +82,12 @@
                 <div><dt>Links</dt><dd class="text-base text-foreground tabular-nums" id="github-count-relationships">{{ status.counts.relationships }}</dd></div>
             </dl>
             <div class="mt-4 flex items-center justify-end gap-3">
+                {% if 'archimate.model_map_page' in flask.current_app.view_functions %}
+                <a href="{{ url_for('archimate.model_map_page') }}" id="github-see-model" data-testid="github-see-model"
+                    class="inline-flex items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4{% if status.counts.applications|int + status.counts.components|int + status.counts.relationships|int == 0 %} hidden{% endif %}">
+                    See your model
+                </a>
+                {% endif %}
                 <a href="{{ review_url }}"
                     class="inline-flex items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4">
                     Review what was found
@@ -104,6 +110,8 @@
             var el = document.getElementById('github-count-' + k);
             if (el) { el.textContent = c[k] || 0; }
         });
+        var see = document.getElementById('github-see-model');
+        if (see && ((c.applications || 0) + (c.components || 0) + (c.relationships || 0)) > 0) { see.classList.remove('hidden'); }
         if (s.state === 'done') {
             line.textContent = 'Read ' + (c.repositories || 0) + ' repositories. ' + (c.pending || 0) + ' proposals are ready for you to review.';
         } else if (s.state === 'failed') {

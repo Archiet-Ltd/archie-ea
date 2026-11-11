@@ -274,7 +274,11 @@ def _layer_children(layer_key: str, types: tuple) -> tuple:
     return tuple(children)
 
 
-MODEL: tuple = tuple(
+MODEL: tuple = (
+    # The whole model as one graph; a doorway to every element's page.
+    _l("model_map", "Model map", "archimate.model_map_page", "waypoints", job="1",
+       aliases=("Model graph", "Graph", "Map", "Architecture map", "Knowledge graph", "Your model")),
+) + tuple(
     _l("layer_" + key, label, "archimate_crud.dashboard", icon, job="1", toggle=True, group="model",
        children=_layer_children(layer_key, types))
     for key, label, icon, layer_key, types in _MODEL_LAYERS
