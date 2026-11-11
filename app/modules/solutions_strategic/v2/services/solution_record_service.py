@@ -117,12 +117,13 @@ def record_url(solution_id: int, tab: str = "overview") -> str:
 # ── elements ────────────────────────────────────────────────────────────────
 
 def element_href(layer: str, element_type: str, archimate_id) -> str | None:
-    """The element's own record page, when the model has one."""
+    """The element's own record page, when the model has one. The number is an element's, so the
+    address says so (ae=1): a record of the same type may carry the same number."""
     if not archimate_id:
         return None
     try:
         return url_for("archimate_crud.detail_element", layer=layer,
-                       element_type=element_type, element_id=archimate_id)
+                       element_type=element_type, element_id=archimate_id, ae=1)
     except (BuildError, RuntimeError):
         return None
 

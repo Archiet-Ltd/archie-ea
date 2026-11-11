@@ -251,11 +251,16 @@ Delivered today by: [AI Chat](/modules/ai-chat), [Digital Twin](/modules/digital
 
 <h3 id="simulation-and-scenario-planning">Simulation and Scenario Planning</h3>
 
-Branch the model, change it, and see what happens to cost, risk, resilience and capacity before you
-commit money.
+<p id="until-simulations"><strong>Early access.</strong> Scenarios lets you branch the model, change it, and see the effect on
+cost, risk, resilience and capacity before money is committed. It is not open yet:
+<a href="/modules/scenario-modelling">join the waiting list for Scenarios</a> and we will tell you the day it opens.</p>
 
-Scenario branches with every assumption visible are planned, with portfolio and roadmap
-optimisation to follow. Until then, the impact question shows exactly what one failure would break.
+<p id="needs-simulations"><strong>Available.</strong> <a href="/modules/scenario-modelling">Scenarios</a> lets you run a change on a copy of
+the model and see the effect on the elements, applications, running cost and risks it reaches, save it under a name and
+compare saved scenarios side by side with a colleague. The impact question shows exactly what one
+failure would break.</p>
+
+<p id="visitor-needs-simulations">Sign in to open it.</p>
 
 <h3 id="agentic-automation">Agentic Automation</h3>
 
@@ -307,7 +312,7 @@ Enterprise sign-in, access control, proven tenant isolation, audit and billing, 
 passes the checks your security team runs first.
 
 **Today:** single sign-on through SAML or OpenID Connect, every record scoped to your organisation, a
-verifiable audit log, and plans you can buy, change and cancel yourself.
+verifiable audit log, and [[if payment-open]]plans you can buy, change and cancel yourself[[else]]a free plan to start on, with paid plans set up in a conversation with us[[/if]].
 
 For certifications and what we do and do not claim today, see [Security](/security).
 

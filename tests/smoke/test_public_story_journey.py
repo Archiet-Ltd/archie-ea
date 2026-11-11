@@ -13,6 +13,9 @@ import pytest
 
 from .conftest import PAGE_TIMEOUT
 
+# The retired Ask page's address; these tests assert it is absent and never open it.
+RETIRED_ASK = "/intelligence/ask"
+
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 VIEWPORTS = {"1440x900": (1440, 900), "390x844": (390, 844)}
@@ -166,7 +169,7 @@ def test_the_renewals_story_sends_the_reader_to_the_chat_not_ask(browser, live_s
         page.wait_for_url("**/modules/vendors")
         assert len(_main_text(page)) > 500
         hrefs = page.eval_on_selector_all("main a", "els => els.map(e => e.getAttribute('href'))")
-        assert not any("/intelligence/ask" in (h or "") for h in hrefs)
+        assert not any(RETIRED_ASK in (h or "") for h in hrefs)
     finally:
         context.close()
 

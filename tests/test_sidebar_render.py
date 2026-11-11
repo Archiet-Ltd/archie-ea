@@ -19,6 +19,9 @@ import pytest
 from app.utils.role_access import SIDEBAR_LINK_BUDGET
 from scripts.check_sidebar_links import count_links as _real_link_count
 
+# The retired Ask page's address; these tests assert it is absent and never open it.
+RETIRED_ASK = "/intelligence/ask"
+
 pytestmark = pytest.mark.usefixtures("db_session")
 
 TOP = ["Home", "AI chat", "Approvals"]
@@ -191,7 +194,7 @@ def test_the_entries_are_the_same_for_everyone_and_within_budget(app, db_session
     assert html.count('data-testid="sidebar-search"') == 1
     assert 'id="search-modal"' not in html and "Search navigation" not in html
     assert "All modules" not in sidebar_html
-    assert "/intelligence/ask" not in html
+    assert RETIRED_ASK not in html
 
 
 @pytest.mark.parametrize("role,label,admin,platform", PERSONAS)
@@ -203,8 +206,8 @@ def test_every_layer_holds_its_element_types_and_every_job_its_pages(app, db_ses
         systems.remove("Interfaces")  # the page's own guard: the data integration section
     assert _subs(links, "systems") == systems
     assert _subs(links, "impact") == ["Impact analysis", "Traceability"]
-    assert _subs(links, "changes") == ["Gaps", "Solutions", "Options analysis", "Business cases", "Work packages", "Roadmap",
-                                       "Programmes"]
+    assert _subs(links, "changes") == ["Gaps", "Solutions", "Options analysis", "Scenarios", "Business cases",
+                                       "Work packages", "Roadmap", "Programmes"]
     assert _subs(links, "compliance") == ["Controls", "Risks", "Decisions", "Review board", "Evidence"]
     assert _subs(links, "layer_strategy") == ["Capability", "Value stream", "Resource", "Course of action"]
     assert _subs(links, "layer_other") == ["Location", "Grouping"]

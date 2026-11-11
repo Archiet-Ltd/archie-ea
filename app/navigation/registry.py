@@ -141,6 +141,8 @@ WORK: tuple = (
               aliases=("Solution designs", "Solution design", "Designs")),
            _l("options_analysis", "Options analysis", "application_mgmt.vendor_analysis_list", job="4",
               aliases=("Vendor options", "Vendor selection", "Vendor analysis", "Compare options")),
+           _l("scenarios", "Scenarios", "early_access.simulations", job="4",
+              aliases=("Simulations", "Simulation", "What if", "Run simulation", "Compare scenarios", "Saved scenarios")),
            _l("business_cases", "Business cases", "business_case.index", job="4",
               aliases=("Business case", "Case for change", "Investment case", "Cost and benefit")),
            _l("work_packages", "Work packages", "enterprise.work_packages", job="4",
@@ -153,7 +155,7 @@ WORK: tuple = (
        ),
        owns=("enterprise.plateaus", "genome_roadmap.", "main.capability_roadmap", "implementation_planning.",
              "adm_kanban_view.", "architecture_journey.", "portfolio.", "solution_design.",
-             "business_case.", "application_mgmt.vendor_analysis_")),
+             "early_access.simulations", "business_case.", "application_mgmt.vendor_analysis_")),
     _l("spend", "Spend", "procurement.spend_analytics", "wallet", job="3", toggle=True, group="work",
        children=(
            _l("costs", "Costs", "procurement.spend_analytics", job="3", requires="spend_pages",
@@ -277,6 +279,10 @@ MODEL: tuple = tuple(
        children=_layer_children(layer_key, types))
     for key, label, icon, layer_key, types in _MODEL_LAYERS
 ) + (
+    # Every Product in the organisation; each one opens onto its own page of everything that makes it up.
+    _l("products", "Products", "archimate_crud.list_elements", "package", job="1",
+       url_values={"layer": "business", "element_type": "Product"},
+       aliases=("Product", "Product page", "Offerings", "Product portfolio")),
     _l("frameworks", "Frameworks", "frameworks.gallery", "library", job="1",
        aliases=("Maturity frameworks", "Capability frameworks", "TOGAF", "APQC", "Industry frameworks",
                 "Industry process frameworks", "Compliance frameworks"),

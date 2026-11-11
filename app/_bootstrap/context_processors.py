@@ -408,9 +408,9 @@ def init_context_processors(app):
     def inject_site_registry():
         """The public navbar and footer read one registry. Handed over as a
         callable so only the pages that render the navbar or footer pay for it."""
-        from app.services.site_registry import site_registry
+        from app.services.site_registry import registry_entry, site_registry
 
-        return {"site_registry": site_registry}
+        return {"site_registry": site_registry, "registry_entry": registry_entry}
 
     @app.context_processor
     def inject_released_path():
@@ -663,6 +663,14 @@ def init_context_processors(app):
         return {"user_visible_sections": visible, "show_all_sections": False}
 
     app.jinja_env.globals["flask"] = flask
+
+    def _template_payment_open():
+        """Whether a paid plan can be bought here; the billing page reads the same switch."""
+        from app.services import billing_plans
+
+        return billing_plans.payment_is_open()
+
+    app.jinja_env.globals["payment_open"] = _template_payment_open
 
     # One permission matrix: the `can(action, object_type)` template global reads the
     # same answer require_permission gives the server.

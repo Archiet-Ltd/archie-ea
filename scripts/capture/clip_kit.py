@@ -524,3 +524,138 @@ def capture_standard_image(browser, base_url, slug, path, out_dir, *, selector="
     data[slug] = {"density": STANDARD_DENSITY, **written}
     manifest.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return data[slug]
+
+
+# ── shapes for sharing ──────────────────────────────────────────────────────
+# The same capture, cut three ways: wide for the site and YouTube, square for LinkedIn, upright for Shorts and
+# Reels. The recording's own lower caption bar (it sits below this many pixels) is left out of every shape and
+# its words are drawn again, larger, at the time each one was on screen, so no second recording is made.
+
+CAPTION_BAR_TOP = 850
+SHAPES = {"wide": (1280, 720), "square": (1080, 1080), "upright": (1080, 1920)}
+SHAPE_BYTES = 2 * 1024 * 1024
+MIN_CAPTION_SECONDS = 3.0
+_SHAPE_BACKGROUND = "0x0b1220"
+_FONT_CANDIDATES = (
+    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+)
+
+
+def _font_file() -> str:
+    for candidate in _FONT_CANDIDATES:
+        if os.path.isfile(candidate):
+            return candidate
+    raise SystemExit("no bold font found for burned-in captions; install fonts-freefont-ttf or fonts-dejavu-core")
+
+
+def caption_intervals(video: pathlib.Path, expected: int) -> list[tuple[float, float]]:
+    """When each caption of a recording was on screen, read from the pixels of its lower bar.
+
+    The bar's text is the only near-white thing inside it, so a change of that white mask is a new caption. While
+    the bar is not drawn (a page just loaded, or the closing card) the strip is empty or all page white, which is
+    not a caption. Raises when the count found is not ``expected``.
+    """
+    import numpy as np
+
+    fps = 10
+    x0, y0, w, h = 20, CAPTION_BAR_TOP + 8, 1000, 34
+    result = subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-i", str(video), "-vf", f"fps={fps},crop={w}:{h}:{x0}:{y0},format=gray",
+         "-f", "rawvideo", "-"], capture_output=True)
+    if result.returncode != 0:
+        raise SystemExit(f"ffmpeg failed reading the caption bar of {video}:\n{result.stderr.decode(errors='replace')}")
+    frames = np.frombuffer(result.stdout, dtype=np.uint8).reshape(-1, h, w) > 200
+    lit = frames.reshape(len(frames), -1).sum(axis=1)
+    present = (lit > 40) & (lit < w * h // 4)
+    # A caption is a run of lit frames; a new caption is a run that begins, or whose white mask changes by more
+    # than half. A run shorter than a second is the card fading in, not a caption.
+    starts, ends, previous = [], [], None
+    for index, mask in enumerate(frames):
+        if not present[index]:
+            if previous is not None:
+                ends.append(index)
+            previous = None
+            continue
+        if previous is None or (mask ^ previous).sum() > 0.5 * max(mask.sum(), previous.sum()):
+            if previous is not None:
+                ends.append(index)
+            starts.append(index)
+        previous = mask
+    if previous is not None:
+        ends.append(len(frames))
+    runs = [(a, b) for a, b in zip(starts, ends) if b - a >= fps]
+    if len(runs) != expected:
+        raise SystemExit(f"{video}: found {len(runs)} captions on screen, expected {expected}")
+    bounds = [a / fps for a, _ in runs] + [runs[-1][1] / fps]
+    return [(bounds[i], bounds[i + 1]) for i in range(expected)]
+
+
+def _wrap(text: str, width: int) -> str:
+    import textwrap
+
+    return "\n".join(textwrap.wrap(text, width=width))
+
+
+def cut_shape(video: pathlib.Path, dest: pathlib.Path, shape: str, captions: list[str],
+              intervals: list[tuple[float, float]], max_bytes: int = SHAPE_BYTES) -> None:
+    """Write one shape of a recording as H.264 in an MP4 under ``max_bytes``, with its captions burned in.
+
+    Each caption is drawn from its own start to the start of the next, so none is shorter than it was in the
+    recording (``MIN_CAPTION_SECONDS`` is the floor the tests hold). The closing sentence is not drawn: the
+    recording's closing card already carries it, so on every shape it appears once.
+    """
+    import tempfile
+
+    if shape not in SHAPES:
+        raise ValueError(f"unknown shape {shape!r}")
+    width, height = SHAPES[shape]
+    duration = ffprobe_duration_seconds(video)
+    font = _font_file()
+    spans = [(intervals[i][0], intervals[i + 1][0] if i + 1 < len(intervals) else intervals[i][1])
+             for i in range(len(intervals))]
+    drawn = list(zip(captions, spans))
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="shape-captions-") as work:
+        chain = []
+        if shape == "wide":
+            source = "crop=1440:810:0:40,scale=%d:%d" % (width, height)
+            size, wrap_at, top = 28, 70, height - 82
+            chain.append(f"drawbox=x=0:y={top}:w={width}:h=82:color=black@0.78:t=fill")
+            text_y = f"{top}+(82-text_h)/2"
+        else:
+            scaled_h = round(width * 810 / 1440 / 2) * 2
+            video_y = 70 if shape == "square" else 360
+            source = "crop=1440:810:0:40,scale=%d:%d" % (width, scaled_h)
+            size, wrap_at = (44, 38) if shape == "square" else (56, 30)
+            text_y = f"{video_y + scaled_h + 40}"
+        for number, (text, (start, end)) in enumerate(drawn):
+            text_file = pathlib.Path(work) / f"c{number}.txt"
+            text_file.write_text(_wrap(text, wrap_at), encoding="utf-8")
+            chain.append(
+                f"drawtext=fontfile={font}:textfile={text_file}:fontsize={size}:fontcolor=white:line_spacing=10:"
+                f"x=(w-text_w)/2:y={text_y}:enable='between(t,{start:.2f},{end:.2f})'")
+        if shape == "wide":
+            graph = f"[0:v]{source},{','.join(chain)}[out]"
+        else:
+            graph = (f"color=c={_SHAPE_BACKGROUND}:s={width}x{height}:d={duration:.2f}[bg];[0:v]{source}[v];"
+                     f"[bg][v]overlay=0:{video_y}:shortest=1,{','.join(chain)}[out]")
+        for crf in (28, 32, 36, 40):
+            _ffmpeg("-i", str(video), "-filter_complex", graph, "-map", "[out]", "-an", "-c:v", "libx264",
+                    "-preset", "slow", "-crf", str(crf), "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dest))
+            if dest.stat().st_size <= max_bytes:
+                return
+    raise SystemExit(f"could not cut {shape} of {video} under {max_bytes} bytes")
+
+
+def cover_image(poster: pathlib.Path, dest: pathlib.Path, size=(1200, 630)) -> None:
+    """The link-preview cover: the recording's outcome frame (its poster) cropped above the caption bar."""
+    from PIL import Image
+
+    im = Image.open(poster).convert("RGB")
+    scale = im.width / size[0]
+    crop_h = min(round(size[1] * scale), CAPTION_BAR_TOP * im.width // 1440)
+    cropped = im.crop((0, 0, im.width, crop_h)).resize(size, Image.LANCZOS)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    cropped.save(dest, format="JPEG", quality=82, optimize=True)

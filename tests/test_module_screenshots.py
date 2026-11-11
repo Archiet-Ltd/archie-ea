@@ -51,6 +51,7 @@ from app.services.public_pages import (
     MODULE_CAPTURE_PENDING,
     MODULE_CAPTURES,
     module_caption,
+    MODULE_RECORDINGS,
     USE_CASE_SCREENSHOT_CAPTURES,
     USE_CASE_SCREENSHOT_PENDING,
     USE_CASE_VIDEO_CAPTURES,
@@ -164,7 +165,10 @@ def test_no_stray_image_file_for_a_pending_module():
 # ── module pages render the image ───────────────────────────────────────
 
 
-def test_every_live_module_page_renders_its_screenshot_with_alt_text(app):
+def test_every_live_module_page_shows_a_product_picture_and_a_recorded_one_does_not_repeat_it(app):
+    """Every live module page shows a product picture. A page with a recording shows the recording with its
+    cover image and no screenshot of the view the recording opens on; a page without one renders its screenshot
+    with alt text, caption, lazy loading and explicit size."""
     from app.services.public_pages import MERGED_PAGES
 
     with app.test_client() as client:
@@ -180,6 +184,13 @@ def test_every_live_module_page_renders_its_screenshot_with_alt_text(app):
             # Jinja autoescapes attribute values (an apostrophe becomes &#39;),
             # so compare against the unescaped text rather than raw HTML.
             page_html = html.unescape(rv.data.decode())
+            if slug in MODULE_RECORDINGS:
+                assert 'data-testid="page-recording"' in page_html, f"{slug}: recorded page shows no recording"
+                assert f'poster="/static/img/modules/{slug}.poster.webp"' in page_html, f"{slug}: no cover image"
+                assert 'data-testid="page-screenshot"' not in page_html, f"{slug}: repeats its recording's view"
+                assert f"/static/img/modules/{slug}.webp" not in page_html, f"{slug}: repeats its recording's view"
+                assert f"/static/img/modules/{slug}-mobile.webp" not in page_html
+                continue
             assert 'data-testid="page-screenshot"' in page_html, f"{slug}: no screenshot block rendered"
             from app.services.public_pages import module_image_alt
 

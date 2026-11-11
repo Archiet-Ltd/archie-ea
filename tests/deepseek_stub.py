@@ -10,6 +10,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock, Thread
 
 KEY = "sk-deepseek-stub-never-real-0001"
+# The names DeepSeek's model list returns; any other name is refused, as the real service does once an alias is gone.
+SERVED_MODELS = ("deepseek-flash", "deepseek-v4-pro")
 NAME_RULE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 
 
@@ -51,6 +53,8 @@ class DeepSeekStub:
                     owner.keys_seen.append(token)
                 if token not in owner.accepted:
                     return self._json(401, {"error": {"message": "invalid key"}})
+                if str(body.get("model")).startswith("deepseek") and body.get("model") not in SERVED_MODELS:
+                    return self._json(400, {"error": {"message": "Model Not Exist"}})
                 names = [t.get("function", {}).get("name", "") for t in body.get("tools") or []]
                 bad = [n for n in names if not NAME_RULE.match(n)]
                 if bad or len(set(names)) != len(names):
@@ -59,6 +63,7 @@ class DeepSeekStub:
                 with owner._lock:
                     owner.requests.append({"model": body.get("model"), "tool_names": names,
                                            "stream": bool(body.get("stream")),
+                                           "thinking": (body.get("thinking") or {}).get("type"),
                                            "text": " ".join(str(m.get("content")) for m in body.get("messages", []))})
                     scripted = owner.tool_script.pop(0) if owner.tool_script and names else None
                 usage = None if owner.usage is None else {
@@ -71,7 +76,9 @@ class DeepSeekStub:
                         "function": {"name": scripted[0], "arguments": json.dumps(scripted[1])}}]}
                     finish = "tool_calls"
                 else:
-                    message = {"role": "assistant", "content": owner.reply}
+                    # Thinking is on unless the request turns it off, and its text spends the budget: no answer.
+                    thinking = (body.get("thinking") or {}).get("type") != "disabled"
+                    message = {"role": "assistant", "content": "" if thinking else owner.reply}
                     finish = "stop"
                 if body.get("stream"):
                     delta = dict(message)

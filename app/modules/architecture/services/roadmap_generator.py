@@ -24,6 +24,7 @@ from app.models.implementation_migration import (  # dead-code-ok
     WorkPackage,
 )
 from app.services.archimate.gap_resolution_service import GapResolutionService
+from app.services.gap_register_service import effective_severity, priority_filter_clause, severity_order_expr
 from app.services.llm_service import LLMService
 
 
@@ -183,7 +184,7 @@ class RoadmapGenerator:
                     "gap_id": gap.id,
                     "gap_name": gap.name,
                     "priority": gap.priority,
-                    "severity": gap.severity,
+                    "severity": gap.rated_severity,
                     "estimated_work_packages": estimated_wps,
                     "estimated_hours": estimated_hours,
                     "estimated_duration_weeks": estimated_hours // 40,
@@ -230,14 +231,14 @@ class RoadmapGenerator:
             query = query.filter(Gap.architecture_id == architecture_id)
 
         if priority_filter:
-            query = query.filter(Gap.priority == priority_filter)
+            query = query.filter(priority_filter_clause(priority_filter))
 
-        return query.order_by(Gap.priority.desc(), Gap.created_at.asc()).all()
+        return query.order_by(severity_order_expr(), Gap.created_at.asc()).all()
 
     def _sort_gaps_by_priority(self, gaps: List[Gap]) -> List[Gap]:
-        """Sort gaps by priority for sequencing."""
+        """Sort gaps by their one rating for sequencing."""
         priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        return sorted(gaps, key=lambda g: (priority_order.get(g.priority, 4), g.id))
+        return sorted(gaps, key=lambda g: (priority_order.get(effective_severity(g), 4), g.id))
 
     def _create_timeline(
         self, work_packages: List[WorkPackage], timeline_months: int
@@ -391,7 +392,7 @@ class RoadmapGenerator:
 
         # Adjust based on severity
         severity_adjustment = {"critical": 2, "high": 1, "medium": 0, "low": -1}
-        adjustment = severity_adjustment.get(gap.severity, 0)
+        adjustment = severity_adjustment.get(gap.rated_severity, 0)
 
         # Adjust based on description length (proxy for complexity)
         if gap.description and len(gap.description) > 500:

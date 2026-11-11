@@ -369,7 +369,7 @@ class LLMRouter:
                 return row.default_model.strip()
         except Exception as exc:
             logger.debug("suppressed error in LLMRouter._get_default_model (app/modules/ai_chat/services/llm_router.py): %s", exc)
-        # Last-resort fallbacks — update these in Admin > API Settings instead
+        # Last-resort fallbacks — update these in Admin > AI settings instead
         defaults = {
             LLMProvider.ANTHROPIC: "claude-haiku-4-5-20251001",
             LLMProvider.OPENAI: "gpt-4o-mini",

@@ -189,7 +189,7 @@ class TestGenerateBlueprintNarrativeTool:
             "app.modules.solutions_strategic.v2.routes.solution_design_routes.generate_section_narrative"
         ) as mock_generate:
             mock_generate.side_effect = NarrativeGenerationError(
-                "No LLM provider configured. Add an API key in Admin → API Settings.", "NO_LLM"
+                "No LLM provider configured. Add an API key in Admin → AI settings.", "NO_LLM"
             )
             result = executor._tool_generate_blueprint_narrative(
                 {"solution_id": 44, "section_id": "sec-2"}

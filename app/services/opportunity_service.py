@@ -203,7 +203,7 @@ def _unstarted_gaps(org_id) -> List[Dict[str, Any]]:
     for gap in gaps:
         if gap.id in planned:
             continue
-        severity = (gap.severity or "").strip().lower() or None
+        severity = (gap.rated_severity or "").strip().lower() or None
         href = footers.page_link("archimate_crud.detail_element", layer="implementation", element_type="Gap", element_id=gap.id)
         when = gap.updated_at or gap.created_at
         facts = [
