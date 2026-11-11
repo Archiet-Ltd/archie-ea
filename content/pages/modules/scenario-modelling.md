@@ -5,6 +5,7 @@ module_label: "Scenarios"
 state: briefed
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
+description: Compare what-if plans side by side before you commit money to any one of them.
 released_variant: {screen: /simulations, file: _released/scenario-modelling.md}
 icon: git-compare
 headline: Compare what-if plans side by side (early access)

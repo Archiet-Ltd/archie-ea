@@ -17,12 +17,16 @@
   <article class="public-page-content public-prose prose max-w-none" data-testid="early-access-hub">
     <div class="style-vega">{{ ui.badge(text='Early access', variant='outline') }}</div>
     <h1>Coming to Entelim</h1>
+    {% if groups %}
     <p>Pick a part of Entelim to join its waiting list.</p>
     <ul>
       {% for g in groups %}
       <li><a href="{{ url_for('early_access.page', slug=g.slug) }}">{{ g.title }}</a>{% if g.blurb %}: {{ g.blurb }}{% endif %}</li>
       {% endfor %}
     </ul>
+    {% else %}
+    <p data-testid="early-access-none">Nothing is waiting: every part of Entelim is open to you now.</p>
+    {% endif %}
   </article>
 </div>
 {% include 'components/public_footer.html' %}

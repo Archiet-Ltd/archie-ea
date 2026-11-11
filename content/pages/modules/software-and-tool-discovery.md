@@ -5,6 +5,7 @@ module_label: "Software and tool discovery"
 state: briefed
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
+description: Discover the software and tools your organisation actually pays for and uses, so the model starts from what is really running.
 icon: search
 headline: Discover the software you pay for and use (early access)
 summary: Not built yet. Entelim is building a way to discover the software and tools your organisation pays for and uses. Today you can record contracts and licences and score each application.

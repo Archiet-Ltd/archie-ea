@@ -2,7 +2,7 @@
 wave: 1
 page_family: site
 title: "Features"
-page_role: "The eighteen capabilities of Enterprise Intelligence Management, grouped by the question each one answers, each linked to the module pages and use cases that deliver it today."
+page_role: "The eighteen capabilities of Enterprise Intelligence Management, grouped by the question each one answers, each linked to the module pages and use cases that deliver it."
 source: docs/eim-category-positioning-v1.md section 2; docs/artifacts/feature-status-register.yml
 ---
 
@@ -316,5 +316,5 @@ For certifications and what we do and do not claim today, see [Security](/securi
 
 ---
 
-Capabilities that are not open to everyone yet are listed under Coming soon below, each with a waiting list. See [how
+Capabilities that are not open to everyone yet are listed under [Coming soon](#coming-soon) below, and where one has a waiting list its entry links to it. See [how
 it's priced](/pricing) or [try it](/account/register).

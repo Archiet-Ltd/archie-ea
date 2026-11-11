@@ -7,7 +7,10 @@ from flask import Blueprint, abort, make_response, redirect, render_template, re
 from flask_login import current_user
 
 from app import db
-from app.release_waves import EARLY_ACCESS_PREFIX, code_slug, group_by_slug, has_page, legacy_slug, moved_slug, wave_map
+from app.release_waves import (
+    EARLY_ACCESS_PREFIX, code_slug, configured_wave, entry_for, group_by_slug, has_page, is_released_rule, legacy_slug,
+    moved_slug, wave_map,
+)
 from app.services.rate_limiter import rate_limit
 
 early_access_bp = Blueprint("early_access", __name__)
@@ -25,18 +28,34 @@ def simulations_released() -> bool:
     return is_released_endpoint("early_access.simulations")
 
 
-def coming_groups() -> list[dict]:
-    """The capabilities that open in a later release, once each, in alphabetical order.
+def _groups_with_open_pages() -> set[str]:
+    """The groups with at least one registered page the release check lets through, with the switch as it is now."""
+    from flask import current_app, has_app_context
 
-    A capability with a page open in the first release is not listed as coming: the person can already use it."""
+    if not has_app_context():
+        return set()
+    cache = current_app.extensions.setdefault("release_waves_open_groups", {})
+    wave = configured_wave()
+    if wave not in cache:
+        cache[wave] = {
+            entry[1]
+            for rule in current_app.url_map.iter_rules()
+            if "GET" in (rule.methods or ()) and (entry := entry_for(rule.rule, rule.endpoint)) is not None
+            and is_released_rule(rule.rule, rule.endpoint)
+        }
+    return cache[wave]
+
+
+def coming_groups() -> list[dict]:
+    """The capabilities that do not open yet, once each, in alphabetical order.
+
+    The release check decides: a capability with any page that answers normally, with the switch off or in the
+    releases that are open, is not listed as coming, because the person can already use it."""
     doc = wave_map()
-    open_now = {entry[1] for entry in doc["rules"].values() if entry[0] == "W1"}
+    open_now = {entry[1] for entry in doc["rules"].values() if entry[0] == "W1"} | _groups_with_open_pages()
     seen: dict[str, dict] = {}
-    simulations_open = simulations_released()
     for entry in doc["rules"].values():
         wave, code = entry[0], entry[1]
-        if code == SIMULATIONS_GROUP and simulations_open:
-            continue
         if code in open_now or wave in doc["pass_waves"] or wave in ("W1", "X", "RT") or code.startswith("BP:") or code in ("infra", "PG-RT", "PG-RTP", "PG-NEW", "PG-EA", "PG-OPS"):
             continue
         info = doc["groups"].get(code)
@@ -62,8 +81,18 @@ def coming_soon_entries() -> list[dict]:
 
     found = [{"url": f"{EARLY_ACCESS_PREFIX}/{g['slug']}", "title": g["title"], "description": g["blurb"]}
              for g in coming_groups()]
+    listed = {item["url"] for item in found}
     for page in module_pages:
         own = page.cta == "waiting_list"
+        screen = (page.front_matter.get("released_variant") or {}).get("screen")
+        group_url = f"{EARLY_ACCESS_PREFIX}/{code_slug(group_for(entry_for(str(screen)))[0])}" if screen else None
+        if own and group_url in listed:
+            # the page waits for a screen whose capability is listed already: one capability, one entry,
+            # named as the page names it
+            entry = next(item for item in found if item["url"] == group_url)
+            entry["title"] = page.front_matter.get("module_label") or page.title
+            entry["description"] = page.description or entry["description"]
+            continue
         if not own and page.wave_closed:
             endpoint = page.front_matter.get("endpoint")
             rule = next(iter(current_app.url_map.iter_rules(endpoint)), None) if endpoint in current_app.view_functions else None

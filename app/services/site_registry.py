@@ -279,6 +279,53 @@ def _drop_sentences_for_unreleased_screens(text: str) -> str:
     return re.sub(r'<p id="(needs|until|visitor-needs)-([a-z0-9-]+)">(.*?)</p>\s*', keep_or_drop, text, flags=re.S)
 
 
+_CAPABILITY = re.compile(r'(<h3 id="([a-z0-9-]+)">(.*?)</h3>)(.*?)(?=<h3 id="|<h2 |<hr|\Z)', re.S)
+_TODAY = re.compile(r"<p><strong>Today:</strong>\s*(.*?)</p>", re.S)
+_DELIVERED = re.compile(r"<p>Delivered today by:\s*(.*?)</p>", re.S)
+_DELIVERED_LINK = re.compile(r'<a href="([^"]+)">.*?</a>(?:\s*\([^)]*\))?', re.S)
+_COMING_LINK = re.compile(r'<a href="#coming-soon">Coming soon</a>:\s*(.*?)</p>', re.S)
+_FIGURE = re.compile(r"<figure\b.*?</figure>\s*", re.S)
+_TAGS = re.compile(r"<[^>]+>")
+
+
+def hold_back_unreleased_capabilities(body_html: str) -> tuple[str, list[dict[str, Any]]]:
+    """Hold each capability on the features page to the release check, the one the menus and the Scenarios text use.
+
+    A link under "Delivered today by" stays only while its page is released. A capability none of whose
+    delivered pages is released is not delivered: its "Today:" description, kept whole, is introduced as Coming
+    soon and its screenshots go. Every capability that is coming soon, held back or always, gets an entry
+    with its own anchor (``coming-<capability>``) for the Coming soon list, and its inline links point at it.
+    """
+    text = str.__str__(body_html)
+    items: list[dict[str, Any]] = []
+
+    def one(match: "re.Match[str]") -> str:
+        heading, anchor, title, rest = match.group(1), match.group(2), _TAGS.sub("", match.group(3)), match.group(4)
+        target = "coming-" + anchor
+        delivered = _DELIVERED.search(rest)
+        links = _DELIVERED_LINK.finditer(delivered.group(1)) if delivered else []
+        kept = [m.group(0) for m in links if wave_released({"href": m.group(1)})]
+        held = delivered is not None and not kept
+        if delivered is not None:
+            rest = rest.replace(delivered.group(0), "<p>Delivered today by: %s.</p>" % ", ".join(kept) if kept else "")
+        today = _TODAY.search(rest)
+        words = []
+        if held and today is not None:
+            words.append(" ".join(_TAGS.sub("", today.group(1)).split()))
+            rest = rest.replace(today.group(0), '<p><a href="#%s">Coming soon</a>: %s</p>' % (target, today.group(1)))
+        if held:
+            rest = _FIGURE.sub("", rest)
+        coming = _COMING_LINK.search(rest)
+        if coming is not None:
+            words.append(" ".join(_TAGS.sub("", coming.group(1)).split()))
+        rest = rest.replace('<a href="#coming-soon">', '<a href="#%s">' % target)
+        if words:
+            items.append({"url": None, "anchor": target, "title": title, "description": " ".join(words)})
+        return heading + rest
+
+    return type(body_html)(_CAPABILITY.sub(one, text)), items
+
+
 def open_signed_in_links(body_html: str) -> str:
     """A page's hand-written links to coming-soon modules, pointed at where *signed_in_target* says."""
     # str.replace on the plain text: Markup.replace would escape the quotes in what it looks for

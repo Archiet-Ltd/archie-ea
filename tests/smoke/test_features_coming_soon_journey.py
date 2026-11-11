@@ -45,9 +45,11 @@ def _walk(browser, base, switch):
                 "link", name="Coming soon").click()
             page.wait_for_url(lambda url: "/features" in url, timeout=PAGE_TIMEOUT)
             expect(page.locator("#coming-soon")).to_have_text("Coming soon", timeout=PAGE_TIMEOUT)
+            assert page.locator("#coming-soon + p + ul li").count() >= 2
             items = page.locator("#coming-soon + p + ul a")
             hrefs = [items.nth(i).get_attribute("href") for i in range(items.count())]
-            assert len(hrefs) >= 2, "Coming soon lists %s" % hrefs
+            assert hrefs, "Coming soon links no waiting list"
+            assert switch == "off" or len(hrefs) >= 2, "Coming soon lists %s" % hrefs
             assert not TIMETABLE.search(page.inner_text("main")), TIMETABLE.search(page.inner_text("main")).group(0)
             _shot(page, "features-coming-soon", width, scheme, switch)
             for href in hrefs:
@@ -61,7 +63,7 @@ def _walk(browser, base, switch):
 
             hub = page.request.get(base + "/early-access").text()
             hub_links = set(re.findall(r'href="(/early-access/[a-z0-9-]+)"', hub))
-            assert hub_links and not hub_links - set(hrefs), sorted(hub_links - set(hrefs))
+            assert (hub_links or switch == "off") and not hub_links - set(hrefs), sorted(hub_links - set(hrefs))
         finally:
             context.close()
     return listed

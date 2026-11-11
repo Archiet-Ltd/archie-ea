@@ -56,10 +56,14 @@
 
     {% if coming_soon %}
     <h2 id="coming-soon">Coming soon</h2>
-    <p>These are not available yet. Open one to join its waiting list and we will email you when you can use it.</p>
+    <p>These are not available yet. Where one has a waiting list, open it to join and we will email you when you can use it.</p>
     <ul data-testid="coming-soon-list">
       {% for item in coming_soon %}
+      {% if item.url %}
       <li><a href="{{ item.url }}">{{ item.title }}</a>{% if item.description %}: {{ item.description }}{% endif %}</li>
+      {% else %}
+      <li id="{{ item.anchor }}">{{ item.title }}{% if item.description %}: {{ item.description }}{% endif %}</li>
+      {% endif %}
       {% endfor %}
     </ul>
     {% endif %}
