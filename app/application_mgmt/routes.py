@@ -328,11 +328,12 @@ def _validate_and_clean_import_row(row, clean_func):
     cleaned["version"] = _truncate_to_length(
         _get_column_value(row, "version", clean_func), "version"
     )
-    cleaned["deployment_status"] = (
-        _truncate_to_length(
-            _get_column_value(row, "deployment_status", clean_func), "deployment_status"
-        )
-        or "planned"
+    # One list of statuses: a known word is stored in the list's form, a blank
+    # stores nothing, anything else is refused for this row.
+    from app.services.application_status import status_for_write
+
+    cleaned["deployment_status"], cleaned["status_error"] = status_for_write(
+        _get_column_value(row, "deployment_status", clean_func)
     )
     cleaned["business_domain"] = _truncate_to_length(
         _get_column_value(row, "business_domain", clean_func), "business_domain"
@@ -1895,11 +1896,14 @@ def _sync_vendor_products(archimate_element_id, target_ids):
         )
 
 
-def render_application_detail(id):
+def render_application_detail(id, form_values=None, form_errors=None, status=200):
     """Render the Application Detail page.
 
     Called by unified_applications_bp (canonical /applications/<id>).
     Restored after BE-054 god-file decomposition dropped this shared handler.
+
+    A refused Overview save comes back through here in edit mode with the typed
+    values and one error per field, so nothing the person typed is lost.
     """
     from app.models.application_portfolio import ApplicationComponent
 
@@ -2354,6 +2358,11 @@ def render_application_detail(id):
         db.session.rollback()
 
     from app.services import technology_cost
+    from flask_login import current_user
+
+    from app.core.auth.permissions import can as _can
+    from app.services.application_overview_fields import overview_limits
+    from app.services.application_status import status_options
 
     technology_cost_shares = technology_cost.shares_for_application(
         app_obj.organization_id, app_obj.id)
@@ -2361,6 +2370,10 @@ def render_application_detail(id):
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
+        form_values=form_values or {},
+        form_errors=form_errors or {},
+        status_options=status_options,
+        field_limits=overview_limits(),
         technology_cost_shares=technology_cost_shares,
         linked_requirements=linked_requirements,
         requirement_options=requirement_options,
@@ -2373,7 +2386,9 @@ def render_application_detail(id):
         compliance_score=None,
         compliance_results=None,
         capabilities_with_compliance=[],
-        edit_mode=request.args.get("edit") == "1",
+        # Only a person the permission matrix lets edit an application gets the form.
+        edit_mode=(request.args.get("edit") == "1" or bool(form_errors))
+        and _can(current_user, "edit", "application"),
         edit_mode_motivation=request.args.get("edit_motivation") == "1",
         edit_mode_strategy=request.args.get("edit_strategy") == "1",
         edit_mode_business=request.args.get("edit_business") == "1",
@@ -2473,4 +2488,4 @@ def render_application_detail(id):
         linked_solutions=linked_solutions,
         archimate_info=archimate_info,
         archimate_relationships=archimate_relationships,
-    )
+    ), status

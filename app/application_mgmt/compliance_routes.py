@@ -2,7 +2,7 @@
 
 import re
 
-from flask import current_app, g, jsonify, render_template, request
+from flask import current_app, g, jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -158,6 +158,7 @@ def _capability_compliance_and_findings():
         ]
         for f in by_app[app.id]["findings"]:
             findings.append({
+                "id": f["mapping_id"],
                 "capability": ", ".join(c["name"] for c in capabilities) or "No capability mapped",
                 "capabilities": capabilities,
                 "application": app.name,
@@ -173,6 +174,40 @@ def _capability_compliance_and_findings():
     findings.sort(key=lambda f: ([(0, int(t), "") if t.isdigit() else (1, 0, t) for t in re.split(r"(\d+)", f["control_code"] or "")],
                                  f["application"]))
     return rows, findings
+
+
+@application_mgmt.route("/compliance/controls/<int:mapping_id>/evidence", methods=["GET"])
+@login_required
+def compliance_control_evidence(mapping_id):
+    """The evidence for one control on one application, inside the app, with the way back to the register.
+
+    A mapping of another organisation answers not found, the same as one that does not exist.
+    """
+    from app.middleware.tenant_context import current_org_id
+
+    mapping = ApplicationComplianceControl.query.filter_by(
+        id=mapping_id, organization_id=current_org_id()
+    ).first_or_404()
+    control = mapping.control
+    application = mapping.application
+    status = (mapping.implementation_status or "planned").replace("_", " ")
+    recorded = mapping.verified_date if mapping.implementation_status == "verified" and mapping.verified_date else (
+        mapping.updated_at or mapping.created_at)
+    return render_template(
+        "compliance/control_evidence.html",
+        control={
+            "code": control.control_code,
+            "title": control.title,
+            "description": control.description,
+            "framework": control.framework.name if control.framework else None,
+        },
+        application_name=application.name if application else None,
+        application_href=url_for("unified_applications.application_detail", id=application.id) if application else None,
+        status=status,
+        evidence=(mapping.notes or "").strip() or None,
+        recorded=recorded.strftime("%-d %B %Y") if recorded else None,
+        register_href=url_for("application_mgmt.compliance_frameworks_dashboard", _anchor="control-%d" % mapping.id),
+    )
 
 
 def _finding_facts(finding, app, origins):
