@@ -238,6 +238,12 @@ let ComposerSearch = (function() {
             });
         },
 
+        /* What the footer counts while the layer cards stand in for the drawing; empty when elements are drawn. */
+        overviewCounts: function() {
+            if (!this.layerCards || !this.layerCards.length) return '';
+            return this.layerCardsTotal + ' elements in ' + this.layerCards.length + (this.layerCards.length === 1 ? ' layer' : ' layers');
+        },
+
         openLayer: function(layer) {
             this.selectViewpoint(this.activeViewpoint, this.activeViewpointName, layer);
         },
