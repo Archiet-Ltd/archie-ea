@@ -190,9 +190,9 @@ class TestStreamCarriesTheFailureMessage:
             "done event carries no response text for the UI to render - this "
             "is the exact server-side shape that produced 15s+ of dead air"
         )
-        assert "Admin" in response_text and "API Settings" in response_text, (
-            "the fallback message should point the user at Admin -> API "
-            "Settings, not a bare failure"
+        assert "Admin" in response_text and "AI settings" in response_text, (
+            "the fallback message should point the user at Admin -> AI "
+            "settings, not a bare failure"
         )
 
     def test_no_provider_configured_also_streams_a_visible_response(self, app, client):

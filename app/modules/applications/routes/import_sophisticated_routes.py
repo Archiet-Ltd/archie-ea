@@ -17,6 +17,7 @@ from app.decorators import audit_log
 from app.models.application_portfolio import ApplicationComponent
 from app.models.import_audit import ImportAuditService, ImportSessionLog
 from app.services.unified_import.duplicate_detector import DuplicateDetector
+from app.services.application_status import StatusRefused, status_for_write
 
 from . import unified_applications_bp
 from app.utils.pagination import safe_int_arg
@@ -1153,6 +1154,13 @@ def upload_excel_applications():
                 # Clean and enrich data at import time
                 app_data = clean_import_data(app_data)
 
+                # Refuse the row before it changes anything when its status is not on the list.
+                if "deployment_status" in app_data:
+                    raw_status = app_data["deployment_status"]
+                    app_data["deployment_status"], status_refusal = status_for_write(raw_status)
+                    if status_refusal:
+                        raise StatusRefused(raw_status)
+
                 # Create or update
                 if existing_app:
                     if duplicate_mode == "skip":
@@ -1196,6 +1204,11 @@ def upload_excel_applications():
                     records_created += 1
 
                 processed_identifiers.add(identifier)
+
+            except StatusRefused as refusal:
+                records_failed += 1
+                errors.append(f"Row {row_idx}: {refusal}")
+                continue
 
             except Exception as e:
                 records_failed += 1

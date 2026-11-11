@@ -11,6 +11,8 @@ Tools always accept names (not IDs) — the EntityResolver converts them.
 
 import re
 
+from app.services.application_status import APPLICATION_STATUS_VALUES
+
 # Figures. A figure reaches a person only as the engine's rendering of a value a
 # declared field returned in that turn. Every tool declares its figures under a
 # "figures" key beside its definition (an empty dict for a tool that returns
@@ -248,10 +250,7 @@ TOOL_SCHEMAS = [
                 "new_status": {
                     "type": "string",
                     "description": "New lifecycle/deployment status",
-                    "enum": [
-                        "design", "development", "testing",
-                        "production", "retiring", "decommissioned",
-                    ],
+                    "enum": list(APPLICATION_STATUS_VALUES),
                 },
                 "rationale": {
                     "type": "string",

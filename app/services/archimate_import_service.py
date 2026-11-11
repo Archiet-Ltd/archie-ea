@@ -879,7 +879,7 @@ class ArchiMateImportService:
         org_id = self._require_organization_id(organization_id)
         elements = parsed_data.get("elements", [])
         preview_elements: List[Dict[str, Any]] = []
-        counts = {"new": 0, "exists": 0, "conflict": 0, "invalid": 0}
+        counts = {"new": 0, "exists": 0, "conflict": 0, "invalid": 0, "similar": 0}
 
         for elem in elements:
             if elem.get("invalid"):
@@ -910,6 +910,10 @@ class ArchiMateImportService:
                 entry["existing_id"] = None
                 entry["diff"] = None
                 counts["new"] += 1
+                similar = self._similar_existing(name_lower, elem_type, org_id)
+                if similar is not None:
+                    entry["similar_to"] = {"id": similar.id, "name": similar.name}
+                    counts["similar"] += 1
             else:
                 existing_desc = (existing.description or "").strip()
                 import_desc = (elem.get("description") or "").strip()
@@ -953,6 +957,49 @@ class ArchiMateImportService:
             "errors": parsed_data.get("errors", []),
             "application_kind_decisions": parsed_data.get("application_kind_decisions", {}),
         }
+
+    def _similar_existing(self, name_lower: str, elem_type: str, org_id: Optional[int]):
+        """A stored element of the same type whose name differs only by words added to
+        one end ("Ifiok" and "Ifiok - agentic generation platform"), or None."""
+        from app.models.archimate_core import ArchiMateElement
+        from app.utils.duplicate_guard import folded_column, normalize_name
+
+        folded = normalize_name(name_lower)
+        stored = folded_column(ArchiMateElement.name)
+        return ArchiMateElement.query.filter(  # model-safety-ok: bounded by XML element count
+            ArchiMateElement.type.in_(self._match_types(elem_type)),
+            *self._in_organization(ArchiMateElement, org_id),
+            db.or_(
+                # Compared by length, not LIKE, so a "%" or "_" in a stored name is a character.
+                db.func.left(db.literal(folded), db.func.length(stored) + 1) == stored + " ",
+                stored.startswith(folded + " ", autoescape=True),
+            ),
+            stored != folded,
+        ).order_by(ArchiMateElement.id).first()
+
+    @staticmethod
+    def _describe_matches(matches: List[Dict[str, Any]], created_in_file: set, org_id: Optional[int]) -> None:
+        """Say, for each match, whether the element it matched was created earlier in the same file,
+        and which layer page it belongs to (the address of its page carries that layer)."""
+        if not matches:
+            return
+        from app.models.archimate_core import ArchiMateElement
+
+        ids = {m["existing_id"] for m in matches if m.get("existing_id")}
+        layers = {
+            row.id: row.layer
+            for row in ArchiMateElement.query.filter(  # model-safety-ok: bounded by the matches of one file
+                ArchiMateElement.id.in_(ids),
+                *ArchiMateImportService._in_organization(ArchiMateElement, org_id),
+            )
+        } if ids else {}
+        for m in matches:
+            m["in_file"] = m.get("existing_id") in created_in_file
+            text = (layers.get(m.get("existing_id")) or "").strip().lower()
+            text = "implementation" if text.startswith("implementation") else text
+            m["existing_layer"] = text if text in (
+                "motivation", "strategy", "business", "application", "technology", "physical", "implementation"
+            ) else "application"
 
     @staticmethod
     def _match_types(elem_type: str) -> tuple:
@@ -1067,6 +1114,7 @@ class ArchiMateImportService:
         if snapshot is not None:
             snapshot.note_model(model_id)
         created_relationship_ids: List[int] = []
+        matches: List[Dict[str, Any]] = []
 
         def _element_result(row, identifier: str, status: str) -> None:
             element_results.append({
@@ -1152,6 +1200,25 @@ class ArchiMateImportService:
                             retyped_row = existing
 
                     if existing is None:
+                        similar = self._similar_existing(name_lower, elem_type, org_id)
+                        if similar is not None:
+                            matches.append({
+                                "name": name, "type": elem_type, "kind": "similar",
+                                "existing_id": similar.id, "existing_name": similar.name,
+                                "action": "created",
+                            })
+                        elif strategy == "create_all":
+                            same = ArchiMateElement.query.filter(  # model-safety-ok: bounded by XML element count
+                                db.func.lower(ArchiMateElement.name) == name_lower,
+                                ArchiMateElement.type.in_(self._match_types(elem_type)),
+                                *self._in_organization(ArchiMateElement, org_id),
+                            ).first()
+                            if same is not None:
+                                matches.append({
+                                    "name": name, "type": elem_type, "kind": "same",
+                                    "existing_id": same.id, "existing_name": same.name,
+                                    "action": "created",
+                                })
                         new_elem = ArchiMateElement(
                             name=name,
                             type=elem_type,
@@ -1176,6 +1243,11 @@ class ArchiMateImportService:
                         _element_result(new_elem, identifier, "created")
                         created_row = new_elem
                     elif strategy == "update_existing":
+                        matches.append({
+                            "name": name, "type": elem_type, "kind": "same",
+                            "existing_id": existing.id, "existing_name": existing.name,
+                            "action": "updated",
+                        })
                         if snapshot is not None:
                             snapshot.note_updated_element(existing)
                         if description is not None:
@@ -1198,6 +1270,11 @@ class ArchiMateImportService:
                         if identifier:
                             id_map[identifier] = {"db_id": existing.id, "type": existing.type}
                         skipped += 1
+                        matches.append({
+                            "name": name, "type": elem_type, "kind": "same",
+                            "existing_id": existing.id, "existing_name": existing.name,
+                            "action": "skipped",
+                        })
                         _element_result(existing, identifier, "skipped")
                         created_row = None
 
@@ -1383,6 +1460,7 @@ class ArchiMateImportService:
             relationships_created, relationships_skipped, len(relationships_failed),
         )
 
+        self._describe_matches(matches, set(created_ids), org_id)
         return {
             "created": created,
             "updated": updated,
@@ -1397,6 +1475,7 @@ class ArchiMateImportService:
             "created_ids": created_ids,
             "model_id": model_id,
             "element_results": element_results,
+            "matches": matches,
             "relationship_results": relationship_results,
             "application_kind_decisions": parsed_data.get("application_kind_decisions", {}),
         }
