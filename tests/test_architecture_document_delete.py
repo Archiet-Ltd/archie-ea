@@ -104,3 +104,36 @@ def test_a_viewer_is_refused_and_nothing_is_deleted(world, client, login_as, db_
     assert resp.status_code == 403
     assert _exists(db_session, world.doc_a.id)
     assert os.path.exists(world.path_a)
+
+
+def test_a_file_that_cannot_be_removed_keeps_the_record_and_says_so(
+    world, client, login_as, db_session, monkeypatch
+):
+    def refuse(*args, **kwargs):
+        raise OSError("read-only")
+
+    monkeypatch.setattr(os, "replace", refuse)
+    login_as(client, world.editor_a)
+    resp = client.delete(URL.format(app_id=world.app_a.id, doc_id=world.doc_a.id))
+    assert resp.status_code == 500
+    assert "not deleted" in resp.get_json()["error"]
+    assert _exists(db_session, world.doc_a.id)
+    assert os.path.exists(world.path_a)
+
+
+def test_a_failed_record_removal_leaves_the_stored_file_in_place(
+    world, client, login_as, db_session, monkeypatch
+):
+    from app.extensions import db
+
+    def refuse():
+        raise RuntimeError("database unavailable")
+
+    login_as(client, world.editor_a)
+    monkeypatch.setattr(db.session, "commit", refuse)
+    resp = client.delete(URL.format(app_id=world.app_a.id, doc_id=world.doc_a.id))
+    monkeypatch.undo()
+    assert resp.status_code == 500
+    assert _exists(db_session, world.doc_a.id)
+    assert os.path.exists(world.path_a)
+    assert not os.path.exists(world.path_a + ".deleting")

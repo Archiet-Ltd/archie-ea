@@ -754,22 +754,41 @@ def api_delete_architecture_document(id, doc_id):
 
     doc = _own_document_or_404(id, doc_id)
 
+    # Record and stored file go together: the file is first moved aside, the record is then removed,
+    # and only a committed removal discards the file. If either step fails, nothing is lost.
+    file_path = doc.file_path
+    aside_path = None
     try:
-        file_path = doc.file_path
+        if file_path and os.path.exists(file_path):
+            aside_path = f"{file_path}.deleting"
+            os.replace(file_path, aside_path)
+    except OSError:
+        current_app.logger.exception("Stored document file could not be set aside")
+        return (
+            jsonify(
+                {"error": "The document was not deleted because its stored file could not be removed"}
+            ),
+            500,
+        )
+
+    try:
         db.session.delete(doc)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting document: {e}")
+        if aside_path:
+            try:
+                os.replace(aside_path, file_path)
+            except OSError:
+                current_app.logger.exception("Stored document file could not be put back")
         return jsonify({"error": "An internal error occurred"}), 500
 
-    # The stored file goes only once the record is gone, so a failed commit never leaves a
-    # record pointing at a missing file.
-    try:
-        if file_path and os.path.exists(file_path):
-            os.remove(file_path)
-    except OSError:
-        current_app.logger.warning("Document record deleted; stored file could not be removed")
+    if aside_path:
+        try:
+            os.remove(aside_path)
+        except OSError:
+            current_app.logger.warning("Document deleted; leftover stored file could not be removed")
 
     return jsonify({"success": True, "message": "Document deleted"})
 
