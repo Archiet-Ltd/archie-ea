@@ -90,7 +90,7 @@ def test_the_procurement_person_reads_the_renewals_and_another_organisations_con
         end_date=dt.date.today() + dt.timedelta(days=190)))
     db_session.flush()
 
-    person = User.query.filter_by(email="taylor.procurement@lantern-quay.example.com", organization_id=org_id).one()
+    person = User.query.filter_by(email="taylor.brennan@lantern-quay.example.com", organization_id=org_id).one()
     assert person.enterprise_role == "procurement"
     login_as(client, person)
     page = client.get("/procurement/renewals")

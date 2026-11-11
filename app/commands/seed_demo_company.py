@@ -869,7 +869,7 @@ _DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.tanaka@lantern-quay.example.com"
 
 # The one procurement person in the demonstration, so the contract renewals can be walked signed in as the role
 # that reads them. Matches an entry of _OWNER_USERS.
-_DEMO_PROCUREMENT_EMAIL = "taylor.procurement@lantern-quay.example.com"
+_DEMO_PROCUREMENT_EMAIL = "taylor.brennan@lantern-quay.example.com"
 
 # Map from display name (as used in BusinessActor elements) to User email.
 _OWNER_NAME_TO_EMAIL = {
