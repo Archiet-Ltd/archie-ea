@@ -131,7 +131,7 @@ def test_the_register_counts_open_gaps_by_severity_and_lists_those_rows(db_sessi
     with mock.patch("app.routes.unified_enterprise_routes.render_template", return_value="ok") as render:
         client.get("/enterprise/implementation/gap-analysis")
     open_by_severity = render.call_args.kwargs["open_by_severity"]
-    assert open_by_severity == {"critical": 2, "high": 1, "medium": 0, "low": 0}
+    assert open_by_severity == {"critical": 2, "high": 1, "medium": 0, "low": 0, "unrated": 0}
     for level, figure in open_by_severity.items():
         with mock.patch("app.routes.unified_enterprise_routes.render_template", return_value="ok") as render:
             client.get("/enterprise/implementation/gap-analysis?severity=%s&status=open" % level)
