@@ -551,6 +551,16 @@
               '</div>';
 
         div.innerHTML = avatar + bubble;
+        if (isAi) {
+            /* A slash command an answer offers (the closest recorded names) is run by a click or Enter. */
+            div.querySelectorAll('.message-content code').forEach(function (code) {
+                if (!/^\/[a-z-]+ \S/.test(code.textContent)) return;
+                code.setAttribute('role', 'button');
+                code.setAttribute('tabindex', '0');
+                code.setAttribute('data-run-command', code.textContent);
+                code.classList.add('cursor-pointer', 'underline');
+            });
+        }
         if (isAi && metadata.genomeHtml) applyGenomeAnswer(div, metadata.genomeHtml);
         if (container) container.appendChild(div);
 

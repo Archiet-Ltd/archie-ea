@@ -456,7 +456,9 @@
 
         // Stream the reply token-by-token (like ChatGPT). If streaming can't be
         // established, fall through to the non-streaming request below.
-        try { if (await streamAiReply(_payload, loadingId, startTime, timestamp)) return; }
+        /* A slash command is run by the server before any model is asked, on the non-streaming endpoint;
+           the streaming endpoint hands every message to the model. */
+        try { if (!message.startsWith('/') && await streamAiReply(_payload, loadingId, startTime, timestamp)) return; }
         catch (_streamErr) {
             /* A user-initiated stop is not a transport failure: re-issuing the
                turn against the non-streaming endpoint would be the opposite of
@@ -830,12 +832,27 @@
     // =========================================================================
     // CSP-safe event delegation — handles all dynamically-injected data-action buttons
     // =========================================================================
+    document.addEventListener('keydown', (event) => {
+        const offered = event.target.closest && event.target.closest('[data-run-command]');
+        if (offered && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            runQuickQuery(offered.dataset.runCommand);
+        }
+    });
+
     document.addEventListener('click', (event) => {
         // --- quick-query (sidebar NL query suggestions) ---
         const quickQueryButton = event.target.closest('[data-quick-query]');
         if (quickQueryButton) {
             event.preventDefault();
             runQuickQuery(quickQueryButton.dataset.quickQuery);
+            return;
+        }
+
+        const offered = event.target.closest('[data-run-command]');
+        if (offered) {
+            event.preventDefault();
+            runQuickQuery(offered.dataset.runCommand);
             return;
         }
 
