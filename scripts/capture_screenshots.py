@@ -554,7 +554,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
                 name=name, solution_type=solution_type, business_domain=domain,
                 complexity_level=complexity, status=status,
                 governance_status="proposed" if status == "planned" else "approved",
-                solution_owner="Demo User", created_by_id=demo_user_id,
+                solution_owner="Alex Brooks", created_by_id=demo_user_id,
             ))
         db.session.flush()
 
@@ -578,9 +578,9 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
         # No ConnectorConfig seeding: app/services/public_pages.py's
         # MODULE_CAPTURES explains why (api_list_connectors 500s on any
-        # row). sage.itops keeps her Administrator role grant above anyway
-        # -- harmless, and ready for whenever that bug is fixed and this
-        # module's capture_status goes back to live.
+        # row). The Administrator role grant above is harmless meanwhile,
+        # and ready for whenever that bug is fixed and this module's
+        # capture_status goes back to live.
 
         db.session.commit()
 
