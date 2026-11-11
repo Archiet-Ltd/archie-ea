@@ -17,6 +17,8 @@ from wtforms import (
 )
 from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
+from app.services.application_status import APPLICATION_STATUSES, match_status
+
 
 class ApplicationComponentForm(FlaskForm):
     """Form for creating/editing Application Components"""
@@ -91,17 +93,10 @@ class ApplicationComponentForm(FlaskForm):
 
     deployment_status = SelectField(
         "Deployment Status",
-        choices=[
-            ("planned", "Planned"),
-            ("development", "Development"),
-            ("testing", "Testing"),
-            ("staging", "Staging"),
-            ("production", "Production"),
-            ("deprecated", "Deprecated"),
-            ("retired", "Retired"),
-        ],
-        default="planned",
+        choices=list(APPLICATION_STATUSES),
+        default="design",
         validators=[DataRequired()],
+        filters=[lambda value: match_status(value) or value],
     )
 
     business_domain = StringField(
@@ -595,20 +590,6 @@ class ApplicationComponentForm(FlaskForm):
     vendor_products = SelectMultipleField(
         "Vendor Products", choices=[], coerce=int, validators=[Optional()]
     )
-
-
-# NOTE: a second, standalone `class OverviewForm(FlaskForm)` with its own ten
-# fields used to be defined immediately above this one. Python bound the name to
-# whichever came last, so that definition was dead — every `OverviewForm()` in the
-# codebase already resolved to the alias below. Removed rather than kept, since two
-# forms sharing a name is how the wrong one gets edited.
-
-
-# Alias for backward compatibility - OverviewForm is the same as ApplicationComponentForm
-class OverviewForm(ApplicationComponentForm):
-    """Form for application overview tab (alias for ApplicationComponentForm)"""
-
-    pass
 
 
 # Layer forms (placeholders for future implementation)

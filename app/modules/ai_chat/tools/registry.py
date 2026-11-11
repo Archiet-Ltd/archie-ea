@@ -11,6 +11,8 @@ Tools always accept names (not IDs) — the EntityResolver converts them.
 
 import re
 
+from app.services.application_status import APPLICATION_STATUS_VALUES
+
 TOOL_SCHEMAS = [
     {
         "name": "create_solution",
@@ -209,10 +211,7 @@ TOOL_SCHEMAS = [
                 "new_status": {
                     "type": "string",
                     "description": "New lifecycle/deployment status",
-                    "enum": [
-                        "design", "development", "testing",
-                        "production", "retiring", "decommissioned",
-                    ],
+                    "enum": list(APPLICATION_STATUS_VALUES),
                 },
                 "rationale": {
                     "type": "string",
