@@ -243,3 +243,68 @@ def test_a_password_key_and_url_token_in_an_ordinary_field_never_reach_the_revie
     for word in ("Connect with password=", "and api_key=", "via https://x.io/a?token="):
         assert word in sent[0], word
     assert ledger.name in sent[0]
+
+
+def test_a_blocked_approve_leaves_no_resumed_row_and_an_unblocked_one_leaves_exactly_one(
+    db_session, make_org, tenant_ctx, monkeypatch
+):
+    import app.connectors.github as github
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+    from app.modules.genome.patch.proposer import propose_genome_patch
+
+    org, other = make_org("rec-g"), make_org("rec-h")
+    requester = _make_admin(db_session, org, "blkreq")
+    approver = _make_admin(db_session, org, "blkapp")
+    other_requester = _make_admin(db_session, other, "blkoth")
+    other_approver = _make_admin(db_session, other, "blkoap")
+    name = "Blocked Patch %s" % uuid.uuid4().hex[:6]
+    FakeReviewer([PASS_ALL, PASS_ALL]).install(monkeypatch)
+
+    with tenant_ctx(other.id):
+        other_id = propose_genome_patch(
+            request_text="propose", user_id=other_requester.id,
+            patch_source=lambda *_a, **_k: _valid_patch(other.id, name="Other %s" % name))["approval_id"]
+        _pause(other, other_requester)
+        db_session.commit()
+        AIChatApprovalService(other_approver.id).approve_and_execute(other_id, other_approver.id)
+        assert _events(other_id).count("paused") == 1
+
+    with tenant_ctx(org.id):
+        _pause(org, requester)
+        db_session.commit()
+        aid = propose_genome_patch(
+            request_text="propose", user_id=requester.id,
+            patch_source=lambda *_a, **_k: _valid_patch(org.id, name=name))["approval_id"]
+        AIChatApprovalService(approver.id).approve_and_execute(aid, approver.id)
+        assert _events(aid).count("paused") == 1, "the change is held while writes are paused"
+        _resume(org)
+        db_session.commit()
+
+        # A repository proposal whose prerequisite is missing blocks the Approve: nothing is claimed.
+        row = AIChatCRUDApproval.query.filter_by(id=aid, organization_id=org.id).one()
+        real_type = row.operation_type
+        row.operation_type = "repository_classification"
+        db_session.commit()
+        real_blocker = github.proposal_blocker
+        monkeypatch.setattr(github, "proposal_blocker", lambda approval: "The application is not in the model yet.")
+        blocked = AIChatApprovalService(approver.id).approve_and_execute(aid, approver.id)
+        assert blocked["success"] is False and blocked["code"] == "CONFLICT", blocked
+        assert _events(aid).count("resumed") == 0, _events(aid)
+        db_session.rollback()
+        assert _events(aid).count("resumed") == 0, "a blocked Approve leaves no resumed row after the session ends"
+        assert _row(aid).status.value == "pending"
+
+        # The blocker clears: the same Approve now goes through and leaves exactly one resumed row.
+        monkeypatch.setattr(github, "proposal_blocker", real_blocker)
+        row = AIChatCRUDApproval.query.filter_by(id=aid, organization_id=org.id).one()
+        row.operation_type = real_type
+        db_session.commit()
+        applied = AIChatApprovalService(approver.id).approve_and_execute(aid, approver.id)
+        assert applied["success"] is True, applied
+        events = _events(aid)
+        assert events.count("resumed") == 1, events
+        assert events.index("paused") < events.index("resumed") < events.index("approved"), events
+        assert _element_count_by_name(org.id, name) == 1
+    with tenant_ctx(other.id):
+        assert _events(other_id).count("resumed") == 0, "the other workspace's held record is not touched"

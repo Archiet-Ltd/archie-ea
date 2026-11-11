@@ -947,9 +947,6 @@ class AIChatApprovalService:
                              "is held. Approve it again after they resume.",
                 }
 
-            if not settled_by_review:
-                change_review.record_resumed_after_pause(self, approval)
-
             # A GitHub proposal that cannot land yet (a part whose application is not
             # in the model, a link whose end is not) is refused here, before it is
             # claimed, so it stays pending and can be approved once its prerequisite is.
@@ -979,6 +976,10 @@ class AIChatApprovalService:
                     "code": "CONFLICT",
                     "error": "Approval was already claimed or is no longer actionable",
                 }
+            # The "resumed" row is written only now that nothing blocks the change and it is claimed, and
+            # in the same commit as the claim, so a blocked or lost Approve leaves no such row.
+            if not settled_by_review:
+                change_review.record_resumed_after_pause(self, approval)
             # The claim is the at-most-once boundary and must be committed
             # before a best-effort audit can fail.  In particular, rolling back
             # a failed audit must never reopen a write that may be dispatched.
