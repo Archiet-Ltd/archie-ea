@@ -888,6 +888,8 @@ let ComposerPersistence = (function() {
                 self.$nextTick(function() {
                     self.fitCanvasReadable();
                     self.refreshMaturityOverlay();
+                    /* the quality figure and warnings count a viewpoint switch shows */
+                    if (self._diagramChanged) self._diagramChanged();
                     /* CMP2-001: Re-apply state overlay after loading viewpoint */
                     if (self.stateViewMode !== 'all') { self.applyStateOverlay(); }
                     if (window.lucide) lucide.createIcons();
@@ -2508,6 +2510,7 @@ let ComposerPersistence = (function() {
 
                 self.$nextTick(function() {
                     self.fitCanvasReadable();
+                    if (self._diagramChanged) self._diagramChanged();
                     if (window.lucide) lucide.createIcons();
                 });
             })
