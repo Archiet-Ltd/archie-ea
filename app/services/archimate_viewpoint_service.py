@@ -573,7 +573,6 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             # bare .query is already scoped to g.current_org_id by the
             # do_orm_execute listener (app/middleware/tenant_isolation.py) --
             # no manual organization_id predicate needed or wanted here.
-            from app import db as _db
             query = ArchiMateElement.query
             if allowed_types:
                 query = query.filter(ArchiMateElement.type.in_(allowed_types))
