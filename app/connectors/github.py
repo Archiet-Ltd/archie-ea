@@ -74,6 +74,7 @@ import base64
 import json
 import logging
 import re
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -1487,15 +1488,12 @@ class _RepositoryEvidence:
         from app.models.ai_chat_crud_approval import AIChatCRUDApproval
         from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
 
-        known = {
-            (p.get("from"), p.get("to"), p.get("kind"))
-            for p in (
-                json.loads(a.operation_payload or "{}")
-                for a in AIChatCRUDApproval.query.filter_by(
-                    organization_id=self.org_id, source_table=PROPOSAL_SOURCE, operation_type=OP_RELATE
-                ).all()
-            )
-        }
+        known = {}
+        for earlier in AIChatCRUDApproval.query.filter_by(
+            organization_id=self.org_id, source_table=PROPOSAL_SOURCE, operation_type=OP_RELATE
+        ).all():
+            p = json.loads(earlier.operation_payload or "{}")
+            known[(p.get("from"), p.get("to"), p.get("kind"))] = (earlier, p)
         created = 0
         for full_name in self.repos:
             try:
@@ -1508,11 +1506,15 @@ class _RepositoryEvidence:
             for edge in edges:
                 key = (edge["from"], edge["to"], edge["kind"])
                 try:
-                    if key in known or not self._modelled(edge["to"]):
+                    if key in known:
+                        if known[key] is not None:
+                            self._claim_for_product(*known[key])
+                        continue
+                    if not self._modelled(edge["to"]):
                         continue
                 except GitHubConnectorError:
                     continue
-                known.add(key)
+                known[key] = None
                 # "A depends on B" is B serving A; a deploy link is read from the deployer to what it deploys.
                 supplier, consumer = (edge["to"], edge["from"]) if edge["kind"] == "dependency" else (edge["from"], edge["to"])
                 names = {r: _title(self.repos[r].get("name") or "") for r in (supplier, consumer) if r in self.repos}
@@ -1550,15 +1552,12 @@ class _RepositoryEvidence:
         from app.models.ai_chat_crud_approval import AIChatCRUDApproval
         from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
 
-        known = {
-            (p.get("from"), p.get("technology"))
-            for p in (
-                json.loads(a.operation_payload or "{}")
-                for a in AIChatCRUDApproval.query.filter_by(
-                    organization_id=self.org_id, source_table=PROPOSAL_SOURCE, operation_type=OP_TECHNOLOGY
-                ).all()
-            )
-        }
+        known = {}
+        for earlier in AIChatCRUDApproval.query.filter_by(
+            organization_id=self.org_id, source_table=PROPOSAL_SOURCE, operation_type=OP_TECHNOLOGY
+        ).all():
+            p = json.loads(earlier.operation_payload or "{}")
+            known[(p.get("from"), p.get("technology"))] = (earlier, p)
         created = 0
         for full_name in self.repos:
             try:
@@ -1573,8 +1572,10 @@ class _RepositoryEvidence:
                     text = self._text(full_name, file)
                     for name, element_type, image, line in github_model.compose_technologies(text or ""):
                         if (full_name, name) in known:
+                            if known[(full_name, name)] is not None:
+                                self._claim_for_product(*known[(full_name, name)])
                             continue
-                        known.add((full_name, name))
+                        known[(full_name, name)] = None
                         application = _title(self.repos[full_name].get("name") or "")
                         detail = f"{file} line {line} runs {image}"
                         summary = f"{application} runs on {name} ({detail})."
@@ -1726,6 +1727,8 @@ def skip_proposal(org_id, approval_id, user_id) -> Dict[str, Any]:
 # --------------------------------------------------------------------- #
 
 FIRST_SYNC_TASK = "github_first_sync"
+BUSY_WAIT_SECONDS = 300  # how long a read of chosen repositories waits for a read already under way
+BUSY_WAIT_STEP = 3
 
 
 def run_first_sync(org_id, connector_id, scope=None) -> Dict[str, Any]:
@@ -1739,6 +1742,13 @@ def run_first_sync(org_id, connector_id, scope=None) -> Dict[str, Any]:
     try:
         with tenant_scope(org_id):
             result = run_connector_sync(org_id=org_id, connector_id=connector_id, delegated=True, scope=scope)
+            # A read of chosen repositories that meets the read of the whole account (started when GitHub
+            # was connected) waits for it rather than failing: the person asked for this one.
+            waited = 0
+            while scope and result.get("busy") and waited < BUSY_WAIT_SECONDS:
+                time.sleep(BUSY_WAIT_STEP)
+                waited += BUSY_WAIT_STEP
+                result = run_connector_sync(org_id=org_id, connector_id=connector_id, delegated=True, scope=scope)
             db.session.commit()
     except CredentialUnreadable as exc:  # the sentence says what failed and who can fix it
         db.session.rollback()

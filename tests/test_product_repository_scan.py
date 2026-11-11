@@ -153,6 +153,8 @@ def test_a_proposal_from_the_whole_organisation_read_is_claimed_by_the_product_t
     assert by_repo["acme/payments-service"] == {world.product.id}
     assert by_repo["acme/customer-portal"] == {world.product.id}
     assert by_repo["acme/billing-api"] == {None}, "a repository nobody chose stays unclaimed"
+    technologies = _pending(org_a, "repository_technology")
+    assert [(t["technology"], t["product_id"]) for t in technologies] == [("Redis", world.product.id)]
 
 
 def test_a_product_of_another_organisation_is_never_joined(db_session, tenant_ctx, org_a, org_b, world, people):
