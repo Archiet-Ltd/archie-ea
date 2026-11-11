@@ -185,7 +185,7 @@ def _field(text: str, label: str) -> list[str]:
 
 
 def brief_id(stem: str) -> str:
-    """`T-sysmodel-01` from `T-sysmodel-01-dispatch-impact-check`: the leading letters, name and number."""
+    """`K-sample-01` from `K-sample-01-dispatch-impact-check`: the leading letters, name and number."""
     m = re.match(r"^([A-Za-z]+-[A-Za-z]+-\d+[a-z]?)(?:-|$)", stem)
     return m.group(1) if m else stem
 

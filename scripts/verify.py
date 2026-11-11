@@ -935,8 +935,10 @@ def gate_system_model() -> Result:
     return its counts, then every check runs on the real model and none may exceed model/ratchet.json."""
     first = _sysml("model_check.py", "selfcheck")
     if first.returncode == 3:
-        return Result("system-model", FAIL, "the SysML parser is not installed: run scripts/sysml/install_parser.sh "
-                      "and set SYSML_HOME", 1, 0)
+        how = "run scripts/sysml/install_parser.sh and set SYSML_HOME"
+        if not os.environ.get("CI"):
+            return Result("system-model", SKIP, f"the SysML parser is not installed on this machine: {how}")
+        return Result("system-model", FAIL, f"the SysML parser is not installed: {how}", 1, 0)
     if first.returncode:
         return Result("system-model", FAIL, first.stdout[-1500:], 1, 0)
     proc = _sysml("model_check.py", "check")

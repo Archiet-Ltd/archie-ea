@@ -448,10 +448,51 @@ def test_the_system_model_gate_carries_the_static_tag_and_fails_with_one_line_wh
     class Run:
         returncode = 3
         stdout = ""
+    monkeypatch.setenv("CI", "1")
     monkeypatch.setattr(verify, "_sysml", lambda *a: Run())
     result = verify.gate_system_model()
     assert result.status == verify.FAIL and "SysML parser is not installed" in result.detail
     assert "\n" not in result.detail.strip()
+
+
+def test_the_system_model_gate_is_skipped_with_the_install_command_when_the_parser_is_missing_and_not_in_ci(monkeypatch):
+    import verify
+
+    class Run:
+        returncode = 3
+        stdout = ""
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.setattr(verify, "_sysml", lambda *a: Run())
+    result = verify.gate_system_model()
+    assert result.status == verify.SKIP
+    assert "scripts/sysml/install_parser.sh" in result.detail and "not installed" in result.detail
+    assert "\n" not in result.detail.strip()
+
+
+def test_the_system_model_gate_runs_the_checks_when_the_parser_is_installed_and_fails_on_a_finding(monkeypatch):
+    import verify
+    calls = []
+
+    def fake(*args):
+        calls.append(args[1])
+
+        class Run:
+            returncode = 1 if (args[1] == "check" and finding) else 0
+            stdout = "one finding"
+            stderr = ""
+        return Run()
+    monkeypatch.setattr(verify, "_sysml", fake)
+    for ci_value in (None, "1"):
+        if ci_value:
+            monkeypatch.setenv("CI", ci_value)
+        else:
+            monkeypatch.delenv("CI", raising=False)
+        finding = False
+        calls.clear()
+        assert verify.gate_system_model().status == verify.PASS and calls == ["selfcheck", "check"]
+        finding = True
+        failed = verify.gate_system_model()
+        assert failed.status == verify.FAIL and "one finding" in failed.detail
 
 
 def test_the_scope_names_the_fields_modelled_and_does_not_limit_which_readers_are_read(tmp_path):
@@ -668,25 +709,25 @@ def test_the_check_command_exits_non_zero_over_a_ratchet_and_zero_at_or_below_it
 
 # ----------------------------------------------------------------------------------- check 5, the rest
 def test_a_brief_names_its_own_branch_from_its_seat_note_else_from_its_id_and_never_from_a_mention(tmp_path):
-    seat = "# x\n\nSEAT NOTE: you work on branch ui/sysmodel02, based on ui/sysmodel01.\nSee branch `ui/other` too.\n"
-    assert mc.own_branch(seat, "sysmodel02") == "ui/sysmodel02"
-    assert mc.own_branch("SEAT NOTE: you work on branch ui/sysmodel02.\n", "x") == "ui/sysmodel02"
+    seat = "# x\n\nSEAT NOTE: you work on branch ui/sample02, based on ui/sample01.\nSee branch `ui/other` too.\n"
+    assert mc.own_branch(seat, "sample02") == "ui/sample02"
+    assert mc.own_branch("SEAT NOTE: you work on branch ui/sample02.\n", "x") == "ui/sample02"
     assert mc.own_branch("you work on branch `ui/fix-1.2` today", "x") == "ui/fix-1.2"
-    mention = "# T\n\nThe slice on branch `ui/sysmodel01` already holds the rule.\n"
-    assert mc.own_branch(mention, "T-sysmodel-01-dispatch-impact-check") == "ui/T-sysmodel-01"
-    assert mc.brief_id("T-sysmodel-05b-interaction-model-and-checks") == "T-sysmodel-05b"
+    mention = "# T\n\nThe slice on branch `ui/sample01` already holds the rule.\n"
+    assert mc.own_branch(mention, "K-sample-01-dispatch-impact-check") == "ui/K-sample-01"
+    assert mc.brief_id("K-sample-05b-interaction-model-and-checks") == "K-sample-05b"
     assert mc.brief_id("odd") == "odd"
 
 
 def test_the_real_dispatch_brief_prints_its_own_branch_and_not_the_one_it_mentions(tmp_path):
     repo = _repo_with_two_branches(tmp_path)
-    brief = tmp_path / "T-sysmodel-01-dispatch-impact-check.md"
+    brief = tmp_path / "K-sample-01-dispatch-impact-check.md"
     brief.write_text("# T\n\n- The slice on branch `ui/first` already holds the rule.\n")
     script = str(REPO_ROOT / "scripts/sysml/model_check.py")
     run = subprocess.run([sys.executable, script, "impact", "--repo", str(repo), "--base", "line", "--new", str(brief)],
                          capture_output=True, text=True)
     assert run.returncode == 0
-    assert "own branch ui/T-sysmodel-01 (not created yet)" in run.stdout and "ui/first" not in run.stdout
+    assert "own branch ui/K-sample-01 (not created yet)" in run.stdout and "ui/first" not in run.stdout
 
 
 def test_two_branches_that_change_one_file_under_migrations_or_tests_collide(tmp_path):
