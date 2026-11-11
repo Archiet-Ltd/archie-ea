@@ -119,6 +119,12 @@
 <div class="flex flex-wrap items-center gap-2 px-3 py-1" data-testid="composer-view-actions">
   {{ dropdown_menu(id='composer-viewpoint-menu', trigger_text='Viewpoint', trigger_icon='layers', trigger_size='sm', transition='opacity', menu_width='w-72', position='left', trigger_testid='menu-viewpoint', trigger_aria_label='Choose a viewpoint', items=viewpoint_items) }}
   {{ dropdown_menu(id='composer-save-menu', trigger_text='Save', trigger_icon='save', trigger_size='sm', transition='opacity', menu_width='w-72', position='left', trigger_testid='menu-save', trigger_aria_label='Save options', items=save_items) }}
+  {{ button(text='All layers', variant='outline', size='sm', icon='layers', attrs_dict={'@click': 'selectViewpoint(activeViewpoint, activeViewpointName)', 'x-show': 'openedLayer && activeViewpoint', 'x-cloak': '', 'data-testid': 'composer-all-layers'}) }}
+  <nav class="flex flex-wrap items-center gap-2" aria-label="Open a layer" x-show="layerCards.length > 0" x-cloak data-testid="composer-layer-buttons">
+    <template x-for="card in layerCards" :key="card.layer">
+      {% call button(variant='outline', size='sm', class='gap-2', attrs_dict={'@click': 'openLayer(card.layer)', ':aria-label': "'Open ' + card.label", ':data-testid': "'composer-layer-' + card.layer"}) %}<span x-text="card.title"></span><span class="tabular-nums text-muted-foreground" x-text="card.count"></span>{% endcall %}
+    </template>
+  </nav>
   {{ button(text='Submit for review', variant='outline', size='sm', icon='send', class='hidden md:inline-flex', attrs_dict={'@click': 'submitForReview()', 'x-show': 'currentSavedVpId && elementCount > 0 && relCount > 0 && !viewpointReviewStatus', 'x-cloak': ''}) }}
   <span class="hidden md:inline" x-show="viewpointReviewStatus" x-cloak>{% call badge(variant='secondary') %}<span x-text="viewpointReviewStatus === 'submitted' ? 'Under review' : viewpointReviewStatus === 'approved' ? 'Approved' : 'Changes requested'"></span>{% endcall %}</span>
   {% call button(variant='outline', size='sm', class='gap-1', attrs_dict={'@click': 'compliancePanelOpen = !compliancePanelOpen', 'x-show': 'elementCount >= 2', 'x-cloak': '', 'aria-label': 'Diagram quality score, open details'}) %}

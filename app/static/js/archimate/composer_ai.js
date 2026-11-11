@@ -1890,6 +1890,10 @@ let ComposerAI = (function() {
         compliancePanelOpen: false,
         _complianceTimer: null,
 
+        /* One pass over the drawing. The quality figure, the list of deductions behind it
+           and the toolbar's error and warning counts all come from the issues found here,
+           so the figure can never read 100% beside a warning it counts. Each issue is
+           listed; the penalty it costs is capped per rule, so a capped issue lists at 0. */
         computeComplianceScore: function() {
             let self = this;
             let score = 100;
@@ -1898,41 +1902,52 @@ let ComposerAI = (function() {
                 return !el.get('isLayerZone') && !el.get('isAnnotation');
             });
             let links = self.graph.getLinks();
+            let nameOf = function(el) {
+                return el.get('elName') || el.get('attrs/label/text') || 'Unnamed';
+            };
+            /* Add one issue; its penalty is whatever is left under the rule's cap. */
+            let spent = {};
+            let issue = function(severity, rule, each, cap, elementId, message) {
+                let pen = Math.max(0, Math.min(each, cap - (spent[rule] || 0)));
+                spent[rule] = (spent[rule] || 0) + pen;
+                score -= pen;
+                deductions.push({ severity: severity, rule: rule, penalty: pen, elementId: elementId, message: message });
+            };
 
-            /* (a) Orphan elements: no connected links → -5 each, max -25 */
-            let orphanPenalty = 0;
-            let orphanCount = 0;
-            elements.forEach(function(el) {
-                let connected = self.graph.getConnectedLinks(el);
-                if (connected.length === 0) {
-                    orphanCount++;
-                    let pen = Math.min(5, 25 - orphanPenalty);
-                    if (pen > 0) {
-                        orphanPenalty += pen;
-                        deductions.push({
-                            rule: 'Orphan element',
-                            penalty: pen,
-                            elementId: el.id,
-                            message: (el.get('elName') || el.get('attrs/label/text') || 'Unnamed') + ' has no relationships'
-                        });
-                    }
+            /* (a) Self-relationships are errors */
+            links.forEach(function(link) {
+                let src = link.get('source');
+                let tgt = link.get('target');
+                if (src && tgt && src.id && tgt.id && src.id === tgt.id) {
+                    let cell = link.getSourceElement();
+                    issue('error', 'Self-relationship', 10, 20, cell ? cell.id : null,
+                        (cell ? nameOf(cell) : 'An element') + ' is related to itself');
                 }
             });
-            score -= orphanPenalty;
 
-            /* (a2) The toolbar's warning count is the one list of warnings: any it
-               shows beyond the orphans above (duplicate names) lowers the figure too,
-               so the quality figure and the warnings count cannot disagree. */
-            let countedOrphans = elements.length >= 2 ? orphanCount : 0;
-            let otherWarnings = Math.max(0, (self.validationWarnings || 0) - countedOrphans);
-            if (otherWarnings > 0) {
-                let dupPenalty = Math.min(10, 2 * otherWarnings);
-                score -= dupPenalty;
-                deductions.push({ rule: 'Duplicate name', penalty: dupPenalty, elementId: null,
-                    message: otherWarnings + (otherWarnings === 1 ? ' name is used by more than one element' : ' names are each used by more than one element') });
+            /* (b) Orphan elements: no connected links, only judged once 2+ elements exist */
+            if (elements.length >= 2) {
+                elements.forEach(function(el) {
+                    if (self.graph.getConnectedLinks(el).length === 0) {
+                        issue('warning', 'Orphan element', 5, 25, el.id, nameOf(el) + ' has no relationships');
+                    }
+                });
             }
 
-            /* (b) Layer coverage — only check if >= 5 elements */
+            /* (c) Duplicate names: one issue per duplicated name */
+            let seen = {};
+            let reported = {};
+            elements.forEach(function(el) {
+                let name = (el.get('elName') || '').trim().toLowerCase();
+                if (!name) return;
+                if (!seen[name]) { seen[name] = el; return; }
+                if (!reported[name]) {
+                    reported[name] = true;
+                    issue('warning', 'Duplicate name', 2, 10, seen[name].id, nameOf(seen[name]) + ' is named more than once');
+                }
+            });
+
+            /* (d) Layer coverage — only check if >= 5 elements */
             if (elements.length >= 5) {
                 let layers = {};
                 elements.forEach(function(el) {
@@ -1942,28 +1957,16 @@ let ComposerAI = (function() {
                     }
                     if (layer) layers[layer] = true;
                 });
-                if (!layers['motivation']) {
-                    score -= 15;
-                    deductions.push({ rule: 'Missing layer', penalty: 15, elementId: null, message: 'No Motivation layer elements present' });
-                }
-                if (!layers['business']) {
-                    score -= 10;
-                    deductions.push({ rule: 'Missing layer', penalty: 10, elementId: null, message: 'No Business layer elements present' });
-                }
-                if (!layers['application']) {
-                    score -= 10;
-                    deductions.push({ rule: 'Missing layer', penalty: 10, elementId: null, message: 'No Application layer elements present' });
-                }
+                if (!layers['motivation']) issue('warning', 'Missing layer', 15, 15, null, 'No Motivation layer elements present');
+                if (!layers['business']) issue('warning', 'Missing layer', 10, 25, null, 'No Business layer elements present');
+                if (!layers['application']) issue('warning', 'Missing layer', 10, 35, null, 'No Application layer elements present');
             }
 
-            /* (c) Cross-layer connectivity: BusinessProcess should connect to Application layer */
-            let crossGapPenalty = 0;
+            /* (e) Cross-layer connectivity: BusinessProcess should connect to Application layer */
             elements.forEach(function(el) {
-                if (crossGapPenalty >= 20) return;
                 let elType = (el.get('elType') || el.get('type') || '').replace(/\s+/g, '');
                 if (elType !== 'BusinessProcess') return;
-                let connectedLinks = self.graph.getConnectedLinks(el);
-                let hasAppLink = connectedLinks.some(function(link) {
+                let hasAppLink = self.graph.getConnectedLinks(el).some(function(link) {
                     let source = link.getSourceElement();
                     let target = link.getTargetElement();
                     let other = (source && source.id === el.id) ? target : source;
@@ -1972,25 +1975,18 @@ let ComposerAI = (function() {
                     return otherType === 'ApplicationComponent' || otherType === 'ApplicationService';
                 });
                 if (!hasAppLink) {
-                    let pen = Math.min(5, 20 - crossGapPenalty);
-                    if (pen > 0) {
-                        crossGapPenalty += pen;
-                        deductions.push({
-                            rule: 'Cross-layer gap',
-                            penalty: pen,
-                            elementId: el.id,
-                            message: (el.get('elName') || el.get('attrs/label/text') || 'Unnamed') + ' has no link to Application layer'
-                        });
-                    }
+                    issue('warning', 'Cross-layer gap', 5, 20, el.id, nameOf(el) + ' has no link to Application layer');
                 }
             });
-            score -= crossGapPenalty;
 
-            /* Clamp 0–100 */
+            /* Clamp 0–100; a drawing with any issue is never perfect. */
             score = Math.max(0, Math.min(100, score));
+            if (deductions.length > 0) score = Math.min(score, 99);
 
             self.complianceScore = score;
             self.complianceDeductions = deductions;
+            self.validationErrors = deductions.filter(function(d) { return d.severity === 'error'; }).length;
+            self.validationWarnings = deductions.length - self.validationErrors;
         },
 
         highlightComplianceElement: function(elementId) {

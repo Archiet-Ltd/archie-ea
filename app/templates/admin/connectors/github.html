@@ -22,11 +22,15 @@
         {% if messages %}
             <div class="mb-6 space-y-2">
                 {% for category, message in messages %}
-                    {{ quiet_alert('success' if category == 'success' else ('danger' if category == 'error' else 'info'), text=message) }}
+                    {% call quiet_alert('success' if category == 'success' else ('danger' if category == 'error' else 'info')) %}{{ message }}{% endcall %}
                 {% endfor %}
             </div>
         {% endif %}
     {% endwith %}
+
+    {% if for_product %}
+    <p class="mb-6 text-sm text-muted-foreground" data-testid="github-for-product">You are connecting GitHub for <a href="{{ for_product.url }}" class="font-medium text-primary underline hover:underline">{{ for_product.name }}</a>. When it is connected you return there to choose its repositories.</p>
+    {% endif %}
 
     {% if github_app_configured %}
     <div class="mb-6 space-y-3" data-testid="github-app-connect">
@@ -38,6 +42,7 @@
 
     <form method="POST" action="{{ url_for('m365_connector.github_connect_save') }}" class="space-y-6" data-testid="github-connect-form">
         {{ hidden_input('csrf_token', csrf_token()) }}
+        {% if for_product %}{{ hidden_input('product', for_product.id) }}{% endif %}
 
         <div data-slot="card" class="rounded-lg border border-border bg-card">
             <div class="p-4 sm:p-6 space-y-4">
@@ -76,12 +81,19 @@
                 {% elif status.state == 'failed' %}{{ status.job.error if status.job and status.job.error else 'The read did not finish.' }}
                 {% else %}Connected to {{ status.organization }}.{% endif %}
             </p>
-            <dl class="mt-3 grid grid-cols-3 gap-4 text-xs text-muted-foreground">
+            <dl class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs text-muted-foreground">
                 <div><dt>Applications in your model</dt><dd class="text-base text-foreground tabular-nums" id="github-count-applications">{{ status.counts.applications }}</dd></div>
                 <div><dt>Parts</dt><dd class="text-base text-foreground tabular-nums" id="github-count-components">{{ status.counts.components }}</dd></div>
+                <div><dt>Technology</dt><dd class="text-base text-foreground tabular-nums" id="github-count-technologies">{{ status.counts.technologies }}</dd></div>
                 <div><dt>Links</dt><dd class="text-base text-foreground tabular-nums" id="github-count-relationships">{{ status.counts.relationships }}</dd></div>
             </dl>
             <div class="mt-4 flex items-center justify-end gap-3">
+                {% if 'archimate.model_map_page' in flask.current_app.view_functions %}
+                <a href="{{ url_for('archimate.model_map_page') }}" id="github-see-model" data-testid="github-see-model"
+                    class="inline-flex items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4{% if status.counts.applications|int + status.counts.components|int + status.counts.relationships|int == 0 %} hidden{% endif %}">
+                    See your model
+                </a>
+                {% endif %}
                 <a href="{{ review_url }}"
                     class="inline-flex items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4">
                     Review what was found
@@ -100,10 +112,12 @@
     var tries = 0;
     function show(s) {
         var c = s.counts || {};
-        ['applications', 'components', 'relationships'].forEach(function (k) {
+        ['applications', 'components', 'technologies', 'relationships'].forEach(function (k) {
             var el = document.getElementById('github-count-' + k);
             if (el) { el.textContent = c[k] || 0; }
         });
+        var see = document.getElementById('github-see-model');
+        if (see && ((c.applications || 0) + (c.components || 0) + (c.relationships || 0)) > 0) { see.classList.remove('hidden'); }
         if (s.state === 'done') {
             line.textContent = 'Read ' + (c.repositories || 0) + ' repositories. ' + (c.pending || 0) + ' proposals are ready for you to review.';
         } else if (s.state === 'failed') {

@@ -654,7 +654,7 @@ class ImplementationValidationService:
         elif archimate_element.type == "ImplementationPlateau":
             return ImplementationPlateau.query.get(archimate_element.id)
         elif archimate_element.type == "ImplementationGap":
-            return ImplementationGap.query.get(archimate_element.id)
+            return ImplementationGap.query.filter_by(id=archimate_element.id).first()
 
         return None
 

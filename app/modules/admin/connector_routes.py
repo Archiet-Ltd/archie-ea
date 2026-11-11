@@ -843,6 +843,24 @@ def jira_config_test():
 # ---------------------------------------------------------------------------
 
 
+def _product_asked_for(org_id: int, raw):
+    """The Product (id, name, page address) a person came from to connect GitHub, only when it is a Product
+    of the active organisation; anything else is ignored and the person stays on the connect page."""
+    from app.models.archimate_core import ArchiMateElement
+
+    if not str(raw or "").isdigit():
+        return None
+    product = ArchiMateElement.query.filter_by(id=int(raw), type="Product", organization_id=org_id).first()
+    if product is None:
+        return None
+    return {
+        "id": product.id,
+        "name": product.name,
+        "url": url_for("archimate_crud.detail_element", layer="business", element_type="Product",
+                       element_id=product.id, ae=1, bring_in=1) + "#bring-in",
+    }
+
+
 def _github_state(org_id: int) -> dict:
     """What the connect page and its status route report: the connection, the latest read and the counts.
     Never the token, only whether one is stored."""
@@ -855,8 +873,12 @@ def _github_state(org_id: int) -> dict:
     cfg = _load_org_connector(org_id, connector_type="github")
     if cfg is None:
         return {"state": "not_connected", "organization": None, "has_token": False, "counts": {}, "job": None}
-    jobs = get_job_queue_service().list_jobs(org_id, limit=1, task=gh.FIRST_SYNC_TASK)
-    job = jobs[0] if jobs else None
+    # The latest read, whether the connect page started it or sign-up did.
+    from app.modules.account.services.onboarding_service import GITHUB_TASK as SIGNUP_TASK
+
+    queue = get_job_queue_service()
+    reads = queue.list_jobs(org_id, limit=1, task=gh.FIRST_SYNC_TASK) + queue.list_jobs(org_id, limit=1, task=SIGNUP_TASK)
+    job = max(reads, key=lambda j: j.id) if reads else None
     state = {
         None: "connected",
         JobStatus.PENDING.value: "waiting",
@@ -896,6 +918,7 @@ def github_connect():
     return render_template(
         "admin/connectors/github.html",
         status=_github_state(org_id),
+        for_product=_product_asked_for(org_id, request.args.get("product")),
         review_url=url_for("m365_connector.github_review"),
         status_url=url_for("m365_connector.github_status"),
         github_app_configured=configured,
@@ -929,7 +952,11 @@ def github_connect_save():
         gh.connect_and_start(org_id, request.form.get("organization"), request.form.get("api_token"))
     except gh.ConnectRefused as exc:
         flash(str(exc), "error")
-        return redirect(url_for("m365_connector.github_connect"))
+        return redirect(url_for("m365_connector.github_connect", product=request.form.get("product") or None))
+    product = _product_asked_for(org_id, request.form.get("product"))
+    if product is not None:
+        flash("Connected. Choose the repositories to read for %s." % product["name"], "success")
+        return redirect(product["url"])
     flash("Connected. Reading your repositories now; this page shows when it is done.", "success")
     return redirect(url_for("m365_connector.github_connect"))
 
@@ -1061,6 +1088,7 @@ def github_review():
     return render_template(
         "admin/connectors/github_review.html",
         review=gh.pending_review(org_id),
+        model_counts=gh.model_counts(org_id),
         status=_github_state(org_id),
         classifications=gh.CLASSIFICATIONS,
     )

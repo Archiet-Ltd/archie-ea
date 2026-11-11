@@ -482,3 +482,29 @@ def site_url(app):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+@pytest.fixture
+def own_visitor_events(app, monkeypatch):
+    """The ids of the visitor events this test's own requests wrote, removed again by id when the test ends.
+
+    A parallel run can write events of the same kind, so a test never deletes "the newest" one."""
+    from app import db
+    from app.models.public_visitor_event import PublicVisitorEvent
+    from app.services import public_analytics_service
+
+    written: list[int] = []
+    real = public_analytics_service._record
+
+    def recording(*args, **kwargs):
+        row = real(*args, **kwargs)
+        if row is not None:
+            written.append(row.id)
+        return row
+
+    monkeypatch.setattr(public_analytics_service, "_record", recording)
+    yield written
+    with app.app_context():
+        if written:
+            PublicVisitorEvent.query.filter(PublicVisitorEvent.id.in_(written)).delete(synchronize_session=False)
+            db.session.commit()

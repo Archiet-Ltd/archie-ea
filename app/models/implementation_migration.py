@@ -862,13 +862,20 @@ class Gap(TenantMixin, db.Model):
             "description": self.description or "",
             "gap_type": self.gap_type,
             "priority": self.priority,
-            "severity": self.severity,
+            "severity": self.rated_severity,
             "resolution_status": self.resolution_status,
             "current_state_ref": self.current_state_ref,
             "target_state_ref": self.target_state_ref,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+    @property
+    def rated_severity(self):
+        """The severity every screen shows: critical when either field says so, the one critical-gap rule."""
+        from app.services.gap_register_service import effective_severity
+
+        return effective_severity(self)
 
     def to_roadmap_dict(self) -> dict:
         """Convert to dictionary for roadmap API responses."""
@@ -881,7 +888,7 @@ class Gap(TenantMixin, db.Model):
             "gap_types": self.get_all_gap_types(),
             "color": self.color or "#6B7280",
             "priority": self.priority,
-            "severity": self.severity,
+            "severity": self.rated_severity,
             "impact": self.impact,
             "resolution_status": self.resolution_status,
             "source_capability_type": self.source_capability_type,

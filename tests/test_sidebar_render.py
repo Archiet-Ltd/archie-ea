@@ -19,13 +19,16 @@ import pytest
 from app.utils.role_access import SIDEBAR_LINK_BUDGET
 from scripts.check_sidebar_links import count_links as _real_link_count
 
+# The retired Ask page's address; these tests assert it is absent and never open it.
+RETIRED_ASK = "/intelligence/ask"
+
 pytestmark = pytest.mark.usefixtures("db_session")
 
 TOP = ["Home", "AI chat", "Approvals"]
 WORK = ["Systems", "Impact", "Changes", "Spend", "Compliance"]
 LAYERS = ["Strategy", "Business", "Application", "Technology", "Physical", "Motivation",
           "Implementation and migration", "Other"]
-MODEL = LAYERS + ["Frameworks", "Canvases", "Composer"]
+MODEL = ["Model map"] + LAYERS + ["Frameworks", "Canvases", "Composer"]
 # Connections is for the architects who author the model and for administrators.
 INTERFACES = {"business_architect", "data_architect", "enterprise_architect", "platform_admin", "security_architect",
               "solution_architect"}
@@ -191,7 +194,7 @@ def test_the_entries_are_the_same_for_everyone_and_within_budget(app, db_session
     assert html.count('data-testid="sidebar-search"') == 1
     assert 'id="search-modal"' not in html and "Search navigation" not in html
     assert "All modules" not in sidebar_html
-    assert "/intelligence/ask" not in html
+    assert RETIRED_ASK not in html
 
 
 @pytest.mark.parametrize("role,label,admin,platform", PERSONAS)

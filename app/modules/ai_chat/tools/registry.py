@@ -11,6 +11,8 @@ Tools always accept names (not IDs) — the EntityResolver converts them.
 
 import re
 
+from app.services.application_status import APPLICATION_STATUS_VALUES
+
 TOOL_SCHEMAS = [
     {
         "name": "create_solution",
@@ -197,7 +199,7 @@ TOOL_SCHEMAS = [
             "Update the deployment/lifecycle status of an application. "
             "Use when the user wants to mark an application as retiring, "
             "decommissioned, in production, strategic, etc. "
-            "REQUIRES USER CONFIRMATION before executing."
+            "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -209,10 +211,7 @@ TOOL_SCHEMAS = [
                 "new_status": {
                     "type": "string",
                     "description": "New lifecycle/deployment status",
-                    "enum": [
-                        "design", "development", "testing",
-                        "production", "retiring", "decommissioned",
-                    ],
+                    "enum": list(APPLICATION_STATUS_VALUES),
                 },
                 "rationale": {
                     "type": "string",
@@ -233,7 +232,7 @@ TOOL_SCHEMAS = [
         "record_types_written": ["ARBReviewItem"],
         "description": (
             "Submit a solution for Architecture Review Board (ARB) governance review. "
-            "REQUIRES USER CONFIRMATION before executing."
+            "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -620,7 +619,7 @@ TOOL_SCHEMAS = [
         "record_types_written": ["BlueprintNarrative"],
         "description": (
             "Generate an AI narrative for a specific blueprint section. "
-            "REQUIRES USER CONFIRMATION — this overwrites existing section text. "
+            "This overwrites existing section text; the server checks and reviews it, then applies or declines it. "
             "section_id examples: sec-1 (Summary), sec-2 (Strategic), sec-3 (Business), "
             "sec-4 (Application), sec-5 (Options), sec-7 (Governance), sec-8 (Risks)."
         ),
@@ -1180,8 +1179,8 @@ TOOL_SCHEMAS = [
             "Probes: Abacus API connector, LLM API endpoints, integration pattern URLs. "
             "Returns up/down status per endpoint, latency, and a delta summary of what's "
             "modelled in Entelim vs what's actually reachable. "
-            "REQUIRES USER CONFIRMATION — outbound network connections, including "
-            "model-supplied URLs."
+            "Makes outbound network connections, including to model-supplied URLs; "
+            "the server checks and reviews the request, then runs it or declines it."
         ),
         "parameters": {
             "type": "object",
@@ -1450,7 +1449,7 @@ TOOL_SCHEMAS = [
             "artifact the solution-architect charter centres on. Captures the "
             "context, the decision taken, its rationale and consequences. The "
             "ADR is created in status 'proposed' and moves through approve/reject "
-            "governance afterwards. REQUIRES USER CONFIRMATION before executing."
+            "governance afterwards. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1515,7 +1514,7 @@ TOOL_SCHEMAS = [
             "that closes them. Writes current_maturity_level / target_maturity_level "
             "(and the derived maturity_gap) on the business capability, stamping the "
             "assessment date so the estate can tell an assessed capability from an "
-            "unassessed one. REQUIRES USER CONFIRMATION before executing."
+            "unassessed one. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1558,7 +1557,7 @@ TOOL_SCHEMAS = [
             "health, TIME action, 7R disposition and readiness gate) and creates "
             "the benefits-tracker row. "
             "USE when the user asks to score, re-score, or record a disposition for "
-            "a specific application. REQUIRES USER CONFIRMATION before executing."
+            "a specific application. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1592,8 +1591,8 @@ TOOL_SCHEMAS = [
             "organization; a capability cannot be merged into itself. "
             "USE when the user confirms two capabilities are the same record and "
             "asks to merge, consolidate, or de-duplicate them. This is a "
-            "DESTRUCTIVE governance action — REQUIRES USER CONFIRMATION before "
-            "executing, and you must never pick which one to keep on the user's "
+            "DESTRUCTIVE governance action: the server checks and reviews it before "
+            "applying it, and you must never pick which one to keep on the user's "
             "behalf without their agreement."
         ),
         "parameters": {
@@ -1632,7 +1631,7 @@ TOOL_SCHEMAS = [
             "tier); commercial terms and contracts are attached separately afterwards. "
             "NOTE: VendorOrganization is SHARED reference data by design (ADR-0003) — its "
             "name is globally unique, so a vendor is visible to every organisation, not "
-            "tenant-private. REQUIRES USER CONFIRMATION before executing."
+            "tenant-private. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1721,7 +1720,7 @@ TOOL_SCHEMAS = [
             "result (updated, or skipped with a reason) — it never reports a "
             "fabricated success — and, if a large selection is capped, says so "
             "explicitly rather than dropping applications silently. Scoped to your "
-            "organisation. REQUIRES USER CONFIRMATION before executing."
+            "organisation. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1781,8 +1780,7 @@ TOOL_SCHEMAS = [
             "contract — it is the commercial VendorContract. An end or renewal "
             "date before the start date is rejected; an invalid type/category/"
             "status is rejected; a missing start date defaults to today. "
-            "Tenant-scoped to your organisation. REQUIRES USER CONFIRMATION "
-            "before executing."
+            "Tenant-scoped to your organisation. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1843,7 +1841,7 @@ TOOL_SCHEMAS = [
             "measurable metric (name/unit/direction/baseline/target), and "
             "either a target_date or a stated reason none is available yet. "
             "Do not invent any of these values — ask the user for anything "
-            "not given. REQUIRES USER CONFIRMATION before executing."
+            "not given. " + "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",
@@ -1914,7 +1912,7 @@ TOOL_SCHEMAS = [
             "contract (contract_id), re-read through your organisation's predicate "
             "so it cannot be hung off another org's contract. Supply license_id to "
             "update an existing entitlement; omit it to create one. Tenant-scoped. "
-            "REQUIRES USER CONFIRMATION before executing."
+            "The server checks and reviews the change, then applies it or declines it with reasons."
         ),
         "parameters": {
             "type": "object",

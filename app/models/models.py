@@ -1816,6 +1816,7 @@ class Principle(TenantMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     statement = db.Column(db.Text, nullable=False)  # The principle statement
+    description = db.Column(db.Text)  # Free-text description entered on the form
     rationale = db.Column(db.Text)  # Why this principle exists
     implications = db.Column(db.Text)  # What this means for implementation
 

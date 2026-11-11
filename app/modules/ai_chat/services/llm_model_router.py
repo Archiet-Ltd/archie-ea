@@ -8,10 +8,24 @@ Addresses Gap #6: No Multi-Model Support
 """
 
 import logging
+from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ReviewerChoice:
+    """The provider and model chosen to review a change, and whether it shares the drafter's provider."""
+
+    provider: str
+    model: str
+    same_provider: bool = False
+
+    @property
+    def ref(self) -> str:
+        return "%s/%s" % (self.provider, self.model)
 
 
 class TaskComplexity(Enum):
@@ -228,7 +242,7 @@ class LLMModelRouter:
         if not candidates:
             raise ValueError(
                 "No available LLM models configured. "
-                "Please configure at least one provider in Admin > API Settings"
+                "Please configure at least one provider in Admin > AI settings"
             )
 
         # Select best candidate based on optimization criteria
@@ -379,6 +393,95 @@ class LLMModelRouter:
                     best = (provider, model)
 
         return best if best else candidates[0]
+
+    # ------------------------------------------------------------------ #
+    # The reviewer of a requested change                                  #
+    # ------------------------------------------------------------------ #
+
+    def select_reviewer(
+        self, drafter_provider: Optional[str], drafter_model: Optional[str]
+    ) -> Optional["ReviewerChoice"]:
+        """The model that reviews a change drafted by ``drafter_provider``/``drafter_model``.
+
+        Always a different model from the drafter. A different provider whenever a second one is
+        configured: the first configured in the order anthropic, openai, gemini that differs from the
+        drafter's. When only the drafter's own provider is configured, that provider's other model
+        (deepseek-chat is reviewed by deepseek-reasoner and the reverse). A change with no drafting
+        model (a rule, a form) is reviewed by the first configured provider. None when no second model
+        at all can be reached, so the caller can wait and try again.
+
+        A provider counts as configured when a key is usable for it now: the organisation's own key, or
+        the platform's key within its order and ceiling. A free-tier model never reviews, because the
+        review carries the organisation's data.
+        """
+        from app.modules.ai_chat.services.llm_service_impl import LLMService
+        from app.modules.ai_chat.services.model_defaults import (
+            REVIEWER_PROVIDER_ORDER,
+            is_free_model,
+            reviewer_model_for,
+        )
+
+        drafter_provider = (drafter_provider or "").strip().lower()
+        drafter_model = (drafter_model or "").strip()
+
+        def usable(provider: str) -> bool:
+            try:
+                return bool(LLMService.resolve_key(provider).key)
+            except Exception:
+                logger.warning("Reviewer selection: could not read the %s key", provider, exc_info=True)
+                return False
+
+        # The named order first, then any other provider the platform is set up to pay for.
+        candidates = list(dict.fromkeys([*REVIEWER_PROVIDER_ORDER, *LLMService.provider_order()]))
+        for provider in candidates:
+            if provider == drafter_provider or not usable(provider):
+                continue
+            model = reviewer_model_for(provider, "")
+            if model and not is_free_model(provider, model):
+                return ReviewerChoice(provider, model, same_provider=False)
+
+        if drafter_provider and not is_free_model(drafter_provider, drafter_model) and usable(drafter_provider):
+            model = reviewer_model_for(drafter_provider, drafter_model)
+            if model and model != drafter_model and not is_free_model(drafter_provider, model):
+                return ReviewerChoice(drafter_provider, model, same_provider=True)
+        return None
+
+    def call_model(self, choice: "ReviewerChoice", prompt: str, timeout: float = 90.0) -> str:
+        """One review (or one revision) answered by ``choice``; the text the model returned.
+
+        Goes through the one LLM service, so the platform's spend ceiling and ledger apply. It never
+        falls over to another provider or model: a reviewer that cannot answer raises, and the change
+        waits for the next attempt rather than being judged by a model that was not chosen.
+        """
+        from app.modules.ai_chat.services.llm_cost_tracker import LLMCostTracker
+        from app.modules.ai_chat.services.llm_service_impl import LLMService, _scrub_prompt
+
+        # The same scrub every other outgoing prompt goes through: a key or a card number the person's words
+        # or the change carry never reaches the model.
+        prompt = _scrub_prompt(prompt, mask_pii=False)
+
+        # The organisation's own AI budget applies to a review as to any other call.
+        try:
+            allowed, reason = LLMCostTracker().check_budget_before_call(estimated_tokens=len(prompt) // 4)
+        except Exception:  # noqa: BLE001 - as for every other call: an unreadable budget does not stop it
+            logger.warning("Reviewer call: the budget could not be read", exc_info=True)
+            allowed, reason = True, None
+        if not allowed:
+            raise ValueError("Budget limit exceeded: %s" % reason)
+        blocked = {
+            "openai", "anthropic", "gemini", "azure", "openrouter", "nvidia", "deepseek", "huggingface",
+            *LLMService.provider_order(),
+        } - {choice.provider}
+        text, _interaction = LLMService._call_llm_with_failover(
+            prompt=prompt,
+            model=choice.model,
+            provider=choice.provider,
+            # The largest budget a call may state: a reviewer that thinks spends part of it before the verdict.
+            max_tokens=8192,
+            timeout=timeout,
+            _already_tried=sorted(blocked),
+        )
+        return text or ""
 
     def get_model_info(self, provider: str, model: str) -> Optional[Dict]:
         """Get information about a specific model."""

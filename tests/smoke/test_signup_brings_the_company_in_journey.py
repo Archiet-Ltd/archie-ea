@@ -280,8 +280,9 @@ def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(br
             ):
                 break
             page.wait_for_timeout(3000)
+        # 21 is every row the read put in the model: 8 applications, 3 parts, 1 technology and 9 links.
         github_line = page.get_by_test_id("signup-status-github").inner_text()
-        assert re.search(r"Read 16 repositories; 23 items added to your model\.", github_line), github_line
+        assert re.search(r"Read 16 repositories; 21 items added to your model\.", github_line), github_line
         expect(page.get_by_test_id("signup-status-website")).to_contain_text(re.compile(r"Read 5 pages; \d+ facts wait for you to confirm"))
         shoot(page, "sources-read")
 

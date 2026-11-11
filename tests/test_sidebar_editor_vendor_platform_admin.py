@@ -50,7 +50,6 @@ WRITES = [
     "/api/admin/sidebar/items/reset",
     "/api/admin/sidebar/items/section/home" "/toggle",
     "/api/admin/sidebar/items/1/toggle",
-    "/admin/_update_editor_contents",
     "/admin/vendor-pricing/confirm",
 ]
 
@@ -65,22 +64,39 @@ def test_a_tenant_administrator_is_refused_on_every_shared_write(app, db_session
     assert response.status_code == 403
 
 
-def test_a_refused_editor_write_stores_nothing(app, db_session, make_org, client, login_as):
+RETIRED_EDITOR_SAVE = "/admin/_update_editor_contents"
+
+
+def test_the_retired_editor_save_address_is_gone_for_a_tenant_administrator(app, db_session, make_org, client, login_as):
     tenant_id, _platform = _world(db_session, make_org)
     name = "probe-" + uuid.uuid4().hex[:8]
 
     _login(db_session, client, login_as, tenant_id)
-    client.post("/admin/_update_editor_contents", data={"editor_name": name, "edit_data": "<b>x</b>"})
+    response = client.post(RETIRED_EDITOR_SAVE, data={"editor_name": name, "edit_data": "<b>x</b>"})
 
+    assert response.status_code in (404, 405)
     assert db_session.execute(text("select count(*) from editable_html where editor_name = :n"), {"n": name}).scalar() == 0
 
 
-def test_a_platform_administrator_can_still_write_the_editor_and_reset_the_sidebar(app, db_session, make_org, client, login_as):
+def test_the_retired_editor_save_address_is_gone_for_a_platform_administrator(app, db_session, make_org, client, login_as):
     _tenant, platform_id = _world(db_session, make_org)
     name = "probe-" + uuid.uuid4().hex[:8]
 
     _login(db_session, client, login_as, platform_id)
-    edited = client.post("/admin/_update_editor_contents", data={"editor_name": name, "edit_data": "<b>ok</b>"})
+    response = client.post(RETIRED_EDITOR_SAVE, data={"editor_name": name, "edit_data": "<b>ok</b>"})
     reset = client.post("/api/admin/sidebar/items/reset")
 
-    assert edited.status_code == 200 and reset.status_code == 200
+    assert response.status_code in (404, 405)
+    assert db_session.execute(text("select count(*) from editable_html where editor_name = :n"), {"n": name}).scalar() == 0
+    assert reset.status_code == 200
+
+
+@pytest.mark.parametrize("module", ["app.modules.admin.routes.admin_routes", "app.modules.admin.v2.routes.admin_routes"])
+def test_neither_admin_blueprint_serves_the_retired_editor_save_address(module):
+    import importlib
+    import inspect
+
+    source = inspect.getsource(importlib.import_module(module))
+
+    assert "_update_editor_contents" not in source
+    assert not hasattr(importlib.import_module(module), "update_editor_contents")

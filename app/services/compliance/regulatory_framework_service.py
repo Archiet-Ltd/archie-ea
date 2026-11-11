@@ -1054,7 +1054,7 @@ Return JSON format:
             logger.error(f"AI compliance analysis failed: {str(e)}")
             return {
                 "error": str(e),
-                "fallback_message": "AI analysis unavailable. Please configure LLM provider in API Settings.",
+                "fallback_message": "AI analysis unavailable. Please configure LLM provider in AI settings.",
             }
 
     @staticmethod

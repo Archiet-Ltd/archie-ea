@@ -25,6 +25,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
+from app.services.application_status import StatusRefused
 from app.models.import_session import (
     CheckpointType,
     ImportCheckpoint,
@@ -422,7 +423,17 @@ class ImportStagingService:
 
             for element in elements:
                 # Commit element based on type
-                committed_id = self._commit_element_by_type(element)
+                try:
+                    committed_id = self._commit_element_by_type(element)
+                except StatusRefused as refusal:
+                    # One refused row is left staged for review; the rest are kept.
+                    self.logger.warning(f"Refused staged element {element.element_uuid}: {refusal}")
+                    element.requires_review = True
+                    element.element_metadata = {
+                        **(element.element_metadata or {}),
+                        "refusal": str(refusal),
+                    }
+                    continue
 
                 if committed_id:
                     # Mark as committed

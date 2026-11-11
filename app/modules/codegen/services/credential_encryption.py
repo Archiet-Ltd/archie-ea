@@ -17,6 +17,13 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 
 
+WRONG_MASTER_KEY = (
+    "The saved access details cannot be opened on this server, because its encryption key is not the one "
+    "they were saved with. The person who runs this installation can fix the server's key; "
+    "once that is done, give the access details again."
+)
+
+
 class CredentialUnreadable(Exception):
     """Raised when a stored credential cannot be decrypted (wrong key,
     corrupted ciphertext, or missing key row). Never silently returns None."""
@@ -115,16 +122,30 @@ def _get_org_fernet(org_id: int, key_version: int | None = None) -> Fernet:
         # Requested a version that is not current — try the previous key
         if (record.previous_encrypted_key is not None
                 and key_version == record.key_version - 1):
-            raw_key = master.decrypt(record.previous_encrypted_key)
-            return Fernet(raw_key)
+            return Fernet(_open_org_key(master, record.previous_encrypted_key, org_id))
         raise CredentialUnreadable(
             f"Credential for org {org_id} uses key version {key_version} "
             f"but only version {record.key_version} (current) and "
             f"{record.key_version - 1} (previous) are available."
         )
 
-    raw_key = master.decrypt(record.encrypted_key)
-    return Fernet(raw_key)
+    return Fernet(_open_org_key(master, record.encrypted_key, org_id))
+
+
+def _open_org_key(master: Fernet, sealed: bytes, org_id: int) -> bytes:
+    """An organisation's key opened with the server's master key.
+
+    A master key that is not the one the organisation's key was sealed with is a server setting
+    only an administrator of the installation can put right; the person reads that in a sentence,
+    and the log keeps the error class.
+    """
+    try:
+        return master.decrypt(sealed)
+    except InvalidToken as exc:
+        logger.error(
+            "Organisation %s key could not be opened with the master key (%s)", org_id, type(exc).__name__
+        )
+        raise CredentialUnreadable(WRONG_MASTER_KEY) from None
 
 
 def _create_org_fernet(org_id: int) -> tuple[Fernet, int]:
@@ -247,3 +268,51 @@ def rotate_org_encryption_key(org_id: int) -> tuple[Fernet, Fernet | None, int]:
 
     new_fernet = Fernet(raw_new)
     return new_fernet, old_fernet, new_version
+
+
+def replace_unopenable_org_key(org_id: int) -> int:
+    """Give an organisation a new key sealed with this server's master key, in place of one it cannot open.
+
+    Used only when new access details are being saved: the new ones must not wait on the old. Nothing
+    that a different server key could still open is thrown away:
+
+    - the sealed key it could not open becomes the previous key, as in ``rotate_org_encryption_key``, so
+      the saved details sealed with it open again once the right server key is back;
+    - when the previous key is one this server key does open, that one is kept instead, because it is
+      the key the other saved details need now, and the unopenable current key was sealed by another
+      server key.
+
+    The new key takes the version number that makes the kept key the previous one. Raises
+    ``CredentialUnreadable`` with the plain sentence when the master key cannot seal a key at all.
+    The caller commits. Returns the new key version.
+    """
+    from app.extensions import db
+    from app.models.connector_config import OrganizationEncryptionKey
+
+    try:
+        master = _get_master_fernet()
+        sealed = master.encrypt(Fernet.generate_key())
+    except Exception:
+        logger.error("Organisation %s key could not be replaced: the master key cannot seal", org_id)
+        raise CredentialUnreadable(WRONG_MASTER_KEY) from None
+    record = OrganizationEncryptionKey.query.filter_by(organization_id=org_id).with_for_update().first()
+    if record is None:
+        raise CredentialUnreadable(WRONG_MASTER_KEY)
+    current_version = record.key_version or 0
+    previous_opens = False
+    if record.previous_encrypted_key is not None:
+        try:
+            master.decrypt(record.previous_encrypted_key)
+            previous_opens = True
+        except InvalidToken:
+            pass
+    if previous_opens:
+        # the previous key stays as it is; the new key sits where the unopenable current one was
+        record.encrypted_key = sealed
+        record.key_version = current_version
+    else:
+        record.previous_encrypted_key = record.encrypted_key
+        record.encrypted_key = sealed
+        record.key_version = current_version + 1
+    db.session.flush()
+    return record.key_version

@@ -28,6 +28,7 @@ Helpers (3):
 """
 
 from app.services.archimate_backbone import sync_archimate_element
+from app.services.gap_register_service import effective_severity
 from datetime import datetime
 
 from flask import current_app, jsonify, request
@@ -41,7 +42,9 @@ from app.services.rate_limiter import rate_limit
 from app import db
 
 from . import capability_map
+import json
 import logging
+import re
 logger = logging.getLogger(__name__)
 
 # Roles that may change what a gap, a work package and a plateau are linked to.
@@ -741,6 +744,8 @@ def api_roadmap_create_gap():
         return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Gap, Plateau
+        from app.modules.architecture.services.gap_archimate_service import apply_rating_rule
+        from app.services.gap_register_service import normalise_priority
 
         data = request.get_json() or {}
         if not data.get("name"):
@@ -751,10 +756,10 @@ def api_roadmap_create_gap():
         if gap_type not in valid_gap_types:
             gap_type = "custom"
 
-        valid_priorities = ["critical", "high", "medium", "low"]
-        priority = data.get("priority", "medium")
-        if priority not in valid_priorities:
-            priority = "medium"
+        try:
+            priority = normalise_priority(data.get("priority")) or "medium"
+        except ValueError as error:
+            return jsonify({"success": False, "error": str(error)}), 400
 
         plateau_id = data.get("plateau_id")
         if plateau_id:
@@ -767,6 +772,8 @@ def api_roadmap_create_gap():
             description=data.get("description", ""),
             gap_type=gap_type,
             priority=priority,
+            # The register counts and lists by severity, so a gap marked Critical is critical there too.
+            severity=apply_rating_rule(None, None, {"priority": priority}).get("severity") or "medium",
             resolution_status="identified",
         )
         if plateau_id:
@@ -783,6 +790,7 @@ def api_roadmap_create_gap():
                 "description": gap.description,
                 "gap_type": gap.gap_type,
                 "priority": gap.priority,
+                "severity": gap.rated_severity,
                 "resolution_status": gap.resolution_status,
                 "target_plateau_id": gap.target_plateau_id,
             },
@@ -1107,7 +1115,9 @@ def api_roadmap_get_gap(gap_id):
     try:
         from app.models.implementation_migration import Gap
 
-        gap = Gap.query.get(gap_id)
+        # A query, not .get(): .get() answers from the session's identity map
+        # without SQL, which would skip the organisation filter on a cache hit.
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             return jsonify({"success": False, "error": "Gap not found"}), 404
 
@@ -1142,7 +1152,11 @@ def api_roadmap_update_gap(gap_id):
         from app.services.gap_archimate_service import gap_archimate_service
 
         data = request.get_json()
-        gap = gap_archimate_service.update_gap(gap_id, data)
+        try:
+            gap = gap_archimate_service.update_gap(gap_id, data)
+        except ValueError as error:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(error)}), 400
 
         if not gap:
             return jsonify({"success": False, "error": "Gap not found"}), 404
@@ -1401,7 +1415,7 @@ def _resolve_roadmap_gap_id(raw_gap_id):
 
     # A plain integer is a stored Gap: the original path, unchanged.
     try:
-        return_gap = Gap.query.get(int(raw_gap_id))
+        return_gap = Gap.query.filter_by(id=int(raw_gap_id)).first()
     except (TypeError, ValueError):
         return_gap = None
     else:
@@ -1577,18 +1591,14 @@ def api_roadmap_create_standalone_work_package():
 
         db.session.commit()
 
-        return jsonify({
-            "success": True,
-            "work_package": {
-                "id": wp.id,
-                "name": wp.name,
-                "description": wp.description,
-                "status": wp.status,
-                "priority": wp.priority,
-                "start_date": wp.start_date.date().isoformat() if wp.start_date else None,
-                "target_date": wp.end_date.date().isoformat() if wp.end_date else None,
-            },
-        }), 201
+        from app.services import result_footer_service
+
+        org_id = current_organization_id()
+        # The same row the list draws (linked gaps, footer), so the new package reads like its neighbours.
+        wp_dict = work_package_service.to_roadmap_dict(wp, org_id)
+        wp_dict["footer_html"] = result_footer_service.render_footer(
+            result_footer_service.work_package_footer(wp, name_shown=True))
+        return jsonify({"success": True, "work_package": wp_dict}), 201
 
     except Exception as e:
         db.session.rollback()
@@ -2068,6 +2078,29 @@ def api_roadmap_detect_gaps():
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
+_GAP_NUMBER_MAX = 2147483647  # the largest number the gap id column holds
+
+
+def _gap_numbers(raw):
+    """The gap numbers in a request body, or (None, a plain sentence naming the bad value). The body must be a
+    list; each item is a JSON whole number or a string of digits, from 1 to the column's largest number."""
+    if not isinstance(raw, list):
+        return None, "gap_ids must be a list of gap numbers."
+    numbers = []
+    for item in raw:
+        if isinstance(item, bool) or not isinstance(item, (int, str)):
+            number = None
+        elif isinstance(item, int):
+            number = item
+        else:
+            number = int(item) if re.fullmatch(r"[0-9]{1,30}", item) else None
+        if number is None or not 1 <= number <= _GAP_NUMBER_MAX:
+            return None, "%s is not a gap number: gap_ids must be whole numbers from 1 to %d." % (
+                json.dumps(item), _GAP_NUMBER_MAX)
+        numbers.append(number)
+    return numbers, None
+
+
 @capability_map.route("/api/roadmap/ai-generate", methods=["POST"])
 @login_required
 @rate_limit(10, "1m")
@@ -2095,6 +2128,10 @@ def api_roadmap_ai_generate():
         if not gap_ids:
             return jsonify({"success": False, "error": "gap_ids is required and must be non-empty"}), 400
 
+        gap_ids, bad = _gap_numbers(gap_ids)
+        if bad is not None:
+            return jsonify({"success": False, "error": bad}), 400
+
         gaps = Gap.query.filter(Gap.id.in_(gap_ids)).all()
         if not gaps:
             return jsonify({"success": False, "error": "No gaps found for the provided IDs"}), 404
@@ -2104,19 +2141,21 @@ def api_roadmap_ai_generate():
 
         preview = []
         for gap in gaps:
-            timeframe_days = PRIORITY_TIMEFRAMES.get(gap.priority or "medium", 365)
+            # The one rating, with no second fallback: a gap with none is unrated and goes in the last plateau.
+            rating = (effective_severity(gap) or "").strip().lower() or None
+            timeframe_days = PRIORITY_TIMEFRAMES.get(rating, 365)
             start_offset = (
-                0 if gap.priority == "critical"
-                else 30 if gap.priority == "high"
+                0 if rating == "critical"
+                else 30 if rating == "high"
                 else 60
             )
             estimated_start = today + timedelta(days=start_offset)
             target_resolution = today + timedelta(days=start_offset + timeframe_days)
 
             # Plateau assignment: critical/high → Plateau 1, medium → Plateau 2, low → Plateau 3
-            if gap.priority in ("critical", "high"):
+            if rating in ("critical", "high"):
                 suggested_plateau = "Plateau 1 — Immediate"
-            elif gap.priority == "medium":
+            elif rating == "medium":
                 suggested_plateau = "Plateau 2 — Near Term"
             else:
                 suggested_plateau = "Plateau 3 — Long Term"
@@ -2125,15 +2164,15 @@ def api_roadmap_ai_generate():
                 "gap_id": gap.id,
                 "gap_name": gap.name,
                 "gap_type": gap.gap_type,
-                "gap_priority": gap.priority,
+                "gap_priority": rating or "unrated",
                 "suggested_work_package": {
                     "name": f"Resolve: {gap.name}",
                     "description": (
                         f"Work package to close gap '{gap.name}'. "
                         f"Gap type: {gap.gap_type or 'coverage'}. "
-                        f"Priority: {gap.priority or 'medium'}."
+                        + (f"Priority: {rating}." if rating else "The gap is not rated.")
                     ),
-                    "priority": gap.priority or "medium",
+                    "priority": rating,
                     "estimated_start_date": estimated_start.isoformat(),
                     "target_resolution_date": target_resolution.isoformat(),
                     "element_type": "WorkPackage",
@@ -2432,7 +2471,7 @@ def api_roadmap_gaps_not_addressed():
                 "id": g.id,
                 "name": g.name,
                 "description": g.description,
-                "severity": g.severity,
+                "severity": g.rated_severity,
                 "priority": g.priority,
                 "resolution_status": g.resolution_status,
                 "gap_type": g.gap_type,

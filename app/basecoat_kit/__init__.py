@@ -32,10 +32,21 @@ def has_lucide(name):
     return name in _ICONS
 
 
+def register_basecoat_helpers(env):
+    """Register the four basecoat helpers on a Jinja environment.
+
+    This is the single place that knows which helpers the basecoat component
+    macros require. Both the Flask app (via init_basecoat) and test harnesses
+    call this function so the helpers are available in every environment that
+    renders basecoat templates.
+    """
+    env.globals.setdefault('slot', _slot)
+    env.globals.setdefault('tw', tw)
+    env.globals.setdefault('has_lucide', has_lucide)
+    if 'lucide' not in env.globals:
+        env.globals['lucide'] = lucide
+
+
 def init_basecoat(app):
     """Expose the helpers the component macros call."""
-    app.jinja_env.globals.setdefault('slot', _slot)
-    app.jinja_env.globals.setdefault('tw', tw)
-    app.jinja_env.globals.setdefault('has_lucide', has_lucide)
-    if 'lucide' not in app.jinja_env.globals:
-        app.jinja_env.globals['lucide'] = lucide
+    register_basecoat_helpers(app.jinja_env)
