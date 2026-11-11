@@ -12,6 +12,7 @@ from app.services.public_pages import (
     MODULE_CAPTURES,
     MODULE_CAPTURES_MANIFEST,
     MODULE_PHONE_ALTS,
+    MODULE_RECORDINGS,
     module_image_alt,
     STANDARD_MODULE_IMAGES,
 )
@@ -21,6 +22,10 @@ from .conftest import PAGE_TIMEOUT
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 ALT = {slug: alt for slug, _p, _persona, _c, alt in MODULE_CAPTURES}
+
+# A recorded module page shows its recording first and no picture of the view the recording opens on
+# (test_module_recording_first_journey.py), so the pictures a visitor sees are those of the pages without one.
+SHOWN = sorted(STANDARD_MODULE_IMAGES - set(MODULE_RECORDINGS))
 
 
 def _shown(live_server, browser, slug, width):
@@ -37,7 +42,7 @@ def _shown(live_server, browser, slug, width):
     return shown
 
 
-@pytest.mark.parametrize("slug", sorted(STANDARD_MODULE_IMAGES))
+@pytest.mark.parametrize("slug", SHOWN)
 def test_desktop_picture_is_shown_at_half_its_pixels_with_the_desktop_description(live_server, browser, slug):
     manifest = json.loads((IMG_MODULES_DIR / MODULE_CAPTURES_MANIFEST).read_text(encoding="utf-8"))
     shown = _shown(live_server, browser, slug, 1440)
@@ -49,7 +54,7 @@ def test_desktop_picture_is_shown_at_half_its_pixels_with_the_desktop_descriptio
     assert shown[0]["natural"] == 2 * manifest[slug]["desktop"]["css_width"]
 
 
-@pytest.mark.parametrize("slug", sorted(STANDARD_MODULE_IMAGES))
+@pytest.mark.parametrize("slug", SHOWN)
 def test_phone_picture_is_shown_with_its_own_description(live_server, browser, slug):
     manifest = json.loads((IMG_MODULES_DIR / MODULE_CAPTURES_MANIFEST).read_text(encoding="utf-8"))
     shown = _shown(live_server, browser, slug, 390)
