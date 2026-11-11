@@ -176,6 +176,21 @@ def test_a_navigation_through_a_joined_string_is_caught(tmp_path):
     assert _plant(tmp_path, 'def test_x(client):\n    client.get("/intelligence/ask", follow_redirects=True)\n')
 
 
+def test_a_navigation_through_a_modulo_template_is_caught(tmp_path):
+    assert _plant(tmp_path, 'ASK = "/intelligence/ask" % q\ndef test_x(page):\n    page.goto("http://h" + ASK + "?q=1")\n')
+    assert _plant(tmp_path, 'ASK = "/intelligence/ask" % q\ndef test_x(client):\n    client.get("/intelligence/ask" % q)\n')
+
+
+def test_a_navigation_through_a_format_template_is_caught(tmp_path):
+    assert _plant(tmp_path, 'ASK = "/intelligence/ask".format(q)\ndef test_x(page):\n    page.goto("http://h" + ASK + "?q=1")\n')
+    assert _plant(tmp_path, 'ASK = "/intelligence/ask".format(q)\ndef test_x(client):\n    client.get("/intelligence/ask".format(q))\n')
+
+
+def test_a_navigation_through_a_format_map_template_is_caught(tmp_path):
+    assert _plant(tmp_path, 'ASK = "/intelligence/ask".format_map(q)\ndef test_x(page):\n    page.goto("http://h" + ASK + "?q=1")\n')
+    assert _plant(tmp_path, 'ASK = "/intelligence/ask".format_map(q)\ndef test_x(client):\n    client.get("/intelligence/ask".format_map(q))\n')
+
+
 def test_an_absence_assertion_is_accepted(tmp_path):
     assert _plant(tmp_path, 'ASK = "/intelligence/" + "ask"\ndef test_x(html):\n    assert ASK not in html\n') == []
     assert _plant(tmp_path, 'ASK = "/intelligence/ask"\ndef test_x(hrefs):\n    assert not any(ASK in h for h in hrefs)\n') == []
