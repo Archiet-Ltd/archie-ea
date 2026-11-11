@@ -74,7 +74,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
             <div class="px-6 pb-4 text-sm text-muted-foreground">
                 {% if scores_error %}The investment figures could not be loaded.
                 {% elif total_inv is none %}No capability has linked work or a funded initiative yet; link a work package to a capability to estimate its investment.
-                {% else %}from {{ portfolio_metrics.investment_costed_count }} of {{ portfolio_metrics.total_capabilities }} capabilities with a recorded figure{% endif %}
+                {% else %}from {{ portfolio_metrics.investment_costed_count }} of {{ portfolio_metrics.total_capabilities }} capabilities with a recorded figure{% if portfolio_metrics.investment_costed_count < portfolio_metrics.total_capabilities %}; the other {{ portfolio_metrics.total_capabilities - portfolio_metrics.investment_costed_count }} have none yet and add nothing to it{% else %}; every capability has one{% endif %}{% endif %}
             </div>
         </div>
         <div data-slot="card" data-testid="average-strategic-score" class="rounded-lg border bg-card text-card-foreground @container/card">
@@ -86,7 +86,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                 <i data-lucide="target" class="absolute top-4 right-4 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
             </div>
             <div class="px-6 pb-4 text-sm text-muted-foreground">
-                {% if scores_error %}The scores could not be loaded.{% elif portfolio_metrics.average_strategic_score is none %}No capability has an importance rating yet.{% else %}over {{ portfolio_metrics.scored_count }} of {{ portfolio_metrics.total_capabilities }} rated capabilities{% endif %}
+                {% if scores_error %}The scores could not be loaded.{% elif portfolio_metrics.average_strategic_score is none %}No capability has an importance rating yet.{% else %}average of the importance scores of the {{ portfolio_metrics.scored_count }} rated capabilities, out of {{ portfolio_metrics.total_capabilities }}{% if portfolio_metrics.scored_count < portfolio_metrics.total_capabilities %}; the other {{ portfolio_metrics.total_capabilities - portfolio_metrics.scored_count }} are not rated yet and are left out{% endif %}{% endif %}
             </div>
         </div>
     </div>
@@ -264,12 +264,19 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                         <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Priority</dt><dd class="font-medium" data-testid="phone-priority" x-text="cap.priority_level"></dd></div>
                                         <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Investment</dt><dd class="font-medium" data-testid="phone-investment" x-text="cap.investment_need.estimated_cost === null ? 'Not estimated' : '{{ currency_symbol }}' + (cap.investment_need.estimated_cost / 1000).toFixed(1) + 'k ' + (cap.investment_need.source ? 'from ' + cap.investment_need.source : '')"></dd></div>
                                     </dl>
-                                    <p class="mt-2 text-xs font-normal text-muted-foreground" data-testid="capability-recommendation" x-text="cap.recommendation"></p>
+                                    
                                     <div class="mt-3 flex flex-wrap gap-2" data-testid="cell-actions">
                                         {% call ui.button(variant='outline', size='sm', attrs={'type': 'button', '@click': "$dispatch('open-roi-calculator', normalizeCapability(cap))", 'title': 'Calculate ROI', 'aria-label': 'Calculate ROI'}) %}{{ lucide('calculator') }}Calculate ROI{% endcall %}
                                         {% call ui.button(variant='outline', size='sm', attrs={'type': 'button', '@click': "$dispatch('open-arb-submission-modal', normalizeCapability(cap))", 'title': 'Submit to Architecture Review Board', 'aria-label': 'Submit to ARB'}) %}{{ lucide('shield-check') }}Submit to ARB{% endcall %}
                                     </div>
-                                    <div class="mt-2 font-normal" x-html="cap.footer_html" data-testid="capability-footer"></div>
+                                    <div class="mt-2 font-normal" x-data="{ open: false }">
+                                        <button type="button" class="text-xs font-medium text-primary underline md:hidden" data-testid="evidence-toggle"
+                                            @click="open = !open" :aria-expanded="open ? 'true' : 'false'">
+                                            <span x-text="open ? 'Hide evidence' : 'Show evidence'"></span>
+                                        </button>
+                                        <p class="mt-2 text-xs font-normal text-muted-foreground" :class="open ? 'block' : 'hidden md:block'" data-testid="capability-recommendation" x-text="cap.recommendation"></p>
+                                        <div :class="open ? 'block' : 'hidden md:block'" x-html="cap.footer_html" data-testid="capability-footer"></div>
+                                    </div>
                                 </td>
                                 <td class="px-2 py-3 text-muted-foreground text-sm" data-testid="cell-domain" x-text="cap.capability_domain || 'Not assigned'"></td>
                                 <td class="px-2 py-3 text-sm" data-testid="cell-strategic">
@@ -299,7 +306,11 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                 </td>
                                 <td class="px-2 py-3" data-testid="cell-investment">
                                     <template x-if="cap.investment_need.estimated_cost === null">
-                                        <span class="text-sm text-muted-foreground">Not estimated</span>
+                                        <div>
+                                            <span class="text-sm text-muted-foreground">Not estimated</span>
+                                            <span class="block max-w-40 text-xs text-muted-foreground" data-testid="investment-reason">No work package or funded initiative is linked to this capability yet.</span>
+                                            <a href="{{ url_for('enterprise.work_packages') }}" class="block text-xs text-primary hover:underline" data-testid="investment-step">Link a work package</a>
+                                        </div>
                                     </template>
                                     <template x-if="cap.investment_need.estimated_cost !== null">
                                         <div>
