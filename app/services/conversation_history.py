@@ -251,8 +251,10 @@ class ConversationHistoryService:
             except Exception as e:
                 print(f"Warning: Vector indexing failed: {e}")
 
-        # Invalidate cache
+        # Invalidate caches: the thread's messages, and the person's thread list, which
+        # carries this thread's message count.
         invalidate_cache(f"thread:messages:*{thread_id}*")
+        invalidate_cache("threads:user:*")
 
         return ConversationMessage(
             id=message_id,

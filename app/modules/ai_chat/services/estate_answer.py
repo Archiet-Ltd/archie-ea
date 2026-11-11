@@ -45,11 +45,13 @@ def named_element_ids(message: str, organization_id: int) -> list:
     return ordered
 
 
-def answer_estate_question(message: str, *, user_id: Optional[int] = None):
+def answer_estate_question(message: str, *, user_id: Optional[int] = None, direction: Optional[str] = None):
     """The stored answer to *message*, or ``None`` when it is not a question
-    about an element of the active organisation."""
+    about an element of the active organisation. *direction* ("upstream" for what
+    the element depends on, "downstream" for what breaks) asks the impact walk that
+    way whatever the wording, for a message that asks several things at once."""
     organization_id = current_org_id()
-    kind = envelope.classify_estate_question(message)
+    kind = envelope.KIND_IMPACT if direction else envelope.classify_estate_question(message)
     if kind is None or organization_id is None:
         return None
     element_ids = named_element_ids(message, organization_id)
@@ -58,6 +60,8 @@ def answer_estate_question(message: str, *, user_id: Optional[int] = None):
     # The dashboard's first answer follows worked-out connections three steps out;
     # the chat asks the same question the same way.
     params = {"include_derived": True, "max_depth": 3}
+    if direction:
+        params["direction"] = direction
     if kind == envelope.KIND_SET_IMPACT and len(element_ids) > 1:
         params["element_ids"] = element_ids[:envelope.SET_IMPACT_MAX_SEEDS]
     else:
