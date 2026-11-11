@@ -42,7 +42,7 @@ def _form_fields(html):
     return dict(re.findall(r'<input type="hidden" name="(\w+)" value="([^"]*)"', html))
 
 
-def test_talk_to_us_from_the_page_records_the_enquiry_against_the_page(app):
+def test_talk_to_us_from_the_page_records_the_enquiry_against_the_page(app, own_visitor_events):
     from app import db
     from app.models.product_inquiry import ProductInquiry
 
@@ -86,3 +86,35 @@ def test_the_hub_lists_each_capability_once_in_one_alphabetical_list(app, monkey
     assert titles == sorted(titles, key=str.lower)
     blurb = re.search(r'Bring your SysML models</a>: ([^<]+)<', html).group(1)
     assert "bring" not in blurb.lower() and "sysml" not in blurb.lower()
+
+
+def _row_titles_and_hrefs(html):
+    return re.findall(r'<li><a href="([^"]+)">([^<]+)</a>', html)
+
+
+def test_every_hub_row_is_headed_with_its_own_title_and_a_held_page_is_not_listed(app):
+    client = app.test_client()
+    rows = _row_titles_and_hrefs(client.get("/early-access").get_data(as_text=True))
+    assert (PAGE, "Bring your SysML models") in rows
+    for href, title in rows:
+        page = client.get(href, follow_redirects=True).get_data(as_text=True)
+        heading = re.search(r"<h1[^>]*>(.*?)</h1>", page, re.S).group(1)
+        assert re.sub(r"<[^>]+>|\s+", " ", heading).strip() == title, href
+    assert "/modules/software-and-tool-discovery" not in [href for href, _ in rows]
+
+
+def test_a_module_pages_closing_band_keeps_talk_to_us_and_the_page_it_came_from(app):
+    html = app.test_client().get(PAGE).get_data(as_text=True)
+    closing = html[html.index('data-testid="landing-closing"'):]
+    link = re.search(r'<a href="([^"]+)"[^>]*public-btn--outline[^>]*>([^<]+)</a>', closing)
+    assert link.group(1) == "/contact?from=sysml-to-archimate"
+    assert link.group(2).strip() == "Talk to us"
+
+
+def test_the_contact_page_says_what_an_enquiry_from_a_known_page_is_about(app):
+    client = app.test_client()
+    html = client.get("/contact?from=sysml-to-archimate").get_data(as_text=True)
+    assert "Your enquiry is about: Bring your SysML models." in html
+    for unknown in ("nonsense", "%3Cscript%3Ealert(1)%3C/script%3E"):
+        other = client.get(f"/contact?from={unknown}").get_data(as_text=True)
+        assert "Your enquiry is about" not in other and "nonsense" not in other and "alert(1)" not in other

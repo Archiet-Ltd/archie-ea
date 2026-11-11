@@ -43,6 +43,8 @@
      checkbox below always matches what gets stored. #}
   <section aria-labelledby="inquiry-heading" class="mt-12 p-6 border border-border rounded-lg bg-card" data-testid="offer-inquiry">
     <h2 id="inquiry-heading" class="text-2xl font-semibold text-foreground mb-2">Ask about this</h2>
+    {% set topic = page.enquiry_topic(page.enquiry_source(request.args.get('from') or request.form.get('source'))) %}
+    {% if topic %}<p class="text-muted-foreground" data-testid="offer-inquiry-topic">Your enquiry is about: {{ topic }}.</p>{% endif %}
     {% if thanks %}
     <p class="text-muted-foreground" data-testid="offer-inquiry-thanks">Thank you. We will be in touch to arrange next steps.</p>
     {% else %}

@@ -611,6 +611,14 @@ class PublicPage:
         )
 
     @property
+    def heading(self) -> str:
+        """The heading the page opens with: a module page's own headline when it has a landing, else its title.
+        Every list that names the page (the early-access hub, the enquiry page) reads this one value."""
+        if self.family == "module" and self.front_matter.get("questions"):
+            return str(self.front_matter.get("headline") or self.title)
+        return self.title
+
+    @property
     def is_early_access_page(self) -> bool:
         """True for a page that is itself the early-access page: it says on the page that the capability is not
         yet available and offers a waiting list. Such a page is a demand test and search is how demand arrives,
@@ -652,6 +660,12 @@ class PublicPage:
             return ""
         origin = load_page("module", slug=raw)
         return origin.slug if origin is not None and origin.cta == "waiting_list" else ""
+
+    def enquiry_topic(self, source: str) -> str:
+        """The heading of the page an enquiry is about, or "" when ``source`` names no known waiting-list page.
+        ``source`` is the value ``enquiry_source`` returned, never raw input."""
+        origin = load_page("module", slug=source) if source else None
+        return origin.heading if origin is not None else ""
 
     def enquiry_offer(self, source: str = "") -> str:
         """The ``offer`` stored for an enquiry on this page: its own offer, followed by the page the visitor
@@ -1929,7 +1943,7 @@ def _module_landing(page: PublicPage) -> ModuleLanding | None:
         ]
 
     return ModuleLanding(
-        headline=str(fm.get("headline") or page.title),
+        headline=page.heading,
         summary=str(fm.get("summary") or page.description or ""),
         who_for=[str(x) for x in fm.get("who_for") or []],
         questions=pairs("questions", "q", "who"),

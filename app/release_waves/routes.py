@@ -51,6 +51,7 @@ def coming_pages() -> list[dict]:
     """The waiting-list pages the public menu lists as coming, other than a capability group already listed.
 
     Each carries the menu's own label and address and its one-line description without the menu's lead-in words."""
+    from app.services.public_pages import load_page
     from app.services.site_registry import site_registry
 
     rules = wave_map()["rules"]
@@ -62,7 +63,15 @@ def coming_pages() -> list[dict]:
         if screen in rules and rules[screen][1] in taken:
             continue
         blurb = re.sub(r"^(Coming soon|Early access):\s*", "", item.get("blurb") or "")
-        pages.append({"href": item["href"], "title": item["label"], "blurb": blurb})
+        title = item["label"]
+        module = re.fullmatch(r"/modules/([\w-]+)", item["href"])
+        if module:
+            # a module page is listed only once it is published, under the heading it opens with
+            found = load_page("module", slug=module.group(1))
+            if found is None or found.is_held:
+                continue
+            title = found.heading
+        pages.append({"href": item["href"], "title": title, "blurb": blurb})
     return sorted(pages, key=lambda p: p["title"])
 
 

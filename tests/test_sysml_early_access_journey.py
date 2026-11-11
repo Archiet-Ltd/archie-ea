@@ -50,18 +50,10 @@ def _counts(app):
 def _forget(app, email):
     from app import db
     from app.models.product_inquiry import ProductInquiry
-    from app.models.public_visitor_event import PublicVisitorEvent
 
+    # the sign-up's event is removed by its own id through the own_visitor_events fixture
     with app.app_context():
         ProductInquiry.query.filter_by(email=email, offer=OFFER).delete()
-        # the sign-up's event carries no email, so the one this run added is the newest of its kind
-        newest = (
-            PublicVisitorEvent.query.filter_by(event_type="offer_enquiry_submitted", offer=OFFER)
-            .order_by(PublicVisitorEvent.id.desc())
-            .first()
-        )
-        if newest is not None:
-            db.session.delete(newest)
         db.session.commit()
 
 
@@ -95,7 +87,7 @@ def test_a_visitor_reaches_the_sysml_page_from_the_menu_and_reads_that_it_is_ear
     context.close()
 
 
-def test_joining_the_waiting_list_records_one_sign_up_against_this_page(browser, site_url, app):
+def test_joining_the_waiting_list_records_one_sign_up_against_this_page(browser, site_url, app, own_visitor_events):
     email = f"sysml.visitor.{uuid.uuid4().hex[:8]}@example.com"
     before = _counts(app)
     context = browser.new_context(viewport={"width": 1440, "height": 900})
