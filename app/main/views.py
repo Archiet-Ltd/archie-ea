@@ -1134,10 +1134,13 @@ def public_site_page(slug):
         )
         import dataclasses
 
-        from app.release_waves.routes import coming_soon_entries
-        from app.services.site_registry import hold_back_unreleased_capabilities, open_signed_in_links, signed_in_target
+        from app.services.site_registry import (
+            available_capabilities, coming_capabilities, hold_back_unreleased_capabilities, open_signed_in_links, signed_in_target,
+        )
 
-        body_html, capabilities = hold_back_unreleased_capabilities(page.body_html)
+        coming_soon = coming_capabilities()
+        body_html, _described = hold_back_unreleased_capabilities(
+            page.body_html, {e["url"] for e in coming_soon if e["url"]})
         page = dataclasses.replace(page, body_html=open_signed_in_links(body_html))
         modules = [dataclasses.replace(m, url=signed_in_target(m.url)) for m in modules]
         hub_groups = [
@@ -1148,7 +1151,7 @@ def public_site_page(slug):
         ]
         return render_template(
             "public/page.html", page=page, hub_groups=hub_groups,
-            coming_soon=sorted(coming_soon_entries() + capabilities, key=lambda item: item["title"].lower()),
+            coming_soon=coming_soon, available=available_capabilities(),
             share_paths=set(share_page_paths()),
             jsonld=build_hub_jsonld(
                 page.title, page.url, page.description, modules + connectors,

@@ -284,23 +284,47 @@ _TODAY = re.compile(r"<p><strong>Today:</strong>\s*(.*?)</p>", re.S)
 _DELIVERED = re.compile(r"<p>Delivered today by:\s*(.*?)</p>", re.S)
 _DELIVERED_LINK = re.compile(r'<a href="([^"]+)">.*?</a>(?:\s*\([^)]*\))?', re.S)
 _COMING_LINK = re.compile(r'<a href="#coming-soon">Coming soon</a>:\s*(.*?)</p>', re.S)
+_COMING_PARA = re.compile(r'<p><a href="#coming-soon">Coming soon</a>:\s*(.*?)</p>\s*', re.S)
 _FIGURE = re.compile(r"<figure\b.*?</figure>\s*", re.S)
 _TAGS = re.compile(r"<[^>]+>")
+_FIRST_LETTER = re.compile(r"^((?:<[^>]+>)*)([a-z])")
 
 
-def hold_back_unreleased_capabilities(body_html: str) -> tuple[str, list[dict[str, Any]]]:
+def _as_sentence(html: str) -> str:
+    """A fragment that follows a label ("Today: keep one register") as a written sentence: capital first, full stop last."""
+    text = " ".join(html.split())
+    text = _FIRST_LETTER.sub(lambda m: m.group(1) + m.group(2).upper(), text)
+    return text if text.endswith((".", "!", "?", "…")) else text + "."
+
+
+def hold_back_unreleased_capabilities(
+    body_html: str, page_urls: set[str] | None = None
+) -> tuple[str, list[dict[str, Any]]]:
     """Hold each capability on the features page to the release check, the one the menus and the Scenarios text use.
 
     A link under "Delivered today by" stays only while its page is released. A capability none of whose
-    delivered pages is released is not delivered: its "Today:" description, kept whole, is introduced as Coming
-    soon and its screenshots go. Every capability that is coming soon, held back or always, gets an entry
-    with its own anchor (``coming-<capability>``) for the Coming soon list, and its inline links point at it.
+    delivered pages is released is not delivered: its "Today:" description, kept whole, is introduced once as Coming
+    soon, as written sentences, and its screenshots go. Every capability that is coming soon, held back or always,
+    gets an entry with its own anchor (``coming-<capability>``) for the Coming soon list, and its inline links
+    point at it.
+
+    The page's front matter may name, under ``same_capability_as``, the page that carries the same capability as a
+    heading. When that page is one of ``page_urls`` (the pages the one list of coming capabilities already holds),
+    the capability is that page's entry and not a second one: its inline links open that page and no entry is
+    made for it here.
     """
+    from app.services.public_pages import load_page
+
+    features = load_page("site", slug="features")
+    same_as = dict((features.front_matter.get("same_capability_as") if features is not None else None) or {})
     text = str.__str__(body_html)
     items: list[dict[str, Any]] = []
+    if page_urls is None:
+        page_urls = {entry["url"] for entry in _page_entries() if entry["url"]}
 
     def one(match: "re.Match[str]") -> str:
         heading, anchor, title, rest = match.group(1), match.group(2), _TAGS.sub("", match.group(3)), match.group(4)
+        same_page = same_as.get(anchor)
         target = "coming-" + anchor
         delivered = _DELIVERED.search(rest)
         links = _DELIVERED_LINK.finditer(delivered.group(1)) if delivered else []
@@ -309,21 +333,132 @@ def hold_back_unreleased_capabilities(body_html: str) -> tuple[str, list[dict[st
         if delivered is not None:
             rest = rest.replace(delivered.group(0), "<p>Delivered today by: %s.</p>" % ", ".join(kept) if kept else "")
         today = _TODAY.search(rest)
+        coming = _COMING_PARA.search(rest)
         words = []
         if held and today is not None:
-            words.append(" ".join(_TAGS.sub("", today.group(1)).split()))
-            rest = rest.replace(today.group(0), '<p><a href="#%s">Coming soon</a>: %s</p>' % (target, today.group(1)))
+            words.append(_TAGS.sub("", _as_sentence(today.group(1))))
+            joined = _as_sentence(today.group(1))
+            if coming is not None:
+                # one paragraph, one label: the held description first, then what is still to come
+                joined += " " + coming.group(1).strip()
+                rest = rest.replace(coming.group(0), "")
+            rest = rest.replace(today.group(0), '<p><a href="#coming-soon">Coming soon</a>: %s</p>\n' % joined)
+            coming = None
         if held:
             rest = _FIGURE.sub("", rest)
-        coming = _COMING_LINK.search(rest)
+        coming = coming or _COMING_LINK.search(rest)
         if coming is not None:
             words.append(" ".join(_TAGS.sub("", coming.group(1)).split()))
-        rest = rest.replace('<a href="#coming-soon">', '<a href="#%s">' % target)
-        if words:
-            items.append({"url": None, "anchor": target, "title": title, "description": " ".join(words)})
+        if words and same_page and same_page in page_urls:
+            rest = rest.replace('<a href="#coming-soon">', '<a href="%s">' % same_page)
+            items.append({"url": same_page, "anchor": target, "name": title, "sentence": " ".join(words)})
+        else:
+            rest = rest.replace('<a href="#coming-soon">', '<a href="#%s">' % target)
+            if words:
+                items.append({"url": None, "anchor": target, "name": title, "sentence": " ".join(words)})
         return heading + rest
 
     return type(body_html)(_CAPABILITY.sub(one, text)), items
+
+
+# What a visitor opens for a coming capability, and where it is listed:
+#   early_access        its early-access page: listed by the hub and the Coming soon list
+#   waiting_list_module a published module page that says plainly it is coming, with a waiting list: listed by both
+#   features_only       described on the features page; if a held waiting-list page exists it is linked, but the hub
+#                       and the sitemap do not carry it
+EARLY_ACCESS, WAITING_LIST_MODULE, FEATURES_ONLY = "early_access", "waiting_list_module", "features_only"
+HUB_KINDS = (EARLY_ACCESS, WAITING_LIST_MODULE)
+
+
+def _first_sentence(text: str) -> str:
+    one = " ".join(_TAGS.sub("", text or "").split())
+    one = re.sub(r"^(Early access|Coming soon):\s*", "", one)
+    found = re.match(r".*?[.!?](?=\s|$)", one)
+    return _as_sentence(found.group(0) if found else one) if one else ""
+
+
+def _page_entries() -> list[dict[str, Any]]:
+    """The coming capabilities that have a page to open, for the release switch and wave as they stand now.
+
+    The early-access groups the release check keeps closed, and every module page that answers a waiting list:
+    its own, or the early-access page of the capability its screen belongs to. Each is one entry, named as the
+    page it opens names itself."""
+    from flask import current_app
+
+    from app.release_waves import EARLY_ACCESS_PREFIX, GENERIC_GROUP, code_slug, entry_for, group_for, has_page
+    from app.release_waves.routes import coming_groups
+    from app.services.public_pages import MERGED_PAGES, load_all_pages
+
+    found: list[dict[str, Any]] = [
+        {"name": g["title"], "sentence": _first_sentence(g["blurb"]), "kind": EARLY_ACCESS,
+         "url": f"{EARLY_ACCESS_PREFIX}/{g['slug']}"}
+        for g in coming_groups()
+    ]
+    listed = {item["url"] for item in found}
+    for page in load_all_pages():
+        if page.family != "module" or page.url in MERGED_PAGES or page.front_matter.get("state") == "not_planned":
+            continue
+        own = page.cta == "waiting_list"
+        screen = (page.front_matter.get("released_variant") or {}).get("screen")
+        group_url = f"{EARLY_ACCESS_PREFIX}/{code_slug(group_for(entry_for(str(screen)))[0])}" if screen else None
+        name = str(page.front_matter.get("module_label") or page.title)
+        if own and group_url in listed:
+            # the page waits for a screen whose capability is listed already: one capability, one entry,
+            # named and described as the page that waits for the screen names it
+            entry = next(item for item in found if item["url"] == group_url)
+            entry["name"], entry["sentence"] = name, _first_sentence(page.description or "") or entry["sentence"]
+            continue
+        if not own and page.wave_closed:
+            endpoint = page.front_matter.get("endpoint")
+            rule = next(iter(current_app.url_map.iter_rules(endpoint)), None) if endpoint in current_app.view_functions else None
+            code, info = group_for(entry_for(rule.rule, rule.endpoint) if rule is not None else None)
+            if has_page(info) and code != GENERIC_GROUP:
+                found.append({"name": info["title"], "sentence": _first_sentence(info["blurb"]), "kind": EARLY_ACCESS,
+                              "url": f"{EARLY_ACCESS_PREFIX}/{code_slug(code)}"})
+            else:
+                found.append({"name": name, "sentence": _first_sentence(page.description or ""), "kind": EARLY_ACCESS,
+                              "url": page.url})
+        elif own:
+            if page.is_held:
+                found.append({"name": name, "sentence": _first_sentence(page.description or ""), "kind": FEATURES_ONLY,
+                              "url": page.url})
+            else:
+                found.append({"name": page.heading, "sentence": _first_sentence(page.description or ""),
+                              "kind": WAITING_LIST_MODULE, "url": page.url})
+    unique: dict[str, dict[str, Any]] = {}
+    for item in found:
+        unique.setdefault(item["url"], item)
+    return list(unique.values())
+
+
+def coming_capabilities() -> list[dict[str, Any]]:
+    """Every capability that is coming, once, for the release switch and wave as they stand now.
+
+    The one list the early-access hub, the features page's Coming soon list and the sitemap read. Each entry has
+    its ``name``, its ``sentence``, its ``kind`` (``early_access``, ``waiting_list_module`` or ``features_only``) and
+    the ``url`` of the page a visitor opens for it, or None for a capability the features page alone describes
+    (then ``anchor`` is where its inline links land; an entry that is also a heading's capability keeps that anchor). A capability is delivered or coming, never both: the
+    delivered lines of the features page and this list come from the same release check. Sorted by name."""
+    from app.services.public_pages import load_page
+
+    entries = _page_entries()
+    features = load_page("site", slug="features")
+    if features is not None:
+        _body, described = hold_back_unreleased_capabilities(features.body_html, {e["url"] for e in entries if e["url"]})
+        taken = {e["name"].lower() for e in entries}
+        by_url = {e["url"]: e for e in entries if e["url"]}
+        for item in described:
+            if item["url"]:
+                # the capability is that page's entry: the entry keeps the capability's anchor
+                by_url[item["url"]]["anchor"] = item["anchor"]
+            elif item["name"].lower() not in taken:
+                entries.append({**item, "kind": FEATURES_ONLY})
+    return sorted(entries, key=lambda e: e["name"].lower())
+
+
+def hub_capabilities() -> list[dict[str, Any]]:
+    """The coming capabilities the early-access hub lists: those with an early-access or waiting-list page to open."""
+    return [e for e in coming_capabilities() if e["kind"] in HUB_KINDS]
 
 
 def open_signed_in_links(body_html: str) -> str:
@@ -331,44 +466,26 @@ def open_signed_in_links(body_html: str) -> str:
     # str.replace on the plain text: Markup.replace would escape the quotes in what it looks for
     text = str.__str__(body_html)
     text = _drop_sentences_for_unreleased_screens(text)
-    opened = []
     for entry in _released_entries():
         target = signed_in_target(entry["href"])
         if target != entry["href"]:
             text = text.replace('href="%s"' % entry["href"], 'href="%s"' % target)
-        opened.append(target)
-    return type(body_html)(_list_opened_as_available(text, opened))
+    return type(body_html)(text)
 
 
-def _list_opened_as_available(text: str, opened: list[str]) -> str:
-    """Move the Coming soon entries a signed-in person can already open into their own Available now list.
+def available_capabilities() -> dict[str, Any]:
+    """The capabilities that were coming and are open now, for the features page's Available now list.
 
-    A released module is listed there for a visitor as well as a signed-in person. The waiting-list
-    sentence then stands only above what is not available; when nothing is left waiting, the Coming
-    soon section goes with it.
-    """
-    import re
-
-    marker = '<h2 id="coming-soon">'
-    start = text.find(marker)
-    if not opened or start < 0:
-        return text
-    head, section = text[:start], text[start:]
-    end = section.find("</ul>")
-    if end < 0:
-        return text
-    items = re.findall(r"<li>.*?</li>", section[:end], flags=re.S)
-    live = [i for i in items if any('href="%s"' % t in i for t in opened)]
-    waiting = [i for i in items if i not in live]
-    if not live:
-        return text
-    tail = section[end + len("</ul>"):]
+    A released module is listed here for a visitor as well as a signed-in person, and never in the coming list: the
+    one release check decides which of the two it is in. A visitor's link opens its page, a signed-in person's the
+    working screen."""
+    items = [
+        {"name": entry["label"], "sentence": re.sub(r"^(Coming soon|Early access):\s*", "", entry.get("blurb") or ""),
+         "url": signed_in_target(entry["href"])}
+        for entry in _released_entries()
+    ]
     intro = "You are signed in, so these open on the working screen." if _signed_in() else "These are available now."
-    available = '<h2 id="available-now">Available now</h2>\n\n<p>%s</p>\n<ul>\n%s\n</ul>\n' % (intro, "\n".join(live))
-    if not waiting:
-        return head + available + tail
-    keep = section[:end].split("<ul>")[0]
-    return head + available + keep + "<ul>\n%s\n</ul>" % "\n".join(waiting) + tail
+    return {"intro": intro, "entries": items}
 
 
 def site_registry() -> dict[str, Any]:

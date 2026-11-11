@@ -24,6 +24,8 @@
       <li><a href="{{ e.href }}">{{ e.title }}</a>{% if e.blurb %}: {{ e.blurb }}{% endif %}</li>
       {% endfor %}
     </ul>
+    {% elif elsewhere %}
+    <p data-testid="early-access-elsewhere">Nothing here has its own waiting list yet. <a href="/features#coming-soon">The features page</a> says what is coming.</p>
     {% else %}
     <p data-testid="early-access-none">Nothing is waiting: every part of Entelim is open to you now.</p>
     {% endif %}

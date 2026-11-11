@@ -54,15 +54,25 @@
   <article class="public-page-content public-prose prose max-w-none">
     {{ page.body_html }}
 
+    {% if available and available.entries %}
+    <h2 id="available-now">Available now</h2>
+    <p>{{ available.intro }}</p>
+    <ul data-testid="available-now-list">
+      {% for item in available.entries %}
+      <li><a href="{{ item.url }}">{{ item.name }}</a>{% if item.sentence %}: {{ item.sentence }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
     {% if coming_soon %}
     <h2 id="coming-soon">Coming soon</h2>
     <p>These are not available yet. Where one has a waiting list, open it to join and we will email you when you can use it.</p>
     <ul data-testid="coming-soon-list">
       {% for item in coming_soon %}
       {% if item.url %}
-      <li><a href="{{ item.url }}">{{ item.title }}</a>{% if item.description %}: {{ item.description }}{% endif %}</li>
+      <li><a href="{{ item.url }}">{{ item.name }}</a>{% if item.sentence %}: {{ item.sentence }}{% endif %}{% if item.anchor %}<span id="{{ item.anchor }}"></span>{% endif %}</li>
       {% else %}
-      <li id="{{ item.anchor }}">{{ item.title }}{% if item.description %}: {{ item.description }}{% endif %}</li>
+      <li id="{{ item.anchor }}">{{ item.name }}{% if item.sentence %}: {{ item.sentence }}{% endif %}</li>
       {% endif %}
       {% endfor %}
     </ul>

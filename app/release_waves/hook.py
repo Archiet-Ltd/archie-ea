@@ -105,9 +105,9 @@ def enforce():
             import secrets
 
             g.csp_nonce = secrets.token_urlsafe(32)
-        from app.release_waves.routes import coming_entries
+        from app.release_waves.routes import hub_context
 
-        out = make_response(render_template("public/early_access_hub.html", entries=coming_entries()))
+        out = make_response(render_template("public/early_access_hub.html", **hub_context()))
         out.headers["X-Robots-Tag"] = "noindex"
         return out
     if wants_json():
