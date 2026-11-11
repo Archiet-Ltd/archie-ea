@@ -1854,13 +1854,56 @@ def _product_page(element, element_type, ae_id):
     if product_ae is None:
         return None
     editable = can_change_model(current_user)
+    from app.utils.role_access import may_open_connector_pages
+
+    def _bring_in(product):
+        return product_page.bring_in(
+            product, org_id=org_id, allowed=may_open_connector_pages(current_user, org_id),
+            choosing=request.args.get("bring_in") == "1",
+            urls={
+                "connect": url_for("m365_connector.github_connect", product=product.id),
+                "choose": url_for("archimate_crud.detail_element", layer="business", element_type="Product",
+                                  element_id=product.id, ae=1, bring_in=1) + "#bring-in",
+                "scan": url_for("archimate_crud.scan_product_repositories", product_id=product.id),
+                "review": url_for("m365_connector.github_review"),
+                "element": lambda el: _element_href((el.layer or "").strip().lower(), el.type, el.id),
+            },
+        )
+
     return product_page.build(
         product_ae, org_id=org_id, href_for=_element_href, owner_for=_owner_names_for, plain_name=_plain_name,
         user=current_user,
         add_url=url_for("archimate_crud.add_product_element", product_id=ae_id) if editable else None,
         export_url=url_for("archimate_crud.export_product", product_id=ae_id),
         status_words=_plain_label,
+        bring_in_for=_bring_in,
     )
+
+
+@archimate_crud.route("/products/<int:product_id>/repositories", methods=["POST"])
+@login_required
+def scan_product_repositories(product_id):
+    """Read the repositories a person chose on a Product's page: the read proposes what they show, each
+    proposal tied to this Product, and nothing enters the model until a person approves it."""
+    from app.connectors import github as gh
+    from app.utils.role_access import may_open_connector_pages
+
+    org_id = getattr(g, "current_org_id", None)
+    product_ae = ArchiMateElement.query.filter_by(id=product_id, type="Product", organization_id=org_id).first()
+    if product_ae is None:
+        abort(404)
+    if not may_open_connector_pages(current_user, org_id):
+        abort(403)
+    back = url_for("archimate_crud.detail_element", layer="business", element_type="Product",
+                   element_id=product_id, ae=1) + "#bring-in"
+    try:
+        started = gh.start_product_scan(org_id, product_id, request.form.getlist("repository"))
+    except gh.ConnectRefused as exc:
+        flash(str(exc), "error")
+        return redirect(back)
+    flash("Reading %d repositor%s for %s. What is found waits for your approval below." % (
+        len(started["repositories"]), "y" if len(started["repositories"]) == 1 else "ies", product_ae.name), "success")
+    return redirect(back)
 
 
 @archimate_crud.route("/products/<int:product_id>/elements", methods=["POST"])
