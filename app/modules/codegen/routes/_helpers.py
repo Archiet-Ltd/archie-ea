@@ -7,6 +7,7 @@ import os
 import re
 from datetime import datetime
 
+from flask import has_request_context, request
 from flask_login import current_user
 
 from app.extensions import db
@@ -104,6 +105,22 @@ def _check_access(solution, user=None):
             )
     if getattr(user, "is_platform_admin", False):
         return True
+    # Reading (never generating, deploying or changing): a persona the permission matrix lets read every
+    # solution opens the Code Workbench of a solution in their own organisation, as they open its record.
+    org_id = getattr(solution, "organization_id", None)
+    if (
+        org_id is not None
+        and getattr(user, "organization_id", None) == org_id
+        and has_request_context()
+        and request.method in ("GET", "HEAD")
+    ):
+        try:
+            from app.core.auth.permissions import can
+
+            if can(user, "view_all", "solution", org_id):
+                return True
+        except Exception:  # noqa: BLE001 - an unreadable grant is no ability
+            logger.exception("view_all check failed in codegen._check_access")
     stakeholder_emails = (
         getattr(solution, "solution_owner", None),
         getattr(solution, "business_sponsor", None),

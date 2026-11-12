@@ -156,6 +156,26 @@ def _check_solution_access(solution, user=None) -> bool:
     )
 
 
+def _may_edit_solution(solution) -> bool:
+    """True when the signed-in person may change this solution.
+
+    The author and the organisation's administrators, as before, and anyone whose persona the permission
+    matrix lets edit solutions (an Enterprise, Solution or Business Architect) in the solution's own organisation.
+    """
+    if solution.created_by_id == current_user.id or is_active_org_admin():
+        return True
+    org_id = getattr(solution, "organization_id", None)
+    if org_id is None or getattr(current_user, "organization_id", None) != org_id:
+        return False
+    try:
+        from app.core.auth.permissions import can
+
+        return bool(can(current_user, "edit", "solution", org_id))
+    except Exception:  # noqa: BLE001 - an unreadable grant is no ability
+        logger.exception("edit check failed in _may_edit_solution")
+        return False
+
+
 def _capability_gap_severity(capability) -> str | None:
     """Derive a simple maturity gap severity for detail rendering."""
     current = getattr(capability, "current_maturity_level", None)
@@ -3283,7 +3303,7 @@ def api_download_specs(solution_id):
     import zipfile
 
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not is_active_org_admin():
+    if not _check_solution_access(solution):
         abort(403)
 
     try:
@@ -4295,7 +4315,7 @@ def export_solution_sad(solution_id: int):
     as the detail page but renders a standalone, styled document.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not is_active_org_admin():
+    if not _check_solution_access(solution):
         abort(403)
 
     ctx = _build_solution_detail_context(solution)
@@ -4352,7 +4372,7 @@ def export_solution_sad(solution_id: int):
 def export_solution_markdown(solution_id: int):
     """Export solution as Markdown document (ENT-011)."""
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not is_active_org_admin():
+    if not _check_solution_access(solution):
         abort(403)
     # Build markdown
     lines = [
@@ -4779,7 +4799,7 @@ def edit_solution(solution_id: int):
     solution = Solution.query.get_or_404(solution_id)
 
     # Verify ownership
-    if solution.created_by_id != current_user.id and not is_active_org_admin():
+    if not _may_edit_solution(solution):
         flash("You don't have permission to edit this solution", "error")
         abort(403)
 
@@ -6250,7 +6270,7 @@ def api_get_solution(solution_id: int):
     solution = Solution.query.get_or_404(solution_id)
 
     # Verify ownership
-    if solution.created_by_id != current_user.id and not is_active_org_admin():
+    if not _check_solution_access(solution):
         return jsonify({"success": False, "error": "Permission denied"}), 403
 
     return jsonify(
