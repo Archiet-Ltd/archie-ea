@@ -163,7 +163,8 @@
 {%- set _domains = solutions|map(attribute='business_domain')|map('default', '', true)|unique|list -%}
 {%- set _types = solutions|map(attribute='solution_type')|map('default', '', true)|unique|list -%}
 {%- set _leads = [] -%}
-{%- for sol in solutions %}{% set lead = (_summaries.get(sol.id, {}).owner_display or '') %}{% if lead not in _leads %}{% set _ = _leads.append(lead) %}{% endif %}{% endfor -%}
+{#- a lead the summary calls Unassigned is no lead: it is not a name to say once above the table -#}
+{%- for sol in solutions %}{% set lead = (_summaries.get(sol.id, {}).owner_display or '') %}{% if lead|lower == 'unassigned' %}{% set lead = '' %}{% endif %}{% if lead not in _leads %}{% set _ = _leads.append(lead) %}{% endif %}{% endfor -%}
 {%- set vary = {'domain': _domains|length > 1, 'type': _types|length > 1, 'lead': _leads|length > 1} -%}
 {%- set _shared = [] -%}
 {%- if not vary.domain %}{% set _ = _shared.append(('every solution is in ' ~ _domains[0]) if _domains[0] else 'no solution has a business domain yet') %}{% endif -%}
