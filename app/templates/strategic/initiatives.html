@@ -73,6 +73,8 @@
         {% endif %}
     {% endfor %}
 
+    {% if costs_withheld %}<p class="mb-4 text-sm text-muted-foreground" data-testid="initiatives-costs-withheld">{{ costs_withheld_text }}</p>{% endif %}
+
     <!-- Initiative Cards Grid -->
     {% if initiatives %}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -141,6 +143,7 @@
                 <div class="text-xs text-muted-foreground mt-1">{{ progress_pct }}% complete</div>
             </div>
 
+            {% if not costs_withheld %}
             <!-- Budget Row -->
             <div class="flex items-center justify-between text-sm border-t pt-3">
                 <div>
@@ -159,6 +162,7 @@
                 </div>
             </div>
 
+            {% endif %}
             <!-- Dates Row -->
             <div class="grid grid-cols-2 gap-4 text-sm">
                 <div>
