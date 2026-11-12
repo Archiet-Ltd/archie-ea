@@ -1,0 +1,16 @@
+{
+  "slice": "application_overview",
+  "doc": "Which slice the generator models for the application Overview edit. Code decides the facts; this file only names the fields, the screens and the route to look at. Every reader of a named field anywhere under app/ is read.",
+  "routeTails": [
+    "overview-update"
+  ],
+  "screens": [
+    "app/templates/applications/dashboard.html",
+    "app/templates/application_mgmt/partials/_views_crud_tab.html"
+  ],
+  "vocabularies": [
+    {
+      "column": "deployment_status"
+    }
+  ]
+}
