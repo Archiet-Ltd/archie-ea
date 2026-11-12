@@ -3,7 +3,8 @@
 The person: a startup CTO who has just signed up. The goal: try the sample, then take it away and
 see the Overview say what is true: nothing in the model, nothing added, nothing from a connected
 source. A second organisation that keeps its own sample loaded must read the same figures before,
-during and after.
+during and after. A record the person added and deleted while the sample was loaded still reads as
+one record added and one removed once the sample is gone, agreeing with the organisation's history.
 """
 import os
 import re
@@ -127,6 +128,114 @@ def test_removing_the_sample_leaves_every_figure_at_nothing(browser, live_server
         page_a.get_by_test_id("recent-changes-link").click()
         page_a.wait_for_load_state("domcontentloaded")
         assert len(page_a.locator("main").first.inner_text().strip()) > 40
+
+        # the other organisation did not move
+        assert _overview(page_b, live_server) == other
+    finally:
+        context_a.close()
+        context_b.close()
+
+
+def _own_adds_in_the_history(app, email, days=90):
+    """How many records the organisation added itself in the period, counted from its own change history."""
+    from datetime import datetime, timedelta
+
+    with app.app_context():
+        from app.models.audit_log import AuditLog
+        from app.models.user import User
+        from app.modules.intelligence.services.history_service import AUDITED_TABLES
+        from app.services.sample_company_service import written_by_the_sample
+
+        org_id = User.query.filter_by(email=email).one().organization_id
+        since = datetime.combine(datetime.utcnow().date() - timedelta(days=days - 1), datetime.min.time())
+        sample = written_by_the_sample(org_id)
+        rows = AuditLog.query.filter(
+            AuditLog.organization_id == org_id, AuditLog.table_name.in_(list(AUDITED_TABLES)),
+            AuditLog.action == "create", AuditLog.created_at >= since,
+        ).all()
+        return sum(1 for r in rows if (r.table_name, r.record_id) not in sample)
+
+
+def _week(page):
+    card = page.locator("[data-slot=card]", has=page.get_by_text("Changes this week", exact=True)).first
+    text = card.inner_text()
+    found = {k: re.search(r"%s\s*(\d+)" % k, text) for k in ("Added", "Updated", "Removed")}
+    return {k: int(m.group(1)) if m else None for k, m in found.items()}
+
+
+@pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
+def test_a_record_the_person_added_and_deleted_still_counts_after_the_sample_is_removed(
+    browser, live_server, people, app, name, viewport
+):
+    width = viewport["width"]
+    context_b, page_b = _context(browser, viewport)
+    context_a, page_a = _context(browser, viewport)
+    try:
+        email_b, _ = sign_up(page_b, live_server, people)
+        _skip_to_the_dashboard(page_b)
+        _load_sample(page_b, live_server)
+        other = _overview(page_b, live_server)
+        assert int(other["totals"]["90d"]) > 0, other
+
+        email_a, _ = sign_up(page_a, live_server, people)
+        assert_is_a_startup_cto_not_an_administrator(app, email_a)
+        _skip_to_the_dashboard(page_a)
+        _load_sample(page_a, live_server)
+        _overview(page_a, live_server)
+        _shot(page_a, "overview-real-record-sample-loaded", width)
+
+        # the person adds one stakeholder of their own, the way the architecture page offers it
+        record = "Board audit committee %s" % os.urandom(3).hex()
+        page_a.goto(live_server + "/architecture/dashboard", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page_a.get_by_test_id("btn-create-element").click()
+        form = page_a.locator("#archimate-form-modal")
+        expect(form).to_be_visible()
+        form.get_by_label("Element Type").select_option("Stakeholder")
+        form.get_by_label("Element name").fill(record)
+        with page_a.expect_response(
+            lambda r: r.url.endswith("/architecture/motivation/Stakeholder/new") and r.request.method == "POST"
+        ) as created:
+            form.get_by_role("button", name="Create", exact=True).click()
+        assert created.value.status == 200, created.value.status
+
+        # then opens it and deletes it
+        page_a.goto(live_server + "/architecture/motivation/Stakeholder", wait_until="domcontentloaded",
+                    timeout=PAGE_TIMEOUT)
+        page_a.get_by_role("link", name=record).first.click()
+        expect(page_a.locator("main")).to_contain_text(record)
+        page_a.get_by_test_id("delete-element").click()
+        dialog = page_a.get_by_role("dialog", name="Confirm")
+        expect(dialog).to_contain_text(record)
+        dialog.get_by_role("button", name="Confirm").click()
+        page_a.wait_for_url(re.compile(r"/architecture/motivation/Stakeholder$"), timeout=PAGE_TIMEOUT)
+
+        # and removes the sample
+        page_a.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page_a.get_by_role("button", name="Remove it", exact=True).first.click()
+        confirm = page_a.get_by_test_id("sample-company-remove-confirm")
+        expect(confirm).to_be_visible()
+        confirm.click()
+        expect(page_a.get_by_text("Sample company removed")).to_be_visible()
+
+        after = _overview(page_a, live_server)
+        week = _week(page_a)
+        _shot(page_a, "overview-real-record-after-removal", width)
+        # what the person did is still there: one record added, and one removed this week
+        assert after["totals"] == {"7d": "1", "30d": "1", "90d": "1"}, after
+        assert after["by_hand"][-1:] == ["1"] and set(after["connected"]) == {"0"}, after
+        assert after["year"] == "1 added this year", after
+        assert week == {"Added": 1, "Updated": 0, "Removed": 1}, week
+        assert after["recent_empty"] is None and record in (after["recent"] or ""), after
+        assert "Removed" in after["recent"], after
+        # the records-added figure is the organisation's own history, counted without the sample
+        assert int(after["totals"]["90d"]) == _own_adds_in_the_history(app, email_a), after
+        body = page_a.get_by_test_id("overview-dashboard").inner_text()
+        for sentence in ("From connected sources 1", "Payments service", "Customer web app"):
+            assert sentence not in body, sentence
+        # "See every change" lands on the change itself
+        page_a.get_by_test_id("recent-changes-link").click()
+        page_a.wait_for_load_state("domcontentloaded")
+        expect(page_a.locator("main").first).to_contain_text(record)
 
         # the other organisation did not move
         assert _overview(page_b, live_server) == other
