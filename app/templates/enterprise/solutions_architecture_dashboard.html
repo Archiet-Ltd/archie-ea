@@ -1,6 +1,7 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/figures.html' import state_badge %}
 
 {% block title %}Buy / Build / Reuse Analysis{% endblock %}
 
@@ -29,13 +30,16 @@
 
     <!-- YOUR SOLUTIONS, PATTERNS AND CONTRACTS -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" data-testid="solutions-counts">
-        <div class="rounded-xl border border-input bg-background p-5" data-testid="count-solutions">
-            <p class="text-sm font-medium text-muted-foreground">Solutions</p>
-            <p class="text-2xl font-bold tracking-tight mt-1" data-testid="count-solutions-value">{{ solution_count|dash }}</p>
-        </div>
+        <a href="{{ url_for('solution_design.list_solutions') }}" class="block" data-testid="count-solutions">
+            <div class="rounded-xl border border-input bg-background p-5">
+                <p class="text-sm font-medium text-muted-foreground">Solutions</p>
+                <p class="text-2xl font-bold tracking-tight mt-1" data-testid="count-solutions-value">{{ solution_count|dash }}</p>
+            </div>
+        </a>
         <div class="rounded-xl border border-input bg-background p-5" data-testid="count-patterns">
             <p class="text-sm font-medium text-muted-foreground">Solution patterns</p>
             <p class="text-2xl font-bold tracking-tight mt-1" data-testid="count-patterns-value">{{ pattern_count|dash }}</p>
+            <p class="text-xs text-muted-foreground mt-2">Counts reusable patterns captured from saved solutions.</p>
         </div>
         {% if contract_count is not none or load_error %}
         <div class="rounded-xl border border-input bg-background p-5" data-testid="count-contracts">
@@ -340,12 +344,7 @@
                             <p class="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{{ sol.description or '' }}</p>
                         </td>
                         <td class="px-6 py-4">
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
-                                {% if sol.status == 'deployed' %}bg-success/10 text-success-emphasis
-                                {% elif sol.status == 'in_progress' %}bg-primary/10 text-primary
-                                {% else %}bg-muted text-muted-foreground{% endif %}">
-                                {{ sol.status|title }}
-                            </span>
+                            {{ state_badge(sol.status) }}
                         </td>
                         <td class="px-6 py-4 text-muted-foreground font-mono text-xs">{{ sol.app_count }}</td>
                         <td class="px-6 py-4 text-xs">{{ sol.capability_count }} mappings</td>

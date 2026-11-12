@@ -228,7 +228,7 @@
   {% endcall %}
   {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap text-muted-foreground') %}{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}{% endcall %}
   {%- set bucket = ws.work_bucket or 'in_design' -%}
-  {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': {'needs_setup': 1, 'in_design': 2, 'needs_attention': 3, 'ready_for_review': 4}.get(bucket, 0)}) %}{{ state_badge(_bucket_labels.get(bucket, bucket|replace('_', ' ')|capitalize), tone={'needs_setup': 'neutral', 'in_design': 'caution', 'needs_attention': 'negative', 'ready_for_review': 'positive'}.get(bucket, 'neutral')) }}{% endcall %}
+  {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': solution.status or 'planned'}) %}{{ state_badge(solution.status or 'planned') }}{% endcall %}
   {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap') %}{{ state_badge(GOV_LABELS.get(gov, gov|replace('_', ' ')|capitalize), tone={'approved': 'positive', 'rejected': 'negative', 'arb_review': 'caution', 'under_review': 'caution', 'in_progress': 'caution', 'proposed': 'caution'}.get(gov, 'neutral')) }}{% endcall %}
   {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': readiness if readiness is not none else -1}) %}
     <span class="inline-flex items-center justify-end gap-2" title="{{ ws.readiness_passed or 0 }} of {{ ws.readiness_total or 0 }} maturity checks pass">
