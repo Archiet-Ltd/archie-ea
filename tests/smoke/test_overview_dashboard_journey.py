@@ -442,6 +442,29 @@ def test_year_card_counts_every_record_the_page_counts(browser, live_server, imp
         context.close()
 
 
+@pytest.mark.parametrize("viewport,theme", [(FOLD, "light"), (PHONE, "dark")], ids=["1440-light", "390-dark"])
+def test_the_week_and_the_ranges_count_the_records_the_year_card_counts(browser, live_server, imported_org, viewport, theme):
+    """Everything in the company was entered today, imported or by hand: the year card, each period of the
+    records-added chart and the Changes this week card all say the same number."""
+    context, page = _page(browser, viewport)
+    try:
+        _open(page, live_server, _signed_in_as_the_architect(imported_org))
+        page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
+        year = _int(re.search(r"\d[\d,]*", page.locator('[data-testid="year-card"] [data-testid="year-value"]').inner_text()).group(0))
+        assert year == 24
+        for key in ("7d", "30d", "90d"):
+            page.select_option('[data-testid="activity-range"]', key)
+            assert _int(page.locator('[data-testid="activity-total-%s"]' % key).inner_text()) == year, key
+        week = page.locator('[data-slot="card"]').filter(has_text="Changes this week")
+        added = week.locator('[role="listitem"]').filter(has_text="Added").inner_text()
+        assert _int(re.search(r"\d[\d,]*", added).group(0)) == year, added
+        assert "No change was recorded this week" not in week.inner_text()
+        page.select_option('[data-testid="activity-range"]', "7d")
+        _shot(page, "overview-imported-week", viewport["width"], theme)
+    finally:
+        context.close()
+
+
 def test_run_cost_and_the_applications_table_agree_or_say_why(browser, live_server, orgs):
     """The run cost comes from contracts, the table from per-application cost; the page says how they differ."""
     context, page = _page(browser, FOLD)

@@ -92,3 +92,26 @@ def test_a_record_with_no_entry_date_is_counted_under_a_plain_line(make_org):
     assert activity["this_year"] == "No records added this year. 3 records with no recorded entry date"
     assert activity["no_entry_date"] == 3
     assert _activity(org_b, user_b)["this_year"] == "1 added this year"
+
+
+def test_the_week_and_the_ranges_count_imported_records_like_the_year(make_org):
+    now = datetime.utcnow()
+    org_a, org_b = make_org(), make_org()
+    user_a = _architect(org_a, "week-a@example.com")
+    user_b = _architect(org_b, "week-b@example.com")
+    _imported(org_b, 5, now)
+    before_b = _activity(org_b, user_b)
+
+    _imported(org_a, 21, now)
+    _by_hand(org_a, user_a, 3)
+
+    activity = _activity(org_a, user_a)
+    assert activity["this_year_count"] == 24
+    for key in ("7d", "30d", "90d"):
+        assert activity["ranges"][key]["total"] == 24, key
+        assert activity["ranges"][key]["connected"] == 21, key
+        assert activity["ranges"][key]["manual"] == 3, key
+    assert activity["week"]["added"] == 24
+    assert activity["week"]["total"] == 24
+    assert sum(row["changes"] for row in activity["week"]["rows"]) == 24
+    assert before_b["week"]["added"] == _activity(org_b, user_b)["week"]["added"] == 5
