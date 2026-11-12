@@ -22,6 +22,38 @@ def normalised_type(element_type: Optional[str]) -> str:
     return (element_type or "").replace("_", "").replace(" ", "").lower()
 
 
+def _links_by_element(org_id: int, element_ids: List[int]) -> Dict[int, List[Dict[str, Any]]]:
+    """The links of each given element, one row per relationship, in this organisation only."""
+    rows: Dict[int, List[Dict[str, Any]]] = {element_id: [] for element_id in element_ids}
+    if not element_ids:
+        return rows
+    for direction, near, far in (
+        ("outgoing", ArchiMateRelationship.source_id, ArchiMateRelationship.target_id),
+        ("incoming", ArchiMateRelationship.target_id, ArchiMateRelationship.source_id),
+    ):
+        found = db.session.execute(
+            db.select(near, ArchiMateRelationship, ArchiMateElement)
+            .join(ArchiMateElement, far == ArchiMateElement.id)
+            .where(
+                near.in_(element_ids),
+                ArchiMateRelationship.organization_id == org_id,
+                ArchiMateElement.organization_id == org_id,
+            )
+            .order_by(ArchiMateElement.name, ArchiMateRelationship.id)
+        ).all()
+        for near_id, relationship, element in found:
+            rows[near_id].append({
+                "id": element.id,
+                "name": element.name,
+                "type": element.type,
+                "layer": (element.layer or "").title(),
+                "rel_type": relationship.type,
+                "relationship_id": relationship.id,
+                "direction": direction,
+            })
+    return rows
+
+
 def linked_elements(application: Any) -> List[Dict[str, Any]]:
     """Every element linked to the application's element, one row per relationship.
 
@@ -32,32 +64,7 @@ def linked_elements(application: Any) -> List[Dict[str, Any]]:
     org_id = getattr(application, "organization_id", None)
     if not element_id or org_id is None:
         return []
-    rows: List[Dict[str, Any]] = []
-    for direction, near, far in (
-        ("outgoing", ArchiMateRelationship.source_id, ArchiMateRelationship.target_id),
-        ("incoming", ArchiMateRelationship.target_id, ArchiMateRelationship.source_id),
-    ):
-        found = db.session.execute(
-            db.select(ArchiMateRelationship, ArchiMateElement)
-            .join(ArchiMateElement, far == ArchiMateElement.id)
-            .where(
-                near == element_id,
-                ArchiMateRelationship.organization_id == org_id,
-                ArchiMateElement.organization_id == org_id,
-            )
-            .order_by(ArchiMateElement.name, ArchiMateRelationship.id)
-        ).all()
-        for relationship, element in found:
-            rows.append({
-                "id": element.id,
-                "name": element.name,
-                "type": element.type,
-                "layer": (element.layer or "").title(),
-                "rel_type": relationship.type,
-                "relationship_id": relationship.id,
-                "direction": direction,
-            })
-    return rows
+    return _links_by_element(org_id, [element_id])[element_id]
 
 
 def _once_per_element(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -104,12 +111,37 @@ def recorded_technology(application: Any) -> List[Dict[str, Any]]:
     ])
 
 
-def linked_suppliers(application: Any, recorded_vendor_name: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Business actors linked to the application, other than the vendor already recorded."""
+def _suppliers_among(rows: List[Dict[str, Any]], recorded_vendor_name: Optional[str]) -> List[Dict[str, Any]]:
     skip = " ".join((recorded_vendor_name or "").split()).lower()
-    rows = [
-        r for r in linked_elements(application)
+    return _once_per_element([
+        r for r in rows
         if normalised_type(r["type"]) == "businessactor"
         and " ".join((r["name"] or "").split()).lower() != skip
-    ]
-    return _once_per_element(rows)
+    ])
+
+
+def linked_suppliers(application: Any, recorded_vendor_name: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Business actors linked to the application, other than the vendor already recorded."""
+    return _suppliers_among(linked_elements(application), recorded_vendor_name)
+
+
+def linked_suppliers_by_application(
+    applications: List[Any], recorded_vendor_names: Optional[Dict[int, Optional[str]]] = None
+) -> Dict[int, List[Dict[str, Any]]]:
+    """``linked_suppliers`` for many applications of one organisation, in two queries.
+
+    Keyed by application id; an application with no supplier linked has an empty list.
+    ``recorded_vendor_names`` maps an application id to the vendor already recorded for it.
+    """
+    names = recorded_vendor_names or {}
+    out: Dict[int, List[Dict[str, Any]]] = {a.id: [] for a in applications}
+    by_org: Dict[int, List[Any]] = {}
+    for application in applications:
+        if getattr(application, "archimate_element_id", None) and application.organization_id is not None:
+            by_org.setdefault(application.organization_id, []).append(application)
+    for org_id, group in by_org.items():
+        links = _links_by_element(org_id, list({a.archimate_element_id for a in group}))
+        for application in group:
+            out[application.id] = _suppliers_among(
+                links[application.archimate_element_id], names.get(application.id))
+    return out
