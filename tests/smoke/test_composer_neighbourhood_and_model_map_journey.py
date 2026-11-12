@@ -374,6 +374,11 @@ def test_ring_of_unconnected_elements_says_what_it_is(browser, live_server, worl
               }).filter(n => n.hit);
             }""")
         assert not covered, "the ring's label is covered by %d element(s): %r" % (len(covered), covered[:3])
+        # And it is drawn at a size a person can read at the opening zoom, not shrunk with the map.
+        drawn = page.evaluate(
+            """() => { const t = document.querySelector('[data-testid="model-map-unconnected-label"]');
+               return parseFloat(getComputedStyle(t).fontSize) * t.getScreenCTM().a; }""")
+        assert drawn >= 11, "the ring's label is drawn %.1f px tall at the opening zoom" % drawn
         _shot(page, "model-map-unconnected", scheme)
     finally:
         context.close()

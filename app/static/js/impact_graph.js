@@ -90,7 +90,14 @@
                 if (ev.type === 'wheel') return ev.ctrlKey || svgEl === document.activeElement || svgEl.contains(document.activeElement);
                 return !ev.ctrlKey && !ev.button;
             })
-            .on('zoom', function (ev) { root.attr('transform', ev.transform); });
+            .on('zoom', function (ev) { lastTransform = ev.transform; root.attr('transform', ev.transform); placeLabelOnScreen(); });
+        var lastTransform = d3.zoomIdentity;
+        var labelAt = null;     // where the ring's label belongs on the map, in map units
+        var ringLabel = null;   // drawn above the map, at a fixed size on screen, so a zoomed-out map still reads
+        function placeLabelOnScreen() {
+            if (!ringLabel || !labelAt) return;
+            ringLabel.attr('x', lastTransform.applyX(labelAt.x)).attr('y', lastTransform.applyY(labelAt.y) - 4);
+        }
         svg.call(zoomer);
         svg.on('pointerdown.focus', function () { svgEl.focus({ preventScroll: true }); });
 
@@ -135,9 +142,9 @@
             hide('impact-loading');
             var nodes = data.nodes || [];
             if (!nodes.length) { show('impact-empty'); text('impact-counts', 'No elements in this layer.'); return; }
+            if (ringLabel) { ringLabel.remove(); ringLabel = null; labelAt = null; }
             var clusters = data.mode === 'clusters';
             var edges = data.edges || [];
-            var ringLabel = null;
             var isolated = clusters ? [] : nodes.filter(function (d) { return d.connected === false; });
             var cx = width / 2, cy = height / 2;
             var ringRadius = Math.min(width, height) * 0.44;
@@ -155,7 +162,8 @@
                 ring.append('circle').attr('cx', cx).attr('cy', cy).attr('r', ringRadius + 22).attr('fill', 'none')
                     .attr('stroke', 'currentColor').attr('class', 'text-border').attr('stroke-width', 1)
                     .attr('stroke-dasharray', '4 4');
-                ringLabel = ring.append('text').attr('x', cx).attr('y', cy - ringRadius - 32).attr('text-anchor', 'middle')
+                labelAt = { x: cx, y: cy - ringRadius - 32 };
+                ringLabel = svg.append('text').attr('text-anchor', 'middle')
                     .attr('font-size', 13).attr('fill', 'currentColor').attr('class', 'text-muted-foreground')
                     .attr('data-testid', 'model-map-unconnected-label')
                     .text('Not connected to anything (' + isolated.length + ')');
@@ -236,7 +244,8 @@
                 if (!ringLabel) return;
                 var top = cy - ringRadius - 32;
                 nodes.forEach(function (d) { top = Math.min(top, d.y - radius(d) - 14); });
-                ringLabel.attr('y', top);
+                labelAt = { x: cx, y: top };
+                placeLabelOnScreen();
             }
             // When the layout settles, zoom to show every element with a margin.
             function fit(list) {
@@ -246,10 +255,13 @@
                     x0 = Math.min(x0, d.x - r); y0 = Math.min(y0, d.y - r);
                     x1 = Math.max(x1, d.x + r + (many ? 0 : 150)); y1 = Math.max(y1, d.y + r);
                 });
-                if (ringLabel) { y0 = Math.min(y0, parseFloat(ringLabel.attr('y')) - 18); }
+                if (labelAt) { y0 = Math.min(y0, labelAt.y); }
                 var w = x1 - x0, h = y1 - y0;
                 if (!(w > 0 && h > 0)) return;
-                var k = Math.max(0.1, Math.min(1, 0.92 * Math.min(width / w, height / h)));
+                // The label keeps its size on screen, so the map leaves it a band of 28px above.
+                var band = ringLabel ? 28 : 0;
+                var k = Math.max(0.1, Math.min(1, 0.92 * Math.min(width / w, (height - band) / h)));
+                y0 -= band / k;
                 var t = d3.zoomIdentity.translate(width / 2 - k * (x0 + x1) / 2, height / 2 - k * (y0 + y1) / 2).scale(k);
                 svg.transition().duration(250).call(zoomer.transform, t);
             }

@@ -101,6 +101,9 @@ function composerApp() {
 
     /* A neighbourhood of this many elements or fewer opens whole; a larger one opens on its nearest ring. */
     let FOCUS_OPEN_WHOLE_MAX = 24;
+    /* An element name is drawn 12px tall at full scale; a focus view never opens with names under 11px. */
+    let FOCUS_NAME_PX = 12;
+    let FOCUS_MIN_NAME_PX = 11;
 
     /* ── Layer Y-band ordering ────────────────────────────── */
     let LAYER_Y_ORDER = {
@@ -876,6 +879,7 @@ function composerApp() {
         /* Tab cycle index for cycling through connected elements */
         _tabCycleIndex: -1,
         _tabCycleNeighbors: [],
+        _tabCycleOrigin: null,
 
         /* Bulk delete confirmation */
         bulkDeleteConfirmOpen: false,
@@ -2436,35 +2440,21 @@ function composerApp() {
                         self.statusText = 'Select exactly 2 elements to relate (Shift+click)';
                     }
                 }
-                /* Tab — cycle through connected elements */
-                if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                    let anchor = (self._selectedCells.length === 1) ? self._selectedCells[0] : self._currentSelectedCell;
-                    if (anchor && self.graph) {
+                /* Arrow keys — walk along the elements connected to the chosen one. Tab is left to the page, so it
+                   moves on to the toolbar and the rest of the page in document order. */
+                if (self._arrowsWalk(e)) {
+                    e.preventDefault();
+                    self._walkConnected(e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1);
+                }
+                /* Enter — open the chosen element's details, as a click on it does */
+                if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.altKey && self._focusInDrawing(e)) {
+                    let chosen = (self._selectedCells.length === 1) ? self._selectedCells[0] : self._currentSelectedCell;
+                    let chosenView = chosen && self.paper && chosen.isElement && chosen.isElement() ? self.paper.findViewByModel(chosen) : null;
+                    if (chosenView) {
                         e.preventDefault();
-                        let neighbors = self.graph.getNeighbors(anchor);
-                        if (neighbors.length > 0) {
-                            /* Reset cycle if anchor changed */
-                            if (self._tabCycleNeighbors.length === 0 ||
-                                self._tabCycleNeighbors !== neighbors ||
-                                self._tabCycleIndex >= neighbors.length) {
-                                self._tabCycleNeighbors = neighbors;
-                                self._tabCycleIndex = -1;
-                            }
-                            self._tabCycleIndex = (self._tabCycleIndex + 1) % neighbors.length;
-                            let nextCell = neighbors[self._tabCycleIndex];
-                            self._clearSelection();
-                            self._selectedCells = [nextCell];
-                            self._currentSelectedCell = nextCell;
-                            let view = self.paper.findViewByModel(nextCell);
-                            if (view) self._highlightCell(view);
-                            /* Scroll into view */
-                            let pos = nextCell.position();
-                            let size = nextCell.size();
-                            self.paper.scrollToPoint(pos.x + size.width / 2, pos.y + size.height / 2);
-                            self.statusText = 'Tab: ' + (nextCell.get('elName') || 'element') + ' (' + (self._tabCycleIndex + 1) + '/' + neighbors.length + ')';
-                        } else {
-                            self.statusText = 'No connected elements';
-                        }
+                        self.paper.trigger('element:pointerclick', chosenView, {});
+                        /* Opening an element makes it the one the arrow keys walk out from. */
+                        self._tabCycleOrigin = null;
                     }
                 }
                 /* 1-6 — toggle layer visibility */
@@ -2481,6 +2471,8 @@ function composerApp() {
             document.addEventListener('keydown', function(e) {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
                 if (self.mode !== 'edit') return;
+                /* In a focus view, and with Alt held, the arrow keys walk the drawing instead of moving it. */
+                if (self._arrowsWalk(e)) return;
                 let arrows = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
                 let dir = arrows[e.key];
                 if (!dir) return;
@@ -3240,7 +3232,8 @@ function composerApp() {
                         return { key: r.key, elementId: r.toId, fromId: r.fromId, from: r.fromName, name: r.toName,
                                  relation: r.relationType, kind: r.kindLabel, depth: r.depth };
                     }),
-                    listOpen: false
+                    listOpen: false,
+                    atReadingSize: false
                 };
                 self._drawFocusRings(firstRing);
                 self._focusQuiet = true;
@@ -3373,26 +3366,79 @@ function composerApp() {
                 + this.shellRelTotal + (this.shellRelTotal === 1 ? ' relationship' : ' relationships') + ' shown';
         },
 
-        /* Where the focus view opens. A neighbourhood that fits the screen is fitted whole. A larger one opens at
-           reading size (full scale, so the smallest label is 12px) with the seed in the middle of the space below
-           the card; the Fit button shows all of it. */
+        /* Keys reach the drawing when focus is on it or on the page itself, never on a toolbar control or a field. */
+        _focusInDrawing: function(e) {
+            let t = e.target;
+            let canvasEl = document.getElementById('composer-canvas');
+            return !!(t === document.body || (canvasEl && canvasEl.contains(t)));
+        },
+
+        /* The arrow keys walk the drawing in a focus view and in view mode; in edit mode they move the chosen
+           element, and Alt+arrow walks. */
+        _arrowsWalk: function(e) {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) === -1) return false;
+            if (e.ctrlKey || e.metaKey || e.shiftKey) return false;
+            if (!this._focusInDrawing(e)) return false;
+            return !!(this.focusView || this.mode !== 'edit' || e.altKey);
+        },
+
+        /* Step to the next (1) or previous (-1) element connected to the one the walk started from. */
+        _walkConnected: function(step) {
+            let self = this;
+            let chosen = (self._selectedCells.length === 1) ? self._selectedCells[0] : self._currentSelectedCell;
+            if (!chosen || !self.graph) return;
+            let inWalk = self._tabCycleOrigin && self._tabCycleNeighbors.indexOf(chosen) !== -1;
+            if (!inWalk) {
+                self._tabCycleOrigin = chosen;
+                self._tabCycleNeighbors = self.graph.getNeighbors(chosen).filter(function(c) { return c.isElement && c.isElement(); });
+                self._tabCycleIndex = -1;
+            }
+            let neighbors = self._tabCycleNeighbors;
+            if (neighbors.length === 0) {
+                self.statusText = 'No connected elements';
+                return;
+            }
+            self._tabCycleIndex = inWalk ? neighbors.indexOf(chosen) : (step > 0 ? -1 : 0);
+            self._tabCycleIndex = (self._tabCycleIndex + step + neighbors.length) % neighbors.length;
+            let nextCell = neighbors[self._tabCycleIndex];
+            self._clearSelection();
+            self._selectedCells = [nextCell];
+            self._currentSelectedCell = nextCell;
+            let view = self.paper.findViewByModel(nextCell);
+            if (view) self._highlightCell(view);
+            let pos = nextCell.position();
+            let size = nextCell.size();
+            let scale = self.paper.scale();
+            let canvasEl = document.getElementById('composer-canvas');
+            /* Bring the element into view only when it has gone off screen. */
+            let at = { x: (pos.x + size.width / 2) * scale.sx + self.paper.translate().tx,
+                       y: (pos.y + size.height / 2) * scale.sy + self.paper.translate().ty };
+            if (canvasEl && (at.x < 0 || at.y < 0 || at.x > canvasEl.clientWidth || at.y > canvasEl.clientHeight)) {
+                self.paper.translate(Math.round(canvasEl.clientWidth / 2 - (pos.x + size.width / 2) * scale.sx),
+                                     Math.round(canvasEl.clientHeight / 2 - (pos.y + size.height / 2) * scale.sy));
+            }
+            self.statusText = (nextCell.get('elName') || 'Element') + ', ' + (self._tabCycleIndex + 1) + ' of ' + neighbors.length + ' connected';
+        },
+
+        /* Where the focus view opens, for every size: the larger of fitting the whole and reading size (names at
+           least 11px on screen), with the seed in the middle of the space the card leaves. When fitting the whole
+           would draw names smaller than that, it opens at full scale on the seed and the Fit button shows all of it. */
         _placeFocusView: function() {
             let self = this;
             let fv = self.focusView;
             if (!fv) return;
             self.fitCanvas();
-            if (fv.total <= FOCUS_OPEN_WHOLE_MAX) return;
+            fv.atReadingSize = false;
+            if (self.paper.scale().sx * FOCUS_NAME_PX >= FOCUS_MIN_NAME_PX) return;
             let seed = self.graph.getElements().filter(function(c) { return c.get('focusRing') === 0; })[0];
             let canvasEl = document.getElementById('composer-canvas');
             if (!seed || !canvasEl) return;
-            let card = document.getElementById('composer-focus-banner');
-            let top = card && card.offsetHeight
-                ? Math.max(0, Math.round(card.getBoundingClientRect().bottom - canvasEl.getBoundingClientRect().top) + 8) : 0;
             let box = seed.getBBox();
             self.paper.scale(1, 1);
             self.paper.translate(Math.round(canvasEl.clientWidth / 2 - (box.x + box.width / 2)),
-                                 Math.round((top + canvasEl.clientHeight) / 2 - (box.y + box.height / 2)));
+                                 Math.round(canvasEl.clientHeight / 2 - (box.y + box.height / 2)));
             self.zoomPercent = 100;
+            fv.atReadingSize = true;
             self._scheduleMiniMapUpdate();
         },
 
@@ -4349,13 +4395,7 @@ function composerApp() {
                 || this.commentPanelOpen
                 || this.auditPanelOpen;
             let rightPadding = rightPanelOpen ? 40 + 320 : 40;
-            /* The unsaved-view card floats over the top of the canvas: fit below it. */
             let topPadding = 40;
-            let card = this.focusView ? document.getElementById('composer-focus-banner') : null;
-            let canvasEl = document.getElementById('composer-canvas');
-            if (card && canvasEl && card.offsetHeight) {
-                topPadding = Math.max(40, Math.round(card.getBoundingClientRect().bottom - canvasEl.getBoundingClientRect().top) + 16);
-            }
             /* CMP-05: fit was unreliable in the narrow side-panel — it zoomed to
                150% with the element half off the left edge. Two causes fixed:
                (1) maxScale 1.5 let a small selection zoom IN past the viewport;

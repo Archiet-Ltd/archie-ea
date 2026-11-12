@@ -201,13 +201,56 @@
 
         {# ── Canvas (full-bleed) ─────────────────────────── #}
         <div class="flex-1 relative flex flex-col">
+        {# ── Focus mode banner: an unsaved view opened from ?element=. It sits above the drawing and takes its own space, so it never covers a box ───────── #}
+        <div x-show="focusView" x-cloak id="composer-focus-banner"
+             role="region" aria-label="Unsaved view"
+             class="relative shrink-0 max-h-[45vh] overflow-y-auto bg-card border-b border-border px-5 py-3">
+            <div class="flex items-start gap-3">
+                <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-foreground mb-1" id="composer-focus-title"
+                        x-text="focusView ? ('Unsaved view: ' + focusView.name + ', ' + _focusHopsText(focusView.depth)) : ''"></h3>
+                    {% if focus and focus.most_connected %}<p class="text-xs text-muted-foreground mb-1" id="composer-focus-most-connected">Showing the most connected element in your model. Search for another element to look at it instead.</p>{% endif %}
+                    <p class="text-xs text-foreground mb-1" id="composer-focus-counts" data-testid="composer-focus-counts"
+                       x-text="focusView ? (focusView.shownElements + ' of ' + focusView.total + ' elements and ' + focusView.shownRelationships + (focusView.shownRelationships === 1 ? ' relationship' : ' relationships') + ' shown' + (focusView.modelRelationships !== null ? '. ' + focusView.modelRelationships + (focusView.modelRelationships === 1 ? ' relationship' : ' relationships') + ' in the model between these elements.' : '.')) : ''"></p>
+                    <p class="text-xs text-muted-foreground mb-1" id="composer-focus-reading-note" x-show="focusView && focusView.atReadingSize" x-cloak>Opens at reading size on the element. Choose Fit to see everything drawn.</p>
+                    <div class="mb-2" x-show="focusView && focusView.moreCount > 0" x-cloak>
+                        {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-next-ring", "@click": "showNextFocusRing()", "x-text": "focusView ? ('Show next ring (' + focusView.moreCount + ' more)') : ''"}) %}{% endcall %}
+                    </div>
+                    <p class="text-xs text-muted-foreground mb-1" id="composer-focus-empty-note" x-show="focusView && focusView.empty">No connections at this depth</p>
+                    <p class="text-xs text-muted-foreground mb-2" id="composer-focus-derived-note" x-show="focusView && focusView.hasDerived">Worked-out connections are shown dashed and are not stored with a saved diagram.</p>
+                    <div class="mb-2" x-show="focusView && !focusView.empty">
+                        {% call button(variant='link', size='bare', class="h-auto p-0 text-xs", attrs_dict={"id": "composer-focus-list-toggle", "@click": "focusView.listOpen = !focusView.listOpen", ":aria-expanded": "focusView && focusView.listOpen ? 'true' : 'false'", "aria-controls": "composer-focus-list", "x-text": "focusView && focusView.listOpen ? 'Hide the connections as a list' : ('Show the connections as a list (' + (focusView ? focusView.rows.length : 0) + ')')"}) %}{% endcall %}
+                        <div id="composer-focus-list" x-show="focusView && focusView.listOpen" x-cloak class="mt-2 max-h-64 overflow-auto rounded-md border border-border">
+                            {% call dense_table(columns=[('From', ''), ('Relationship', ''), ('To', ''), ('Kind', '')], caption='Connections of the chosen element', flush=true, table_class='text-xs') %}
+                                    <template x-for="row in (focusView ? focusView.rows : [])" :key="row.key">
+                                        <tr class="border-t border-border" data-focus-row>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.from || 'Unnamed element'"></td>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.relation"></td>
+                                            <td class="px-2 py-1">
+                                                {% call button(variant='link', size='bare', class="h-auto p-0 text-xs font-normal whitespace-normal text-left", attrs_dict={"@click": "openFocusConnection(row.elementId)", "x-text": "row.name || 'Unnamed element'"}) %}{% endcall %}
+                                            </td>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.kind"></td>
+                                        </tr>
+                                    </template>
+                                {% endcall %}
+                        </div>
+                    </div>
+                    <div class="flex gap-2 md:absolute md:top-3 md:right-5">
+                        {% call button(variant='default', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-save", "@click": "saveFocusView()", ":disabled": "focusView && focusView.saving"}) %}Save as diagram{% endcall %}
+                        {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-discard", "@click": "discardFocusView()"}) %}Discard{% endcall %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
             <div class="flex-1 relative composer-canvas-bg"
                  x-show="!relMatrixOpen" x-cloak
                  @dragover.prevent="dragOver = true"
                  @dragleave="dragOver = false"
                  @drop="onCanvasDrop($event)"
                  @mousemove="updateCursorPos($event)">
-                <div id="composer-canvas" class="absolute inset-0"></div>
+                <div id="composer-canvas" class="absolute inset-0" tabindex="0" role="group" aria-label="Drawing" aria-describedby="composer-canvas-keys"></div>
+                <p id="composer-canvas-keys" class="sr-only">Arrow keys step through the elements connected to the chosen one. Enter opens its details. Tab moves on to the toolbar and the rest of the page.</p>
 
                 {# ── MM-17: Floating alignment toolbar on multi-select ── #}
                 <div x-show="_selectedCells.length >= 2 && mode === 'edit'" x-cloak x-transition.opacity
@@ -857,48 +900,6 @@
             </div>
         </div>
 
-        {# ── Focus mode banner: an unsaved view opened from ?element= ───────── #}
-        <div x-show="focusView" x-cloak id="composer-focus-banner"
-             role="region" aria-label="Unsaved view"
-             class="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-xl px-5 py-3 max-w-xl">
-            <div class="flex items-start gap-3">
-                <div class="flex-1">
-                    <h3 class="text-sm font-semibold text-foreground mb-1" id="composer-focus-title"
-                        x-text="focusView ? ('Unsaved view: ' + focusView.name + ', ' + _focusHopsText(focusView.depth)) : ''"></h3>
-                    {% if focus and focus.most_connected %}<p class="text-xs text-muted-foreground mb-1" id="composer-focus-most-connected">Showing the most connected element in your model. Search for another element to look at it instead.</p>{% endif %}
-                    <p class="text-xs text-foreground mb-1" id="composer-focus-counts" data-testid="composer-focus-counts"
-                       x-text="focusView ? (focusView.shownElements + ' of ' + focusView.total + ' elements and ' + focusView.shownRelationships + (focusView.shownRelationships === 1 ? ' relationship' : ' relationships') + ' shown' + (focusView.modelRelationships !== null ? '. ' + focusView.modelRelationships + (focusView.modelRelationships === 1 ? ' relationship' : ' relationships') + ' in the model between these elements.' : '.')) : ''"></p>
-                    <p class="text-xs text-muted-foreground mb-1" id="composer-focus-reading-note" x-show="focusView && focusView.total > 24" x-cloak>Opens at reading size on the element. Choose Fit to see everything drawn.</p>
-                    <div class="mb-2" x-show="focusView && focusView.moreCount > 0" x-cloak>
-                        {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-next-ring", "@click": "showNextFocusRing()", "x-text": "focusView ? ('Show next ring (' + focusView.moreCount + ' more)') : ''"}) %}{% endcall %}
-                    </div>
-                    <p class="text-xs text-muted-foreground mb-1" id="composer-focus-empty-note" x-show="focusView && focusView.empty">No connections at this depth</p>
-                    <p class="text-xs text-muted-foreground mb-2" id="composer-focus-derived-note" x-show="focusView && focusView.hasDerived">Worked-out connections are shown dashed and are not stored with a saved diagram.</p>
-                    <div class="mb-2" x-show="focusView && !focusView.empty">
-                        {% call button(variant='link', size='bare', class="h-auto p-0 text-xs", attrs_dict={"id": "composer-focus-list-toggle", "@click": "focusView.listOpen = !focusView.listOpen", ":aria-expanded": "focusView && focusView.listOpen ? 'true' : 'false'", "aria-controls": "composer-focus-list", "x-text": "focusView && focusView.listOpen ? 'Hide the connections as a list' : ('Show the connections as a list (' + (focusView ? focusView.rows.length : 0) + ')')"}) %}{% endcall %}
-                        <div id="composer-focus-list" x-show="focusView && focusView.listOpen" x-cloak class="mt-2 max-h-64 overflow-auto rounded-md border border-border">
-                            {% call dense_table(columns=[('From', ''), ('Relationship', ''), ('To', ''), ('Kind', '')], caption='Connections of the chosen element', flush=true, table_class='text-xs') %}
-                                    <template x-for="row in (focusView ? focusView.rows : [])" :key="row.key">
-                                        <tr class="border-t border-border" data-focus-row>
-                                            <td class="px-2 py-1 text-foreground" x-text="row.from || 'Unnamed element'"></td>
-                                            <td class="px-2 py-1 text-foreground" x-text="row.relation"></td>
-                                            <td class="px-2 py-1">
-                                                {% call button(variant='link', size='bare', class="h-auto p-0 text-xs font-normal whitespace-normal text-left", attrs_dict={"@click": "openFocusConnection(row.elementId)", "x-text": "row.name || 'Unnamed element'"}) %}{% endcall %}
-                                            </td>
-                                            <td class="px-2 py-1 text-foreground" x-text="row.kind"></td>
-                                        </tr>
-                                    </template>
-                                {% endcall %}
-                        </div>
-                    </div>
-                    <div class="flex gap-2">
-                        {% call button(variant='default', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-save", "@click": "saveFocusView()", ":disabled": "focusView && focusView.saving"}) %}Save as diagram{% endcall %}
-                        {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-discard", "@click": "discardFocusView()"}) %}Discard{% endcall %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
         {# ── Right detail panel (floating) ──────────────────── #}
         <div x-show="selectedNode || selectedEdge" x-cloak x-transition
              class="detail-panel">
@@ -1402,7 +1403,7 @@
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Cut</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">Ctrl+X</kbd></div>
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Paste</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">Ctrl+V</kbd></div>
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Duplicate</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">Ctrl+D</kbd></div>
-                <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Nudge (grid)</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">Arrow Keys</kbd></div>
+                <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Nudge (grid)</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">Arrow Keys</kbd><span class="sr-only"> (Alt+Arrow walks instead)</span></div>
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Nudge (1px)</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">Shift+Arrow</kbd></div>
                 <div class="col-span-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-3">View</div>
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Zoom In</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">Ctrl++</kbd></div>
@@ -1414,7 +1415,7 @@
                 <div class="col-span-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-3">Elements &amp; Relations</div>
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">New Element</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">N</kbd></div>
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Relate Selected Pair</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">R</kbd></div>
-                <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Cycle Connected</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">Tab</kbd></div>
+                <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Walk to connected elements</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">Arrow Keys</kbd></div>
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Connect Mode</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">C</kbd></div>
                 <div class="col-span-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-3">Layers (1-6)</div>
                 <div class="flex items-center justify-between py-1 border-b border-border/40"><span class="text-foreground">Business</span><kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono">1</kbd></div>

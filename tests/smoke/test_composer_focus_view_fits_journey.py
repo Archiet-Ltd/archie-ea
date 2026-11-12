@@ -82,17 +82,22 @@ def hub():
             provenance="derivation", engine_version="1.0",
             computed_at=datetime.datetime.utcnow(), stale=False))
         db.session.commit()
+        # A second view of 21 elements: a ledger application with twenty neighbours.
+        ledger = element("Calibration Ledger", "ApplicationComponent", "application")
+        for index in range(20):
+            other = element("Ledger Neighbour %02d" % index, "ApplicationComponent", "application")
+            link("Serving", ledger, other)
         out = {"email": fresh["emails"]["enterprise_architect"], "centre": centre.id,
-               "name": centre.name}
+               "name": centre.name, "ledger": ledger.id}
         db.session.remove()
     return out
 
 
-def _open(browser, live_server, hub, width, height, scheme):
+def _open(browser, live_server, hub, width, height, scheme, centre=None):
     context = browser.new_context(viewport={"width": width, "height": height}, color_scheme=scheme)
     page = context.new_page()
     sign_in(page, live_server, hub["email"])
-    page.goto("%s/archimate/composer?element=%d" % (live_server, hub["centre"]),
+    page.goto("%s/archimate/composer?element=%d" % (live_server, centre or hub["centre"]),
               wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.wait_for_function(
         """(sel) => { if (!window.Alpine || !document.querySelector(sel)) return false;
@@ -123,6 +128,17 @@ MEASURE = """() => {
 }"""
 
 
+def _at_reading_size(page):
+    return page.evaluate("(sel) => !!Alpine.$data(document.querySelector(sel)).focusView.atReadingSize", APP)
+
+
+def _assert_inside(nodes, c, where):
+    for n in nodes:
+        assert n["x"] >= c["x"] - 1 and n["y"] >= c["y"] - 1 and \
+            n["x"] + n["w"] <= c["x"] + c["w"] + 1 and n["y"] + n["h"] <= c["y"] + c["h"] + 1, \
+            "%s: %r lies outside the canvas %r" % (where, n, c)
+
+
 def _intersects(a, b):
     return a["x"] < b["x"] + b["w"] and a["x"] + a["w"] > b["x"] and a["y"] < b["y"] + b["h"] and a["y"] + a["h"] > b["y"]
 
@@ -138,10 +154,16 @@ def test_focus_view_is_fitted_themed_and_legible(browser, live_server, hub, widt
         assert m["zoom"] > 10, "%s: zoom reads %s%%" % (where, m["zoom"])
         assert len(m["nodes"]) >= 13, "%s: %d elements drawn" % (where, len(m["nodes"]))
         c = m["canvas"]
-        for n in m["nodes"]:
-            assert n["x"] >= c["x"] - 1 and n["y"] >= c["y"] - 1 and \
-                n["x"] + n["w"] <= c["x"] + c["w"] + 1 and n["y"] + n["h"] <= c["y"] + c["h"] + 1, \
-                "%s: %r lies outside the canvas %r" % (where, n, c)
+        # The drawing opens either whole or, when whole would shrink the names below reading size, at reading
+        # size on the chosen element with the sentence that says how to see everything.
+        if not _at_reading_size(page):
+            _assert_inside(m["nodes"], c, where)
+        else:
+            expect(page.locator("#composer-focus-reading-note")).to_contain_text("Choose Fit to see everything drawn")
+        # Fit always shows every element.
+        page.get_by_test_id("zoom-fit").click()
+        page.wait_for_timeout(600)
+        _assert_inside(page.evaluate(MEASURE)["nodes"], c, where + " after Fit")
         if scheme == "dark":
             assert m["luminance"] < 0.2, "%s: canvas luminance %.3f" % (where, m["luminance"])
         else:
@@ -176,5 +198,119 @@ def test_connections_list_has_fourteen_rows_each_opening_details(browser, live_s
         panel = page.locator(".detail-panel")
         expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
         assert panel.locator('input[aria-label="Element name"]').input_value()
+    finally:
+        context.close()
+
+
+NAME_PX = """() => {
+  const sel = '#composer-canvas .joint-element [joint-selector=nameLabel]';
+  return Array.from(document.querySelectorAll(sel)).map(t => {
+    const m = t.getScreenCTM();
+    return {text: t.textContent.trim(), px: parseFloat(getComputedStyle(t).fontSize) * m.a};
+  });
+}"""
+
+CARD_AND_BOXES = """() => {
+  const card = document.querySelector('#composer-focus-banner').getBoundingClientRect();
+  const canvas = document.querySelector('#composer-canvas').getBoundingClientRect();
+  const hits = Array.from(document.querySelectorAll('#composer-canvas .joint-element')).map(n => {
+    const full = n.getBoundingClientRect();
+    // Only the part of a box inside the drawing is on screen; the rest is cut off by the drawing's edge.
+    const r = {x: Math.max(full.x, canvas.x), y: Math.max(full.y, canvas.y), right: Math.min(full.right, canvas.right), bottom: Math.min(full.bottom, canvas.bottom)};
+    return {text: n.textContent.trim().slice(0, 30), hit: r.right > r.x && r.bottom > r.y && r.x < card.right && r.right > card.x && r.y < card.bottom - 1 && r.bottom > card.y};
+  }).filter(n => n.hit);
+  return {cardBottom: card.bottom, canvasTop: canvas.top, hits: hits};
+}"""
+
+
+@pytest.mark.parametrize("scheme,width,height", [("light", 1440, 900), ("dark", 390, 844)])
+@pytest.mark.parametrize("which", ["centre", "ledger"])
+def test_focus_view_opens_with_names_a_person_can_read_and_no_card_over_a_box(
+        browser, live_server, hub, which, scheme, width, height):
+    context, page = _open(browser, live_server, hub, width, height, scheme, centre=hub[which])
+    try:
+        where = "%s %dx%d %s" % (which, width, height, scheme)
+        page.screenshot(path="%s/composer-readable-%s-%d-%s.png" % (_walk_dir(), which, width, scheme))
+        names = page.evaluate(NAME_PX)
+        assert len(names) >= 13, "%s: %d names drawn" % (where, len(names))
+        assert min(n["px"] for n in names) >= 10.99, \
+            "%s: names as small as %.1f px tall" % (where, min(n["px"] for n in names))
+        if _at_reading_size(page):
+            # Opened at reading size on the chosen element, and the page says how to see everything.
+            measured = page.evaluate(MEASURE)
+            assert [n for n in measured["nodes"] if _intersects(n, measured["canvas"])], \
+                "%s: nothing of the drawing is on screen" % where
+            expect(page.locator("#composer-focus-reading-note")).to_contain_text("Choose Fit to see everything drawn")
+        card = page.evaluate(CARD_AND_BOXES)
+        assert not card["hits"], "%s: the unsaved-view card covers %r" % (where, card["hits"])
+        assert card["cardBottom"] <= card["canvasTop"] + 1, \
+            "%s: the card ends at %.0f but the drawing starts at %.0f" % (where, card["cardBottom"], card["canvasTop"])
+        # Fit still shows every element.
+        page.get_by_test_id("zoom-fit").click()
+        page.wait_for_timeout(600)
+        canvas = page.evaluate(MEASURE)
+        _assert_inside(canvas["nodes"], canvas["canvas"], where + " after Fit")
+    finally:
+        context.close()
+
+
+FOCUS_STATE = """() => {
+  const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
+  const cell = a._selectedCells && a._selectedCells[0];
+  const ae = document.activeElement;
+  return {selected: cell ? cell.get('elName') : null,
+          inCanvas: !!(ae && document.querySelector('#composer-canvas').contains(ae)),
+          active: ae ? (ae.getAttribute('aria-label') || ae.getAttribute('data-testid') || ae.id || ae.tagName) : null,
+          isBody: ae === document.body};
+}"""
+
+
+@pytest.mark.parametrize("scheme,width,height", [("light", 1440, 900), ("dark", 390, 844)])
+def test_keyboard_leaves_the_drawing_and_arrow_keys_walk_it(browser, live_server, hub, scheme, width, height):
+    context, page = _open(browser, live_server, hub, width, height, scheme)
+    try:
+        where = "%dx%d %s" % (width, height, scheme)
+        # The drawing says which keys walk it.
+        described = page.evaluate(
+            """() => { const c = document.querySelector('#composer-canvas');
+               return document.getElementById(c.getAttribute('aria-describedby')).textContent; }""")
+        assert "Arrow keys" in described and "Tab" in described, described
+        # From the toolbar, Tab goes on along the page and leaves the chosen element alone.
+        before = page.evaluate(FOCUS_STATE)["selected"]
+        assert before and before.startswith(hub["name"].split(" ")[0]), before
+        fit = page.get_by_test_id("zoom-fit")
+        fit.focus()
+        seen = [page.evaluate(FOCUS_STATE)]
+        for _ in range(3):
+            page.keyboard.press("Tab")
+            seen.append(page.evaluate(FOCUS_STATE))
+        assert len({s["active"] for s in seen}) == 4, "%s: Tab did not move on: %r" % (where, [s["active"] for s in seen])
+        assert all(s["selected"] == before for s in seen), "%s: Tab walked the drawing: %r" % (where, seen)
+        # Focus is in the drawing: Tab and Shift+Tab leave it for the page.
+        page.locator("#composer-canvas").focus()
+        assert page.evaluate(FOCUS_STATE)["inCanvas"]
+        page.keyboard.press("Tab")
+        after = page.evaluate(FOCUS_STATE)
+        assert not after["inCanvas"], "%s: Tab stayed in the drawing: %r" % (where, after)
+        assert after["selected"] == before
+        page.locator("#composer-canvas").focus()
+        page.keyboard.press("Shift+Tab")
+        back = page.evaluate(FOCUS_STATE)
+        assert not back["inCanvas"] and not back["isBody"], "%s: Shift+Tab stayed in the drawing: %r" % (where, back)
+        assert back["selected"] == before
+        # In the drawing, the arrow keys walk to each connected element in turn, and Enter opens one.
+        page.locator("#composer-canvas").focus()
+        walked = []
+        for _ in range(10):
+            page.keyboard.press("ArrowRight")
+            walked.append(page.evaluate(FOCUS_STATE)["selected"])
+        assert len(set(walked)) == 10, "%s: the arrows reached %r" % (where, walked)
+        assert before not in walked
+        page.keyboard.press("ArrowLeft")
+        assert page.evaluate(FOCUS_STATE)["selected"] == walked[-2]
+        page.keyboard.press("Enter")
+        panel = page.locator(".detail-panel")
+        expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert panel.locator('input[aria-label="Element name"]').input_value() == walked[-2]
     finally:
         context.close()
