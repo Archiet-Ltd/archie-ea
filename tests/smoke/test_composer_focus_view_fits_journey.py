@@ -314,3 +314,142 @@ def test_keyboard_leaves_the_drawing_and_arrow_keys_walk_it(browser, live_server
         assert panel.locator('input[aria-label="Element name"]').input_value() == walked[-2]
     finally:
         context.close()
+
+
+def _tab_until_in_drawing(page, key, limit=60):
+    """Press Tab (or Shift+Tab) until the keyboard reaches the drawing; the number of presses it took."""
+    for count in range(1, limit + 1):
+        page.keyboard.press(key)
+        if page.evaluate(FOCUS_STATE)["inCanvas"]:
+            return count
+    return None
+
+
+# Where the chosen element is in the model, and on the page measured from another drawn element, so a pan
+# of the whole drawing does not count as a move.
+CHOSEN_AT = """(other) => {
+  const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
+  const cell = a._selectedCells && a._selectedCells[0];
+  if (!cell) return null;
+  const ref = a.graph.getElements().filter(c => c.get('elName') === other)[0];
+  const r = a.paper.findViewByModel(cell).el.getBoundingClientRect();
+  const o = a.paper.findViewByModel(ref).el.getBoundingClientRect();
+  return {name: cell.get('elName'), x: cell.position().x, y: cell.position().y, left: r.x - o.x, top: r.y - o.y};
+}"""
+
+
+@pytest.mark.parametrize("scheme,width,height", [("light", 1440, 900), ("dark", 390, 844)])
+def test_keyboard_alone_reaches_walks_opens_leaves_and_moves_in_the_drawing(
+        browser, live_server, hub, scheme, width, height):
+    """A person who works without a mouse: Tab reaches the drawing, the arrows walk what is connected,
+    Enter opens one, Tab and Shift+Tab leave, and once the view is saved as a diagram the arrows move
+    the chosen element instead."""
+    context, page = _open(browser, live_server, hub, width, height, scheme)
+    try:
+        where = "%dx%d %s" % (width, height, scheme)
+        # Ten recorded neighbours and the two applications reached by a worked-out connection.
+        suffix = hub["name"].rsplit(" ", 1)[1]
+        connected = {"%s %s" % (n, suffix) for n in [n[0] for n in NEIGHBOURS]
+                     + ["Regulatory Reporting Hub", "Retention Policy Register"]}
+        seed = page.evaluate(FOCUS_STATE)["selected"]
+        assert seed == hub["name"], "%s: the view opened on %r" % (where, seed)
+
+        # Tab from the toolbar reaches the drawing, and the drawing tells a screen reader which keys walk it.
+        page.get_by_test_id("zoom-fit").focus()
+        presses = _tab_until_in_drawing(page, "Tab")
+        assert presses, "%s: Tab never reached the drawing" % where
+        assert page.evaluate("() => document.activeElement.id") == "composer-canvas"
+        assert page.evaluate("() => document.activeElement.getAttribute('aria-label')") == "Drawing"
+        page.screenshot(path="%s/composer-keyboard-in-drawing-%d-%s.png" % (_walk_dir(), width, scheme))
+
+        # The arrows walk the elements connected to the one the view is about, and say where they are.
+        walked = []
+        for step in range(3):
+            page.keyboard.press("ArrowDown")
+            state = page.evaluate(FOCUS_STATE)
+            assert state["inCanvas"], "%s: an arrow key took focus out of the drawing" % where
+            walked.append(state["selected"])
+            expect(page.get_by_test_id("diagram-status-line").get_by_role("status", include_hidden=True)).to_contain_text(
+                "%s, %d of 12 connected" % (state["selected"], step + 1))
+        assert len(set(walked)) == 3 and set(walked) <= connected, "%s: the arrows reached %r" % (where, walked)
+        page.keyboard.press("ArrowUp")
+        assert page.evaluate(FOCUS_STATE)["selected"] == walked[1]
+        page.screenshot(path="%s/composer-keyboard-walk-%d-%s.png" % (_walk_dir(), width, scheme))
+
+        # Enter opens the chosen element's details.
+        page.keyboard.press("Enter")
+        panel = page.locator(".detail-panel")
+        expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(panel.locator('input[aria-label="Element name"]')).to_have_value(walked[1])
+        page.screenshot(path="%s/composer-keyboard-details-%d-%s.png" % (_walk_dir(), width, scheme))
+        page.keyboard.press("Escape")
+
+        # Tab leaves the drawing for the next control; Shift+Tab comes back to it and Shift+Tab again leaves
+        # it for the control before, with the chosen element unchanged throughout.
+        page.locator("#composer-canvas").focus()
+        chosen = page.evaluate(FOCUS_STATE)["selected"]
+        page.keyboard.press("Tab")
+        ahead = page.evaluate(FOCUS_STATE)
+        assert not ahead["inCanvas"] and not ahead["isBody"], "%s: Tab stayed in the drawing: %r" % (where, ahead)
+        assert _tab_until_in_drawing(page, "Shift+Tab", limit=3) == 1, "%s: Shift+Tab did not return" % where
+        page.keyboard.press("Shift+Tab")
+        behind = page.evaluate(FOCUS_STATE)
+        assert not behind["inCanvas"] and not behind["isBody"], "%s: Shift+Tab stayed in the drawing: %r" % (where, behind)
+        assert ahead["active"] != behind["active"]
+        assert ahead["selected"] == behind["selected"] == chosen
+
+        # Saved as a diagram, the view opens for editing; Alt+arrow still walks and a plain arrow moves the
+        # chosen element one grid step, on the page as well as in the model.
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.locator("#composer-focus-save").click()
+        page.wait_for_function(
+            """(sel) => { if (!window.Alpine || !document.querySelector(sel)) return false;
+                const a = Alpine.$data(document.querySelector(sel));
+                return a.mode === 'edit' && !a.focusView && a.graph.getElements().length > 1; }""",
+            arg=APP, timeout=DRAW_SECONDS)
+        page.wait_for_timeout(800)
+        assert "viewpoint_id=" in page.url
+        # The element list chooses the application from the keyboard: each control is reached and pressed
+        # with Enter, the name typed into the search.
+        if not page.get_by_test_id("composer-rail").is_visible():
+            page.get_by_test_id("shell-rail-toggle").focus()
+            page.keyboard.press("Enter")
+        expect(page.get_by_test_id("composer-rail")).to_be_visible()
+        page.get_by_test_id("rail-tab-view").focus()
+        page.keyboard.press("Enter")
+        page.get_by_test_id("finder-search").focus()
+        page.keyboard.type(hub["name"])
+        rows = page.locator("[data-testid^='finder-row-']")
+        expect(rows).to_have_count(1)
+        rows.first.focus()
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "([sel, n]) => ((Alpine.$data(document.querySelector(sel))._selectedCells || [])[0] || {get: () => null}).get('elName') === n",
+            arg=[APP, hub["name"]], timeout=PAGE_TIMEOUT)
+        # Closing the details and the element list gives the drawing the room back; the choice stays.
+        page.get_by_role("button", name="Close detail panel").focus()
+        page.keyboard.press("Enter")
+        expect(page.locator(".detail-panel")).to_be_hidden()
+        page.get_by_test_id("shell-rail-toggle").focus()
+        page.keyboard.press("Enter")
+        expect(page.get_by_test_id("composer-rail")).to_be_hidden()
+        page.locator("#composer-canvas").focus()
+        page.keyboard.press("Alt+ArrowRight")
+        start = page.evaluate(CHOSEN_AT, hub["name"])
+        assert start and start["name"] in connected, "%s: Alt+arrow chose %r" % (where, start)
+        page.keyboard.press("ArrowRight")
+        page.keyboard.press("ArrowDown")
+        moved = page.evaluate(CHOSEN_AT, hub["name"])
+        assert moved["name"] == start["name"], "%s: a plain arrow walked instead of moving: %r" % (where, moved)
+        assert (moved["x"] - start["x"], moved["y"] - start["y"]) == (12, 12), "%s: moved %r" % (where, (start, moved))
+        assert moved["left"] > start["left"] and moved["top"] > start["top"], "%s: not moved on the page" % where
+        on_screen = page.evaluate("""(name) => {
+            const a = Alpine.$data(document.querySelector('[x-data^="composerApp"]'));
+            const cell = a.graph.getElements().filter(c => c.get('elName') === name)[0];
+            const r = a.paper.findViewByModel(cell).el.getBoundingClientRect();
+            const c = document.querySelector('#composer-canvas').getBoundingClientRect();
+            return r.x < c.right && r.right > c.x && r.y < c.bottom && r.bottom > c.y; }""", moved["name"])
+        assert on_screen, "%s: the moved element is not in sight" % where
+        page.screenshot(path="%s/composer-keyboard-moved-%d-%s.png" % (_walk_dir(), width, scheme))
+    finally:
+        context.close()
