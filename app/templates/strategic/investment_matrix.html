@@ -78,20 +78,24 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
             </div>
         </div>
         {%- set total_inv = portfolio_metrics.total_estimated_investment -%}
+        {%- set costs_hidden = portfolio_metrics.costs_hidden -%}
+        {%- set shown_symbol = '' if costs_hidden else currency_symbol -%}
         <div data-slot="card" data-testid="total-investment" class="rounded-lg border bg-card text-card-foreground @container/card">
             <div data-slot="card-header" class="relative flex flex-col space-y-1.5 p-6 pb-2">
                 <p data-slot="card-description" class="text-sm font-medium tracking-tight">Total Investment</p>
                 <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-primary">
                     {%- if scores_error -%}Unavailable
+                    {%- elif costs_hidden -%}Restricted
                     {%- elif total_inv is none -%}Not estimated
-                    {%- elif total_inv < 1000000 -%}{{ currency_symbol }}{{ "%.1f"|format(total_inv / 1000) }}k
-                    {%- else -%}{{ currency_symbol }}{{ "%.1f"|format(total_inv / 1000000) }}M{%- endif -%}
+                    {%- elif total_inv < 1000000 -%}{{ shown_symbol }}{{ "%.1f"|format(total_inv / 1000) }}k
+                    {%- else -%}{{ shown_symbol }}{{ "%.1f"|format(total_inv / 1000000) }}M{%- endif -%}
                 </div>
             </div>
             <div class="px-6 pb-4 text-sm text-muted-foreground">
                 {% if scores_error %}The investment figures could not be loaded.
+                {% elif costs_hidden %}Restricted to roles with budget authority.
                 {% elif total_inv is none %}No capability has linked work or a funded initiative yet; link a work package to a capability to estimate its investment.
-                {% else %}from {{ portfolio_metrics.investment_costed_count }} of {{ portfolio_metrics.total_capabilities }} capabilities with a recorded figure{% endif %}
+                {% else %}from {{ portfolio_metrics.investment_costed_count }} of {{ portfolio_metrics.total_capabilities }} capabilities with a recorded figure{% if portfolio_metrics.investment_costed_count < portfolio_metrics.total_capabilities %}; the other {{ portfolio_metrics.total_capabilities - portfolio_metrics.investment_costed_count }} have none yet and add nothing to it{% else %}; every capability has one{% endif %}{% endif %}
             </div>
         </div>
         <div data-slot="card" data-testid="average-strategic-score" class="rounded-lg border bg-card text-card-foreground @container/card">
@@ -103,7 +107,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                 <i data-lucide="target" class="absolute top-4 right-4 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
             </div>
             <div class="px-6 pb-4 text-sm text-muted-foreground">
-                {% if scores_error %}The scores could not be loaded.{% elif portfolio_metrics.average_strategic_score is none %}No capability has an importance rating yet.{% else %}over {{ portfolio_metrics.scored_count }} of {{ portfolio_metrics.total_capabilities }} rated capabilities{% endif %}
+                {% if scores_error %}The scores could not be loaded.{% elif portfolio_metrics.average_strategic_score is none %}No capability has an importance rating yet.{% else %}average of the importance scores of the {{ portfolio_metrics.scored_count }} rated capabilities, out of {{ portfolio_metrics.total_capabilities }}{% if portfolio_metrics.scored_count < portfolio_metrics.total_capabilities %}; the other {{ portfolio_metrics.total_capabilities - portfolio_metrics.scored_count }} are not rated yet and are left out{% endif %}{% endif %}
             </div>
         </div>
     </div>
@@ -279,14 +283,17 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                     <dl class="mt-2 grid gap-1 text-xs font-normal md:hidden" data-testid="phone-summary">
                                         <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Score</dt><dd class="font-medium" data-testid="phone-score" x-text="cap.investment_priority_score === null ? 'Not scored' : cap.investment_priority_score + '/100'"></dd></div>
                                         <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Priority</dt><dd class="font-medium" data-testid="phone-priority" x-text="cap.priority_level"></dd></div>
-                                        <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Investment</dt><dd class="font-medium" data-testid="phone-investment" x-text="cap.investment_need.estimated_cost === null ? 'Not estimated' : '{{ currency_symbol }}' + (cap.investment_need.estimated_cost / 1000).toFixed(1) + 'k ' + (cap.investment_need.source ? 'from ' + cap.investment_need.source : '')"></dd></div>
+                                        <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Investment</dt><dd class="font-medium" data-testid="phone-investment" x-text="cap.investment_need.cost_hidden ? 'Restricted to roles with budget authority' : (cap.investment_need.estimated_cost === null ? 'Not estimated' : '{{ shown_symbol }}' + (cap.investment_need.estimated_cost / 1000).toFixed(1) + 'k ' + (cap.investment_need.source ? 'from ' + cap.investment_need.source : ''))"></dd></div>
                                     </dl>
-                                    <p class="mt-2 text-xs font-normal text-muted-foreground" data-testid="capability-recommendation" x-text="cap.recommendation"></p>
                                     <div class="mt-3 flex flex-wrap gap-2" data-testid="cell-actions">
-                                        {% call ui.button(variant='outline', size='sm', attrs={'type': 'button', '@click': "$dispatch('open-roi-calculator', normalizeCapability(cap))", 'title': 'Calculate ROI', 'aria-label': 'Calculate ROI'}) %}{{ lucide('calculator') }}Calculate ROI{% endcall %}
+                                        {% if not costs_hidden %}{% call ui.button(variant='outline', size='sm', attrs={'type': 'button', '@click': "$dispatch('open-roi-calculator', normalizeCapability(cap))", 'title': 'Calculate ROI', 'aria-label': 'Calculate ROI'}) %}{{ lucide('calculator') }}Calculate ROI{% endcall %}{% endif %}
                                         {% call ui.button(variant='outline', size='sm', attrs={'type': 'button', '@click': "$dispatch('open-arb-submission-modal', normalizeCapability(cap))", 'title': 'Submit to Architecture Review Board', 'aria-label': 'Submit to ARB'}) %}{{ lucide('shield-check') }}Submit to ARB{% endcall %}
                                     </div>
-                                    <div class="mt-2 font-normal" x-html="cap.footer_html" data-testid="capability-footer"></div>
+                                    <div class="mt-2 font-normal" x-data="{ open: false }">
+                                        {% call ui.button(variant='link', size='sm', class='md:hidden', attrs={'type': 'button', 'data-testid': 'evidence-toggle', '@click': 'open = !open', ':aria-expanded': "open ? 'true' : 'false'"}) %}<span x-text="open ? 'Hide evidence' : 'Show evidence'"></span>{% endcall %}
+                                        <p class="mt-2 text-xs font-normal text-muted-foreground" :class="open ? 'block' : 'hidden md:block'" data-testid="capability-recommendation" x-text="cap.recommendation"></p>
+                                        <div :class="open ? 'block' : 'hidden md:block'" x-html="cap.footer_html" data-testid="capability-footer"></div>
+                                    </div>
                                 </td>
                                 <td class="px-2 py-3 text-muted-foreground text-sm" data-testid="cell-domain" x-text="cap.capability_domain || 'Not assigned'"></td>
                                 <td class="px-2 py-3 text-sm" data-testid="cell-strategic">
@@ -315,12 +322,19 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                     x-text="cap.priority_level"></span>
                                 </td>
                                 <td class="px-2 py-3" data-testid="cell-investment">
-                                    <template x-if="cap.investment_need.estimated_cost === null">
-                                        <span class="text-sm text-muted-foreground">Not estimated</span>
+                                    <template x-if="cap.investment_need.cost_hidden">
+                                        <span class="text-sm text-muted-foreground" data-testid="investment-hidden">Restricted to roles with budget authority</span>
                                     </template>
-                                    <template x-if="cap.investment_need.estimated_cost !== null">
+                                    <template x-if="!cap.investment_need.cost_hidden && cap.investment_need.estimated_cost === null">
                                         <div>
-                                            <span x-text="'{{ currency_symbol }}' + (cap.investment_need.estimated_cost / 1000).toFixed(1) + 'k'"></span>
+                                            <span class="text-sm text-muted-foreground">Not estimated</span>
+                                            <span class="block max-w-40 text-xs text-muted-foreground" data-testid="investment-reason">No work package or funded initiative is linked to this capability yet.</span>
+                                            <a href="{{ url_for('enterprise.work_packages') }}" class="block text-xs text-primary hover:underline" data-testid="investment-step">Link a work package</a>
+                                        </div>
+                                    </template>
+                                    <template x-if="!cap.investment_need.cost_hidden && cap.investment_need.estimated_cost !== null">
+                                        <div>
+                                            <span x-text="'{{ shown_symbol }}' + (cap.investment_need.estimated_cost / 1000).toFixed(1) + 'k'"></span>
                                             <span class="block text-xs text-muted-foreground" x-text="'from ' + cap.investment_need.source"></span>
                                         </div>
                                     </template>
@@ -332,7 +346,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                                 :title="cap.linked_initiative_name"
                                                 x-text="cap.linked_initiative_name"></div>
                                             <div class="text-muted-foreground"
-                                                x-text="'{{ currency_symbol }}' + (cap.linked_initiative_budget / 1000).toFixed(0) + 'k allocated'"></div>
+                                                x-text="cap.costs_hidden ? 'Budget restricted' : ('{{ shown_symbol }}' + (cap.linked_initiative_budget / 1000).toFixed(0) + 'k allocated')"></div>
                                         </div>
                                     </template>
                                     <template x-if="!cap.has_real_budget || !cap.linked_initiative_name">
@@ -342,7 +356,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                             </tr>
                         </template>
                         <tr x-show="filteredItems.length === 0" x-cloak>
-                            <td colspan="11" class="p-12 text-center text-muted-foreground">
+                            <td colspan="12" class="p-12 text-center text-muted-foreground">
                                 No capabilities match the current filter.
                             </td>
                         </tr>
@@ -394,8 +408,10 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                     <h4 class="font-semibold mb-2">{{ rec.type }}: {{ rec.capability }}</h4>
                     <p class="text-sm mb-1"><strong>Justification:</strong> {{ rec.justification }}</p>
                     <p class="text-sm mb-1"><strong>Timeframe:</strong> {{ rec.timeframe }} | <strong>Expected ROI:</strong> {{ rec.expected_roi }}</p>
-                    {% if rec.estimated_cost is number %}
-                    <p class="text-sm"><strong>Estimated Cost:</strong> {{ currency_symbol }}{{ "%.0f"|format(rec.estimated_cost/1000) }}k</p>
+                    {% if costs_hidden %}
+                    <p class="text-sm"><strong>Estimated Cost:</strong> Restricted to roles with budget authority</p>
+                    {% elif rec.estimated_cost is number %}
+                    <p class="text-sm"><strong>Estimated Cost:</strong> {{ shown_symbol }}{{ "%.0f"|format(rec.estimated_cost/1000) }}k</p>
                     {% else %}
                     <p class="text-sm"><strong>Estimated Cost:</strong> {{ rec.estimated_cost }}</p>
                     {% endif %}
@@ -421,9 +437,10 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                 <h3 class="text-2xl font-semibold leading-none tracking-tight">Investment Allocation</h3>
             </div>
             <div class="p-6 pt-0">
-                <canvas id="investmentChart"></canvas>
+                {% if not costs_hidden %}<canvas id="investmentChart"></canvas>{% endif %}
                 <p class="mt-3 text-sm text-muted-foreground" data-testid="allocation-note">
                     {%- if scores_error -%}Unavailable
+                    {%- elif costs_hidden -%}The allocation by priority is restricted to roles with budget authority.
                     {%- elif portfolio_metrics.investment_costed_count == 0 -%}No capability has an investment estimate, so nothing is plotted.
                     {%- elif portfolio_metrics.investment_costed_count < portfolio_metrics.total_capabilities -%}Plots {{ portfolio_metrics.investment_costed_count }} of {{ portfolio_metrics.total_capabilities }} capabilities. {{ portfolio_metrics.total_capabilities - portfolio_metrics.investment_costed_count }} not estimated and not plotted.
                     {%- else -%}Plots all {{ portfolio_metrics.total_capabilities }} capabilities.
@@ -537,7 +554,7 @@ document.addEventListener('alpine:init', () => {
 
         exportSelected() {
             const selected = this.capabilities.filter(c => this.selectedIds.includes(this.capabilityKey(c)));
-            const headers = ['Capability', 'Domain', 'Strategic Score', 'Coverage', 'Maturity', 'Risk', 'Total Score', 'Priority', 'Investment ({{ currency_symbol }}k)', 'Initiative', 'Recommendation'];
+            const headers = ['Capability', 'Domain', 'Strategic Score', 'Coverage', 'Maturity', 'Risk', 'Total Score', 'Priority', 'Investment ({{ shown_symbol }}k)', 'Initiative', 'Recommendation'];
             const rows = selected.map(c => [
                 c.capability_name,
                 c.capability_domain,
@@ -547,7 +564,7 @@ document.addEventListener('alpine:init', () => {
                 c.risk_count ? c.risk_score + '/25' : 'No risks linked',
                 c.investment_priority_score === null ? 'Not scored' : c.investment_priority_score + '/100',
                 c.priority_level,
-                c.investment_need.estimated_cost === null ? 'Not estimated' : (c.investment_need.estimated_cost / 1000).toFixed(1),
+                c.investment_need.cost_hidden ? 'Restricted' : (c.investment_need.estimated_cost === null ? 'Not estimated' : (c.investment_need.estimated_cost / 1000).toFixed(1)),
                 c.linked_initiative_name || '',
                 c.recommendation
             ]);
@@ -642,7 +659,7 @@ if (investmentCanvas) {
             data: {
                 labels: ['Critical', 'High', 'Medium', 'Low'],
                 datasets: [{
-                    label: 'Investment ({{ currency_symbol }}k)',
+                    label: 'Investment ({{ shown_symbol }}k)',
                     data: [
                         {% for band in ('critical_investment', 'high_investment', 'medium_investment', 'low_investment') %}
                         {% set figure = portfolio_metrics.get(band) %}{{ ("%.1f"|format(figure / 1000)) if figure is number else 'null' }}{{ ',' if not loop.last }}
@@ -658,7 +675,7 @@ if (investmentCanvas) {
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Investment ({{ currency_symbol }}k)'
+                            text: 'Investment ({{ shown_symbol }}k)'
                         }
                     }
                 }
@@ -696,8 +713,10 @@ if (investmentCanvas) {
 {% from 'components/scenario_comparison_modal.html' import scenario_comparison_modal with context %}
 
 {{ arb_submission_modal() }}
+{% if not costs_hidden %}
 {{ roi_calculator_modal() }}
 {{ scenario_comparison_modal(capability_scores) }}
+{% endif %}
 
 {% from 'components/initiative_modal.html' import initiative_modal, plans_created_here %}
 
