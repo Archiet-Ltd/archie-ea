@@ -313,8 +313,9 @@ def test_a_deleted_pricing_rule_copied_back_fails_with_its_register_entry(tmp_pa
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "reuse-register.yml").write_text(
         (REPO / "docs" / "reuse-register.yml").read_text(encoding="utf-8"), encoding="utf-8")
+    _carry_canonicals(tmp_path, gate.load_register(REPO)[0])
     css = tmp_path / "app" / "static" / "css"
-    css.mkdir(parents=True)
+    css.mkdir(parents=True, exist_ok=True)
     (css / "public_site.css").write_text((REPO / "app/static/css/public_site.css").read_text(encoding="utf-8"), encoding="utf-8")
     (css / "public_pricing.css").write_text(OLD_PRICING_RULES[key], encoding="utf-8")
     fails, _ = _run(tmp_path)
@@ -689,10 +690,26 @@ def _public_entries():
     return [e for e in entries if e["id"].startswith("public-")]
 
 
+def _carry_canonicals(root, entries):
+    """Copy every active entry's canonical file from the real tree into the temporary one, so a new
+    register entry is covered without editing the tests that build a tree from the real register."""
+    for e in entries:
+        if e.get("status") != "active":
+            continue
+        rel = e["canonical"]["path"]
+        src = REPO / rel
+        if src.is_file():
+            dest = root / rel
+            if not dest.exists():
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+
+
 def _public_tree(tmp_path, rel, text):
     (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
     (tmp_path / "docs" / "reuse-register.yml").write_text(
         yaml.safe_dump({"version": 1, "entries": _public_entries()}, sort_keys=False), encoding="utf-8")
+    _carry_canonicals(tmp_path, _public_entries())
     css = tmp_path / "app" / "static" / "css"
     css.mkdir(parents=True, exist_ok=True)
     (css / "public_site.css").write_text(
@@ -1027,8 +1044,9 @@ def _extra_css_tree(tmp_path, css_text):
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "reuse-register.yml").write_text(
         (REPO / "docs" / "reuse-register.yml").read_text(encoding="utf-8"), encoding="utf-8")
+    _carry_canonicals(tmp_path, gate.load_register(REPO)[0])
     css = tmp_path / "app" / "static" / "css"
-    css.mkdir(parents=True)
+    css.mkdir(parents=True, exist_ok=True)
     (css / "public_site.css").write_text(
         (REPO / "app/static/css/public_site.css").read_text(encoding="utf-8"), encoding="utf-8")
     (css / "public_extra.css").write_text(css_text + "\n", encoding="utf-8")

@@ -735,6 +735,12 @@
                 },
                 onDone: async (result) => {
                     dropLoading();
+                    if (result.retryable) {
+                        /* Every model failed: one plain sentence with Retry, not an answer card. */
+                        dropBubble();
+                        appendError(result.text, () => _retryTurn(JSON.parse(payload).message, timestamp));
+                        return;
+                    }
                     if (!wrap) wrap = beginStreamedMessage();
                     const meta = {
                         domain: result.domain || state.currentDomain,
