@@ -20,6 +20,7 @@
 </script>
 <script src="{{ url_for('static', filename='js/vendors/create_modal.js') }}"></script>
 <script src="{{ url_for('static', filename='js/vendors/mapping.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vendors/linked_suppliers.js') }}"></script>
 {% endblock %}
 
 {#- A stored ISO date ("2026-11-03") written the way the Overview writes dates: 3 Nov 2026. -#}
@@ -49,6 +50,9 @@
 {%- set register_rows = register_rows if (register_rows is defined and register_rows is not none) else _page.register_rows -%}
 {%- set system_counts = system_counts if (system_counts is defined and system_counts) else _page.system_counts -%}
 {%- set rows = register_rows if register_rows is not none else [] -%}
+{#- The suppliers the model links to systems, read through the reader the application's Vendors tab uses. -#}
+{%- set linked = linked_suppliers if (linked_suppliers is defined and linked_suppliers is not none) else _page.linked_suppliers -%}
+{%- set linked_n = linked.supplier_count if linked else 0 -%}
 {%- set tab = 'mapping' if request.args.get('tab') == 'mapping' else 'vendors' -%}
 {#- System counts follow the Overview's definition of an application (not decommissioned); the view supplies them. -#}
 {%- set sc = system_counts if (system_counts is defined and system_counts) else vp -%}
@@ -143,6 +147,9 @@
         {{ vp.supplied_count }} of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }}.
         {% set rc = vp.renewing_contracts %}{% if vp.renewals_due or rc.contracts %}{{ rc.contracts }} contract{{ '' if rc.contracts == 1 else 's' }}{% if vp.renewals_due %} with {{ vp.renewals_due }} vendor{{ '' if vp.renewals_due == 1 else 's' }}{% endif %} renew{{ 's' if rc.contracts == 1 else '' }} within 90 days{% if rc.without_vendor %} ({{ rc.without_vendor }} name{{ 's' if rc.without_vendor == 1 else '' }} no vendor){% endif %}.{% else %}No contract renews within 90 days.{% endif %}
         {% if sc.decommissioned %}Decommissioned systems are not counted ({{ sc.decommissioned }}).{% if rc.on_retired_system %} An active contract on one still renews: {{ rc.on_retired_system }} of the renewals above.{% endif %}{% endif %}
+      {% elif linked_n %}
+        None of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }} records a vendor yet, but the model links
+        {{ linked_n }} supplier{{ '' if linked_n == 1 else 's' }} to {{ linked.system_count }} of them.
       {% elif vp.total_systems %}
         None of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }} name a vendor yet.
       {% else %}
@@ -158,6 +165,9 @@
       {% else %}
         <a href="{{ url_for('unified_applications.applications_list') if 'unified_applications.applications_list' in flask.current_app.view_functions else '/applications/' }}" class="text-primary hover:underline">Add your first system</a> and name its vendor.
       {% endif %}
+      {% if linked_n and vp.vendor_count %}
+        The model also links {{ linked_n }} supplier{{ '' if linked_n == 1 else 's' }} to {{ linked.system_count }} system{{ '' if linked.system_count == 1 else 's' }}, none recorded as the vendor.
+      {% endif %}
       {% if vp.annual_cost is not none %}
         Annual cost across vendors: {{ vp.annual_cost|currency }}{% if vp.unassigned_cost is not none %}, including {{ vp.unassigned_cost|currency }} on {{ vp.unassigned_count }} active {{ 'contract that names' if vp.unassigned_count == 1 else 'contracts that name' }} no vendor{% endif %}.
       {% endif %}
@@ -167,10 +177,47 @@
     </p>
     {% endcall %}
   {% endcall %}
+  {% if linked_n %}
+  {% call ui.card(attrs={'data-testid': 'suppliers-linked-portfolio'}) %}
+    {% call ui.card_content() %}
+    <div class="space-y-4">
+      <div>
+        <h2 class="text-lg font-semibold">Suppliers linked in the model</h2>
+        <p class="text-sm text-muted-foreground" data-testid="suppliers-linked-summary">
+          {{ linked_n }} supplier{{ '' if linked_n == 1 else 's' }} linked in the model to {{ linked.system_count }} system{{ '' if linked.system_count == 1 else 's' }}, none recorded as the vendor.
+          They are not counted as vendors until you record one.
+        </p>
+      </div>
+      <ul class="divide-y divide-border" x-data="linkedSuppliers" data-linked-suppliers>
+        {% for system in linked.systems %}
+        <li class="space-y-2 py-3" data-testid="linked-system-row" data-application="{{ system.id }}">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <a href="{{ url_for('unified_applications.application_detail', id=system.id, tab='vendors') }}" class="font-medium text-foreground hover:underline" data-testid="linked-system-link">{{ system.name }}</a>
+            <span class="text-xs text-muted-foreground" data-testid="linked-system-count">{{ system.count }} on its Vendors tab{% if system.recorded %}, {{ system.recorded.name }} recorded{% endif %}</span>
+          </div>
+          <ul class="space-y-1">
+            {% for supplier in system.suppliers %}
+            <li class="flex items-center justify-between gap-3 text-sm" data-testid="linked-supplier-row">
+              <span class="min-w-0 break-words">{{ supplier.name }} <span class="text-xs text-muted-foreground">{{ supplier.rel_type | replace('Relationship', '') | lower }}</span></span>
+              {% if can('edit', 'application') %}
+              {{ ui.button(text='Record as vendor', type='button', variant='outline', size='sm',
+                           attrs={'aria-label': 'Record ' ~ supplier.name ~ ' as vendor for ' ~ system.name, ':disabled': 'saving',
+                                  '@click': 'record(' ~ (url_for('application_mgmt.application_vendor_link', id=system.id) | tojson | forceescape) ~ ', ' ~ supplier.id ~ ')'}) }}
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endcall %}
+  {% endcall %}
+  {% endif %}
   <div{% if not rows %} data-testid="vendors-true-empty-state"{% endif %}>
   {% call(row) list_table(rows=rows, columns=columns, caption='Vendors your systems and contracts name', testid='vendors-table', row_testid='vendor-row',
                           search_placeholder='Filter vendors...', toolbar=true, toolbar_actions=_set_vendors, notice=notice,
-                          empty_message=('None of your ' ~ sc.total_systems ~ ' systems names a vendor yet. Set the vendor on each system and it is listed here.') if sc.total_systems else 'No vendors yet. Add a system or a contract that names its vendor and it is listed here.',
+                          empty_message=('No vendor is recorded yet. Record one of the suppliers linked above and it is listed here.') if linked_n else ('None of your ' ~ sc.total_systems ~ ' systems names a vendor yet. Set the vendor on each system and it is listed here.') if sc.total_systems else 'No vendors yet. Add a system or a contract that names its vendor and it is listed here.',
                           empty_action=_add_first) %}
     {% call table_cell(class='max-w-56 whitespace-normal break-words sm:max-w-64') %}
       <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}" class="block break-words font-medium sm:truncate text-foreground hover:underline" data-testid="vendor-link">{{ row.name }}</a>
