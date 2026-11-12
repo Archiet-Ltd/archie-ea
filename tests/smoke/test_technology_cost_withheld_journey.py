@@ -102,6 +102,7 @@ def test_an_architect_reads_the_node_without_any_amount(browser, live_server, se
         assert not MONEY.search(text), "an amount reached a person the rule withholds: %s" % MONEY.search(text).group(0)
         for figure in ("40,000", "88,888", "88888", "40000"):
             assert figure not in text
+        section.scroll_into_view_if_needed()
         _shot(page, "technology-element-withheld-" + label)
         with page.expect_navigation():
             link.click()
@@ -120,6 +121,7 @@ def test_the_chief_technology_officer_reads_the_same_node_with_its_figures(brows
         expect(section.locator("[data-testid=technology-cost-fact-row]").first).to_contain_text("40,000.00 GBP")
         assert WITHHELD not in page.locator("main").inner_text()
         assert "88,888" not in page.locator("main").inner_text()
+        section.scroll_into_view_if_needed()
         _shot(page, "technology-element-allowed-" + label)
     finally:
         ctx.close()
