@@ -165,6 +165,7 @@ def test_the_figures_agree_on_every_page_and_with_the_seed(browser, live_server,
         assert on_register[0] == "low"
         assert "Linked elements: none recorded" in on_register[1]
         expect(page.locator("main")).not_to_contain_text(theirs["risk"])
+        ranked.scroll_into_view_if_needed()
         _shot(page, "risks", viewport, scheme)
         ranked.get_by_role("link", name=mine["risk"]).click()
         page.wait_for_url(re.compile(r"/risks/\d+$"))
@@ -176,6 +177,7 @@ def test_the_figures_agree_on_every_page_and_with_the_seed(browser, live_server,
         expect(action).to_have_count(1)
         assert _footer_after(page, action) == on_register
         expect(page.locator("main")).not_to_contain_text(theirs["risk"])
+        action.scroll_into_view_if_needed()
         _shot(page, "simulations", viewport, scheme)
         action.get_by_test_id("priority-action-link").click()
         page.wait_for_url(re.compile(r"/risks/\d+"))
