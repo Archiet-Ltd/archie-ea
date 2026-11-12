@@ -59,7 +59,14 @@ RUBRIC: Tuple[Tuple[int, str, str], ...] = (
 )
 
 MAX_REVIEWS = 3  # the first draft and two revisions
-CALLS_PER_RUN = 50  # model calls (reviews and revisions) in one run
+# Model calls (reviews and revisions) in one run. Measured cost of one call at the dearest price the platform
+# uses (deepseek-v4-pro, USD 1.32 in / 3.96 out per million tokens): a review prompt of a normal change is
+# 4,075 characters (about 1,018 tokens, built by build_review_prompt for a one-field status change), and a
+# call may spend up to MAX_REPLY_TOKENS (8,192) on its reply, so one call costs at most USD 0.0338 (and about
+# USD 0.0025 for the 300-token reply a normal review gives). At 10 calls one run spends at most USD 0.34, which is
+# 0.55% of the USD 62 monthly ceiling the DeepSeek tests are written for. The old 50 allowed USD 1.69.
+MAX_REPLY_TOKENS = 8192  # the most a reply may use; llm_model_router.call_model states the same figure
+CALLS_PER_RUN = 10
 MAX_WAITS = 12  # attempts to reach an independent reviewer, one per sweep
 SWEEP_INTERVAL_MINUTES = 5  # how often the sweep runs (the scheduler reads this)
 # A record is swept only after this long with no activity of its own. It is shorter than the interval, so
@@ -72,6 +79,10 @@ CHARTER_CHECK_NAME = "The assistant's charter allows it"
 CHARTER_REFUSED_REASON = (
     "Your assistant is not set up to make this kind of change, so nothing was changed. "
     "You can make it yourself on its own page."
+)
+BUDGET_USED_UP_REASON = (
+    "The month's AI budget is used up, so this change is waiting. The review carries on by itself when "
+    "the budget allows."
 )
 ACCOUNT_OFF_REASON = "The account that asked for this change has been switched off, so the change was not made."
 MOVED_REASON = "The person who asked for this change is no longer in the workspace."
@@ -101,6 +112,7 @@ class ReviewBudget:
     def __init__(self, limit: int = CALLS_PER_RUN):
         self.limit = limit
         self.used = 0
+        self.out_of_money = False  # set when the month's AI budget stopped a call; the run then ends
 
     def take(self) -> bool:
         if self.used >= self.limit:
@@ -111,6 +123,10 @@ class ReviewBudget:
 
 class ReviewerUnavailable(Exception):
     """No independent reviewer could answer this attempt (none configured, paused, unreachable, unreadable)."""
+
+
+class MonthBudgetUsedUp(Exception):
+    """The month's AI spend has no room for another call; nothing was sent and the change waits."""
 
 
 class BudgetSpent(Exception):
@@ -329,8 +345,16 @@ def _entity_model(entity_type: str):
 def _scoped_row(model, row_id: Any, org_id: int):
     """One row of ``model`` by id, for this organisation only.
 
-    The vendor list is shared reference data with no organisation column (see VendorOrganization); who may
-    change it is decided by the platform-administrator rule in run_checks, so it is read by id alone."""
+    A vendor has no organisation column but is named by one (``named_by_organization_id``): it is read only if it
+    came with the platform or is on this organisation's own vendor list, the same rule as the vendor choices. Who
+    may change it is then decided by the platform-administrator rule in run_checks."""
+    if model.__name__ == "VendorOrganization":
+        from app.services import vendor_register
+
+        return model.query.filter(
+            model.id == row_id,
+            db.or_(model.named_by_organization_id.is_(None), model.id.in_(vendor_register.vendor_ids(org_id) or [0])),
+        ).first()
     if not hasattr(model, "organization_id"):
         return model.query.filter_by(id=row_id).first()
     return model.query.filter_by(id=row_id, organization_id=org_id).first()
@@ -819,8 +843,42 @@ def build_revision_prompt(approval: AIChatCRUDApproval, payload: Any, failed: Li
     ])
 
 
+def _month_has_room(choice, prompt: str) -> bool:
+    """Whether the month's AI spend for the reviewer's provider can take this call, asked of the one place that
+    keeps the headroom and the spend (LLMService), never counted again here.
+
+    A call is refused when the provider is at its ceiling, or when the dearest this call could cost (its prompt
+    plus a full reply) would take the month's spend past the ceiling. A provider with no ceiling set is left to
+    the call itself, which refuses it."""
+    from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+    open_now, why = LLMService.headroom(choice.provider, require_ceiling=False)
+    if not open_now:
+        logger.warning("Change review: no call to %s, %s", choice.ref, why)
+        return False
+    ceiling = LLMService.spend_ceiling_usd(choice.provider)
+    if ceiling <= 0 or not LLMService.is_priced(choice.provider):
+        return True
+    spent = LLMService.spend_this_month(choice.provider)
+    if spent is None:
+        return False
+    price_in, price_out = LLMService.price_per_mtok(choice.provider, choice.model)
+    worst = (len(prompt) // 4 + 1) * price_in / 1e6 + MAX_REPLY_TOKENS * price_out / 1e6
+    if spent[0] + worst > ceiling:
+        logger.warning("Change review: no call to %s, USD %.4f spent of USD %.2f and a call may cost USD %.4f",
+                       choice.ref, spent[0], ceiling, worst)
+        return False
+    return True
+
+
 def _ask(router, choice, prompt: str, budget: Optional[ReviewBudget]) -> str:
-    """One model call through the router, inside the run's call cap."""
+    """One model call through the router, inside the run's call cap and the month's AI budget."""
+    if budget is not None and budget.out_of_money:
+        raise MonthBudgetUsedUp()
+    if not _month_has_room(choice, prompt):
+        if budget is not None:
+            budget.out_of_money = True
+        raise MonthBudgetUsedUp()
     if budget is not None and not budget.take():
         raise BudgetSpent()
     try:
@@ -1110,6 +1168,8 @@ def settle(
                 break
             if not approval.drafter_model or number >= MAX_REVIEWS:
                 return _decline(service, approval, state, _failed_reasons(state["rounds"][-1]))
+    except MonthBudgetUsedUp:
+        return _wait(service, approval, state, BUDGET_USED_UP_REASON, counts=False)
     except BudgetSpent:
         return _wait(service, approval, state, "This run's review limit was reached; the review resumes next run.",
                      counts=False)
@@ -1285,6 +1345,8 @@ def sweep_organisation(organization_id: int, budget: Optional[ReviewBudget] = No
 
     counts = {"applied": 0, "declined": 0, "in_review": 0}
     budget = budget or ReviewBudget()
+    if budget.out_of_money:
+        return counts  # the month's AI budget stopped this run; the changes wait for the next one
     for approval_id in waiting_ids(organization_id):
         row = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=organization_id).first()
         if row is None or row.user_id is None:
@@ -1300,6 +1362,6 @@ def sweep_organisation(organization_id: int, budget: Optional[ReviewBudget] = No
         else:
             outcome = AIChatApprovalService(row.user_id).settle_after_review(approval_id, budget=budget)
         counts[outcome.get("state") if outcome.get("state") in counts else "in_review"] += 1
-        if budget.used >= budget.limit:
+        if budget.used >= budget.limit or budget.out_of_money:
             break
     return counts
