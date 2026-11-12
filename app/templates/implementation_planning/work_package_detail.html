@@ -52,12 +52,12 @@
                 <dt class="text-muted-foreground">Progress</dt>
                 <dd class="font-medium" data-testid="wp-progress">
                     {% if progress_value is none %}—{% else %}{{ progress_value }}%{% endif %}
+                    {% if progress_value is not none %}
+                    <div class="mt-1">
+                        {{ progress(value=progress_value, max=100, label='Progress of ' ~ (work_package.name or 'this work package')) }}
+                    </div>
+                    {% endif %}
                 </dd>
-                {% if progress_value is not none %}
-                <div class="mt-1">
-                    {{ progress(value=progress_value, max=100) }}
-                </div>
-                {% endif %}
             </div>
             <div>
                 <dt class="text-muted-foreground">Dates</dt>
