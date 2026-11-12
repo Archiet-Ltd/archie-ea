@@ -154,6 +154,7 @@ def build_roadmap_board(
             p["id"], p["name"], p["target_date"], mine, today, p["provenance"],
             gaps=gap_rows.get(p["id"], []),
         ))
+    _tell_alike_plateaus_apart(cards, {p["id"]: p["target_date"] for p in slice_dict["plateaus"]})
     loose = by_plateau.get(None, [])
     if loose:
         cards.append(_card(None, "Not on a plateau yet", None, loose, today))
@@ -184,6 +185,37 @@ def build_roadmap_board(
             for c in cards
         ],
     }
+
+
+def _day(value) -> str | None:
+    try:
+        d = date.fromisoformat(value[:10])
+    except (TypeError, ValueError):
+        return None
+    return "%d %s %d" % (d.day, d.strftime("%b"), d.year)
+
+
+def _tell_alike_plateaus_apart(cards: list, target_dates: dict) -> None:
+    """Two plateau records with one name are two plateaus, not one in two states: say which is which.
+
+    A name held by one plateau is left as written. Alike names get the plateau's date, and when the
+    date is alike too (or missing) the position of the record, so no two cards read the same.
+    """
+    by_name: dict = {}
+    for c in cards:
+        by_name.setdefault(c["title"], []).append(c)
+    for name, group in by_name.items():
+        if len(group) < 2:
+            continue
+        labels = {}
+        for c in group:
+            labels[id(c)] = "%s (%s)" % (name, _day(target_dates.get(c["id"])) or "no date set")
+        seen: dict = {}
+        for c in group:
+            seen.setdefault(labels[id(c)], []).append(c)
+        for label, same in seen.items():
+            for number, c in enumerate(same, start=1):
+                c["title"] = label if len(same) == 1 else "%s, plateau %d of %d" % (label, number, len(same))
 
 
 def _card(plateau_id, title, target_iso, wps, today, provenance=None, gaps=None):
