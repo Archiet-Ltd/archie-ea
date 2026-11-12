@@ -12,13 +12,13 @@ edits it; an answer somebody gave is never erased.
 The downgrade turns unset back into False, the form the column had before; no row is lost.
 
 Revision ID: 20261112_competitive_advantage
-Revises: 20261110_founder_charter
+Revises: 20261112_gap_one_record
 Create Date: 2026-11-12
 """
 from alembic import op
 
 revision = "20261112_competitive_advantage"
-down_revision = "20261110_founder_charter"
+down_revision = "20261112_gap_one_record"
 branch_labels = None
 depends_on = None
 
