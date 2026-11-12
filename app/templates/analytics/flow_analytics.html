@@ -5,8 +5,7 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/alert.html' import alert %}
 {% from 'components/button.html' import button %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
-{% from 'components/select.html' import native_select %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/card.html' import card, card_header, card_title, card_content, card_description %}
@@ -21,13 +20,12 @@
 
     {% macro _ps_actions() %}
     {% if boards %}
-    {% call native_select(id='board-selector', size='sm', aria_label='Select Board', attrs_dict={'x-model': 'boardId', '@change': 'loadAll()'}) %}
+    {% call ui.native_select_wrapper(class='relative w-56') %}
+    {% call ui.native_select(id='board-selector', class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'aria-label': 'Select Board', 'x-model': 'boardId', '@change': 'loadAll()'}) %}
         {% for board in boards %}
-        <option value="{{ board.id }}"
-                {% if selected_board_id is not none and board.id|string == selected_board_id|string %}selected{% endif %}>
-            {{ board.name }}
-        </option>
+        {{ ui.native_select_option(text=board.name, attrs={'value': board.id}, selected=(selected_board_id is not none and board.id|string == selected_board_id|string)) }}
         {% endfor %}
+    {% endcall %}
     {% endcall %}
     {% else %}
     <span class="text-sm text-muted-foreground">No boards found</span>
@@ -139,25 +137,25 @@
                             {% endcall %}
                         {% endcall %}
                         {% call card_content() %}
-                            {% call table() %}
-                                {% call table_header() %}
-                                    {% call table_row() %}
-                                        {% call table_head() %}Board column{% endcall %}
-                                        {% call table_head(class='text-right') %}Cards{% endcall %}
+                            {% call ui.table_container() %}{% call ui.table() %}
+                                {% call ui.table_header() %}
+                                    {% call ui.table_row() %}
+                                        {% call ui.table_head() %}Board column{% endcall %}
+                                        {% call ui.table_head(class='text-right') %}Cards{% endcall %}
                                     {% endcall %}
                                 {% endcall %}
-                                {% call table_body(attrs_dict={'x-data': ''}) %}
+                                {% call ui.table_body(attrs={'x-data': ''}) %}
                                     <template x-for="col in wipData.columns" :key="col.column">
-                                        {% call table_row() %}
-                                            {% call table_cell() %}
+                                        {% call ui.table_row() %}
+                                            {% call ui.table_cell() %}
                                                 <span x-text="columnLabel(col.column)"></span>
                                             {% endcall %}
-                                            {% call table_cell(class='text-right font-semibold') %}
+                                            {% call ui.table_cell(class='text-right font-semibold') %}
                                                 <span x-text="col.card_count"></span>
                                             {% endcall %}
                                         {% endcall %}
                                     </template>
-                                {% endcall %}
+                                {% endcall %}{% endcall %}
                             {% endcall %}
                         {% endcall %}
                     {% endcall %}

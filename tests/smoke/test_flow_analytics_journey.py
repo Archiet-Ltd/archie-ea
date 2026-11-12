@@ -130,6 +130,25 @@ def _seed_board_with_cards(org_id, user_id, suffix):
     return board_id
 
 
+def _seed_quiet_board(org_id, user_id, suffix):
+    """A second board in the same organisation with no finished cards."""
+    from app import create_app, db
+    from app.models.adm_kanban import KanbanBoard
+
+    app = create_app("testing")
+    with app.app_context():
+        board = KanbanBoard(
+            name="Quiet Board %s" % suffix,
+            organization_id=org_id,
+            created_by_id=user_id,
+        )
+        db.session.add(board)
+        db.session.commit()
+        board_id = board.id
+        db.session.remove()
+    return board_id
+
+
 def _save_screenshots(browser, live_server, email, board_id, walk_dir):
     """Save full-page screenshots at 1440 and 390, light and dark."""
     os.makedirs(walk_dir, exist_ok=True)
@@ -184,6 +203,7 @@ def test_flow_analytics_journey(browser, live_server):
     email = org["emails"][PERSONA]
 
     board_id = _seed_board_with_cards(org_id, user_id, suffix)
+    quiet_board_id = _seed_quiet_board(org_id, user_id, suffix)
 
     # Assert the persona is correct before the browser starts
     _assert_persona(email)
@@ -272,7 +292,17 @@ def test_flow_analytics_journey(browser, live_server):
         expect(page.get_by_role("cell", name="In progress", exact=True)).to_be_visible()
         expect(page.get_by_text("in_progress")).to_have_count(0)
 
-        # 13. Save screenshots if WALK_DIR is set
+        # 13. Choosing the other board reloads the figures for it, and choosing
+        # the first again brings its figures back.
+        board_selector.select_option(str(quiet_board_id))
+        expect(page.get_by_text("No flow data yet")).to_be_visible()
+        expect(page.get_by_text("WIP Snapshot")).to_have_count(0)
+        board_selector.select_option(str(board_id))
+        expect(page.get_by_text("13d").first).to_be_visible()
+        expect(page.get_by_text("76.5%").first).to_be_visible()
+        expect(page.get_by_role("cell", name="In progress", exact=True)).to_be_visible()
+
+        # 14. Save screenshots if WALK_DIR is set
         walk_dir = os.environ.get("WALK_DIR")
         if walk_dir:
             _save_screenshots(browser, live_server, email, board_id, walk_dir)
