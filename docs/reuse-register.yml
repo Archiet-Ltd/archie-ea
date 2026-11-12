@@ -37,6 +37,19 @@ entries:
       template, and do not write a second footer, "Source:" line or confidence label beside it.
       The rule is in the service docstring and in docs/adr/0013-result-footer.md.
 
+  - id: cost-masker
+    concept: Withholding a figure in pounds from a person who may not see spend (investment figures, budgets, costs)
+    status: active
+    canonical:
+      path: app/modules/solutions_strategic/v2/services/investment_prioritization_service.py
+      symbols: [hide_costs, limit_costs_to_viewer]
+    reuse: >
+      Pass an analysis through limit_costs_to_viewer before a page or feed sends it; it asks the one role helper
+      (can_see_costs) and, for a person who may not see spend, hide_costs replaces every money figure with None
+      and sets costs_hidden so the page says the figure is restricted instead of showing a zero. Do not write a
+      second masker, do not test roles by hand in a route or template to decide whether a cost shows, and do not
+      blank a figure in the browser: the figure must not leave the server.
+
   - id: design-tokens
     concept: Colour, radius and type tokens for every page (one token file; the public marketing
       palette is a scoped class in it)
@@ -359,6 +372,26 @@ entries:
     known_exceptions:
       - path: app/utils/duplicate_guard.py
         reason: find_duplicate_by_name is the canonical duplicate lookup of the name-matching entry
+
+  # Searched before adding: "name", "resolve" and "matcher". name-matching (normaliser and duplicate lookup) and
+  # entity-matching (imports and proposals) both exist; neither says which element a shared name means in an answer.
+  - id: answer-name-resolution
+    concept: Which element a name means in any answer (typed question, catalogue, assistant tools, slash commands)
+    status: active
+    canonical:
+      path: app/modules/dashboard/services/overview_figures.py
+      symbols: [element_each_name_means, element_named]
+    reuse: >
+      element_named(org_id, name) finds the elements a name matches ignoring case, spacing, "-" and "_", and
+      element_each_name_means picks one: the most recorded relationships, then the application's own element, then
+      the one recorded first. Every answer path calls it so card, answer and tools agree. Never pick an element
+      with .first() or an ilike lookup in answer code; MatcherService stays the matcher for imports and proposals.
+    must_not_create:
+      - id: answer-name-picker
+        regex: 'ArchiMateElement\.name\.ilike\([^)]*\)\s*\)\s*\.first\('
+    known_exceptions:
+      - path: app/modules/genome/patch/grounding.py
+        reason: grounds a patch against one element for the genome, not an answer to a person; moves to the rule in a later round
 
   - id: impact-answer
     concept: What breaks if this element changes or fails (impact answer)

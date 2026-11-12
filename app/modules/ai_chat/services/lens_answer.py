@@ -17,6 +17,7 @@ from app.extensions import db
 from app.middleware.tenant_context import current_org_id
 from app.models import ArchiMateElement
 from app.modules.ai_chat.services.estate_answer import named_element_ids
+from app.modules.intelligence.services.answer_envelope import OWNER_CUE
 
 # key -> (words that ask it, the view that serves it)
 LENSES = {
@@ -34,7 +35,7 @@ LENSES = {
         "programme_for_element",
     ),
     "accountability": (
-        re.compile(r"\baccountable\b|who(?:'s| is) responsible", re.I),
+        re.compile(OWNER_CUE.pattern + r"|\baccountable\b", re.I),
         "accountability_for_element",
     ),
     "data": (re.compile(r"\bwhat data\b|\bwho stewards\b|\bdata (flows?|objects?)\b", re.I), "data_for_element"),
@@ -70,8 +71,13 @@ def lens_payload(lens: str, element_id: int) -> Optional[Dict[str, Any]]:
 def answer_lens_question(message: str) -> Optional[Dict[str, Any]]:
     """``{lens, element, data}`` for a lens question naming an element of the
     active organisation, or None when it is not one."""
+    return answer_for_lens(classify_lens_question(message), message)
+
+
+def answer_for_lens(lens: Optional[str], message: str) -> Optional[Dict[str, Any]]:
+    """``{lens, element, data}`` for the named lens asked about the element *message*
+    names in the active organisation, or None when it names none."""
     organization_id = current_org_id()
-    lens = classify_lens_question(message)
     if lens is None or organization_id is None:
         return None
     element_ids = named_element_ids(message, organization_id)

@@ -2064,29 +2064,17 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
             db.session.rollback()
 
     # --- ArchiMate relationships for this app ---
+    # One reader of what the model links to the application: the Architecture tab, the
+    # Technology and Vendors tabs and the completeness banner all read it.
     archimate_relationships = {'incoming': [], 'outgoing': []}
     if app_obj.archimate_element_id:
         try:
-            from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
-            ae_id = app_obj.archimate_element_id
+            from app.services.application_model_links import linked_elements
 
-            outgoing = db.session.query(ArchiMateRelationship, ArchiMateElement).join(
-                ArchiMateElement, ArchiMateRelationship.target_id == ArchiMateElement.id
-            ).filter(ArchiMateRelationship.source_id == ae_id).all()
-
-            incoming = db.session.query(ArchiMateRelationship, ArchiMateElement).join(
-                ArchiMateElement, ArchiMateRelationship.source_id == ArchiMateElement.id
-            ).filter(ArchiMateRelationship.target_id == ae_id).all()
-
-            for rel, elem in outgoing:
-                archimate_relationships['outgoing'].append({
-                    'id': elem.id, 'name': elem.name, 'type': elem.type,
-                    'layer': (elem.layer or '').title(), 'rel_type': rel.type,
-                })
-            for rel, elem in incoming:
-                archimate_relationships['incoming'].append({
-                    'id': elem.id, 'name': elem.name, 'type': elem.type,
-                    'layer': (elem.layer or '').title(), 'rel_type': rel.type,
+            for item in linked_elements(app_obj):
+                archimate_relationships[item['direction']].append({
+                    'id': item['id'], 'name': item['name'], 'type': item['type'],
+                    'layer': item['layer'], 'rel_type': item['rel_type'],
                 })
         except Exception:
             db.session.rollback()
@@ -2098,6 +2086,27 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         "product_count": 0,
         "has_archimate": bool(app_obj.archimate_element_id),
     }
+    # The vendor the one register holds for this application, and the suppliers the
+    # model links to it that are not yet recorded as its vendor.
+    vendor_organisations = []
+    supplier_links = []
+    primary_vendor_label = "None recorded"
+    try:
+        from app.services import vendor_register
+        from app.services.application_model_links import linked_suppliers
+
+        vendor_id = vendor_register.vendor_of(app_obj)
+        vendor = db.session.get(VendorOrganization, vendor_id) if vendor_id else None
+        if vendor is not None:
+            vendor_organisations = [{"id": vendor.id, "name": vendor.name}]
+            primary_vendor_label = vendor.name
+        vendor_summary["vendor_count"] = len(vendor_organisations)
+        vendor_summary["product_count"] = 1 if app_obj.primary_vendor_product is not None else 0
+        supplier_links = linked_suppliers(app_obj, vendor.name if vendor is not None else None)
+    except Exception:
+        logger.exception("Could not load vendors for application %s", app_obj.id)
+        db.session.rollback()
+    vendors_tab_count = len(vendor_organisations) + len(supplier_links)
     # Populate vendor product dropdown from VendorProduct table
     all_products = []
     try:
@@ -2166,7 +2175,11 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
             "delta": (
                 "Among its connections"
                 if interface_count
-                else "None yet; add one in Architecture"
+                else (
+                    "None linked yet; link one in the Composer"
+                    if archimate_info
+                    else "None linked"
+                )
             ),
             "icon_svg": "",
         },
@@ -2367,6 +2380,18 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     technology_cost_shares = technology_cost.shares_for_application(
         app_obj.organization_id, app_obj.id)
 
+    technology_linked_count = 0
+    completeness_notes = {}
+    try:
+        from app.services.application_fact_sheet import linked_notes
+        from app.services.application_model_links import linked_technology
+
+        technology_linked_count = len(linked_technology(app_obj))
+        completeness_notes = linked_notes(app_obj, app_obj.completeness_gaps)
+    except Exception:
+        logger.exception("Could not read the model links for application %s", app_obj.id)
+        db.session.rollback()
+
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
@@ -2403,6 +2428,12 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         interfaces=interfaces,
         vendor_footprint=vendor_footprint,
         vendor_summary=vendor_summary,
+        vendor_organisations=vendor_organisations,
+        supplier_links=supplier_links,
+        primary_vendor_label=primary_vendor_label,
+        vendors_tab_count=vendors_tab_count,
+        technology_linked_count=technology_linked_count,
+        completeness_notes=completeness_notes,
         vendor_form_config=vendor_form_config,
         metric_cards=metric_cards,
         dashboard_config=dashboard_config,
