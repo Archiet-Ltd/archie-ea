@@ -1,7 +1,7 @@
-"""The owner of a new organisation opens Settings; refused and failed addresses show a usable page.
+"""The owner of a new organisation reaches their organisation's page, never the platform's settings.
 
-Three faults, each shown by a person's own request:
-  - the person who signed up and owns a new organisation was refused at /settings;
+Faults, each shown by a person's own request:
+  - the platform's settings were readable by every organisation's owner;
   - three AI chat administration addresses answered a refusal with no heading or way back;
   - the portfolio patterns address showed a bare JSON sentence to a browser on a timeout.
 """
@@ -76,21 +76,39 @@ def two_owners(app, db_session, mail_off, monkeypatch):
     return a_client, a, b_client, b
 
 
-def test_the_owner_of_a_new_organisation_opens_settings(two_owners):
-    a_client, a, _b_client, _b = two_owners
-    resp = a_client.get("/settings")
-    assert resp.status_code == 200, resp.status_code
-    assert "System Settings" in resp.get_data(as_text=True)
-
-
-def test_the_owner_sees_the_saved_values_but_cannot_change_them(two_owners):
+def test_the_owner_is_refused_the_platforms_settings_and_its_saved_values(two_owners):
     a_client, *_ = two_owners
-    assert a_client.get("/api/system-settings").status_code == 200
+    for path in ("/settings", "/api/system-settings"):
+        resp = a_client.get(path)
+        assert resp.status_code == 403, (path, resp.status_code)
+    assert "session" not in a_client.get("/api/system-settings").get_data(as_text=True).lower()
     resp = a_client.post("/api/system-settings/save", json={"settings": {"app-name": "Mine"}})
     assert resp.status_code == 403
-    html = a_client.get("/settings").get_data(as_text=True)
-    assert 'data-testid="settings-read-only"' in html
-    assert 'data-testid="btn-save-all"' not in html
+
+
+def test_the_owners_menu_leads_to_their_own_organisation_and_not_the_platforms_settings(two_owners):
+    import re
+
+    a_client, *_ = two_owners
+    html = a_client.get("/team/").get_data(as_text=True)
+    assert 'data-testid="user-menu-platform_settings"' not in html
+    link = re.search(r'<a[^>]*data-testid="user-menu-settings"[^>]*>', html)
+    assert link, "the owner has no organisation entry in the menu"
+    assert 'href="/admin/"' in link.group(0)
+    page = a_client.get("/admin/")
+    assert page.status_code == 200
+    assert "Organisation" in page.get_data(as_text=True)
+
+
+def test_a_platform_administrator_still_reads_the_platform_settings(two_owners, app):
+    from app import db
+
+    a_client, a, _b_client, _b = two_owners
+    a.is_platform_admin = True
+    db.session.commit()
+    assert a_client.get("/settings").status_code == 200
+    assert a_client.get("/api/system-settings").status_code == 200
+    assert "System Settings" in a_client.get("/settings").get_data(as_text=True)
 
 
 def test_a_member_of_an_owners_organisation_without_an_administrator_role_is_refused(two_owners, app):
@@ -109,14 +127,17 @@ def test_a_member_of_an_owners_organisation_without_an_administrator_role_is_ref
     client = _Person(_anonymous(app))
     assert client.post("/account/login", data={"email": member.email, "password": PASSWORD}).status_code == 302
     assert client.get("/settings").status_code == 403
+    assert client.get("/api/system-settings").status_code == 403
 
 
-def test_a_second_organisations_owner_is_admitted_on_their_own_settings_and_is_still_not_a_platform_admin(two_owners):
+def test_each_organisations_owner_reaches_only_their_own_organisation_page(two_owners):
     from app.middleware.tenant_decorators import is_platform_admin
 
-    _a_client, a, b_client, b = two_owners
-    assert b_client.get("/settings").status_code == 200
+    a_client, a, b_client, b = two_owners
     assert not is_platform_admin(a) and not is_platform_admin(b)
+    for client in (a_client, b_client):
+        assert client.get("/admin/").status_code == 200
+        assert client.get("/settings").status_code == 403
 
 
 @pytest.mark.parametrize("path", [

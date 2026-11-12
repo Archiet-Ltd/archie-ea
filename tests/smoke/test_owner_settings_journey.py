@@ -1,8 +1,9 @@
-"""The person who signs up opens Settings from the sidebar and reads it; a refused page is the standard one.
+"""The person who signs up reaches their organisation's page from the account menu; the platform's settings stay closed.
 
 The person: someone who has just signed up and owns the organisation sign-up made for them. The goal:
-configure the organisation, which starts by opening Settings. They land on a page with content (the
-saved values, read-only, with the reason said plainly) and every tab opens a panel with content.
+manage the organisation. They open the account menu, choose the organisation entry, and land on a page
+with their organisation's content. The platform's own Settings is not offered and its address is refused
+with the standard page and a way back that lands on content.
 
 Set ONB_WALK_DIR to save screenshots.
 """
@@ -49,7 +50,9 @@ def _skip_to_the_dashboard(page):
 
 
 @pytest.mark.parametrize("size,viewport,scheme", SIZES, ids=[s[0] for s in SIZES])
-def test_the_new_owner_opens_settings(browser, live_server, people, size, viewport, scheme):
+def test_the_new_owner_reaches_their_organisation_not_the_platforms_settings(
+    browser, live_server, people, size, viewport, scheme
+):
     context = browser.new_context(viewport=viewport, color_scheme=scheme)
     context.set_default_timeout(PAGE_TIMEOUT)
     context.set_default_navigation_timeout(PAGE_TIMEOUT)
@@ -61,27 +64,31 @@ def test_the_new_owner_opens_settings(browser, live_server, people, size, viewpo
         sign_up(page, live_server, people)
         _skip_to_the_dashboard(page)
 
-        # They open Settings (the address the brief and the administration pages name) and land on a page.
-        assert page.goto(live_server + "/settings", wait_until="domcontentloaded").status == 200
-        expect(page.get_by_role("heading", name="System Settings")).to_be_visible()
+        # The account menu offers the organisation, and does not offer the platform's Settings.
+        if viewport["width"] < 768:
+            # On a phone the sidebar is a drawer; open it so the menu is on screen.
+            page.get_by_test_id("sidebar-trigger").click()
+            expect(page.get_by_role("dialog", name="Navigation")).to_be_visible()
+        page.locator("#user-menu-btn").click()
+        entry = page.get_by_test_id("user-menu-settings")
+        expect(entry).to_be_visible()
+        expect(entry).to_contain_text("Organisation")
+        expect(page.get_by_test_id("user-menu-platform_settings")).to_have_count(0)
+        _shot(page, "avatar-menu", size)
 
-        # The saved values are shown, not defaults standing in for them, and the reason they cannot
-        # be changed is said where the person looks.
-        expect(page.get_by_test_id("settings-read-only")).to_contain_text("You can read these settings but not change them")
-        expect(page.get_by_test_id("btn-save-all")).to_have_count(0)
-        expect(page.get_by_text("Saved settings could not be loaded")).to_be_hidden()
-        name = page.locator("#app-name")
-        expect(name).to_be_disabled()
-        assert name.input_value().strip(), "the application name field is empty"
-        _shot(page, "settings", size)
+        # Choosing it lands on the organisation's page, which has content.
+        entry.click()
+        page.wait_for_url("**/admin/")
+        assert page.locator("main").inner_text().strip(), "the organisation page is empty"
+        _shot(page, "organisation-page", size)
 
-        # Every tab opens a panel with content.
-        for tab in ("Security", "Notifications", "Integrations", "Backup and restore"):
-            page.get_by_role("tab", name=tab).click()
-            panel = page.locator("[role=tabpanel]:visible")
-            assert panel.inner_text().strip(), tab
-        page.get_by_role("tab", name="Security").click()
-        expect(page.locator("#session-timeout")).to_be_disabled()
-        assert page.locator("#session-timeout").input_value().strip()
+        # The platform's Settings, opened by address, is refused with a page and a way back.
+        assert page.goto(live_server + "/settings", wait_until="domcontentloaded").status == 403
+        expect(page.get_by_role("heading", name="You don't have access to this page")).to_be_visible()
+        assert "System Settings" not in page.content()
+        _shot(page, "settings-refused", size)
+        page.get_by_role("link", name="Go to the dashboard").click()
+        page.wait_for_url("**/dashboard/**")
+        assert page.locator("main").inner_text().strip()
     finally:
         context.close()

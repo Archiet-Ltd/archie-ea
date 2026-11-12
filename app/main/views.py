@@ -1457,21 +1457,15 @@ def integrations():
 
 @main.route("/settings")
 @login_required
+@platform_admin_required
 @admin_required
 def settings():
     """System Settings - Application configuration and user preferences.
 
-    Opens for anyone who administers their organisation, which includes the
-    person who signed up and owns a new one. The page reads the global
-    system_settings table, so only a platform administrator may change it:
-    everyone else sees the values read-only (the save route below stays
-    platform-only).
+    Admin-only: the page reads and writes the global system_settings table, and
+    it is linked only from the Administration section of the sidebar.
     """
-    from app.middleware.tenant_decorators import is_platform_admin
-
-    return render_template(
-        "settings/index.html", may_change_settings=is_platform_admin(current_user)
-    )
+    return render_template("settings/index.html")
 
 
 @main.route("/api/system-settings", methods=["GET"])
@@ -1482,13 +1476,12 @@ def settings():
 # (settings/index.html) is linked only from the Administration sidebar section,
 # so gating it on admin matches how it is actually reached.
 #
-# admin_required is satisfied by Permission.ADMINISTER, a GLOBAL flag every
-# self-registered user holds for their own organisation, so that organisation's
-# owner can read this table but must not change it (see the save route).
-#
-# Reading is open to anyone who administers their organisation, because the
-# Settings page they are allowed to open shows these values read-only. Only the
-# save route below changes them, and it stays platform-only.
+# admin_required alone was not enough either: it is satisfied by
+# Permission.ADMINISTER, a GLOBAL flag every self-registered user holds for
+# their own organisation, so any tenant's own admin -- not just a platform
+# admin -- could read this platform-wide table. platform_admin_required
+# closes that (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def get_system_settings():
     """Return all saved system settings as JSON."""
@@ -1521,7 +1514,7 @@ def get_system_settings():
 #
 # Same gap as get_system_settings above: admin_required alone let any
 # tenant's own admin rewrite this platform-wide table. platform_admin_required
-# closes that, and keeps closing it now that the owner may read the page.
+# closes that (R1 admin-rbac systemic fix).
 @platform_admin_required
 @admin_required
 def save_system_settings():
