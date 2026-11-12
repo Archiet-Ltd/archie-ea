@@ -49,7 +49,7 @@ def test_a_signed_in_person_finds_scenarios_among_what_is_available(browser, liv
         page.wait_for_url("**/simulations", timeout=PAGE_TIMEOUT)
         assert page.get_by_test_id("early-access-page").count() == 0
         expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
-        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
     finally:
         context.close()
 
@@ -92,7 +92,7 @@ def test_the_features_page_promotes_scenarios_only_in_the_release_wave_that_open
             page.locator("h2#available-now + p + ul").get_by_role("link", name="Scenarios").click()
             page.wait_for_url("**/simulations", timeout=PAGE_TIMEOUT)
             expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
-            expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+            expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
         else:
             expect(page.locator("h2#available-now")).to_have_count(0)
             expect(page.get_by_text("You are signed in, so these open on the working screen.")).to_have_count(0)
@@ -149,7 +149,7 @@ def test_every_scenarios_link_lands_on_a_page_that_agrees_with_the_section(brows
             if opened and signed_in:
                 assert page.url.endswith("/simulations"), (label, href, page.url)
                 expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
-                expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+                expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
             elif opened:
                 assert page.url.endswith("/modules/scenario-modelling"), (label, href, page.url)
                 assert "Available now" in body and "Not built yet" not in body and "waiting list" not in body.lower(), body
@@ -177,7 +177,7 @@ def test_the_module_page_agrees_with_the_wave_when_opened_directly(browser, wave
         page.goto(server + "/modules/scenario-modelling", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         if wave == "3" and signed_in:
             assert page.url.endswith("/simulations"), page.url
-            expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+            expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
         elif wave == "3":
             assert page.url.endswith("/modules/scenario-modelling")
             body = page.locator("main").inner_text()
@@ -208,7 +208,7 @@ def _lands_on_what_it_says(page, server, href, released, signed_in, where):
     page.goto(server + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     if released and signed_in:
         assert page.url.endswith("/simulations"), (where, page.url)
-        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
         return
     assert page.url.endswith("/modules/scenario-modelling"), (where, page.url)
     body = page.locator("main").inner_text()

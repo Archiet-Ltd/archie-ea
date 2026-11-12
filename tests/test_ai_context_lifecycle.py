@@ -17,7 +17,7 @@ import pytest
 from playwright.sync_api import expect, sync_playwright
 
 from scripts.build_js import BUNDLES, render
-from tests.chat_opening_fixture import APPLICATIONS, APPLICATIONS_PATH, open_chat_options
+from tests.chat_opening_fixture import APPLICATIONS, APPLICATIONS_PATH, FIRST_QUESTIONS, FIRST_QUESTIONS_PATH, open_chat_options
 from tests.test_ai_model_selector_display import ROOT, html
 
 
@@ -133,6 +133,7 @@ def context_page(lifecycle_browser):
                 '/ai-chat/recommendations': {'alerts': [], 'recommendations': [], 'summary': {'total': 0}},
                 '/account/session/keepalive': {'success': True},
                 APPLICATIONS_PATH: APPLICATIONS,
+                FIRST_QUESTIONS_PATH: FIRST_QUESTIONS,
             }
             if path in bodies:
                 return self.respond(bodies[path])

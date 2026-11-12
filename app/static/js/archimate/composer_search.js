@@ -166,7 +166,7 @@ let ComposerSearch = (function() {
                  * loadSavedViewpoint(). */
                 self.viewpointDirty = false;
                 self.$nextTick(function() {
-                    self.fitCanvas();
+                    self.fitCanvasReadable();
                     if (window.lucide) lucide.createIcons();
                     if (self.intelligenceEnabled) self.fetchIntelligence();
                     /* GAP-CMP-002/003: Update validation badge + orphan highlights */

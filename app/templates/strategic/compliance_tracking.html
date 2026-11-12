@@ -5,6 +5,7 @@
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
+{% from 'components/provenance.html' import result_footer %}
 
 {% block title %}Compliance Tracking{% endblock %}
 
@@ -68,7 +69,7 @@
             {% call card_title() %}Capability Compliance Status{% endcall %}
         {% endcall %}
         {% call card_content() %}
-            {% call(item) list_table(rows=capability_compliance, columns=[('Capability', ''), ('Compliance Status', ''), ('Score', ''), ('Next step', ''), ('Last Review', '')],
+            {% call(item) list_table(rows=capability_compliance, columns=[('Capability', ''), ('Compliance Status', ''), ('Score', ''), ('Next step', ''), ('Last Review', ''), ('Evidence, source and date', '')],
                                      caption='Compliance of each capability', testid='compliance-tracking-table', row_testid='compliance-tracking-row',
                                      empty_message='No capabilities yet. Add capabilities to see their compliance.') %}
                 {% call table_cell(class='font-medium') %}
@@ -78,8 +79,9 @@
                 {% endcall %}
                 {% call table_cell() %}{{ item.status }}{% endcall %}
                 {% call table_cell(class='tabular-nums', attrs={'data-testid': 'compliance-figure'}) %}{{ item.figure }}{% endcall %}
-                {% call table_cell(class='text-muted-foreground') %}{{ item.next_step or 'Every control is in place' }}{% endcall %}
+                {% call table_cell(class='max-w-52 whitespace-normal text-muted-foreground') %}{{ item.next_step or 'Every control is in place' }}{% endcall %}
                 {% call table_cell(class='text-muted-foreground') %}{{ item.last_review or 'Not reviewed yet' }}{% endcall %}
+                {% call table_cell(class='min-w-64 whitespace-normal') %}{{ result_footer(item.footer) }}{% endcall %}
             {% endcall %}
         {% endcall %}
     {% endcall %}

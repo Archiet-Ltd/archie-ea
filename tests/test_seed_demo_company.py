@@ -108,7 +108,7 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
     assert stats["capabilities_created"] == 24
     assert stats["risks_created"] == 10
     assert stats["programmes_created"] == 5
-    assert stats["work_packages_created"] == 12
+    assert stats["work_packages_created"] == 29
     assert stats["plateaus_created"] == 5
     assert stats["gaps_created"] == 10
     assert stats["demo_user_created"] == 1
@@ -132,7 +132,7 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
     assert counts["capabilities"] == 24
     assert counts["risks"] == 10
     assert counts["programmes"] == 5
-    assert counts["work_packages"] == 12
+    assert counts["work_packages"] == 29
     # Every seeded work package must carry the organisation so it is visible
     # under the tenant filter used by TenantMixin models.
     from app.models import ArchiMateElement
@@ -856,10 +856,10 @@ def test_work_packages_have_owner_initiative_and_connections(app, db_session, ma
     from app.models.unified_work_package import UnifiedWorkPackage
 
     stats = _seed_once()
-    assert stats["work_packages_linked"] == 12
+    assert stats["work_packages_linked"] == 29
     org_id = _get_lantern_org_id()
     wps = UnifiedWorkPackage.query.filter_by(organization_id=org_id).all()
-    assert len(wps) == 12
+    assert len(wps) == 29
     for wp in wps:
         assert wp.owner_id is not None, wp.name
         assert wp.enterprise_initiative_id is not None, wp.name

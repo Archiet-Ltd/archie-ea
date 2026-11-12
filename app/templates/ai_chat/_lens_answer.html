@@ -109,11 +109,9 @@
         {% call card(class='p-4') %}
             <div data-lens-row>
                 <div class="flex flex-wrap items-start justify-between gap-2">
-                    <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ item.ownership_type or 'Ownership' }}</h3>
-                    {% if item.organization_unit and item.organization_unit.name %}{% call badge('neutral') %}{{ item.organization_unit.name }}{% endcall %}{% endif %}
+                    <h3 class="min-w-0 break-words text-sm font-semibold text-foreground" data-owner-name>{{ item.name or 'Owner not named' }}</h3>
+                    {% if item.role %}{% call badge('neutral') %}{{ item.role }}{% endcall %}{% endif %}
                 </div>
-                <p class="mt-1 text-sm text-foreground">{{ item.primary_contact or 'No contact recorded' }}</p>
-                {% if item.start_date %}<p class="mt-1 text-sm text-muted-foreground">Since {{ item.start_date }}</p>{% endif %}
             </div>
         {% endcall %}
         {% else %}

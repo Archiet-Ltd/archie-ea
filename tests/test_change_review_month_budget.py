@@ -234,7 +234,7 @@ def test_a_vendor_from_the_platform_list_is_read_by_the_review_of_every_workspac
                                          website="https://old.example.com", named_by_organization_id=None)
     db.session.add(platform_vendor)
     db.session.flush()
-    reviewer = FakeReviewer([PASS_ALL]).install(monkeypatch)
+    FakeReviewer([PASS_ALL]).install(monkeypatch)
 
     for org in (first, second):
         with tenant_ctx(org.id):

@@ -1300,6 +1300,78 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
+# What the Controls page reads                                                 #
+# --------------------------------------------------------------------------- #
+
+CHECKS_PERIOD_DAYS = 30
+CHECKS_LISTED = 10
+# The kinds of AI operation the loop checks, and the one it does not, in the words the Controls page uses.
+CHECKS_COVER = "Changes the assistant makes are checked, then reviewed by a second model before they are applied."
+CHECKS_DO_NOT_COVER = "Answers in the chat are not checked by a policy yet."
+
+
+def checks_report(organization_id: int, days: int = CHECKS_PERIOD_DAYS) -> Dict[str, Any]:
+    """The changes of this organisation that went through the checks in the last ``days`` days, with each
+    one's outcome. A change counts once, however many times it was checked again. Reads the audit trail the
+    loop writes (the "checked" event) joined to the change's own record, for this organisation only."""
+    since = datetime.utcnow() - timedelta(days=days)
+    first_check = (
+        db.session.query(
+            AIChatApprovalAuditLog.approval_id.label("approval_id"),
+            db.func.min(AIChatApprovalAuditLog.created_at).label("checked_at"),
+        )
+        .filter(AIChatApprovalAuditLog.event == "checked")
+        .group_by(AIChatApprovalAuditLog.approval_id)
+        .subquery()
+    )
+    rows = (
+        db.session.query(AIChatCRUDApproval, first_check.c.checked_at)
+        .join(first_check, first_check.c.approval_id == AIChatCRUDApproval.id)
+        .filter(AIChatCRUDApproval.organization_id == organization_id, first_check.c.checked_at >= since)
+        .order_by(first_check.c.checked_at.desc(), AIChatCRUDApproval.id.desc())
+        .all()
+    )
+    report: Dict[str, Any] = {
+        "period_days": days, "total": len(rows), "checks_passed": 0, "checks_failed": 0,
+        "applied": 0, "declined": 0, "in_review": 0, "recent": [],
+        "writes_paused": _writes_paused(organization_id),
+    }
+    for approval, checked_at in rows:
+        checks = _state(approval)["checks"]
+        failed = next((c for c in checks if not c.get("passed")), None)
+        report["checks_failed" if failed else "checks_passed"] += 1
+        if approval.status == ApprovalStatus.APPROVED:
+            result, key = "Applied", "applied"
+        elif approval.status == ApprovalStatus.REJECTED:
+            result, key = "Declined", "declined"
+        else:
+            result, key = "In review", "in_review"
+        report[key] += 1
+        if len(report["recent"]) < CHECKS_LISTED:
+            report["recent"].append({
+                "subject": _subject_of(approval),
+                "summary": approval.summary,
+                "checked_at": checked_at,
+                "checks": "Failed" if failed else "Passed",
+                "result": result,
+                "reason": (failed or {}).get("reason") or (approval.rejected_reason if key == "declined" else None),
+                "record_url": record_path(approval.id),
+            })
+    return report
+
+
+def _subject_of(approval: AIChatCRUDApproval) -> str:
+    """The name of the thing the change is about, else the change's own summary."""
+    payload = _payload_of(approval)
+    args = payload.get("arguments") if isinstance(payload, dict) and isinstance(payload.get("arguments"), dict) else payload
+    if isinstance(args, dict):
+        for key in ("application_name", "name", "capability_name", "vendor_name", "title"):
+            if isinstance(args.get(key), str) and args[key].strip():
+                return args[key].strip()
+    return approval.summary
+
+
+# --------------------------------------------------------------------------- #
 # The sweep                                                                    #
 # --------------------------------------------------------------------------- #
 

@@ -385,3 +385,10 @@ def test_every_answer_path_renders_the_same_footer():
     assert "actions: data.actions_taken || []" in app_js, (
         "the non-streaming fallback drops receipts"
     )
+
+
+def test_a_url_is_built_on_a_background_thread_with_only_an_application_context(app):
+    """A streamed turn has no request, yet its sources must still link to the record."""
+    with app.app_context():
+        url = AgentRunner._source_url("application", {"id": 7, "name": "Salesforce"})
+    assert url == "/applications/7", url
