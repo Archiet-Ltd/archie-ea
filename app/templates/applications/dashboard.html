@@ -302,12 +302,8 @@
 
     <div class="grid grid-cols-1 gap-6">
 
-      {# Application Identity #}
-      <div data-slot="card" class="rounded-lg border border-border bg-card">
-        <div class="flex flex-col space-y-1.5 p-6 pb-3">
-          <h2 class="text-lg font-semibold">Application Identity</h2>
-        </div>
-        <div class="p-6 pt-0 space-y-3 text-sm">
+      {# Application Identity: drawn only when it has rows to show #}
+      {% set identity_has_rows = edit_mode or app.application_code or app.application_type or app.application_category or app.deployment_model or app.lifecycle_status or app.architecture_domain or app.version %}
           {% macro detail_row(label, value) %}
           {% if value %}
           <div class="flex justify-between gap-4">
@@ -320,11 +316,17 @@
           {% macro edit_row(label, name, value) %}
           {{ form_field(id='edit-' ~ name, name=name, label=label, value=(form_values[name] if name in form_values else (value or '')), error=form_errors.get(name), attrs_dict={'maxlength': field_limits[name]}) }}
           {% endmacro %}
+      {% if identity_has_rows %}
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
+        <div class="flex flex-col space-y-1.5 p-6 pb-3">
+          <h2 class="text-lg font-semibold">Application Identity</h2>
+        </div>
+        <div class="p-6 pt-0 space-y-3 text-sm">
 
           {% if edit_mode %}
           {{ edit_row('Name', 'name', app.name) }}
           {{ detail_row('Application Code', app.application_code) }}
-          {{ detail_row('Type', app.application_type | replace('_',' ') | title if app.application_type else none) }}
+          {{ detail_row('Type', app.application_type | title_keep_caps if app.application_type else none) }}
           {{ edit_row('Category', 'application_category', app.application_category) }}
           {% set status_now = form_values['deployment_status'] if 'deployment_status' in form_values else app.deployment_status %}
           {% call form_group(id='edit-deployment_status', label='Deployment Status', error=form_errors.get('deployment_status')) %}
@@ -335,8 +337,8 @@
           {{ edit_row('Version', 'version', app.version) }}
           {% else %}
           {{ detail_row('Application Code', app.application_code) }}
-          {{ detail_row('Type', app.application_type | replace('_',' ') | title if app.application_type else none) }}
-          {{ detail_row('Category', app.application_category | replace('_',' ') | title if app.application_category else none) }}
+          {{ detail_row('Type', app.application_type | title_keep_caps if app.application_type else none) }}
+          {{ detail_row('Category', app.application_category | title_keep_caps if app.application_category else none) }}
           {{ detail_row('Deployment Model', app.deployment_model | replace('_',' ') | title if app.deployment_model else none) }}
           {{ detail_row('Lifecycle Status', app.lifecycle_status | replace('_',' ') | title if app.lifecycle_status else none) }}
           {{ detail_row('Architecture Domain', app.architecture_domain) }}
@@ -344,6 +346,7 @@
           {% endif %}
         </div>
       </div>
+      {% endif %}
 
       {# ArchiMate Element — connects portfolio to architecture #}
       {% if archimate_info is defined and archimate_info %}
@@ -405,7 +408,7 @@
           {{ edit_row('Business Domain', 'businessDomain', app.business_domain) }}
           {{ detail_row('Strategic Importance', app.strategic_importance | replace('_',' ') | title if app.strategic_importance else none) }}
           {{ detail_row('Business Value', app.business_value | replace('_',' ') | title if app.business_value else none) }}
-          {{ detail_row('Competitive Advantage', 'Yes' if app.competitive_advantage else 'No' if app.competitive_advantage is not none else none) }}
+          {{ detail_row('Competitive Advantage', 'Yes' if app.competitive_advantage else 'Not recorded') }}
           {{ detail_row('Differentiation Level', app.differentiation_level | replace('_',' ') | title if app.differentiation_level else none) }}
           {{ detail_row('User Base Size', app.user_base_size | string if app.user_base_size else none) }}
           {{ form_field(id='edit-userCount', name='userCount', label='User Count', type='number', value=(form_values['userCount'] if 'userCount' in form_values else (app.user_count | string if app.user_count is not none else '')), error=form_errors.get('userCount'), attrs_dict={'min': '0', 'max': '10000000'}) }}
@@ -415,7 +418,7 @@
           {{ detail_row('Business Domain', app.business_domain) }}
           {{ detail_row('Strategic Importance', app.strategic_importance | replace('_',' ') | title if app.strategic_importance else none) }}
           {{ detail_row('Business Value', app.business_value | replace('_',' ') | title if app.business_value else none) }}
-          {{ detail_row('Competitive Advantage', 'Yes' if app.competitive_advantage else 'No' if app.competitive_advantage is not none else none) }}
+          {{ detail_row('Competitive Advantage', 'Yes' if app.competitive_advantage else 'Not recorded') }}
           {{ detail_row('Differentiation Level', app.differentiation_level | replace('_',' ') | title if app.differentiation_level else none) }}
           {{ detail_row('User Base Size', app.user_base_size | string if app.user_base_size else none) }}
           {{ detail_row('User Count', app.user_count | string if app.user_count else none) }}
@@ -1172,6 +1175,7 @@
           {% endif %}
           {% endmacro %}
           {{ tech_row('Technology Stack', app.technology_stack) }}
+          {% if app.authentication_method %}<div class="flex justify-between"><span class="text-muted-foreground">Authentication Method</span><span>{{ app.authentication_method }}</span></div>{% endif %}
           {{ tech_row('Programming Languages', app.programming_languages) }}
           {{ tech_row('Frameworks', app.frameworks) }}
           {{ tech_row('Database Platforms', app.database_platforms) }}
