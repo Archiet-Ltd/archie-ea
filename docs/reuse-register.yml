@@ -1159,3 +1159,39 @@ entries:
     note: >
       Searched before writing: joint, d3, mermaid, plantuml, cytoscape, dagre, bpmn, UMLModel, SavedDiagram across
       app/. dagre is a layout helper that composer.js and erd.js already use and is not a drawing library.
+
+  - id: graph-client
+    concept: Reading Microsoft Graph (SharePoint lists and columns) with the customer's own token
+    status: active
+    canonical:
+      path: app/services/api_clients/graph_client.py
+      symbols: [GraphClient]
+    reuse: >
+      Read Graph data through GraphClient (bearer header, refused redirects, token scrubbing, ids checked before
+      they reach a path). The token comes from M365Service.graph_token. Do not write a second class whose name
+      ends GraphClient, and do not call graph.microsoft.com from a new module.
+    must_not_create:
+      - id: second-graph-client
+        regex: '^\s*class\s+\w*GraphClient\b'
+        scope: [app]
+      - id: new-graph-host-call
+        regex: 'graph\.microsoft\.com'
+        scope: [app]
+    known_exceptions:
+      - path: app/services/m365_service.py
+        reason: the Microsoft 365 export predates the client; it writes a file and sends a Teams card, and holds the one token routine
+
+  - id: sharepoint-connector
+    concept: Reading a customer's SharePoint list into the model
+    status: active
+    canonical:
+      path: app/connectors/sharepoint.py
+      symbols: [SharePointConnector]
+    reuse: >
+      Everything about the SharePoint list connection (the lists on the saved site, the column mapping, the
+      selection a request may name) is in SharePointConnector. Do not write a second connector class for
+      SharePoint or build a Graph list address anywhere else; selection_path is the one place.
+    must_not_create:
+      - id: second-sharepoint-connector
+        regex: '^\s*class\s+\w*SharePoint\w*Connector\b'
+        scope: [app]
