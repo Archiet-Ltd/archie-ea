@@ -23,6 +23,31 @@
         ) }}
     </div>
 
+    {% if load_error %}
+    <p class="text-sm text-muted-foreground" role="status">{{ load_error }}</p>
+    {% endif %}
+
+    <!-- YOUR SOLUTIONS, PATTERNS AND CONTRACTS -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" data-testid="solutions-counts">
+        <div class="rounded-xl border border-input bg-background p-5" data-testid="count-solutions">
+            <p class="text-sm font-medium text-muted-foreground">Solutions</p>
+            <p class="text-2xl font-bold tracking-tight mt-1" data-testid="count-solutions-value">{{ solution_count|dash }}</p>
+        </div>
+        <div class="rounded-xl border border-input bg-background p-5" data-testid="count-patterns">
+            <p class="text-sm font-medium text-muted-foreground">Solution patterns</p>
+            <p class="text-2xl font-bold tracking-tight mt-1" data-testid="count-patterns-value">{{ pattern_count|dash }}</p>
+        </div>
+        {% if contract_count is not none or load_error %}
+        <div class="rounded-xl border border-input bg-background p-5" data-testid="count-contracts">
+            <p class="text-sm font-medium text-muted-foreground">Contracts</p>
+            <p class="text-2xl font-bold tracking-tight mt-1" data-testid="count-contracts-value">{{ contract_count|dash }}</p>
+            {% if contract_count is not none %}
+            <a href="{{ url_for('procurement.contracts_list') }}" class="text-sm font-medium text-primary hover:underline">View the contracts register</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
     <!-- ANALYSIS FORM -->
     <div class="rounded-xl border-2 border-input bg-background p-6 space-y-5">
         <div class="flex items-center gap-3">
