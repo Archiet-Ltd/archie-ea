@@ -65,8 +65,12 @@ class InvestmentPrioritizationService:
         Returns:
             Dict with prioritized investment recommendations
         """
-        # Get all unified capabilities
-        capabilities = UnifiedCapability.query.all()
+        from app.middleware.tenant_context import current_org_id
+        from app.modules.capabilities.services.capability_count_service import capability_totals
+
+        # The organisation's own capabilities and the shared catalogue's, by the one visibility rule
+        org_id = current_org_id()
+        capabilities = UnifiedCapability.query.filter(UnifiedCapability.visibility_predicate(org_id)).all()
 
         capability_ids = [c.id for c in capabilities]
 
@@ -120,14 +124,20 @@ class InvestmentPrioritizationService:
         medium_investments = [c for c in capability_scores if c["priority_level"] == "MEDIUM"]
         low_investments = [c for c in capability_scores if c["priority_level"] == "LOW"]
 
-        # Calculate portfolio metrics
+        # Calculate portfolio metrics; the total is a count query, never the length of a list
         portfolio_metrics = self._calculate_portfolio_metrics(capability_scores)
+        totals = capability_totals(org_id)
+        portfolio_metrics.update({
+            "total_capabilities": totals["total"],
+            "own_capabilities": totals["own"],
+            "shared_capabilities": totals["shared"],
+        })
 
         # Generate investment recommendations
         recommendations = self._generate_investment_recommendations(capability_scores)
 
         return {
-            "total_capabilities": len(capabilities),
+            "total_capabilities": totals["total"],
             "capability_scores": capability_scores,
             "critical_investments": critical_investments,
             "high_investments": high_investments,
