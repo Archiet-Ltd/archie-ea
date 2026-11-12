@@ -11,7 +11,8 @@
 
 {% macro _new_gap() %}
 {% if can_change_model() %}
-{% call ui.button(href=url_for('archimate_crud.create_element', layer='implementation', element_type='Gap'), attrs={'data-testid': 'btn-new-gap'}) %}{{ lucide('plus') }}New gap{% endcall %}
+{#- The link still works without a script; with one, the dialog opens here and the gap is made on this page. -#}
+{% call ui.button(href=url_for('archimate_crud.create_element', layer='implementation', element_type='Gap'), attrs={'data-testid': 'btn-new-gap', '@click.prevent': 'openCreateForType()'}) %}{{ lucide('plus') }}New gap{% endcall %}
 {% endif %}
 {% endmacro %}
 
@@ -98,14 +99,24 @@
 {%- set show = {'type': types|length > 1, 'severity': sevs|length > 1 or (sevs[0]|lower) in ['critical', 'high'], 'status': statuses|length > 1, 'impact': impacts|length > 1, 'work': (gaps|length - unaddressed|length) * 2 > gaps|length} -%}
 {%- set facts = [] -%}
 {%- if gaps and not show.status %}{% set _ = facts.append('every gap is ' ~ statuses[0]|replace('_', ' ')|lower) %}{% endif -%}
-{%- if gaps and not show.severity %}{% set _ = facts.append(('every gap is rated ' ~ sevs[0]|lower) if sevs[0] else 'no gap has a severity yet') %}{% endif -%}
-{%- if gaps and not show.impact %}{% set _ = facts.append(('every gap has ' ~ impacts[0]|replace('_', ' ')|lower ~ ' impact') if impacts[0] else 'no gap has its impact recorded') %}{% endif -%}
+{#- The rating is said from the same rows the list shows: one level for every gap, or how many sit at each. -#}
+{%- if gaps and not show.severity %}{% set _ = facts.append(('every gap is rated ' ~ sevs[0]|lower) if sevs[0] else 'no gap has a severity yet') %}
+{%- elif gaps %}
+{%- set parts = [] -%}
+{%- for level in ['critical', 'high', 'medium', 'low'] %}{% set n = gaps|selectattr('rated_severity', 'equalto', level)|list|length %}{% if n %}{% set _ = parts.append(n ~ ' rated ' ~ level) %}{% endif %}{% endfor -%}
+{%- set unrated = gaps|rejectattr('rated_severity')|list|length -%}
+{%- if unrated %}{% set _ = parts.append(unrated ~ ' not rated yet') %}{% endif -%}
+{%- set _ = facts.append(parts|join(', ')) -%}
+{%- endif -%}
+{#- Impact is its own field: a rating does not change it, so only a recorded difference or an empty field is said. -#}
+{%- if gaps and not show.impact and not impacts[0] %}{% set _ = facts.append('no gap has its impact recorded') %}{% endif -%}
 {%- if gaps and not show.type %}{% set _ = facts.append(('every gap is a ' ~ types[0]|replace('_', ' ')|lower ~ ' gap') if types[0] else 'no gap is classified yet') %}{% endif -%}
 {%- if gaps and not show.work %}{% set _ = facts.append(('no gap has a work package yet') if unaddressed|length == gaps|length else ((gaps|length - unaddressed|length) ~ ' of ' ~ gaps|length ~ ' gaps have a work package, named under the gap')) %}{% endif -%}
 {#- Titles shared by more than one gap get a reference line so the rows can be told apart. -#}
 {%- set _seen = [] -%}{%- set dupes = [] -%}
 {%- for g in gaps %}{% set t = _unprefixed(g.name) %}{% if t in _seen and t not in dupes %}{% set _ = dupes.append(t) %}{% endif %}{% set _ = _seen.append(t) %}{% endfor -%}
 <div class="p-6 space-y-6">
+<div x-data="archDashboard()">
 {{ page_shell(title='Gap analysis', subtitle='What separates today\'s architecture from the target, and the work that closes each gap',
               breadcrumb=[('Home', url_for('main.index')), ('Enterprise architecture', url_for('enterprise.enterprise_dashboard')), ('Gap analysis', none)],
               actions_caller=_new_gap) }}
@@ -124,7 +135,7 @@
     {'label': 'Resolved', 'value': resolved, 'icon': 'circle-check', 'sentence': ('Closed by delivered work' if resolved else 'No gap has been closed yet'), 'testid': 'gap-stat-resolved'},
 ]) }}
 {%- if not severity_filter %}
-<p class="text-sm text-muted-foreground" data-testid="gap-unclosed-count-line"><span class="font-semibold tabular-nums text-foreground" data-testid="gap-unclosed-count">{{ unaddressed|length }}</span> unclosed: {% if unaddressed %}{{ 'this gap has' if unaddressed|length == 1 else 'these gaps have' }} no work package yet{% else %}every gap has a work package{% endif %}. The change board counts the same gaps.</p>
+<p class="text-sm text-muted-foreground" data-testid="gap-unclosed-count-line"><span class="font-semibold tabular-nums text-foreground" data-testid="gap-unclosed-count">{{ unclosed_gap_count }}</span> unclosed: {% if unclosed_gap_count %}{{ 'this gap has' if unclosed_gap_count == 1 else 'these gaps have' }} no work package yet{% else %}every gap has a work package{% endif %}. The change board counts the same gaps.</p>
 {%- endif %}
 
 {%- set columns = [{'label': 'Gap', 'sortable': true}] -%}
@@ -164,11 +175,28 @@
     {{ empty_state(icon='target', title='No gaps recorded yet',
                    description='A gap is something the target architecture needs that today\'s does not have. Each one you record shows here with its severity and the work that closes it.',
                    cta_text=('New gap' if can_change_model() else none), cta_icon='plus',
-                   cta_href=(url_for('archimate_crud.create_element', layer='implementation', element_type='Gap') if can_change_model() else none)) }}
+                   cta_onclick=('openCreateForType()' if can_change_model() else none)) }}
   {% endcall %}
 {% endcall %}
 {% endif %}
+{% if can_change_model() %}{% include 'archimate_crud/partials/_element_form_modal.html' %}{% endif %}
 </div>
+</div>
+{% endblock %}
+
+{% block extra_head_js %}
+{% if can_change_model() %}
+<script nonce="{{ csp_nonce }}">
+  window.__APP_CONFIG__ = window.__APP_CONFIG__ || {};
+  window.__APP_CONFIG__.layerConfig = {'implementation': {'name': 'Implementation and migration', 'elements': ['Gap']}};
+  window.__APP_CONFIG__.initialLayer = 'implementation';
+  window.__APP_CONFIG__.createElementType = 'Gap';
+  window.__APP_CONFIG__.createNoun = 'gap';
+  window.__APP_CONFIG__.embeddedForm = true;
+  window.__APP_CONFIG__.fieldConfigsUrl = {{ url_for('archimate_crud.api_field_configs') | tojson | safe }};
+</script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/archimate_crud/dashboard.js') }}"></script>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
