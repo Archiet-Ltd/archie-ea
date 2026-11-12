@@ -106,7 +106,7 @@ def test_every_demonstration_card_shows_a_score_worked_out_from_its_inputs_and_i
         assert SCORE.match(card["score"]), "card %r reads %r instead of a worked-out score" % (card["name"], card["score"])
         for part in ("Evidence", "Source", "Confidence", "Date"):
             assert part in card["footer"], "card %r footer has no %s: %r" % (card["name"], part, card["footer"])
-        assert "business value" in card["footer"] and "job size" in card["footer"], card["footer"]
+        assert "Business value" in card["footer"] and "Job size" in card["footer"], card["footer"]
         assert card["confidence"] in ("high", "medium", "low"), card
     _shot(page, "cards-scored", scheme, width)
 
