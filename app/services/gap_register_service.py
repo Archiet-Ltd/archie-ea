@@ -16,7 +16,7 @@ Contract (docs/adm_phases_d_a_g_e_f_h_tasks.json OA-001):
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import case, func
+from sqlalchemy import case, func, null
 
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
@@ -464,6 +464,26 @@ def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
     return [(gap, gap.id in covered) for gap in gaps]
 
 
+def gap_record_for_element(element) -> Gap:
+    """The unsaved gap record for a new Gap element of an organisation.
+
+    A Gap made in the Composer, on the model map or by an import is an ArchiMate element; the register lists
+    gap records. The element's writer (the flush listener in archimate_backbone) adds this record in the
+    same flush, unrated (nothing says how serious it is) and open, so reading the register never writes.
+    """
+    return Gap(
+        organization_id=element.organization_id,
+        name=(element.name or "Untitled gap")[:255],
+        description=element.description or "",
+        archimate_element=element,
+        resolution_status="identified",
+        # the columns default to "medium" on insert; nobody rated this gap, so it is stored unrated
+        priority=null(),
+        severity=null(),
+        impact=null(),
+    )
+
+
 def gap_register_query(
     organization_id: int,
     severity: Optional[str] = None,
@@ -474,7 +494,7 @@ def gap_register_query(
     """The one query behind every count and list of the gap register: the organisation's gaps, plateau
     transitions left out, optionally only those of one severity ("critical" is the critical-gap rule),
     only the closed (True) or unclosed (False) ones, only those in progress, and only those with (True)
-    or without (False) a work package."""
+    or without (False) a work package. It only reads: Gap elements get their record when the element is written."""
     query = Gap.query.filter(
         Gap.organization_id == organization_id,
         Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,

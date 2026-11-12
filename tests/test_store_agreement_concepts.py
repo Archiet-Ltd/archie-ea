@@ -672,3 +672,50 @@ def test_work_packages_concept_reports_one_unmerged_retired_row(
     assert "[retired-store-unmerged]" in findings[0]
     assert "orm:RoadmapWorkPackage(unmerged)" in findings[0]
     assert "1 row(s)" in findings[0]
+
+
+def test_contract_missing_from_the_architecture_model_is_red_in_its_own_organisation_only(
+        app, db_session, make_org, tenant_ctx):
+    from sqlalchemy import text
+
+    from app.models.application_portfolio import VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    vendor = VendorOrganization(name="Contract vendor %s" % uuid.uuid4().hex[:6])
+    db_session.add(vendor)
+    db_session.flush()
+    orgs = {}
+    for label in ("contracts-a", "contracts-b"):
+        org = make_org(label)
+        user = _admin_user(db_session, org)
+        for number in (1, 2):
+            db_session.add(VendorContract(
+                organization_id=org.id, vendor_id=vendor.id,
+                contract_name="%s agreement %d" % (label, number),
+                contract_number="%s-%d" % (label, number),
+                contract_type="subscription", contract_category="software",
+                start_date=datetime(2026, 1, 1).date(), status="active"))
+        db_session.flush()
+        orgs[label] = (org, user)
+
+    for org, user in orgs.values():
+        findings, notes, _obs = _live_findings(
+            app, tenant_ctx, org.id, user, ["contracts"], http=False)
+        assert findings == [], (findings, notes)
+
+    # One contract of organisation B loses its element node: B is red, A stays clean.
+    org_b, user_b = orgs["contracts-b"]
+    db_session.execute(text(
+        "UPDATE vendor_contracts SET archimate_element_id = NULL "
+        "WHERE id = (SELECT min(id) FROM vendor_contracts WHERE organization_id = :o)"),
+        {"o": org_b.id})
+    findings, notes, _obs = _live_findings(
+        app, tenant_ctx, org_b.id, user_b, ["contracts"], http=False)
+    assert len(findings) == 1, (findings, notes)
+    assert "[store-disagreement]" in findings[0]
+    assert "orm:VendorContract=2" in findings[0]
+    assert "orm:VendorContract(on the architecture model)=1" in findings[0]
+    org_a, user_a = orgs["contracts-a"]
+    findings, notes, _obs = _live_findings(
+        app, tenant_ctx, org_a.id, user_a, ["contracts"], http=False)
+    assert findings == [], (findings, notes)

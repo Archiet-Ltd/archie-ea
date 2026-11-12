@@ -703,7 +703,17 @@ class Gap(TenantMixin, db.Model):
     """
 
     __tablename__ = "gaps"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        # One gap record per Gap element of an organisation, even when two requests arrive together.
+        db.Index(
+            "uq_gaps_org_element",
+            "organization_id",
+            "archimate_element_id",
+            unique=True,
+            postgresql_where=db.text("archimate_element_id IS NOT NULL"),
+        ),
+        {"extend_existing": True},
+    )
 
     organization_id = db.Column(
         db.Integer,
