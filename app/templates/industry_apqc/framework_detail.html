@@ -50,7 +50,7 @@
     <dl class="flex flex-wrap gap-x-8 gap-y-2 text-sm">
         <div><dt class="text-muted-foreground">Categories</dt><dd class="text-lg font-semibold tabular-nums">{{ summary.categories }}</dd></div>
         <div><dt class="text-muted-foreground">Processes</dt><dd class="text-lg font-semibold tabular-nums">{{ summary.total }}</dd></div>
-        <div><dt class="text-muted-foreground">Industry specific</dt><dd class="text-lg font-semibold tabular-nums">{{ summary.specific if summary.specific else "None, baseline" }}</dd></div>
+        <div><dt class="text-muted-foreground">Industry specific</dt><dd class="text-lg font-semibold tabular-nums">{{ summary.specific if summary.specific else "Baseline only" }}</dd></div>
         {% if framework.pcf_version %}<div><dt class="text-muted-foreground">PCF version</dt><dd class="text-lg font-semibold">{{ framework.pcf_version }}</dd></div>{% endif %}
     </dl>
 

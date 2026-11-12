@@ -44,6 +44,12 @@ def get_disposition_matrix():
 # ---------------------------------------------------------------------------
 
 
+# One budget for the whole request: a person waiting on this address gets an answer or a
+# plain error within about this many seconds, however many batches the portfolio needs.
+# Each model call is given only what is left of it (LLMService's time_limit argument).
+PATTERNS_REQUEST_BUDGET_SECONDS = 20
+
+
 @sa_phase_c_bp.route("/application-patterns", methods=["GET"])
 @login_required
 def get_application_patterns():
@@ -56,20 +62,21 @@ def get_application_patterns():
 
         svc = ApplicationPatternClassifierService()
         # A large portfolio is ~19 sequential LLM calls at batch_size=50, which
-        # stalled this request for 10+ minutes. Bound the wall clock; apps not
-        # reached in time get the deterministic rule engine, and the response
-        # reports the split (patterns.by_source / patterns.llm_truncated).
-        patterns = svc.classify_portfolio(time_budget_seconds=60)
+        # stalled this request for 10+ minutes. The whole request shares one
+        # budget: batches that finished are kept, apps not reached in time get the
+        # deterministic rule engine, and the response says so in patterns.note
+        # (with the split in patterns.by_source / patterns.llm_truncated). If no
+        # batch finished at all, the answer is the plain 504 below.
+        patterns = svc.classify_portfolio(time_budget_seconds=PATTERNS_REQUEST_BUDGET_SECONDS)
         return jsonify({"patterns": patterns}), 200
     except LLMClassificationTimeoutError as exc:
         logger.error("application-patterns timed out: %s", exc)
         return jsonify({
-            "error": "Application pattern classification timed out",
-            "detail": str(exc),
+            "error": "The AI provider did not answer in time. Try again in a moment.",
         }), 504
     except Exception as exc:
         logger.error("application-patterns error: %s", exc, exc_info=True)
-        return jsonify({"error": "Failed to classify portfolio", "detail": str(exc)}), 500
+        return jsonify({"error": "Could not classify the portfolio. Try again in a moment."}), 500
 
 
 # ---------------------------------------------------------------------------

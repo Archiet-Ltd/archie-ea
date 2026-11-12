@@ -96,9 +96,17 @@
       <p class="text-sm font-medium text-foreground">Missing to reach a complete record</p>
       <div class="flex flex-wrap gap-2 mt-2">
         {% for m in completeness.missing %}
+        {% set note = (completeness.notes or {}).get(m) %}
+        {% if note %}
+        <span class="text-xs text-warning-emphasis bg-warning/10 border border-warning/20 rounded px-2 py-0.5" data-testid="missing-record-linked">{{ m }}: {{ note.text }}. <a class="underline hover:no-underline" href="{{ (url_for('unified_applications.application_edit', id=app.id) ~ '#' ~ note.field) if note.page == 'edit' else url_for('unified_applications.application_detail', id=app.id, tab=note.tab) }}">{{ (note.action or 'record it')|capitalize }}</a></span>
+        {% else %}
         <span class="text-xs text-warning-emphasis bg-warning/10 border border-warning/20 rounded px-2 py-0.5">{{ m }}</span>
+        {% endif %}
         {% endfor %}
       </div>
+      {% if completeness.notes %}
+      <p class="text-xs text-muted-foreground mt-2">The score counts only facts recorded on the application. Links in the model are not counted until you record them.</p>
+      {% endif %}
     </div>
   </div>
   {% endif %}

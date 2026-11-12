@@ -30,6 +30,54 @@ def currency_symbol() -> str:
     except Exception:
         return "£"
 
+COST_HIDDEN_NOTE = "Restricted to roles with budget authority"
+
+_PORTFOLIO_MONEY = (
+    "total_estimated_investment",
+    "critical_investment",
+    "high_investment",
+    "medium_investment",
+    "low_investment",
+)
+
+
+def hide_costs(analysis: Dict) -> Dict:
+    """Take every money figure out of an analysis, in place, and say that it was taken out.
+
+    A figure is replaced by ``None`` with a ``costs_hidden`` flag beside it, so a page can say the
+    figure is restricted rather than show a zero or "Not estimated". Priority, score and coverage
+    stay: only money is removed.
+    """
+    for cap in analysis.get("capability_scores") or []:
+        need = cap.get("investment_need") or {}
+        for key in ("estimated_cost", "budget_allocated", "budget_spent", "source"):
+            need[key] = None
+        need["cost_hidden"] = True
+        cap["investment_need"] = need
+        cap["estimated_cost"] = None
+        cap["linked_initiative_budget"] = None
+        cap["costs_hidden"] = True
+    metrics = analysis.get("portfolio_metrics") or {}
+    for key in _PORTFOLIO_MONEY:
+        metrics[key] = None
+    metrics["costs_hidden"] = True
+    for rec in analysis.get("recommendations") or []:
+        rec["estimated_cost"] = COST_HIDDEN_NOTE
+    analysis["costs_hidden"] = True
+    return analysis
+
+
+def limit_costs_to_viewer(analysis: Dict) -> Dict:
+    """Hide the money in an analysis unless the signed-in person may see cost (the one cost rule)."""
+    from flask_login import current_user
+
+    from app.utils.role_access import can_see_costs
+
+    if can_see_costs(current_user):
+        return analysis
+    return hide_costs(analysis)
+
+
 # Timeframe string → integer months for ROI calculator
 _TIMEFRAME_MONTHS: Dict[str, int] = {
     "12 - 18 months": 15,
@@ -65,8 +113,12 @@ class InvestmentPrioritizationService:
         Returns:
             Dict with prioritized investment recommendations
         """
-        # Get all unified capabilities
-        capabilities = UnifiedCapability.query.all()
+        from app.middleware.tenant_context import current_org_id
+        from app.modules.capabilities.services.capability_count_service import capability_totals
+
+        # The organisation's own capabilities and the shared catalogue's, by the one visibility rule
+        org_id = current_org_id()
+        capabilities = UnifiedCapability.query.filter(UnifiedCapability.visibility_predicate(org_id)).all()
 
         capability_ids = [c.id for c in capabilities]
 
@@ -120,14 +172,20 @@ class InvestmentPrioritizationService:
         medium_investments = [c for c in capability_scores if c["priority_level"] == "MEDIUM"]
         low_investments = [c for c in capability_scores if c["priority_level"] == "LOW"]
 
-        # Calculate portfolio metrics
+        # Calculate portfolio metrics; the total is a count query, never the length of a list
         portfolio_metrics = self._calculate_portfolio_metrics(capability_scores)
+        totals = capability_totals(org_id)
+        portfolio_metrics.update({
+            "total_capabilities": totals["total"],
+            "own_capabilities": totals["own"],
+            "shared_capabilities": totals["shared"],
+        })
 
         # Generate investment recommendations
         recommendations = self._generate_investment_recommendations(capability_scores)
 
         return {
-            "total_capabilities": len(capabilities),
+            "total_capabilities": totals["total"],
             "capability_scores": capability_scores,
             "critical_investments": critical_investments,
             "high_investments": high_investments,
@@ -400,20 +458,28 @@ class InvestmentPrioritizationService:
     def _work_cost_by_capability(self, capability_ids: List[int]) -> Dict[int, Dict]:
         """Estimated cost of the work packages linked to each capability.
 
-        A package with no estimate (0 is the column default) adds no figure.
+        A package is linked to its primary capability and to every capability
+        in its list of capabilities. A package that changes several shares its
+        estimate equally between them, so the total over all capabilities is
+        never more than the estimates recorded. A package with no estimate
+        (0 is the column default) adds no figure.
         """
         from app.models.unified_work_package import UnifiedWorkPackage
+        from app.services.work_package_service import _capability_ids_of
 
         if not capability_ids:
             return {}
+        wanted = set(capability_ids)
         result = {}
-        for wp in UnifiedWorkPackage.query.filter(
-            UnifiedWorkPackage.capability_id.in_(capability_ids),
-            UnifiedWorkPackage.estimated_cost > 0,
-        ).all():
-            entry = result.setdefault(wp.capability_id, {"cost": 0.0, "count": 0})
-            entry["cost"] += float(wp.estimated_cost)
-            entry["count"] += 1
+        for wp in UnifiedWorkPackage.query.filter(UnifiedWorkPackage.estimated_cost > 0).all():
+            linked = [i for i in _capability_ids_of(wp) if i in wanted]
+            if not linked:
+                continue
+            share = float(wp.estimated_cost) / len(linked)
+            for cap_id in linked:
+                entry = result.setdefault(cap_id, {"cost": 0.0, "count": 0})
+                entry["cost"] += share
+                entry["count"] += 1
         return result
 
     def _calculate_strategic_score(self, capability) -> int:

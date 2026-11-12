@@ -55,22 +55,24 @@ def test_the_empty_tenant_gets_an_onboarding_path_not_a_blank_panel():
     assert "/import" in js, "the empty state must offer to import a portfolio"
 
 
-def test_the_denominator_is_shown():
-    """Three items out of an unstated total is an editorial claim.
+def test_a_card_shows_its_own_figure_and_the_line_under_the_cards_says_how_they_were_chosen():
+    """A card says what it is a question about and the figure behind it.
 
-    The user cannot see what was ranked above what, or how much was left out.
+    The cards now come from the organisation's recorded relationships (the old list of open findings is gone),
+    so the figure is each card's own count read from the payload, and the line under the cards says how the
+    list was chosen. Three cards out of an unstated total would be an editorial claim.
     """
     js = _panels()
-    assert "open finding" in js and "ranked by impact" in js
-    assert "summary.total" in js, "the total is not read from the payload"
+    assert "it.detail" in js, "the card's figure is not read from the payload"
+    assert "Questions about your most connected applications" in js, "the line under the cards must say how they were chosen"
+    assert "Linked applications first, then general questions" in js, "fewer than four linked applications must say so"
 
 
 def test_the_briefing_does_not_invent_a_total():
-    """When the payload carries no total, say how many are shown — not a made-up N."""
+    """When the payload carries no figure for a card, the card shows none, not a made-up N."""
     js = _panels()
-    assert "total === null" in js, (
-        "a missing total must fall back to the shown count, never to a fabricated one"
-    )
+    assert "(it.detail || '')" in js, "a missing figure must fall back to nothing, never to a fabricated one"
+    assert "(detail ? " in js, "a card without a figure must not draw an empty figure line"
 
 
 def test_briefing_items_are_escaped():
