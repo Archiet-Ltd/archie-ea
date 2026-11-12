@@ -19,6 +19,7 @@
         var base = '/architecture/api/applications/' + applicationId + '/technology-links';
         return Object.assign(global.Intelligence.picker('techstack'), {
             links: [],
+            linked: [],
             loading: true,
             loadError: null,
             saving: false,
@@ -33,8 +34,10 @@
                 try {
                     var data = await Platform.fetch.get(base, null, { silent: true });
                     this.links = (data && data.links) || [];
+                    this.linked = (data && data.linked) || [];
                 } catch (err) {
                     this.links = [];
+                    this.linked = [];
                     this.loadError = (err && err.message) || 'The technology links could not be loaded.';
                 } finally {
                     this.loading = false;
@@ -63,6 +66,7 @@
                     this.statusText = '';
                     Platform.toast.success('Technology mapped.');
                     await this.load();
+                    await this.refreshCostShares();
                 } catch (err) {
                     Platform.toast.error((err && err.message) || 'The technology link could not be saved.');
                 } finally {
@@ -70,11 +74,39 @@
                 }
             },
 
+            /* Record a technology element the model already links as something this
+               application runs on: the same write the picker makes. */
+            async record(item) {
+                this.saving = true;
+                try {
+                    await Platform.fetch.post(base, { element_id: item.element_id }, { silent: true });
+                    Platform.toast.success(item.name + ' recorded as runs on.');
+                    await this.load();
+                    await this.refreshCostShares();
+                } catch (err) {
+                    Platform.toast.error((err && err.message) || 'The technology link could not be saved.');
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            /* The cost share section is drawn by the server from the same links:
+               swap in its current version so it never disagrees with the list above. */
+            async refreshCostShares() {
+                var section = document.getElementById('technology-cost-shares');
+                if (!section) { return; }
+                var resp = await fetch(window.location.pathname + '?tab=technology', { credentials: 'same-origin' });
+                var doc = new DOMParser().parseFromString(await resp.text(), 'text/html');
+                var fresh = doc.getElementById('technology-cost-shares');
+                if (fresh) { section.innerHTML = fresh.innerHTML; }
+            },
+
             async remove(link) {
                 try {
                     await Platform.fetch.delete(base + '/' + link.relationship_id, { silent: true });
                     Platform.toast.success('Technology link removed.');
                     await this.load();
+                    await this.refreshCostShares();
                 } catch (err) {
                     Platform.toast.error((err && err.message) || 'The technology link could not be removed.');
                 }

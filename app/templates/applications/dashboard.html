@@ -42,6 +42,7 @@
 <script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
 <script src="{{ url_for('static', filename='js/applications/technology_links.js') }}"></script>
 {% endif %}
+<script src="{{ url_for('static', filename='js/applications/vendor_links.js') }}"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     if (typeof mermaid !== 'undefined') {
@@ -174,8 +175,11 @@
           Data completeness: {{ app.completeness_score }}% — AI analysis quality is low
         </p>
         <p class="text-xs text-warning-emphasis/80 mt-0.5">
-          Missing: {{ app.completeness_gaps | join(', ') }}. Fill these in to improve AI architect responses.
+          Missing: {% for gap in app.completeness_gaps %}{% set note = (completeness_notes or {}).get(gap) %}{{ gap }}{% if note %} ({{ note.text }}; <a class="underline hover:no-underline" href="{{ url_for('unified_applications.application_detail', id=app.id, tab=note.tab) }}">record it</a>){% endif %}{{ ', ' if not loop.last else '' }}{% endfor %}. Fill these in to improve AI architect responses.
         </p>
+        {% if completeness_notes %}
+        <p class="text-xs text-warning-emphasis/80 mt-0.5">The score counts only facts recorded on the application. Links in the model are not counted until you record them.</p>
+        {% endif %}
       </div>
     </div>
     <div class="flex items-center gap-2 flex-shrink-0">
@@ -246,7 +250,7 @@
   {'id': 'architecture',    'label': 'Architecture',     'count': (archimate_relationships.incoming | length + archimate_relationships.outgoing | length) if archimate_relationships else 0},
   {'id': 'capabilities',    'label': 'Capabilities',     'count': (capabilities | default([], true)) | length},
   {'id': 'processes',       'label': 'Processes',        'count': (business_processes | default([], true)) | length},
-  {'id': 'vendors',         'label': 'Vendors',          'count': (vendor_products | default([], true)) | length},
+  {'id': 'vendors',         'label': 'Vendors',          'count': ((vendors_tab_count | default(0)) or none)},
   {'id': 'motivation',      'label': 'Motivation',       'count': (archimate_relationships.incoming + archimate_relationships.outgoing) | selectattr('layer', 'equalto', 'Motivation') | list | length if archimate_relationships else 0},
   {'id': 'dependencies',    'label': 'Dependencies',     'count': (archimate_relationships.incoming | length + archimate_relationships.outgoing | length) if archimate_relationships else 0},
   {'id': 'ea-workflows',    'label': 'EA Workflows',     'count': none},
@@ -995,7 +999,7 @@
      TAB: VENDORS
   ═══════════════════════════════════════════════════════════════════════════ #}
   {% call tab_panel('vendors', active=(resolved_tab == 'vendors')) %}
-  <div class="space-y-6">
+  <div class="space-y-6" data-vendor-links x-data="vendorLinks({{ url_for('application_mgmt.application_vendor_link', id=app.id) | tojson | forceescape }})">
 
     {# Vendor summary #}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1012,6 +1016,58 @@
         <p class="mt-1 text-sm font-medium text-foreground truncate" title="{{ primary_vendor_label }}">{{ primary_vendor_label }}</p>
       </div>
     </div>
+
+    {# The vendor the register holds for this application #}
+    <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="vendor-organisations">
+      <div class="flex flex-col space-y-1.5 p-6 pb-3">
+        <h3 class="text-lg font-semibold">Vendor organisations</h3>
+        <p class="text-sm text-muted-foreground">The vendor recorded for this application in the vendor register.</p>
+      </div>
+      <div class="p-6 pt-0">
+        {% if vendor_organisations %}
+        <ul class="divide-y divide-border">
+          {% for vendor in vendor_organisations %}
+          <li class="flex items-center justify-between gap-3 py-2 text-sm" data-testid="vendor-organisation-row">
+            <span class="font-medium text-foreground">{{ vendor.name }}</span>
+            <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=vendor.id) }}"
+               class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Open vendor</a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="vendor-organisations-empty">No vendor is recorded for this application yet.{% if supplier_links %} The model links {{ supplier_links | length }} supplier{{ '' if supplier_links | length == 1 else 's' }} to it; record one below.{% endif %}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Suppliers the model links to the application but the register does not hold #}
+    {% if supplier_links %}
+    <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="suppliers-linked">
+      <div class="flex flex-col space-y-1.5 p-6 pb-3">
+        <h3 class="text-lg font-semibold">Suppliers linked in the model</h3>
+        <p class="text-sm text-muted-foreground">Business actors the architecture model links to this application. They are not counted as vendors until you record one.</p>
+      </div>
+      <div class="p-6 pt-0">
+        <ul class="divide-y divide-border">
+          {% for supplier in supplier_links %}
+          <li class="flex items-center justify-between gap-3 py-2 text-sm" data-testid="supplier-linked-row">
+            <div class="min-w-0">
+              <span class="font-medium text-foreground">{{ supplier.name }}</span>
+              <span class="ml-2 text-xs text-muted-foreground">{{ supplier.rel_type | replace('Relationship', '') | lower }}</span>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <a href="{{ url_for('architect_ui.element_traceability', element_id=supplier.id) }}"
+                 class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">What it connects to</a>
+              {% if can('edit', 'application') %}
+              {% call button(variant='outline', on_click="record({ id: " ~ supplier.id ~ ", name: " ~ (supplier.name | tojson | forceescape) ~ " })", aria_label="Record " ~ supplier.name ~ " as vendor") %}Record as vendor{% endcall %}
+              {% endif %}
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
 
     {# Vendor Footprint Table #}
     <div data-slot="card" class="rounded-lg border border-border bg-card">
