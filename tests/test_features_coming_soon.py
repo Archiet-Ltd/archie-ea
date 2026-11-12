@@ -39,10 +39,8 @@ def test_the_list_holds_every_waiting_list_page_the_hub_and_the_module_pages_ans
     assert len(listed) == len(set(listed)), "an item is listed twice"
 
     hub = re.findall(r'href="(/early-access/[a-z0-9-]+)"', client.get("/early-access").get_data(as_text=True))
-    if switch == "1":
-        assert hub
-    else:
-        assert not hub, "with the switch off every capability opens, so the hub lists none: %s" % hub
+    # the hub lists the coming capabilities that have a page to open, with the switch off as well as on
+    assert hub, "the hub lists no waiting list while Coming soon lists %s" % listed
     assert not set(hub) - set(listed), "waiting lists the hub links to but Coming soon omits: %s" % sorted(set(hub) - set(listed))
 
     missing = []
@@ -172,8 +170,8 @@ def test_with_the_switch_off_the_list_does_not_hold_a_capability_the_page_delive
     html = app.test_client().get("/features").get_data(as_text=True)
     addresses = _listed(html)
     if switch == "off":
-        assert not [a for a in addresses if a.startswith("/early-access/")], "open capabilities listed as not available: %s" % addresses
         delivered = {link for section in _sections(html).values() for link in _delivered_links(section)}
+        assert not delivered & set(addresses), "open capabilities listed as not available: %s" % sorted(delivered & set(addresses))
         assert {"/modules/business-case", "/modules/vendors", "/modules/org-chart"} <= delivered
     else:
         assert "/early-access/business-cases" in addresses

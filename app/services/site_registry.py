@@ -297,9 +297,7 @@ def _as_sentence(html: str) -> str:
     return text if text.endswith((".", "!", "?", "…")) else text + "."
 
 
-def hold_back_unreleased_capabilities(
-    body_html: str, page_urls: set[str] | None = None
-) -> tuple[str, list[dict[str, Any]]]:
+def hold_back_unreleased_capabilities(body_html: str) -> tuple[str, list[dict[str, Any]]]:
     """Hold each capability on the features page to the release check, the one the menus and the Scenarios text use.
 
     A link under "Delivered today by" stays only while its page is released. A capability none of whose
@@ -308,19 +306,19 @@ def hold_back_unreleased_capabilities(
     gets an entry with its own anchor (``coming-<capability>``) for the Coming soon list, and its inline links
     point at it.
 
-    The page's front matter may name, under ``same_capability_as``, the page that carries the same capability as a
-    heading. When that page is one of ``page_urls`` (the pages the one list of coming capabilities already holds),
-    the capability is that page's entry and not a second one: its inline links open that page and no entry is
-    made for it here.
+    The page's front matter may name, under ``waiting_list_group``, the early-access page that carries a heading's
+    capability (a group code). Then the capability's waiting list is that page: its inline links open the page
+    instead of an anchor, and the item returned names the page, the capability's name and sentence, and the
+    anchor its old links keep. Any other capability's item has no page.
     """
+    from app.release_waves import EARLY_ACCESS_PREFIX, code_slug
     from app.services.public_pages import load_page
 
     features = load_page("site", slug="features")
-    same_as = dict((features.front_matter.get("same_capability_as") if features is not None else None) or {})
+    groups = dict((features.front_matter.get("waiting_list_group") if features is not None else None) or {})
+    same_as = {anchor: f"{EARLY_ACCESS_PREFIX}/{code_slug(code)}" for anchor, code in groups.items()}
     text = str.__str__(body_html)
     items: list[dict[str, Any]] = []
-    if page_urls is None:
-        page_urls = {entry["url"] for entry in _page_entries() if entry["url"]}
 
     def one(match: "re.Match[str]") -> str:
         heading, anchor, title, rest = match.group(1), match.group(2), _TAGS.sub("", match.group(3)), match.group(4)
@@ -334,22 +332,20 @@ def hold_back_unreleased_capabilities(
             rest = rest.replace(delivered.group(0), "<p>Delivered today by: %s.</p>" % ", ".join(kept) if kept else "")
         today = _TODAY.search(rest)
         coming = _COMING_PARA.search(rest)
-        words = []
         if held and today is not None:
-            words.append(_TAGS.sub("", _as_sentence(today.group(1))))
             joined = _as_sentence(today.group(1))
             if coming is not None:
                 # one paragraph, one label: the held description first, then what is still to come
                 joined += " " + coming.group(1).strip()
                 rest = rest.replace(coming.group(0), "")
             rest = rest.replace(today.group(0), '<p><a href="#coming-soon">Coming soon</a>: %s</p>\n' % joined)
-            coming = None
+            words = [" ".join(_TAGS.sub("", joined).split())]
+        else:
+            coming = _COMING_LINK.search(rest)
+            words = [" ".join(_TAGS.sub("", coming.group(1)).split())] if coming is not None else []
         if held:
             rest = _FIGURE.sub("", rest)
-        coming = coming or _COMING_LINK.search(rest)
-        if coming is not None:
-            words.append(" ".join(_TAGS.sub("", coming.group(1)).split()))
-        if words and same_page and same_page in page_urls:
+        if words and same_page:
             rest = rest.replace('<a href="#coming-soon">', '<a href="%s">' % same_page)
             items.append({"url": same_page, "anchor": target, "name": title, "sentence": " ".join(words)})
         else:
@@ -444,13 +440,17 @@ def coming_capabilities() -> list[dict[str, Any]]:
     entries = _page_entries()
     features = load_page("site", slug="features")
     if features is not None:
-        _body, described = hold_back_unreleased_capabilities(features.body_html, {e["url"] for e in entries if e["url"]})
+        _body, described = hold_back_unreleased_capabilities(features.body_html)
         taken = {e["name"].lower() for e in entries}
         by_url = {e["url"]: e for e in entries if e["url"]}
         for item in described:
             if item["url"]:
-                # the capability is that page's entry: the entry keeps the capability's anchor
-                by_url[item["url"]]["anchor"] = item["anchor"]
+                # the capability's waiting list is that early-access page: one entry, named and worded as the
+                # capability is on the page, keeping the anchor its old links use
+                entry = by_url.setdefault(item["url"], {"kind": EARLY_ACCESS, "url": item["url"]})
+                entry.update(name=item["name"], sentence=item["sentence"], anchor=item["anchor"])
+                if entry not in entries:
+                    entries.append(entry)
             elif item["name"].lower() not in taken:
                 entries.append({**item, "kind": FEATURES_ONLY})
     return sorted(entries, key=lambda e: e["name"].lower())

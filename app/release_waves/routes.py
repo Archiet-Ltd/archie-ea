@@ -93,21 +93,31 @@ def hub_context() -> dict:
     return {"entries": rows, "elsewhere": bool(not rows and coming_capabilities())}
 
 
-def _named_by_the_list(slug: str) -> dict:
+def named_by_the_list(slug: str, *, features_only: bool = False) -> dict:
     """The name and sentence the one list of coming capabilities gives this page, when they differ from the group's.
 
-    A capability that a module page and a group both describe is one entry, named as the module page names it; the
-    early-access page it opens says the same name and sentence, so the hub, the features list and the page agree."""
+    A capability that a module page or a features-page capability and a group both describe is one entry, named as
+    that page names it; the early-access page it opens says the same name and sentence, so the hub, the features
+    list and the page agree. With ``features_only``, only a features-page capability renames the group: a closed
+    address answered in place then reads as the capability it belongs to, while a screen a module page waits for
+    (``/simulations``) keeps the name of its own group."""
     from app.release_waves import group_by_slug
-    from app.services.site_registry import _page_entries
+    from app.services.site_registry import coming_capabilities
 
     found = group_by_slug(slug)
     if found is None:
         return {}
-    for entry in _page_entries():
+    for entry in coming_capabilities():
+        if features_only and not entry.get("anchor"):
+            continue
         if entry["url"] == f"{EARLY_ACCESS_PREFIX}/{slug}" and entry["name"] != found[1]["title"]:
             return {"title": entry["name"], "blurb": entry["sentence"]}
     return {}
+
+
+def _listed_page(slug: str, **kwargs):
+    """The early-access page of a group, under the name and sentence the one list gives it."""
+    return _page(slug, **{**named_by_the_list(slug), **kwargs})
 
 
 def _page(slug: str, *, thanks: bool = False, error: str | None = None, title: str | None = None, blurb: str | None = None):
@@ -214,7 +224,7 @@ def page(slug):
         target = moved_slug(slug)
         if target is not None:
             return redirect(target, code=301)
-    return _page(slug, **_named_by_the_list(slug))
+    return _listed_page(slug)
 
 
 @early_access_bp.route("/early-access/<slug>/join", methods=["POST"])
@@ -232,16 +242,16 @@ def join(slug):
         slug = code_slug(found[0])
     email = (request.form.get("email") or "").strip().lower()
     if not email:
-        return _page(slug, error="Please enter an email address.")
+        return _listed_page(slug, error="Please enter an email address.")
     if not request.form.get("consent"):
-        return _page(slug, error="Please agree that we may email you about this.")
+        return _listed_page(slug, error="Please agree that we may email you about this.")
     try:
         email = validate_email(email, check_deliverability=False).normalized
     except EmailNotValidError:
-        return _page(slug, error="Please enter a valid email address.")
+        return _listed_page(slug, error="Please enter a valid email address.")
     # one record per group, whichever form of the address the person joined from
     offer = f"early-access:{legacy_slug(found[0])}"[:50]
     if ProductInquiry.query.filter_by(email=email, offer=offer).first() is None:
         db.session.add(ProductInquiry(email=email, name=None, offer=offer, consent_text=CONSENT_TEXT))
         db.session.commit()
-    return _page(slug, thanks=True)
+    return _listed_page(slug, thanks=True)

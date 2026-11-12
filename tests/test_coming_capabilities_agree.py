@@ -52,6 +52,14 @@ def test_the_hub_lists_exactly_the_coming_capabilities_that_have_a_page_to_open(
             sorted({r["name"] for r in hub} - openable), sorted(openable - {r["name"] for r in hub})))
 
 
+def test_the_hub_opens_with_an_early_access_page_and_lists_one_alphabetical_list(app, switch):
+    client = app.test_client()
+    _html, hub = _hub(client)
+    names = [r["name"] for r in hub]
+    assert names == sorted(names, key=str.lower)
+    assert hub[0]["href"].startswith("/early-access/"), "the first row opens %s" % hub[0]["href"]
+
+
 def test_with_the_switch_off_the_hub_does_not_say_nothing_is_waiting_while_the_features_page_lists_coming(app, switch):
     client = app.test_client()
     html, hub = _hub(client)
@@ -78,9 +86,9 @@ def test_no_name_is_listed_twice_and_one_capability_has_one_name(app, switch):
     names = [r["name"].lower() for r in _features(client)]
     assert len(names) == len(set(names)), sorted(n for n in names if names.count(n) > 1)
     assert not ("scenarios" in names and "simulation scenarios" in names)
+    assert "risk management" in names
+    assert "risk register and risk views" not in names, "the risk register is listed under two names"
     if switch == "1":
-        assert "risk register and risk views" in names
-        assert "risk management" not in names, "the risk register is listed under two names"
         assert "business model canvas" in names and "strategy management" in names
 
 
@@ -109,6 +117,11 @@ def test_a_held_capability_is_introduced_once_in_its_section(app, switch):
     html = app.test_client().get("/features").get_data(as_text=True)
     body = html.split('id="coming-soon"', 1)[0]
     assert "Coming soon</a>: Coming soon" not in body
+    for section in re.split(r'<h3 id="', body)[1:]:
+        assert len(re.findall(r"Coming soon</a>:", section)) <= 1, "a capability says Coming soon twice: %s" % section[:60]
+    for row in _features(app.test_client()):
+        sentences = [x.strip() for x in re.split(r"(?<=[.!?])\s+", row["sentence"]) if x.strip()]
+        assert len(sentences) == len(set(sentences)), "%s says a sentence twice" % row["name"]
     for paragraph in re.findall(r"<p>(.*?)</p>", body, flags=re.S):
         assert len(re.findall(r"Coming soon</a>:", paragraph)) <= 1, paragraph[:80]
         for match in re.finditer(r"Coming soon</a>:\s*([a-z])", paragraph):

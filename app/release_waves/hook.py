@@ -122,10 +122,14 @@ def enforce():
         import secrets
 
         g.csp_nonce = secrets.token_urlsafe(32)
+    from app.release_waves.routes import named_by_the_list
+
+    # the page answered in place says what the hub and the features list call the capability
+    named = named_by_the_list(slug, features_only=True)
     out = make_response(render_template(
         "public/early_access.html",
         group_slug=slug,
-        group=info,
+        group={**info, **named},
         thanks=False,
         error=None,
         form_action=url_for("early_access.join", slug=slug),

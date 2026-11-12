@@ -4,10 +4,11 @@ page_family: site
 title: "Features"
 page_role: "The eighteen capabilities of Enterprise Intelligence Management, grouped by the question each one answers, each linked to the module pages and use cases that deliver it."
 source: docs/eim-category-positioning-v1.md section 2; docs/artifacts/feature-status-register.yml
-same_capability_as:
-  risk-management: /early-access/risk-register-and-risk-views
-  vendor-and-procurement-management: /early-access/vendors-contracts-licences-and-spend
-  people-and-organisation-management: /early-access/organisation-chart-raci-stakeholders
+waiting_list_group:
+  agentic-automation: PG-CHAT
+  risk-management: PG-RISK
+  vendor-and-procurement-management: PG-VEN
+  data-management: PG-DATA
 ---
 
 # The eighteen capabilities of Enterprise Intelligence Management

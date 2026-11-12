@@ -1139,8 +1139,7 @@ def public_site_page(slug):
         )
 
         coming_soon = coming_capabilities()
-        body_html, _described = hold_back_unreleased_capabilities(
-            page.body_html, {e["url"] for e in coming_soon if e["url"]})
+        body_html, _described = hold_back_unreleased_capabilities(page.body_html)
         page = dataclasses.replace(page, body_html=open_signed_in_links(body_html))
         modules = [dataclasses.replace(m, url=signed_in_target(m.url)) for m in modules]
         hub_groups = [
