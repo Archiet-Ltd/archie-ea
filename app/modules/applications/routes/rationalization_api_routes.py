@@ -14,7 +14,7 @@ from app.middleware.tenant_decorators import platform_admin_required
 from app.models.application_portfolio import ApplicationComponent
 from app.core.auth.decorators import require_permission
 from app.services.application_cost_accessor import set_annual_cost
-from app.utils.role_access import can_see_costs
+from app.services.cost_visibility import costs_visible
 from ._helpers import _verify_app_in_org
 from app.services.rate_limiter import rate_limit
 
@@ -4434,7 +4434,7 @@ def rationalization_enrich_app(app_id):
         changed = []
 
         cost_not_saved = None
-        if "total_cost_of_ownership" in payload and not can_see_costs(current_user):
+        if "total_cost_of_ownership" in payload and not costs_visible(current_user):
             cost_not_saved = (
                 "The cost was not saved. Only a person who may set costs can record one.")
         elif "total_cost_of_ownership" in payload:

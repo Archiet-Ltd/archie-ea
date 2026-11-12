@@ -32,7 +32,7 @@ from app.modules.dashboard.v2.services import (
 )
 from app.services import scoring_configuration_service
 from app.services.application_cost_accessor import set_annual_cost
-from app.utils.role_access import can_see_costs
+from app.services.cost_visibility import costs_visible
 from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
@@ -1047,7 +1047,7 @@ def api_rationalization_onboard():
             application_type=data.get("type"),
             lifecycle_status=data.get("lifecycle_status", "planning"),
         )
-        if can_see_costs(current_user):
+        if costs_visible(current_user):
             set_annual_cost(app, data.get("annual_cost"))
         db.session.add(app)
         db.session.flush()

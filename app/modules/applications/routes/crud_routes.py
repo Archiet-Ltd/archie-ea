@@ -52,7 +52,7 @@ from app.models.models import (  # dead-code-ok
     ArchitectureModel,
 )
 from app.services.application_fact_sheet import detail_tab
-from app.utils.role_access import can_see_costs
+from app.services.cost_visibility import costs_visible
 from app.services.archimate.archimate_llm_service import ArchiMateLLMService
 from app.core.auth.decorators import require_permission
 from app.decorators import audit_log, require_roles
@@ -315,7 +315,7 @@ def application_create():
             "total_cost_of_ownership",
         ]
         # Cost is accepted only from a person the one cost rule allows; the rest saves.
-        allowed_cost_fields = cost_field_names if can_see_costs(current_user) else []
+        allowed_cost_fields = cost_field_names if costs_visible(current_user) else []
         for field in allowed_cost_fields:
             value = data.get(field)
             if value and hasattr(app, field):
@@ -856,7 +856,7 @@ def application_edit(id):
                 return render_template(
                     "applications/edit.html", application=app,
                     abacus_connected=_abacus_connected(g.current_org_id),
-                    show_cost=can_see_costs(current_user),
+                    show_cost=costs_visible(current_user),
                     lifecycle_stage_choices=APPLICATION_LIFECYCLE_STAGES,
                     lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
                     return_tab=detail_tab(request.form.get("return_tab")),
@@ -921,7 +921,7 @@ def application_edit(id):
                 "total_cost_of_ownership",
             ]
             # Cost is read and written only by a person the one cost rule allows.
-            allowed_cost_fields = cost_field_names if can_see_costs(current_user) else []
+            allowed_cost_fields = cost_field_names if costs_visible(current_user) else []
             for field in allowed_cost_fields:
                 value = request.form.get(field)
                 if value is not None and hasattr(app, field):
@@ -1002,7 +1002,7 @@ def application_edit(id):
             lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
             application_owners=application_owners,
             abacus_connected=_abacus_connected(org_id),
-            show_cost=can_see_costs(current_user),
+            show_cost=costs_visible(current_user),
             return_tab=detail_tab(request.args.get("tab")),
         )
 

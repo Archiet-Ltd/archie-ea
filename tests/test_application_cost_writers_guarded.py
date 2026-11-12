@@ -223,3 +223,28 @@ def test_bulk_cost_import_is_refused_without_spend_and_skips_another_organisatio
     assert allowed["updated_count"] == 1
     assert float(_cost(db_session, row.id)) == 9.0
     assert float(_cost(db_session, foreign.id)) == 200.0
+
+
+# ── reading and writing follow one rule ───────────────────────────────────────
+
+def test_a_finance_person_is_allowed_to_set_a_cost_exactly_when_they_may_read_spend(client, login_as, db_session, make_org):
+    from app.decorators.requires_role import may_see_spend_pages
+    from app.services.cost_visibility import costs_visible
+    from app.utils.role_access import can_see_costs
+
+    mine, theirs = make_org("cw-h"), make_org("cw-i")
+    finance = _user(db_session, mine, "finance")
+    # the two older checks disagree for this role: spend pages are open to finance, the cost set is not
+    assert may_see_spend_pages(finance) is True and can_see_costs(finance) is False
+    assert costs_visible(finance) is True
+    row = _system(db_session, mine)
+    _as(client, login_as, finance)
+    reply = client.post(f"/applications/rationalization/api/enrich/{row.id}", json={"total_cost_of_ownership": 6100})
+    assert reply.status_code == 200 and "total_cost_of_ownership" in reply.get_json()["updated_fields"]
+    assert float(_cost(db_session, row.id)) == 6100.0
+    # a finance person of the other organisation still cannot reach this organisation's system
+    other = _user(db_session, theirs, "finance")
+    _as(client, login_as, other)
+    refused = client.post(f"/applications/rationalization/api/enrich/{row.id}", json={"total_cost_of_ownership": 1})
+    assert refused.status_code == 404
+    assert float(_cost(db_session, row.id)) == 6100.0

@@ -17,7 +17,7 @@ from ..models.requirements import Requirement
 from ..services.application_cost_accessor import set_annual_cost
 from ..services.application_status import status_for_write
 from ..utils.html_sanitizer import sanitize_html
-from ..utils.role_access import can_see_costs
+from app.services.cost_visibility import costs_visible
 from ..utils.validators import (
     validate_application_name,
     validate_description,
@@ -58,7 +58,7 @@ def _app_in_active_org_or_404(app_id):
 def application_create():
     """Create new Application Component"""
     form = ApplicationComponentForm()
-    may_set_cost = can_see_costs(current_user)
+    may_set_cost = costs_visible(current_user)
     vendor_choices = _build_vendor_product_choices()
     form.vendor_products.choices = vendor_choices
 
@@ -396,7 +396,7 @@ def legacy_application_detail_redirect(id):
 def application_edit(id):
     """Edit Application Component"""
     app = _app_in_active_org_or_404(id)
-    may_set_cost = can_see_costs(current_user)
+    may_set_cost = costs_visible(current_user)
     form = ApplicationComponentForm(obj=app)
 
     vendor_choices = _build_vendor_product_choices()
@@ -849,7 +849,7 @@ def application_quick_fill(app_id):
     }
     model_field = _FIELD_MAP[field]
 
-    if field == "annual_cost" and not can_see_costs(current_user):
+    if field == "annual_cost" and not costs_visible(current_user):
         return jsonify({"success": False, "error": _COST_NOT_SAVED}), 403
 
     try:

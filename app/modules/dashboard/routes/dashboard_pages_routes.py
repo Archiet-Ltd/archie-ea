@@ -64,7 +64,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from app.decorators import audit_log
 from app.middleware.tenant_decorators import platform_admin_required
 from app.services.application_cost_accessor import set_annual_cost
-from app.utils.role_access import can_see_costs
+from app.services.cost_visibility import costs_visible
 
 from app.services.application_consolidation_service import (
     ApplicationConsolidationService,
@@ -1063,7 +1063,7 @@ def api_rationalization_onboard():
             application_type=data.get("type"),
             lifecycle_status=data.get("lifecycle_status", "planning"),
         )
-        if can_see_costs(current_user):
+        if costs_visible(current_user):
             set_annual_cost(app, data.get("annual_cost"))
         db.session.add(app)
         db.session.flush()

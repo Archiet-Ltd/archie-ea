@@ -21,7 +21,7 @@ from sqlalchemy import or_
 
 from app.decorators import audit_log
 from app.services.application_cost_accessor import set_annual_cost
-from app.utils.role_access import can_see_costs
+from app.services.cost_visibility import costs_visible
 
 from .. import db
 from ..models.application_portfolio import ApplicationComponent
@@ -591,7 +591,7 @@ def update_entry(entry_id):
 
         # Back-propagate annual operating cost to Application model if provided
         cost_not_saved = None
-        if "annual_operating_cost" in data and data["annual_operating_cost"] and not can_see_costs(current_user):
+        if "annual_operating_cost" in data and data["annual_operating_cost"] and not costs_visible(current_user):
             cost_not_saved = "The cost was not saved. Only a person who may set costs can record one."
         elif "annual_operating_cost" in data and data["annual_operating_cost"]:
             try:
@@ -1006,7 +1006,7 @@ def bulk_cost_import():
         if not file.filename or not file.filename.endswith(".csv"):
             return jsonify({"success": False, "error": "File must be a .csv"}), 400
 
-        if not can_see_costs(current_user):
+        if not costs_visible(current_user):
             return jsonify({"success": False, "error": "The cost was not saved. Only a person who may set costs can record one."}), 403
 
         content = file.read().decode("utf-8-sig")
