@@ -234,7 +234,7 @@ def test_the_banner_names_what_is_linked_and_drops_the_note_once_recorded(
     hosting = sheet["completeness"]["notes"]["Hosting / deployment"]
     assert "none recorded as runs on" not in hosting["text"]
     assert "the score counts the hosting description" in hosting["text"]
-    assert hosting["tab"] == "overview" and hosting["edit"] == "1"
+    assert hosting["page"] == "edit" and hosting["field"] == "deployment_model"
     assert "Vendor" not in sheet["completeness"]["notes"]
 
 

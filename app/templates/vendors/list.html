@@ -198,7 +198,7 @@
           <ul class="space-y-1">
             {% for supplier in system.suppliers %}
             <li class="flex items-center justify-between gap-3 text-sm" data-testid="linked-supplier-row">
-              <span class="min-w-0 truncate">{{ supplier.name }} <span class="text-xs text-muted-foreground">{{ supplier.rel_type | replace('Relationship', '') | lower }}</span></span>
+              <span class="min-w-0 break-words">{{ supplier.name }} <span class="text-xs text-muted-foreground">{{ supplier.rel_type | replace('Relationship', '') | lower }}</span></span>
               {% if can('edit', 'application') %}
               {{ ui.button(text='Record as vendor', type='button', variant='outline', size='sm',
                            attrs={'aria-label': 'Record ' ~ supplier.name ~ ' as vendor for ' ~ system.name, ':disabled': 'saving',

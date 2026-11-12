@@ -135,7 +135,8 @@ def linked_notes(app: Any, missing: List[str]) -> Dict[str, Dict[str, str]]:
             notes["Hosting / deployment"] = {
                 "text": "what it runs on is recorded, but the score counts the hosting description",
                 "tab": "overview",
-                "edit": "1",
+                "page": "edit",
+                "field": "deployment_model",
                 "action": "add the hosting description",
             }
     if "Vendor" in missing:
