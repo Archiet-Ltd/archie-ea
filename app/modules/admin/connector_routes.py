@@ -1146,3 +1146,222 @@ def github_review_skip(approval_id):
     except LookupError as exc:
         flash(str(exc), "error")
     return redirect(url_for("m365_connector.github_review"))
+
+
+# ---------------------------------------------------------------------------
+# SharePoint (read): choose a list, map its columns, save the connection
+# ---------------------------------------------------------------------------
+
+
+def _sharepoint_saved_row(org_id: int):
+    from app.services.connector_framework import _load_org_connector
+
+    return _load_org_connector(org_id, connector_type="sharepoint_read")
+
+
+def _sharepoint_approval_state(org_id: int, approval_id: int) -> dict:
+    """Where one SharePoint change of this organisation stands, in the words the page shows.
+
+    The approval is looked up in the signed-in organisation only; another organisation's id
+    answers 404.
+    """
+    import json
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+    from app.services.connector_framework import CONNECTOR_APPROVAL_ENTITY_TYPE
+
+    approval = AIChatCRUDApproval.query.filter_by(
+        id=approval_id, organization_id=org_id, entity_type=CONNECTOR_APPROVAL_ENTITY_TYPE
+    ).first()
+    try:
+        payload = json.loads(approval.operation_payload or "{}") if approval else {}
+    except (TypeError, ValueError):
+        payload = {}
+    if approval is None or payload.get("connector_type") != "sharepoint_read":
+        abort(404)
+    if approval.status == ApprovalStatus.REJECTED:
+        reason = approval.rejected_reason or "The change was not accepted."
+        return {"state": "not_saved", "message": f"Not saved: {reason}"}
+    if approval.status == ApprovalStatus.APPROVED and approval.execution_result:
+        try:
+            result = json.loads(approval.execution_result)
+        except (TypeError, ValueError):
+            result = {}
+        if result.get("success"):
+            return {"state": "saved", "message": "Connection saved"}
+        return {"state": "not_saved", "message": f"Not saved: {result.get('error') or 'the change could not be applied.'}"}
+    return {"state": "checking", "message": "Checking this change"}
+
+
+def _sharepoint_page(org_id: int) -> dict:
+    """Everything the SharePoint page shows, taken from this organisation's own rows and its own site."""
+    from app.connectors.sharepoint import (
+        MODEL_FIELDS,
+        NO_COLUMN,
+        SelectionRefused,
+        SharePointConnector,
+        SharePointError,
+        propose_mapping,
+    )
+
+    saved = _sharepoint_saved_row(org_id)
+    saved_config = (saved.config or {}) if saved else {}
+    page = {
+        "problem": None,
+        "lists": [],
+        "chosen": None,
+        "fields": [],
+        "saved": None,
+        "state": None,
+    }
+    if saved is not None:
+        labels = saved_config.get("mapping_labels") or {}
+        page["saved"] = {
+            "list_name": saved_config.get("list_name") or "",
+            "mapping": [
+                {"label": label, "column": labels.get(field) or (NO_COLUMN)}
+                for field, label in MODEL_FIELDS
+            ],
+        }
+        page["state"] = {"state": "saved", "message": "Connection saved"}
+    try:
+        connector = SharePointConnector.for_organisation(org_id, saved=saved)
+        lists = connector.available_lists()
+    except SharePointError as exc:
+        page["problem"] = str(exc)
+        return page
+
+    wanted = (request.args.get("list") or saved_config.get("list_id") or "").strip()
+    page["lists"] = [
+        {
+            "id": item["id"],
+            "name": item["display_name"],
+            "url": url_for("m365_connector.sharepoint_connect", list=item["id"]),
+            "selected": item["id"] == wanted,
+        }
+        for item in lists
+    ]
+    if wanted:
+        try:
+            chosen = connector.choose_list(wanted)
+            columns = chosen.columns()
+        except SelectionRefused as exc:
+            page["problem"] = str(exc)
+            return page
+        except SharePointError as exc:
+            page["problem"] = str(exc)
+            return page
+        if saved is not None and saved_config.get("list_id") == wanted:
+            current = saved_config.get("mapping") or {}
+        else:
+            current = propose_mapping(columns)
+        offered = [c for c in columns if not c["hidden"] and not c["read_only"]]
+        page["chosen"] = {"id": chosen.selection.list_id, "name": chosen.config.config["list_name"]}
+        page["fields"] = [
+            {
+                "field": field,
+                "label": label,
+                "selected": current.get(field) or "",
+                "options": [("", NO_COLUMN)] + [(c["name"], c["display_name"]) for c in offered],
+            }
+            for field, label in MODEL_FIELDS
+        ]
+    return page
+
+
+@m365_connector_bp.route("/sharepoint", methods=["GET"])
+@login_required
+@connections_access
+def sharepoint_connect():
+    """The SharePoint page: the lists on the saved site, the column mapping and the saved connection."""
+    org_id = _require_active_org()
+    approval_id = request.args.get("approval", type=int)
+    page = _sharepoint_page(org_id)
+    if approval_id is not None:
+        page["state"] = _sharepoint_approval_state(org_id, approval_id)
+    return render_template(
+        "admin/connectors/sharepoint.html",
+        page=page,
+        approval_id=approval_id,
+        status_url=url_for("m365_connector.sharepoint_status"),
+    )
+
+
+@m365_connector_bp.route("/sharepoint", methods=["POST"])
+@login_required
+@connections_access
+def sharepoint_save():
+    """Propose the saved list and mapping through the change path; the review settles it, not this route."""
+    from app.connectors.sharepoint import (
+        CONNECTOR_TYPE,
+        SelectionRefused,
+        SharePointConnector,
+        SharePointError,
+        clean_mapping,
+    )
+    from app.extensions import db
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_CREATE,
+        CONNECTOR_ACTION_UPDATE,
+        propose_connector_change,
+    )
+
+    org_id = _require_active_org()
+    back = url_for("m365_connector.sharepoint_connect")
+    list_id = (request.form.get("list_id") or "").strip()
+    try:
+        _permit_connector_type(CONNECTOR_TYPE)
+        saved = _sharepoint_saved_row(org_id)
+        chosen = SharePointConnector.for_organisation(org_id, saved=saved).choose_list(list_id)
+        columns = chosen.columns()
+    except SelectionRefused as exc:
+        flash(str(exc), "error")
+        return redirect(back)
+    except (SharePointError, PermissionError) as exc:
+        flash(str(exc), "error")
+        return redirect(back)
+
+    mapping = clean_mapping(request.form, columns)
+    names = {c["name"]: c["display_name"] for c in columns}
+    config = dict(chosen.config.config)
+    config["mapping"] = mapping
+    config["mapping_labels"] = {field: names[column] for field, column in mapping.items() if column}
+    chosen.config.config = config
+    problems = chosen.validate_config()
+    if problems:
+        flash(problems[0], "error")
+        return redirect(url_for("m365_connector.sharepoint_connect", list=list_id))
+
+    payload = {
+        "connector_type": CONNECTOR_TYPE,
+        "name": "SharePoint (read)",
+        "description": f"Reads the list {config['list_name']} on the saved SharePoint site",
+        "config": {key: config[key] for key in ("tenant_id", "site_id", "list_id", "list_name", "mapping", "mapping_labels", "provider")},
+        "status": "inactive",
+    }
+    if saved is not None:
+        payload["connector_id"] = saved.id
+    approval = propose_connector_change(
+        org_id=org_id,
+        actor_user_id=current_user_id(),
+        action=CONNECTOR_ACTION_UPDATE if saved is not None else CONNECTOR_ACTION_CREATE,
+        connector_type=CONNECTOR_TYPE,
+        summary=f"Save the SharePoint list {config['list_name']} and its column mapping",
+        payload=payload,
+    )
+    db.session.commit()
+    return redirect(url_for("m365_connector.sharepoint_connect", list=list_id, approval=approval.id))
+
+
+@m365_connector_bp.route("/sharepoint/status", methods=["GET"])
+@login_required
+@connections_access
+def sharepoint_status():
+    """JSON for the SharePoint page to poll while a save is checked."""
+    org_id = _require_active_org()
+    approval_id = request.args.get("approval", type=int)
+    if approval_id is not None:
+        return jsonify(_sharepoint_approval_state(org_id, approval_id))
+    if _sharepoint_saved_row(org_id) is not None:
+        return jsonify({"state": "saved", "message": "Connection saved"})
+    return jsonify({"state": "none", "message": ""})

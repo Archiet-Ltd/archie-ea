@@ -1,0 +1,123 @@
+{# design-block: settings #}
+{% extends 'layouts/admin_base.html' %}
+{% block title %}SharePoint (read){% endblock %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/alert.html' import alert as quiet_alert %}
+{% from 'components/input.html' import hidden_input %}
+{% from 'components/button.html' import button %}
+{% from 'components/select.html' import native_select %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+    {{ page_header(
+        title='SharePoint (read)',
+        description='Choose the list that holds your applications, say which column fills each field, and save. Entelim reads your own SharePoint with your own sign-in and never changes it.',
+        breadcrumbs=[
+            ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
+            {'label': 'Connectors', 'href': url_for('m365_connector.connectors_index')},
+            {'label': 'SharePoint'}
+        ]
+    ) }}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-6 space-y-2" data-testid="sharepoint-messages">
+                {% for category, message in messages %}
+                    {% call quiet_alert('success' if category == 'success' else ('danger' if category == 'error' else 'info')) %}{{ message }}{% endcall %}
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% if page.problem %}
+    <div class="mb-6" data-testid="sharepoint-problem">
+        {% call quiet_alert('danger') %}{{ page.problem }}{% endcall %}
+    </div>
+    {% endif %}
+
+    {% if page.state %}
+    <p class="mb-6 text-sm font-medium text-foreground" id="sharepoint-state" data-testid="sharepoint-state" data-state="{{ page.state.state }}" aria-live="polite">{{ page.state.message }}</p>
+    {% endif %}
+
+    {% if page.saved %}
+    <section class="mb-8" aria-labelledby="sharepoint-saved-heading" data-testid="sharepoint-saved">
+        <h2 id="sharepoint-saved-heading" class="text-sm font-semibold mb-2">Saved connection</h2>
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-4 sm:p-6 text-sm">
+            <p class="text-foreground">List: <span class="font-medium" data-testid="sharepoint-saved-list">{{ page.saved.list_name }}</span></p>
+            <dl class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm" data-testid="sharepoint-saved-mapping">
+                {% for row in page.saved.mapping %}
+                <div class="flex items-baseline justify-between gap-3 border-b border-border py-1" data-testid="sharepoint-saved-row">
+                    <dt class="text-muted-foreground">{{ row.label }}</dt>
+                    <dd class="font-medium text-foreground text-right">{{ row.column }}</dd>
+                </div>
+                {% endfor %}
+            </dl>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if page.lists %}
+    <section class="mb-8" aria-labelledby="sharepoint-lists-heading" data-testid="sharepoint-lists">
+        <h2 id="sharepoint-lists-heading" class="text-sm font-semibold mb-2">Lists on your site</h2>
+        <ul class="rounded-lg border border-border bg-card divide-y divide-border">
+            {% for item in page.lists %}
+            <li>
+                <a href="{{ item.url }}" class="flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {{ 'font-semibold text-foreground' if item.selected else 'text-foreground' }}"
+                    data-testid="sharepoint-list-link"{% if item.selected %} aria-current="true"{% endif %}>
+                    <span>{{ item.name }}</span>
+                    {% if item.selected %}<span class="text-xs text-muted-foreground">Chosen</span>{% endif %}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% elif not page.problem %}
+    <p class="mb-8 text-sm text-muted-foreground" data-testid="sharepoint-no-lists">There are no lists on the saved site yet. Add a list in SharePoint, then come back to this page.</p>
+    {% endif %}
+
+    {% if page.chosen %}
+    <form method="POST" action="{{ url_for('m365_connector.sharepoint_save') }}" class="space-y-6" data-testid="sharepoint-form">
+        {{ hidden_input('csrf_token', csrf_token()) }}
+        {{ hidden_input('list_id', page.chosen.id) }}
+        <section aria-labelledby="sharepoint-map-heading">
+            <h2 id="sharepoint-map-heading" class="text-sm font-semibold mb-2">Columns of {{ page.chosen.name }}</h2>
+            <div data-slot="card" class="rounded-lg border border-border bg-card p-4 sm:p-6 space-y-4">
+                {% for field in page.fields %}
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 sm:items-center">
+                    <label for="map-{{ field.field }}" class="text-sm font-medium text-muted-foreground">{{ field.label }}</label>
+                    {{ native_select(id='map-' ~ field.field, name=field.field, size='sm', class='w-full', options=field.options, selected=field.selected) }}
+                </div>
+                {% endfor %}
+                <p class="text-xs text-muted-foreground">Hidden and read-only columns are not offered. Choose "No column chosen" to leave a field empty.</p>
+            </div>
+        </section>
+        <div class="flex items-center justify-end gap-3">
+            {{ button(text='Save', type='submit', variant='primary', size='default', testid='sharepoint-save') }}
+        </div>
+    </form>
+    {% elif page.lists %}
+    <p class="text-sm text-muted-foreground" data-testid="sharepoint-choose-hint">Choose a list above to see its columns.</p>
+    {% endif %}
+</div>
+
+{% if page.state and page.state.state == 'checking' and approval_id %}
+<script>
+(function () {
+    var line = document.getElementById('sharepoint-state');
+    var url = {{ status_url|tojson }} + '?approval=' + {{ approval_id|tojson }};
+    var tries = 0;
+    function poll() {
+        tries += 1;
+        fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (s) {
+                if (s && s.state !== 'checking') { window.location.reload(); return; }
+                if (tries < 120) { window.setTimeout(poll, 3000); }
+            })
+            .catch(function () { if (tries < 120) { window.setTimeout(poll, 6000); } });
+    }
+    window.setTimeout(poll, 2000);
+})();
+</script>
+{% endif %}
+{% endblock %}
