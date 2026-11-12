@@ -7,7 +7,7 @@ shell) gets the standalone page in ``templates/errors``.
 
 from __future__ import annotations
 
-from flask import jsonify, render_template
+from flask import jsonify, render_template, request
 from flask_login import current_user
 from markupsafe import Markup, escape
 
@@ -17,6 +17,11 @@ PLAIN = {
         "You don't have access to this page",
         "Your role does not include this page. Ask an administrator of your organisation to "
         "give you access, or go back to the dashboard.",
+    ),
+    504: (
+        "timer",
+        "The AI provider did not answer in time",
+        "Nothing was changed. Try again in a moment, or go back to the dashboard.",
     ),
     429: (
         "timer",
@@ -45,6 +50,19 @@ ICON_PATHS = {
     "search-x": '<path d="m13.5 8.5-5 5"></path><path d="m8.5 8.5 5 5"></path><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>',
     "triangle-alert": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path>',
 }
+
+
+def is_browser_page_request() -> bool:
+    """True when a person's browser is opening this address as a page.
+
+    A browser navigation asks for HTML first; a script, a fetch() call (Accept:
+    */*) or an XMLHttpRequest does not, and keeps getting JSON.
+    """
+    if request.method not in ("GET", "HEAD"):
+        return False
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return False
+    return request.accept_mimetypes.best == "text/html"
 
 
 def plain_json(status: int, error_type: str, **extra):

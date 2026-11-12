@@ -41,7 +41,14 @@
         {{ button(text='Save all changes', variant='primary', icon='save', testid='btn-save-all', aria_label='Save all settings', on_click='save()', attrs_dict={':disabled': 'saving'}) }}
     </div>
     {% endmacro %}
+    {% if may_change_settings %}
     {{ page_shell(title='System Settings', breadcrumb=[('Home', '/'), ('System Settings', none)], subtitle='Platform-wide configuration. Changes apply to every organisation.', actions_caller=_ps_actions) }}
+    {% else %}
+    {{ page_shell(title='System Settings', breadcrumb=[('Home', '/'), ('System Settings', none)], subtitle='Platform-wide configuration. It applies to every organisation.') }}
+    <div data-testid="settings-read-only">
+        {{ quiet_alert(kind='info', title='You can read these settings but not change them', text='They are set by the administrators of the platform and apply to every organisation, including yours. Ask a platform administrator if one needs to change.') }}
+    </div>
+    {% endif %}
 
     <div x-show="loadFailed" x-cloak>
         {{ quiet_alert(kind='warning', title='Saved settings could not be loaded', text='The values shown are the defaults, not what is saved. Reload the page before changing anything.') }}
@@ -126,6 +133,7 @@
     {% endcall %}
     {% endcall %}
 
+    {% if may_change_settings %}
     <!-- Danger Zone -->
     {% call card() %}
         {% call card_header() %}{% call card_title() %}Reset{% endcall %}{% call card_description() %}Puts every setting on this page back to its default. Nothing is saved until you press Save all changes. Your data is not affected.{% endcall %}{% endcall %}
@@ -135,6 +143,7 @@
     {% endcall %}
 
     {{ confirmation_dialog(id='reset-settings', title='Reset to defaults?', message='Every setting on this page goes back to its default. Nothing is saved until you press Save all changes.', confirm_text='Reset settings', variant='destructive') }}
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -156,6 +165,14 @@ document.addEventListener('alpine:init', function () {
             dirty: false,
             saving: false,
             loadFailed: false,
+            readOnly: {{ 'false' if may_change_settings else 'true' }},
+            lockControls() {
+                // Reading is allowed, changing is not: lock every control in the panels, leave the tabs usable.
+                this.$nextTick(() => {
+                    document.querySelectorAll('[role="tabpanel"] input, [role="tabpanel"] select, [role="tabpanel"] button')
+                        .forEach((el) => { el.disabled = true; });
+                });
+            },
             init() {
                 this.values = Object.assign({}, this.defaults);
                 window.addEventListener('beforeunload', (e) => {
@@ -169,6 +186,7 @@ document.addEventListener('alpine:init', function () {
                 } catch (error) {
                     this.loadFailed = true;
                 }
+                if (this.readOnly) this.lockControls();
             },
             change(key, value) {
                 this.values[key] = value;
