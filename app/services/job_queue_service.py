@@ -390,7 +390,10 @@ class JobQueueService:
 
         from app.connectors.github import run_first_sync
 
-        return run_first_sync(org_id, connector_id)
+        scope = None
+        if payload.get("repositories"):
+            scope = {"repositories": payload["repositories"], "product_id": payload.get("product_id")}
+        return run_first_sync(org_id, connector_id, scope=scope)
 
     def _execute_onboarding_import(self, task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Read one source the person gave during sign-up. The job carries the organisation, the

@@ -687,7 +687,10 @@ def send_message():
                 "domain": domain,
                 "actions_taken": agent_result.get("actions_taken", []),
                 "pending_approvals": agent_result.get("pending_approvals", []),
-                "requires_approval": bool(agent_result.get("pending_approvals")),
+                # Only a change still in review is waiting on anything; an applied or declined one is settled.
+                "requires_approval": any(
+                    (p or {}).get("state") == "in_review" for p in agent_result.get("pending_approvals", [])
+                ),
                 # The records the read tools actually returned this turn, so the
                 # reader can check the answer against the rows rather than
                 # trusting it.
@@ -1623,7 +1626,10 @@ def approve_tool_action(approval_id: int):
         "NOT_FOUND": 404,
         "FORBIDDEN": 403,
         "APPROVAL_DENIED": 403,
+        "ACCOUNT_OFF": 403,
         "CONFLICT": 409,
+        "DECLINED": 409,
+        "IN_REVIEW": 409,
     }.get(result.get("code"), 200 if result.get("success") else 400)
     return jsonify({
         "success": result.get("success", False),
@@ -1644,7 +1650,10 @@ def reject_tool_action(approval_id: int):
         "NOT_FOUND": 404,
         "FORBIDDEN": 403,
         "APPROVAL_DENIED": 403,
+        "ACCOUNT_OFF": 403,
         "CONFLICT": 409,
+        "DECLINED": 409,
+        "IN_REVIEW": 409,
     }.get(result.get("code"), 200 if result.get("success") else 400)
     return jsonify({
         "success": result.get("success", False),
