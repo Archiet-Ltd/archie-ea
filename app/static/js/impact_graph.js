@@ -117,6 +117,18 @@
                 : d.href;
         }
 
+        // "1547 of 1562" when the register holds elements the map does not draw, else just the figure.
+        function ofTotal(drawn, total) {
+            return total && total > drawn ? drawn + ' of ' + total : String(drawn);
+        }
+
+        // The figure the dashboard gives for what is on screen: the asked layer's, or the whole model's.
+        function layerTotal(data) {
+            if (!data.layer) return data.store_total;
+            var row = (data.counts || []).filter(function (c) { return c.layer === data.layer; })[0];
+            return row ? row.total : 0;
+        }
+
         function render(data) {
             hide('impact-loading');
             var nodes = data.nodes || [];
@@ -125,9 +137,9 @@
             var edges = data.edges || [];
 
             if (clusters) {
-                text('impact-counts', data.total + ' elements, drawn one circle per layer. Click a layer to open it.');
+                text('impact-counts', ofTotal(data.total, data.store_total) + ' elements, drawn one circle per layer. Click a layer to open it.');
             } else {
-                text('impact-counts', nodes.length + ' elements · ' + edges.length + ' relationships'
+                text('impact-counts', ofTotal(nodes.length, layerTotal(data)) + ' elements · ' + edges.length + ' relationships'
                     + (data.truncated ? ' · first ' + data.max_nodes + ' shown, pick a layer to narrow it' : ''));
             }
 

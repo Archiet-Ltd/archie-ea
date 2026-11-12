@@ -67,21 +67,27 @@ def origin_sentence(source_kind: Optional[str], source_label: Optional[str], sou
 def layer_counts() -> List[Dict[str, Any]]:
     """One row per layer: its key, label and the count of the organisation's model elements, and the kinds in it.
 
-    The counts come from count_layers (its ``model`` figure: the elements the map draws), so the tab on the
-    architecture dashboard, the Composer's layer card and this map read one count."""
+    The counts come from count_layers: ``count`` is the ``model`` figure (the elements the map draws), ``total`` the
+    figure on the architecture dashboard's tab and the Composer's layer card, and ``not_drawn`` the records the
+    layer lists that the map does not draw, so drawn plus not drawn is the dashboard's figure on every layer."""
     from app.models.archimate_core import ArchiMateElement
     from app.services import archimate_viewpoint_service as counting
     from app.utils.tenant_sql import current_org_id
 
     org_id = current_org_id()
-    model = {row["layer"]: row["model"] for row in counting.count_layers(org_id)}
+    rows = {row["layer"]: row for row in counting.count_layers(org_id)}
     type_column = db.func.coalesce(ArchiMateElement.type, "Unspecified")
     out = []
     for key in LAYERS:
         kinds = counting.layer_model_query(_counting_layer(key), org_id).with_entities(
             type_column, db.func.count(ArchiMateElement.id)).group_by(type_column).all()
+        row = rows.get(_counting_layer(key), {})
+        drawn = row.get("model", 0)
+        # The dashboard's figure for the layer. A layer whose records could not be counted has no such figure:
+        # it is shown as drawn, with nothing said about records.
+        total = row["count"] if row.get("count") is not None else drawn
         out.append({
-            "layer": key, "label": LAYER_LABELS[key], "count": model.get(_counting_layer(key), 0),
+            "layer": key, "label": LAYER_LABELS[key], "count": drawn, "total": total, "not_drawn": total - drawn,
             "kinds": [{"type": t, "count": c} for t, c in sorted(kinds, key=lambda kv: (-kv[1], kv[0]))],
         })
     return out
@@ -97,8 +103,9 @@ def build_model_map(layer: Optional[str] = None) -> Dict[str, Any]:
 
     counts = layer_counts()
     total = sum(c["count"] for c in counts)
+    store_total = sum(c["total"] for c in counts)
     wanted = layer if layer in LAYERS else None
-    base = {"counts": counts, "total": total, "layer": wanted, "max_nodes": MAX_NODES}
+    base = {"counts": counts, "total": total, "store_total": store_total, "layer": wanted, "max_nodes": MAX_NODES}
 
     if wanted is None and total > MAX_NODES:
         nodes = [{"id": "layer:" + c["layer"], "name": c["label"], "layer": c["layer"], "count": c["count"],

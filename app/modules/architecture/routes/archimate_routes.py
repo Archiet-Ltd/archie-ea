@@ -7412,9 +7412,10 @@ def model_map_page():
     layer = layer if layer in model_map.LAYERS else ""
     counts = model_map.layer_counts()
     total = sum(c["count"] for c in counts)
+    store_total = sum(c["total"] for c in counts)
     return render_template(
         "architecture/impact_graph.html", element=None, decisions=[], model_map=True,
-        map_layer=layer, map_counts=counts, map_total=total,
+        map_layer=layer, map_counts=counts, map_total=total, map_store_total=store_total,
     )
 
 

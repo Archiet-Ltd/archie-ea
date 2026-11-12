@@ -43,7 +43,7 @@
     <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Show one layer">
       {{ button(text='All layers', variant='default' if not map_layer else 'outline', size='sm', href=url_for('archimate.model_map_page'), testid='model-map-all-layers') }}
       {% for c in map_counts if c.count %}
-      {{ button(text=c.label ~ ' (' ~ c.count ~ ')', variant='default' if map_layer == c.layer else 'outline', size='sm', href=url_for('archimate.model_map_page', layer=c.layer), testid='model-map-layer-' ~ c.layer) }}
+      {{ button(text=c.label ~ ' (' ~ c.count ~ (' of ' ~ c.total if c.not_drawn else '') ~ ')', variant='default' if map_layer == c.layer else 'outline', size='sm', href=url_for('archimate.model_map_page', layer=c.layer), testid='model-map-layer-' ~ c.layer) }}
       {% endfor %}
     </div>
     {% else %}
@@ -101,10 +101,21 @@
           {% for c in map_counts if c.count %}
           <li class="flex items-center justify-between gap-2" data-layer="{{ c.layer }}" data-testid="model-map-legend-{{ c.layer }}">
             <span class="flex items-center gap-2 min-w-0"><span class="inline-block h-3 w-3 shrink-0 rounded-full border-2 bg-notation-{{ c.layer }} border-notation-{{ c.layer }}-stroke"></span><span class="truncate">{{ c.label }}</span></span>
-            <span class="tabular-nums text-muted-foreground" data-testid="model-map-count-{{ c.layer }}">{{ c.count }}</span>
+            <span class="tabular-nums whitespace-nowrap text-muted-foreground" data-testid="model-map-count-{{ c.layer }}">{{ c.count }}{% if c.not_drawn %} of {{ c.total }}{% endif %}</span>
           </li>
           {% endfor %}
         </ul>
+        {% set undrawn = map_counts | selectattr('not_drawn') | list %}
+        {% if undrawn %}
+        <div class="mt-3 text-xs text-muted-foreground" data-testid="model-map-not-drawn">
+          <p>{{ undrawn | sum(attribute='not_drawn') }} elements entered in a register are not drawn on the map, by layer:</p>
+          <ul class="mt-1 space-y-0.5">
+            {% for c in undrawn %}
+            <li data-testid="model-map-not-drawn-{{ c.layer }}">{% if c.layer != 'other' %}<a class="underline underline-offset-2 hover:text-foreground" href="{{ url_for('archimate_crud.dashboard', layer=c.layer) }}">{{ c.label }}</a>{% else %}{{ c.label }}{% endif %}: {{ c.not_drawn }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
       </div>
       <div class="mt-4 pt-4 border-t border-border">
         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Selected</h3>

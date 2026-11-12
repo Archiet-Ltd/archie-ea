@@ -76,7 +76,7 @@ def test_every_layer_has_one_count_on_the_dashboard_the_composer_and_the_model_m
             button = page.get_by_test_id("model-map-layer-" + key)
             wanted = EXPECTED[name] - off_map[name]
             if wanted:
-                expect(button).to_contain_text("(%d)" % wanted)
+                expect(button).to_contain_text(re.compile(r"\(%d( of %d)?\)" % (wanted, EXPECTED[name])))
                 on_map[key] = _number(button.inner_text().split("(")[-1])
             else:
                 expect(button).to_have_count(0)
