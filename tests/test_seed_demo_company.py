@@ -496,8 +496,18 @@ def test_demo_page_returns_200_with_description(app, db_session, make_org, clien
     assert "water-monitoring" in html
 
 
-def test_demo_page_shows_not_seeded_when_no_org(app, client):
-    """When the org hasn't been seeded, the page shows a helpful message."""
+def test_demo_page_shows_not_seeded_when_no_org(app, client, db_session):
+    """When the org hasn't been seeded, the page shows a helpful message.
+
+    A database another run has already seeded holds the organisation, so the
+    test sets aside any Lantern Quay organisation inside its own transaction
+    (rolled back with it) to start from the unseeded state it describes.
+    """
+    from app.models.organization import Organization
+
+    for existing in Organization.query.filter_by(slug="lantern-quay").all():
+        existing.slug = "set-aside-%d" % existing.id
+    db_session.flush()
     resp = client.get("/demo/lantern-quay")
     assert resp.status_code == 200
     html = resp.data.decode("utf-8")
