@@ -34,16 +34,19 @@
 
     <!-- Risk Summary -->
     <div class="grid gap-4 md:grid-cols-4">
-        {{ metrics_card(title='Total gaps', value=gaps|length|default(0), icon='target') }}
-        {{ metrics_card(title='Critical or high gaps', value=gaps|selectattr('rated_severity', 'in', ['high', 'critical'])|list|length|default(0), icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
-        {{ metrics_card(title='Medium gaps', value=gaps|selectattr('rated_severity', 'equalto', 'medium')|list|length|default(0), icon='alert-circle', icon_class='!text-warning', value_class='text-warning') }}
-        {{ metrics_card(title='Low gaps', value=gaps|selectattr('rated_severity', 'equalto', 'low')|list|length|default(0), icon='info', icon_class='!text-success', value_class='text-success') }}
+        {{ metrics_card(title='Total gaps', value=counts.total, icon='target') }}
+        {{ metrics_card(title='Critical or high gaps', value=counts.high, icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
+        {{ metrics_card(title='Medium gaps', value=counts.medium, icon='alert-circle', icon_class='!text-warning', value_class='text-warning') }}
+        {{ metrics_card(title='Low gaps', value=counts.low, icon='info', icon_class='!text-success', value_class='text-success') }}
     </div>
 
     <!-- Gaps Table -->
     <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="p-6">
             <h3 class="font-semibold mb-4">Gaps</h3>
+            {% if counts.total > shown %}
+            <p class="text-sm text-muted-foreground mb-4" data-testid="gap-rows-note">Showing {{ shown }} of {{ counts.total }} gaps. <a href="{{ url_for('enterprise.gap_analysis') }}" class="font-medium text-primary hover:underline">Open the Gaps page</a> to see them all.</p>
+            {% endif %}
             <div class="overflow-x-auto">
                 <table class="dense-table w-full">
                     <thead>
