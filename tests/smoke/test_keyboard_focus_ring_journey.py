@@ -54,14 +54,38 @@ READ = """() => {
 }"""
 
 
+# Marks the control that has focus before a Tab, so the control Tab leaves
+# can be read straight after. With nothing focused (after a blur, which keeps
+# the Tab starting point on the control blurred) the last mark stays.
+MARK = """() => { const e = document.activeElement; if (!e || e === document.body) return;
+  document.querySelectorAll('[data-focus-left]').forEach(x => x.removeAttribute('data-focus-left'));
+  e.setAttribute('data-focus-left', ''); }"""
+
+# The control Tab just left: does its ring linger (still drawn, or fading out
+# because its outline is animated), so that two controls look focused?
+LEFT = """() => { const e = document.querySelector('[data-focus-left]');
+  if (!e || e === document.activeElement) return null;
+  const c = getComputedStyle(e);
+  const drawn = c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0
+    && !/rgba\\(\\s*0,\\s*0,\\s*0,\\s*0\\s*\\)|transparent/.test(c.outlineColor);
+  const props = c.transitionProperty.split(',').map(x => x.trim());
+  const secs = c.transitionDuration.split(',').map(x => parseFloat(x));
+  const fades = c.outlineStyle !== 'none' && props.some((p, i) =>
+    ['all', 'outline', 'outline-color'].includes(p) && secs[i % secs.length] > 0);
+  return (drawn || fades) ? (e.getAttribute('aria-label') || e.innerText || e.tagName).replace(/\\s+/g, ' ').trim() : null; }"""
+
+
 def _reach(page, label, limit=120):
     """Press Tab until the page's own control with this name (inside main, not
     the sidebar link of the same name) has focus; return its reading."""
+    page.evaluate(MARK)
     page.evaluate("() => { window.scrollTo(0, 0); document.activeElement && document.activeElement.blur(); }")
     for _ in range(limit):
+        page.evaluate(MARK)
         page.keyboard.press("Tab")
         stop = page.evaluate(READ)
         if stop and stop["inMain"] and stop["label"] == label:
+            stop["left"] = page.evaluate(LEFT)
             return stop
     return None
 
@@ -131,6 +155,9 @@ def test_tabbing_shows_a_focus_ring(browser, live_server, seeded, linked_data, w
             stop = _reach(page, label)
             if stop is None:
                 missing.append(label)
+                continue
+            if stop["left"]:
+                bare.append("%s (the control Tab left, %s, still shows its ring as it fades)" % (label, stop["left"]))
                 continue
             if stop["fades"]:
                 bare.append("%s (its ring fades in from transparent)" % label)

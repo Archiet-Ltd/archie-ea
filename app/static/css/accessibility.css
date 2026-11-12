@@ -61,6 +61,14 @@ textarea:focus-visible {
         opacity, transform, translate, scale, rotate, width, height, padding;
 }
 
+/* And it leaves the moment the keyboard does. The library's outline-none is a
+   transparent solid outline, which those same transitions faded out over the
+   control Tab had left, so two controls looked focused at once. With no outline
+   at all when not focused, the ring is removed at once. */
+.outline-none:not(:focus-visible) {
+    outline-style: none;
+}
+
 /* Ensure mouse clicks don't show focus ring */
 *:focus:not(:focus-visible) {
     outline: none;
