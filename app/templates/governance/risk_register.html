@@ -31,7 +31,7 @@
     {% macro _ps_actions() %}
         {% if can_write %}{{ button(text='Add Risk', icon='plus', on_click='openCreate()') }}{% endif %}
     {% endmacro %}
-    {{ page_shell(title='Risk Register', subtitle='Enterprise architecture risk tracking and mitigation', actions_caller=_ps_actions) }}
+    {{ page_shell(title='Risk Register', subtitle='Enterprise architecture risk tracking and mitigation', breadcrumb=[('Home', '/'), ('Risk Register', none)], actions_caller=_ps_actions) }}
     {% if not can_write %}
         {% call quiet_alert('info', testid='risk-register-view-only') %}You can view this register. Ask an administrator for edit access.{% endcall %}
     {% endif %}

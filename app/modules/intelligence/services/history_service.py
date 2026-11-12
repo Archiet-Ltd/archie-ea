@@ -348,7 +348,7 @@ SOURCE_OPTIONS = [("", "Every source")] + list(SOURCE_LABELS.items())
 
 _ACTION_LABELS = {"insert": "Created", "update": "Updated", "delete": "Deleted"}
 _ACTION_VARIANTS = {"insert": "success", "update": "info", "delete": "danger"}
-_HIDDEN_FIELDS = frozenset(["id", "organization_id", "lock_version", "source_id", "target_id", "architecture_id"])
+_HIDDEN_FIELDS = frozenset(["id", "organization_id", "lock_version", "source_id", "target_id", "architecture_id", "risk_id", "entity_id"])
 
 
 def _hidden(name: str) -> bool:

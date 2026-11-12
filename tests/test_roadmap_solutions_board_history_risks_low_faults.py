@@ -132,6 +132,7 @@ def test_mapping_a_risk_shows_in_the_change_history(app, client, login_as, db_se
     assert "Risk mapping" in page
     assert "Billing outage %s mapped to Ledger %s" % (suffix, suffix) in page
     assert "Dana Okoye" in page
+    assert "Risk id:" not in page and "Entity id:" not in page
 
     login_as(client, other)
     theirs_page = _text(client.get("/intelligence/history/changes").get_data(as_text=True))
