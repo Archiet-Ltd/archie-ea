@@ -102,7 +102,7 @@ def test_the_tree_all_button_raises_no_console_error(browser, live_server, world
         _login(page, live_server, world["emails"]["portfolio_manager"])
         page.goto(live_server + "/capability-map/tree/capability", timeout=PAGE_TIMEOUT)
         page.wait_for_load_state("load")
-        button = page.get_by_role("button", name="All", exact=True)
+        button = page.locator("#main-content").get_by_role("button", name="All", exact=True)
         expect(button).to_be_visible(timeout=PAGE_TIMEOUT)
         del errors[:]
         button.click()
