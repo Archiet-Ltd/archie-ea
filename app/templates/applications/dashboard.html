@@ -6,6 +6,9 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input, textarea %}
+{% from 'components/form_field.html' import form_field, form_group %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/alert.html' import alert %}
 {% from 'macros/nav_macros_shadcn.html' import pill_tabs, tab_panel with context %}
 {% from 'macros/page_shell.html' import page_shell %}
 
@@ -39,6 +42,7 @@
 <script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
 <script src="{{ url_for('static', filename='js/applications/technology_links.js') }}"></script>
 {% endif %}
+<script src="{{ url_for('static', filename='js/applications/vendor_links.js') }}"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     if (typeof mermaid !== 'undefined') {
@@ -53,10 +57,10 @@
 {# ─────────────────────────────────────────────────────────────────────────────
    Retired Banner
 ───────────────────────────────────────────────────────────────────────────── #}
-{% if app and (app.deployment_status == 'retired' or app.lifecycle_status == 'retired') %}
+{% if app and (is_end_of_life(app.deployment_status) or app.lifecycle_status == 'retired') %}
 <div class="mb-4 flex items-center gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2">
   <i data-lucide="alert-triangle" class="h-5 w-5 text-destructive shrink-0" aria-hidden="true"></i>
-  <span class="text-sm font-semibold text-destructive-emphasis">RETIRED — This application has been decommissioned and is no longer active.</span>
+  <span class="text-sm font-semibold text-destructive-emphasis">{% if (app.deployment_status or '').strip().lower() == 'retiring' %}RETIRING — This application is being phased out.{% else %}RETIRED — This application has been decommissioned and is no longer active.{% endif %}</span>
 </div>
 {% endif %}
 
@@ -81,7 +85,7 @@
   {% call button(variant='primary', type='submit', attrs_dict={'form': "overview-edit-form"}) %}
     <i data-lucide="save" class="w-4 h-4 mr-2" aria-hidden="true"></i>Save
   {% endcall %}
-  {% else %}
+  {% elif can('edit', 'application') %}
   <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}?edit=1&tab={{ resolved_tab }}"
      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
     <i data-lucide="pencil" class="w-4 h-4 mr-2" aria-hidden="true"></i>Edit
@@ -135,7 +139,7 @@
     {% if app.deployment_status %}
     {% set ds = app.deployment_status | lower %}
     {% if ds == 'production' %}{% call badge(variant='success') %}{{ app.deployment_status | replace('_',' ') | title }}{% endcall %}
-    {% elif ds in ['retired', 'deprecated'] %}{% call badge(variant='destructive') %}{{ app.deployment_status | replace('_',' ') | title }}{% endcall %}
+    {% elif is_end_of_life(ds) %}{% call badge(variant='destructive') %}{{ app.deployment_status | replace('_',' ') | title }}{% endcall %}
     {% elif ds in ['development', 'testing', 'staging'] %}{% call badge(variant='warning') %}{{ app.deployment_status | replace('_',' ') | title }}{% endcall %}
     {% else %}{% call badge(variant='neutral') %}{{ app.deployment_status | replace('_',' ') | title }}{% endcall %}
     {% endif %}
@@ -161,7 +165,7 @@
    Data Completeness Nudge Banner — shown only when completeness < 40%
 ───────────────────────────────────────────────────────────────────────────── #}
 {% if app and app.completeness_score < 40 %}
-<div class="mb-4 bg-warning/10 border border-warning/30 rounded-lg"
+<div id="completeness-banner" class="mb-4 bg-warning/10 border border-warning/30 rounded-lg"
      x-data="{ dismissed: false }" x-show="!dismissed">
   <div class="px-4 py-3 flex items-center justify-between gap-4">
     <div class="flex items-center gap-3">
@@ -171,8 +175,11 @@
           Data completeness: {{ app.completeness_score }}% — AI analysis quality is low
         </p>
         <p class="text-xs text-warning-emphasis/80 mt-0.5">
-          Missing: {{ app.completeness_gaps | join(', ') }}. Fill these in to improve AI architect responses.
+          Missing: {% for gap in app.completeness_gaps %}{% set note = (completeness_notes or {}).get(gap) %}{{ gap }}{% if note %} ({{ note.text }}; <a class="underline hover:no-underline" href="{{ url_for('unified_applications.application_detail', id=app.id, tab=note.tab) }}">record it</a>){% endif %}{{ ', ' if not loop.last else '' }}{% endfor %}. Fill these in to improve AI architect responses.
         </p>
+        {% if completeness_notes %}
+        <p class="text-xs text-warning-emphasis/80 mt-0.5">The score counts only facts recorded on the application. Links in the model are not counted until you record them.</p>
+        {% endif %}
       </div>
     </div>
     <div class="flex items-center gap-2 flex-shrink-0">
@@ -186,11 +193,11 @@
    Metric Cards (app detail) or Portfolio Stats (portfolio dashboard)
 ───────────────────────────────────────────────────────────────────────────── #}
 {% if metric_cards is defined and metric_cards %}
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
   {% for card_data in metric_cards %}
   <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-4">
     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ card_data.label }}</p>
-    <p class="mt-1 text-2xl font-bold text-foreground">{{ card_data.value }}</p>
+    <p class="mt-1 text-xl font-bold text-foreground break-words">{{ card_data.value }}</p>
     {% if card_data.delta %}
     <p class="mt-1 text-xs text-muted-foreground truncate" title="{{ card_data.delta }}">{{ card_data.delta }}</p>
     {% endif %}
@@ -243,7 +250,7 @@
   {'id': 'architecture',    'label': 'Architecture',     'count': (archimate_relationships.incoming | length + archimate_relationships.outgoing | length) if archimate_relationships else 0},
   {'id': 'capabilities',    'label': 'Capabilities',     'count': (capabilities | default([], true)) | length},
   {'id': 'processes',       'label': 'Processes',        'count': (business_processes | default([], true)) | length},
-  {'id': 'vendors',         'label': 'Vendors',          'count': (vendor_products | default([], true)) | length},
+  {'id': 'vendors',         'label': 'Vendors',          'count': ((vendors_tab_count | default(0)) or none)},
   {'id': 'motivation',      'label': 'Motivation',       'count': (archimate_relationships.incoming + archimate_relationships.outgoing) | selectattr('layer', 'equalto', 'Motivation') | list | length if archimate_relationships else 0},
   {'id': 'dependencies',    'label': 'Dependencies',     'count': (archimate_relationships.incoming | length + archimate_relationships.outgoing | length) if archimate_relationships else 0},
   {'id': 'ea-workflows',    'label': 'EA Workflows',     'count': none},
@@ -272,8 +279,13 @@
   {% call tab_panel('overview', active=(resolved_tab == 'overview')) %}
   <div class="space-y-6">
     {% if edit_mode %}
-    <form id="overview-edit-form" method="POST" action="{{ url_for('application_mgmt.update_overview', id=app.id) }}">
+    <form id="overview-edit-form" method="POST" action="{{ url_for('unified_applications.update_overview', id=app.id) }}">
       {{ input(type="hidden", name="csrf_token", value=(csrf_token())) }}
+      {% if form_errors %}
+      <div class="mb-4" data-testid="overview-form-errors">
+        {% call alert('danger', title='Nothing was saved') %}Fix the {{ 'field' if form_errors | length == 1 else form_errors | length ~ ' fields' }} marked below and save again: {{ form_errors.values() | join(' ') }}{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
+      </div>
+      {% endif %}
     {% endif %}
 
     {# Contract expiry warning #}
@@ -290,12 +302,8 @@
 
     <div class="grid grid-cols-1 gap-6">
 
-      {# Application Identity #}
-      <div data-slot="card" class="rounded-lg border border-border bg-card">
-        <div class="flex flex-col space-y-1.5 p-6 pb-3">
-          <h2 class="text-lg font-semibold">Application Identity</h2>
-        </div>
-        <div class="p-6 pt-0 space-y-3 text-sm">
+      {# Application Identity: drawn only when it has rows to show #}
+      {% set identity_has_rows = edit_mode or app.application_code or app.application_type or app.application_category or app.deployment_model or app.lifecycle_status or app.architecture_domain or app.version %}
           {% macro detail_row(label, value) %}
           {% if value %}
           <div class="flex justify-between gap-4">
@@ -305,26 +313,32 @@
           {% endif %}
           {% endmacro %}
 
-          {% macro edit_row(label, name, value, maxlength=255) %}
-          <div class="flex justify-between items-center gap-4">
-            <label for="edit-{{ name }}" class="block text-sm font-medium text-muted-foreground mb-1 shrink-0">{{ label }}</label>
-            {{ input(type="text", id="edit-" ~ (name), name=(name), value=(value or ''), class='h-9 w-2/3 transition-colors', attrs_dict={'maxlength': (maxlength)}) }}
-          </div>
+          {% macro edit_row(label, name, value) %}
+          {{ form_field(id='edit-' ~ name, name=name, label=label, value=(form_values[name] if name in form_values else (value or '')), error=form_errors.get(name), attrs_dict={'maxlength': field_limits[name]}) }}
           {% endmacro %}
+      {% if identity_has_rows %}
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
+        <div class="flex flex-col space-y-1.5 p-6 pb-3">
+          <h2 class="text-lg font-semibold">Application Identity</h2>
+        </div>
+        <div class="p-6 pt-0 space-y-3 text-sm">
 
           {% if edit_mode %}
           {{ edit_row('Name', 'name', app.name) }}
           {{ detail_row('Application Code', app.application_code) }}
-          {{ detail_row('Type', app.application_type | replace('_',' ') | title if app.application_type else none) }}
-          {{ edit_row('Category', 'application_category', app.application_category, 100) }}
-          {{ edit_row('Deployment Status', 'deployment_status', app.deployment_status, 50) }}
+          {{ detail_row('Type', app.application_type | title_keep_caps if app.application_type else none) }}
+          {{ edit_row('Category', 'application_category', app.application_category) }}
+          {% set status_now = form_values['deployment_status'] if 'deployment_status' in form_values else app.deployment_status %}
+          {% call form_group(id='edit-deployment_status', label='Deployment Status', error=form_errors.get('deployment_status')) %}
+            {% call native_select(id='edit-deployment_status', name='deployment_status', size='sm', class='w-full', selected=(match_status(status_now) or status_now), options=[('', 'Not set')] + status_options(status_now or app.deployment_status)) %}{% endcall %}
+          {% endcall %}
           {{ detail_row('Lifecycle Status', app.lifecycle_status | replace('_',' ') | title if app.lifecycle_status else none) }}
           {{ detail_row('Architecture Domain', app.architecture_domain) }}
-          {{ edit_row('Version', 'version', app.version, 50) }}
+          {{ edit_row('Version', 'version', app.version) }}
           {% else %}
           {{ detail_row('Application Code', app.application_code) }}
-          {{ detail_row('Type', app.application_type | replace('_',' ') | title if app.application_type else none) }}
-          {{ detail_row('Category', app.application_category | replace('_',' ') | title if app.application_category else none) }}
+          {{ detail_row('Type', app.application_type | title_keep_caps if app.application_type else none) }}
+          {{ detail_row('Category', app.application_category | title_keep_caps if app.application_category else none) }}
           {{ detail_row('Deployment Model', app.deployment_model | replace('_',' ') | title if app.deployment_model else none) }}
           {{ detail_row('Lifecycle Status', app.lifecycle_status | replace('_',' ') | title if app.lifecycle_status else none) }}
           {{ detail_row('Architecture Domain', app.architecture_domain) }}
@@ -332,6 +346,7 @@
           {% endif %}
         </div>
       </div>
+      {% endif %}
 
       {# ArchiMate Element — connects portfolio to architecture #}
       {% if archimate_info is defined and archimate_info %}
@@ -390,23 +405,20 @@
         </div>
         <div class="p-6 pt-0 space-y-3 text-sm">
           {% if edit_mode %}
-          {{ edit_row('Business Domain', 'businessDomain', app.business_domain, 100) }}
+          {{ edit_row('Business Domain', 'businessDomain', app.business_domain) }}
           {{ detail_row('Strategic Importance', app.strategic_importance | replace('_',' ') | title if app.strategic_importance else none) }}
           {{ detail_row('Business Value', app.business_value | replace('_',' ') | title if app.business_value else none) }}
-          {{ detail_row('Competitive Advantage', 'Yes' if app.competitive_advantage else 'No' if app.competitive_advantage is not none else none) }}
+          {{ detail_row('Competitive Advantage', 'Yes' if app.competitive_advantage else 'Not recorded') }}
           {{ detail_row('Differentiation Level', app.differentiation_level | replace('_',' ') | title if app.differentiation_level else none) }}
           {{ detail_row('User Base Size', app.user_base_size | string if app.user_base_size else none) }}
-          <div class="flex justify-between items-center gap-4">
-            <label for="edit-userCount" class="block text-sm font-medium text-muted-foreground mb-1 shrink-0">User Count</label>
-            {{ input(type="number", id="edit-userCount", name="userCount", value=(app.user_count or ''), class='h-9 w-2/3 transition-colors', attrs_dict={'min': "0", 'max': "10000000"}) }}
-          </div>
+          {{ form_field(id='edit-userCount', name='userCount', label='User Count', type='number', value=(form_values['userCount'] if 'userCount' in form_values else (app.user_count | string if app.user_count is not none else '')), error=form_errors.get('userCount'), attrs_dict={'min': '0', 'max': '10000000'}) }}
           {{ detail_row('Avg Daily Users', app.average_daily_users | string if app.average_daily_users else none) }}
           {{ detail_row('Max Concurrent Users', app.concurrent_users_max | string if app.concurrent_users_max else none) }}
           {% else %}
           {{ detail_row('Business Domain', app.business_domain) }}
           {{ detail_row('Strategic Importance', app.strategic_importance | replace('_',' ') | title if app.strategic_importance else none) }}
           {{ detail_row('Business Value', app.business_value | replace('_',' ') | title if app.business_value else none) }}
-          {{ detail_row('Competitive Advantage', 'Yes' if app.competitive_advantage else 'No' if app.competitive_advantage is not none else none) }}
+          {{ detail_row('Competitive Advantage', 'Yes' if app.competitive_advantage else 'Not recorded') }}
           {{ detail_row('Differentiation Level', app.differentiation_level | replace('_',' ') | title if app.differentiation_level else none) }}
           {{ detail_row('User Base Size', app.user_base_size | string if app.user_base_size else none) }}
           {{ detail_row('User Count', app.user_count | string if app.user_count else none) }}
@@ -472,9 +484,9 @@
     <div class="grid grid-cols-1 gap-6">
       {% if edit_mode %}
       <div data-slot="card" class="rounded-lg border border-border bg-card">
-        <div class="flex flex-col space-y-1.5 p-6 pb-3"><label for="edit-description" class="block text-sm font-medium text-muted-foreground mb-1 text-lg">Description</label></div>
+        <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">About this application</h3></div>
         <div class="p-6 pt-0">
-          {% call textarea(id='edit-description', name='description', rows=4) %}{{ app.description or '' }}{% endcall %}
+          {{ form_field(id='edit-description', name='description', label='Description', input_type='textarea', rows=4, value=(form_values['description'] if 'description' in form_values else (app.description or '')), error=form_errors.get('description'), attrs_dict={'maxlength': field_limits['description']}) }}
         </div>
       </div>
       {% elif app.description %}
@@ -990,7 +1002,7 @@
      TAB: VENDORS
   ═══════════════════════════════════════════════════════════════════════════ #}
   {% call tab_panel('vendors', active=(resolved_tab == 'vendors')) %}
-  <div class="space-y-6">
+  <div class="space-y-6" data-vendor-links x-data="vendorLinks({{ url_for('application_mgmt.application_vendor_link', id=app.id) | tojson | forceescape }})">
 
     {# Vendor summary #}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1007,6 +1019,58 @@
         <p class="mt-1 text-sm font-medium text-foreground truncate" title="{{ primary_vendor_label }}">{{ primary_vendor_label }}</p>
       </div>
     </div>
+
+    {# The vendor the register holds for this application #}
+    <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="vendor-organisations">
+      <div class="flex flex-col space-y-1.5 p-6 pb-3">
+        <h3 class="text-lg font-semibold">Vendor organisations</h3>
+        <p class="text-sm text-muted-foreground">The vendor recorded for this application in the vendor register.</p>
+      </div>
+      <div class="p-6 pt-0">
+        {% if vendor_organisations %}
+        <ul class="divide-y divide-border">
+          {% for vendor in vendor_organisations %}
+          <li class="flex items-center justify-between gap-3 py-2 text-sm" data-testid="vendor-organisation-row">
+            <span class="font-medium text-foreground">{{ vendor.name }}</span>
+            <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=vendor.id) }}"
+               class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Open vendor</a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="vendor-organisations-empty">No vendor is recorded for this application yet.{% if supplier_links %} The model links {{ supplier_links | length }} supplier{{ '' if supplier_links | length == 1 else 's' }} to it; record one below.{% endif %}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Suppliers the model links to the application but the register does not hold #}
+    {% if supplier_links %}
+    <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="suppliers-linked">
+      <div class="flex flex-col space-y-1.5 p-6 pb-3">
+        <h3 class="text-lg font-semibold">Suppliers linked in the model</h3>
+        <p class="text-sm text-muted-foreground">Business actors the architecture model links to this application. They are not counted as vendors until you record one.</p>
+      </div>
+      <div class="p-6 pt-0">
+        <ul class="divide-y divide-border">
+          {% for supplier in supplier_links %}
+          <li class="flex items-center justify-between gap-3 py-2 text-sm" data-testid="supplier-linked-row">
+            <div class="min-w-0">
+              <span class="font-medium text-foreground">{{ supplier.name }}</span>
+              <span class="ml-2 text-xs text-muted-foreground">{{ supplier.rel_type | replace('Relationship', '') | lower }}</span>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <a href="{{ url_for('architect_ui.element_traceability', element_id=supplier.id) }}"
+                 class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">What it connects to</a>
+              {% if can('edit', 'application') %}
+              {% call button(variant='outline', on_click="record({ id: " ~ supplier.id ~ ", name: " ~ (supplier.name | tojson | forceescape) ~ " })", aria_label="Record " ~ supplier.name ~ " as vendor") %}Record as vendor{% endcall %}
+              {% endif %}
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
 
     {# Vendor Footprint Table #}
     <div data-slot="card" class="rounded-lg border border-border bg-card">
@@ -1111,6 +1175,7 @@
           {% endif %}
           {% endmacro %}
           {{ tech_row('Technology Stack', app.technology_stack) }}
+          {% if app.authentication_method %}<div class="flex justify-between"><span class="text-muted-foreground">Authentication Method</span><span>{{ app.authentication_method }}</span></div>{% endif %}
           {{ tech_row('Programming Languages', app.programming_languages) }}
           {{ tech_row('Frameworks', app.frameworks) }}
           {{ tech_row('Database Platforms', app.database_platforms) }}

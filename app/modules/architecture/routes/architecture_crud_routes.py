@@ -751,14 +751,16 @@ def api_application_technology_links(application_id):
     """API: the nodes and system software an application is mapped to."""
     from app.modules.architecture.services.application_technology_links import (
         TechnologyLinkError,
+        list_linked,
         list_links,
     )
 
     try:
         links = list_links(application_id)
+        linked = list_linked(application_id)
     except TechnologyLinkError as exc:
         return _technology_link_error(exc)
-    return jsonify({"status": "success", "links": links})
+    return jsonify({"status": "success", "links": links, "linked": linked})
 
 
 @architecture_crud_bp.route(

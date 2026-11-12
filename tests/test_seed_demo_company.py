@@ -108,7 +108,7 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
     assert stats["capabilities_created"] == 24
     assert stats["risks_created"] == 10
     assert stats["programmes_created"] == 5
-    assert stats["work_packages_created"] == 12
+    assert stats["work_packages_created"] == 29
     assert stats["plateaus_created"] == 5
     assert stats["gaps_created"] == 10
     assert stats["demo_user_created"] == 1
@@ -132,7 +132,7 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
     assert counts["capabilities"] == 24
     assert counts["risks"] == 10
     assert counts["programmes"] == 5
-    assert counts["work_packages"] == 12
+    assert counts["work_packages"] == 29
     # Every seeded work package must carry the organisation so it is visible
     # under the tenant filter used by TenantMixin models.
     from app.models import ArchiMateElement
@@ -856,10 +856,10 @@ def test_work_packages_have_owner_initiative_and_connections(app, db_session, ma
     from app.models.unified_work_package import UnifiedWorkPackage
 
     stats = _seed_once()
-    assert stats["work_packages_linked"] == 12
+    assert stats["work_packages_linked"] == 29
     org_id = _get_lantern_org_id()
     wps = UnifiedWorkPackage.query.filter_by(organization_id=org_id).all()
-    assert len(wps) == 12
+    assert len(wps) == 29
     for wp in wps:
         assert wp.owner_id is not None, wp.name
         assert wp.enterprise_initiative_id is not None, wp.name
@@ -1219,13 +1219,32 @@ def test_no_retired_demonstration_name_or_address_remains_in_the_code():
     assert not hits, hits
 
 
+def _forget_demo_evidence(org_id):
+    """Take the evidence off every demonstration mapping, so a seed that follows has to write it."""
+    from app.models.application_compliance import ApplicationComplianceControl
+
+    for row in ApplicationComplianceControl.query.filter_by(organization_id=org_id).all():
+        row.evidence_url = None
+        row.notes = None
+
+
 def test_every_compliance_mapping_that_is_under_way_or_finished_points_at_its_evidence(app, db_session, make_org, tenant_ctx):
-    """A control the demonstration reports as implemented, verified or in progress names the document that shows it,
-    so the control page does not say the evidence is missing for work the demonstration says is done."""
+    """A control the demonstration reports as implemented, verified or in progress names the page that shows its
+    evidence, so the control page does not say the evidence is missing. The evidence is taken off first, so the
+    addresses read here are the ones the seed has just written."""
+    import re
+
     from app.models.application_compliance import ApplicationComplianceControl
 
     _seed_once()
     org_id = _get_lantern_org_id()
+    with tenant_ctx(org_id):
+        _forget_demo_evidence(org_id)
+        db_session.flush()
+        assert ApplicationComplianceControl.query.filter(
+            ApplicationComplianceControl.organization_id == org_id,
+            ApplicationComplianceControl.evidence_url.isnot(None)).count() == 0
+    _seed_once()
     with tenant_ctx(org_id):
         rows = ApplicationComplianceControl.query.filter_by(organization_id=org_id).all()
         assert len(rows) > 100
@@ -1233,40 +1252,78 @@ def test_every_compliance_mapping_that_is_under_way_or_finished_points_at_its_ev
         assert under_way
         assert [r.id for r in under_way if not r.evidence_url] == []
         assert all(r.evidence_url is None for r in rows if r.implementation_status == "planned")
-        # the address opens a document inside the app, never a host outside it
-        outside = [r.evidence_url for r in under_way if not r.evidence_url.startswith("/applications/documents/")]
+        # the address opens that control's own page inside the app, never a host outside it or a bare file
+        outside = [r.evidence_url for r in under_way
+                   if r.evidence_url != "/dashboard/compliance/controls/%d/evidence" % r.id]
         assert outside == []
+        assert all(r.notes for r in under_way)
+        assert re.match(r"^/dashboard/compliance/controls/\d+/evidence$", under_way[0].evidence_url)
 
 
-def test_every_evidence_address_names_a_seeded_document_with_content_of_the_same_organisation(app, db_session, make_org, tenant_ctx):
-    """The address behind an Evidence document link is the document of that application, it exists in the
-    organisation's own documents, its file is there and it lists the control the mapping is for."""
-    import re
-
+def test_every_evidence_address_names_a_seeded_document_with_content_of_the_same_organisation(app, db_session, make_org, tenant_ctx, client, login_as):
+    """The address behind an Evidence document link is the page of that control, it shows the control and its
+    evidence, and it answers only to the organisation that owns it. A second organisation has evidence of its
+    own, and each organisation is refused the other's page."""
     from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.application_portfolio import ApplicationComponent
     from app.models.compliance_models import ComplianceControl
-    from app.models.miscellaneous import ApplicationDocument
+    from app.models.user import User
+    from app.modules.account.services.onboarding_service import _adopt_frameworks
+    from app.modules.compliance.services.applicability_service import ApplicabilityService
+    from tests.test_work_package_writer import _user
 
     _seed_once()
     org_id = _get_lantern_org_id()
     other = make_org("other-evidence")
+    other_user = _user(db_session, other, "other-evidence", role="enterprise_architect")
+    other_id, other_user_id = other.id, other_user.id
+    with tenant_ctx(org_id):
+        _forget_demo_evidence(org_id)
+        db_session.flush()
+    _seed_once()
     with tenant_ctx(org_id):
         rows = ApplicationComplianceControl.query.filter(
             ApplicationComplianceControl.organization_id == org_id,
-            ApplicationComplianceControl.evidence_url.isnot(None)).all()
+            ApplicationComplianceControl.evidence_url.isnot(None)).order_by(ApplicationComplianceControl.id).all()
         assert rows
-        for row in rows:
-            doc_id = int(re.match(r"^/applications/documents/(\d+)/download\?view=1$", row.evidence_url).group(1))
-            doc = ApplicationDocument.query.filter_by(id=doc_id).one()
-            assert doc.organization_id == org_id and doc.organization_id != other.id
-            assert doc.application_component_id == row.application_id
-            text = open(doc.file_path, encoding="utf-8").read()
-            assert ComplianceControl.query.get(row.control_id).control_code in text
+        mid = rows[len(rows) // 2]
+        picked = [(r.id, r.evidence_url, ComplianceControl.query.get(r.control_id).control_code, r.notes)
+                  for r in (rows[0], mid, rows[-1])]
+        assert all(r.evidence_url == "/dashboard/compliance/controls/%d/evidence" % r.id for r in rows)
+        lantern_user_id = User.query.filter_by(organization_id=org_id).order_by(User.id).first().id
+
+    # the second organisation holds evidence of its own
+    with tenant_ctx(other_id):
+        _adopt_frameworks(other_id, ["iso27001"])
+        foreign_app = ApplicationComponent(name="Other ledger", organization_id=other_id)
+        db_session.add(foreign_app)
+        db_session.flush()
+        control = ComplianceControl.query.filter_by(control_code=picked[0][2]).first()
+        foreign = ApplicabilityService.link_requirement(other_id, foreign_app.id, control.id, "verified")
+        foreign.notes = "Other organisation's own evidence."
+        foreign_address = "/dashboard/compliance/controls/%d/evidence" % foreign.id
+        foreign.evidence_url = foreign_address
+        db_session.flush()
+
+    for row_id, address, code, notes in picked:
+        assert address == "/dashboard/compliance/controls/%d/evidence" % row_id
+        login_as(client, lantern_user_id)
+        page = client.get(address)
+        assert page.status_code == 200
+        body = page.get_data(as_text=True)
+        assert code in body and notes in body
+        login_as(client, other_user_id)
+        assert client.get(address).status_code == 404
+    login_as(client, lantern_user_id)
+    assert client.get(foreign_address).status_code == 404
+    login_as(client, other_user_id)
+    assert "Other organisation&#39;s own evidence." in client.get(foreign_address).get_data(as_text=True)
 
 
 def test_seeding_again_changes_no_compliance_figure(app, db_session, make_org, tenant_ctx):
     """Seed, change nothing, seed again: the status of every mapping and the evidence it names are those of a
-    fresh seed. A mapping left at an earlier status is brought to the seed's."""
+    fresh seed. A change a person made to a mapping survives the second seed, and a mapping with no evidence
+    gets the seed's."""
     from app.models.application_compliance import ApplicationComplianceControl
 
     def figures(org_id):
@@ -1277,16 +1334,30 @@ def test_seeding_again_changes_no_compliance_figure(app, db_session, make_org, t
     org_id = _get_lantern_org_id()
     with tenant_ctx(org_id):
         fresh = figures(org_id)
-        # an organisation seeded earlier: one mapping at an old status, one pointing outside the app
         rows = ApplicationComplianceControl.query.filter_by(organization_id=org_id).order_by(ApplicationComplianceControl.id).all()
-        old = [r for r in rows if r.implementation_status == "verified"][0]
-        old.implementation_status = "planned"
-        old.evidence_url = "https://evidence.example.com/old.pdf"
+        # a person's change in the demonstration: one verified mapping moved back with an address of their own
+        changed = [r for r in rows if r.implementation_status == "verified"][0]
+        changed.implementation_status = "planned"
+        changed.evidence_url = "https://evidence.example.com/mine.pdf"
+        changed.notes = "My own note."
+        # a mapping with no evidence at all
+        bare = [r for r in rows if r.implementation_status == "implemented" and r.id != changed.id][0]
+        bare_address = bare.evidence_url
+        bare.evidence_url = None
+        bare.notes = None
         db_session.flush()
-        assert figures(org_id) != fresh
+        changed_key = (str(changed.application_id), str(changed.control_id))
+        changed_id, bare_id = changed.id, bare.id
     _seed_once()
     with tenant_ctx(org_id):
-        assert figures(org_id) == fresh
+        after = figures(org_id)
+        kept = [row for row in after if (row[0], row[1]) == changed_key][0]
+        assert kept[2] == "planned" and kept[3] == "https://evidence.example.com/mine.pdf"
+        assert ApplicationComplianceControl.query.get(changed_id).notes == "My own note."
+        restored = ApplicationComplianceControl.query.get(bare_id)
+        assert restored.evidence_url == bare_address and restored.notes
+        expected = [row for row in fresh if (row[0], row[1]) != changed_key]
+        assert [row for row in after if (row[0], row[1]) != changed_key] == expected
     _seed_once()
     with tenant_ctx(org_id):
-        assert figures(org_id) == fresh
+        assert figures(org_id) == after

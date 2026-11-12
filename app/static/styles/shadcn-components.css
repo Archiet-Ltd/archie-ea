@@ -394,3 +394,31 @@
 .table-responsive table {
     min-width: 640px;
 }
+
+/* A Product's layer tables keep the element's name in view while the columns beside it scroll: the first column
+   (heading and cell) is frozen at every width, and the last column scrolls with the rest instead of floating over
+   them. The name wraps within a fixed width so it never covers the other columns. */
+#main-content [data-table-id^="product-layer-table-"] .workbench-table-scroll.overflow-x-auto table thead th:first-child,
+#main-content [data-table-id^="product-layer-table-"] .workbench-table-scroll.overflow-x-auto table tbody td:first-child {
+    position: sticky;
+    left: 0;
+    min-width: 8rem;
+    max-width: 11rem;
+    white-space: normal;
+}
+
+#main-content [data-table-id^="product-layer-table-"] .workbench-table-scroll.overflow-x-auto table thead th:first-child {
+    z-index: 2;
+    background-color: hsl(var(--muted));
+}
+
+#main-content [data-table-id^="product-layer-table-"] .workbench-table-scroll.overflow-x-auto table tbody td:first-child {
+    z-index: 1;
+    background-color: hsl(var(--card));
+}
+
+#main-content [data-table-id^="product-layer-table-"] .workbench-table-scroll.overflow-x-auto table thead th:last-child,
+#main-content [data-table-id^="product-layer-table-"] .workbench-table-scroll.overflow-x-auto table tbody td:last-child {
+    position: static;
+    background-color: transparent;
+}

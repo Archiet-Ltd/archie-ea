@@ -41,6 +41,7 @@ MODULE_ICONS = {
     "build-your-model-from-your-tools": "unplug",
     "scenario-modelling": "git-compare",
     "software-and-tool-discovery": "search",
+    "sysml-to-archimate": "route",
     "applications": "app-window",
     "arb": "gavel",
     "architecture-model": "boxes",
@@ -809,7 +810,7 @@ def test_use_case_answer_figure_still_renders_without_a_figure_band_section(app,
 def test_every_module_page_declares_a_known_icon():
     module_dir = CONTENT_ROOT / "modules"
     files = sorted(module_dir.glob("*.md"))
-    assert len(files) == 31
+    assert len(files) == 32
     known = set(MODULE_ICONS.values())
     for md_file in files:
         front = md_file.read_text(encoding="utf-8").split("---", 2)[1]

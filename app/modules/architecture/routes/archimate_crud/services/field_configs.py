@@ -238,6 +238,9 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Outcome',
         description='An end result achieved or to be achieved by a stakeholder',
         fields=[
+            ElementField(name='outcome_type', label='Outcome Type', field_type='select',
+                options=[FieldOption('business','Business'), FieldOption('technical','Technical'),
+                         FieldOption('operational','Operational')], grid_column=1),
             ElementField(name='kpi_metric', label='Measurement / KPI', field_type='text',
                 placeholder='e.g., NPS > 50, Uptime 99.9%', grid_column=2),
         ]
@@ -278,6 +281,8 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Business Role',
         description='The responsibility for performing specific behavior',
         fields=[
+            ElementField(name='actor_type', label='Assigned Actor Type', field_type='select',
+                options=ACTOR_TYPES, grid_column=1),
         ]
     ),
     'BusinessProcess': ElementTypeConfig(
@@ -289,6 +294,8 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
             ElementField(name='process_type', label='Process Type', field_type='select',
                 options=[FieldOption('core','Core'), FieldOption('supporting','Supporting'),
                          FieldOption('management','Management')], grid_column=1),
+            ElementField(name='apqc_code', label='APQC Code', field_type='text',
+                placeholder='e.g., 1.1.1', grid_column=2),
         ]
     ),
     'BusinessFunction': ElementTypeConfig(
@@ -299,6 +306,8 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         fields=[
             ElementField(name='capability_id', label='Capability', field_type='capability', required=True,
                 placeholder='Search capabilities', grid_column=1),
+            ElementField(name='domain', label='Domain', field_type='text',
+                placeholder='e.g., Finance, HR, Operations', grid_column=2),
         ]
     ),
     'BusinessService': ElementTypeConfig(
@@ -318,6 +327,9 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Business Object',
         description='A passive element that has relevance from a business perspective',
         fields=[
+            ElementField(name='lifecycle_state', label='Lifecycle State', field_type='select',
+                options=[FieldOption('draft','Draft'), FieldOption('active','Active'),
+                         FieldOption('archived','Archived')], grid_column=1),
         ]
     ),
     'ValueStream': ElementTypeConfig(
@@ -352,6 +364,14 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Application Service',
         description='An explicitly defined exposed application behavior',
         fields=[
+            ElementField(name='protocol', label='Protocol', field_type='select',
+                options=[FieldOption('rest','REST'), FieldOption('graphql','GraphQL'),
+                         FieldOption('soap','SOAP'), FieldOption('grpc','gRPC'),
+                         FieldOption('event','Event/Message')], grid_column=1),
+            ElementField(name='sla_tier', label='SLA Tier', field_type='select',
+                options=[FieldOption('tier1','Tier 1 – Mission Critical'),
+                         FieldOption('tier2','Tier 2 – Business Critical'),
+                         FieldOption('tier3','Tier 3 – Standard')], grid_column=2),
         ]
     ),
     'ApplicationInterface': ElementTypeConfig(
@@ -361,11 +381,9 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         description='A point of access where application services are made available',
         fields=[
             ElementField(name='interface_type', label='Interface Type', field_type='select',
-                options=[FieldOption('REST','REST'), FieldOption('SOAP','SOAP'),
-                         FieldOption('GraphQL','GraphQL'), FieldOption('gRPC','gRPC'),
-                         FieldOption('Message Queue','Message Queue'), FieldOption('Event Stream','Event Stream'),
-                         FieldOption('File Transfer','File Transfer'), FieldOption('Database','Database')],
-                grid_column=1),
+                options=[FieldOption(v, v) for v in (
+                    'REST', 'SOAP', 'GraphQL', 'gRPC', 'Message Queue', 'Event Stream',
+                    'File Transfer', 'Database', 'WebSocket', 'RPC')], grid_column=1),
         ]
     ),
     'DataObject': ElementTypeConfig(
@@ -509,6 +527,9 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
         display_name='Plateau',
         description='A relatively stable state of the architecture that exists during a limited period',
         fields=[
+            ElementField(name='plateau_type', label='Plateau Type', field_type='select',
+                options=[FieldOption('baseline','Baseline'), FieldOption('target','Target'),
+                         FieldOption('transition','Transition')], grid_column=1),
             ElementField(name='target_date', label='Target date', field_type='date',
                 placeholder='YYYY-MM-DD', grid_column=2),
         ]

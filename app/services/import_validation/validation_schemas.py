@@ -7,6 +7,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from app.services.application_status import (
+    APPLICATION_STATUS_VALUES,
+    OLD_STATUS_WORDS,
+    STATUS_SYNONYMS,
+)
+
 
 class FieldType(Enum):
     """Supported field data types"""
@@ -52,15 +58,34 @@ LIFECYCLE_STATUS_VALUES = [
     "retired",
 ]
 
-DEPLOYMENT_STATUS_VALUES = [
-    "planned",
-    "development",
-    "testing",
-    "staging",
-    "production",
-    "deprecated",
-    "retired",
-]
+# Support level / status as recorded on an application (free text on import).
+# The Tech Debt panel reads these lists: only SUPPORTED counts as good standing.
+SUPPORT_LEVEL_SUPPORTED = frozenset({
+    "supported", "active", "full", "mainstream", "basic", "standard", "premium", "custom",
+})
+SUPPORT_LEVEL_LIMITED = frozenset({"limited", "partial", "extended"})
+SUPPORT_LEVEL_UNSUPPORTED = frozenset({
+    "unsupported", "not supported", "no longer supported", "out of support", "end of support",
+    "end of life", "expired", "deprecated", "retired",
+})
+
+
+def classify_support_level(value) -> str:
+    """'supported', 'limited', 'unsupported', 'blank' or 'unrecognised' (any case and spacing)."""
+    text = " ".join(str(value or "").lower().replace("_", " ").replace("-", " ").split())
+    if not text:
+        return "blank"
+    if text in SUPPORT_LEVEL_UNSUPPORTED:
+        return "unsupported"
+    if text in SUPPORT_LEVEL_LIMITED:
+        return "limited"
+    if text in SUPPORT_LEVEL_SUPPORTED:
+        return "supported"
+    return "unrecognised"
+
+
+# The one list of deployment statuses: app/services/application_status.py.
+DEPLOYMENT_STATUS_VALUES = list(APPLICATION_STATUS_VALUES)
 
 COMPONENT_TYPE_VALUES = [
     "Web Application",
@@ -164,36 +189,9 @@ LIFECYCLE_STATUS_ALIASES: Dict[str, str] = {
 }
 
 DEPLOYMENT_STATUS_ALIASES: Dict[str, str] = {
-    "prod": "production",
-    "live": "production",
-    "operational": "production",
-    "running": "production",
-    "active": "production",
-    "done": "production",
-    "dev": "development",
-    "developing": "development",
-    "in dev": "development",
-    "under development": "development",
-    "test": "testing",
-    "qa": "testing",
-    "uat": "testing",
-    "in test": "testing",
-    "in testing": "testing",
-    "stage": "staging",
-    "preprod": "staging",
-    "pre-prod": "staging",
-    "pre-production": "staging",
-    "deprecated": "deprecated",
-    "legacy": "deprecated",
-    "sunset": "deprecated",
-    "decommissioned": "retired",
-    "eol": "retired",
-    "end-of-life": "retired",
-    "removed": "retired",
-    "inactive": "retired",
-    "planned": "planned",
-    "proposed": "planned",
-    "pending": "planned",
+    **STATUS_SYNONYMS,
+    # Older words (planned, deprecated, retired ...) mean a value on the one list.
+    **OLD_STATUS_WORDS,
 }
 
 COMPONENT_TYPE_ALIASES: Dict[str, str] = {

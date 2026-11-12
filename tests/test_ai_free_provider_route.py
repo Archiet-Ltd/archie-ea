@@ -293,7 +293,7 @@ def test_chat_reports_the_failure_when_every_free_route_is_out_of_quota(app, mon
 
 def test_nvidia_default_is_a_model_the_service_serves():
     """The earlier default is listed by NVIDIA but answers 404, so every fallback turn failed."""
-    assert default_model_for("nvidia") == "nvidia/nemotron-3-ultra-550b-a55b"
+    assert default_model_for("nvidia") == "mistralai/mistral-large-4-1t-a52b"
     for path in (
         "app/modules/ai_chat/services/llm_router.py",
         "app/modules/admin/routes/admin_routes.py",

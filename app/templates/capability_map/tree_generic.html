@@ -16,7 +16,7 @@
 {% endblock %}
 
 {% block extra_css %}
-<style>
+<style nonce="{{ csp_nonce }}">
     #tree-container svg text { cursor: pointer; transition: fill 0.15s; user-select: none; }
     #tree-container svg text:hover { fill: hsl(var(--primary)); }
     .ctx-menu {
@@ -76,7 +76,7 @@
     <!-- Tree + Detail -->
     <div class="flex gap-6">
         <div class="flex-1 bg-card rounded-lg border border-border overflow-hidden min-h-[500px]">
-            <div id="tree-container" class="w-full h-full min-h-[500px]"></div>
+            <div id="tree-container" data-csp-nonce="{{ csp_nonce }}" class="w-full h-full min-h-[500px]"></div>
             <div x-show="nodeCount === 0 && !loading" x-cloak class="flex flex-col items-center justify-center py-24 text-center">
                 <i data-lucide="tree-pine" class="w-12 h-12 text-muted-foreground/40 mb-4"></i>
                 <p class="text-lg font-medium text-muted-foreground">No items yet</p>

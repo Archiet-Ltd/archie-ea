@@ -4,6 +4,7 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'components/list_table.html' import list_table %}
 {% if technology_cost_shares is defined and technology_cost_shares is not none %}
+{% set linked_count = technology_linked_count | default(0) %}
 <section id="technology-cost-shares" data-testid="technology-cost-shares-section" class="space-y-4 rounded-lg border border-border bg-card p-6" aria-labelledby="technology-cost-shares-heading">
   <div class="space-y-1">
     <h3 id="technology-cost-shares-heading" class="text-lg font-semibold text-foreground">Share of technology costs</h3>
@@ -12,11 +13,14 @@
   {% call(row) list_table(rows=technology_cost_shares, columns=[('Technology', ''), {'label': 'Total a year', 'align': 'right', 'class': 'hidden sm:table-cell'}, {'label': 'Applications served', 'align': 'right', 'class': 'hidden sm:table-cell'}, {'label': 'Share', 'align': 'right'}],
                           caption='Share of technology costs for this application', testid='app-technology-costs', row_testid='app-technology-cost-row',
                           toolbar=false,
-                          empty_message='This application is not mapped to any technology yet, so it carries no technology cost. Add a node or system software above.') %}
+                          empty_message=(linked_count ~ ' technology element' ~ ('' if linked_count == 1 else 's') ~ ' linked in the model, none recorded as runs on, so this application carries no technology cost until you record one.') if linked_count else 'This application is not mapped to any technology yet, so it carries no technology cost. Add a node or system software above.') %}
     {% call ui.table_cell(class='font-medium') %}<a class="text-primary underline hover:underline" data-testid="app-technology-cost-link" href="{{ url_for('archimate_crud.detail_element', layer='technology', element_type=row.type, element_id=row.element_id, ae=1) }}#technology-cost">{{ row.name }}</a>{% endcall %}
     {% call ui.table_cell(class='hidden text-right tabular-nums sm:table-cell', attrs={'data-testid': 'app-technology-cost-total'}) %}{% if row.total is not none %}{{ '{:,.2f}'.format(row.total) }} {{ row.currency }}{% elif row.missing %}<span class="text-muted-foreground">No exchange rate on file</span>{% else %}<span class="text-muted-foreground">No cost recorded</span>{% endif %}{% endcall %}
     {% call ui.table_cell(class='hidden text-right tabular-nums sm:table-cell') %}{{ row.served }}{% endcall %}
     {% call ui.table_cell(class='text-right tabular-nums', attrs={'data-testid': 'app-technology-cost-share'}) %}{% if row.share is not none %}{{ '{:,.2f}'.format(row.share) }} {{ row.currency }}{% elif row.missing %}<span class="text-muted-foreground">No exchange rate on file</span>{% else %}<span class="text-muted-foreground">No cost recorded</span>{% endif %}{% endcall %}
   {% endcall %}
+  {% if linked_count and not technology_cost_shares %}
+  <p class="text-sm"><a class="text-primary underline hover:underline" href="#techstack-heading" data-testid="cost-share-runs-on-link">Go to the Runs on card to record them</a></p>
+  {% endif %}
 </section>
 {% endif %}

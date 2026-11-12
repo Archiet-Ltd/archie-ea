@@ -116,14 +116,14 @@
     --layer-risk-emphasis: 0 84% 42%;
 
     /* ArchiMate 3.2 notation colours, as the standard teaches them: strategy tan, business yellow, application
-       blue, technology and physical green, motivation lilac, implementation pink, migration pale green,
+       blue, technology green, physical teal (the standard draws it green too; here it is told apart from technology), motivation lilac, implementation pink, migration pale green,
        location orange. Fill and hairline stroke per layer. The composer canvas, its palette and its legend
        read these and nothing else. */
     --notation-strategy: 39 78% 83%;        --notation-strategy-stroke: 38 55% 38%;
     --notation-business: 60 100% 85%;       --notation-business-stroke: 55 70% 33%;
     --notation-application: 180 100% 86%;   --notation-application-stroke: 190 80% 28%;
     --notation-technology: 104 45% 80%;     --notation-technology-stroke: 120 45% 28%;
-    --notation-physical: 104 45% 80%;       --notation-physical-stroke: 120 45% 28%;
+    --notation-physical: 165 45% 78%;       --notation-physical-stroke: 165 55% 24%;
     --notation-motivation: 240 100% 90%;    --notation-motivation-stroke: 250 40% 42%;
     --notation-implementation: 0 100% 91%;  --notation-implementation-stroke: 0 50% 42%;
     --notation-migration: 120 70% 90%;      --notation-migration-stroke: 130 45% 32%;
@@ -197,7 +197,7 @@
     --notation-business: 58 45% 22%;        --notation-business-stroke: 56 65% 62%;
     --notation-application: 190 50% 22%;    --notation-application-stroke: 190 60% 65%;
     --notation-technology: 125 35% 22%;     --notation-technology-stroke: 125 40% 62%;
-    --notation-physical: 125 35% 22%;       --notation-physical-stroke: 125 40% 62%;
+    --notation-physical: 165 35% 22%;       --notation-physical-stroke: 165 45% 62%;
     --notation-motivation: 250 35% 26%;     --notation-motivation-stroke: 250 60% 74%;
     --notation-implementation: 0 35% 25%;   --notation-implementation-stroke: 0 60% 72%;
     --notation-migration: 130 35% 22%;      --notation-migration-stroke: 130 45% 62%;

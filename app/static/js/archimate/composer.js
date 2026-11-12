@@ -781,8 +781,9 @@ function composerApp() {
         elementCount: 0,
         relCount: 0,
 
-        /* Wave 10: Quality score + stale tracking */
-        qualityScore: null,
+        /* Stale tracking */
+        layerCards: [],
+        layerCardsTotal: 0,
         staleCount: 0,
         _staleElementIds: [],
 
@@ -903,6 +904,7 @@ function composerApp() {
         /* GAP-CMP-002: Quick validation badge counts */
         validationErrors: 0,
         validationWarnings: 0,
+        openedLayer: '',
         _quickValidationTimer: null,
 
         /* CMP-043: Custom properties state */
@@ -1740,6 +1742,12 @@ function composerApp() {
                 let cell = cellView.model;
                 let elId = cell.get('elementId');
 
+                /* A layer card on the overview opens that layer. */
+                if (cell.get('isLayerSummary')) {
+                    self.openLayer(cell.get('summaryLayer'));
+                    return;
+                }
+
                 /* Connect mode: first click picks source; second click picks target + opens picker */
                 if (self.connectModeActive && !cell.get('isLayerZone') && !cell.get('isAnnotation') && elId) {
                     if (!self.connectModeSource) {
@@ -2172,6 +2180,15 @@ function composerApp() {
 
             /* ── Port affordance discovery hint (ENT-120) ── */
             this.paper.on('element:mouseenter', function(cellView) {
+                /* A long name is cut to one line inside its box so the type label stays readable: the full name is the hover text. */
+                if (cellView && cellView.el && cellView.model && !cellView.el.querySelector(':scope > title')) {
+                    let full = cellView.model.attr('nameLabel/text');
+                    if (full) {
+                        let tip = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                        tip.textContent = full;
+                        cellView.el.insertBefore(tip, cellView.el.firstChild);
+                    }
+                }
                 if (self.mode === 'view') return;
                 /* CMP-14 (revised): only raise the hovered element when it
                    ACTUALLY overlaps a neighbour — the case where its ports would
@@ -2544,13 +2561,6 @@ function composerApp() {
                     }
                 }
             }, 10000);
-
-            /* ── Wave 10: Load quality score for solution ── */
-            if (self.solutionId) {
-                Platform.fetch('/api/solutions/' + self.solutionId + '/quality-score', { silent: true })
-                    .then(function(data) { if (data) self.qualityScore = data; })
-                    .catch(function() { /* swallow-ok: unrequested enrichment fetched on canvas open; qualityScore stays null so the toolbar badge (x-if="qualityScore") is simply absent — it never shows a made-up percentage — and a network failure or non-ok response while opening the canvas must not interrupt the modelling task with a toast about a badge */ });
-            }
 
             /* ── Check for saved viewpoint_id in URL ── */
             let urlParams = new URLSearchParams(window.location.search);
@@ -3782,54 +3792,14 @@ function composerApp() {
             cell.set('maturityData', m);
         },
 
-        /* ── GAP-CMP-002: Quick validation badge ─────────── */
+        /* ── GAP-CMP-002: Quick validation badge ───────────
+           The counts come from the same pass as the quality figure
+           (computeComplianceScore), so the badge and the figure always agree. */
         _runQuickValidation: function() {
             let self = this;
             if (self._quickValidationTimer) clearTimeout(self._quickValidationTimer);
             self._quickValidationTimer = setTimeout(function() {
-                let errors = 0;
-                let warnings = 0;
-                let elements = self.graph.getElements().filter(function(c) {
-                    return !c.get('isLayerZone') && !c.get('isAnnotation');
-                });
-                let links = self.graph.getLinks();
-                let nameMap = {};
-
-                /* Error: self-relationships */
-                links.forEach(function(link) {
-                    let src = link.get('source');
-                    let tgt = link.get('target');
-                    if (src && tgt && src.id && tgt.id && src.id === tgt.id) {
-                        errors++;
-                    }
-                });
-
-                /* Warning: orphan elements (0 connections) — only when 2+ elements exist */
-                if (elements.length >= 2) {
-                    elements.forEach(function(cell) {
-                        let connected = self.graph.getConnectedLinks(cell);
-                        if (connected.length === 0) {
-                            warnings++;
-                        }
-                    });
-                }
-
-                /* Warning: duplicate names */
-                elements.forEach(function(cell) {
-                    let name = (cell.get('elName') || '').trim().toLowerCase();
-                    if (name) {
-                        if (nameMap[name]) {
-                            /* Count only once per duplicate group */
-                            if (nameMap[name] === 1) warnings++;
-                            nameMap[name]++;
-                        } else {
-                            nameMap[name] = 1;
-                        }
-                    }
-                });
-
-                self.validationErrors = errors;
-                self.validationWarnings = warnings;
+                self.computeComplianceScore();
             }, 300);
         },
 
@@ -4209,6 +4179,18 @@ function composerApp() {
                 verticalAlign: 'middle'
             });
             this.zoomPercent = Math.round(this.paper.scale().sx * 100);
+            this._scheduleMiniMapUpdate();
+        },
+
+        /* Every way of opening a drawing (a viewpoint, a saved view, a snapshot) fits it, then keeps it
+           readable: a large model fitted whole is a wall of shapes at 10%, so it opens at 50% on the
+           top-left of the drawing (Ctrl+0 still fits all). */
+        fitCanvasReadable: function() {
+            this.fitCanvas();
+            if (!this.paper || this.zoomPercent >= 50) return;
+            let area = this.graph.getBBox(this.graph.getElements());
+            this.setZoom(50);
+            if (area) this.paper.translate(40 - area.x * 0.5, 40 - area.y * 0.5);
             this._scheduleMiniMapUpdate();
         },
 
