@@ -7,6 +7,21 @@
 (function (global) {
     'use strict';
 
+    /* The completeness banner is drawn by the server from the same links as the tabs:
+       swap in its current version so it never disagrees with what was just recorded. */
+    global.refreshCompletenessBanner = async function () {
+        var current = document.getElementById('completeness-banner');
+        if (!current) { return; }
+        var resp = await fetch(window.location.pathname, { credentials: 'same-origin' });
+        var doc = new DOMParser().parseFromString(await resp.text(), 'text/html');
+        var fresh = doc.getElementById('completeness-banner');
+        if (fresh) {
+            current.innerHTML = fresh.innerHTML;
+        } else {
+            current.remove();
+        }
+    };
+
     function vendorLinks(linkUrl) {
         return {
             saving: false,
@@ -21,6 +36,7 @@
                     );
                     Platform.toast.success(supplier.name + ' recorded as vendor.');
                     await this.refresh();
+                    await global.refreshCompletenessBanner();
                 } catch (err) {
                     Platform.toast.error((err && err.message) || 'The vendor could not be recorded.');
                 } finally {

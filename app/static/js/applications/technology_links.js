@@ -99,6 +99,7 @@
                 var doc = new DOMParser().parseFromString(await resp.text(), 'text/html');
                 var fresh = doc.getElementById('technology-cost-shares');
                 if (fresh) { section.innerHTML = fresh.innerHTML; }
+                if (global.refreshCompletenessBanner) { await global.refreshCompletenessBanner(); }
             },
 
             async remove(link) {

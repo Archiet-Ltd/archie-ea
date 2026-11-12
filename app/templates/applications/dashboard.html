@@ -165,7 +165,7 @@
    Data Completeness Nudge Banner — shown only when completeness < 40%
 ───────────────────────────────────────────────────────────────────────────── #}
 {% if app and app.completeness_score < 40 %}
-<div class="mb-4 bg-warning/10 border border-warning/30 rounded-lg"
+<div id="completeness-banner" class="mb-4 bg-warning/10 border border-warning/30 rounded-lg"
      x-data="{ dismissed: false }" x-show="!dismissed">
   <div class="px-4 py-3 flex items-center justify-between gap-4">
     <div class="flex items-center gap-3">
