@@ -924,7 +924,17 @@ def api_capability_choices():
 
 
 def _count_layer_elements(layer):
-    """Total element count for one layer, or None if it could not be counted.
+    """Total element count for one layer, or None if it could not be counted."""
+    parts = _layer_count_parts(layer)
+    return None if parts is None else parts[0] + parts[1]
+
+
+def _layer_count_parts(layer):
+    """The two parts of one layer's count: (records not in the model, model elements), or None.
+
+    The model elements are what the model map draws for the layer; the records are rows of the layer's own
+    tables that have no model element (a gap entered in the gap register), listed on the layer's page but
+    not drawn on the map. The page states the second number beside the first, so the two pages agree.
 
     Shared by the per-layer and batched endpoints so the two can never drift.
 
@@ -943,7 +953,7 @@ def _count_layer_elements(layer):
         return None
 
     layer_types = LAYER_CONFIG[layer]["elements"]
-    total = 0
+    records = 0
     # Count from dedicated per-type tables, EXCLUDING rows that are mirrored into
     # archimate_elements — those are added below, and counting both sides made the
     # page report every mirrored entity twice. A tenant with 71 elements was told
@@ -957,7 +967,7 @@ def _count_layer_elements(layer):
             q = model_class.query
             if hasattr(model_class, "archimate_element_id"):
                 q = q.filter(model_class.archimate_element_id.is_(None))
-            total += q.count()
+            records += q.count()
         except Exception as e:
             current_app.logger.warning(f"_count_layer_elements: count failed for {etype}: {e}")
             return None
@@ -974,12 +984,11 @@ def _count_layer_elements(layer):
         ae_count = ArchiMateElement.query.filter(
             db.func.lower(ArchiMateElement.layer).in_(_aliases),
         ).count()
-        total += ae_count
     except Exception as e:
         current_app.logger.warning(f"_count_layer_elements: archimate_elements count failed for {layer}: {e}")
         return None
 
-    return total
+    return records, ae_count
 
 
 @archimate_crud.route("/api/layer/<layer>/count")
@@ -1013,8 +1022,11 @@ def api_layer_counts():
     """
     # A layer that could not be counted is null, never 0 -- the dashboard renders
     # null as an em dash and falls back to the per-layer endpoint for it.
-    counts = {layer: _count_layer_elements(layer) for layer in LAYER_CONFIG}
-    return jsonify({"counts": counts})
+    parts = {layer: _layer_count_parts(layer) for layer in LAYER_CONFIG}
+    counts = {layer: None if p is None else p[0] + p[1] for layer, p in parts.items()}
+    # How many of each layer's records the model map does not draw, so the page can say so beside its count.
+    not_on_model_map = {layer: None if p is None else p[0] for layer, p in parts.items()}
+    return jsonify({"counts": counts, "not_on_model_map": not_on_model_map})
 
 
 @archimate_crud.route("/api/layer/<layer>/elements")
@@ -1185,12 +1197,15 @@ def api_layer_elements(layer):
             # Same alias matching as api_layer_count (ARCH-010) — otherwise the
             # listing silently omits the elements the count now includes, and the
             # catalogue page keeps rendering the layer as empty.
+            # With no type asked for, every element of the layer is listed, whatever its stored type: the
+            # layer's count has no type filter, and a list narrower than its own count read as a second number.
             ae_q = ArchiMateElement.query.filter(
                 db.func.lower(ArchiMateElement.layer).in_(
                     [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
                 ),
-                ArchiMateElement.type.in_(query_types),
             )
+            if type_filter:
+                ae_q = ae_q.filter(ArchiMateElement.type.in_(query_types))
             if search:
                 safe_s = escape_like_literal(search)
                 ae_q = ae_q.filter(
