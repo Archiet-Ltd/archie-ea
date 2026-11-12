@@ -378,7 +378,7 @@ def test_the_chat_refuses_a_status_change_the_form_refuses_and_an_editor_succeed
     procurement = _procurement_person(db_session, org_a)
     editor = _member(db_session, org_a, "architect")
     target = ApplicationComponent.query.filter_by(organization_id=org_a.id).first()
-    target.deployment_status = "planned"
+    target.deployment_status = "design"
     db_session.commit()
     target_id, target_name = target.id, target.name
 
@@ -396,7 +396,7 @@ def test_the_chat_refuses_a_status_change_the_form_refuses_and_an_editor_succeed
     refused = run_as(procurement, "testing")
     assert refused.get("success") is False, refused
     db_session.expire_all()
-    assert db_session.get(ApplicationComponent, target_id).deployment_status == "planned"
+    assert db_session.get(ApplicationComponent, target_id).deployment_status == "design"
 
     allowed = run_as(editor, "testing")
     assert allowed.get("success") is True, allowed
