@@ -213,6 +213,19 @@
         {% call form_group(id='cloud_provider', label='Cloud Provider') %}
           {{ input(type="text", id=("cloud_provider"), name=("cloud_provider"), value=(application.cloud_provider or ''), placeholder=("e.g. AWS, Azure, GCP, On-Prem"), size='sm', class="w-full") }}
         {% endcall %}
+        <div>
+          <label for="deployment_model" class="block text-sm font-medium text-muted-foreground mb-1">Hosting / Deployment Model</label>
+          {% set hosting_now = application.deployment_model or '' %}
+          {% call native_select(id=("deployment_model"), name=("deployment_model"), size='sm', class="w-full") %}
+            <option value="" {% if not hosting_now %}selected{% endif %}>Not set</option>
+            {% for val, label in [('on_premise', 'On-premise'), ('cloud', 'Cloud'), ('saas', 'SaaS'), ('hybrid', 'Hybrid'), ('mobile', 'Mobile')] %}
+            <option value="{{ val }}" {% if hosting_now == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            {% if hosting_now and hosting_now not in ['on_premise', 'cloud', 'saas', 'hybrid', 'mobile'] %}
+            <option value="{{ hosting_now }}" selected>{{ hosting_now | replace('_', ' ') | title }}</option>
+            {% endif %}
+          {% endcall %}
+        </div>
         {% call form_group(id='deployment_region', label='Deployment Region') %}
           {{ input(type="text", id=("deployment_region"), name=("deployment_region"), value=(application.deployment_region or ''), size='sm', class="w-full") }}
         {% endcall %}

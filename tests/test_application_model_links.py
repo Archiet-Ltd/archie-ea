@@ -230,7 +230,11 @@ def test_the_banner_names_what_is_linked_and_drops_the_note_once_recorded(
     assert client.post(VENDOR % a["app"], json={"element_id": a["actors"][0]}).status_code == 201
     with tenant_ctx(two_orgs["a"].id):
         sheet = build_fact_sheet(db.session.get(ApplicationComponent, a["app"]))
-    assert "Hosting / deployment" not in sheet["completeness"]["notes"]
+    # No ask for the link just recorded: the note now says what the score reads instead.
+    hosting = sheet["completeness"]["notes"]["Hosting / deployment"]
+    assert "none recorded as runs on" not in hosting["text"]
+    assert "the score counts the hosting description" in hosting["text"]
+    assert hosting["page"] == "edit" and hosting["field"] == "deployment_model"
     assert "Vendor" not in sheet["completeness"]["notes"]
 
 
