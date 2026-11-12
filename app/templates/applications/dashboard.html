@@ -461,7 +461,7 @@
         </div>
       </div>
 
-      {% include 'applications/_linked_requirements.html' with context %}
+      {% if not edit_mode %}{% include 'applications/_linked_requirements.html' with context %}{% endif %}
 
       {# Dates #}
       <div data-slot="card" class="rounded-lg border border-border bg-card">
@@ -545,6 +545,8 @@
     {% endif %}
 
     {% if edit_mode %}</form>{% endif %}
+    {# The link form is its own form, so it sits outside the edit form: a form inside a form is dropped by the browser and its required select would block Save. #}
+    {% if edit_mode %}{% include 'applications/_linked_requirements.html' with context %}{% endif %}
   </div>
   {% endcall %}{# /tab_panel overview #}
 
