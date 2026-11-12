@@ -721,9 +721,16 @@ def investment_priorities():
     Canonical URL under /architecture/ for ArchiMate architects.
     """
     # The tenant's configured currency, never a literal "$".
+    from flask_login import current_user
+
     from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
         currency_symbol as _currency_symbol,
-        limit_costs_to_viewer,
+    )
+    from app.services.cost_visibility import (
+        COSTS_WITHHELD,
+        INVESTMENT_MONEY_KEYS,
+        costs_visible,
+        withhold_costs,
     )
 
     currency_symbol = _currency_symbol()
@@ -745,7 +752,8 @@ def investment_priorities():
 
     result_footer_service.attach_capability_footers(current_org_id(), analysis["capability_scores"])
     # After the footers, which read the figures to say where each came from.
-    limit_costs_to_viewer(analysis)
+    if not costs_visible(current_user):
+        analysis = withhold_costs(analysis, keys=INVESTMENT_MONEY_KEYS)
 
     return render_template(
         "strategic/investment_matrix.html",
@@ -757,6 +765,7 @@ def investment_priorities():
         portfolio_metrics=analysis["portfolio_metrics"],
         recommendations=analysis["recommendations"],
         currency_symbol=currency_symbol,
+        costs_withheld_text=COSTS_WITHHELD,
     )
 
 
@@ -850,11 +859,13 @@ def ai_investment_suggestions():
     # analysis spans every organization on the install (see
     # _org_scoped_investment_context) — never hand it to the LLM as-is.
     # A person without spend authority gets suggestions drawn from an analysis with the money out.
-    from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
-        limit_costs_to_viewer,
-    )
+    from flask_login import current_user
 
-    org_context = _org_scoped_investment_context(limit_costs_to_viewer(analysis))
+    from app.services.cost_visibility import INVESTMENT_MONEY_KEYS, costs_visible, withhold_costs
+
+    if not costs_visible(current_user):
+        analysis = withhold_costs(analysis, keys=INVESTMENT_MONEY_KEYS)
+    org_context = _org_scoped_investment_context(analysis)
     if org_context is None:
         return jsonify({
             "suggestions": None,
