@@ -439,3 +439,25 @@ def test_the_empty_consolidation_opportunities_page_offers_its_next_step_once(br
     links.first.click()
     page.wait_for_load_state("domcontentloaded")
     expect(page.get_by_role("heading", name="Consolidation Candidates").first).to_be_visible()
+
+
+def test_a_person_without_budget_authority_sees_no_savings_figure_on_consolidation_opportunities(browser, server):
+    suffix = uuid.uuid4().hex[:6]
+    mine = create_fresh_org("enterprise_architect")
+    opportunity_id, target_id = _seed_opportunity(mine["org_id"], suffix)
+    try:
+        for width, dark in ((1440, False), (390, True)):
+            page = _context(browser, width, dark).new_page()
+            sign_in(page, server, mine["emails"]["enterprise_architect"])
+            page.goto(server + "/enterprise/consolidation/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            if page.get_by_test_id("early-access-page").count():
+                expect(page.get_by_test_id("early-access-submit")).to_be_visible()
+                return
+            expect(page.get_by_test_id("opportunities-savings")).to_contain_text("not shown for your role")
+            main = page.locator("main").inner_text()
+            for sign in ("$", "£", "€"):
+                assert sign not in main, (sign, main)
+            assert page.locator("[data-testid^='opportunities-savings-2']").count() == 0
+            _shot(page, "opportunities-restricted-%d" % width)
+    finally:
+        _drop_opportunity(opportunity_id, target_id)

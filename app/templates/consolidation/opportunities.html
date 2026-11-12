@@ -37,8 +37,6 @@
     <h2 class="text-lg font-semibold">Consolidation plans</h2>
     {% if forecast_failed %}
     {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'The savings forecast could not be calculated. Try again in a moment.', 'testid': 'opportunities-savings'}]) }}
-    {% elif not with_cost %}
-    {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'Savings figures are not shown for your role.', 'testid': 'opportunities-savings'}]) }}
     {% elif opportunities_included == 0 %}
     {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'No savings estimated yet: no opportunity has been included', 'testid': 'opportunities-savings'}]) }}
     {# With nothing ranked the one next step is the empty state above; it is not repeated here. #}
@@ -46,6 +44,8 @@
     <p class="text-sm text-muted-foreground">A saving is estimated once a plan is approved. Start from a consolidation candidate.
         <a href="{{ url_for('unified_low_priority.consolidation_candidates') }}" class="text-primary hover:underline" data-testid="savings-next-step">Review consolidation candidates</a></p>
     {% endif %}
+    {% elif forecast_by_year and not with_cost %}
+    {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'Savings figures are not shown for your role.', 'testid': 'opportunities-savings'}]) }}
     {% elif forecast_by_year %}
     {% set years = [] %}
     {% for year, amount in forecast_by_year.items() %}

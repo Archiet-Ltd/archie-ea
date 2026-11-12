@@ -149,7 +149,8 @@ def test_a_person_without_budget_authority_sees_the_opportunities_but_no_cost(br
             cell = costs.nth(i).inner_text()
             assert not any(ch.isdigit() for ch in cell) and cell.strip(), cell
         assert page.locator("[data-testid^='opportunities-savings-2']").count() == 0
-        expect(page.get_by_test_id("opportunities-savings")).to_contain_text("not shown for your role")
+        savings = page.get_by_test_id("opportunities-savings").inner_text()
+        assert savings.strip() and not any(ch.isdigit() for ch in savings), savings
         _shot(page, "consolidation-opportunities-restricted", viewport["width"])
     finally:
         page.close()
