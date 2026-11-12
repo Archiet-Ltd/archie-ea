@@ -12,7 +12,7 @@
     global.refreshCompletenessBanner = async function () {
         var current = document.getElementById('completeness-banner');
         if (!current) { return; }
-        var resp = await fetch(window.location.pathname, { credentials: 'same-origin' });
+        var resp = await fetch(window.location.pathname, { credentials: 'same-origin' }); // raw-fetch-ok: reads the server-drawn page HTML, not JSON
         var doc = new DOMParser().parseFromString(await resp.text(), 'text/html');
         var fresh = doc.getElementById('completeness-banner');
         if (fresh) {
@@ -46,7 +46,7 @@
 
             /* Swap in the server's current vendors panel contents. */
             async refresh() {
-                var resp = await fetch(window.location.pathname + '?tab=vendors', { credentials: 'same-origin' });
+                var resp = await fetch(window.location.pathname + '?tab=vendors', { credentials: 'same-origin' }); // raw-fetch-ok: reads the server-drawn page HTML, not JSON
                 var html = await resp.text();
                 var doc = new DOMParser().parseFromString(html, 'text/html');
                 var fresh = doc.querySelector('[data-vendor-links]');

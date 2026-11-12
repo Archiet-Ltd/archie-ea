@@ -95,7 +95,7 @@
             async refreshCostShares() {
                 var section = document.getElementById('technology-cost-shares');
                 if (!section) { return; }
-                var resp = await fetch(window.location.pathname + '?tab=technology', { credentials: 'same-origin' });
+                var resp = await fetch(window.location.pathname + '?tab=technology', { credentials: 'same-origin' }); // raw-fetch-ok: reads the server-drawn page HTML, not JSON
                 var doc = new DOMParser().parseFromString(await resp.text(), 'text/html');
                 var fresh = doc.getElementById('technology-cost-shares');
                 if (fresh) { section.innerHTML = fresh.innerHTML; }
