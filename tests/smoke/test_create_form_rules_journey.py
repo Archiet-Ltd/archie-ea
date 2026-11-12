@@ -67,7 +67,8 @@ def test_new_gap_opens_the_gap_form_and_each_rating_chosen_is_the_rating_saved(b
             expect(form).to_be_visible(timeout=PAGE_TIMEOUT)
             # The form is the Gap form, on the implementation tab, with Gap chosen and its fields shown.
             expect(form.get_by_label("Element Type")).to_have_value("Gap", timeout=PAGE_TIMEOUT)
-            assert "/architecture/implementation/Gap/new" in page.url
+            # The form opens on the Gaps page itself; the address does not change.
+            assert page.url.split("?")[0].endswith("/enterprise/implementation/gap-analysis")
             ratings = form.get_by_label(RATING)
             expect(ratings).to_have_value("medium")
             assert _offered(ratings) == ["Critical", "High", "Medium", "Low"]
@@ -79,6 +80,7 @@ def test_new_gap_opens_the_gap_form_and_each_rating_chosen_is_the_rating_saved(b
             _frame(page, "new-gap-%s" % rating.lower(), viewport, theme)
             form.get_by_role("button", name="Create").click()
             expect(form).to_be_hidden(timeout=PAGE_TIMEOUT)
+            assert page.url.split("?")[0].endswith("/enterprise/implementation/gap-analysis")
 
             page.goto(live_server + "/enterprise/implementation/gap-analysis", wait_until="domcontentloaded",
                       timeout=PAGE_TIMEOUT)
