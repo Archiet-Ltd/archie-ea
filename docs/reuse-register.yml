@@ -255,17 +255,29 @@ entries:
           follow-up: route through ApplicationOwner.display_rows_for_owner_rows
 
   - id: ai-chat-approval
-    concept: Approving or rejecting an AI chat change request (the approval gate)
+    concept: Settling an AI chat change request (checked, reviewed, then applied or declined by the server)
     status: active
     canonical:
       path: app/modules/ai_chat/services/ai_chat_approval_service.py
       symbols:
+        - AIChatApprovalService.settle_after_review
         - AIChatApprovalService.approve_and_execute
         - AIChatApprovalService.reject_approval
     reuse: >
-      Every approval goes through AIChatApprovalService.approve_and_execute / reject_approval so the approver is
-      recorded, the audit log is written, only a PENDING request can be claimed and self-approval is refused.
-      Never call approval.approve(...) or approval.reject(...) on the model from a route or another service.
+      A requested change is settled by AIChatApprovalService.settle_after_review, which runs the checks and the
+      model review in app/modules/ai_chat/services/change_review.py (the only caller of that module) and then
+      applies the change through approve_and_execute as the system, or declines it with reasons. Every apply
+      and every decline goes through approve_and_execute / reject_approval so the audit log is written and only
+      a PENDING request can be claimed. No second queue, no second reviewer, no route or service that writes the
+      status itself. Never call approval.approve(...) or approval.reject(...) on the model from a route or
+      another service. A person's Approve (the route, the inbox button and "approve it" in the chat) is a request
+      to settle: approve_and_execute sends a change the review settles through settle_after_review and applies
+      it only after a passing review; the settled_by_review flag is checked against the record's own passing
+      round. The charter rule is AgentCharter.tool_allowed, called from change_review.run_checks. A prompt that
+      leaves the server for a review or a revision goes through LLMModelRouter.call_model, which applies
+      llm_service_impl._scrub_prompt, and its data blocks are wrapped by architect_persona_charters.fence_untrusted
+      (no second fence). Who may act is the one sign-in rule, User.is_active (disabled_at), read in
+      AIChatApprovalService._acting_user. The address of a record is change_review.record_path.
     must_not_create:
       - id: approval-path
         regex: 'def\s+_?(approve_and_execute|reject_approval|approve_and_run|execute_approval\w*|approve_pending\w*)\s*\('
