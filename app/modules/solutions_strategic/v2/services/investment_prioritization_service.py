@@ -30,54 +30,6 @@ def currency_symbol() -> str:
     except Exception:
         return "£"
 
-COST_HIDDEN_NOTE = "Restricted to roles with budget authority"
-
-_PORTFOLIO_MONEY = (
-    "total_estimated_investment",
-    "critical_investment",
-    "high_investment",
-    "medium_investment",
-    "low_investment",
-)
-
-
-def hide_costs(analysis: Dict) -> Dict:
-    """Take every money figure out of an analysis, in place, and say that it was taken out.
-
-    A figure is replaced by ``None`` with a ``costs_hidden`` flag beside it, so a page can say the
-    figure is restricted rather than show a zero or "Not estimated". Priority, score and coverage
-    stay: only money is removed.
-    """
-    for cap in analysis.get("capability_scores") or []:
-        need = cap.get("investment_need") or {}
-        for key in ("estimated_cost", "budget_allocated", "budget_spent", "source"):
-            need[key] = None
-        need["cost_hidden"] = True
-        cap["investment_need"] = need
-        cap["estimated_cost"] = None
-        cap["linked_initiative_budget"] = None
-        cap["costs_hidden"] = True
-    metrics = analysis.get("portfolio_metrics") or {}
-    for key in _PORTFOLIO_MONEY:
-        metrics[key] = None
-    metrics["costs_hidden"] = True
-    for rec in analysis.get("recommendations") or []:
-        rec["estimated_cost"] = COST_HIDDEN_NOTE
-    analysis["costs_hidden"] = True
-    return analysis
-
-
-def limit_costs_to_viewer(analysis: Dict) -> Dict:
-    """Hide the money in an analysis unless the signed-in person may see cost (the one cost rule)."""
-    from flask_login import current_user
-
-    from app.utils.role_access import can_see_costs
-
-    if can_see_costs(current_user):
-        return analysis
-    return hide_costs(analysis)
-
-
 # Timeframe string → integer months for ROI calculator
 _TIMEFRAME_MONTHS: Dict[str, int] = {
     "12 - 18 months": 15,
