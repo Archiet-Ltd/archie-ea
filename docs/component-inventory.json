@@ -14299,10 +14299,8 @@
    "label": "name_of(row.element_id)",
    "line": null,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {
     "href": "{{ composer_url }}?element={{ row.element_id }}&from=answer"
    },
@@ -14317,10 +14315,8 @@
    "label": "View file on GitHub",
    "line": null,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {
     "href": "located[0].url"
    },
@@ -14335,10 +14331,8 @@
    "label": "link.source.name or '\u2014'",
    "line": null,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {
     "href": "link.source.href"
    },
@@ -14353,10 +14347,8 @@
    "label": "link.target.name or '\u2014'",
    "line": null,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {
     "href": "link.target.href"
    },
@@ -14371,10 +14363,8 @@
    "label": "decision.title",
    "line": null,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {
     "href": "decision.href"
    },
@@ -14389,10 +14379,8 @@
    "label": "Open relationship record",
    "line": null,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {
     "href": "/architecture/relationships?relationship={{ origin.relationship_id }}#relationship-{{ origin.relationship_id }}"
    },
@@ -14407,10 +14395,8 @@
    "label": "See every connection",
    "line": null,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {
     "href": "shown.page_url"
    },
@@ -14423,12 +14409,10 @@
    "id": "app/templates/ai_chat/_estate_answer.html::button::0",
    "kind": "button",
    "label": "Work them out now",
-   "line": 69,
+   "line": 73,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {},
    "template": "app/templates/ai_chat/_estate_answer.html",
    "testid": null,
@@ -14439,12 +14423,10 @@
    "id": "app/templates/ai_chat/_estate_answer.html::button::1",
    "kind": "button",
    "label": "Work them out now",
-   "line": 73,
+   "line": 77,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {},
    "template": "app/templates/ai_chat/_estate_answer.html",
    "testid": null,
@@ -14455,12 +14437,10 @@
    "id": "app/templates/ai_chat/_estate_answer.html::button::2",
    "kind": "button",
    "label": "Work them out now",
-   "line": 77,
+   "line": 81,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {},
    "template": "app/templates/ai_chat/_estate_answer.html",
    "testid": null,
@@ -14471,12 +14451,10 @@
    "id": "app/templates/ai_chat/_estate_answer.html::button::3",
    "kind": "button",
    "label": "Open this answer",
-   "line": 82,
+   "line": 86,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {
     "href": "shown.page_url"
    },
@@ -14491,10 +14469,22 @@
    "label": "p",
    "line": null,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
+   "target": {},
+   "template": "app/templates/ai_chat/_estate_answer.html",
+   "testid": "answer-sentence",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/ai_chat/_estate_answer.html::testid::1",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {},
    "template": "app/templates/ai_chat/_estate_answer.html",
    "testid": "answer-sentence",
@@ -14523,10 +14513,8 @@
    "label": "Open rationalization planning",
    "line": 100,
    "mutating": false,
-   "rendered_on": [
-    "/ai-chat/estate-answer"
-   ],
-   "rendered_on_count": 1,
+   "rendered_on": [],
+   "rendered_on_count": 0,
    "target": {
     "href": "planning_url"
    },
@@ -59616,7 +59604,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -59632,7 +59620,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -59648,7 +59636,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -59664,7 +59652,7 @@
    "line": 71,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/admin_header.html",
    "testid": null,
@@ -59678,7 +59666,7 @@
    "line": 80,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/admin_header.html",
    "testid": null,
@@ -59692,7 +59680,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "endpoint": "main.index",
     "href": "url_for('main.index')"
@@ -59709,7 +59697,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "sidebar-search-page",
@@ -59723,7 +59711,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "sidebar-search-record",
@@ -59737,7 +59725,7 @@
    "line": 236,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "href": "nav.connect_url"
    },
@@ -59753,7 +59741,7 @@
    "line": 283,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "endpoint": "account.login",
     "href": "url_for(\"account.login\")"
@@ -59770,7 +59758,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "active-organization-chip",
@@ -59784,7 +59772,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "sidebar-search-results",
@@ -59798,7 +59786,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "nav-main",
@@ -59812,7 +59800,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "nav-work",
@@ -59826,7 +59814,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "nav-model",
@@ -59840,7 +59828,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "connect-source-card",
@@ -59854,7 +59842,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "nav-secondary",
@@ -59868,7 +59856,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 424,
+   "rendered_on_count": 423,
    "target": {
     "href": "link_href"
    },
@@ -59884,7 +59872,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 424,
+   "rendered_on_count": 423,
    "target": {
     "button_type": "button"
    },
@@ -59900,7 +59888,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 424,
+   "rendered_on_count": 423,
    "target": {},
    "template": "app/templates/components/alert.html",
    "testid": "testid",
@@ -60340,7 +60328,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 444,
+   "rendered_on_count": 442,
    "target": {
     "href": "href"
    },
@@ -60420,7 +60408,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 446,
+   "rendered_on_count": 444,
    "target": {
     "href": "href"
    },
@@ -60436,7 +60424,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 446,
+   "rendered_on_count": 444,
    "target": {
     "button_type": "type",
     "data_action": "data_action"
@@ -61861,7 +61849,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 424,
+   "rendered_on_count": 423,
    "target": {
     "button_type": "button"
    },
@@ -61877,7 +61865,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 424,
+   "rendered_on_count": 423,
    "target": {
     "button_type": "button"
    },
@@ -61893,7 +61881,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 424,
+   "rendered_on_count": 423,
    "target": {},
    "template": "app/templates/components/dialog.html",
    "testid": null,
@@ -62191,7 +62179,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -62207,7 +62195,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/drawer.html",
    "testid": null,
@@ -62221,7 +62209,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "href": "item.href"
    },
@@ -62237,7 +62225,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -62253,7 +62241,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -62269,7 +62257,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "submit",
     "form_method": "POST"
@@ -62286,7 +62274,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button",
     "data_action": "item.data_action"
@@ -62303,7 +62291,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -62319,7 +62307,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "action": "item.post",
     "fields": [
@@ -62360,7 +62348,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "target": {
     "href": "cta_href"
    },
@@ -62376,7 +62364,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "target": {
     "href": "secondary_cta_href"
    },
@@ -62392,7 +62380,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "submit",
     "form_method": "POST"
@@ -62409,7 +62397,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -62425,7 +62413,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -62441,7 +62429,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "target": {
     "action": "cta_href",
     "fields": [
@@ -62461,7 +62449,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/empty_state.html",
    "testid": "heading_testid",
@@ -62475,7 +62463,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/empty_state.html",
    "testid": "description_testid",
@@ -62581,7 +62569,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 41,
+   "rendered_on_count": 40,
    "target": {
     "href": "item.href"
    },
@@ -62597,7 +62585,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 41,
+   "rendered_on_count": 40,
    "target": {},
    "template": "app/templates/components/figures.html",
    "testid": "{{ item.testid }}-value",
@@ -62611,7 +62599,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 41,
+   "rendered_on_count": 40,
    "target": {},
    "template": "app/templates/components/figures.html",
    "testid": "item.testid",
@@ -62625,7 +62613,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 41,
+   "rendered_on_count": 40,
    "target": {},
    "template": "app/templates/components/figures.html",
    "testid": "testid",
@@ -63959,7 +63947,7 @@
    "line": 66,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 54,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -63973,7 +63961,7 @@
    "line": 159,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 54,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -63987,7 +63975,7 @@
    "line": 160,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 54,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -64001,7 +63989,7 @@
    "line": 161,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 54,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -64015,7 +64003,7 @@
    "line": 162,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 54,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -64029,7 +64017,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 54,
+   "rendered_on_count": 53,
    "target": {
     "action": "action",
     "fields": [
@@ -64049,7 +64037,7 @@
    "line": 90,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 54,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -64063,7 +64051,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 54,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": "{{ testid }}-pager",
@@ -64476,7 +64464,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -64492,7 +64480,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "submit",
     "form_method": "GET"
@@ -64509,7 +64497,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "method": "GET"
    },
@@ -64525,7 +64513,7 @@
    "line": 3,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "modal_id": "page-guide"
    },
@@ -64709,7 +64697,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "modal_id": "id"
    },
@@ -66532,7 +66520,7 @@
    "line": 14,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/see_how.html",
    "testid": null,
@@ -66546,7 +66534,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "target": {},
    "template": "app/templates/components/see_how.html",
    "testid": "see-how-video-{{ c.key }}",
@@ -66774,7 +66762,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -66790,7 +66778,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -66820,7 +66808,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 208,
+   "rendered_on_count": 207,
    "target": {
     "href": "item[1]"
    },
@@ -66836,7 +66824,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 208,
+   "rendered_on_count": 207,
    "target": {},
    "template": "app/templates/components/tabs.html",
    "testid": "testid",
@@ -66866,7 +66854,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "target": {
     "button_type": "button"
    },
@@ -81593,7 +81581,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "href": "#main-content"
    },
@@ -81609,7 +81597,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "href": "#sidebar-nav"
    },
@@ -81625,7 +81613,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "href": "#sidebar-search"
    },
@@ -81641,7 +81629,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "endpoint": "service_status.status_page",
     "href": "url_for('service_status.status_page')"
@@ -81658,7 +81646,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "button_type": "button"
    },
@@ -81674,7 +81662,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "button_type": "button"
    },
@@ -81690,7 +81678,7 @@
    "line": 140,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {},
    "template": "app/templates/layouts/admin_base.html",
    "testid": null,
@@ -81704,7 +81692,7 @@
    "line": 251,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "data_action": "exit()"
    },
@@ -81720,7 +81708,7 @@
    "line": 252,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "data_action": "next()"
    },
@@ -81736,7 +81724,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "action": "url_for('architect_ui.remove_sample_company')",
     "endpoint": "architect_ui.remove_sample_company",
@@ -81754,7 +81742,7 @@
    "line": 137,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {},
    "template": "app/templates/layouts/admin_base.html",
    "testid": null,
@@ -81768,7 +81756,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {},
    "template": "app/templates/layouts/admin_base.html",
    "testid": "sample-company-indicator",
@@ -81782,7 +81770,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {},
    "template": "app/templates/layouts/admin_base.html",
    "testid": "app-footer",
@@ -82125,7 +82113,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 199,
+   "rendered_on_count": 198,
    "target": {
     "href": "href"
    },
@@ -82141,7 +82129,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 199,
+   "rendered_on_count": 198,
    "target": {
     "href": "_parent[1]"
    },
@@ -82157,7 +82145,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 199,
+   "rendered_on_count": 198,
    "target": {
     "href": "href"
    },
@@ -82173,7 +82161,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 199,
+   "rendered_on_count": 198,
    "target": {
     "href": "cta_href"
    },
@@ -84268,24 +84256,54 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/policy_monitoring/dashboard.html::button::0",
-   "kind": "button",
-   "label": "",
-   "line": 11,
+   "id": "app/templates/policy_monitoring/dashboard.html::link::0",
+   "kind": "link",
+   "label": "r.subject",
+   "line": null,
    "mutating": false,
    "rendered_on": [
-    "/enterprise/policy-monitoring",
     "/policy-monitoring/"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 1,
    "target": {
-    "endpoint": "admin.api_settings",
-    "href": "url_for(\"admin.api_settings\")"
+    "href": "r.record_url"
    },
    "template": "app/templates/policy_monitoring/dashboard.html",
-   "testid": null,
-   "type": "navigate",
-   "via_macro": "basecoat/index.html:button"
+   "testid": "policy-check-link",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/policy_monitoring/dashboard.html::testid::0",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/policy-monitoring/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/policy_monitoring/dashboard.html",
+   "testid": "policy-covered",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/policy_monitoring/dashboard.html::testid::1",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/policy-monitoring/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/policy_monitoring/dashboard.html",
+   "testid": "policy-not-covered",
+   "type": null,
+   "via_macro": null
   },
   {
    "id": "app/templates/portfolio/demand_form.html::link::0",
@@ -108734,21 +108752,21 @@
   }
  ],
  "counts": {
-  "controls": 6130,
+  "controls": 6133,
   "controls_by_kind": {
-   "button": 3114,
+   "button": 3113,
    "form": 300,
-   "link": 1001,
+   "link": 1002,
    "modal": 204,
    "table": 361,
-   "testid": 1150
+   "testid": 1153
   },
   "controls_mutating": 694,
-  "pages": 449,
-  "pages_without_parameters": 321,
+  "pages": 448,
+  "pages_without_parameters": 320,
   "routes": 3918,
   "templates": 819,
-  "templates_not_reached_by_a_route": 146
+  "templates_not_reached_by_a_route": 148
  },
  "routes": [
   {
@@ -210340,80 +210358,7 @@
   },
   {
    "blueprint": "unified_ai_chat",
-   "closure": [
-    "app/templates/ai_chat/_estate_answer.html",
-    "app/templates/ai_chat/_lens_answer.html",
-    "app/templates/basecoat/accordion.html",
-    "app/templates/basecoat/alert-dialog.html",
-    "app/templates/basecoat/alert.html",
-    "app/templates/basecoat/aspect-ratio.html",
-    "app/templates/basecoat/attachment.html",
-    "app/templates/basecoat/avatar.html",
-    "app/templates/basecoat/badge.html",
-    "app/templates/basecoat/breadcrumb.html",
-    "app/templates/basecoat/bubble.html",
-    "app/templates/basecoat/button-group.html",
-    "app/templates/basecoat/button.html",
-    "app/templates/basecoat/calendar.html",
-    "app/templates/basecoat/card.html",
-    "app/templates/basecoat/carousel.html",
-    "app/templates/basecoat/chart.html",
-    "app/templates/basecoat/checkbox.html",
-    "app/templates/basecoat/code-block.html",
-    "app/templates/basecoat/collapsible.html",
-    "app/templates/basecoat/combobox.html",
-    "app/templates/basecoat/command.html",
-    "app/templates/basecoat/context-menu.html",
-    "app/templates/basecoat/dialog.html",
-    "app/templates/basecoat/direction.html",
-    "app/templates/basecoat/drawer.html",
-    "app/templates/basecoat/dropdown-menu.html",
-    "app/templates/basecoat/empty.html",
-    "app/templates/basecoat/field.html",
-    "app/templates/basecoat/form.html",
-    "app/templates/basecoat/hover-card.html",
-    "app/templates/basecoat/index.html",
-    "app/templates/basecoat/input-group.html",
-    "app/templates/basecoat/input-otp.html",
-    "app/templates/basecoat/input.html",
-    "app/templates/basecoat/item.html",
-    "app/templates/basecoat/kbd.html",
-    "app/templates/basecoat/label.html",
-    "app/templates/basecoat/marker.html",
-    "app/templates/basecoat/menubar.html",
-    "app/templates/basecoat/message-scroller.html",
-    "app/templates/basecoat/message.html",
-    "app/templates/basecoat/native-select.html",
-    "app/templates/basecoat/navigation-menu.html",
-    "app/templates/basecoat/pagination.html",
-    "app/templates/basecoat/popover.html",
-    "app/templates/basecoat/progress.html",
-    "app/templates/basecoat/questionnaire.html",
-    "app/templates/basecoat/radio-group.html",
-    "app/templates/basecoat/resizable.html",
-    "app/templates/basecoat/scroll-area.html",
-    "app/templates/basecoat/select.html",
-    "app/templates/basecoat/separator.html",
-    "app/templates/basecoat/sheet.html",
-    "app/templates/basecoat/sidebar.html",
-    "app/templates/basecoat/skeleton.html",
-    "app/templates/basecoat/slider.html",
-    "app/templates/basecoat/spinner.html",
-    "app/templates/basecoat/switch.html",
-    "app/templates/basecoat/table.html",
-    "app/templates/basecoat/tabs.html",
-    "app/templates/basecoat/textarea.html",
-    "app/templates/basecoat/toast.html",
-    "app/templates/basecoat/toggle-group.html",
-    "app/templates/basecoat/toggle.html",
-    "app/templates/basecoat/tooltip.html",
-    "app/templates/basecoat/trace.html",
-    "app/templates/components/badge.html",
-    "app/templates/components/button.html",
-    "app/templates/components/card.html",
-    "app/templates/components/empty_state.html",
-    "app/templates/components/see_how.html"
-   ],
+   "closure": [],
    "endpoint": "unified_ai_chat.estate_answer",
    "guards": [
     "login_required"
@@ -210427,10 +210372,7 @@
    "page": false,
    "rule": "/ai-chat/estate-answer",
    "template_unresolved": [],
-   "templates": [
-    "app/templates/ai_chat/_estate_answer.html",
-    "app/templates/ai_chat/_lens_answer.html"
-   ],
+   "templates": [],
    "templates_missing": []
   },
   {
@@ -219876,101 +219818,7 @@
   },
   {
    "blueprint": "unified_low_priority",
-   "closure": [
-    "app/templates/basecoat/accordion.html",
-    "app/templates/basecoat/alert-dialog.html",
-    "app/templates/basecoat/alert.html",
-    "app/templates/basecoat/aspect-ratio.html",
-    "app/templates/basecoat/attachment.html",
-    "app/templates/basecoat/avatar.html",
-    "app/templates/basecoat/badge.html",
-    "app/templates/basecoat/breadcrumb.html",
-    "app/templates/basecoat/bubble.html",
-    "app/templates/basecoat/button-group.html",
-    "app/templates/basecoat/button.html",
-    "app/templates/basecoat/calendar.html",
-    "app/templates/basecoat/card.html",
-    "app/templates/basecoat/carousel.html",
-    "app/templates/basecoat/chart.html",
-    "app/templates/basecoat/checkbox.html",
-    "app/templates/basecoat/code-block.html",
-    "app/templates/basecoat/collapsible.html",
-    "app/templates/basecoat/combobox.html",
-    "app/templates/basecoat/command.html",
-    "app/templates/basecoat/context-menu.html",
-    "app/templates/basecoat/dialog.html",
-    "app/templates/basecoat/direction.html",
-    "app/templates/basecoat/drawer.html",
-    "app/templates/basecoat/dropdown-menu.html",
-    "app/templates/basecoat/empty.html",
-    "app/templates/basecoat/field.html",
-    "app/templates/basecoat/form.html",
-    "app/templates/basecoat/hover-card.html",
-    "app/templates/basecoat/index.html",
-    "app/templates/basecoat/input-group.html",
-    "app/templates/basecoat/input-otp.html",
-    "app/templates/basecoat/input.html",
-    "app/templates/basecoat/item.html",
-    "app/templates/basecoat/kbd.html",
-    "app/templates/basecoat/label.html",
-    "app/templates/basecoat/marker.html",
-    "app/templates/basecoat/menubar.html",
-    "app/templates/basecoat/message-scroller.html",
-    "app/templates/basecoat/message.html",
-    "app/templates/basecoat/native-select.html",
-    "app/templates/basecoat/navigation-menu.html",
-    "app/templates/basecoat/pagination.html",
-    "app/templates/basecoat/popover.html",
-    "app/templates/basecoat/progress.html",
-    "app/templates/basecoat/questionnaire.html",
-    "app/templates/basecoat/radio-group.html",
-    "app/templates/basecoat/resizable.html",
-    "app/templates/basecoat/scroll-area.html",
-    "app/templates/basecoat/select.html",
-    "app/templates/basecoat/separator.html",
-    "app/templates/basecoat/sheet.html",
-    "app/templates/basecoat/sidebar.html",
-    "app/templates/basecoat/skeleton.html",
-    "app/templates/basecoat/slider.html",
-    "app/templates/basecoat/spinner.html",
-    "app/templates/basecoat/switch.html",
-    "app/templates/basecoat/table.html",
-    "app/templates/basecoat/tabs.html",
-    "app/templates/basecoat/textarea.html",
-    "app/templates/basecoat/toast.html",
-    "app/templates/basecoat/toggle-group.html",
-    "app/templates/basecoat/toggle.html",
-    "app/templates/basecoat/tooltip.html",
-    "app/templates/basecoat/trace.html",
-    "app/templates/components/_breadcrumb_root.html",
-    "app/templates/components/admin_header.html",
-    "app/templates/components/admin_sidebar.html",
-    "app/templates/components/alert.html",
-    "app/templates/components/badge.html",
-    "app/templates/components/button.html",
-    "app/templates/components/card.html",
-    "app/templates/components/dialog.html",
-    "app/templates/components/drawer.html",
-    "app/templates/components/dropdown_menu.html",
-    "app/templates/components/empty_state.html",
-    "app/templates/components/figures.html",
-    "app/templates/components/input.html",
-    "app/templates/components/list_table.html",
-    "app/templates/components/page_guide_drawer.html",
-    "app/templates/components/popover.html",
-    "app/templates/components/see_how.html",
-    "app/templates/components/switch.html",
-    "app/templates/components/tabs.html",
-    "app/templates/components/toast-container.html",
-    "app/templates/components/ui_sidebar.html",
-    "app/templates/dashboards/_overview_parts.html",
-    "app/templates/layouts/admin_base.html",
-    "app/templates/macros/page_shell.html",
-    "app/templates/partials/_data_load_error.html",
-    "app/templates/partials/_head.html",
-    "app/templates/partials/_scripts_common.html",
-    "app/templates/policy_monitoring/dashboard.html"
-   ],
+   "closure": [],
    "endpoint": "unified_low_priority.policy_monitoring_dashboard",
    "guards": [
     "login_required"
@@ -219981,12 +219829,10 @@
    "methods": [
     "GET"
    ],
-   "page": true,
+   "page": false,
    "rule": "/enterprise/policy-monitoring",
    "template_unresolved": [],
-   "templates": [
-    "app/templates/policy_monitoring/dashboard.html"
-   ],
+   "templates": [],
    "templates_missing": []
   },
   {
@@ -226698,7 +226544,7 @@
    "includes": [],
    "name": "ai_chat/_estate_answer.html",
    "parse_errors": [],
-   "rendered_on_count": 1,
+   "rendered_on_count": 0,
    "unresolved_refs": []
   },
   "app/templates/ai_chat/_genome_answer.html": {
@@ -226721,7 +226567,7 @@
    "includes": [],
    "name": "ai_chat/_lens_answer.html",
    "parse_errors": [],
-   "rendered_on_count": 1,
+   "rendered_on_count": 0,
    "unresolved_refs": []
   },
   "app/templates/ai_chat/admin_prompts.html": {
@@ -228891,7 +228737,7 @@
    "includes": [],
    "name": "basecoat/accordion.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/alert-dialog.html": {
@@ -228900,7 +228746,7 @@
    "includes": [],
    "name": "basecoat/alert-dialog.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/alert.html": {
@@ -228909,7 +228755,7 @@
    "includes": [],
    "name": "basecoat/alert.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/aspect-ratio.html": {
@@ -228918,7 +228764,7 @@
    "includes": [],
    "name": "basecoat/aspect-ratio.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/attachment.html": {
@@ -228927,7 +228773,7 @@
    "includes": [],
    "name": "basecoat/attachment.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/avatar.html": {
@@ -228936,7 +228782,7 @@
    "includes": [],
    "name": "basecoat/avatar.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/badge.html": {
@@ -228945,7 +228791,7 @@
    "includes": [],
    "name": "basecoat/badge.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/breadcrumb.html": {
@@ -228954,7 +228800,7 @@
    "includes": [],
    "name": "basecoat/breadcrumb.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/bubble.html": {
@@ -228963,7 +228809,7 @@
    "includes": [],
    "name": "basecoat/bubble.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/button-group.html": {
@@ -228972,7 +228818,7 @@
    "includes": [],
    "name": "basecoat/button-group.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/button.html": {
@@ -228981,7 +228827,7 @@
    "includes": [],
    "name": "basecoat/button.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/calendar.html": {
@@ -228990,7 +228836,7 @@
    "includes": [],
    "name": "basecoat/calendar.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/card.html": {
@@ -228999,7 +228845,7 @@
    "includes": [],
    "name": "basecoat/card.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/carousel.html": {
@@ -229008,7 +228854,7 @@
    "includes": [],
    "name": "basecoat/carousel.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/chart.html": {
@@ -229017,7 +228863,7 @@
    "includes": [],
    "name": "basecoat/chart.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/checkbox.html": {
@@ -229026,7 +228872,7 @@
    "includes": [],
    "name": "basecoat/checkbox.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/code-block.html": {
@@ -229035,7 +228881,7 @@
    "includes": [],
    "name": "basecoat/code-block.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/collapsible.html": {
@@ -229044,7 +228890,7 @@
    "includes": [],
    "name": "basecoat/collapsible.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/combobox.html": {
@@ -229053,7 +228899,7 @@
    "includes": [],
    "name": "basecoat/combobox.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/command.html": {
@@ -229062,7 +228908,7 @@
    "includes": [],
    "name": "basecoat/command.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/context-menu.html": {
@@ -229071,7 +228917,7 @@
    "includes": [],
    "name": "basecoat/context-menu.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/dialog.html": {
@@ -229080,7 +228926,7 @@
    "includes": [],
    "name": "basecoat/dialog.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/direction.html": {
@@ -229089,7 +228935,7 @@
    "includes": [],
    "name": "basecoat/direction.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/drawer.html": {
@@ -229098,7 +228944,7 @@
    "includes": [],
    "name": "basecoat/drawer.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/dropdown-menu.html": {
@@ -229107,7 +228953,7 @@
    "includes": [],
    "name": "basecoat/dropdown-menu.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/empty.html": {
@@ -229116,7 +228962,7 @@
    "includes": [],
    "name": "basecoat/empty.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/field.html": {
@@ -229125,7 +228971,7 @@
    "includes": [],
    "name": "basecoat/field.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/form.html": {
@@ -229134,7 +228980,7 @@
    "includes": [],
    "name": "basecoat/form.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/hover-card.html": {
@@ -229143,7 +228989,7 @@
    "includes": [],
    "name": "basecoat/hover-card.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/index.html": {
@@ -229217,7 +229063,7 @@
    "includes": [],
    "name": "basecoat/index.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/input-group.html": {
@@ -229226,7 +229072,7 @@
    "includes": [],
    "name": "basecoat/input-group.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/input-otp.html": {
@@ -229235,7 +229081,7 @@
    "includes": [],
    "name": "basecoat/input-otp.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/input.html": {
@@ -229244,7 +229090,7 @@
    "includes": [],
    "name": "basecoat/input.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/item.html": {
@@ -229253,7 +229099,7 @@
    "includes": [],
    "name": "basecoat/item.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/kbd.html": {
@@ -229262,7 +229108,7 @@
    "includes": [],
    "name": "basecoat/kbd.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/label.html": {
@@ -229271,7 +229117,7 @@
    "includes": [],
    "name": "basecoat/label.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/macros.html": {
@@ -229354,7 +229200,7 @@
    "includes": [],
    "name": "basecoat/marker.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/menubar.html": {
@@ -229363,7 +229209,7 @@
    "includes": [],
    "name": "basecoat/menubar.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/message-scroller.html": {
@@ -229372,7 +229218,7 @@
    "includes": [],
    "name": "basecoat/message-scroller.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/message.html": {
@@ -229381,7 +229227,7 @@
    "includes": [],
    "name": "basecoat/message.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/native-select.html": {
@@ -229390,7 +229236,7 @@
    "includes": [],
    "name": "basecoat/native-select.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/navigation-menu.html": {
@@ -229399,7 +229245,7 @@
    "includes": [],
    "name": "basecoat/navigation-menu.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/pagination.html": {
@@ -229408,7 +229254,7 @@
    "includes": [],
    "name": "basecoat/pagination.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/popover.html": {
@@ -229417,7 +229263,7 @@
    "includes": [],
    "name": "basecoat/popover.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/progress.html": {
@@ -229426,7 +229272,7 @@
    "includes": [],
    "name": "basecoat/progress.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/questionnaire.html": {
@@ -229435,7 +229281,7 @@
    "includes": [],
    "name": "basecoat/questionnaire.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/radio-group.html": {
@@ -229444,7 +229290,7 @@
    "includes": [],
    "name": "basecoat/radio-group.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/resizable.html": {
@@ -229453,7 +229299,7 @@
    "includes": [],
    "name": "basecoat/resizable.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/scroll-area.html": {
@@ -229462,7 +229308,7 @@
    "includes": [],
    "name": "basecoat/scroll-area.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/select.html": {
@@ -229471,7 +229317,7 @@
    "includes": [],
    "name": "basecoat/select.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/separator.html": {
@@ -229480,7 +229326,7 @@
    "includes": [],
    "name": "basecoat/separator.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/sheet.html": {
@@ -229489,7 +229335,7 @@
    "includes": [],
    "name": "basecoat/sheet.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/sidebar.html": {
@@ -229498,7 +229344,7 @@
    "includes": [],
    "name": "basecoat/sidebar.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/skeleton.html": {
@@ -229507,7 +229353,7 @@
    "includes": [],
    "name": "basecoat/skeleton.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/slider.html": {
@@ -229516,7 +229362,7 @@
    "includes": [],
    "name": "basecoat/slider.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/sonner.html": {
@@ -229534,7 +229380,7 @@
    "includes": [],
    "name": "basecoat/spinner.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/switch.html": {
@@ -229543,7 +229389,7 @@
    "includes": [],
    "name": "basecoat/switch.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/table.html": {
@@ -229552,7 +229398,7 @@
    "includes": [],
    "name": "basecoat/table.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/tabs.html": {
@@ -229561,7 +229407,7 @@
    "includes": [],
    "name": "basecoat/tabs.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/textarea.html": {
@@ -229570,7 +229416,7 @@
    "includes": [],
    "name": "basecoat/textarea.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/toast.html": {
@@ -229579,7 +229425,7 @@
    "includes": [],
    "name": "basecoat/toast.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/toggle-group.html": {
@@ -229588,7 +229434,7 @@
    "includes": [],
    "name": "basecoat/toggle-group.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/toggle.html": {
@@ -229597,7 +229443,7 @@
    "includes": [],
    "name": "basecoat/toggle.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/tooltip.html": {
@@ -229606,7 +229452,7 @@
    "includes": [],
    "name": "basecoat/tooltip.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/basecoat/trace.html": {
@@ -229615,7 +229461,7 @@
    "includes": [],
    "name": "basecoat/trace.html",
    "parse_errors": [],
-   "rendered_on_count": 429,
+   "rendered_on_count": 427,
    "unresolved_refs": []
   },
   "app/templates/batch_import/batch_review.html": {
@@ -230602,7 +230448,7 @@
    "includes": [],
    "name": "components/_breadcrumb_root.html",
    "parse_errors": [],
-   "rendered_on_count": 418,
+   "rendered_on_count": 417,
    "unresolved_refs": []
   },
   "app/templates/components/accessibility_helpers.html": {
@@ -230626,7 +230472,7 @@
    "includes": [],
    "name": "components/admin_header.html",
    "parse_errors": [],
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "unresolved_refs": []
   },
   "app/templates/components/admin_sidebar.html": {
@@ -230641,7 +230487,7 @@
    "includes": [],
    "name": "components/admin_sidebar.html",
    "parse_errors": [],
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "unresolved_refs": []
   },
   "app/templates/components/alert.html": {
@@ -230650,7 +230496,7 @@
    "includes": [],
    "name": "components/alert.html",
    "parse_errors": [],
-   "rendered_on_count": 424,
+   "rendered_on_count": 423,
    "unresolved_refs": []
   },
   "app/templates/components/answer_cascade.html": {
@@ -230728,7 +230574,7 @@
    "includes": [],
    "name": "components/badge.html",
    "parse_errors": [],
-   "rendered_on_count": 444,
+   "rendered_on_count": 442,
    "unresolved_refs": []
   },
   "app/templates/components/breadcrumb.html": {
@@ -230757,7 +230603,7 @@
    "includes": [],
    "name": "components/button.html",
    "parse_errors": [],
-   "rendered_on_count": 446,
+   "rendered_on_count": 444,
    "unresolved_refs": []
   },
   "app/templates/components/canvas/_frame.html": {
@@ -230986,7 +230832,7 @@
    "includes": [],
    "name": "components/card.html",
    "parse_errors": [],
-   "rendered_on_count": 434,
+   "rendered_on_count": 432,
    "unresolved_refs": []
   },
   "app/templates/components/checkbox.html": {
@@ -231164,7 +231010,7 @@
    "includes": [],
    "name": "components/dialog.html",
    "parse_errors": [],
-   "rendered_on_count": 424,
+   "rendered_on_count": 423,
    "unresolved_refs": []
   },
   "app/templates/components/disabled_action.html": {
@@ -231193,7 +231039,7 @@
    "includes": [],
    "name": "components/drawer.html",
    "parse_errors": [],
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "unresolved_refs": []
   },
   "app/templates/components/dropdown_menu.html": {
@@ -231204,7 +231050,7 @@
    "includes": [],
    "name": "components/dropdown_menu.html",
    "parse_errors": [],
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "unresolved_refs": []
   },
   "app/templates/components/element_table.html": {
@@ -231227,7 +231073,7 @@
    "includes": [],
    "name": "components/empty_state.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "unresolved_refs": []
   },
   "app/templates/components/error_boundary.html": {
@@ -231266,7 +231112,7 @@
    "includes": [],
    "name": "components/figures.html",
    "parse_errors": [],
-   "rendered_on_count": 41,
+   "rendered_on_count": 40,
    "unresolved_refs": []
   },
   "app/templates/components/file_upload.html": {
@@ -231370,7 +231216,7 @@
    "includes": [],
    "name": "components/input.html",
    "parse_errors": [],
-   "rendered_on_count": 438,
+   "rendered_on_count": 437,
    "unresolved_refs": []
   },
   "app/templates/components/list_table.html": {
@@ -231386,7 +231232,7 @@
    "includes": [],
    "name": "components/list_table.html",
    "parse_errors": [],
-   "rendered_on_count": 54,
+   "rendered_on_count": 53,
    "unresolved_refs": []
   },
   "app/templates/components/llm_recommendations.html": {
@@ -231451,7 +231297,7 @@
    "includes": [],
    "name": "components/page_guide_drawer.html",
    "parse_errors": [],
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "unresolved_refs": []
   },
   "app/templates/components/page_header.html": {
@@ -231481,7 +231327,7 @@
    "includes": [],
    "name": "components/popover.html",
    "parse_errors": [],
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "unresolved_refs": []
   },
   "app/templates/components/priority_actions.html": {
@@ -231647,7 +231493,7 @@
    "includes": [],
    "name": "components/see_how.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 425,
    "unresolved_refs": []
   },
   "app/templates/components/select.html": {
@@ -231719,7 +231565,7 @@
    "includes": [],
    "name": "components/switch.html",
    "parse_errors": [],
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "unresolved_refs": []
   },
   "app/templates/components/table.html": {
@@ -231739,7 +231585,7 @@
    "includes": [],
    "name": "components/tabs.html",
    "parse_errors": [],
-   "rendered_on_count": 208,
+   "rendered_on_count": 207,
    "unresolved_refs": []
   },
   "app/templates/components/toast-container.html": {
@@ -231748,7 +231594,7 @@
    "includes": [],
    "name": "components/toast-container.html",
    "parse_errors": [],
-   "rendered_on_count": 446,
+   "rendered_on_count": 445,
    "unresolved_refs": []
   },
   "app/templates/components/traceability_panel.html": {
@@ -231766,7 +231612,7 @@
    "includes": [],
    "name": "components/ui_sidebar.html",
    "parse_errors": [],
-   "rendered_on_count": 426,
+   "rendered_on_count": 425,
    "unresolved_refs": []
   },
   "app/templates/components/unified_mapping_modal.html": {
@@ -231922,7 +231768,7 @@
    "includes": [],
    "name": "dashboards/_overview_parts.html",
    "parse_errors": [],
-   "rendered_on_count": 42,
+   "rendered_on_count": 41,
    "unresolved_refs": []
   },
   "app/templates/dashboards/generic_detail.html": {
@@ -233481,7 +233327,7 @@
    ],
    "name": "layouts/admin_base.html",
    "parse_errors": [],
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "unresolved_refs": []
   },
   "app/templates/layouts/base.html": {
@@ -233611,7 +233457,7 @@
    "includes": [],
    "name": "macros/page_shell.html",
    "parse_errors": [],
-   "rendered_on_count": 199,
+   "rendered_on_count": 198,
    "unresolved_refs": []
   },
   "app/templates/macros/pricing_cta.html": {
@@ -233879,7 +233725,7 @@
    "includes": [],
    "name": "partials/_data_load_error.html",
    "parse_errors": [],
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "unresolved_refs": []
   },
   "app/templates/partials/_filter_section.html": {
@@ -233915,7 +233761,7 @@
    "includes": [],
    "name": "partials/_head.html",
    "parse_errors": [],
-   "rendered_on_count": 446,
+   "rendered_on_count": 445,
    "unresolved_refs": []
   },
   "app/templates/partials/_head_common.html": {
@@ -233960,7 +233806,7 @@
    "includes": [],
    "name": "partials/_scripts_common.html",
    "parse_errors": [],
-   "rendered_on_count": 446,
+   "rendered_on_count": 445,
    "unresolved_refs": []
   },
   "app/templates/partials/_seo_meta.html": {
@@ -234035,7 +233881,7 @@
    "includes": [],
    "name": "policy_monitoring/dashboard.html",
    "parse_errors": [],
-   "rendered_on_count": 2,
+   "rendered_on_count": 1,
    "unresolved_refs": []
   },
   "app/templates/portfolio/demand_form.html": {
@@ -235875,7 +235721,9 @@
   "app/templates/admin/servicenow_integration.html",
   "app/templates/admin/team.html",
   "app/templates/ai_chat/_catalogue_answer.html",
+  "app/templates/ai_chat/_estate_answer.html",
   "app/templates/ai_chat/_genome_answer.html",
+  "app/templates/ai_chat/_lens_answer.html",
   "app/templates/application_mgmt/custom_field_form.html",
   "app/templates/applications/rationalization/_detection_modal.html",
   "app/templates/architecture/decision_table.html",
@@ -235997,5 +235845,5 @@
   "app/templates/solutions_strategic/partials/_gantt_chart.html",
   "app/templates/tools/gantt_demo.html"
  ],
- "templates_sha256": "232d5533394bf09cd184ea89a02f6567df9808485568b7e8cc87e6833eac91ef"
+ "templates_sha256": "db2df8208b4072da70c9c2e340416638929960a37fe23d00733fba578512a7b9"
 }

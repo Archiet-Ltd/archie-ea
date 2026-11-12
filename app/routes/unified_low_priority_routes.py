@@ -561,8 +561,8 @@ def consolidation_opportunities():
 @unified_low_priority_bp.route("/policy-monitoring")
 @login_required
 def policy_monitoring_dashboard():
-    """Policy Monitoring Dashboard — compliance scan results and violation tracking."""
-    return render_template("policy_monitoring/dashboard.html")
+    """The old address of Controls: the one page is served at /policy-monitoring/."""
+    return redirect(url_for("policy_monitoring.policy_dashboard"))
 
 
 # === API ENDPOINTS ===

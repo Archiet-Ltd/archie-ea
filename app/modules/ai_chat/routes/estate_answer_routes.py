@@ -14,7 +14,7 @@ from app.modules.ai_chat.services.estate_answer import (
     owned_element_id,
     recorded_text,
 )
-from app.modules.ai_chat.services.lens_answer import answer_lens_question
+from app.modules.ai_chat.services.lens_answer import answer_for_lens, answer_lens_question
 from app.modules.intelligence.services import answer_envelope as envelope
 
 from app.services.conversation_history import persist_turn
@@ -146,6 +146,8 @@ def _what_it_depends_on(answer):
     params = dict(answer.get("params") or {})
     if answer.get("question_kind") != envelope.KIND_IMPACT or not params.get("element_id"):
         return None
+    if params.get("direction") == "upstream":
+        return None  # asked what it depends on: the answer already is that walk
     # The links as recorded, one step. The count of relationships touching the element is the
     # overview's (``_recorded_links``); this lists the distinct elements those links reach.
     params.update(direction="both", include_derived=False, max_depth=1)
@@ -169,56 +171,21 @@ def _recorded_links(answer):
     return relationship_split(int(current_org_id()), int(element_id))
 
 
-@unified_ai_chat_bp.route("/estate-answer", methods=["POST"])
-@login_required
-def estate_answer():
-    """The cited answer cards for a question that names an element of the
-    active organisation, or ``found: false`` so the chat asks the model.
+def _lens_card(lens):
+    component_id = ((lens["data"] or {}).get("application_component_id")) if lens["lens"] == "portfolio" else None
+    return render_template(
+        "ai_chat/_lens_answer.html",
+        lens=lens["lens"],
+        element=lens["element"],
+        data=lens["data"],
+        planning_url=(
+            url_for("unified_applications.rationalization_planning", app_id=component_id) if component_id else None
+        ),
+    )
 
-    The answer is the stored envelope the answers page opens at its own address;
-    the cards are that envelope drawn on the server.
-    """
-    body = request.get_json(silent=True)
-    message = body.get("message") if isinstance(body, dict) else None
-    if not isinstance(message, str) or not message.strip():
-        return jsonify({"success": False, "error": "Ask a question first."}), 400
-    thread_id = body.get("thread_id") if isinstance(body.get("thread_id"), str) else None
-    keep = body.get("remember") is not False
-    posted_element = body.get("element_id") if isinstance(body.get("element_id"), int) else None
-    # A card names its element: the question is about that element, not about a lens its name sounds like.
-    lens = None if owned_element_id(posted_element, current_org_id()) else answer_lens_question(message[:MAX_QUESTION_CHARS])
-    if lens is not None:
-        component_id = ((lens["data"] or {}).get("application_component_id")) if lens["lens"] == "portfolio" else None
-        kept = _remember(thread_id, message, _lens_line(lens), keep=keep) if lens["data"] is not None else None
-        return jsonify(
-            {
-                "success": True,
-                "found": True,
-                "thread_id": kept,
-                "lens": lens["lens"],
-                "html": render_template(
-                    "ai_chat/_lens_answer.html",
-                    lens=lens["lens"],
-                    element=lens["element"],
-                    data=lens["data"],
-                    planning_url=(
-                        url_for("unified_applications.rationalization_planning", app_id=component_id)
-                        if component_id
-                        else None
-                    ),
-                ),
-            }
-        )
-    try:
-        record = answer_estate_question(
-            message[:MAX_QUESTION_CHARS],
-            user_id=current_user.id,
-            element_id=posted_element,
-        )
-    except envelope.AnswerNotAskable:
-        record = None
-    if record is None:
-        return _catalogue_response(message, thread_id, keep)
+
+def _estate_card(record, message, part=None):
+    """The cards for one stored answer, with the line kept in the conversation."""
     answer = envelope.present(record)
     # Closest connections first, a recorded one ahead of a worked-out one at the same
     # distance, then by name, as the dashboard's first answer lists them.
@@ -247,25 +214,135 @@ def estate_answer():
             "" if total == 1 else "s",
             answer["page_url"],
         )
-    kept = _remember(thread_id, message, line, keep=keep)
+    html = render_template(
+        "ai_chat/_estate_answer.html",
+        answer=answer,
+        composer_url=url_for("archimate.composer_page"),
+        question=message[:MAX_QUESTION_CHARS],
+        part=part,
+        derivation=_derivation_status(),
+        shown_limit=SHOWN_LIMIT,
+        depends_on=depends_on,
+        recorded_links=_recorded_links(answer),
+        explanations=explanations_for(answer, SHOWN_LIMIT),
+        recorded_text=recorded_text,
+    )
+    return {"html": html, "line": line, "address": answer["address"], "page_url": answer["page_url"]}
+
+
+# What each distinct card of a question is, in the order the parts are asked. What an
+# element runs on and what it depends on are one walk upstream, so they are one card.
+_CARD_OF_PART = {
+    envelope.PART_OWNER: "owner",
+    envelope.PART_RUNS_ON: "upstream",
+    envelope.PART_DEPENDS_ON: "upstream",
+    envelope.PART_BREAKS: "breaks",
+}
+
+
+def _cards_asked(parts):
+    cards = []
+    for part in parts:
+        card = _CARD_OF_PART[part]
+        if card not in cards:
+            cards.append(card)
+    return cards
+
+
+def _parts_response(message, thread_id, keep, cards):
+    """One reply holding a card for each thing the question asks about its element,
+    in the order asked: its owners, what it depends on, what breaks. ``None`` when the
+    question names no element of the organisation, so the ordinary answers take over."""
+    drawn, lines, first = [], [], None
+    for card in cards:
+        if card == "owner":
+            lens = answer_for_lens("accountability", message[:MAX_QUESTION_CHARS])
+            if lens is None:
+                return None
+            drawn.append(_lens_card(lens))
+            lines.append(_lens_line(lens))
+            continue
+        direction = "upstream" if card == "upstream" else "downstream"
+        try:
+            record = answer_estate_question(message[:MAX_QUESTION_CHARS], user_id=current_user.id, direction=direction)
+        except envelope.AnswerNotAskable:
+            record = None
+        if record is None:
+            return None
+        made = _estate_card(record, message, part=card)
+        first = first or made
+        drawn.append(made["html"])
+        lines.append(made["line"])
+    body = {
+        "success": True,
+        "found": True,
+        "thread_id": _remember(thread_id, message, "\n".join(lines), keep=keep),
+        "cards": cards,
+        "html": '<div class="space-y-6">%s</div>' % "".join(drawn) if len(drawn) > 1 else drawn[0],
+    }
+    if first:
+        body["address"], body["page_url"] = first["address"], first["page_url"]
+    return jsonify(body)
+
+
+@unified_ai_chat_bp.route("/estate-answer", methods=["POST"])
+@login_required
+def estate_answer():
+    """The cited answer cards for a question that names an element of the
+    active organisation, or ``found: false`` so the chat asks the model.
+
+    The answer is the stored envelope the answers page opens at its own address;
+    the cards are that envelope drawn on the server.
+    """
+    body = request.get_json(silent=True)
+    message = body.get("message") if isinstance(body, dict) else None
+    if not isinstance(message, str) or not message.strip():
+        return jsonify({"success": False, "error": "Ask a question first."}), 400
+    thread_id = body.get("thread_id") if isinstance(body.get("thread_id"), str) else None
+    keep = body.get("remember") is not False
+    posted_element = body.get("element_id") if isinstance(body.get("element_id"), int) else None
+    card_element = owned_element_id(posted_element, current_org_id())
+    # A card names its element: the question is about that element, not about the parts or the
+    # lens its wording sounds like.
+    parts = [] if card_element else envelope.classify_estate_parts(message[:MAX_QUESTION_CHARS])
+    if set(parts) & {envelope.PART_OWNER, envelope.PART_RUNS_ON, envelope.PART_DEPENDS_ON}:
+        cards = _cards_asked(parts)
+        only = body.get("part")
+        if only in cards:
+            cards = [only]
+        response = _parts_response(message, thread_id, keep, cards)
+        if response is not None:
+            return response
+    lens = None if card_element else answer_lens_question(message[:MAX_QUESTION_CHARS])
+    if lens is not None:
+        kept = _remember(thread_id, message, _lens_line(lens), keep=keep) if lens["data"] is not None else None
+        return jsonify(
+            {
+                "success": True,
+                "found": True,
+                "thread_id": kept,
+                "lens": lens["lens"],
+                "html": _lens_card(lens),
+            }
+        )
+    try:
+        record = answer_estate_question(
+            message[:MAX_QUESTION_CHARS],
+            user_id=current_user.id,
+            element_id=posted_element,
+        )
+    except envelope.AnswerNotAskable:
+        record = None
+    if record is None:
+        return _catalogue_response(message, thread_id, keep)
+    made = _estate_card(record, message)
     return jsonify(
         {
             "success": True,
             "found": True,
-            "thread_id": kept,
-            "address": answer["address"],
-            "page_url": answer["page_url"],
-            "html": render_template(
-                "ai_chat/_estate_answer.html",
-                answer=answer,
-                composer_url=url_for("archimate.composer_page"),
-                question=message[:MAX_QUESTION_CHARS],
-                derivation=_derivation_status(),
-                shown_limit=SHOWN_LIMIT,
-                depends_on=depends_on,
-                recorded_links=_recorded_links(answer),
-                explanations=explanations_for(answer, SHOWN_LIMIT),
-                recorded_text=recorded_text,
-            ),
+            "thread_id": _remember(thread_id, message, made["line"], keep=keep),
+            "address": made["address"],
+            "page_url": made["page_url"],
+            "html": made["html"],
         }
     )
