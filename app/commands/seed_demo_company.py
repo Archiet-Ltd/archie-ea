@@ -2514,10 +2514,56 @@ def _seed_boards(org_id, demo_user_id) -> dict:
         ))
         stats["backlog_requirements_created"] += 1
     db.session.flush()
+    stats["backlog_scores_recorded"] = _seed_backlog_scores(org_id)
     stats.update(_seed_solution_blueprints(org_id, solutions))
     stats["solution_risks_created"] = _seed_solution_risks(org_id, solutions)
     stats["risk_records_completed"] = stats.get("risk_records_completed", 0) + _complete_risk_records(org_id)
     return stats
+
+
+# Score inputs the team has recorded for each backlog requirement, by name:
+# (business value, time criticality, risk reduction, job size, reach, impact, confidence %, story points).
+# The scores are worked out from these on the prioritisation page, never typed in.
+_BACKLOG_SCORE_INPUTS = {
+    "Record the as-found reading for every instrument": (8, 5, 8, 3, 400, 4, 80, 3),
+    "Show a customer the status of an open request": (5, 3, 2, 5, 1200, 2, 70, 5),
+    "Suggest the nearest qualified engineer": (8, 5, 3, 8, 90, 4, 60, 8),
+    "Suppliers confirm delivery dates in the portal": (8, 8, 5, 5, 300, 3, 80, 5),
+    "Reject certificates with a missing reference standard": (13, 8, 13, 3, 500, 5, 90, 3),
+    "Retry a failed event delivery three times": (3, 2, 8, 2, 40, 2, 90, 2),
+    "Publish every instrument change as an event": (5, 3, 5, 5, 60, 3, 80, 5),
+    "Export certificates as signed documents": (5, 2, 3, 3, 700, 2, 80, 3),
+}
+
+
+def _seed_backlog_scores(org_id) -> int:
+    """Record score inputs on the ranked copy of each backlog requirement that has none.
+
+    A requirement with any input already recorded is left as a person set it."""
+    from app.models.models import Requirement
+    from app.models.solution_architect_models import SolutionRequirement
+    from app.services.prioritisation_service import project_backlog_requirements
+
+    project_backlog_requirements(org_id)
+    db.session.flush()
+    filled = 0
+    rows = db.session.query(SolutionRequirement).filter(
+        SolutionRequirement.organization_id == org_id, SolutionRequirement.deleted_at.is_(None),
+        SolutionRequirement.archimate_requirement_id.isnot(None),
+    ).all()
+    for source in rows:
+        inputs = _BACKLOG_SCORE_INPUTS.get(source.name)
+        ranked = db.session.get(Requirement, source.archimate_requirement_id)
+        if inputs is None or ranked is None or ranked.organization_id != org_id:
+            continue
+        fields = ("business_value", "time_criticality", "risk_reduction", "job_size",
+                  "reach", "impact", "confidence", "story_points")
+        if any(getattr(ranked, f) is not None for f in fields):
+            continue
+        for field, value in zip(fields, inputs):
+            setattr(ranked, field, value)
+        filled += 1
+    return filled
 
 
 # ── the blueprint of each seeded solution ─────────────────────────────────
