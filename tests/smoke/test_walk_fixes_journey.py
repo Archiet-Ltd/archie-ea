@@ -79,6 +79,17 @@ def _goto(page, base, path):
     page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
 
 
+def _open_layered_drawing(page, base):
+    """Open the layered viewpoint and then its Application layer, as a person does from the layer buttons.
+
+    The layered viewpoint first shows one card per layer; the drawing with shapes, a quality figure and
+    warnings is the layer a person opens from there."""
+    page.goto(base + "/archimate/composer?viewpoint=layered", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    layer = page.get_by_test_id("composer-layer-application")
+    expect(layer).to_be_visible(timeout=PAGE_TIMEOUT)
+    layer.click()
+
+
 # --- the composer ---------------------------------------------------------------------------------
 
 COMPOSER_STATE = """() => {
@@ -94,8 +105,7 @@ def test_composer_opens_readable_and_quality_agrees_with_its_warnings(browser, l
     page = context.new_page()
     try:
         sign_in(page, live_server, DEMO_EMAIL)
-        page.goto(live_server + "/archimate/composer?viewpoint=layered", wait_until="domcontentloaded",
-                  timeout=PAGE_TIMEOUT)
+        _open_layered_drawing(page, live_server)
         page.wait_for_function(
             "() => { const r = document.querySelector('[x-data=\"composerApp()\"]');"
             " if (!r || !window.Alpine) return false; const d = Alpine.$data(r);"
@@ -131,8 +141,7 @@ def test_saved_layered_view_opens_readable_and_the_phone_toolbar_shows_quality_a
     page = context.new_page()
     try:
         sign_in(page, live_server, DEMO_EMAIL)
-        page.goto(live_server + "/archimate/composer?viewpoint=layered", wait_until="domcontentloaded",
-                  timeout=PAGE_TIMEOUT)
+        _open_layered_drawing(page, live_server)
         page.wait_for_function(
             "() => { const r = document.querySelector('[x-data=\"composerApp()\"]');"
             " if (!r || !window.Alpine) return false; const d = Alpine.$data(r);"
@@ -219,8 +228,7 @@ def test_one_drawing_shows_the_same_quality_and_warnings_as_viewpoint_saved_view
     page = context.new_page()
     try:
         sign_in(page, live_server, DEMO_EMAIL)
-        page.goto(live_server + "/archimate/composer?viewpoint=layered", wait_until="domcontentloaded",
-                  timeout=PAGE_TIMEOUT)
+        _open_layered_drawing(page, live_server)
         as_viewpoint = _wait_composer_settled(page)
         assert as_viewpoint["warnings"] > 0, as_viewpoint
         viewpoint_figures = _toolbar_figures(page)
