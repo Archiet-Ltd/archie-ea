@@ -167,6 +167,76 @@ def get_query_examples():
 # ============================================================================
 
 
+@unified_ai_chat_bp.route("/first-questions")
+@login_required
+def get_first_questions():
+    """The applications the chat offers a first question about: those the organisation has
+    recorded relationships for, most connected first, so each question has a cited answer.
+    Counted by the same reader as the overview's "most connected" line."""
+    from app import db
+    from app.middleware.tenant_context import current_org_id
+    from app.models import ArchiMateElement
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.dashboard.services.overview_figures import element_each_name_means, relationship_ends
+
+    org_id = current_org_id()
+    if org_id is None:
+        return jsonify({"questions": [], "applications": 0})
+    # How many applications are recorded tells the page, when there is no card to offer, whether to
+    # say that none are or that their connections are not.
+    # Counted by name: an application and the element recorded for it are one application.
+    from app.utils.duplicate_guard import folded_column, normalize_name
+
+    recorded = max(
+        db.session.execute(
+            db.select(db.func.count(db.distinct(folded_column(ApplicationComponent.name)))).where(
+                ApplicationComponent.organization_id == org_id
+            )
+        ).scalar_one(),
+        db.session.execute(
+            db.select(db.func.count(db.distinct(folded_column(ArchiMateElement.name)))).where(
+                ArchiMateElement.organization_id == org_id,
+                ArchiMateElement.type.in_(("ApplicationComponent", "Application")),
+            )
+        ).scalar_one(),
+    )
+    ends = relationship_ends(org_id)
+    if not ends:
+        return jsonify({"questions": [], "applications": recorded})
+    named = db.session.execute(
+        db.select(ArchiMateElement.id, ArchiMateElement.name).where(
+            ArchiMateElement.organization_id == org_id,
+            ArchiMateElement.type.in_(("ApplicationComponent", "Application")),
+            ArchiMateElement.id.in_(list(ends)),
+        )
+    ).all()
+    # An application and a second element with its name are one application seen twice, so it is
+    # offered once: the element its name means by the rule every surface shares.
+    # Every element carrying such a name is weighed, of any type, as a typed question weighs them.
+    names = {normalize_name(row.name) for row in named if row.name}
+    sharing = db.session.execute(
+        db.select(ArchiMateElement.id, ArchiMateElement.name).where(
+            ArchiMateElement.organization_id == org_id, folded_column(ArchiMateElement.name).in_(names)
+        )
+    ).all()
+    meant = set(element_each_name_means(org_id, sharing, ends).values())
+    chosen = sorted((row for row in sharing if row.id in meant), key=lambda row: (-ends[row.id], row.id))
+    return jsonify(
+        {
+            "applications": recorded,
+            "questions": [
+                {
+                    "element_id": row.id,
+                    "name": row.name,
+                    "question": "What breaks if %s fails?" % row.name,
+                    "detail": "%d relationship%s recorded" % (ends[row.id], "" if ends[row.id] == 1 else "s"),
+                }
+                for row in chosen
+            ][:4]
+        }
+    )
+
+
 @unified_ai_chat_bp.route("/recommendations")
 @login_required
 def get_recommendations():
