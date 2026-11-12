@@ -225,7 +225,7 @@ def _parts_response(message, thread_id, keep, cards):
         "found": True,
         "thread_id": _remember(thread_id, message, "\n".join(lines), keep=keep),
         "cards": cards,
-        "html": "".join(drawn),
+        "html": '<div class="space-y-6">%s</div>' % "".join(drawn) if len(drawn) > 1 else drawn[0],
     }
     if first:
         body["address"], body["page_url"] = first["address"], first["page_url"]
