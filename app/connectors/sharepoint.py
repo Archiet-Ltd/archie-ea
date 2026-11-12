@@ -198,9 +198,13 @@ class SharePointConnector(BaseConnector):
     def _client(self) -> GraphClient:
         if self._m365 is None:
             raise SharePointError("The Microsoft 365 connection is not available")
+        from app.modules.codegen.services.credential_encryption import CredentialUnreadable
         from app.services.m365_service import M365Service
 
-        token = M365Service().graph_token(self._m365)
+        try:
+            token = M365Service().graph_token(self._m365)
+        except CredentialUnreadable as exc:
+            raise SharePointError(str(exc)) from exc
         if not token:
             raise SharePointError(
                 "Microsoft did not give Entelim a sign-in for this connection. "

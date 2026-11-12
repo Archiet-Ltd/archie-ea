@@ -48700,8 +48700,10 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 2,
-    "form": 1
+    "button": 1,
+    "form": 1,
+    "link": 1,
+    "testid": 10
    },
    "departures": [
     {
@@ -48720,7 +48722,8 @@
    "macros": [
     "components/alert.html",
     "components/button.html",
-    "components/page_header.html"
+    "components/input.html",
+    "components/select.html"
    ],
    "original": "preview-02",
    "page_type": "settings",
