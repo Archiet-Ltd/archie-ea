@@ -318,6 +318,8 @@ def api_impact_analysis():
 
             analysis["footer_html"] = result_footer_service.render_footer(
                 result_footer_service.impact_footer(current_org_id(), analysis))
+            if not simulation_service.may_see_costs(current_user):
+                analysis = simulation_service.withhold_costs(analysis)
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
@@ -571,6 +573,8 @@ def api_portfolio_impact():
 
         service = ImpactAnalysisService()
         analysis = service.analyze_portfolio_impact(change_scenarios)
+        if not simulation_service.may_see_costs(current_user):
+            analysis = simulation_service.withhold_costs(analysis)
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
