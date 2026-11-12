@@ -8,6 +8,7 @@ capability owner service) and the AI system owner route both call
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Callable, Iterable, Optional
 
 from app import db
@@ -156,6 +157,8 @@ def set_element_owner(
             # A named person without an account, replaced by a user, leaves no name behind.
             record.person_name = record.person_email = record.person_role = None
             record.assigned_by = assigned_by
+            # The new owner was assigned now, not when the row it replaced was made.
+            record.assigned_at = datetime.utcnow()
             _delete_other_owners_of_type(key, organization_id, ownership_type, keep=record)
             if commit:
                 db.session.commit()
@@ -479,6 +482,7 @@ def set_named_person_owner(
                 values["person_name"], email, role,
             )
             record.user_id, record.assigned_by = None, assigned_by
+            record.assigned_at = datetime.utcnow()
         else:
             record = None
         if replace and record is not None:

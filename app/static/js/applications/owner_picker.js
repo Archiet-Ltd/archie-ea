@@ -126,18 +126,21 @@
             say(label + ' chosen. Save owner to record them.');
         }
 
-        function render(users) {
+        function render(users, query) {
             results.textContent = '';
             options = [];
             setActive(-1);
             if (!users.length) {
                 var div = document.createElement('div');
                 div.className = 'px-3 py-2 text-xs text-muted-foreground';
-                div.textContent = 'No matching users';
+                var sentence = 'Nobody in this workspace matches \'' + query + '\'.'
+                    + (root.querySelector('[data-person-name]') ? ' Record someone without an account below.' : '');
+                div.textContent = sentence;
+                div.setAttribute('data-owner-none', '');
                 results.appendChild(div);
                 results.classList.remove('hidden');
                 input.setAttribute('aria-expanded', 'true');
-                say('No matching people');
+                say(sentence);
                 return;
             }
             users.forEach(function (u, i) {
@@ -173,7 +176,7 @@
                 return;
             }
             Platform.fetch.get('/api/users', { q: query, limit: 10 }, { silent: true })
-                .then(function (data) { render(data.users || []); })
+                .then(function (data) { render(data.users || [], query); })
                 .catch(function () { hideResults(); });
         }
         var search = debounce(runSearch, 300);

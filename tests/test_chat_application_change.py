@@ -204,3 +204,34 @@ def test_an_owner_who_has_no_account_can_be_set_from_the_chat(world, client, log
     assert saved["success"] is True and "Ifiok Etim" in saved["html"]
     row = ApplicationOwner.query.filter_by(application_id=world["apps"]["a"].id).one()
     assert row.user_id is None and row.person_name == "Ifiok Etim"
+
+
+def test_a_plainly_worded_request_with_a_colon_is_a_change_request():
+    from app.modules.ai_chat.services.application_change import parse_change_request
+
+    plain = parse_change_request("Change the description of Acme Ledger to: Runs monthly billing")
+    assert plain == {"application": "Acme Ledger", "key": "description", "label": "description",
+                     "value": "Runs monthly billing"}
+    possessive = parse_change_request("Change Acme Ledger's description to: Runs monthly billing")
+    assert possessive["value"] == "Runs monthly billing" and possessive["application"] == "Acme Ledger"
+
+
+def test_a_replaced_owner_is_assigned_when_it_was_recorded(world, db_session):
+    from datetime import datetime, timedelta
+
+    from app.models.application_owner import ApplicationOwner
+    from app.services.element_ownership_service import set_named_person_owner
+
+    for key, org in (("a", world["org_a"]), ("b", world["org_b"])):
+        long_ago = datetime.utcnow() - timedelta(hours=2)
+        db_session.add(ApplicationOwner(
+            application_id=world["apps"][key].id, organization_id=org.id, ownership_type="primary",
+            person_name="Earlier Owner", assigned_at=long_ago, created_at=long_ago))
+    db_session.flush()
+    record = set_named_person_owner(world["apps"]["a"], "Later Owner", "primary",
+                                    organization_id=world["org_a"].id)
+    db_session.flush()
+    assert record.person_name == "Later Owner"
+    assert datetime.utcnow() - record.assigned_at < timedelta(minutes=5)
+    other = ApplicationOwner.query.filter_by(application_id=world["apps"]["b"].id).one()
+    assert other.person_name == "Earlier Owner" and datetime.utcnow() - other.assigned_at > timedelta(hours=1)

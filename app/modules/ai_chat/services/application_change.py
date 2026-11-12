@@ -40,12 +40,14 @@ FIELDS = {
 }
 
 _VERB = r"(?:please\s+)?(?:set|change|update|edit)\s+(?:the\s+)?"
+# "to Y", "as Y" or "to: Y": the colon is how a person naturally writes the plain request.
+_TO = r"(?:(?:to|as)\s*:\s*|(?:to|as)\s+)"
 _POSSESSIVE = re.compile(
-    r"^\s*" + _VERB + r"(?P<app>.+?)(?:'s|\u2019s)\s+(?P<field>[a-z ]+?)\s+(?:to|as)\s+(?P<value>.+?)\s*$",
+    r"^\s*" + _VERB + r"(?P<app>.+?)(?:'s|\u2019s)\s+(?P<field>[a-z ]+?)\s+" + _TO + r"(?P<value>.+?)\s*$",
     re.I | re.S,
 )
 _OF = re.compile(
-    r"^\s*" + _VERB + r"(?P<field>[a-z ]+?)\s+(?:of|for|on)\s+(?P<app>.+?)\s+(?:to|as)\s+(?P<value>.+?)\s*$",
+    r"^\s*" + _VERB + r"(?P<field>[a-z ]+?)\s+(?:of|for|on)\s+(?P<app>.+?)\s+" + _TO + r"(?P<value>.+?)\s*$",
     re.I | re.S,
 )
 _QUOTES = "\"'\u201c\u201d\u2018\u2019`"
