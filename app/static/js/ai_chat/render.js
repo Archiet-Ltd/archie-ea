@@ -94,9 +94,26 @@
        formatting is an acceptable outcome; unsanitised HTML is not. */
     function renderMarkdown(text) {
         if (window.DOMPurify && window.marked) {
-            return DOMPurify.sanitize(marked.parse(text == null ? '' : String(text)));
+            return externalLinksInNewTab(DOMPurify.sanitize(marked.parse(text == null ? '' : String(text))));
         }
         return escapeForHtml(text);
+    }
+
+    /* A link in an answer that leaves this site (a file on GitHub, a source page) opens in
+       a new tab, marked noopener noreferrer, so reading a citation never replaces the
+       conversation. Links within the product stay where they are. */
+    function externalLinksInNewTab(html) {
+        var holder = document.createElement('div');
+        holder.innerHTML = html;
+        holder.querySelectorAll('a[href]').forEach(function (a) {
+            var url;
+            try { url = new URL(a.getAttribute('href'), window.location.href); } catch (e) { return; }
+            if ((url.protocol === 'http:' || url.protocol === 'https:') && url.origin !== window.location.origin) {
+                a.setAttribute('target', '_blank');
+                a.setAttribute('rel', 'noopener noreferrer');
+            }
+        });
+        return holder.innerHTML;
     }
 
     /* Records the answer was actually built from.
@@ -541,6 +558,16 @@
               '</div>';
 
         div.innerHTML = avatar + bubble;
+        if (isAi) {
+            /* A slash command an answer offers (the closest recorded names) is run by a click or Enter. */
+            div.querySelectorAll('.message-content code').forEach(function (code) {
+                if (!/^\/[a-z-]+ \S/.test(code.textContent)) return;
+                code.setAttribute('role', 'button');
+                code.setAttribute('tabindex', '0');
+                code.setAttribute('data-run-command', code.textContent);
+                code.classList.add('cursor-pointer', 'underline');
+            });
+        }
         if (isAi && metadata.genomeHtml) applyGenomeAnswer(div, metadata.genomeHtml);
         if (container) container.appendChild(div);
 
@@ -707,7 +734,7 @@
     function applyGenomeAnswer(el, html) {
         var body = el.querySelector('.message-content');
         if (!body || !window.DOMPurify) return false;
-        body.innerHTML = DOMPurify.sanitize(html);
+        body.innerHTML = externalLinksInNewTab(DOMPurify.sanitize(html));
         el.setAttribute('data-testid', 'genome-answer');
         return true;
     }
