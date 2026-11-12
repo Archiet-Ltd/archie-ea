@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from app import db
 from app.models import ArchiMateElement, ArchiMateRelationship
 from app.models.application_portfolio import ApplicationComponent
+from app.services.application_model_links import normalised_type
 from app.modules.architecture.services.archimate_relationship_service import (
     ArchiMateRelationshipService,
 )
@@ -39,12 +40,8 @@ class TechnologyLinkError(Exception):
         self.status = status
 
 
-def _normalised_type(element_type: Optional[str]) -> str:
-    return (element_type or "").replace("_", "").replace(" ", "").lower()
-
-
 def is_technology_element(element: ArchiMateElement) -> bool:
-    return _normalised_type(element.type) in TECHNOLOGY_TYPES
+    return normalised_type(element.type) in TECHNOLOGY_TYPES
 
 
 def _application_and_element(application_id: int) -> Tuple[ApplicationComponent, ArchiMateElement]:
@@ -74,7 +71,7 @@ def _link_dict(relationship: ArchiMateRelationship, element: ArchiMateElement) -
         "element_id": element.id,
         "name": element.name,
         "type": element.type,
-        "type_label": TECHNOLOGY_TYPES.get(_normalised_type(element.type), element.type),
+        "type_label": TECHNOLOGY_TYPES.get(normalised_type(element.type), element.type),
     }
 
 
@@ -108,7 +105,7 @@ def list_linked(application_id: int) -> List[Dict[str, Any]]:
             "element_id": row["id"],
             "name": row["name"],
             "type": row["type"],
-            "type_label": TECHNOLOGY_TYPES.get(_normalised_type(row["type"]), row["type"]),
+            "type_label": TECHNOLOGY_TYPES.get(normalised_type(row["type"]), row["type"]),
             "relationship_type": (row["rel_type"] or "").replace("Relationship", "").lower(),
         }
         for row in linked_technology(application)

@@ -142,6 +142,17 @@ def systems_of(vendor_id: int, org_id: Optional[int] = None) -> List[Application
     ).scalars())
 
 
+def register_contracts(org_id: Optional[int] = None) -> List[VendorContract]:
+    """Every contract the Contracts register lists for the organisation, the one reader behind that page and
+    behind any figure that says how many contracts there are."""
+    org_id = _org(org_id)
+    if org_id is None:
+        return []
+    return list(db.session.execute(
+        db.select(VendorContract).where(VendorContract.organization_id == org_id).order_by(VendorContract.id)
+    ).scalars())
+
+
 def contracts_of(vendor_id: int, org_id: Optional[int] = None) -> List[VendorContract]:
     org_id = _org(org_id)
     if org_id is None:
@@ -617,6 +628,48 @@ def system_coverage(org_id: Optional[int] = None) -> Optional[Dict]:
     }
 
 
+def linked_supplier_summary(org_id: Optional[int] = None) -> Optional[Dict]:
+    """The suppliers the model links to the organisation's live systems, beside the vendors recorded.
+
+    Read through application_model_links, the reader the application's Vendors tab uses, so a
+    system's ``count`` here (the vendor recorded for it, if any, plus the suppliers linked and not
+    yet recorded) is the number on that tab. Systems with nothing linked and nothing recorded are
+    left out. None when the links cannot be read.
+    """
+    from app.services.application_model_links import linked_suppliers_by_application
+
+    org_id = _org(org_id)
+    if org_id is None:
+        return None
+    apps = list(db.session.execute(
+        db.select(ApplicationComponent).where(*_live_apps(org_id))
+        .order_by(func.lower(ApplicationComponent.name), ApplicationComponent.id)
+    ).scalars())
+    vendor_ids_of = {a.id: vendor_of(a) for a in apps}
+    names = {}
+    if any(vendor_ids_of.values()):
+        names = {v.id: v.name for v in db.session.execute(
+            db.select(VendorOrganization).where(VendorOrganization.id.in_({i for i in vendor_ids_of.values() if i}))
+        ).scalars()}
+    recorded_name = {a.id: names.get(vendor_ids_of[a.id]) for a in apps}
+    suppliers = linked_suppliers_by_application(apps, recorded_name)
+    systems = []
+    for a in apps:
+        recorded = {"id": vendor_ids_of[a.id], "name": recorded_name[a.id]} if recorded_name[a.id] else None
+        linked = suppliers.get(a.id, [])
+        if not linked:
+            continue
+        systems.append({
+            "id": a.id, "name": a.name, "recorded": recorded, "suppliers": linked,
+            "count": len(linked) + (1 if recorded else 0),
+        })
+    return {
+        "systems": systems,
+        "system_count": len(systems),
+        "supplier_count": sum(len(s["suppliers"]) for s in systems),
+    }
+
+
 def list_context() -> Dict:
     """What the Vendors page renders from: its register rows (cost shown to the people the Costs page
     admits, each row's active-contract figures) and the system coverage. One function for every route
@@ -662,4 +715,11 @@ def list_context() -> Dict:
         db.session.rollback()
         log.exception("Vendor page system counts could not be read")
         coverage = None
-    return {"register_rows": rows, "system_coverage": coverage, "system_counts": coverage}
+    try:
+        linked = linked_supplier_summary()
+    except Exception:  # noqa: BLE001 - the linked suppliers are left out rather than shown wrong
+        db.session.rollback()
+        log.exception("Suppliers linked in the model could not be read")
+        linked = None
+    return {"register_rows": rows, "system_coverage": coverage, "system_counts": coverage,
+            "linked_suppliers": linked}
