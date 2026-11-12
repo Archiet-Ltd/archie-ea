@@ -27,6 +27,41 @@ def change_label(change_type: str) -> str:
     return CHANGE_LABELS.get((change_type or "").upper(), (change_type or "").replace("_", " ").capitalize())
 
 
+COSTS_WITHHELD = "Cost figures are withheld for your role."
+
+# every key that holds a money amount, in a run's result and in a saved scenario's figures
+_COST_KEYS = ("estimated_financial_risk", "estimated_risk_cost", "application_cost", "annual_cost", "cost_source",
+              "running_cost", "costed_applications")
+
+
+def may_see_costs(user) -> bool:
+    """The one rule the Overview applies to cost: whoever may read the spend pages."""
+    from app.decorators.requires_role import may_see_spend_pages
+
+    return may_see_spend_pages(user)
+
+
+def withhold_costs(result: Any) -> Any:
+    """A copy of a run or a saved scenario's figures with every cost left out and the reason stated.
+
+    The stored data is not changed; this is applied on the way out for a person the cost rule withholds from.
+    """
+    if isinstance(result, list):
+        return [withhold_costs(item) for item in result]
+    if not isinstance(result, dict):
+        return result
+    out = {}
+    for key, value in result.items():
+        out[key] = None if key in _COST_KEYS else withhold_costs(value)
+    if "financial_risk_reason" in result:
+        out["financial_risk_reason"] = COSTS_WITHHELD
+    if result.get("money") is True and "label" in result:
+        out.update(before=None, after=None, change=None, note=COSTS_WITHHELD, withheld=True)
+    if any(k in result for k in ("estimated_financial_risk", "estimated_risk_cost", "figures", "simulation")):
+        out["costs_withheld"] = True
+    return out
+
+
 class ElementNotInModel(LookupError):
     """The element is not in the caller's model (it does not exist, or belongs to another organisation)."""
 
@@ -105,6 +140,9 @@ def _risks_reached(org_id: int, element_id: int, reached_ids: List[int]) -> List
         db.select(ArchiMateElement.id, ArchiMateElement.name).where(
             ArchiMateElement.organization_id == org_id, ArchiMateElement.id.in_(sorted(about_ids)))).all()
     ) if about_ids else {}
+    from app.release_waves import is_released_endpoint
+
+    register_open = is_released_endpoint("risk.risk_page")
     rows = []
     for risk in risks:
         about = risk.archimate_element_id if risk.archimate_element_id in element_ids else linked.get(risk.id)
@@ -115,7 +153,7 @@ def _risks_reached(org_id: int, element_id: int, reached_ids: List[int]) -> List
             "about_id": about,
             "about": names.get(about),
             "about_changed_element": about == element_id,
-            "href": url_for("risk.risk_page", risk_id=risk.id),
+            "href": url_for("risk.risk_page", risk_id=risk.id) if register_open else None,
         })
     return rows
 

@@ -108,7 +108,8 @@ def _relationship_words(row: Dict[str, Any], names: Dict[int, str]) -> str:
 
 
 def build(product_ae, *, org_id: int, href_for: Callable, owner_for: Callable, plain_name: Callable, user,
-          add_url: Optional[str], export_url: Optional[str], status_words: Callable) -> Dict[str, Any]:
+          add_url: Optional[str], export_url: Optional[str], status_words: Callable,
+          bring_in_for: Optional[Callable] = None) -> Dict[str, Any]:
     """Everything the Product's page adds to the element page."""
     walked = members(product_ae.id, org_id)
     names = {r["element"].id: r["element"].name for r in walked["rows"]}
@@ -132,6 +133,7 @@ def build(product_ae, *, org_id: int, href_for: Callable, owner_for: Callable, p
             "owner": ", ".join(owner_names) if owner_names else (
                 "No owner recorded" if applicable else "Owners are not kept for this type"),
             "description": (element.description or "").strip(),
+            "source": source_of(element),
         })
     sections = []
     for key, label, _spellings, types, relationship in SECTIONS:
@@ -167,7 +169,79 @@ def build(product_ae, *, org_id: int, href_for: Callable, owner_for: Callable, p
         "summary": summary_for(product_ae, sections, walked["graph"]),
         "footer": product_footer(org_id, product_ae.id, [r["id"] for r in shown]),
         "export_url": export_url,
+        "bring_in": bring_in_for(product_ae) if bring_in_for else None,
     }
+
+
+def source_of(element) -> Dict[str, Any]:
+    """Where an element came from, in words: the repository and file a connector read it from (with the
+    address of that file at its commit), else that a person entered it."""
+    import json
+
+    from app.connectors.github import file_url
+
+    if getattr(element, "source_kind", None) == "connector":
+        try:
+            ref = json.loads(getattr(element, "source_ref", None) or "")
+        except (TypeError, ValueError):
+            ref = None
+        if isinstance(ref, dict) and ref.get("repository"):
+            repository, file = str(ref["repository"]), ref.get("file")
+            return {
+                "repository": repository,
+                "file": file,
+                "text": "%s: %s" % (repository, file) if file else "%s (no single file shows it)" % repository,
+                "href": file_url(repository, ref.get("commit"), file),
+            }
+    return {"repository": None, "file": None, "text": "Entered in the model by a person", "href": None}
+
+
+def bring_in(product_ae, *, org_id: int, allowed: bool, choosing: bool, urls: Dict[str, str]) -> Optional[Dict[str, Any]]:
+    """What the Product page offers for reading repositories: connect GitHub, choose repositories, or the
+    state of the last read. None for a person who may not use connections."""
+    if not allowed:
+        return None
+    from app.connectors import github as gh
+    from app.models.job import JobStatus
+    from app.services.connector_framework import _load_org_connector
+    from app.services.job_queue_service import get_job_queue_service
+
+    cfg = _load_org_connector(org_id, connector_type="github")
+    if cfg is None:
+        return {"state": "not_connected", "connect_url": urls["connect"]}
+    out: Dict[str, Any] = {
+        "state": "connected", "organization": (cfg.config or {}).get("organization"), "choosing": choosing,
+        "choose_url": urls["choose"], "scan_url": urls["scan"], "review_url": urls["review"],
+        "repositories": [], "error": None, "limit": gh.PRODUCT_SCAN_MAX,
+    }
+    if choosing:
+        try:
+            out["repositories"] = [
+                {**r, "href": urls["element"](r["element"]) if r["element"] is not None else None}
+                for r in gh.list_repositories(org_id)
+            ]
+        except Exception as exc:  # noqa: BLE001 - the person reads one plain sentence; the connector's own reasons are plain
+            out["error"] = str(exc) if isinstance(exc, gh.GitHubConnectorError) else (
+                "GitHub could not be reached just now. Nothing was changed; try again in a moment.")
+    last = None
+    for job in get_job_queue_service().list_jobs(org_id, limit=20, task=gh.FIRST_SYNC_TASK):
+        if (job.payload or {}).get("product_id") == product_ae.id:
+            last = job
+            break
+    if last is not None:
+        result = last.result or {}
+        state = {JobStatus.PENDING.value: "waiting", JobStatus.IN_PROGRESS.value: "reading",
+                 JobStatus.COMPLETED.value: "done"}.get(last.status, "failed")
+        if state == "done" and result.get("success") is False:
+            state = "failed"
+        out["last"] = {
+            "state": state,
+            "repositories": list((last.payload or {}).get("repositories") or []),
+            "already_in_model": list(result.get("already_in_model") or []),
+            "error": (result.get("error") or last.error or "The read did not finish; try again.") if state == "failed" else None,
+        }
+    out["waiting"] = gh.pending_for_product(org_id, product_ae.id)
+    return out
 
 
 def summary_for(product_ae, sections, graph) -> str:
@@ -318,7 +392,7 @@ def export_payload(product_ae, page: Dict[str, Any]) -> Dict[str, Any]:
         "product": {"id": product_ae.id, "name": product_ae.name, "description": product_ae.description},
         "summary": page["summary"],
         "layers": [{"layer": s["label"], "elements": [
-            {k: r[k] for k in ("name", "type", "relationship", "owner")} for r in s["rows"]]} for s in page["sections"]],
+            {**{k: r[k] for k in ("name", "type", "relationship", "owner")}, "source": r["source"]["text"]} for r in s["rows"]]} for s in page["sections"]],
         "diagrams": [d["name"] for d in page["linked"]["diagrams"]],
         "decisions": [{"title": d["name"], "status": d["status"]} for d in page["linked"]["decisions"]],
         "repositories": [r["label"] for r in page["linked"]["repositories"]],

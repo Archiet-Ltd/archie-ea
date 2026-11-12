@@ -9,11 +9,17 @@
         selectedScenarios: [],
         loading: false,
         loadError: '',
+        exportError: '',
         carriedNotice: '',
         goneCount: 0,
         refusedCount: 0,
         retryCount: 0,
         goneItems: [],
+        renamingId: null,
+        renameText: '',
+        renameError: '',
+        deletingId: null,
+        manageError: '',
         listLimit: {{ list_limit | int }},
         canSave: {{ 'true' if can_save else 'false' }},
         saveRoles: '{{ save_roles | e }}',
@@ -57,7 +63,12 @@
             return (window.currencyManager && window.currencyManager.format) ? window.currencyManager.format(value) : value.toLocaleString();
         },
 
+        costsWithheld(s) {
+            return !!(s && s.analysis_result && s.analysis_result.costs_withheld);
+        },
+
         costLabel(s) {
+            if (this.costsWithheld(s)) return s.analysis_result.financial_risk_reason;
             const cost = this.riskCost(s);
             return cost === null ? 'Not recorded' : this.money(cost);
         },
@@ -179,28 +190,94 @@
             return this.selectedScenarios.map(id => this.getScenario(id)).filter(Boolean);
         },
         
+        // The file is written on the server, by the writer every other export uses, from the saved scenarios.
         exportToCSV() {
-            const comparison = this.getComparisonData();
-            if (comparison.length === 0) return;
-            
-            let csv = 'Metric,' + comparison.map(s => s.name).join(',') + '\\n';
-            
-            csv += 'Change Type,' + comparison.map(s => s.change_label || s.change_type).join(',') + '\\n';
-            csv += 'Element,' + comparison.map(s => s.element.name).join(',') + '\\n';
-            csv += 'Severity,' + comparison.map(s => s.analysis_result.severity).join(',') + '\\n';
-            csv += 'Affected Capabilities,' + comparison.map(s => this.countLabel(s.analysis_result.impacted_capabilities)).join(',') + '\\n';
-            csv += 'Affected Processes,' + comparison.map(s => this.countLabel(s.analysis_result.impacted_processes)).join(',') + '\\n';
-            csv += 'Financial Risk (organisation currency),' + comparison.map(s => this.riskCost(s) === null ? 'Not recorded' : this.riskCost(s)).join(',') + '\\n';
-            csv += 'Dependencies,' + comparison.map(s => this.countLabel(s.analysis_result.dependencies)).join(',') + '\\n';
-            
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'impact-scenario-comparison-' + Date.now() + '.csv';
-            a.click();
+            if (this.selectedScenarios.length === 0) return Promise.resolve();
+            this.exportError = '';
+            const url = '/strategic/api/scenarios/export.csv?ids=' + this.selectedScenarios.map(encodeURIComponent).join(',');
+            /* The reply is read here, so a refusal is worded in the dialog and the tab stays on the page. */
+            return Platform.fetch.get(url, null, { silent: true }).then(text => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+                link.download = 'scenario-comparison.csv';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(link.href);
+            }).catch(err => {
+                /* a refusal carries the server's sentence; anything else is a failure to reach it */
+                this.exportError = (err && err.type === 'HttpError' && err.message) || 'The file could not be written. Try again in a moment.';
+            });
         },
-        
+
+        // What each run worked out about the model: the same figures the Scenarios screen showed, one row for each
+        figureLabels() {
+            const labels = [];
+            this.getComparisonData().forEach(s => ((s.analysis_result && s.analysis_result.figures) || []).forEach(f => {
+                if (labels.indexOf(f.label) === -1) labels.push(f.label);
+            }));
+            return labels;
+        },
+
+        figureOf(s, label) {
+            return ((s && s.analysis_result && s.analysis_result.figures) || []).find(f => f.label === label) || null;
+        },
+
+        figureValue(f, value) {
+            if (value === null || value === undefined) return 'Not worked out';
+            return f.money ? this.money(value) : String(value);
+        },
+
+        // Worded as the Scenarios screen words a change: Up, Down or No change
+        figureLine(s, label) {
+            const f = this.figureOf(s, label);
+            if (!f) return 'Not saved with this scenario';
+            if (f.withheld) return f.note;
+            let change = '';
+            if (f.change !== null && f.change !== undefined) {
+                change = f.change === 0 ? ' (No change)' : ' (' + (f.change > 0 ? 'Up ' : 'Down ') + this.figureValue(f, Math.abs(f.change)) + ')';
+            }
+            const unknown = (f.before === null || f.before === undefined || f.after === null || f.after === undefined) && f.note;
+            return this.figureValue(f, f.before) + ' to ' + this.figureValue(f, f.after) + change + (unknown ? ' (' + f.note + ')' : '');
+        },
+
+        startRename(scenario) {
+            this.deletingId = null; this.manageError = ''; this.renameError = '';
+            this.renamingId = scenario.id;
+            this.renameText = scenario.name;
+        },
+
+        saveRename(scenario) {
+            const name = (this.renameText || '').trim();
+            if (!name) { this.renameError = 'Give the scenario a name so you can find it when you compare.'; return Promise.resolve(); }
+            return Platform.fetch.patch('/strategic/api/scenarios/' + encodeURIComponent(scenario.id), { name: name }, { silent: true })
+                .then(kept => {
+                    scenario.name = (kept && kept.name) || name;
+                    this.renamingId = null;
+                    this.renameError = '';
+                })
+                .catch(error => {
+                    this.renameError = (error && error.message) || 'The scenario could not be renamed. Try again in a moment.';
+                });
+        },
+
+        askDelete(scenario) {
+            this.renamingId = null; this.manageError = '';
+            this.deletingId = scenario.id;
+        },
+
+        confirmDelete(scenario) {
+            return Platform.fetch.delete('/strategic/api/scenarios/' + encodeURIComponent(scenario.id), { silent: true })
+                .then(() => {
+                    this.scenarios = this.scenarios.filter(x => x.id !== scenario.id);
+                    this.selectedScenarios = this.selectedScenarios.filter(id => id !== scenario.id);
+                    this.deletingId = null;
+                })
+                .catch(error => {
+                    this.manageError = (error && error.message) || 'The scenario could not be deleted. Try again in a moment.';
+                });
+        },
+
         getBestScenarios() {
             const comparison = this.getComparisonData();
             if (!this.canRank()) return null;
@@ -342,9 +419,31 @@
                                         ></span>
                                         <span class="px-2 py-0.5 text-xs bg-muted text-foreground/80 rounded" x-text="scenario.change_label || scenario.change_type"></span>
                                     </div>
+                                    <div x-show="canSave" x-cloak @click.stop class="mt-3 space-y-2 border-t border-border pt-3">
+                                        <div x-show="renamingId !== scenario.id && deletingId !== scenario.id" class="flex gap-2">
+                                            {{ ui.button(text='Rename', variant='outline', size='sm', attrs={'type': 'button', 'data-testid': 'scenario-rename', '@click': 'startRename(scenario)', ':aria-label': "'Rename ' + scenario.name"}) }}
+                                            {{ ui.button(text='Delete', variant='outline', size='sm', attrs={'type': 'button', 'data-testid': 'scenario-delete', '@click': 'askDelete(scenario)', ':aria-label': "'Delete ' + scenario.name"}) }}
+                                        </div>
+                                        <form x-show="renamingId === scenario.id" x-cloak @submit.prevent="saveRename(scenario)" class="space-y-2">
+                                            {{ ui.input(type='text', attrs={'x-model': 'renameText', 'data-testid': 'scenario-rename-input', 'aria-label': 'New name for the scenario', 'maxlength': '200'}) }}
+                                            <div class="text-sm text-destructive" role="alert" x-show="renameError" x-cloak x-text="renameError"></div>
+                                            <div class="flex gap-2">
+                                                {{ ui.button(text='Save name', size='sm', type='submit', attrs={'data-testid': 'scenario-rename-save'}) }}
+                                                {{ ui.button(text='Cancel', variant='outline', size='sm', attrs={'type': 'button', '@click': 'renamingId = null'}) }}
+                                            </div>
+                                        </form>
+                                        <div x-show="deletingId === scenario.id" x-cloak class="space-y-2">
+                                            <p class="text-sm text-foreground">Delete this saved scenario for everyone in your organisation? Your model is not changed.</p>
+                                            <div class="flex gap-2">
+                                                {{ ui.button(text='Delete scenario', variant='destructive', size='sm', attrs={'type': 'button', 'data-testid': 'scenario-delete-confirm', '@click': 'confirmDelete(scenario)'}) }}
+                                                {{ ui.button(text='Keep it', variant='outline', size='sm', attrs={'type': 'button', '@click': 'deletingId = null'}) }}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </template>
                         </div>
+                        <div x-show="manageError" x-cloak role="alert" class="mt-3 text-sm text-destructive" x-text="manageError"></div>
                         
                         <div x-show="scenarios.length === 0 && !loading && !loadError" x-cloak class="text-center py-12 text-muted-foreground">
                             <i data-lucide="inbox" class="h-16 w-16 mx-auto mb-3 text-muted-foreground/50"></i>
@@ -446,6 +545,16 @@
                                             <td data-slot="table-cell" class="px-4 py-3 text-sm font-semibold text-foreground/80" x-text="countLabel(getScenario(scenarioId)?.analysis_result.dependencies)"></td>
                                         </template>
                                     </tr>
+
+                                    <!-- What each run worked out about the model -->
+                                    <template x-for="label in figureLabels()" :key="'fig-' + label">
+                                        <tr data-testid="compare-figure-row">
+                                            <td class="px-4 py-3 text-sm font-medium text-foreground whitespace-normal min-w-[10rem]" x-text="label"></td>
+                                            <template x-for="scenarioId in selectedScenarios" :key="'fig-' + label + scenarioId">
+                                                <td data-slot="table-cell" class="px-4 py-3 text-sm text-foreground/80 whitespace-normal" x-text="figureLine(getScenario(scenarioId), label)"></td>
+                                            </template>
+                                        </tr>
+                                    </template>
                                 </tbody>
                             </table>
                         </div>
@@ -466,12 +575,14 @@
                         </div>
                     </div>
                     <div x-show="selectedScenarios.length > 1 && !canRank()" x-cloak class="bg-muted border border-border rounded-lg p-4">
-                        <p class="text-sm text-muted-foreground">These scenarios cannot be ranked: at least one has no severity or no recorded financial risk. Run the analysis again and save it to compare them.</p>
+                        <p class="text-sm text-muted-foreground" x-show="!getComparisonData().some(costsWithheld)">These scenarios cannot be ranked: at least one has no severity or no recorded financial risk. Run the analysis again and save it to compare them.</p>
+                        <p class="text-sm text-muted-foreground" x-show="getComparisonData().some(costsWithheld)" x-cloak>These scenarios are not ranked because ranking uses cost figures, which are withheld for your role.</p>
                     </div>
                 </div>
 
                 <!-- Footer -->
                 <div class="shrink-0 bg-background flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+                    <p class="mr-auto text-sm text-destructive" data-testid="export-error" role="status" x-show="exportError" x-cloak x-text="exportError"></p>
                     <button type="button"
                         @click="exportToCSV()"
                         :disabled="selectedScenarios.length === 0"

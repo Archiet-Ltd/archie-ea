@@ -22,11 +22,15 @@
         {% if messages %}
             <div class="mb-6 space-y-2">
                 {% for category, message in messages %}
-                    {{ quiet_alert('success' if category == 'success' else ('danger' if category == 'error' else 'info'), text=message) }}
+                    {% call quiet_alert('success' if category == 'success' else ('danger' if category == 'error' else 'info')) %}{{ message }}{% endcall %}
                 {% endfor %}
             </div>
         {% endif %}
     {% endwith %}
+
+    {% if for_product %}
+    <p class="mb-6 text-sm text-muted-foreground" data-testid="github-for-product">You are connecting GitHub for <a href="{{ for_product.url }}" class="font-medium text-primary underline hover:underline">{{ for_product.name }}</a>. When it is connected you return there to choose its repositories.</p>
+    {% endif %}
 
     {% if github_app_configured %}
     <div class="mb-6 space-y-3" data-testid="github-app-connect">
@@ -38,6 +42,7 @@
 
     <form method="POST" action="{{ url_for('m365_connector.github_connect_save') }}" class="space-y-6" data-testid="github-connect-form">
         {{ hidden_input('csrf_token', csrf_token()) }}
+        {% if for_product %}{{ hidden_input('product', for_product.id) }}{% endif %}
 
         <div data-slot="card" class="rounded-lg border border-border bg-card">
             <div class="p-4 sm:p-6 space-y-4">

@@ -85,6 +85,9 @@ POLICY = {
     # Viewer role, which is refused, is pinned in tests/test_application_registration_check.py.
     "/applications/api/registration-check": set(ARCHETYPES),
     "/ai-chat":                set(ARCHETYPES),
+    # The applications the chat offers first questions about: @login_required only, like the page,
+    # and read through the signed-in person's own organisation.
+    "/ai-chat/first-questions": set(ARCHETYPES),
     # The RACI matrix page is @login_required only, so every archetype reads it; setting,
     # clearing and adding a stakeholder carry the same require_roles("admin", "architect",
     # "business_architect") and are pinned in tests/smoke/test_raci_clear_journey.py.
@@ -1181,6 +1184,28 @@ def test_saved_scenarios_are_listed_by_everyone_and_saved_by_architects(archetyp
     expected = ALLOWED if archetype in SCENARIO_SAVE_ARCHETYPES else DENIED
     actual = DENIED if response.status in (401, 403) else ALLOWED
     assert actual == expected, "%s saving a scenario: expected %s, got %s" % (archetype, expected, response.status)
+
+
+# Renaming and deleting a saved scenario take the same roles as saving one. A scenario that does not exist
+# answers 404 to a role the route admits, after the role is asked; anyone else is refused with a 403 first.
+# The export is a read, open to every signed-in person, and refuses an empty choice with a 400.
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_saved_scenarios_are_renamed_and_deleted_by_architects_and_exported_by_everyone(archetype, page, live_server, seeded):
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    expected = ALLOWED if archetype in SCENARIO_SAVE_ARCHETYPES else DENIED
+    address = live_server + "/strategic/api/scenarios/scenario-999999999"
+    for verb, response in (
+        ("rename", page.request.patch(address, data={"name": "x"}, headers={"X-CSRFToken": csrf}, max_redirects=0)),
+        ("delete", page.request.delete(address, headers={"X-CSRFToken": csrf}, max_redirects=0)),
+    ):
+        actual = DENIED if response.status in (401, 403) else ALLOWED
+        assert actual == expected, "%s trying to %s a scenario: expected %s, got %s" % (archetype, verb, expected, response.status)
+        if expected == ALLOWED:
+            assert response.status == 404, (archetype, verb, response.status)
+    exported = page.request.get(live_server + "/strategic/api/scenarios/export.csv?ids=scenario-999999999")
+    assert exported.status == 400, "%s export of nothing: %s" % (archetype, exported.status)
 
 
 # Role-gated ARB writes. Each is probed with an id that does not exist, except

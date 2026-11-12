@@ -48,13 +48,22 @@
         </div>
     </div>
 
-    {% if simulation %}
-    {# The prioritised action list belongs to Impact Analysis; this page links to it rather than repeating it. #}
-    <p class="text-sm text-muted-foreground" data-testid="priority-actions-link-line">What should be done first is ranked on
-        <a href="{{ url_for('strategic.impact_analysis') }}#priority-actions" class="font-medium text-primary hover:underline" data-testid="priority-actions-link">Impact Analysis</a>.</p>
-    {% else %}
-    {# Strategic actions: the one shared prioritised action list #}
-    {% include 'components/priority_actions.html' %}
+    {% if model_empty %}
+    {# An empty model has nothing to try a change on, nor any action to prioritise: say so and offer the way to fill it. #}
+    <div class="style-vega rounded-lg border bg-card p-6" data-testid="model-empty">
+        {% call ui.empty() %}
+            {% call ui.empty_header() %}
+                {% call ui.empty_icon(variant='icon') %}<i data-lucide="database" aria-hidden="true"></i>{% endcall %}
+                {{ ui.empty_title(text='Your model has no elements yet') }}
+                {{ ui.empty_description(text=('There is nothing to try a change on until your model holds elements. Connect GitHub to read your repositories into it.' if may_connect_github else 'There is nothing to try a change on until your model holds elements. Ask an administrator of your organisation to connect GitHub or add elements.')) }}
+            {% endcall %}
+            {% if may_connect_github %}
+            {% call ui.empty_content() %}
+                {{ ui.button(text='Connect GitHub', href=url_for('m365_connector.github_connect')) }}
+            {% endcall %}
+            {% endif %}
+        {% endcall %}
+    </div>
     {% endif %}
 
     <!-- Main Grid -->
@@ -125,7 +134,7 @@
                         {# x-show sits on a wrapper, not on the <i>: Lucide swaps each <i> for an <svg> and the binding is lost. #}
                         <span x-show="!loading" x-cloak class="mr-2 inline-flex"><i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i></span>
                         <span x-show="loading" x-cloak class="mr-2 inline-flex"><i data-lucide="loader-2" class="h-4 w-4 animate-spin" aria-hidden="true"></i></span>
-                        {{ 'Run simulation' if simulation else 'Analyze Impact' }}
+                        {{ 'Run scenario' if simulation else 'Analyze Impact' }}
                     </button>
                 </div>
             </div>
@@ -136,7 +145,7 @@
             <div class="flex flex-col space-y-1.5 p-6 border-b">
                 <h3 class="font-semibold leading-none tracking-tight">Analysis Report</h3>
                 <p class="text-sm text-muted-foreground"
-                    x-text="analysisResult ? ('Impact of ' + changeLabel() + ' on ' + selectedElement.name) : (loading ? ('Analyzing ' + changeLabel() + ' on ' + selectedElement.name + '…') : (analysisError ? ('Analysis failed for ' + selectedElement.name) : (selectedElement ? (selectedElement.name + ' selected — click {{ 'Run simulation' if simulation else 'Analyze Impact' }} to run') : 'Select an element to begin analysis')))">
+                    x-text="analysisResult ? ('Impact of ' + changeLabel() + ' on ' + selectedElement.name) : (loading ? ('Analyzing ' + changeLabel() + ' on ' + selectedElement.name + '…') : (analysisError ? ('Analysis failed for ' + selectedElement.name) : (selectedElement ? (selectedElement.name + ' selected — click {{ 'Run scenario' if simulation else 'Analyze Impact' }} to run') : 'Select an element to begin analysis')))">
                 </p>
             </div>
 
@@ -240,10 +249,12 @@
                         <div class="space-y-2" data-testid="simulation-risks">
                             <h4 class="text-sm font-semibold">Open risks touching the change</h4>
                             <p class="text-sm text-muted-foreground" x-show="!(analysisResult?.simulation?.risks || []).length" x-cloak>No open risk is recorded against this element or anything that depends on it.</p>
+                            <p class="text-sm text-muted-foreground" data-testid="risk-register-coming" x-show="(analysisResult?.simulation?.risks || []).some(r => !r.href)" x-cloak>The risk register is coming, so these risks are named here without a link.</p>
                             <ul class="space-y-1">
                                 <template x-for="risk in (analysisResult?.simulation?.risks || [])" :key="risk.id">
                                     <li class="text-sm">
-                                        <a :href="risk.href" class="font-medium text-primary underline underline-offset-2" x-text="risk.title"></a>
+                                        <a x-show="risk.href" :href="risk.href" class="font-medium text-primary underline underline-offset-2" x-text="risk.title"></a>
+                                        <span x-show="!risk.href" x-cloak class="font-medium" x-text="risk.title"></span>
                                         <span class="text-muted-foreground" x-text="' · ' + risk.level + (risk.about ? ' · about ' + risk.about : '')"></span>
                                     </li>
                                 </template>
@@ -404,6 +415,17 @@
         </div>
     </div>
 
+    {# Below the picker: a person starts a run first and reads the queue of other work after it. #}
+    {% if not model_empty %}
+    {% if simulation %}
+    {# The prioritised action list belongs to Impact Analysis; this page links to it rather than repeating it. #}
+    <p class="text-sm text-muted-foreground" data-testid="priority-actions-link-line">What should be done first is ranked on
+        <a href="{{ url_for('strategic.impact_analysis') }}#priority-actions" class="font-medium text-primary hover:underline" data-testid="priority-actions-link">Impact Analysis</a>.</p>
+    {% else %}
+    {% include 'components/priority_actions.html' %}
+    {% endif %}
+    {% endif %}
+
     {# Naming a scenario to save: the library dialog, not the browser's own prompt. #}
     {% call modal(id='save-scenario-dialog', title='Save scenario', description='Name this scenario so you can find it when you compare scenarios.', size='sm') %}
         <form @submit.prevent="confirmSaveScenario()" class="style-vega space-y-4" data-testid="save-scenario-form">
@@ -525,6 +547,7 @@
             searchNote: '',
             searchError: '',
             emptyMessage: '',
+            modelEmpty: {{ 'true' if model_empty else 'false' }},
             otherLayers: [],
             selectedElement: null,
             changeType: 'MODIFY',
@@ -597,6 +620,7 @@
             },
 
             costAtRiskText() {
+                if (this.analysisResult && this.analysisResult.costs_withheld) return 'Withheld';
                 const cost = this.analysisResult ? this.analysisResult.estimated_risk_cost : null;
                 return (cost === null || cost === undefined) ? 'Not worked out' : this.money(cost);
             },
@@ -611,12 +635,14 @@
             },
 
             figureValue(figure, value) {
+                if (figure.withheld) return 'Withheld';
                 if (value === null || value === undefined) return 'Not worked out';
                 if (figure.money) return this.money(value);
                 return String(value);
             },
 
             figureChange(figure) {
+                if (figure.withheld) return 'Withheld';
                 if (figure.change === null || figure.change === undefined) return 'Not worked out';
                 if (figure.change === 0) return 'No change';
                 const text = figure.money ? this.figureValue(figure, Math.abs(figure.change)) : String(Math.abs(figure.change));
@@ -759,7 +785,9 @@
                     if (rows.length >= IMPACT_PICKER_LIMIT) {
                         this.searchNote = 'Showing the first ' + IMPACT_PICKER_LIMIT + ' matches. Type more of the name to narrow the list.';
                     }
-                    if (rows.length === 0) {
+                    if (rows.length === 0 && this.modelEmpty) {
+                        this.emptyMessage = 'Your model has no elements yet, so there is nothing to find.';
+                    } else if (rows.length === 0) {
                         await this.explainNoMatch(text, layer, seq);
                     }
                 } catch (e) {
@@ -833,6 +861,7 @@
                         dependencies: direct.map(function(d, i) { return self.dependencyRow(d, i, 'Level ' + d.level + ' dependency'); }),
                         indirect_dependencies: indirect.map(function(d, i) { return self.dependencyRow(d, i, 'Level ' + d.level + ' (transitive)'); }),
                         financial_risk_reason: raw.financial_risk_reason || '',
+                        costs_withheld: !!raw.costs_withheld,
                         simulation: raw.simulation || null,
                         footer_html: raw.footer_html || '',
                         total_affected: raw.total_affected || 0,
