@@ -90,8 +90,13 @@ def test_a_gap_made_on_the_page_and_an_element_are_each_listed_once(client, logi
     mine = make_org("gaps-once")
     tag = uuid.uuid4().hex[:6]
     element = _element(db_session, mine, "Made on the map %s" % tag)
-    _record(db_session, mine, "Made on the page %s" % tag, priority="high", severity="high",
-            archimate_element_id=_element(db_session, mine, "Made on the page %s" % tag).id)
+    # the element's writer wrote its record with it; the person then rates that record on the page
+    page_made = _element(db_session, mine, "Made on the page %s" % tag)
+    from app.models.implementation_migration import Gap as _Gap
+
+    rated = _Gap.query.filter_by(archimate_element_id=page_made.id).one()
+    rated.priority = rated.severity = "high"
+    db_session.flush()
     login_as(client, _architect_in(mine))
 
     text = _text(client.get(PAGE))

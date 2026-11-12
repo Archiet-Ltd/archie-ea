@@ -16,7 +16,7 @@ Contract (docs/adm_phases_d_a_g_e_f_h_tasks.json OA-001):
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import case, func
+from sqlalchemy import case, func, null
 
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
@@ -461,54 +461,30 @@ def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
     return [(gap, gap.id in covered) for gap in gaps]
 
 
-def adopt_gap_elements(organization_id: int) -> int:
-    """Give every Gap element of the organisation that has no gap record its record; return how many.
+def gap_record_for_element(element) -> Gap:
+    """The unsaved gap record for a new Gap element of an organisation.
 
-    A Gap made in the Composer, on the model map or by an import is an ArchiMate element only; one made on
-    the gap pages is a gap record that points at its element. The register lists gap records, so the
-    elements are adopted into it here, once, unrated (nothing says how serious they are) and open. The
-    record is linked to the element, so the element's page, its work packages and its rating all work.
-    Another organisation's elements are never touched.
+    A Gap made in the Composer, on the model map or by an import is an ArchiMate element; the register lists
+    gap records. The element's writer (the flush listener in archimate_backbone) adds this record in the
+    same flush, unrated (nothing says how serious it is) and open, so reading the register never writes.
     """
-    from app.models.archimate_core import ArchiMateElement
-
-    if not organization_id:
-        return 0
-    linked = db.session.query(Gap.archimate_element_id).filter(
-        Gap.archimate_element_id.isnot(None), Gap.organization_id == organization_id)
-    orphans = (
-        db.session.query(ArchiMateElement)
-        .filter(
-            ArchiMateElement.organization_id == organization_id,
-            func.lower(ArchiMateElement.type) == "gap",
-            ArchiMateElement.superseded_at.is_(None),
-            ~ArchiMateElement.id.in_(linked),
-        )
-        .order_by(ArchiMateElement.id)
-        .all()
+    return Gap(
+        organization_id=element.organization_id,
+        name=(element.name or "Untitled gap")[:255],
+        description=element.description or "",
+        archimate_element=element,
+        resolution_status="identified",
+        # the columns default to "medium" on insert; nobody rated this gap, so it is stored unrated
+        priority=null(),
+        severity=null(),
+        impact=null(),
     )
-    for element in orphans:
-        gap = Gap(
-            organization_id=organization_id,
-            name=(element.name or "Untitled gap")[:255],
-            description=element.description or "",
-            archimate_element_id=element.id,
-            resolution_status="identified",
-        )
-        db.session.add(gap)
-        db.session.flush()
-        # The columns default to "medium" on insert; nobody rated this gap, so it is stored unrated.
-        gap.priority = gap.severity = gap.impact = None
-    if orphans:
-        db.session.commit()
-    return len(orphans)
 
 
 def gap_register_query(organization_id: int, severity: Optional[str] = None):
     """The one query behind every count and list of the gap register: the organisation's gaps, plateau
     transitions left out, optionally only those of one severity ("critical" is the critical-gap rule).
-    Gap elements made outside the gap pages are adopted first, so every reader sees them."""
-    adopt_gap_elements(organization_id)
+    It only reads: Gap elements get their record when the element is written."""
     query = Gap.query.filter(
         Gap.organization_id == organization_id,
         Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,

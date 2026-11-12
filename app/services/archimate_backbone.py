@@ -294,16 +294,22 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
                 fmt_args["interface_type"] = getattr(obj, "interface_type", name)
             description = template.format(**fmt_args)
 
-        element = create_backbone_element(
-            element_type=element_type,
-            layer=layer,
-            name=name,
-            description=description,
-            organization_id=org_id,
-            session=session,
-            provenance=properties,
-            flush=flush,
-        )
+        # A gap record's own element does not get a second record made for it.
+        mark = _element_for_gap_record.set(True) if type_name == "Gap" else None
+        try:
+            element = create_backbone_element(
+                element_type=element_type,
+                layer=layer,
+                name=name,
+                description=description,
+                organization_id=org_id,
+                session=session,
+                provenance=properties,
+                flush=flush,
+            )
+        finally:
+            if mark is not None:
+                _element_for_gap_record.reset(mark)
         obj.archimate_element_id = element.id
         return element
     finally:
@@ -383,6 +389,25 @@ def _pending_map(session):
     return _PENDING[sid]
 
 
+_element_for_gap_record: ContextVar = ContextVar("element_for_gap_record", default=False)
+
+
+def _add_gap_record(session, element):
+    """A new Gap element of an organisation gets its gap record in the same flush, so the Gaps page lists it.
+
+    Whoever writes the element (Composer, model map, import, create form) writes the record with it; a
+    read of the register writes nothing. A record already pointing at the element is left alone."""
+    if (element.type or "").lower() != "gap" or not element.organization_id or element.superseded_at is not None:
+        return
+    if _element_for_gap_record.get():
+        return
+    from app.services.gap_register_service import gap_record_for_element
+
+    if element.gap:
+        return
+    session.add(gap_record_for_element(element))
+
+
 def _on_before_flush(session, flush_context, instances):
     """Create ArchiMate elements for newly inserted domain records.
 
@@ -398,6 +423,9 @@ def _on_before_flush(session, flush_context, instances):
     pending = _pending_map(session)
     for obj in list(session.new):
         type_name = type(obj).__name__
+        if type_name == "ArchiMateElement":
+            _add_gap_record(session, obj)
+            continue
         if type_name not in FLUSH_LISTENER_ALLOW_LIST:
             continue
         if getattr(obj, "archimate_element_id", None):
