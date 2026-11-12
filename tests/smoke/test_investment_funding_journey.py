@@ -23,6 +23,8 @@ from .test_archetype_journeys import _login
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 DEMO_ADMIN = "demo@lantern-quay.example.com"
+# The demonstration's own architect is not allowed to see spend; this person, added beside the seed, is.
+DEMO_SPENDER = "finance.lead@lantern-quay.example.com"
 PAGES = ("/strategic/investment-matrix", "/architecture/investment-priorities")
 SHOTS = pathlib.Path(os.environ.get("SMOKE_SHOT_DIR") or tempfile.mkdtemp(prefix="investment-funding-"))
 CAPABILITIES = 24
@@ -37,9 +39,25 @@ def demo(live_server):
     try:
         with create_app("testing").app_context():
             seed_demo_company()
+            _add_demo_spender()
     finally:
         del os.environ["DEMO_USER_PASSWORD"]
-    return DEMO_ADMIN
+    return DEMO_SPENDER
+
+
+def _add_demo_spender():
+    from app import db
+    from app.models.organization import Organization
+    from app.models.user import Role, User
+
+    org_id = db.session.query(Organization.id).filter_by(slug="lantern-quay").scalar()
+    if User.query.filter_by(email=DEMO_SPENDER, organization_id=org_id).first():
+        return
+    person = User(email=DEMO_SPENDER, first_name="Finley", last_name="Spender", organization_id=org_id,
+                  confirmed=True, enterprise_role="cto", role=Role.query.filter_by(name="Architect").one())
+    person.password = PASSWORD
+    db.session.add(person)
+    db.session.commit()
 
 
 def _open(browser, live_server, email, path, width, scheme="light"):
@@ -112,7 +130,7 @@ def test_a_capability_with_no_work_says_why_and_the_step_lands_on_work_packages(
     from app import create_app, db
     from app.models.unified_capability import UnifiedCapability
 
-    org = create_fresh_org("enterprise_architect")
+    org = create_fresh_org("portfolio_manager")
     name = "Handle returns %s" % uuid.uuid4().hex[:6]
     with create_app("testing").app_context():
         db.session.add(UnifiedCapability(name=name, organization_id=org["org_id"], strategic_importance="high", level=1))
@@ -120,7 +138,7 @@ def test_a_capability_with_no_work_says_why_and_the_step_lands_on_work_packages(
     context = browser.new_context(viewport={"width": 1440, "height": 900})
     page = context.new_page()
     try:
-        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        sign_in(page, live_server, org["emails"]["portfolio_manager"])
         page.goto(live_server + PAGES[0], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         row = page.get_by_test_id("capability-row").filter(has_text=name)
         expect(row).to_have_count(1)
@@ -176,5 +194,164 @@ def test_desktop_keeps_the_evidence_open_without_a_control(browser, live_server,
         row = page.get_by_test_id("capability-row").first
         expect(row.get_by_test_id("capability-footer")).to_be_visible()
         expect(row.get_by_test_id("evidence-toggle")).to_be_hidden()
+    finally:
+        context.close()
+
+
+READER = "drew.holloway@lantern-quay.example.com"
+HELD_BACK = "Restricted to roles with budget authority"
+
+
+def _owner_of_money_fixture(estimates):
+    """A new organisation of one spend person and one other person; the spend person's capabilities carry the estimates."""
+    from app import create_app, db
+    from app.models.unified_capability import UnifiedCapability
+    from app.models.unified_work_package import UnifiedWorkPackage
+
+    org = create_fresh_org("portfolio_manager", extra_roles=("enterprise_architect",))
+    names = []
+    with create_app("testing").app_context():
+        caps = []
+        for i, _ in enumerate(estimates):
+            name = "Settle claims %s %d" % (uuid.uuid4().hex[:5], i)
+            cap = UnifiedCapability(name=name, organization_id=org["org_id"], strategic_importance="high", level=1)
+            db.session.add(cap)
+            db.session.flush()
+            caps.append(cap)
+            names.append(name)
+        for cap, cost in zip(caps, estimates):
+            db.session.add(UnifiedWorkPackage(name="Work for %s" % cap.name, organization_id=org["org_id"],
+                                              capability_id=cap.id, capability_ids=[cap.id], estimated_cost=cost))
+        # one package shared by the first two capabilities is split between them, never counted twice
+        db.session.add(UnifiedWorkPackage(name="Shared %s" % uuid.uuid4().hex[:5], organization_id=org["org_id"],
+                                          capability_id=caps[0].id, capability_ids=[caps[0].id, caps[1].id],
+                                          estimated_cost=1750.0))
+        db.session.commit()
+    org["capabilities"] = names
+    return org
+
+
+@pytest.mark.parametrize("path", PAGES)
+def test_a_person_without_spend_authority_reads_every_capability_and_no_money(browser, live_server, demo, path):
+    context, page = _open(browser, live_server, READER, path, 1440)
+    try:
+        rows = page.get_by_test_id("capability-row")
+        assert rows.count() == CAPABILITIES
+        for i in range(CAPABILITIES):
+            cell = rows.nth(i).get_by_test_id("cell-investment")
+            expect(cell).to_have_text(HELD_BACK)
+            footer = rows.nth(i).get_by_test_id("capability-footer").inner_text()
+            assert "£" not in footer, footer
+        total = page.get_by_test_id("total-investment").inner_text()
+        assert "Restricted" in total and HELD_BACK in total, total
+        assert "Not estimated" not in total and "£" not in total, total
+        # nothing on the page, drawn or hidden, carries a pound figure
+        assert "£" not in page.content()
+        _shot(page, "restricted-" + ("matrix" if "strategic" in path else "priorities"), 1440, "light")
+        # the capability's own page still opens from the matrix, with content
+        link = rows.first.get_by_test_id("cell-name").locator("a").first
+        if link.count():
+            link.click()
+            page.wait_for_load_state("domcontentloaded")
+            assert len(page.locator("main").inner_text().strip()) > 100
+    finally:
+        context.close()
+
+
+def test_a_restricted_phone_in_the_dark_shows_the_held_back_note_beside_each_capability(browser, live_server, demo):
+    context, page = _open(browser, live_server, READER, PAGES[0], 390, scheme="dark")
+    try:
+        assert page.evaluate("document.documentElement.scrollWidth") <= 391
+        expect(page.get_by_test_id("phone-investment").first).to_have_text(HELD_BACK)
+        _shot(page, "restricted-matrix", 390, "dark")
+    finally:
+        context.close()
+
+
+def test_the_total_is_the_sum_of_the_estimates_on_both_pages_and_nothing_of_another_organisation(browser, live_server):
+    mine = _owner_of_money_fixture([12345.0, 6789.0])
+    theirs = _owner_of_money_fixture([777777.0, 555555.0])
+    expected = 12345.0 + 6789.0 + 1750.0
+    seen = []
+    for path in PAGES:
+        context = browser.new_context(viewport={"width": 1440, "height": 900})
+        page = context.new_page()
+        try:
+            sign_in(page, live_server, mine["emails"]["portfolio_manager"])
+            page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            rows = page.get_by_test_id("capability-row")
+            expect(rows).to_have_count(2, timeout=PAGE_TIMEOUT)
+            cells = [rows.nth(i).get_by_test_id("cell-investment").inner_text() for i in range(2)]
+            # each row shows its own estimate (the shared package split evenly), the total shows their sum
+            assert abs(sum(_thousands(c) for c in cells) - expected / 1000) <= 0.11, cells
+            total = page.get_by_test_id("total-investment").inner_text()
+            assert abs(_thousands(total) - expected / 1000) <= 0.06, (total, expected)
+            assert "from 2 of 2 capabilities" in total, total
+            seen.append(total)
+            body = page.content()
+            for figure in ("777777", "777,777", "777.8k", "555.6k", theirs["capabilities"][0]):
+                assert figure not in body, (path, figure)
+            if "strategic" in path:
+                _shot(page, "spend-matrix", 1440, "light")
+        finally:
+            context.close()
+    assert seen[0] == seen[1]
+    # the same sum is what the roadmap timeline carries for these packages
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        from .fresh_org import api
+
+        sign_in(page, live_server, mine["emails"]["portfolio_manager"])
+        page.goto(live_server + PAGES[0], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        status, body = api(page, "GET", "/strategic/api/investment-analysis")
+        assert status == 200
+        assert body["portfolio_metrics"]["total_estimated_investment"] == pytest.approx(expected)
+    finally:
+        context.close()
+
+
+def test_a_person_without_spend_authority_is_given_no_figure_by_the_feed(browser, live_server):
+    org = _owner_of_money_fixture([12345.0, 6789.0])
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        from .fresh_org import api
+
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + PAGES[0], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        status, body = api(page, "GET", "/strategic/api/investment-analysis")
+        assert status == 200
+        text = str(body)
+        for figure in ("12345", "6789", "1750", "20884"):
+            assert figure not in text, figure
+        assert body["costs_hidden"] is True
+        expect(page.get_by_test_id("capability-row")).to_have_count(2, timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("cell-investment").first).to_have_text(HELD_BACK)
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("path", PAGES)
+def test_show_evidence_opens_and_closes_from_the_keyboard(browser, live_server, demo, path):
+    context, page = _open(browser, live_server, demo, path, 390, scheme="dark")
+    try:
+        row = page.get_by_test_id("capability-row").first
+        toggle = row.get_by_test_id("evidence-toggle")
+        footer = row.get_by_test_id("capability-footer")
+        expect(footer).to_be_hidden()
+        toggle.focus()
+        expect(toggle).to_be_focused()
+        expect(toggle).to_have_attribute("aria-expanded", "false")
+        page.keyboard.press("Enter")
+        expect(footer).to_be_visible()
+        expect(toggle).to_have_attribute("aria-expanded", "true")
+        expect(toggle).to_have_text(re.compile("Hide evidence"))
+        for label in ("Evidence", "Source", "Confidence", "Date"):
+            expect(footer).to_contain_text(label)
+        page.keyboard.press("Space")
+        expect(footer).to_be_hidden()
+        expect(toggle).to_have_attribute("aria-expanded", "false")
+        expect(toggle).to_have_text(re.compile("Show evidence"))
     finally:
         context.close()
