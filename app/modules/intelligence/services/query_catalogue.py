@@ -341,8 +341,7 @@ def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
     from app.models.application_portfolio import ApplicationComponent
     from app.services.element_ownership_service import owner_label
 
-    from app.modules.dashboard.services.overview_figures import _active_applications
-    from app.services.vendor_register import system_coverage
+    from app.modules.dashboard.services.overview_figures import _active_applications, left_out_applications
 
     # The applications in use: the Systems list's own definition (not a copy, not
     # decommissioned, not an unpromoted import), so the count here is that list's count.
@@ -355,8 +354,8 @@ def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
         .scalars()
         .all()
     )
-    coverage = system_coverage(organization_id)
-    decommissioned = (coverage or {}).get("decommissioned") or 0
+    # The Overview's own left-out figure: an unpromoted repository import is not a decommissioned application.
+    decommissioned = left_out_applications(organization_id)["decommissioned"]
 
     owners_by_app: Dict[int, List[str]] = {}
     if apps:

@@ -166,3 +166,49 @@ def test_each_organisation_hears_only_its_own_applications_and_owners(client, lo
     html = _ask(client, INVENTORY)["html"]
     assert _sentence(html).startswith("2 applications in use; 1 decommissioned not counted."), html[:600]
     assert "Harbour Payroll" not in html and "Zed Foreign" not in html
+
+
+def _github_import(org_id, name):
+    """A repository the GitHub connector brought in that nobody has promoted: no lifecycle, no owner."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+
+    made = ArchiMateElement(
+        name=name, type="ApplicationComponent", layer="application", organization_id=org_id, source_kind="connector"
+    )
+    db.session.add(made)
+    db.session.flush()
+    row = ApplicationComponent(
+        name=name, organization_id=org_id, component_type="repository", archimate_element_id=made.id
+    )
+    db.session.add(row)
+    db.session.flush()
+    return row
+
+
+def test_an_unpromoted_github_import_is_never_called_decommissioned(client, login_as, make_org):
+    from app.modules.dashboard.services.overview_figures import left_out_applications
+
+    org, other = make_org(), make_org()
+    mine = _architect(org, "apps-import-a-%s@example.com" % uuid.uuid4().hex[:6])
+    theirs = _architect(other, "apps-import-b-%s@example.com" % uuid.uuid4().hex[:6])
+    _estate(org.id)
+    _github_import(org.id, "payments-service")
+    for name in ("web-shop", "batch-jobs", "infra-scripts"):
+        _github_import(other.id, name)
+    db.session.commit()
+
+    login_as(client, mine)
+    html = _ask(client, INVENTORY)["html"]
+    sentence = _sentence(html)
+    assert sentence.startswith("2 applications in use; 1 decommissioned not counted."), sentence
+    assert "payments-service" not in html
+    # The chat's decommissioned figure is the Overview's left-out figure for the same organisation.
+    assert left_out_applications(org.id)["decommissioned"] == 1
+
+    # An organisation with only imports has nothing decommissioned to report.
+    login_as(client, theirs)
+    other_html = _ask(client, INVENTORY)["html"]
+    assert "decommissioned" not in other_html.lower(), other_html[:600]
+    assert "web-shop" not in other_html
+    assert left_out_applications(other.id)["decommissioned"] == 0
