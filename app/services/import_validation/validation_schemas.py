@@ -58,6 +58,32 @@ LIFECYCLE_STATUS_VALUES = [
     "retired",
 ]
 
+# Support level / status as recorded on an application (free text on import).
+# The Tech Debt panel reads these lists: only SUPPORTED counts as good standing.
+SUPPORT_LEVEL_SUPPORTED = frozenset({
+    "supported", "active", "full", "mainstream", "basic", "standard", "premium", "custom",
+})
+SUPPORT_LEVEL_LIMITED = frozenset({"limited", "partial", "extended"})
+SUPPORT_LEVEL_UNSUPPORTED = frozenset({
+    "unsupported", "not supported", "no longer supported", "out of support", "end of support",
+    "end of life", "expired", "deprecated", "retired",
+})
+
+
+def classify_support_level(value) -> str:
+    """'supported', 'limited', 'unsupported', 'blank' or 'unrecognised' (any case and spacing)."""
+    text = " ".join(str(value or "").lower().replace("_", " ").replace("-", " ").split())
+    if not text:
+        return "blank"
+    if text in SUPPORT_LEVEL_UNSUPPORTED:
+        return "unsupported"
+    if text in SUPPORT_LEVEL_LIMITED:
+        return "limited"
+    if text in SUPPORT_LEVEL_SUPPORTED:
+        return "supported"
+    return "unrecognised"
+
+
 # The one list of deployment statuses: app/services/application_status.py.
 DEPLOYMENT_STATUS_VALUES = list(APPLICATION_STATUS_VALUES)
 

@@ -23,6 +23,9 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 WALK = os.environ.get("SIMULATION_WALK_DIR")
 DEMO_EMAIL = "demo@lantern-quay.example.com"
+# the demonstration architect is one the cost rule withholds running costs from; a journey that reads a cost
+# signs in as this architect, who administers the same organisation and so may read them and save scenarios
+COST_READER_EMAIL = "cost.reader@lantern-quay.example.com"
 ELEMENT = "Calibration Ledger"
 VIEWPORTS = [
     ({"width": 1440, "height": 900}, "light"),
@@ -59,6 +62,41 @@ def demo(live_server, app):
         else:
             os.environ["DEMO_USER_PASSWORD"] = previous
     return True
+
+
+def _member(app, email, role):
+    """A person of the demonstration organisation holding one enterprise role."""
+    from app import db
+    from app.models.user import Role, User
+
+    with app.app_context():
+        org_id = db.session.execute(db.text("select id from organizations where slug = 'lantern-quay'")).scalar_one()
+        member = User.query.filter_by(email=email).first()
+        if member is None:
+            member = User(email=email, first_name="Role", last_name="Tester", organization_id=org_id, confirmed=True,
+                          enterprise_role=role)
+            member.role = Role.query.filter_by(name="Architect").one()
+            db.session.add(member)
+        member.enterprise_role = role
+        member.password = PASSWORD
+        db.session.commit()
+        db.session.remove()
+
+
+def _cost_reader(app):
+    """An architect who administers the demonstration organisation: the cost rule lets them read running
+    costs, and they may save scenarios."""
+    from app import db
+    from app.models.org_role import OrgRole
+    from app.models.user import User
+
+    _member(app, COST_READER_EMAIL, "enterprise_architect")
+    with app.app_context():
+        reader = User.query.filter_by(email=COST_READER_EMAIL).one()
+        OrgRole.set_role(reader.organization_id, reader.id, "org_admin", granted_by_id=reader.id)
+        db.session.commit()
+        db.session.remove()
+    return COST_READER_EMAIL
 
 
 def _model_counts(app):
@@ -106,14 +144,14 @@ def _owners_by_application(app):
     return owners
 
 
-def _sign_in(browser, live_server, viewport, scheme):
+def _sign_in(browser, live_server, viewport, scheme, email=DEMO_EMAIL):
     context = browser.new_context(viewport=viewport, color_scheme=scheme, ignore_https_errors=True)
     context.set_default_timeout(PAGE_TIMEOUT)
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
     page = context.new_page()
     page.on("dialog", lambda dialog: pytest.fail("a browser dialog opened: " + dialog.message))
     page.goto(live_server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.fill("#email", DEMO_EMAIL)
+    page.fill("#email", email)
     page.fill("#password", PASSWORD)
     page.locator("#submit").click()
     page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
@@ -132,7 +170,7 @@ def _number(text):
 
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
 def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, live_server, app, demo, viewport, scheme):
-    context, page = _sign_in(browser, live_server, viewport, scheme)
+    context, page = _sign_in(browser, live_server, viewport, scheme, email=_cost_reader(app))
     try:
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.get_by_test_id("early-access-page").count() == 0, "the waiting list is showing to a signed-in person"
@@ -146,7 +184,7 @@ def test_simulations_opens_the_screen_and_runs_a_retirement_on_a_copy(browser, l
         listed = int(re.match(r"(\d+) shown", badge).group(1))
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(page)
-        page.get_by_role("button", name="Run simulation").click()
+        page.get_by_role("button", name="Run scenario").click()
 
         panel = page.get_by_test_id("simulation-panel")
         expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -228,7 +266,7 @@ def test_a_scenario_is_named_in_a_dialog_saved_and_two_are_compared_after_a_relo
         for change, name in (("Decommission / Retirement", "Retire the ledger"), ("Full Replacement", "Replace the ledger")):
             page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
             _pick(page, change=change)
-            page.get_by_role("button", name="Run simulation").click()
+            page.get_by_role("button", name="Run scenario").click()
             expect(page.get_by_test_id("simulation-panel")).to_be_visible(timeout=PAGE_TIMEOUT)
 
             # announced by its full name, and naming the scenario opens a dialog, not a browser prompt
@@ -317,7 +355,8 @@ def test_an_element_with_nothing_attached_says_why_there_is_no_cost_and_no_risk(
 
     from .fresh_org import create_fresh_org, sign_in
 
-    mine = create_fresh_org("enterprise_architect")
+    # a person the cost rule admits: the reason is about the element, not about who may read cost
+    mine = create_fresh_org("cto")
     with create_app("testing").app_context():
         db.session.add(ArchiMateElement(name="Lone Capability", type="Capability", layer="strategy",
                                         organization_id=mine["org_id"]))
@@ -328,10 +367,10 @@ def test_an_element_with_nothing_attached_says_why_there_is_no_cost_and_no_risk(
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
     page = context.new_page()
     try:
-        sign_in(page, live_server, mine["emails"]["enterprise_architect"])
+        sign_in(page, live_server, mine["emails"]["cto"])
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(page, name="Lone Capability")
-        page.get_by_role("button", name="Run simulation").click()
+        page.get_by_role("button", name="Run scenario").click()
         panel = page.get_by_test_id("simulation-panel")
         expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("tco-at-risk")).to_have_text("Not worked out")
@@ -358,6 +397,6 @@ def test_a_visitor_who_is_not_signed_in_is_sent_to_sign_in_and_returns_to_the_sc
         page.fill("#password", PASSWORD)
         page.locator("#submit").click()
         page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
     finally:
         context.close()
