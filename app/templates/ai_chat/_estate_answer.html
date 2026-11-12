@@ -82,7 +82,7 @@
     {% endcall %}
 
     {% if not answer.rows %}
-        {% if upstream %}{{ empty_state(icon='search', title='Nothing is recorded as something this depends on yet', description='No connections lead into it. Nothing is missing: there is simply nothing recorded.', padding='py-6') }}{% else %}{{ empty_state(icon='search', title='Nothing is recorded as depending on this yet', description='No connections lead from here. Nothing is missing: there is simply nothing recorded.', padding='py-6') }}{% endif %}
+        {{ empty_state(icon='search', title=('Nothing is recorded as something this depends on yet' if upstream else 'Nothing is recorded as depending on this yet'), description=('No connections lead into it. Nothing is missing: there is simply nothing recorded.' if upstream else 'No connections lead from here. Nothing is missing: there is simply nothing recorded.'), padding='py-6') }}
     {% endif %}
 
     {% for row in answer.rows[:shown_limit] %}
