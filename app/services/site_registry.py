@@ -439,10 +439,13 @@ def coming_capabilities() -> list[dict[str, Any]]:
     list come from the same release check. Sorted by name, and built once per content and release wave."""
     import copy
 
-    from flask import current_app
+    from flask import current_app, has_app_context
 
     from app.services.public_pages import _content_fingerprint
 
+    if not has_app_context():
+        # a caller outside the application (a command, a test of the sitemap paths) asks once
+        return _build_coming_capabilities()
     # every closed address answered in place asks for it, so it is not rebuilt per request
     cache = current_app.extensions.setdefault("coming_capabilities", {})
     key = _content_fingerprint()
