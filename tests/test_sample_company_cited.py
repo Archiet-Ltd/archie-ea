@@ -66,7 +66,9 @@ def test_the_toast_counts_every_element_the_card_counts(client, login_as, make_o
     page = response.get_data(as_text=True)
     stored = _scalar("SELECT count(*) FROM archimate_elements WHERE organization_id = :o", o=org.id)
     assert "Sample company loaded: %d elements created." % stored in page
-    assert _figure(page, "health-kpi-elements") == str(stored)
+    # The first screen is the Overview; its "Facts with a source" card counts the model's elements.
+    sentence = _figure(page, "sourced-sentence")
+    assert re.search(r"\b%d elements\b" % stored, sentence), sentence
 
 
 def test_json_load_reports_the_same_count(client, login_as, make_org):
@@ -87,14 +89,11 @@ def test_every_connection_of_the_payments_service_is_cited_with_a_health(client,
     for row in rows:
         provenance = row["relation"]["provenance"] if row["relation"]["kind"] == "explicit" else None
         if provenance:
-            # Corrected: this already failed on the line, naming the signed-in person
-            # ("Drawn by Sam Founder") on a relationship sample_company_service.py's own
-            # working-data step adds (the relationship-origin listener stamps "manual"
-            # before that step's own citation runs). Two legitimate texts now occur: the
-            # base file's own relationships, imported directly with a source label, read
-            # "Imported from Sample company"; the ones the working-data step adds read
-            # "Sample company" with no prefix. Neither ever names the signed-in person.
-            assert provenance["text"] in ("Imported from Sample company", "Sample company"), provenance
+            # Two legitimate texts occur, and neither ever names the signed-in person: the base
+            # file's own relationships, imported directly with a source label, read
+            # "Imported from Sample company"; the ones the working-data step adds are of kind
+            # "sample" and read "Sample data".
+            assert provenance["text"] in ("Imported from Sample company", "Sample data"), provenance
             assert provenance["recorded_at"]
     applications = [r for r in rows if answer["elements"][str(r["element_id"])]["type"] == "ApplicationComponent"]
     assert applications
