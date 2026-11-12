@@ -469,7 +469,10 @@
             } else if (c.state === 'applied') {
                 detail = c.summary || '';
             } else {
-                detail = 'Checking this change. ' + (c.reasons && c.reasons.length ? c.reasons.join(' ') : '');
+                /* Named in plain words, so two changes waiting together can be told apart. */
+                var what = String(c.plain || '').trim();
+                detail = (what ? 'Checking this change: ' + what.replace(/\.$/, '') + '. ' : 'Checking this change. ') +
+                    (c.reasons && c.reasons.length ? c.reasons.join(' ') : '');
             }
             var link = c.record_url
                 ? ' <a href="' + escapeForHtml(c.record_url) + '" class="underline hover:no-underline" ' +

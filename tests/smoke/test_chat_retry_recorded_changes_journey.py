@@ -210,6 +210,11 @@ def test_retry_after_two_recorded_changes_says_both_are_not_applied_and_writes_n
     assert _approvals(app, org["org_id"]) == rows
     answer = page.locator("#messages-container").inner_text()
     assert "Billing" in answer and "Payroll" in answer, answer  # the answer still shows both changes
+    # Each change under the answer names itself, so the person can tell the two apart.
+    verdicts = page.locator('#messages-container [data-testid="change-verdict"]')
+    expect(verdicts).to_have_count(2)
+    named = sorted(verdicts.all_inner_texts())
+    assert "Billing" in named[0] and "Payroll" in named[1], named
     _shoot(page, "retry-two-recorded-answer")
 
 
