@@ -542,6 +542,29 @@ def requirements_backlog_footer(organization_id: int, now: Optional[datetime] = 
     return build_footer(facts, now)
 
 
+_WSJF_INPUT_LABELS = (
+    ("business_value", "business value"), ("time_criticality", "time criticality"),
+    ("risk_reduction", "risk reduction"), ("job_size", "job size"),
+)
+
+
+def missing_wsjf_inputs(req) -> List[str]:
+    """The WSJF inputs a requirement has not recorded, in words, in the order the page lists them."""
+    return [label for key, label in _WSJF_INPUT_LABELS if getattr(req, key, None) is None]
+
+
+def backlog_score_footer(req, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for a requirement's WSJF score: the inputs recorded, each missing input named, and the date they
+    were last recorded. The score itself is worked out by ``Requirement.wsjf_score``, never typed in."""
+    href = page_link("enterprise_crud.requirements_backlog")
+    when = getattr(req, "updated_at", None) or getattr(req, "created_at", None)
+    facts = [fact("%s %s" % (label.capitalize(), getattr(req, key)), href=href, source_kind="manual", as_of=when)
+             for key, label in _WSJF_INPUT_LABELS if getattr(req, key, None) is not None]
+    for label in missing_wsjf_inputs(req):
+        facts.append(fact("%s: not recorded" % label.capitalize(), missing=True))
+    return build_footer(facts, now)
+
+
 def roadmap_footer(work_packages: List[Any], total: int, now: Optional[datetime] = None) -> Dict[str, Any]:
     """Footer for a roadmap drawn from work packages: the first few, then a count of the rest. ``total`` is
     every package the roadmap draws; none at all is a missing input."""
