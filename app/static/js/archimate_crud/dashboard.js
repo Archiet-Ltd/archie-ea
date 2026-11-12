@@ -39,6 +39,7 @@ document.addEventListener('alpine:init', function() {
             // fetch completes, exactly as it already does for a type with no
             // configured fields.
             fieldConfigs: {},
+            fieldConfigsReady: null,
 
             // Card filter and grouping
             cardFilter: '',
@@ -390,7 +391,7 @@ document.addEventListener('alpine:init', function() {
                     // A page that makes one kind of element in place (the Gaps page) uses only the dialog:
                     // it loads the field settings and leaves the repository list alone.
                     if (APP_CONFIG.fieldConfigsUrl) {
-                        Platform.fetch.get(APP_CONFIG.fieldConfigsUrl, null, { silent: true })
+                        this.fieldConfigsReady = Platform.fetch.get(APP_CONFIG.fieldConfigsUrl, null, { silent: true })
                             .then(function(data) { self.fieldConfigs = data || {}; })
                             .catch(function() { /* the dialog falls back to name and description */ });
                     }
@@ -831,7 +832,9 @@ document.addEventListener('alpine:init', function() {
                 return APP_CONFIG.createNoun || 'Element';
             },
             // The page's own button: open the dialog on the kind the page makes.
-            openCreateForType() {
+            // It waits for the field settings, so each field opens on its own default, not on its first option.
+            async openCreateForType() {
+                if (this.fieldConfigsReady) { await this.fieldConfigsReady; }
                 this.openCreateModal();
                 this.formData.element_type = APP_CONFIG.createElementType || '';
                 this.resetTypedFields();

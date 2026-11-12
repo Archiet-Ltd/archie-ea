@@ -57,6 +57,13 @@ def test_architect_sees_every_gap_and_makes_one_in_place(browser, live_server, v
     try:
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
         page.evaluate("localStorage.setItem('theme', '%s')" % theme)
+
+        # A slow network: the form's field settings arrive after the person has pressed New gap.
+        def _slow(route):
+            page.wait_for_timeout(2000)
+            route.continue_()
+
+        page.route("**/architecture/api/field-configs", _slow)
         page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
         # The gap made outside the page is listed, and opens its own page.
@@ -71,6 +78,8 @@ def test_architect_sees_every_gap_and_makes_one_in_place(browser, live_server, v
         dialog = page.get_by_role("dialog", name=re.compile("Create gap"))
         expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
         assert page.url.split("?")[0].endswith(PATH)
+        # The rating opens on its default, never on the first option of the list.
+        expect(dialog.get_by_label(re.compile("^Rating"))).to_have_value("medium")
         dialog.get_by_label("Element name").fill("")
         dialog.get_by_label("Element name").press_sequentially(made)
         dialog.get_by_label("Description").press_sequentially("Four of nine stacks")
