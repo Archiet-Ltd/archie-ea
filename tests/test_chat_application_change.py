@@ -159,6 +159,42 @@ def test_an_unknown_application_and_an_unchanged_value_say_so(world, client, log
     assert same["change_state"] == "unchanged" and "already has that description" in same["html"]
 
 
+def test_a_question_from_an_element_card_is_never_a_change_request(world, client, login_as, db_session):
+    """A card names its element, so a question worded like a change is answered about that element.
+
+    The same words typed in the chat are a change request; sent from a card of this
+    organisation they are not, and a card id from another organisation counts for nothing.
+    """
+    from app.models.archimate_core import ArchiMateElement
+
+    mine = ArchiMateElement(name=world["name"], type="ApplicationComponent", layer="Application",
+                            organization_id=world["org_a"].id)
+    theirs = ArchiMateElement(name=world["name"], type="ApplicationComponent", layer="Application",
+                              organization_id=world["org_b"].id)
+    db_session.add_all([mine, theirs])
+    db_session.flush()
+    application = world["apps"]["a"]
+    words = f"set {world['name']}'s version to 3.1"
+    login_as(client, world["editor"])
+
+    def ask(**extra):
+        resp = client.post("/ai-chat/estate-answer", json={"message": words, "remember": False, **extra})
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        return resp.get_json()
+
+    typed = ask()
+    assert typed["change_state"] == "preview" and "data-change-token" in typed["html"]
+
+    from_card = ask(element_id=mine.id)
+    assert "change_state" not in from_card, "a card question was treated as a change request"
+    assert "data-change-token" not in (from_card.get("html") or "")
+    assert "lens" not in from_card, "a card question was answered by a lens"
+
+    other_card = ask(element_id=theirs.id)
+    assert other_card["change_state"] == "preview", "another organisation's card id changed how the question is read"
+    assert _stored(db_session, application, "version") != "3.1", "nothing was asked to be saved"
+
+
 def test_an_owner_who_has_no_account_can_be_set_from_the_chat(world, client, login_as, db_session):
     from app.models.application_owner import ApplicationOwner
 
