@@ -16,7 +16,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from flask import has_request_context, request, session
+from flask import abort, has_request_context, request, session
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,11 @@ def record(user, origin: Optional[Dict[str, Optional[str]]] = None) -> None:
 def install_signup_origin(app) -> None:
     @app.before_request
     def _keep_signup_origin():
+        # A query string that is not valid text is a bad request, answered as any bad request is.
+        try:
+            request.args
+        except UnicodeDecodeError:
+            abort(400)
         # Only a page request that actually carries a value touches the session.
         if request.method == "GET" and request.args and (
             "utm_source" in request.args or "utm_campaign" in request.args or "ref" in request.args
