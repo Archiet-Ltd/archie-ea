@@ -72,8 +72,14 @@ def test_what_breaks_keeps_its_card(client, login_as, make_org):
     login_as(client, user)
     html = _ask(client, "What breaks if Ifiok fails?")["html"]
     assert "What breaks if Ifiok fails" in html
-    # Ifiok depends on the node; the node does not depend on Ifiok, so it is not shown as broken.
-    assert "Ashby Cloud Node" not in html
+    # Ifiok depends on the node; the node does not depend on Ifiok, so it is not shown as broken:
+    # the card says nothing depends on Ifiok, and names the node only as something Ifiok is connected to.
+    assert "Nothing is recorded as depending on Ifiok" in html
+    assert "If Ifiok fails," not in html
+    affected = re.findall(r'data-testid="answer-sentence">(.*?)</p>', html, re.S)
+    assert not any("Ashby Cloud Node" in sentence for sentence in affected), affected
+    assert re.search(r"data-depends-on>Ifiok is connected to [^<]*Ashby Cloud Node", html)
+    assert "Brook Server Node" not in html
 
 
 def test_the_three_part_question_answers_every_part_in_order_in_one_reply(client, login_as, make_org):
