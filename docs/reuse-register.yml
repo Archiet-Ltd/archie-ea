@@ -1205,5 +1205,6 @@ entries:
       its layer lists and the Composer's layer cards all read them. Do not count a layer from the stored layer
       column or from a second type map, and do not take a tab's count from the list that opens under it.
     note: >
-      The model map (app/services/model_map.py) still groups by the stored layer column; it moves to count_layers in
-      a later round.
+      One layer set for the dashboard tabs, the Composer cards and the model map: Strategy, Motivation, Business,
+      Application, Technology (Physical's four types are inside it), Implementation and migration, and the composite
+      row (Other on the map). The model map (app/services/model_map.py) reads count_layers and layer_model_query.
