@@ -63,7 +63,10 @@ def _compliance_gap_ids(organization_id: int, gap_ids: List[int]) -> set:
 
 
 def _from_actions(organization_id: int) -> List[Dict[str, Any]]:
-    actions = priority_action_service.prioritised_actions(organization_id)["rows"]
+    from app.services import risk_service
+
+    actions = priority_action_service.prioritised_actions(
+        organization_id, risk_footers=risk_service.footers_by_risk(organization_id))["rows"]
     compliance = _compliance_gap_ids(organization_id, [r["record_id"] for r in actions if r["kind"] == "gap"])
     rows = []
     for action in actions:
