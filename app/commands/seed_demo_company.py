@@ -2560,8 +2560,16 @@ def _seed_backlog_scores(org_id) -> int:
                   "reach", "impact", "confidence", "story_points")
         if any(getattr(ranked, f) is not None for f in fields):
             continue
-        for field, value in zip(fields, inputs):
-            setattr(ranked, field, value)
+        (business_value, time_criticality, risk_reduction, job_size,
+         reach, impact, confidence, story_points) = inputs
+        ranked.business_value = business_value
+        ranked.time_criticality = time_criticality
+        ranked.risk_reduction = risk_reduction
+        ranked.job_size = job_size
+        ranked.reach = reach
+        ranked.impact = impact
+        ranked.confidence = confidence
+        ranked.story_points = story_points
         filled += 1
     return filled
 
