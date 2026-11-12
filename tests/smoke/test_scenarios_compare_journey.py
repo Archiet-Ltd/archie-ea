@@ -77,7 +77,7 @@ def test_compare_scenarios_holds_the_demonstration_scenarios_and_one_a_person_sa
         # a minor change that moves nothing says why in one sentence
         page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(page, change="Minor Modification")
-        page.get_by_role("button", name="Run simulation").click()
+        page.get_by_role("button", name="Run scenario").click()
         expect(page.get_by_test_id("simulation-panel")).to_be_visible(timeout=PAGE_TIMEOUT)
         sentence = page.get_by_test_id("no-effect")
         expect(sentence).to_be_visible()
