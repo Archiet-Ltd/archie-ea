@@ -18,7 +18,7 @@ import re
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app import db
 
@@ -238,38 +238,134 @@ def _sourced_share(org_id):
     }
 
 
-def _relationships(org_id, now):
-    from app.models import ArchiMateElement as E
+def _relationship_pairs(org_id, element_id=None, since=None):
+    """The (source, target) of each recorded relationship of the organisation, or only those
+    touching *element_id*, or only those recorded since *since*. The one place relationships are
+    read for these counts."""
     from app.models import ArchiMateRelationship as R
-    from app.models.audit_log import AuditLog
 
-    total = db.session.execute(db.select(func.count(R.id)).where(R.organization_id == org_id)).scalar_one()
-    if not total:
-        return {"total": 0}
-    since = now - timedelta(days=30)
-    added = db.session.execute(
-        db.select(func.count(AuditLog.id)).where(
-            AuditLog.organization_id == org_id,
-            AuditLog.table_name == "archimate_relationships",
-            AuditLog.action == "create",
-            AuditLog.created_at >= since,
-        )
-    ).scalar_one()
+    from app.models import ArchiMateElement as E
+
+    # A relationship with a deleted element at either end is not a connection any more: bulk
+    # delete keeps the row so a restore brings it back, but no count or answer reads it meanwhile.
+    live = db.select(E.id).where(E.organization_id == org_id, E.deleted_at.is_(None))
+    query = db.select(R.source_id, R.target_id).where(
+        R.organization_id == org_id, R.source_id.in_(live), R.target_id.in_(live)
+    )
+    if element_id is not None:
+        query = query.where(or_(R.source_id == element_id, R.target_id == element_id))
+    if since is not None:
+        query = query.where(R.created_at >= since)
+    return db.session.execute(query).all()
+
+
+def relationship_ends(org_id):
+    """How many recorded relationships touch each element of the organisation (an element at
+    both ends of one relationship counts it once). The one count the overview's "most
+    connected" line and the chat's first questions both read."""
     ends = Counter()
-    for source_id, target_id in db.session.execute(
-        db.select(R.source_id, R.target_id).where(R.organization_id == org_id)
-    ):
+    for source_id, target_id in _relationship_pairs(org_id):
         ends[source_id] += 1
         if target_id != source_id:
             ends[target_id] += 1
+    return ends
+
+
+_SEPARATORS = str.maketrans("-_", "  ")
+
+
+def element_each_name_means(org_id, rows, ends=None):
+    """The one element each name means, for *rows* of ``(id, name)`` of this organisation.
+
+    Several elements can share a name. The one the name means is the one with the most recorded
+    relationships; on a tie the application's own element (``ApplicationComponent.archimate_element_id``);
+    then the one recorded first. The overview, the first-question cards, the answer and a typed question
+    all call this, so they name the same element and the same count. Returns ``{folded name: id}``."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.utils.duplicate_guard import normalize_name
+
+    rows = [(element_id, name) for element_id, name in rows if normalize_name(name)]
+    if not rows:
+        return {}
+    if ends is None:
+        ends = relationship_ends(org_id)
+    own = set(
+        db.session.execute(
+            db.select(ApplicationComponent.archimate_element_id).where(
+                ApplicationComponent.organization_id == org_id,
+                ApplicationComponent.archimate_element_id.in_([element_id for element_id, _ in rows]),
+            )
+        ).scalars()
+    )
+    best = {}
+    for element_id, name in rows:
+        rank = (-ends.get(element_id, 0), element_id not in own, element_id)
+        key = normalize_name(name)
+        if key not in best or rank < best[key][0]:
+            best[key] = (rank, element_id)
+    return {key: element_id for key, (_, element_id) in best.items()}
+
+
+def element_named(org_id, name):
+    """The id of the one element *name* means in this organisation, or ``None`` when no element
+    carries it. A name matches ignoring case, spacing, ``-`` and ``_``; among elements sharing it
+    ``element_each_name_means`` picks. Every answer path calls this, never ``.first()``."""
+    from app.models import ArchiMateElement as E
+    from app.utils.duplicate_guard import folded_column, normalize_name
+
+    key = normalize_name(str(name or "").translate(_SEPARATORS))
+    if not key:
+        return None
+    rows = db.session.execute(
+        db.select(E.id).where(
+            E.organization_id == org_id,
+            E.deleted_at.is_(None),
+            folded_column(func.translate(E.name, "-_", "  ")) == key,
+        )
+    ).all()
+    meant = element_each_name_means(org_id, [(row.id, key) for row in rows])
+    return meant.get(key)
+
+
+def relationship_split(org_id, element_id):
+    """What makes up one element's count in ``relationship_ends``: how many relationships lead
+    from it, how many lead to it (one that does both counts once, as leading from it), and how
+    many different other elements they reach. ``total`` is always ``from_it + to_it``."""
+    from_it = to_it = 0
+    reached = set()
+    for source_id, target_id in _relationship_pairs(org_id, element_id):
+        if source_id == element_id:
+            from_it += 1
+            if target_id != element_id:
+                reached.add(target_id)
+        else:
+            to_it += 1
+            reached.add(source_id)
+    return {"total": from_it + to_it, "from_it": from_it, "to_it": to_it, "reached": len(reached)}
+
+
+def _relationships(org_id, now):
+    from app.models import ArchiMateElement as E
+
+    total = len(_relationship_pairs(org_id))
+    if not total:
+        return {"total": 0}
+    since = now - timedelta(days=30)
+    # the same live relationships the total counts, so the figure beside it can never exceed it
+    added = len(_relationship_pairs(org_id, since=since))
+    ends = relationship_ends(org_id)
     top = None
     if ends:
-        element_id, count = max(ends.items(), key=lambda item: (item[1], -item[0]))
-        name = db.session.execute(
-            db.select(E.name).where(E.id == element_id, E.organization_id == org_id)
-        ).scalar_one_or_none()
-        if name:
-            top = {"name": name, "count": count}
+        # The element the leading name means, by the one rule every surface uses.
+        rows = db.session.execute(
+            db.select(E.id, E.name).where(E.organization_id == org_id, E.id.in_(list(ends)))
+        ).all()
+        meant = element_each_name_means(org_id, rows, ends)
+        names = {element_id: name for element_id, name in rows}
+        leading = [element_id for element_id in meant.values()]
+        if leading:
+            element_id = max(leading, key=lambda item: (ends[item], -item))
+            top = {"name": names[element_id], "count": ends[element_id]}
     return {"total": total, "added_30d": added, "top": top}
 
 

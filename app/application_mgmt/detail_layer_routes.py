@@ -7,11 +7,12 @@ import json
 import logging
 from datetime import datetime
 
-from flask import current_app, flash, jsonify, request, session
+from flask import current_app, flash, g, jsonify, request, session
 from flask_login import login_required
 from sqlalchemy import func, select
 
 from .. import db
+from ..decorators import audit_log, require_roles
 from ..models.application_portfolio import ApplicationComponent
 from ..models.archimate_business import (
     BusinessCollaboration,
@@ -143,6 +144,47 @@ def update_capability_mapping(id, mapping_id):
         flash("Error updating capability mapping. Please try again.", "error")
 
     return _redirect_to_detail(app.id, tab="capabilities")
+
+
+@application_mgmt.route("/applications/<int:id>/vendor-link", methods=["POST"])
+@login_required
+@require_roles("admin", "architect")
+@audit_log("application_vendor_link_create")
+def application_vendor_link(id):
+    """Record a supplier the model links to the application as its vendor.
+
+    The supplier is a business actor linked to this application in the model; the
+    vendor is found by name or created through the one vendor register, and only
+    this application's link is written.
+    """
+    from ..services import vendor_register
+    from ..services.application_model_links import linked_suppliers
+
+    org_id = getattr(g, "current_org_id", None)
+    application = db.session.execute(
+        db.select(ApplicationComponent).where(
+            ApplicationComponent.id == id, ApplicationComponent.organization_id == org_id)
+    ).scalar_one_or_none()
+    if application is None:
+        return jsonify({"status": "error", "error": "Application not found."}), 404
+
+    try:
+        element_id = int((request.get_json(silent=True) or {}).get("element_id"))
+    except (TypeError, ValueError):
+        element_id = 0
+    supplier = next((row for row in linked_suppliers(application) if row["id"] == element_id), None)
+    if supplier is None:
+        return jsonify({
+            "status": "error",
+            "error": "That supplier is not linked to this application in the model.",
+        }), 404
+
+    vendor = vendor_register.resolve_vendor(supplier["name"], org_id)
+    if vendor is None:
+        return jsonify({"status": "error", "error": "The supplier has no name to record."}), 400
+    vendor_register.set_application_vendor(application, vendor)
+    db.session.commit()
+    return jsonify({"status": "success", "vendor": {"id": vendor.id, "name": vendor.name}}), 201
 
 
 @application_mgmt.route("/applications/<int:id>/vendor-footprint", methods=["POST"])
