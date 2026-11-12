@@ -39,6 +39,7 @@ from app.modules.solutions_strategic.v2.services.impact_analysis_service import 
 from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
     currency_symbol,
     InvestmentPrioritizationService,
+    limit_costs_to_viewer,
 )
 from app.modules.solutions_strategic.v2.services.process_optimization_service import (
     ProcessOptimizationService,
@@ -177,6 +178,8 @@ def investment_matrix():
         from app.services import result_footer_service
 
         result_footer_service.attach_capability_footers(current_org_id(), analysis["capability_scores"])
+        # After the footers, which read the figures to say where each came from.
+        limit_costs_to_viewer(analysis)
 
         return render_template(
             "strategic/investment_matrix.html",
@@ -205,7 +208,7 @@ def api_investment_analysis():
     try:
         service = InvestmentPrioritizationService()
         analysis = service.analyze_investment_priorities(include_risk_analysis=True)
-        return jsonify(analysis)
+        return jsonify(limit_costs_to_viewer(analysis))
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
