@@ -199,16 +199,16 @@ def test_desktop_keeps_the_evidence_open_without_a_control(browser, live_server,
 
 
 READER = "drew.holloway@lantern-quay.example.com"
-HELD_BACK = "Restricted to roles with budget authority"
+HELD_BACK = "Cost figures are withheld for your role."
 
 
-def _owner_of_money_fixture(estimates):
+def _owner_of_money_fixture(estimates, first_role="portfolio_manager", others=("enterprise_architect",)):
     """A new organisation of one spend person and one other person; the spend person's capabilities carry the estimates."""
     from app import create_app, db
     from app.models.unified_capability import UnifiedCapability
     from app.models.unified_work_package import UnifiedWorkPackage
 
-    org = create_fresh_org("portfolio_manager", extra_roles=("enterprise_architect",))
+    org = create_fresh_org(first_role, extra_roles=others)
     names = []
     with create_app("testing").app_context():
         caps = []
@@ -243,7 +243,7 @@ def test_a_person_without_spend_authority_reads_every_capability_and_no_money(br
             footer = rows.nth(i).get_by_test_id("capability-footer").inner_text()
             assert "£" not in footer, footer
         total = page.get_by_test_id("total-investment").inner_text()
-        assert "Restricted" in total and HELD_BACK in total, total
+        assert "Withheld" in total and HELD_BACK in total, total
         assert "Not estimated" not in total and "£" not in total, total
         # nothing on the page, drawn or hidden, carries a pound figure
         assert "£" not in page.content()
@@ -325,9 +325,47 @@ def test_a_person_without_spend_authority_is_given_no_figure_by_the_feed(browser
         text = str(body)
         for figure in ("12345", "6789", "1750", "20884"):
             assert figure not in text, figure
-        assert body["costs_hidden"] is True
+        assert body["costs_withheld"] is True
         expect(page.get_by_test_id("capability-row")).to_have_count(2, timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("cell-investment").first).to_have_text(HELD_BACK)
+    finally:
+        context.close()
+
+
+def test_a_finance_person_reads_the_figures_and_a_solution_architect_reads_the_sentence(browser, live_server):
+    """Cost rule: whoever may open Spend reads the matrix's money; the solution architect of the same
+    organisation reads the one sentence in its place, on the desktop in light and the phone in dark."""
+    org = _owner_of_money_fixture([12345.0, 6789.0], first_role="finance", others=("solution_architect",))
+    expected = 12345.0 + 6789.0 + 1750.0
+    context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="light")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["finance"])
+        page.goto(live_server + PAGES[0], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        rows = page.get_by_test_id("capability-row")
+        expect(rows).to_have_count(2, timeout=PAGE_TIMEOUT)
+        cells = [rows.nth(i).get_by_test_id("cell-investment").inner_text() for i in range(2)]
+        assert abs(sum(_thousands(c) for c in cells) - expected / 1000) <= 0.11, cells
+        total = page.get_by_test_id("total-investment").inner_text()
+        assert abs(_thousands(total) - expected / 1000) <= 0.06, (total, expected)
+        assert HELD_BACK not in total and "Withheld" not in total, total
+        assert HELD_BACK not in " ".join(cells), cells
+        _shot(page, "finance-matrix", 1440, "light")
+    finally:
+        context.close()
+    context = browser.new_context(viewport={"width": 390, "height": 900}, color_scheme="dark")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["solution_architect"])
+        page.goto(live_server + PAGES[0], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("capability-row")).to_have_count(2, timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("phone-investment").first).to_have_text(HELD_BACK)
+        total = page.get_by_test_id("total-investment").inner_text()
+        assert HELD_BACK in total and "£" not in total, total
+        assert "£" not in page.content()
+        for figure in ("12345", "6789", "1750", "20884"):
+            assert figure not in page.content(), figure
+        _shot(page, "architect-matrix", 390, "dark")
     finally:
         context.close()
 
