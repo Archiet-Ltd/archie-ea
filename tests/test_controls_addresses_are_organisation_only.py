@@ -84,3 +84,30 @@ def test_a_person_without_the_role_gets_the_refusal_page(app, db_session, make_o
     html = response.get_data(as_text=True)
     assert "You don't have access to this page" in html or "You don&#39;t have access to this page" in html
     assert 'data-testid="policy-checked-value"' not in html
+
+
+@pytest.mark.parametrize("address", ("/api/policy-monitoring/violations", "/enterprise/api/policy-monitoring/violations"))
+def test_organisation_b_gets_nothing_of_organisation_a_violations_from_the_json_address(
+    app, db_session, make_org, client, login_as, address
+):
+    from app.models.policy_monitoring import ArchitecturePolicy, PolicyViolation
+
+    org_a = make_org("policy-json-a")
+    marker = "alpha-app-%s" % uuid.uuid4().hex[:8]
+    policy = ArchitecturePolicy(name="Encrypt at rest", organization_id=org_a.id)
+    db_session.add(policy)
+    db_session.flush()
+    db_session.add(
+        PolicyViolation(
+            policy_id=policy.id, entity_type="application", entity_id=1, entity_name=marker,
+            violation_details="Details for %s" % marker, severity="high", status="open",
+            organization_id=org_a.id,
+        )
+    )
+    db_session.commit()
+    _architect_of(db_session, make_org, login_as, client, "policy-json-b")
+
+    response = client.get(address)
+
+    assert marker not in response.get_data(as_text=True)
+    assert response.status_code == 404
