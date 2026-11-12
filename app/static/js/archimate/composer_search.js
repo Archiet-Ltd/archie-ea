@@ -217,8 +217,10 @@ let ComposerSearch = (function() {
             self.canvasElements = {};
             /* The same cards as buttons, so a keyboard or screen reader opens a layer too. */
             self.layerCards = data.overview.map(function(row) {
+                let apart = row.not_on_model_map
+                    ? ', ' + row.not_on_model_map + ' of them entered in a register and not drawn' : '';
                 return { layer: row.layer, title: row.title, count: row.count,
-                         label: row.title + ', ' + row.count + (row.count === 1 ? ' element' : ' elements') };
+                         label: row.title + ', ' + row.count + (row.count === 1 ? ' element' : ' elements') + apart };
             });
             self.layerCardsTotal = data.store_total;
             self.elementCount = 0;

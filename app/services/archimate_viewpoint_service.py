@@ -381,15 +381,29 @@ def _types_for_layer(layer: str) -> list:
     return sorted(LAYER_TYPES.get(layer, set()))
 
 
-def _filter_to_layer(query, layer, layer_type_names):
-    """Narrow an element query to one layer; the composite view takes every type no layer holds."""
+def _type_key(type_name) -> str:
+    """A stored element type as the layer map spells it: lower case, no spaces or underscores, so a
+    model file's "Work Package" is the same type as "WorkPackage"."""
+    return (type_name or "").lower().replace(" ", "").replace("_", "")
+
+
+def _type_key_column():
+    """The same spelling as _type_key, on the stored column."""
     from app import db as _db
     from app.models.archimate_core import ArchiMateElement
 
     lowered = _db.func.lower(_db.func.coalesce(ArchiMateElement.type, ""))
+    return _db.func.replace(_db.func.replace(lowered, " ", ""), "_", "")
+
+
+def _filter_to_layer(query, layer, layer_type_names):
+    """Narrow an element query to one layer; the composite view takes every type no layer holds."""
+    from app import db as _db
+
+    key = _type_key_column()
     if layer == COMPOSITE_LAYER:
-        return query.filter(_db.not_(lowered.in_(list(LAYER_TYPE_TO_LAYER))))
-    return query.filter(lowered.in_(layer_type_names))
+        return query.filter(_db.not_(key.in_(list(LAYER_TYPE_TO_LAYER))))
+    return query.filter(key.in_(layer_type_names))
 
 
 # The most elements one viewpoint answer carries.
@@ -444,8 +458,50 @@ def _most_connected(query, org_id):
     )
 
 
-def _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, org_id):
-    """The opening for a model too large to draw readably: one count per layer."""
+# The four Physical types. ArchiMate 3.2 folds them into Technology and the layer map above does too, so
+# no screen counts Physical as a layer of its own; the Technology count holds them.
+PHYSICAL_TYPES = frozenset({"equipment", "facility", "distributionnetwork", "material"})
+
+
+def _register_only_count(dashboard_layer: str) -> int:
+    """Records of the layer's own tables that have no model element (a gap entered in the gap register).
+
+    The layer lists them and counts them, the model map does not draw them. A type held in a table that
+    mirrors into the model is counted once, as its model element. Raises when a table cannot be read."""
+    from app.modules.architecture.routes.archimate_crud.routes import LAYER_CONFIG, MODEL_REGISTRY
+
+    keys = [dashboard_layer] + (["physical"] if dashboard_layer == "technology" else [])
+    records = 0
+    for key in keys:
+        for type_name in LAYER_CONFIG.get(key, {}).get("elements", []):
+            model_class = MODEL_REGISTRY.get(type_name)
+            if not model_class:
+                continue
+            query = model_class.query
+            if hasattr(model_class, "archimate_element_id"):
+                query = query.filter(model_class.archimate_element_id.is_(None))
+            records += query.count()
+    return records
+
+
+def layer_model_query(layer: str):
+    """The organisation's model elements of one layer, the rows count_layers counts for it. Physical, which is
+    no layer of its own, answers with the Physical types alone."""
+    from app.models.archimate_core import ArchiMateElement
+
+    if layer == "physical":
+        return ArchiMateElement.query.filter(_type_key_column().in_(list(PHYSICAL_TYPES)))
+    return _filter_to_layer(ArchiMateElement.query, layer, [t.lower() for t in _types_for_layer(layer)])
+
+
+def count_layers(org_id, allowed_types=None) -> list:
+    """The one count of every layer, read by the architecture dashboard's tabs and the Composer's layer cards.
+
+    One row per layer in LAYER_TITLES order: ``model`` is the organisation's model elements whose type
+    belongs to the layer (types the map does not know are the composite row), ``register_only`` the
+    records the layer lists that the model does not hold, and ``count`` their sum. ``count`` is None, never
+    a partial figure, when the records could not be counted. Physical is not a row: its types are Technology's.
+    """
     from app import db as _db
     from app.models.archimate_core import ArchiMateElement
 
@@ -453,12 +509,38 @@ def _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, org_id):
         _db.func.lower(ArchiMateElement.type)).where(ArchiMateElement.organization_id == org_id)
     if allowed_types:
         query = query.where(ArchiMateElement.type.in_(allowed_types))
-    counts = {}
+    model = {}
     for type_name, n in _db.session.execute(query).all():
-        key = LAYER_TYPE_TO_LAYER.get(type_name or "", COMPOSITE_LAYER)
-        counts[key] = counts.get(key, 0) + n
-    order = [k for k in vp.get('layer_order', layers or []) if k in counts]
-    order += [k for k in LAYER_TITLES if k in counts and k not in order]
+        key = LAYER_TYPE_TO_LAYER.get(_type_key(type_name), COMPOSITE_LAYER)
+        model[key] = model.get(key, 0) + n
+    rows = []
+    for layer, title in LAYER_TITLES.items():
+        try:
+            records = 0 if layer == COMPOSITE_LAYER else _register_only_count(layer)
+        except Exception as exc:  # a table that cannot be read leaves the layer uncounted, not under-counted
+            logger.warning("count_layers: records of %s could not be counted: %s", layer, exc)
+            _db.session.rollback()
+            records = None
+        rows.append({
+            "layer": layer, "title": title, "model": model.get(layer, 0), "register_only": records,
+            "count": None if records is None else model.get(layer, 0) + records,
+        })
+    return rows
+
+
+def _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, org_id):
+    """The opening for a model too large to draw readably: one count per layer."""
+    rows = {row["layer"]: row for row in count_layers(org_id, allowed_types)}
+    present = {k: row for k, row in rows.items() if (row["count"] if row["count"] is not None else row["model"])}
+    order = [k for k in vp.get('layer_order', layers or []) if k in present]
+    order += [k for k in LAYER_TITLES if k in present and k not in order]
+    overview = []
+    for k in order:
+        row = present[k]
+        overview.append({
+            'layer': k, 'title': row["title"], 'count': row["count"] if row["count"] is not None else row["model"],
+            'not_on_model_map': row["register_only"] or 0,
+        })
     return {
         'viewpoint_id': viewpoint_id,
         'viewpoint_name': vp['name'],
@@ -467,10 +549,8 @@ def _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, org_id):
         'elements': [],
         'relationships': [],
         'total': 0,
-        'overview': [
-            {'layer': k, 'title': LAYER_TITLES[k], 'count': counts[k]} for k in order
-        ],
-        'store_total': matching,
+        'overview': overview,
+        'store_total': sum(row['count'] for row in overview),
     }
 
 

@@ -30,13 +30,17 @@
        to near-invisible despite being focused. #}
     <div id="layer-spine-scroll" class="flex gap-1 overflow-x-auto workbench-table-scroll py-1 -my-1"
          style="scroll-padding-inline-end: 28px;">
-        {% for layer_key, layer_info in layer_config.items() %}
+        {% for layer_key, layer_info in layer_config.items() if not layer_info.folded_into %}
         <a href="{{ url_for('archimate_crud.dashboard', layer=layer_key) }}"
                       title="{{ layer_info.title }}"
            {% if layer_key == selected_layer.key %}aria-current="page"{% endif %}
            {% if layer_key == selected_layer.key %}style="border-left-color: hsl(var({{ layer_info.color_token }}));"{% endif %}
            class="flex shrink-0 items-center justify-between gap-2 whitespace-nowrap rounded-md border-l-4 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {% if layer_key == selected_layer.key %}border-y border-r border-border bg-muted/50 text-foreground{% else %}border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground{% endif %}">
             <span class="truncate">{{ layer_info.short_name }}</span>
+            {# Until the counts answer the tab says it is counting; only a count that failed leaves it blank. #}
+            <span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground"
+                  x-cloak x-show="countsLoading && layerCounts['{{ layer_key }}'] === undefined"
+                  data-testid="layer-count-loading" role="status" aria-label="Counting {{ layer_info.short_name }}">&hellip;</span>
             {# The count appears only once it is known; a dash where a count would go told nobody anything.
                x-show reads layerCounts['{{ layer_key }}'] by bracket access (not hasOwnProperty, which
                goes through getOwnPropertyDescriptor and Alpine's reactivity does not track that as a
@@ -69,7 +73,7 @@
 </script>
 
 <section data-testid="figure-cards" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="{{ selected_layer.short_name }} repository metrics">
-    {{ repository_metric('Elements', "layerCountKnown ? layerCount : '—'", "layerCountHint", 'layers', 'layer-elements-card') }}
+    {{ repository_metric('Elements', "layerCountDisplay", "layerCountHint", 'layers', 'layer-elements-card') }}
     {{ repository_metric('Connected', "relationshipMetrics.known ? relationshipMetrics.connected : '—'", "relationshipHint", 'git-branch') }}
     {{ repository_metric('Documentation', "pageCount ? documentationPercent + '%' : '—'", "documentationHint", 'file-text') }}
     {{ repository_metric('Validation posture', "validationSummary.value", "validationSummary.hint", 'shield-check') }}

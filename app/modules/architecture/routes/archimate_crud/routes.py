@@ -214,6 +214,8 @@ LAYER_ALIASES = {
         "implementation and migration",
         "implementation_migration",
     ],
+    # Composite elements (a location, a grouping, a junction) and any stored type no layer holds.
+    "composite": ["composite"],
 }
 
 LAYER_CONFIG = {
@@ -312,6 +314,11 @@ LAYER_CONFIG = {
         ],
         "icon": "🚀",
     },
+    "composite": {
+        "name": "Composite and other elements",
+        "elements": [],
+        "icon": "🧩",
+    },
 }
 
 # User-facing layer language belongs beside the registry that defines the layer
@@ -356,12 +363,21 @@ LAYER_PRESENTATION = {
         "short_name": "Physical",
         "description": "Facilities, equipment, distribution networks and materials that anchor the physical estate",
         "color_token": "--layer-technology",
+        # ArchiMate 3.2 folds Physical into Technology and the Composer does too, so the layer has no tab or
+        # count of its own: its pages open on the Technology tab, whose count holds its elements.
+        "folded_into": "technology",
     },
     "implementation": {
         "title": "Implementation & Migration Architecture",
-        "short_name": "Implementation",
+        "short_name": "Implementation & Migration",
         "description": "Work packages, deliverables, plateaus, events and gaps that govern architecture change",
         "color_token": "--layer-implementation",
+    },
+    "composite": {
+        "title": "Composite and other elements",
+        "short_name": "Composite and other elements",
+        "description": "Locations, groupings, junctions and any element whose type belongs to no layer",
+        "color_token": "--layer-technology",
     },
 }
 
@@ -425,9 +441,10 @@ def _validated_layer_filter(layer, element_type):
     """
     if layer not in LAYER_CONFIG:
         return None, None
+    tab = LAYER_PRESENTATION[layer].get("folded_into", layer)
     if element_type not in LAYER_CONFIG[layer]["elements"]:
-        return layer, None
-    return layer, element_type
+        return tab, None
+    return tab, element_type
 
 
 # Fields to skip when auto-discovering displayable attributes
@@ -868,10 +885,7 @@ def dashboard():
         request.args.get("layer"), request.args.get("element_type")
     )
     selected_key = initial_layer or "motivation"
-    presentation_config = {
-        key: {**config, **LAYER_PRESENTATION[key], "key": key}
-        for key, config in LAYER_CONFIG.items()
-    }
+    presentation_config = _presentation_config()
     return render_template(
         "archimate_crud/dashboard.html",
         layer_config=presentation_config,
@@ -932,63 +946,75 @@ def _count_layer_elements(layer):
 def _layer_count_parts(layer):
     """The two parts of one layer's count: (records not in the model, model elements), or None.
 
-    The model elements are what the model map draws for the layer; the records are rows of the layer's own
-    tables that have no model element (a gap entered in the gap register), listed on the layer's page but
-    not drawn on the map. The page states the second number beside the first, so the two pages agree.
+    Read from the one counting service the Composer's layer cards read too
+    (archimate_viewpoint_service.count_layers), so the tab, the page header, the list and the card are the
+    same number. The model elements are those whose type belongs to the layer; the records are rows of the
+    layer's own tables that have no model element (a gap entered in the gap register), listed on the layer's
+    page but not drawn on the map. Physical has no count of its own (its elements are Technology's); asked for
+    directly it answers with the Physical types alone.
 
-    Shared by the per-layer and batched endpoints so the two can never drift.
-
-    Counts dedicated per-type tables (portfolio source) plus archimate_elements
-    (architecture source), excluding typed rows that are mirrored into
-    archimate_elements -- counting both sides reported every mirrored entity
-    twice, and a tenant with 71 elements was told it had 142.
-
-    Returns None, never a partial total, when any constituent count raises.
-    The previous behaviour logged the failure and carried on with the remaining
-    types, which produced an under-count that looked exactly like a real one:
-    the user could not tell a measured total from a broken one. Per CLAUDE.md a
-    value that was not measured must be None so the UI renders an em dash.
+    Returns None, never a partial total, when a count raises: a value that was not measured is None, so the
+    screen shows a loading or unavailable state rather than an under-count that looks real.
     """
     if layer not in LAYER_CONFIG:
         return None
+    from app.middleware.tenant_context import current_org_id
+    from app.services import archimate_viewpoint_service as counting
 
-    layer_types = LAYER_CONFIG[layer]["elements"]
-    records = 0
-    # Count from dedicated per-type tables, EXCLUDING rows that are mirrored into
-    # archimate_elements — those are added below, and counting both sides made the
-    # page report every mirrored entity twice. A tenant with 71 elements was told
-    # it had 142 (71 typed rows + the same 71 mirrors). A model with no
-    # archimate_element_id cannot be deduplicated this way, so it is counted whole.
-    for etype in layer_types:
-        model_class = MODEL_REGISTRY.get(etype)
-        if not model_class:
-            continue
-        try:
-            q = model_class.query
-            if hasattr(model_class, "archimate_element_id"):
-                q = q.filter(model_class.archimate_element_id.is_(None))
-            records += q.count()
-        except Exception as e:
-            current_app.logger.warning(f"_count_layer_elements: count failed for {etype}: {e}")
-            return None
-
-    # Count from archimate_elements for this layer.
-    # 17 Aug 2026 (ARCH-010): matched on the LAYER_CONFIG key alone, so an
-    # element stored as "implementation & migration" — the ArchiMate 3.2 name
-    # for the layer whose key here is "implementation" — matched nothing and
-    # was dropped from every count. The dashboard headline was short by exactly
-    # the size of that layer while its own tiles summed to the real total, and
-    # the layer's elements were invisible in the UI. Match every spelling.
-    try:
-        _aliases = [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
-        ae_count = ArchiMateElement.query.filter(
-            db.func.lower(ArchiMateElement.layer).in_(_aliases),
-        ).count()
-    except Exception as e:
-        current_app.logger.warning(f"_count_layer_elements: archimate_elements count failed for {layer}: {e}")
+    org_id = current_org_id()
+    if org_id is None:
         return None
+    try:
+        if layer == "physical":
+            return _physical_parts(org_id, counting)
+        row = next(r for r in counting.count_layers(org_id) if r["layer"] == layer)
+    except Exception as e:
+        current_app.logger.warning(f"_layer_count_parts: count failed for {layer}: {e}")
+        db.session.rollback()
+        return None
+    return None if row["register_only"] is None else (row["register_only"], row["model"])
 
-    return records, ae_count
+
+def _physical_parts(org_id, counting):
+    """The Physical types' own count, for the address that still asks for it; no tab adds it to Technology."""
+    rows = db.session.execute(
+        db.select(db.func.lower(ArchiMateElement.type), db.func.count())
+        .where(ArchiMateElement.organization_id == org_id)
+        .group_by(db.func.lower(ArchiMateElement.type))
+    ).all()
+    model = sum(n for t, n in rows if counting._type_key(t) in counting.PHYSICAL_TYPES)
+    records = 0
+    for etype in LAYER_CONFIG["physical"]["elements"]:
+        model_class = MODEL_REGISTRY.get(etype)
+        if model_class:
+            query = model_class.query
+            if hasattr(model_class, "archimate_element_id"):
+                query = query.filter(model_class.archimate_element_id.is_(None))
+            records += query.count()
+    return records, model
+
+
+def _presentation_config():
+    """Each layer's configuration with how it is presented. Technology lists the Physical types folded into it."""
+    config = {
+        key: {**layer_config, **LAYER_PRESENTATION[key], "key": key}
+        for key, layer_config in LAYER_CONFIG.items()
+    }
+    config["technology"]["elements"] = _dashboard_types("technology")
+    return config
+
+
+def _tab_layer_keys():
+    """The layers that have a tab: every layer except those folded into another."""
+    return [key for key in LAYER_CONFIG if "folded_into" not in LAYER_PRESENTATION[key]]
+
+
+def _dashboard_types(layer):
+    """The element types a layer's page lists: its own and, for Technology, the Physical ones folded in."""
+    types = list(LAYER_CONFIG[layer]["elements"])
+    if layer == "technology":
+        types += LAYER_CONFIG["physical"]["elements"]
+    return types
 
 
 @archimate_crud.route("/api/layer/<layer>/count")
@@ -1020,12 +1046,21 @@ def api_layer_counts():
     """Return counts for ALL layers in one response.
     Used by the dashboard to avoid per-layer requests that trigger rate limits.
     """
-    # A layer that could not be counted is null, never 0 -- the dashboard renders
-    # null as an em dash and falls back to the per-layer endpoint for it.
-    parts = {layer: _layer_count_parts(layer) for layer in LAYER_CONFIG}
-    counts = {layer: None if p is None else p[0] + p[1] for layer, p in parts.items()}
+    # A layer that could not be counted is null, never 0 -- the dashboard keeps showing its loading state
+    # for it and asks for that layer alone.
+    from app.middleware.tenant_context import current_org_id
+    from app.services.archimate_viewpoint_service import count_layers
+
+    try:
+        rows = {row["layer"]: row for row in count_layers(current_org_id())}
+    except Exception as e:
+        current_app.logger.warning(f"api_layer_counts: count failed: {e}")
+        db.session.rollback()
+        rows = {}
+    keys = _tab_layer_keys()
+    counts = {key: (rows[key]["count"] if key in rows else None) for key in keys}
     # How many of each layer's records the model map does not draw, so the page can say so beside its count.
-    not_on_model_map = {layer: None if p is None else p[0] for layer, p in parts.items()}
+    not_on_model_map = {key: (rows[key]["register_only"] if key in rows else None) for key in keys}
     return jsonify({"counts": counts, "not_on_model_map": not_on_model_map})
 
 
@@ -1050,7 +1085,7 @@ def api_layer_elements(layer):
     sort_by = request.args.get("sort_by", "name")
     sort_order = request.args.get("sort_order", "asc")
 
-    layer_types = LAYER_CONFIG[layer]["elements"]
+    layer_types = _dashboard_types(layer)
     if type_filter:
         # Support comma-separated list of types (viewpoint filter) or single type
         requested_types = [t.strip() for t in type_filter.split(",") if t.strip()]
@@ -1199,13 +1234,11 @@ def api_layer_elements(layer):
             # catalogue page keeps rendering the layer as empty.
             # With no type asked for, every element of the layer is listed, whatever its stored type: the
             # layer's count has no type filter, and a list narrower than its own count read as a second number.
-            ae_q = ArchiMateElement.query.filter(
-                db.func.lower(ArchiMateElement.layer).in_(
-                    [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
-                ),
-            )
+            from app.services.archimate_viewpoint_service import _type_key, _type_key_column, layer_model_query
+
+            ae_q = layer_model_query(layer)
             if type_filter:
-                ae_q = ae_q.filter(ArchiMateElement.type.in_(query_types))
+                ae_q = ae_q.filter(_type_key_column().in_([_type_key(t) for t in query_types]))
             if search:
                 safe_s = escape_like_literal(search)
                 ae_q = ae_q.filter(
@@ -1214,13 +1247,23 @@ def api_layer_elements(layer):
                         ArchiMateElement.description.ilike(f"%{safe_s}%", escape="\\"),
                     )
                 )
-            for ae in ae_q.all():
-                _rel_count = ArchiMateRelationship.query.filter(
-                    db.or_(
-                        ArchiMateRelationship.source_id == ae.id,
-                        ArchiMateRelationship.target_id == ae.id,
-                    )
-                ).count()
+            ae_rows = ae_q.all()
+            # One grouped read for every element's connections, not one query per element: a layer of a
+            # thousand elements waited on a thousand queries before its list, and its count, could show.
+            ae_ids = [ae.id for ae in ae_rows]
+            rels_by_ae = {}
+            for start in range(0, len(ae_ids), 5000):
+                chunk = ae_ids[start:start + 5000]
+                for end_column in (ArchiMateRelationship.source_id, ArchiMateRelationship.target_id):
+                    for ae_id_hit, n in (
+                        db.session.query(end_column, db.func.count())
+                        .filter(end_column.in_(chunk))
+                        .group_by(end_column)
+                        .all()
+                    ):
+                        rels_by_ae[ae_id_hit] = rels_by_ae.get(ae_id_hit, 0) + n
+            for ae in ae_rows:
+                _rel_count = rels_by_ae.get(ae.id, 0)
                 ae_dict = {
                     "id": ae.id,
                     "name": ae.name or "",
@@ -1408,10 +1451,7 @@ def list_elements(layer, element_type):
         )
 
     initial_layer, initial_element_type = _validated_layer_filter(layer, element_type)
-    presentation_config = {
-        key: {**config, **LAYER_PRESENTATION[key], "key": key}
-        for key, config in LAYER_CONFIG.items()
-    }
+    presentation_config = _presentation_config()
     selected_key = initial_layer or "motivation"
     return render_template(
         "archimate_crud/dashboard.html",
@@ -1439,10 +1479,7 @@ def _selected_layer_for(layer):
     content renders, which is what GET .../<type>/new did (Capgemini walkthrough,
     F-18-adjacent: element creation was unreachable, not merely edit). Mirrors
     the same presentation_config lookup the dashboard() route already does."""
-    presentation_config = {
-        key: {**config, **LAYER_PRESENTATION[key], "key": key}
-        for key, config in LAYER_CONFIG.items()
-    }
+    presentation_config = _presentation_config()
     selected_key = layer if layer in presentation_config else "motivation"
     return presentation_config[selected_key]
 
