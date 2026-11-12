@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from tests.test_change_review import PASS_ALL, FakeReviewer
+
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
@@ -104,6 +106,10 @@ def test_same_org_reviewer_executes_once_and_receives_allowlisted_queue(
                 "status": "pending",
                 "source_table": None,
                 "source_id": None,
+                "settled_by_review": True,
+                "held_by_pause": False,
+                "can_approve": True,
+                "approve_note": None,
                 "requester": {"id": requester.id, "display_name": "Requester Reviewer"},
             }
         ]
@@ -113,6 +119,8 @@ def test_same_org_reviewer_executes_once_and_receives_allowlisted_queue(
         assert mismatch["code"] == "FORBIDDEN"
         assert calls == []
 
+        # An approve is a request to settle the change: it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         result = AIChatApprovalService(reviewer.id).approve_and_execute(approval_id, reviewer.id)
         assert result["success"] is True
         assert calls == [(reviewer.id, {"name": "Handoff"})]
@@ -266,6 +274,8 @@ def test_audit_failure_after_claim_cannot_reopen_or_dispatch_an_approval(
 
         monkeypatch.setattr(AIChatApprovalService, "_audit", fail_only_the_post_claim_audit)
 
+        # An approve is a request to settle the change: it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         first = AIChatApprovalService(reviewer.id).approve_and_execute(approval_id, reviewer.id)
         replay = AIChatApprovalService(second_reviewer.id).approve_and_execute(
             approval_id, second_reviewer.id
@@ -509,6 +519,8 @@ def test_approval_modal_is_a_reviewer_queue_with_requester_attribution():
         " && !$store.approvals.error && $store.approvals.approvals.length === 0"
         in template
     )
-    assert "queued for another authorized user" in (
-        root / "app/modules/ai_chat/services/ai_chat_approval_service.py"
-    ).read_text(encoding="utf-8")
+    # Nobody else has to approve a change: the service never tells the person who asked that
+    # another user must review it.
+    service_text = (root / "app/modules/ai_chat/services/ai_chat_approval_service.py").read_text(encoding="utf-8")
+    assert "another authorized user" not in service_text
+    assert "must approve" not in service_text

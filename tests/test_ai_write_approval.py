@@ -27,6 +27,8 @@ convention, rather than hand-rolling a module app fixture.
 
 import pytest
 
+from tests.test_change_review import PASS_ALL, FakeReviewer
+
 from app.modules.ai_chat.tools.registry import TOOL_SCHEMAS, mutating_tool_names
 from app.modules.ai_chat.services.agent_runner import AgentRunner
 
@@ -600,9 +602,14 @@ class TestApprovalExecutionParity:
         user = _make_user(db_session, org)
         _login(client, user.id)
         calls = self._stub_executor(monkeypatch, "create_solution")
-        record = _make_tool_use_approval(db_session, user, tool_name="create_solution")
+        record = _make_tool_use_approval(
+            db_session, user, tool_name="create_solution",
+            arguments={"name": "Payments rebuild", "description": "Rebuild the payments platform"},
+        )
         db_session.commit()
 
+        # An approve is a request to settle the change: it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         _login_second_approver(client, db_session, org)
         resp = client.post(f"/ai-chat/tools/approve/{record.id}")
         assert resp.status_code == 200
@@ -629,6 +636,8 @@ class TestApprovalExecutionParity:
         )
         db_session.commit()
 
+        # An approve is a request to settle the change: it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         _login_second_approver(client, db_session, org)
         resp = client.post(f"/ai-chat/approvals/{record.id}/approve")
         assert resp.status_code == 200, resp.get_json()
@@ -677,10 +686,13 @@ class TestApprovalExpiry:
 
         record = _make_tool_use_approval(
             db_session, user, tool_name="create_solution",
+            arguments={"name": "Payments rebuild", "description": "Rebuild the payments platform"},
             expires_at=datetime.utcnow() - timedelta(hours=1),  # overdue
         )
         db_session.commit()
 
+        # An approve is a request to settle the change: it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         _login_second_approver(client, db_session, org)
         resp = client.post(f"/ai-chat/tools/approve/{record.id}")
         assert resp.status_code == 200, resp.get_json()
@@ -712,10 +724,13 @@ class TestApprovalExpiry:
 
         record = _make_tool_use_approval(
             db_session, user, tool_name="create_solution",
+            arguments={"name": "Payments rebuild", "description": "Rebuild the payments platform"},
             expires_at=datetime.utcnow() - timedelta(hours=1),  # overdue
         )
         db_session.commit()
 
+        # An approve is a request to settle the change: it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         _login_second_approver(client, db_session, org)
         resp = client.post(f"/ai-chat/approvals/{record.id}/approve")
         assert resp.status_code == 200, resp.get_json()
@@ -816,6 +831,8 @@ class TestRequireAIApprovalDefaultsOn:
         resp = client.post("/ai-chat/data/create-capability", json={"name": cap_name})
         approval_id = resp.get_json()["approval_id"]
 
+        # An approve is a request to settle the change: it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         _login_second_approver(client, db_session, org)
         approve_resp = client.post(f"/ai-chat/approvals/{approval_id}/approve")
         assert approve_resp.status_code == 200, approve_resp.get_data(as_text=True)
@@ -899,6 +916,8 @@ class TestRequireAIApprovalDefaultsOn:
         assert record.operation_type == "update"
         assert record.entity_id == cap.id
 
+        # An approve is a request to settle the change: it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         _login_second_approver(client, db_session, org)
         approve_resp = client.post(f"/ai-chat/approvals/{approval_id}/approve")
         assert approve_resp.status_code == 200, approve_resp.get_data(as_text=True)
