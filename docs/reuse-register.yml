@@ -37,6 +37,19 @@ entries:
       template, and do not write a second footer, "Source:" line or confidence label beside it.
       The rule is in the service docstring and in docs/adr/0013-result-footer.md.
 
+  - id: cost-masker
+    concept: Withholding a figure in pounds from a person who may not see spend (investment figures, budgets, costs)
+    status: active
+    canonical:
+      path: app/modules/solutions_strategic/v2/services/investment_prioritization_service.py
+      symbols: [hide_costs, limit_costs_to_viewer]
+    reuse: >
+      Pass an analysis through limit_costs_to_viewer before a page or feed sends it; it asks the one role helper
+      (can_see_costs) and, for a person who may not see spend, hide_costs replaces every money figure with None
+      and sets costs_hidden so the page says the figure is restricted instead of showing a zero. Do not write a
+      second masker, do not test roles by hand in a route or template to decide whether a cost shows, and do not
+      blank a figure in the browser: the figure must not leave the server.
+
   - id: design-tokens
     concept: Colour, radius and type tokens for every page (one token file; the public marketing
       palette is a scoped class in it)

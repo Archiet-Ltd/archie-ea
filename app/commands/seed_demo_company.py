@@ -1850,6 +1850,110 @@ _WORK_PACKAGES = [
         -20, 45, 65000, 38000,
         "Inventory Accuracy Drive", "Inventory Control",
     ),
+    # The other capabilities each carry the work that changes them, so every
+    # capability on the investment pages has a recorded figure with its source.
+    (
+        "Install online water quality probes",
+        "in_progress", "high",
+        -40, 150, 185000, 72000,
+        "Predictive Maintenance Pilot", "Water Quality Monitoring",
+    ),
+    (
+        "Streamline order-to-dispatch hand-offs",
+        "in_progress", "medium",
+        -25, 100, 88000, 31000,
+        "Inventory Accuracy Drive", "Order Fulfilment",
+    ),
+    (
+        "Introduce skills-based rostering",
+        "planned", "medium",
+        45, 110, 72000, 0,
+        "Field Tester Rollout", "Workforce Planning",
+    ),
+    (
+        "Stand up a 24-hour incident desk",
+        "in_progress", "high",
+        -35, 90, 120000, 54000,
+        "Event Backbone Migration", "Incident Response",
+    ),
+    (
+        "Build demand forecasting model",
+        "planned", "medium",
+        75, 130, 98000, 0,
+        "Predictive Maintenance Pilot", "Demand Forecasting",
+    ),
+    (
+        "Automate batch quality checks",
+        "in_progress", "medium",
+        -20, 80, 64000, 22000,
+        "Compliance System Upgrade", "Quality Assurance",
+    ),
+    (
+        "Launch the shared analytics workspace",
+        "planned", "high",
+        30, 140, 175000, 0,
+        "Predictive Maintenance Pilot", "Data Analytics",
+    ),
+    (
+        "Replace point-to-point interfaces with the bus",
+        "in_progress", "high",
+        -55, 160, 230000, 96000,
+        "Event Backbone Migration", "Integration Management",
+    ),
+    (
+        "Introduce single sign-on for field tools",
+        "planned", "high",
+        40, 75, 82000, 0,
+        "Compliance System Upgrade", "Identity and Access",
+    ),
+    (
+        "Move controlled documents to one register",
+        "in_progress", "low",
+        -15, 70, 46000, 15000,
+        "Compliance System Upgrade", "Document Control",
+    ),
+    (
+        "Add alert routing and on-call rotas",
+        "planned", "medium",
+        50, 60, 58000, 0,
+        "Event Backbone Migration", "Monitoring and Alerting",
+    ),
+    (
+        "Enrol field devices in central management",
+        "in_progress", "medium",
+        -30, 110, 92000, 35000,
+        "Field Tester Rollout", "Device Management",
+    ),
+    (
+        "Sign and stage firmware releases",
+        "planned", "medium",
+        60, 90, 69000, 0,
+        "Calibration Automation Phase 2", "Firmware Distribution",
+    ),
+    (
+        "Renew the site network links",
+        "in_progress", "medium",
+        -45, 120, 135000, 68000,
+        "Event Backbone Migration", "Network Operations",
+    ),
+    (
+        "Test restore of the calibration ledger",
+        "planned", "high",
+        25, 45, 41000, 0,
+        "Event Backbone Migration", "Backup and Recovery",
+    ),
+    (
+        "Plan capacity for peak calibration season",
+        "planned", "low",
+        90, 60, 36000, 0,
+        "Event Backbone Migration", "Capacity Planning",
+    ),
+    (
+        "Segment the lab and field networks",
+        "in_progress", "high",
+        -10, 100, 115000, 29000,
+        "Compliance System Upgrade", "Security Operations",
+    ),
 ]
 
 # ── plateaus ───────────────────────────────────────────────────────────────
@@ -1903,12 +2007,18 @@ _PLATEAU_DESCRIPTIONS = {
     "Future State": "Platform services with governed data, full integration coverage and complete monitoring.",
 }
 
-# The two work packages that close no gap, and the plateau each one realises.
+# The work packages that close no gap, and the plateau each one realises.
 # Every other package realises the plateau its gap is closed on.
 _WORK_PACKAGE_PLATEAUS = {
     "Procure handheld field testers": "Transition State 1",
     "Consolidate supplier base": "Target Architecture",
 }
+# Packages that close no gap sit on the plateau their status points to: under way is
+# Transition State 1, planned is Target Architecture.
+_WORK_PACKAGE_PLATEAUS.update({
+    spec[0]: ("Target Architecture" if spec[1] == "planned" else "Transition State 1")
+    for spec in _WORK_PACKAGES[12:]
+})
 
 # gap name -> (gap type, impact): what kind of shortfall it is and what it costs.
 _GAP_DETAILS = {
