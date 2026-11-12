@@ -26,7 +26,7 @@ An operational answer on Ask: baseline drift, consistency findings, and stale de
 plainly rather than shown as current, with a live health probe once a monitoring source is
 connected.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

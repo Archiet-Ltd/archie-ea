@@ -26,28 +26,28 @@
     <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
       <p class="font-semibold text-foreground">Community</p>
       <p class="text-sm text-muted-foreground">Free, with no trial clock.</p>
-      <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Start free</a>
+      <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Start free</a>
     </div>
     {% for key, name in [('startup', 'Startup'), ('team', 'Team')] %}
     <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
       <p class="font-semibold text-foreground">{{ name }}</p>
       {% if _billing %}
-      <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
+      <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
          class="{{ _btn }} mt-auto bg-primary text-primary-foreground hover:bg-primary/90"
          data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
-      <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
+      <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
          class="text-sm text-primary underline text-center">or pay monthly</a>
       {% else %}
       <p class="text-sm text-muted-foreground">Paid plans are set up in a conversation with us.</p>
-      <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="{{ _btn }} mt-auto bg-primary text-primary-foreground hover:bg-primary/90" data-testid="buy-{{ key }}">Start free</a>
-      <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="text-sm text-primary underline text-center" data-testid="talk-{{ key }}">Talk to us about {{ name }}</a>
+      <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="{{ _btn }} mt-auto bg-primary text-primary-foreground hover:bg-primary/90" data-testid="buy-{{ key }}">Start free</a>
+      <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="text-sm text-primary underline text-center" data-testid="talk-{{ key }}">Talk to us about {{ name }}</a>
       {% endif %}
     </div>
     {% endfor %}
     <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
       <p class="font-semibold text-foreground">Enterprise</p>
       <p class="text-sm text-muted-foreground">Sold by annual contract.</p>
-      <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent" data-testid="buy-enterprise">Contact sales</a>
+      <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent" data-testid="buy-enterprise">Contact sales</a>
     </div>
   </div>
 </section>
