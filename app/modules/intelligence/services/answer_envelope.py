@@ -131,12 +131,66 @@ _QUESTION_CUES = (
             r"\bblast radius\b|\bimpact (of|if)\b|"
             r"\bif\b.+\b(fails?|goes down|is retired|is decommissioned|is removed|is replaced|was retired|was decommissioned|was removed|was replaced)\b|"
             r"\bwhat\s+(if|happens if)\b.*\b(retire|decommission|remove|replace)\b|"
-            r"\b(depends?|depend) on\b|\bwhat (calls|uses)\b|\bwho owns\b|"
+            r"\b(depends?|depend) on\b|\bwhat (calls|uses)\b|"
             r"\b(relies|rely|relied) on\b|\bconnected to\b|\b(everything|anything|which|what|list)\b.*\b(uses?|relies|connected)\b",
             re.I,
         ),
     ),
 )
+
+
+# The parts of a question about one element that the chat answers separately, in
+# the words people use. "who owns" is answered by the accountability lens; "what
+# does it run on" and "what does it depend on" by the impact walk upstream; "what
+# breaks" by the same walk downstream.
+PART_OWNER = "owner"
+PART_RUNS_ON = "runs_on"
+PART_DEPENDS_ON = "depends_on"
+PART_BREAKS = "breaks"
+UPSTREAM_PARTS = (PART_RUNS_ON, PART_DEPENDS_ON)
+
+OWNER_CUE = re.compile(
+    r"\bwho\s+owns\b|\bwho(?:'s|\u2019s| is) responsible\b|\bowned by\b|\b\w+(?:'s|\u2019s)\s+owners?\b|\bowners? of\b",
+    re.I,
+)
+_RUNS_ON_CUE = re.compile(
+    r"\b(?:does|do|did|will)\b[^?,;]*?\b(?:run|runs)\s+on\b|\bwhere\s+(?:is|are|does|do)\b[^?]*?\b(?:hosted|run|runs)\b|\bhosted\b",
+    re.I,
+)
+_DEPENDS_ON_CUE = re.compile(
+    r"\b(?:does|do|did|will|would)\b[^?,;]*?\b(?:depend|rely)\s+on\b|\b(?:is|are)\b[^?,;]*?\bdependent on\b",
+    re.I,
+)
+
+
+def classify_estate_parts(message: Any) -> List[str]:
+    """The parts a message asks about one element, each once, in the order they are
+    asked: ``owner``, ``runs_on``, ``depends_on`` and ``breaks``. A phrase that asks
+    what the element depends on or runs on is not also read as asking what breaks."""
+    if not isinstance(message, str) or not message.strip():
+        return []
+    found: List[tuple] = []
+    claimed: List[tuple] = []
+    for part, pattern in (
+        (PART_OWNER, OWNER_CUE),
+        (PART_RUNS_ON, _RUNS_ON_CUE),
+        (PART_DEPENDS_ON, _DEPENDS_ON_CUE),
+    ):
+        match = pattern.search(message)
+        if match:
+            found.append((match.start(), part))
+        for each in pattern.finditer(message):
+            claimed.append(each.span())
+    # What breaks is read from the words that no other part has already used.
+    rest = list(message)
+    for start, end in claimed:
+        for index in range(start, end):
+            rest[index] = " "
+    match = _QUESTION_CUES[-1][1].search("".join(rest))
+    if match:
+        found.append((match.start(), PART_BREAKS))
+    found.sort()
+    return [part for _position, part in found]
 
 
 def classify_estate_question(message: Any) -> Optional[str]:
@@ -146,6 +200,8 @@ def classify_estate_question(message: Any) -> Optional[str]:
     for kind, pattern in _QUESTION_CUES:
         if pattern.search(message):
             return kind
+    if _RUNS_ON_CUE.search(message) or _DEPENDS_ON_CUE.search(message):
+        return KIND_IMPACT
     return None
 
 
