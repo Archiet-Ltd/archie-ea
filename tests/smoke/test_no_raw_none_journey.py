@@ -71,6 +71,10 @@ def _shot(page, name):
     if SHOTS:
         Path(SHOTS).mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(Path(SHOTS) / (name + ".png")), full_page=True)
+        if page.viewport_size["width"] == 390:
+            page.evaluate("document.documentElement.classList.add('dark')")
+            page.screenshot(path=str(Path(SHOTS) / (name + "-dark.png")), full_page=True)
+            page.evaluate("document.documentElement.classList.remove('dark')")
 
 
 def test_no_page_prints_a_raw_none(browser, live_server, world):
