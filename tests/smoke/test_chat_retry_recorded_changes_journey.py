@@ -33,6 +33,9 @@ BILLING = {"solution_id": 1, "name": "Billing"}
 PAYROLL = {"solution_id": 1, "name": "Payroll"}
 NOT_APPLIED = "recorded and not applied yet"
 CARD_NOTE = "Recorded, not applied yet, and not recorded again on Retry"
+# An enterprise architect's assistant may add goals; the platform administrator's charter forbids it, so
+# that person's change would be declined at once and never wait as recorded.
+PERSONA = "enterprise_architect"
 STOPS = [("tool", "a1", BILLING), ("tool", "b1", PAYROLL), ("400",)]
 
 
@@ -173,8 +176,8 @@ def _shoot(page, name):
 
 def test_retry_after_two_recorded_changes_says_both_are_not_applied_and_writes_nothing_twice(
         page, provider_server, provider, app):
-    org = create_fresh_org("platform_admin", org_admin=True, platform_role="Administrator")
-    sign_in(page, provider_server, org["emails"]["platform_admin"])
+    org = create_fresh_org(PERSONA, org_admin=True, platform_role="Administrator")
+    sign_in(page, provider_server, org["emails"][PERSONA])
     provider.script = list(STOPS) + list(STOPS) + [("tool", "a3", BILLING), ("tool", "b3", PAYROLL), ("text", ANSWER)]
     open_chat(page, provider_server)
     page.fill("#user-input", QUESTION)
@@ -212,9 +215,9 @@ def test_retry_after_two_recorded_changes_says_both_are_not_applied_and_writes_n
 
 def test_a_second_organisation_that_forges_the_first_ones_list_is_told_nothing_about_it(
         page, provider_server, provider, app):
-    first = create_fresh_org("platform_admin", org_admin=True, platform_role="Administrator")
-    second = create_fresh_org("platform_admin", org_admin=True, platform_role="Administrator")
-    sign_in(page, provider_server, first["emails"]["platform_admin"])
+    first = create_fresh_org(PERSONA, org_admin=True, platform_role="Administrator")
+    second = create_fresh_org(PERSONA, org_admin=True, platform_role="Administrator")
+    sign_in(page, provider_server, first["emails"][PERSONA])
     provider.script = [("tool", "a1", BILLING), ("400",)]
     open_chat(page, provider_server)
     page.fill("#user-input", "Add the goal Billing to solution 1 please.")
@@ -222,7 +225,7 @@ def test_a_second_organisation_that_forges_the_first_ones_list_is_told_nothing_a
     _card(page, 1)
     assert _approvals(app, first["org_id"]) == [("pending", "Billing")]
 
-    sign_in(page, provider_server, second["emails"]["platform_admin"])
+    sign_in(page, provider_server, second["emails"][PERSONA])
     open_chat(page, provider_server)
     provider.script = [("tool", "x1", BILLING), ("text", "Done.")]
     provider.tool_results.clear()
@@ -244,8 +247,8 @@ def test_a_second_organisation_that_forges_the_first_ones_list_is_told_nothing_a
 
 def test_retry_of_an_unrelated_question_does_not_name_a_change_an_earlier_chat_recorded(
         page, provider_server, provider, app):
-    org = create_fresh_org("platform_admin", org_admin=True, platform_role="Administrator")
-    sign_in(page, provider_server, org["emails"]["platform_admin"])
+    org = create_fresh_org(PERSONA, org_admin=True, platform_role="Administrator")
+    sign_in(page, provider_server, org["emails"][PERSONA])
     unrelated = "Which applications depend on SAP?"
     answer = "Nothing in the estate depends on SAP."
     # The first chat records Billing and finishes normally; the second chat's question then fails once.
