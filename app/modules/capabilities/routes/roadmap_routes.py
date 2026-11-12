@@ -1339,16 +1339,20 @@ def api_roadmap_work_packages():
 
         try:
             query = work_package_service.query_for(org_id)
-            if root_only:
-                query = query.filter(UWP.parent_id.is_(None))
             if gap_id:
                 # The one reader of a work package's gap links (the relationships).
                 query = query.filter(UWP.id.in_(
                     work_package_service.work_package_ids_for_gap(gap_id, org_id)))
+            # Every package of the organisation (parts included): the figure the roadmap
+            # board and the headline count give, whatever rows this answer lists.
+            all_count = query.count()
+            if root_only:
+                query = query.filter(UWP.parent_id.is_(None))
             work_packages = query.order_by(UWP.start_date, UWP.id).all()
         except Exception as qe:
             current_app.logger.warning(f"Work packages query failed: {qe}", exc_info=True)
             work_packages = []
+            all_count = 0
 
         serialized = []
         for wp in work_packages:
@@ -1375,6 +1379,7 @@ def api_roadmap_work_packages():
                 "success": True,
                 "work_packages": serialized,
                 "total_count": len(serialized),
+                "all_count": all_count,
             }
         )
 
@@ -1839,7 +1844,8 @@ def api_roadmap_get_plateaus():
         from app.utils.tenant import current_organization_id
 
         org_id = current_organization_id()
-        plateaus = Plateau.query.order_by(Plateau.sequence_order.asc(), Plateau.id.asc()).all()
+        plateaus = Plateau.query.filter(Plateau.organization_id == org_id).order_by(
+            Plateau.sequence_order.asc(), Plateau.id.asc()).all()
         ids = [p.id for p in plateaus]
         # The one rule for what a plateau holds: the gaps linked to it or closed
         # by its packages, and the packages that realise it.

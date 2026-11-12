@@ -99,13 +99,13 @@
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Plateaus{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_plateaus"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-plateaus-tile" x-text="metrics.total_plateaus"></span>{% endcall %}
       {% endcall %}
     {% endcall %}
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Work Packages{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_wps"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-work-packages-tile" x-text="metrics.total_wps"></span>{% endcall %}
       {% endcall %}
     {% endcall %}
     {% call card() %}
@@ -578,6 +578,7 @@
       gaps: [],
       plateaus: [],
       workPackages: [],
+      workPackageCount: 0,
       gapFilter: { priority: '', type: '' },
       selectedGapIds: [],
       isDetecting: false,
@@ -606,7 +607,7 @@
         return {
           total_gaps: this.gaps.length,
           total_plateaus: this.plateaus.length,
-          total_wps: this.workPackages.length,
+          total_wps: this.workPackageCount,
           ai_generated: this.gaps.filter(g => g.auto_generated).length,
         };
       },
@@ -654,9 +655,11 @@
         try {
           const d = await Platform.fetch('/capability-map/api/roadmap/work-packages?footer=1', { silent: true });
           this.workPackages = d.work_packages || [];
+          this.workPackageCount = d.all_count === undefined ? this.workPackages.length : d.all_count;
           Alpine.store('rdm').workPackages = this.workPackages;
         } catch (e) {
           this.workPackages = [];
+          this.workPackageCount = 0;
           Alpine.store('rdm').workPackages = [];
           this.errorMessage = 'Failed to load work packages (' + e.message + ').';
         }
