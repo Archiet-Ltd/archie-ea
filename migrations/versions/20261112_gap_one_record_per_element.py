@@ -18,6 +18,15 @@ branch_labels = None
 depends_on = None
 
 INDEX = "uq_gaps_org_element"
+# Tables that only link a gap to one other record; the same link twice says nothing more.
+LINK_TABLES = ("plateau_gaps", "gap_archimate_elements", "gap_work_packages", "gap_capabilities")
+
+
+def _columns(bind, table):
+    return [r[0] for r in bind.execute(sa.text(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema = current_schema() AND table_name = :t ORDER BY ordinal_position"
+    ), {"t": table})]
 
 
 def _referencing_columns(bind):
@@ -49,17 +58,29 @@ def _merge_duplicates(bind):
     refs = [(r.tbl, r.col) for r in _referencing_columns(bind)]
     for dup, keep in pairs:
         for tbl, col in refs:
-            if tbl == "gaps" and col == "archimate_element_id":
+            if tbl == "gaps":
                 continue
-            # a row the kept record already has (the same link) is dropped, any other moves across
-            try:
-                with bind.begin_nested():
-                    bind.execute(sa.text(
-                        f'UPDATE "{tbl}" SET "{col}" = :keep WHERE "{col}" = :dup'
-                    ), {"keep": keep, "dup": dup})
-            except sa.exc.IntegrityError:
-                with bind.begin_nested():
-                    bind.execute(sa.text(f'DELETE FROM "{tbl}" WHERE "{col}" = :dup'), {"dup": dup})
+            if tbl in LINK_TABLES:
+                # a link the kept record already has is dropped rather than doubled
+                same = " AND ".join(
+                    f'd."{c}" IS NOT DISTINCT FROM k."{c}"' for c in _columns(bind, tbl)
+                    if c not in ("id", "created_at", col))
+                bind.execute(sa.text(
+                    f'DELETE FROM "{tbl}" d USING "{tbl}" k '
+                    f'WHERE d."{col}" = :dup AND k."{col}" = :keep' + (f" AND {same}" if same else "")
+                ), {"keep": keep, "dup": dup})
+            bind.execute(sa.text(f'UPDATE "{tbl}" SET "{col}" = :keep WHERE "{col}" = :dup'),
+                         {"keep": keep, "dup": dup})
+        # a rating, impact or owner a person gave the copy is kept where the kept record has none
+        bind.execute(sa.text(
+            """
+            UPDATE gaps k SET priority = COALESCE(k.priority, d.priority),
+                              severity = COALESCE(k.severity, d.severity),
+                              impact = COALESCE(k.impact, d.impact),
+                              owner = COALESCE(k.owner, d.owner)
+            FROM gaps d WHERE k.id = :keep AND d.id = :dup
+            """
+        ), {"keep": keep, "dup": dup})
         bind.execute(sa.text("DELETE FROM gaps WHERE id = :dup"), {"dup": dup})
 
 
