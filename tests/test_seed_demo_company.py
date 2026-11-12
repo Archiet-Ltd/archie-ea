@@ -1395,3 +1395,37 @@ def test_seeding_again_changes_no_compliance_figure(app, db_session, make_org, t
     _seed_once()
     with tenant_ctx(org_id):
         assert figures(org_id) == after
+
+
+def test_seeding_saved_scenarios_for_one_organisation_writes_only_that_organisations_rows(app, db_session, make_org):
+    """Two organisations hold a system of the same name: seeding the scenarios for one adds rows to that one only."""
+    from app.commands.seed_demo_company import _SCENARIOS, _seed_scenarios
+    from app.models import ArchiMateElement
+    from app.models.saved_scenario import SavedScenario
+
+    lantern_id = _seed_and_get_org_id()
+    system = _SCENARIOS[0][1]
+    other = make_org("scenarios")
+    other_id = other.id
+    db_session.add(ArchiMateElement(name=system, type="ApplicationComponent", layer="application", organization_id=other_id))
+    db_session.commit()
+
+    def rows(org_id):
+        return sorted(
+            (r.name, r.element_id, r.organization_id)
+            for r in db_session.query(SavedScenario).filter(SavedScenario.organization_id == org_id)
+        )
+
+    lantern_before = rows(lantern_id)
+    assert [name for name, _e, _o in lantern_before] == sorted(name for name, _s, _c in _SCENARIOS)
+    assert rows(other_id) == []
+
+    assert _seed_scenarios(other_id, None) == {"saved_scenarios_created": len(_SCENARIOS)}
+    db_session.commit()
+
+    own_element = db_session.query(ArchiMateElement).filter_by(organization_id=other_id, name=system).one()
+    assert rows(other_id) == sorted((name, own_element.id, other_id) for name, _s, _c in _SCENARIOS)
+    assert rows(lantern_id) == lantern_before
+    # a second run changes nothing in either organisation
+    assert _seed_scenarios(other_id, None) == {"saved_scenarios_created": 0}
+    assert rows(lantern_id) == lantern_before
