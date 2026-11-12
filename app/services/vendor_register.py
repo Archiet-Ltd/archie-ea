@@ -142,6 +142,17 @@ def systems_of(vendor_id: int, org_id: Optional[int] = None) -> List[Application
     ).scalars())
 
 
+def register_contracts(org_id: Optional[int] = None) -> List[VendorContract]:
+    """Every contract the Contracts register lists for the organisation, the one reader behind that page and
+    behind any figure that says how many contracts there are."""
+    org_id = _org(org_id)
+    if org_id is None:
+        return []
+    return list(db.session.execute(
+        db.select(VendorContract).where(VendorContract.organization_id == org_id).order_by(VendorContract.id)
+    ).scalars())
+
+
 def contracts_of(vendor_id: int, org_id: Optional[int] = None) -> List[VendorContract]:
     org_id = _org(org_id)
     if org_id is None:
