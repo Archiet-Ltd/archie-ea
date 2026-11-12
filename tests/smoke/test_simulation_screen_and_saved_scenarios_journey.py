@@ -470,6 +470,52 @@ def test_carried_scenarios_leave_browser_storage_one_by_one_and_one_that_fails_c
 
 
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
+def test_while_carried_scenarios_are_still_moving_the_notice_already_says_how_many_have_moved(browser, server, app, demo, viewport, scheme):
+    from app import db
+    from app.models.saved_scenario import SavedScenario
+
+    element_id = _element_id(app)
+    names = (LEGACY + " moved early", LEGACY + " moved next")
+    storage = """localStorage.setItem('impactAnalysisScenarios', JSON.stringify([
+        {id: 's1', name: %r, element: {id: %d, name: %r}, change_type: 'RETIRE', analysis_result: {}},
+        {id: 's2', name: %r, element: {id: %d, name: %r}, change_type: 'RETIRE', analysis_result: {}},
+        {id: 's3', name: 'Points at nothing', element: {id: 2000000000, name: 'Gone'}, change_type: 'RETIRE', analysis_result: {}}]));""" % (
+        names[0], element_id, ELEMENT, names[1], element_id, ELEMENT)
+    context = _context(browser, viewport, scheme)
+    context.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); %s }" % storage)
+    try:
+        page = _sign_in_as(context, server, DEMO_EMAIL)
+        held = []
+
+        def hold_the_last(route):
+            # the server is slow to answer for the last one: the person is still waiting for it
+            if route.request.method == "POST" and json.loads(route.request.post_data)["element"]["id"] == 2000000000:
+                held.append(route)
+            else:
+                route.continue_()
+
+        page.route("**/strategic/api/scenarios", hold_the_last)
+        compare = _compare(page, server)
+        notice = compare.get_by_test_id("carried-notice")
+        # before the last answer arrives the person already reads how many have moved
+        expect(notice).to_contain_text("2 scenarios saved earlier in this browser were moved to your organisation")
+        assert len(held) == 1
+        assert page.evaluate("JSON.parse(localStorage.getItem('impactAnalysisScenarios')).map(s => s.name)") == ["Points at nothing"]
+        _shot(page, "carried-moving", viewport, scheme)
+        held[0].continue_()
+        expect(notice).to_contain_text("1 could not be moved (its element may no longer exist)")
+        expect(notice).to_contain_text("2 scenarios saved earlier in this browser were moved to your organisation")
+        expect(compare.get_by_text(names[0])).to_be_visible()
+        expect(compare.get_by_text(names[1])).to_be_visible()
+    finally:
+        context.close()
+        with app.app_context():
+            SavedScenario.query.filter(SavedScenario.name.in_(names)).delete(synchronize_session=False)
+            db.session.commit()
+            db.session.remove()
+
+
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
 def test_a_scenario_the_server_could_not_check_stays_in_the_browser_and_is_moved_on_trying_again(browser, server, app, demo, viewport, scheme):
     from app import db
     from app.models.saved_scenario import SavedScenario
