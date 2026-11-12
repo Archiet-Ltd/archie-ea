@@ -343,6 +343,55 @@ def test_matrix_next_step_in_another_organisation_lands_on_its_own_empty_vendors
         context.close()
 
 
+VENDOR_ROW_BOXES = """() => [...document.querySelectorAll('[data-testid="vendor-row"]')].map(row => {
+    const boxes = [];
+    row.querySelectorAll('td').forEach(cell => {
+        const cr = cell.getBoundingClientRect();
+        // The leaf elements holding text, each with the cell it sits in.
+        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+        const seen = new Set();
+        while (walker.nextNode()) {
+            const n = walker.currentNode;
+            if (!n.textContent.trim()) continue;
+            const el = n.parentElement;
+            if (seen.has(el)) continue;
+            seen.add(el);
+            const r = el.getBoundingClientRect();
+            if (r.width === 0 || r.height === 0) continue;
+            boxes.push({text: n.textContent.trim().slice(0, 40), cell: cell.cellIndex, left: r.left, right: r.right,
+                        top: r.top, bottom: r.bottom, cellLeft: cr.left, cellRight: cr.right});
+        }
+    });
+    return boxes;
+})"""
+
+
+def test_vendors_list_rows_do_not_overlap_text_at_phone_width(browser, live_server, demo):
+    """Every row's text stays inside its own cell, so the evidence box never sits on the cost cell beside it."""
+    context = _context(browser, "dark", 390, 844)
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, DEMO_EMAIL)
+        _goto(page, live_server, "/applications/vendors")
+        expect(page.get_by_test_id("vendor-row").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        rows = page.evaluate(VENDOR_ROW_BOXES)
+        assert rows, "the demo organisation lists vendors"
+        stray = []
+        for boxes in rows:
+            for b in boxes:
+                if b["right"] > b["cellRight"] + 1 or b["left"] < b["cellLeft"] - 1:
+                    stray.append((b["text"], b["cell"], round(b["right"]), round(b["cellRight"])))
+            for i, a in enumerate(boxes):
+                for c in boxes[i + 1:]:
+                    if a["cell"] != c["cell"] and a["left"] < c["right"] - 1 and c["left"] < a["right"] - 1 \
+                            and a["top"] < c["bottom"] - 1 and c["top"] < a["bottom"] - 1:
+                        stray.append(("overlap", a["text"], c["text"]))
+        assert stray == [], stray
+        _shot(page, "vendors-list-rows-390")
+    finally:
+        context.close()
+
+
 # --- focus rings ----------------------------------------------------------------------------------
 
 FOCUS_PROBE = """() => {
