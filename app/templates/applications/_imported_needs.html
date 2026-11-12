@@ -10,9 +10,9 @@
 {% set editable = can('edit', 'application') %}
 {% macro step(gap) %}
   {%- if not editable -%}
-    <span>{{ gap.label }}</span>
+    <span>{{ gap.action or gap.label }}</span>
   {%- elif gap.href -%}
-    <a href="{{ gap.href }}" class="font-medium text-primary underline-offset-4 hover:underline">{{ gap.label }}</a>
+    <a href="{{ gap.href }}" class="font-medium text-primary underline-offset-4 hover:underline">{{ gap.action or gap.label }}</a>
   {%- else -%}
     {{ button(text=gap.label, variant='link', size='bare', class='font-medium ' ~ ('text-xs' if compact else 'text-sm'), on_click=cap_onclick, aria_label='Map a capability for ' ~ app.name) }}
   {%- endif -%}

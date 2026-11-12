@@ -6,8 +6,9 @@ its life. This module names those four gaps for an imported application, links e
 step that fills it, and offers a value only where the repository gives one, with the file and
 repository it came from. Nothing is offered without such a source.
 
-Owner, capability, type and status are judged by the same rules the application list uses elsewhere:
-an owner is what ``has_assigned_owner`` says, a capability is a row in the capability mapping store.
+Owner, capability, type and status are judged by the same rules the application page uses elsewhere:
+the owner gap is the "Owner" item of ``compute_completeness`` (an owner is a record in the owner
+store; text alone is not one), a capability is a row in the capability mapping store.
 Type and status are the two things the import fills with a starting word (the general type
 "application" and the status "planning"); while either is still that word, nobody has chosen it.
 """
@@ -95,9 +96,10 @@ def application_gaps(org_id, applications: Iterable[Any], skip_ids: Iterable[int
     (``skip_ids``), are absent. Everything is read by organisation.
     """
     from app.models.application_capability import ApplicationCapabilityMapping
-    from app.models.application_portfolio import ApplicationComponent as A
     from app.models.archimate_core import ArchiMateElement
-    from app.modules.my_applications.services import has_assigned_owner
+    from app.models.application_owner import ApplicationOwner
+    from app.services.application_fact_sheet import compute_completeness
+    from app.services.element_ownership_service import ACCOUNTABLE_LEGACY_OWNER_COLUMNS, OWNER_TEXT_BLANKS
 
     skip = set(skip_ids)
     rows = [a for a in applications if a.archimate_element_id and a.id not in skip and a.organization_id == org_id]
@@ -117,8 +119,10 @@ def application_gaps(org_id, applications: Iterable[Any], skip_ids: Iterable[int
     ids = [a.id for a in rows]
     if not ids:
         return {}
-    owned = set(db.session.execute(
-        db.select(A.id).where(A.organization_id == org_id, A.id.in_(ids), has_assigned_owner(org_id))).scalars())
+    owner_counts = dict(db.session.execute(
+        db.select(ApplicationOwner.application_id, db.func.count(ApplicationOwner.id))
+        .where(ApplicationOwner.organization_id == org_id, ApplicationOwner.application_id.in_(ids))
+        .group_by(ApplicationOwner.application_id)).all())
     mapped = set(db.session.execute(
         db.select(ApplicationCapabilityMapping.application_component_id).where(
             ApplicationCapabilityMapping.organization_id == org_id,
@@ -131,9 +135,15 @@ def application_gaps(org_id, applications: Iterable[Any], skip_ids: Iterable[int
         edit = url_for("unified_applications.application_edit", id=a.id)
         detail = url_for("unified_applications.application_detail", id=a.id)
         gaps: List[Dict[str, Any]] = []
-        if a.id not in owned:
-            gaps.append({"key": "owner", "label": "Owner", "detail": "No owner yet",
-                         "href": detail + "#ownership", **_owner_hint(element, org_id)})
+        if "Owner" in compute_completeness(a, owner_count=owner_counts.get(a.id, 0))["missing"]:
+            text = next((getattr(a, c).strip(OWNER_TEXT_BLANKS) for c in ACCOUNTABLE_LEGACY_OWNER_COLUMNS
+                         if (getattr(a, c, None) or "").strip(OWNER_TEXT_BLANKS)), None)
+            gap = {"key": "owner", "label": "Owner", "detail": "No owner yet",
+                   "href": detail + "#ownership", **_owner_hint(element, org_id)}
+            if text:
+                gap.update(action="Record as owner",
+                           detail="Named as " + text + " in text only; no owner is recorded")
+            gaps.append(gap)
         if a.id not in mapped:
             gaps.append({"key": "capability", "label": "Capability", "detail": "No capability mapped yet",
                          "href": None, **_capability_hint(element, org_id)})

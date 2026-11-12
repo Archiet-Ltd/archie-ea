@@ -1,0 +1,21 @@
+{# What the record still needs, each item with the step that sets it.
+   steps  from completeness_steps: label, href, where
+   notes  from linked_notes: what the model already links, keyed by label (may be empty)
+   A person who cannot edit sees the names without links. #}
+{% set editable = can('edit', 'application') %}
+<ul class="mt-1 flex flex-col gap-1" data-testid="completeness-steps">
+  {% for step in steps %}
+  {% set note = (notes or {}).get(step.label) %}
+  <li data-testid="completeness-step" data-step="{{ step.label }}">
+    {% if editable %}
+    <a class="font-medium underline underline-offset-2 hover:no-underline" href="{{ step.href }}">{{ step.label }}</a>
+    {% else %}
+    <span class="font-medium">{{ step.label }}</span>
+    {% endif %}
+    <span class="text-muted-foreground">set in {{ step.where }}</span>
+    {% if note %}
+    <span>({{ note.text }}; <a class="underline underline-offset-2 hover:no-underline" href="{{ url_for('unified_applications.application_detail', id=app.id, tab=note.tab) }}">see it</a>)</span>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>

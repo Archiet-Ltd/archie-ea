@@ -18,6 +18,7 @@
   <form method="POST" action="{{ url_for('unified_applications.application_edit', id=application.id) }}" class="space-y-8">
     {{ hidden_input(("csrf_token"), value=(csrf_token())) }}
     {{ hidden_input(("updated_at"), value=(application.updated_at.isoformat() if application.updated_at else '')) }}
+    {% if return_tab %}{{ hidden_input(("return_tab"), value=return_tab) }}{% endif %}
 
     {# ── Identity ── #}
     <section class="rounded-lg border border-border bg-card p-6 space-y-4">
@@ -122,6 +123,20 @@
             {% endif %}
           {% endcall %}
         </div>
+        <div>
+          <label for="data_classification" class="block text-sm font-medium text-muted-foreground mb-1">Data classification</label>
+          {% set current_dc = application.data_classification %}
+          {% set dc_options = ['public', 'internal', 'confidential', 'restricted'] %}
+          {% call native_select(id=("data_classification"), name=("data_classification"), size='sm', class="w-full") %}
+            <option value="" {% if not current_dc %}selected{% endif %}>Not set</option>
+            {% for val in dc_options %}
+            <option value="{{ val }}" {% if current_dc and current_dc | lower == val %}selected{% endif %}>{{ val | capitalize }}</option>
+            {% endfor %}
+            {% if current_dc and current_dc | lower not in dc_options %}
+            <option value="{{ current_dc }}" selected>{{ current_dc | capitalize }}</option>
+            {% endif %}
+          {% endcall %}
+        </div>
         {% call form_group(id='business_purpose', label='Business Purpose') %}
           {{ input(type="text", id=("business_purpose"), name=("business_purpose"), value=(application.business_purpose or ''), placeholder=("e.g. Core business function, compliance reporting"), size='sm', class="w-full") }}
         {% endcall %}
@@ -181,6 +196,20 @@
       <h2 class="text-lg font-semibold">Technical profile</h2>
 
       <div class="grid grid-cols-1 gap-4">
+        <div>
+          <label for="deployment_model" class="block text-sm font-medium text-muted-foreground mb-1">Hosting model</label>
+          {% set current_dm = application.deployment_model %}
+          {% set dm_options = [('on_premise', 'On premise'), ('cloud', 'Cloud'), ('saas', 'Software as a service'), ('hybrid', 'Hybrid'), ('mobile', 'Mobile')] %}
+          {% call native_select(id=("deployment_model"), name=("deployment_model"), size='sm', class="w-full") %}
+            <option value="" {% if not current_dm %}selected{% endif %}>Not set</option>
+            {% for val, text in dm_options %}
+            <option value="{{ val }}" {% if current_dm and current_dm | lower == val %}selected{% endif %}>{{ text }}</option>
+            {% endfor %}
+            {% if current_dm and current_dm | lower not in (dm_options | map(attribute=0) | list) %}
+            <option value="{{ current_dm }}" selected>{{ current_dm }}</option>
+            {% endif %}
+          {% endcall %}
+        </div>
         {% call form_group(id='cloud_provider', label='Cloud Provider') %}
           {{ input(type="text", id=("cloud_provider"), name=("cloud_provider"), value=(application.cloud_provider or ''), placeholder=("e.g. AWS, Azure, GCP, On-Prem"), size='sm', class="w-full") }}
         {% endcall %}
@@ -214,6 +243,28 @@
       </div>
     </section>
 
+    {# ── Cost, vendor and resilience ── #}
+    <section class="rounded-lg border border-border bg-card p-6 space-y-4">
+      <h2 class="text-lg font-semibold">Cost, vendor and resilience</h2>
+
+      <div class="grid grid-cols-1 gap-4">
+        {% call form_group(id='total_cost_of_ownership', label='Total cost of ownership (per year)') %}
+          {{ input(type="number", id=("total_cost_of_ownership"), name=("total_cost_of_ownership"), value=(application.total_cost_of_ownership if application.total_cost_of_ownership is not none else ''), size='sm', class="w-full", attrs_dict={"min": "0", "step": "any"}) }}
+        {% endcall %}
+        {% call form_group(id='vendor_name', label='Vendor') %}
+          {{ input(type="text", id=("vendor_name"), name=("vendor_name"), value=(application.vendor_name or ''), size='sm', class="w-full", attrs_dict={"maxlength": "100"}) }}
+        {% endcall %}
+        <div>
+          <label for="disaster_recovery_enabled" class="block text-sm font-medium text-muted-foreground mb-1">Disaster recovery</label>
+          {% call native_select(id=("disaster_recovery_enabled"), name=("disaster_recovery_enabled"), size='sm', class="w-full") %}
+            <option value="" selected>Leave as it is ({{ 'Yes' if application.disaster_recovery_enabled else 'No' if application.disaster_recovery_enabled is not none else 'Not set' }})</option>
+            <option value="yes">Yes, a recovery plan exists</option>
+            <option value="no">No recovery plan</option>
+          {% endcall %}
+        </div>
+      </div>
+    </section>
+
     {# ── Compliance and notes ── #}
     <section class="rounded-lg border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Compliance and notes</h2>
@@ -238,7 +289,7 @@
 
     {# ── Actions ── #}
     <div class="flex items-center justify-between pt-2">
-      <a href="{{ url_for('unified_applications.application_detail', id=application.id) }}"
+      <a href="{{ url_for('unified_applications.application_detail', id=application.id, tab=return_tab) }}"
          class="text-sm text-muted-foreground hover:text-foreground">Cancel</a>
       {% call button(type="submit", variant="default", class="justify-center whitespace-nowrap") %}
         <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i> Save Changes
@@ -251,4 +302,5 @@
 {% block scripts %}
 {{ super() }}
 <script src="{{ url_for('static', filename='js/applications/owner_picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/applications/focus_target.js') }}"></script>
 {% endblock %}

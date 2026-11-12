@@ -51,6 +51,7 @@ from app.models.models import (  # dead-code-ok
     ArchiMateRelationship,
     ArchitectureModel,
 )
+from app.services.application_fact_sheet import detail_tab
 from app.services.archimate.archimate_llm_service import ArchiMateLLMService
 from app.core.auth.decorators import require_permission
 from app.decorators import audit_log, require_roles
@@ -844,6 +845,7 @@ def application_edit(id):
                     abacus_connected=_abacus_connected(g.current_org_id),
                     lifecycle_stage_choices=APPLICATION_LIFECYCLE_STAGES,
                     lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
+                    return_tab=detail_tab(request.form.get("return_tab")),
                 ), 400
 
             # Capture additional fields if submitted (API calls, expanded forms)
@@ -862,6 +864,7 @@ def application_edit(id):
                 "integration_pattern",
                 "authentication_method",
                 "data_classification",
+                "vendor_name",
                 # Technical profile / compliance / notes fields the edit form
                 # gained alongside the fact sheet that already displayed
                 # them -- the form having the input was not enough on its
@@ -935,16 +938,22 @@ def application_edit(id):
                     except ValueError:
                         flash("The end-of-support date was not a date, so it was not changed.", "error")
 
+            # Disaster recovery: a chosen Yes or No is recorded; "Not set" leaves it as it was.
+            disaster_recovery = request.form.get("disaster_recovery_enabled")
+            if disaster_recovery in ("yes", "no"):
+                app.disaster_recovery_enabled = disaster_recovery == "yes"
+
             app.updated_by = current_user.id
 
             db.session.commit()
 
             flash("Application updated successfully!", "success")
+            # Back to the tab the person came from; the Architecture tab when they came from none.
             return redirect(
                 url_for(
                     "unified_applications.application_detail",
                     id=app.id,
-                    tab="architecture",
+                    tab=detail_tab(request.form.get("return_tab")) or "architecture",
                 )
             )
 
@@ -967,6 +976,7 @@ def application_edit(id):
             lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
             application_owners=application_owners,
             abacus_connected=_abacus_connected(org_id),
+            return_tab=detail_tab(request.args.get("tab")),
         )
 
     except HTTPException:

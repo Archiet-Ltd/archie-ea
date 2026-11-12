@@ -2391,6 +2391,9 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
 
     technology_linked_count = 0
     completeness_notes = {}
+    from app.services.application_fact_sheet import completeness_steps, detail_tab
+
+    completeness_step_rows = completeness_steps(app_obj, app_obj.completeness_gaps, tab=detail_tab(request.args.get("tab")))
     try:
         from app.services.application_fact_sheet import linked_notes
         from app.services.application_model_links import linked_technology
@@ -2444,6 +2447,7 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         vendors_tab_count=vendors_tab_count,
         technology_linked_count=technology_linked_count,
         completeness_notes=completeness_notes,
+        completeness_steps=completeness_step_rows,
         vendor_form_config=vendor_form_config,
         metric_cards=metric_cards,
         dashboard_config=dashboard_config,
