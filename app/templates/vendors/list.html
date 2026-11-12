@@ -172,7 +172,7 @@
                           search_placeholder='Filter vendors...', toolbar=true, toolbar_actions=_set_vendors, notice=notice,
                           empty_message=('None of your ' ~ sc.total_systems ~ ' systems names a vendor yet. Set the vendor on each system and it is listed here.') if sc.total_systems else 'No vendors yet. Add a system or a contract that names its vendor and it is listed here.',
                           empty_action=_add_first) %}
-    {% call table_cell(class='max-w-56 whitespace-normal break-words sm:max-w-sm') %}
+    {% call table_cell(class='max-w-56 whitespace-normal break-words sm:max-w-64') %}
       <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}" class="block break-words font-medium sm:truncate text-foreground hover:underline" data-testid="vendor-link">{{ row.name }}</a>
       {% if row.website %}<span class="block truncate text-xs text-muted-foreground">{{ row.website|replace('https://', '')|replace('http://', '') }}</span>{% endif %}
       {% set row_footer = (vendor_footers or {}).get(row.id) %}{% if row_footer %}{{ result_footer(row_footer) }}{% endif %}
