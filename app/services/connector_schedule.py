@@ -157,6 +157,19 @@ def _note_declined_proposal(organization_id: int, cfg: ConnectorConfig, logs, no
     return True
 
 
+def settle_scheduled_proposals(organization_id: int) -> dict:
+    """Settle what the hourly read left waiting: the read it asked for, and the proposals that read made.
+    A failure is logged and leaves them to the five-minute sweep, which settles them the same way."""
+    from app.modules.ai_chat.services import change_review
+
+    try:
+        return change_review.settle_proposals(organization_id, sources=change_review.PROPOSAL_SOURCES)
+    except Exception:  # noqa: BLE001 - the sweep settles what is left
+        logger.exception("Settling the scheduled read of organisation %s failed", organization_id)
+        db.session.rollback()
+        return {}
+
+
 def describe_last_read(cfg: ConnectorConfig, logs=None) -> dict:
     """What the connection's page says about its last read and its next one."""
     logs = _recent_logs(cfg.id) if logs is None else logs
@@ -231,6 +244,9 @@ def reread_due_connectors(organization_id: int, now: datetime | None = None) -> 
                 propose_connector_sync(org_id=organization_id, cfg=cfg)
                 db.session.commit()
                 outcome["proposed"].append(connector_id)
+                # Nobody asked for this read, so it is decided as the organisation's system actor: checked,
+                # then run (or declined with its reasons). Its own proposals are settled with it.
+                settle_scheduled_proposals(organization_id)
             continue
         try:
             result = run_connector_sync(
@@ -243,6 +259,7 @@ def reread_due_connectors(organization_id: int, now: datetime | None = None) -> 
                 outcome["running"].append(connector_id)
                 continue
             db.session.commit()
+            settle_scheduled_proposals(organization_id)
         except Exception as exc:
             db.session.rollback()
             # A read that could not even start is still an attempt: the failure is recorded so

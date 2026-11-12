@@ -238,9 +238,14 @@ def bring_in(product_ae, *, org_id: int, allowed: bool, choosing: bool, urls: Di
             "state": state,
             "repositories": list((last.payload or {}).get("repositories") or []),
             "already_in_model": list(result.get("already_in_model") or []),
+            "settled": dict(result.get("settled") or {}),
             "error": (result.get("error") or last.error or "The read did not finish; try again.") if state == "failed" else None,
         }
     out["waiting"] = gh.pending_for_product(org_id, product_ae.id)
+    if last is not None and out["last"]["state"] == "done":
+        settled = out["last"]["settled"]
+        out["last"]["line"] = gh.read_summary(len(out["last"]["repositories"]), settled, out["waiting"])
+        out["last"]["checked"] = sum(settled.values()) + out["waiting"]
     return out
 
 

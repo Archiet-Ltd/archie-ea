@@ -39,6 +39,17 @@ def _both_organisations_delegate_sync(org_a, org_b):
     _delegate_sync(org_b)
 
 
+@pytest.fixture(autouse=True)
+def _the_hours_job_leaves_a_request_unsettled(monkeypatch):
+    """These tests are about the queue's own rules: one request for a connection at a time, a declined request
+    noted once, and the sentence a person reads about it. The hourly job now settles a request it makes in the
+    same pass (see tests/test_scheduled_read_settles_without_a_person.py), so settling is held back here and
+    each rule can be seen on a request that is still open."""
+    from app.services import connector_schedule
+
+    monkeypatch.setattr(connector_schedule, "settle_scheduled_proposals", lambda organization_id: {})
+
+
 def _logs(cfg):
     from app.models.connector_config import SyncLog
 

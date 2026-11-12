@@ -1631,6 +1631,15 @@ def _item(approval) -> Dict[str, Any]:
     return dict(payload, id=approval.id, short_commit=commit[:7], operation_type=approval.operation_type)
 
 
+def proposal_rank(approval) -> int:
+    """The order proposals are settled in: applications, then their parts, then the decisions that add
+    nothing, then the links (a part and a link need the application in the model first)."""
+    if approval.operation_type in (OP_RELATE, OP_TECHNOLOGY):
+        return 3
+    kind = json.loads(approval.operation_payload or "{}").get("classification")
+    return _APPROVE_ORDER.get(kind, 2)
+
+
 def pending_review(org_id) -> Dict[str, Any]:
     """The pending proposals of one organisation, grouped for the review screen:
     applications by system, parts, links, and the decisions that add nothing to the
@@ -1666,13 +1675,7 @@ def approve_all_proposals(org_id, approver_id) -> Dict[str, Any]:
 
     items = _pending(org_id, OP_CLASSIFY) + _pending(org_id, OP_RELATE) + _pending(org_id, OP_TECHNOLOGY)
 
-    def rank(approval):
-        if approval.operation_type in (OP_RELATE, OP_TECHNOLOGY):
-            return 3
-        kind = json.loads(approval.operation_payload or "{}").get("classification")
-        return _APPROVE_ORDER.get(kind, 2)
-
-    items.sort(key=lambda a: (rank(a), a.id))
+    items.sort(key=lambda a: (proposal_rank(a), a.id))
     service = AIChatApprovalService(user_id=approver_id)
     ids = [a.id for a in items]
     approved, failed = 0, []
@@ -1750,18 +1753,63 @@ def run_first_sync(org_id, connector_id, scope=None) -> Dict[str, Any]:
                 waited += BUSY_WAIT_STEP
                 result = run_connector_sync(org_id=org_id, connector_id=connector_id, delegated=True, scope=scope)
             db.session.commit()
+            # What the read proposed is checked, reviewed and applied, linked or declined here, in the read's
+            # own job: nobody approves it.
+            settled = settle_read_proposals(org_id)
     except CredentialUnreadable as exc:  # the sentence says what failed and who can fix it
         db.session.rollback()
         return {"success": False, "repositories": 0, "proposals": pending_total(org_id), "error": str(exc)}
     return {
         "success": bool(result.get("success")),
         "repositories": result.get("records_processed", 0),
-        "proposals": pending_total(org_id),
+        "proposals": sum(settled.values()),
+        "settled": settled,
         "relationships_proposed": result.get("relationships_proposed", 0),
         "already_in_model": result.get("already_in_model", []),
         "failed": result.get("records_failed", 0),
         "error": (result.get("error") or result.get("error_message") or None) if not result.get("success") else None,
     }
+
+
+def read_summary(repositories: int, settled: Dict[str, int], waiting: int) -> str:
+    """The sentence the connect page says about a finished read: what was read and what became of it."""
+    noun = "repository" if repositories == 1 else "repositories"
+    checked = sum(settled.values()) + waiting
+    if not checked:
+        return f"Read {repositories} {noun}. Nothing new was found."
+    parts = []
+    if settled.get("applied"):
+        parts.append(f"{settled['applied']} added to your model")
+    if settled.get("linked"):
+        parts.append(f"{settled['linked']} already there and linked")
+    if settled.get("declined"):
+        parts.append(f"{settled['declined']} declined, with the reason kept")
+    if settled.get("retired"):
+        parts.append(f"{settled['retired']} out of date and retired")
+    waiting_words = settled.get("in_review", 0) + waiting
+    if waiting_words:
+        parts.append(f"{waiting_words} still being checked")
+    findings = "finding was" if checked == 1 else "findings were"
+    return f"Read {repositories} {noun}. {checked} {findings} checked: " + ", ".join(parts) + "."
+
+
+def settle_read_proposals(org_id) -> Dict[str, int]:
+    """Settle every proposal a read of this organisation's repositories left waiting (never inside a web
+    request). A failure here is logged and leaves the proposals for the five-minute sweep, which settles
+    them the same way."""
+    from flask import has_request_context
+
+    from app.modules.ai_chat.services import change_review
+
+    empty = {"applied": 0, "linked": 0, "declined": 0, "retired": 0, "in_review": 0}
+    if has_request_context():
+        return empty
+    try:
+        return change_review.settle_proposals(org_id, sources=(PROPOSAL_SOURCE,))
+    except Exception:  # noqa: BLE001 - the read itself succeeded; the sweep settles what is left
+        logger.exception("Settling the proposals of a GitHub read failed for organisation %s", org_id)
+        db.session.rollback()
+        return empty
 
 
 class ConnectRefused(ValueError):

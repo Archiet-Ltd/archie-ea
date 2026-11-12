@@ -84,6 +84,7 @@ BUDGET_USED_UP_REASON = (
     "The month's AI budget is used up, so this change is waiting. The review carries on by itself when "
     "the budget allows."
 )
+NO_SYSTEM_ACTOR_REASON = "The workspace has no active administrator account to make this change, so nothing was changed."
 ACCOUNT_OFF_REASON = "The account that asked for this change has been switched off, so the change was not made."
 MOVED_REASON = "The person who asked for this change is no longer in the workspace."
 WRITES_PAUSED_REASON = (
@@ -102,6 +103,27 @@ CHAT_CRUD_ENTITIES = (
     "capability", "application", "vendor", "capability_mapping", "work_package",
     "application_capability_mapping",
 )
+
+# The writers whose proposals this review settles whatever made them, with no person asking: a solution
+# blueprint, a read of GitHub, and a change to or read of a connection. The organisation's system actor
+# decides them (see ``system_actor``).
+PROPOSAL_SOURCES = ("solution_blueprint_proposals", "github_connector", "connector_config")
+EXPIRED_CHECK_NAME = "Still current"
+# How alike two names must score (SimpleDuplicateService) for the reviewer to be shown the existing element. Low on
+# purpose: the reviewer, not the score, decides whether two close names are one thing.
+NEAR_MATCH_THRESHOLD = 0.4
+SETTLED_ON_CHECKS_KEY = "settled_on_checks"
+SPENT_MONTH_SENTENCE = (
+    "Applied on the deterministic checks; the reviewer was not called because this month's review budget is spent."
+)
+NO_REVIEWER_SENTENCE = (
+    "Applied on the deterministic checks; the reviewer was not called because no reviewer model is set up."
+)
+SPENT_RUN_SENTENCE = (
+    "Applied on the deterministic checks; the reviewer was not called because this run's review limit was reached."
+)
+# A read or a blueprint can write many proposals at once; one batch may make this many reviewer calls.
+CALLS_PER_BATCH = 120
 
 _MAX_REASON = 400
 
@@ -156,6 +178,8 @@ class Target:
     value_reason: str = ""  # set when the value written is not legal for the field
     checked: bool = True  # False: this kind of change has no target lookup, so its checks were not run
     creates: bool = False  # the change adds a record; there is nothing that must exist first
+    link: Optional[Dict[str, Any]] = None  # the element already in the model that the change repeats (id, name)
+    near: List[Dict[str, Any]] = field(default_factory=list)  # elements that look like it but are not the same
 
 
 # --------------------------------------------------------------------------- #
@@ -563,6 +587,61 @@ def _target_score_rationalization(args: Dict[str, Any], org_id: int) -> Target:
                   facts={"application": app_obj.name, "has_a_score_already": score is not None})
 
 
+def _target_blueprint(payload: Dict[str, Any], org_id: int) -> Target:
+    """A blueprint proposal against the elements the organisation already has: the same folded name and the
+    same type is an element it already has (linked, never added again); the same name of another type, or a
+    name that nearly matches, is shown to the reviewer to judge."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.utils.duplicate_guard import find_similar_entities, folded_column, normalize_name
+
+    name = _clean_name(payload, "name")
+    kind = str(payload.get("archimate_type") or "")
+    target = Target(True, label=name, creates=True,
+                    before={"kind": "create", "note": "Nothing existed before; undoing it removes the new element."},
+                    facts={"element": name, "type": kind})
+    if not name:
+        return target
+    live = [] if not hasattr(ArchiMateElement, "deleted_at") else [ArchiMateElement.deleted_at.is_(None)]
+    same_name = (
+        ArchiMateElement.query.filter(ArchiMateElement.organization_id == org_id,
+                                      folded_column(ArchiMateElement.name) == normalize_name(name), *live)
+        .order_by(ArchiMateElement.id).all()
+    )
+    exact = next((row for row in same_name if row.type == kind), None)
+    if exact is not None:
+        target.link = {"id": exact.id, "name": exact.name, "type": exact.type}
+        target.before = {"kind": "link", "note": "Nothing was added; the proposal points at the element already there."}
+        return target
+    near = [{"id": row.id, "name": row.name, "type": row.type, "why": "same name, a different type"}
+            for row in same_name]
+    seen = {row["id"] for row in near}
+    for row in find_similar_entities(ArchiMateElement, name, organization_id=org_id, extra_filters=live,
+                                    threshold=NEAR_MATCH_THRESHOLD):
+        if row["id"] not in seen:
+            other = ArchiMateElement.query.filter_by(id=row["id"], organization_id=org_id).first()
+            near.append({"id": row["id"], "name": row["name"], "type": other.type if other else None,
+                         "why": "a close variant of the name"})
+    target.near = near[:5]
+    if target.near:
+        target.facts["near_matches"] = target.near
+    return target
+
+
+def _target_proposal(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> Target:
+    """What a proposal written by a connector or a blueprint is about."""
+    args = payload if isinstance(payload, dict) else {}
+    if approval.source_table == "solution_blueprint_proposals":
+        return _target_blueprint(args, org_id)
+    label = _short(approval.summary, 120)
+    if approval.source_table == "connector_config":
+        return Target(True, label=label, creates=True,
+                      before={"kind": "unrecorded", "note": "A connection change keeps no copy of the old settings."},
+                      facts={"connector": args.get("connector_type")})
+    return Target(True, label=label, creates=True,
+                  before={"kind": "create", "note": "Nothing existed before; undoing it removes what was added."},
+                  facts={"repository": args.get("repository") or args.get("source")})
+
+
 # The tools whose target the review reads from the organisation's own records. The eight an owner-founder's
 # assistant may use are all here; any other tool's change is checked for its shape only and says so.
 _TOOL_TARGETS = {
@@ -581,6 +660,8 @@ def resolve_target(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> T
 
     A tool with no lookup of its own comes back with ``checked=False`` and an unrecorded before-snapshot, so
     the record says its target checks were not run and the reviewer is told no snapshot is kept."""
+    if is_proposal(approval):
+        return _target_proposal(approval, payload, org_id)
     if approval.operation_type == "tool_use":
         if approval.entity_type == "update_application_status" and isinstance(payload, dict):
             return _target_update_application_status(payload, org_id)
@@ -595,8 +676,29 @@ def resolve_target(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> T
                   before={"kind": "create", "note": "Nothing existed before; undoing it removes the new record."})
 
 
+def is_proposal(approval: AIChatCRUDApproval) -> bool:
+    """True for a proposal written by a connector or a blueprint (see PROPOSAL_SOURCES), asked for by no one."""
+    return approval.source_table in PROPOSAL_SOURCES
+
+
+def system_actor(organization_id: int):
+    """The user a proposal with no requesting person is decided as: the organisation's own earliest active,
+    confirmed administrator, by the one admin rule (``User.is_org_admin``). None when it has none."""
+    from app.models.user import User
+
+    candidates = (
+        User.query.filter(User.organization_id == organization_id, User.confirmed.is_(True),
+                          User.disabled_at.is_(None), db.func.coalesce(User.is_service_user, False).is_(False))
+        .order_by(User.id).all()
+    )
+    return next((u for u in candidates if u.is_org_admin), None)
+
+
 def in_scope(approval: AIChatCRUDApproval) -> bool:
-    """True for a change this review settles (see CHAT_CRUD_OPERATIONS)."""
+    """True for a change this review settles: a proposal from any writer in PROPOSAL_SOURCES, the
+    assistant's tool calls, and the chat's own changes (see CHAT_CRUD_OPERATIONS)."""
+    if is_proposal(approval):
+        return True
     if approval.user_id is None or approval.source_table:
         return False
     if approval.operation_type == "tool_use":
@@ -634,6 +736,15 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
         else "The change does not belong to the workspace of the person who asked for it.",
     ):
         return checks, Target(False)
+
+    if is_proposal(approval):
+        # A proposal past its due time is never applied, whatever it says.
+        expires = approval.expires_at
+        expired = expires is not None and expires < datetime.utcnow()
+        if not add(EXPIRED_CHECK_NAME, not expired,
+                   "It is still within the time it was proposed for." if not expired
+                   else "Expired on %s; not applied." % expires.strftime("%d %B %Y").lstrip("0")):
+            return checks, Target(False)
 
     payload = _payload_of(approval)
     if approval.operation_type == "tool_use":
@@ -689,6 +800,24 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
                    "The value is allowed for that field." if not target.value_reason else target.value_reason):
             return checks, target
 
+    if approval.source_table == "github_connector":
+        # What the proposal needs in the model first (the application a part belongs to, both ends of a link).
+        from app.connectors.github import proposal_blocker
+
+        blocker = proposal_blocker(approval)
+        if not add("What it depends on is in the model", blocker is None,
+                   "Everything it refers to is already in the model." if blocker is None else blocker):
+            return checks, target
+    if approval.source_table == "solution_blueprint_proposals":
+        if target.link:
+            add("Not already in the model", True,
+                "It is already in the model as %s (element %d), so it is linked to that one and not added again."
+                % (target.link["name"], target.link["id"]))
+        else:
+            add("Not already in the model", True,
+                ("Nothing of that name and type is in the model; %d look similar and are judged by the reviewer."
+                 % len(target.near)) if target.near else "Nothing of that name or a close name is in the model.")
+
     duplicate = _duplicate_of(service, approval, payload)
     if not add("Not a repeat", duplicate is None,
                "No identical change is waiting or was just applied." if duplicate is None
@@ -706,6 +835,9 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
         # same rule as the vendor API).
         allowed, role_reason = False, (
             "The vendor list is shared by every workspace, and only a platform administrator can change it.")
+    elif approval.user_id is None:
+        role_reason = ("The workspace's own administrator account makes it, as nobody asked for it."
+                       if allowed else "The workspace's administrator account cannot make changes.")
     else:
         role_reason = ("The person who asked still has the role this change needs." if allowed
                        else "The person who asked no longer has a role that can make changes.")
@@ -769,7 +901,8 @@ def build_review_prompt(
     approval: AIChatCRUDApproval, payload: Any, target: Target, checks: List[Check], earlier: List[Dict[str, Any]]
 ) -> str:
     """The prompt a reviewer sees. It carries this record's workspace data and nothing from any other."""
-    rubric = "\n".join("%d. %s: %s" % (n, name, question) for n, name, question in RUBRIC)
+    criteria = rubric_for(target)
+    rubric = "\n".join("%d. %s: %s" % (n, name, question) for n, name, question in criteria)
     lines = [
         "You review one change that a person asked an assistant to make in their enterprise architecture "
         "workspace. You did not draft it. Judge it against this rubric (version %s). Score every criterion "
@@ -790,6 +923,8 @@ def build_review_prompt(
         }, default=str, indent=1)),
         _fence("CHECKS_ALREADY_PASSED", "\n".join("- " + c.name + ": " + c.reason for c in checks if c.ran)),
     ]
+    if target.near:
+        lines.append(_fence("NEAR_MATCHES", json.dumps(target.near, default=str, indent=1)))
     not_run = [c for c in checks if not c.ran]
     if not_run:
         lines.append(_fence("CHECKS_NOT_RUN", "\n".join("- " + c.name + ": " + c.reason for c in not_run)))
@@ -800,12 +935,36 @@ def build_review_prompt(
     lines += [
         "",
         'Reply with one JSON object only: {"criteria": [{"id": 1, "passed": true, "reason": "..."}, ... one '
-        'entry for each of the %d criteria]}. Use plain words in each reason.' % len(RUBRIC),
+        'entry for each of the %d criteria]}. Use plain words in each reason.' % len(criteria),
     ]
     return "\n".join(lines)
 
 
-def parse_review(text: str) -> List[Dict[str, Any]]:
+NEAR_MATCH_CRITERION = (
+    7, "Not a duplicate",
+    "The elements listed under NEAR_MATCHES already exist in the workspace. Pass only if this proposal is a "
+    "genuinely different thing. If it is the same thing as one of them, fail it, say which one in the reason and "
+    "put that element's id in \"link_to\" so it is linked to it; if it should only be named differently, fail it "
+    "and say the better name.",
+)
+
+
+def rubric_for(target: Optional[Target] = None) -> Tuple[Tuple[int, str, str], ...]:
+    """The rubric a reviewer answers: the six criteria, and the seventh when the proposal has near matches."""
+    return RUBRIC + (NEAR_MATCH_CRITERION,) if target is not None and target.near else RUBRIC
+
+
+def _link_chosen(results: List[Dict[str, Any]], target: Target) -> Optional[Dict[str, Any]]:
+    """The near match the reviewer says the proposal is the same as, when that is the only thing it failed."""
+    failed = [r for r in results if not r["passed"]]
+    if len(failed) != 1 or failed[0]["id"] != NEAR_MATCH_CRITERION[0]:
+        return None
+    wanted = failed[0].get("link_to")
+    return next((n for n in target.near if wanted is not None and str(n["id"]) == str(wanted)), None)
+
+
+def parse_review(text: str, rubric: Tuple[Tuple[int, str, str], ...] = RUBRIC,
+                 target: Optional[Target] = None) -> List[Dict[str, Any]]:
     """The reviewer's per-criterion results, or raises ReviewerUnavailable when the reply cannot be read."""
     data = _json_object(text)
     items = data.get("criteria") if isinstance(data, dict) else None
@@ -819,12 +978,15 @@ def parse_review(text: str) -> List[Dict[str, Any]]:
             except (TypeError, ValueError):
                 continue
     results = []
-    for number, name, _question in RUBRIC:
+    for number, name, _question in rubric:
         item = by_id.get(number)
         if item is None:
             raise ReviewerUnavailable("The reviewer's reply left out the criterion '%s'." % name)
-        results.append({"id": number, "name": name, "passed": item["passed"],
-                        "reason": _short(item.get("reason")) or ("Passed." if item["passed"] else "Failed.")})
+        result = {"id": number, "name": name, "passed": item["passed"],
+                  "reason": _short(item.get("reason")) or ("Passed." if item["passed"] else "Failed.")}
+        if number == NEAR_MATCH_CRITERION[0] and item.get("link_to") is not None:
+            result["link_to"] = item["link_to"]
+        results.append(result)
     return results
 
 
@@ -902,6 +1064,9 @@ def _state(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "outcome": state.get("outcome"),
         "outcome_reasons": list(state.get("outcome_reasons") or []),
         "waiting_reason": state.get("waiting_reason"),
+        "linked_to": state.get("linked_to"),
+        SETTLED_ON_CHECKS_KEY: state.get(SETTLED_ON_CHECKS_KEY),
+        "undone": state.get("undone"),
     }
 
 
@@ -1028,7 +1193,8 @@ def verdict(approval: AIChatCRUDApproval, state: str, summary: str, reasons: Lis
 
 
 def _decline(
-    service, approval: AIChatCRUDApproval, state: Dict[str, Any], reasons: List[str], charter_refused: bool = False
+    service, approval: AIChatCRUDApproval, state: Dict[str, Any], reasons: List[str], charter_refused: bool = False,
+    outcome: str = "declined",
 ) -> Dict[str, Any]:
     """Decline the change with its reasons: the data is left as it was.
 
@@ -1041,7 +1207,7 @@ def _decline(
     if not claimed:
         return verdict(approval, "applied" if approval.status == ApprovalStatus.APPROVED else "declined",
                        approval.summary, [approval.rejected_reason] if approval.rejected_reason else [])
-    state["outcome"] = "declined"
+    state["outcome"] = outcome
     state["outcome_reasons"] = reasons
     _save(approval, state)
     _event(service, approval, "declined", reason_text, to_status=ApprovalStatus.REJECTED.value)
@@ -1115,7 +1281,16 @@ def settle(
     failed = next((c for c in checks if not c.passed), None)
     if failed is not None:
         return _decline(service, approval, state, [failed.reason],
-                        charter_refused=failed.name == CHARTER_CHECK_NAME)
+                        charter_refused=failed.name == CHARTER_CHECK_NAME,
+                        outcome="retired" if failed.name == EXPIRED_CHECK_NAME else "declined")
+
+    # 2b. An exact repeat of an element already in the model is linked to it: nothing is added and no reviewer
+    # is called.
+    if target.link:
+        state["linked_to"] = target.link
+        return _apply_on_checks(service, approval, state, target,
+                                "Linked to the existing %s (element %d); nothing was added." % (
+                                    target.link["name"], target.link["id"]))
 
     # 3. The reviewer: never the model that drafted. It stays the same across the rounds of one change.
     drafter_provider, drafter_model = split_ref(approval.drafter_model)
@@ -1125,6 +1300,11 @@ def settle(
     else:
         choice = router.select_reviewer(drafter_provider, drafter_model)
         if choice is None:
+            if is_proposal(approval):
+                # No reviewer model is set up for this workspace at all: a proposal that passed every
+                # deterministic check is applied and says so, rather than waiting for a reviewer that
+                # does not exist.
+                return _apply_on_checks(service, approval, state, target, NO_REVIEWER_SENTENCE)
             return _wait(service, approval, state, NO_REVIEWER_REASON, counts=True)
         approval.reviewer_model = choice.ref
         state["same_provider"] = choice.same_provider
@@ -1158,8 +1338,20 @@ def settle(
                 return held
             number = len(state["rounds"]) + 1
             reply = _ask(router, choice, build_review_prompt(approval, payload, target, checks, state["rounds"]), budget)
-            results = parse_review(reply)
+            results = parse_review(reply, rubric_for(target), target)
             passed = all(r["passed"] for r in results)
+            moved = _link_chosen(results, target)
+            if moved is not None:
+                state["rounds"].append({"round": number, "passed": True, "criteria": results,
+                                        "summary": approval.summary})
+                _save(approval, state)
+                _event(service, approval, "reviewed", "Review %d. %s" % (number, _round_words(state["rounds"][-1])))
+                state["linked_to"] = moved
+                target.link = moved
+                return _apply_on_checks(service, approval, state, target,
+                                        "The reviewer judged it the same as %s (element %d), so it is linked to "
+                                        "that one and nothing was added." % (moved["name"], moved["id"]),
+                                        reviewed=True)
             state["rounds"].append({"round": number, "passed": passed, "criteria": results,
                                     "summary": approval.summary})
             _save(approval, state)
@@ -1169,8 +1361,12 @@ def settle(
             if not approval.drafter_model or number >= MAX_REVIEWS:
                 return _decline(service, approval, state, _failed_reasons(state["rounds"][-1]))
     except MonthBudgetUsedUp:
+        if is_proposal(approval):
+            return _apply_on_checks(service, approval, state, target, SPENT_MONTH_SENTENCE)
         return _wait(service, approval, state, BUDGET_USED_UP_REASON, counts=False)
     except BudgetSpent:
+        if is_proposal(approval):
+            return _apply_on_checks(service, approval, state, target, SPENT_RUN_SENTENCE)
         return _wait(service, approval, state, "This run's review limit was reached; the review resumes next run.",
                      counts=False)
     except ReviewerUnavailable as exc:
@@ -1208,6 +1404,8 @@ def _revise(service, router, approval, state, payload, budget) -> Optional[Dict[
         _save(approval, state)
         _event(service, approval, "revised", "The revision was the same as the draft, so the review ended.")
         return _decline(service, approval, state, _failed_reasons(last))
+    if is_proposal(approval) and isinstance(payload, dict):
+        revised = {**payload, **revised}  # the revision keeps the proposal's own identity keys
     approval.operation_payload = json.dumps(revised)
     summary = _short(data.get("summary"), 300)
     if summary:
@@ -1217,8 +1415,28 @@ def _revise(service, router, approval, state, payload, budget) -> Optional[Dict[
     return None
 
 
+def _apply_on_checks(
+    service, approval: AIChatCRUDApproval, state: Dict[str, Any], target: Target, note: str, reviewed: bool = False
+) -> Dict[str, Any]:
+    """Apply a change that passed its deterministic checks without a (further) reviewer call: an exact repeat
+    linked to what is there, or a proposal settled while the review budget is spent. ``note`` is recorded."""
+    held = _hold_if_paused(service, approval, state)
+    if held is not None:
+        return held
+    if not reviewed:
+        state[SETTLED_ON_CHECKS_KEY] = note
+    payload = _payload_of(approval)
+    if target.link and isinstance(payload, dict):
+        payload["link_to_element_id"] = target.link["id"]
+        approval.operation_payload = json.dumps(payload)
+    approval.before_snapshot = target.before or {"kind": "unrecorded"}
+    _save(approval, state)
+    return _apply(service, approval, state, None, note=note)
+
+
 def _apply(
-    service, approval: AIChatCRUDApproval, state: Dict[str, Any], approved_by: Optional[int] = None
+    service, approval: AIChatCRUDApproval, state: Dict[str, Any], approved_by: Optional[int] = None,
+    note: Optional[str] = None,
 ) -> Dict[str, Any]:
     approval_id, org_id = approval.id, approval.organization_id
     result = service.approve_and_execute(approval_id, settled_by_review=True, approved_by=approved_by)
@@ -1227,12 +1445,15 @@ def _apply(
     if result.get("success"):
         inner = result.get("result") if isinstance(result.get("result"), dict) else {}
         summary = _short(inner.get("message") or approval.summary, 300)
-        state["outcome"] = "applied"
-        state["outcome_reasons"] = []
+        linked = bool(inner.get("linked") or inner.get("already_in_model") or state.get("linked_to"))
+        state["outcome"] = "linked" if linked else "applied"
+        state["outcome_reasons"] = [note] if note else []
         _save(approval, state)
-        _event(service, approval, "applied", summary)
+        _event(service, approval, "applied", note or summary)
         db.session.commit()
-        return verdict(approval, "applied", summary, [])
+        answer = verdict(approval, "applied", note if (note and linked) else summary, [])
+        answer["outcome"] = state["outcome"]
+        return answer
     if result.get("code") == "CONFLICT" and approval.status != ApprovalStatus.PENDING:
         # Someone else settled it first; report what happened to it.
         return verdict(approval, "applied" if approval.status == ApprovalStatus.APPROVED else "declined",
@@ -1260,9 +1481,11 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
     """The record of one reviewed change as the page shows it (read only)."""
     saved = _state(approval)
     if approval.status == ApprovalStatus.APPROVED:
-        label, tone = "Applied", "positive"
+        label, tone = ("Linked", "neutral") if saved["outcome"] == "linked" else ("Applied", "positive")
+        if saved["undone"]:
+            label, tone = "Undone", "neutral"
     elif approval.status == ApprovalStatus.REJECTED:
-        label, tone = "Declined", "negative"
+        label, tone = ("Retired", "neutral") if saved["outcome"] == "retired" else ("Declined", "negative")
     else:
         label, tone = "In review", "caution"
     waiting_reason = saved["waiting_reason"] if approval.status == ApprovalStatus.PENDING else None
@@ -1297,6 +1520,215 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "review_rounds": saved["rounds"],
         "rubric_version": approval.rubric_version,
     }
+
+
+# --------------------------------------------------------------------------- #
+# The inbox record: one row for each settled item, and Undo                    #
+# --------------------------------------------------------------------------- #
+
+SOURCE_WORDS = {
+    "solution_blueprint_proposals": "Solution blueprint",
+    "github_connector": "Read of GitHub",
+    "connector_config": "Connection",
+}
+LOOP_OUTCOME_WORDS = {
+    "applied": ("Applied", "positive"),
+    "linked": ("Linked", "neutral"),
+    "declined": ("Declined", "negative"),
+    "retired": ("Retired", "neutral"),
+}
+
+
+def _source_of(approval: AIChatCRUDApproval, payload: Any) -> Dict[str, Any]:
+    """Where the item came from, in words, and the address of the thing it cites (None when it cites none)."""
+    args = payload if isinstance(payload, dict) else {}
+    table = approval.source_table
+    label, url = SOURCE_WORDS.get(table) or ("Asked for in the AI chat" if approval.user_id else "The system"), None
+    try:
+        from flask import url_for
+
+        if table == "github_connector":
+            from app.connectors.github import file_url
+
+            repository = args.get("repository") or args.get("from") or args.get("source")
+            if repository:
+                commit = str(args.get("commit") or "")
+                file = args.get("evidence_file") or args.get("file")
+                label = "%s%s%s" % (repository, (" at " + commit[:7]) if commit else "", (", " + file) if file else "")
+                url = file_url(repository, commit, file) or "https://github.com/%s" % repository
+        elif table == "solution_blueprint_proposals" and args.get("solution_id"):
+            from app.models.solution_models import Solution
+
+            solution = Solution.query.filter_by(id=args["solution_id"], organization_id=approval.organization_id).first()
+            if solution is not None:
+                label = "Blueprint: %s" % solution.name
+                url = url_for("solution_design.view_solution", solution_id=solution.id)
+        elif table == "connector_config":
+            label = "Connection: %s" % (args.get("connector_type") or "connector")
+            url = url_for("m365_connector.connectors_index")
+    except Exception:  # noqa: BLE001 - a source address is a convenience; the row reads without it
+        url = None
+    return {"label": label, "url": url}
+
+
+def undo_problem(approval: AIChatCRUDApproval) -> Optional[str]:
+    """Why an applied item cannot be undone (a sentence), or None when it can."""
+    saved = _state(approval)
+    if approval.status != ApprovalStatus.APPROVED:
+        return "Only an applied item can be undone."
+    if saved["undone"]:
+        return "It has already been undone."
+    snapshot = approval.before_snapshot if isinstance(approval.before_snapshot, dict) else {}
+    kind = snapshot.get("kind")
+    if saved["outcome"] == "linked" or kind == "link":
+        return "Nothing was added, so there is nothing to undo."
+    if snapshot.get("fields") and snapshot.get("id") and snapshot.get("record"):
+        return None
+    if kind == "create" and _created_ids(approval):
+        return None
+    return "This kind of change keeps no copy of what it replaced, so it cannot be undone here."
+
+
+def _result_of(approval: AIChatCRUDApproval) -> Dict[str, Any]:
+    try:
+        value = json.loads(approval.execution_result or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _created_ids(approval: AIChatCRUDApproval) -> Dict[str, List[int]]:
+    """The records an applied item added, as its writer reported them."""
+    result = _result_of(approval)
+    inner = result.get("result") if isinstance(result.get("result"), dict) else result
+    found: Dict[str, List[int]] = {}
+    elements = [i for i in (inner.get("created_element_ids") or []) if isinstance(i, int)]
+    if not elements and isinstance(inner.get("element_id"), int) and not inner.get("linked"):
+        elements = [inner["element_id"]]
+    if elements:
+        found["elements"] = elements
+    relationships = [inner[k] for k in ("composition_id", "relationship_id") if isinstance(inner.get(k), int)
+                     and not inner.get("already_in_model")]
+    if relationships:
+        found["relationships"] = relationships
+    return found
+
+
+def record_row(approval: AIChatCRUDApproval, people: Optional[Dict[int, str]] = None) -> Dict[str, Any]:
+    """One row of the Approvals record: what, outcome, reason, source, verdict, and whether Undo is offered."""
+    saved = _state(approval)
+    payload = _payload_of(approval)
+    if approval.status == ApprovalStatus.PENDING:
+        label, tone = "In review", "caution"
+        reason = saved["waiting_reason"] or (
+            "It is being checked and reviewed by the server." if in_scope(approval)
+            else "This kind of proposal is not checked automatically yet.")
+    elif approval.status == ApprovalStatus.APPROVED:
+        label, tone = LOOP_OUTCOME_WORDS["linked" if saved["outcome"] == "linked" else "applied"]
+        reason = " ".join(saved["outcome_reasons"]) if saved["outcome_reasons"] else (
+            "Checked, then reviewed by %s, and it passed." % model_words(approval.reviewer_model)
+            if saved["rounds"] and approval.reviewer_model else "Checked and applied.")
+        if saved["undone"]:
+            label, tone = "Undone", "neutral"
+            reason = "Undone on %s. %s" % (str(saved["undone"].get("at") or "")[:10], reason)
+    else:
+        label, tone = LOOP_OUTCOME_WORDS["retired" if saved["outcome"] == "retired" else "declined"]
+        reason = " ".join(saved["outcome_reasons"]) or approval.rejected_reason or "No reason was recorded."
+    rounds = saved["rounds"]
+    if approval.status == ApprovalStatus.PENDING:
+        verdict_words = "Not decided yet"
+    elif saved["outcome"] == "retired":
+        verdict_words = "Past its time"
+    elif rounds:
+        verdict_words = "Reviewer passed it" if rounds[-1]["passed"] else "Reviewer did not pass it"
+    elif saved[SETTLED_ON_CHECKS_KEY]:
+        verdict_words = "Checks only"
+    elif saved["outcome"] == "linked":
+        verdict_words = "Checks only"
+    elif approval.status == ApprovalStatus.REJECTED:
+        verdict_words = "Failed a check"
+    else:
+        verdict_words = "Checked"
+    problem = undo_problem(approval)
+    return {
+        "id": approval.id,
+        "summary": approval.summary,
+        "label": label,
+        "tone": tone,
+        "reason": reason,
+        "verdict": verdict_words,
+        "source": _source_of(approval, payload),
+        "source_key": approval.source_table or "chat",
+        "when": approval.executed_at or approval.approved_at or approval.created_at,
+        "can_undo": problem is None,
+        "undo_note": None if problem is None else problem,
+        "record_url": record_path(approval.id),
+        "requested_by": (people or {}).get(approval.user_id) or "The system",
+    }
+
+
+def undo(service, approval: AIChatCRUDApproval, actor) -> Dict[str, Any]:
+    """Put back what an applied item changed: the fields it overwrote, or remove what it added. Recorded on
+    the item and in its audit trail. Only the item's own organisation's records are touched."""
+    problem = undo_problem(approval)
+    if problem is not None:
+        return {"success": False, "code": "CONFLICT", "error": problem}
+    org_id = approval.organization_id
+    snapshot = approval.before_snapshot if isinstance(approval.before_snapshot, dict) else {}
+    if snapshot.get("fields") and snapshot.get("id") and snapshot.get("record"):
+        model = _entity_model(approval.entity_type)
+        row = _scoped_row(model, snapshot["id"], org_id) if model is not None else None
+        if row is None:
+            return {"success": False, "code": "CONFLICT", "error": "The record it changed is no longer in this workspace."}
+        for key, value in snapshot["fields"].items():
+            if hasattr(row, key):
+                setattr(row, key, value)
+        what = "Put back %s on %s." % (", ".join(sorted(snapshot["fields"])), snapshot.get("name") or "the record")
+    else:
+        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+        created = _created_ids(approval)
+        now = datetime.utcnow()
+        removed = 0
+        for rel_id in created.get("relationships", []):
+            rel = ArchiMateRelationship.query.filter_by(id=rel_id, organization_id=org_id).first()
+            if rel is not None:
+                db.session.delete(rel)
+                removed += 1
+        for element_id in created.get("elements", []):
+            element = ArchiMateElement.query.filter_by(id=element_id, organization_id=org_id).first()
+            if element is None:
+                continue
+            for rel in ArchiMateRelationship.query.filter(
+                ArchiMateRelationship.organization_id == org_id,
+                db.or_(ArchiMateRelationship.source_id == element_id, ArchiMateRelationship.target_id == element_id),
+            ).all():
+                db.session.delete(rel)
+            from app.models.solution_models import SolutionArchiMateElement
+
+            for junction in SolutionArchiMateElement.query.filter_by(element_id=element_id).all():
+                db.session.delete(junction)
+            if hasattr(element, "deleted_at"):
+                element.deleted_at = now
+            else:
+                db.session.delete(element)
+            removed += 1
+        if approval.source_table == "solution_blueprint_proposals":
+            from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
+
+            proposal = SolutionBlueprintProposal.query.filter_by(
+                id=approval.source_id, organization_id=org_id).first()
+            if proposal is not None:
+                proposal.status = "proposed"
+                proposal.promoted_element_id = None
+        what = "Removed %d record%s it added." % (removed, "" if removed == 1 else "s")
+    state = _state(approval)
+    state["undone"] = {"at": datetime.utcnow().isoformat(timespec="seconds"), "by": actor.id, "what": what}
+    _save(approval, state)
+    service._audit(approval, event="undone", to_status=approval.status.value, actor_user_id=actor.id,
+                   from_status=approval.status.value, reason=what)
+    db.session.commit()
+    return {"success": True, "message": what, "approval_id": approval.id}
 
 
 # --------------------------------------------------------------------------- #
@@ -1398,12 +1830,16 @@ def waiting_ids(organization_id: int) -> List[int]:
         .filter(
             AIChatCRUDApproval.organization_id == organization_id,
             AIChatCRUDApproval.status == ApprovalStatus.PENDING,
-            AIChatCRUDApproval.user_id.isnot(None),
-            AIChatCRUDApproval.source_table.is_(None),
+            db.or_(
+                db.and_(AIChatCRUDApproval.user_id.isnot(None), AIChatCRUDApproval.source_table.is_(None)),
+                AIChatCRUDApproval.source_table.in_(PROPOSAL_SOURCES),
+            ),
             db.func.coalesce(last_event.c.last_at, AIChatCRUDApproval.created_at) < cutoff,
             # Only a change that is in the loop: it carries a rubric version or has review events. A row
-            # from before the loop has neither and is left alone until its own brief moves it in.
-            db.or_(AIChatCRUDApproval.rubric_version.isnot(None), has_loop_event),
+            # from before the loop has neither and is left alone until its own brief moves it in. A proposal
+            # from a connector or a blueprint is always in the loop.
+            db.or_(AIChatCRUDApproval.rubric_version.isnot(None), has_loop_event,
+                   AIChatCRUDApproval.source_table.in_(PROPOSAL_SOURCES)),
         )
         .order_by(AIChatCRUDApproval.id)
         .all()
@@ -1411,29 +1847,81 @@ def waiting_ids(organization_id: int) -> List[int]:
     return [row.id for row in rows if in_scope(row)]
 
 
-def sweep_organisation(organization_id: int, budget: Optional[ReviewBudget] = None) -> Dict[str, int]:
-    """Settle this organisation's quiet changes in review. Runs with the organisation already active."""
+def _settle_row(row: AIChatCRUDApproval, organization_id: int, budget: Optional[ReviewBudget]) -> Dict[str, Any]:
+    """Settle one waiting change as the person who asked, or as the organisation's system actor when nobody did."""
+    from app.models.user import User
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
 
+    approval_id = row.id
+    if row.user_id is None:
+        actor = system_actor(organization_id)
+        if actor is None:
+            return decline(AIChatApprovalService(None), row, NO_SYSTEM_ACTOR_REASON)
+        return AIChatApprovalService(actor.id).settle_after_review(approval_id, budget=budget)
+    requester = User.query.filter_by(id=row.user_id, organization_id=organization_id).first()
+    if requester is None:
+        # The person who asked now belongs to another workspace (or none): the change is declined, not
+        # retried by every sweep. Only this organisation's record is touched.
+        return decline(AIChatApprovalService(row.user_id), row, MOVED_REASON)
+    return AIChatApprovalService(row.user_id).settle_after_review(approval_id, budget=budget)
+
+
+def sweep_organisation(organization_id: int, budget: Optional[ReviewBudget] = None) -> Dict[str, int]:
+    """Settle this organisation's quiet changes in review. Runs with the organisation already active."""
     counts = {"applied": 0, "declined": 0, "in_review": 0}
     budget = budget or ReviewBudget()
     if budget.out_of_money:
         return counts  # the month's AI budget stopped this run; the changes wait for the next one
     for approval_id in waiting_ids(organization_id):
         row = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=organization_id).first()
-        if row is None or row.user_id is None:
+        if row is None:
             continue
         db.session.expire_all()
-        from app.models.user import User
-
-        requester = User.query.filter_by(id=row.user_id, organization_id=organization_id).first()
-        if requester is None:
-            # The person who asked now belongs to another workspace (or none): the change is declined, not
-            # retried by every sweep. Only this organisation's record is touched.
-            outcome = decline(AIChatApprovalService(row.user_id), row, MOVED_REASON)
-        else:
-            outcome = AIChatApprovalService(row.user_id).settle_after_review(approval_id, budget=budget)
+        outcome = _settle_row(row, organization_id, budget)
         counts[outcome.get("state") if outcome.get("state") in counts else "in_review"] += 1
         if budget.used >= budget.limit or budget.out_of_money:
+            break
+    return counts
+
+
+def settle_proposals(
+    organization_id: int, sources: Optional[Tuple[str, ...]] = None, budget: Optional[ReviewBudget] = None,
+    only_ids: Optional[List[int]] = None,
+) -> Dict[str, int]:
+    """Settle every proposal of this organisation that is still waiting, now: the job a read or a blueprint
+    starts, and the one-off job for what was waiting before. Never runs inside a web request. Runs with the
+    organisation already active (``tenant_scope``). Returns how many were applied, linked, declined, retired
+    and left in review."""
+    counts = {"applied": 0, "linked": 0, "declined": 0, "retired": 0, "in_review": 0}
+    budget = budget or ReviewBudget(CALLS_PER_BATCH)
+    from app.connectors.github import proposal_rank
+
+    attempted: set = set()
+    # A read that is itself settled (an approved sync of a connection) writes proposals of its own, so the
+    # waiting ones are fetched again until a pass finds none that this run has not already tried.
+    for _pass in range(4):
+        query = AIChatCRUDApproval.query.filter(
+            AIChatCRUDApproval.organization_id == organization_id,
+            AIChatCRUDApproval.status == ApprovalStatus.PENDING,
+            AIChatCRUDApproval.source_table.in_(sources or PROPOSAL_SOURCES),
+        )
+        if only_ids is not None:
+            query = query.filter(AIChatCRUDApproval.id.in_(only_ids))
+        rows = sorted((r for r in query.order_by(AIChatCRUDApproval.id).all() if r.id not in attempted),
+                      key=lambda a: (proposal_rank(a) if a.source_table == "github_connector" else 0, a.id))
+        if not rows:
+            break
+        for row in [r.id for r in rows]:
+            attempted.add(row)
+            db.session.expire_all()
+            approval = AIChatCRUDApproval.query.filter_by(id=row, organization_id=organization_id).first()
+            if approval is None or approval.status != ApprovalStatus.PENDING:
+                continue
+            _settle_row(approval, organization_id, budget)
+            db.session.expire_all()
+            done = AIChatCRUDApproval.query.filter_by(id=row, organization_id=organization_id).first()
+            outcome = _state(done)["outcome"] if done.status != ApprovalStatus.PENDING else None
+            counts[outcome if outcome in counts else "in_review"] += 1
+        if only_ids is not None:
             break
     return counts

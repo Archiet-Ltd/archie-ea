@@ -8,7 +8,7 @@ The structure (sentence case, the shadcn sidebar pattern, a group label, a colla
 its sub-items: two levels at most):
 
 - the organisation switcher, then one search box ("Search or ask...");
-- TOP: Home, AI chat and Approvals (with the number of items waiting for the person);
+- TOP: Home, AI chat and Approvals (the record of what was settled; it carries no number);
 - WORK: Systems, Impact, Changes, Spend and Compliance, each opening onto its pages;
 - MODEL, shown to every role: one item per ArchiMate layer opening onto its element types
   (ADR-0018), then Frameworks and Composer. Frameworks are one gallery page (ADR-0017);
@@ -99,9 +99,9 @@ TOP: tuple = (
     _l("ai_chat", "AI chat", "unified_ai_chat.index", "message-square", job="6",
        aliases=("Ask", "Ask a question", "Assistant", "Chat", "Saved answers", "Question"),
        owns=("unified_ai_chat.", "intelligence_ui.ask", "intelligence_ui.answers")),
-    # The one approvals inbox; its number is what the inbox lists for this person.
+    # The record of what was applied, linked, declined and retired. Nothing waits for a person, so no number.
     _l("approvals", "Approvals", "unified_ai_chat.approval_inbox", "inbox", job="6", requires="general",
-       aliases=("Approval inbox", "Pending changes", "Proposals", "Waiting for me"), count="approvals"),
+       aliases=("Approval inbox", "Pending changes", "Proposals", "Waiting for me")),
 )
 
 # ── Work: five jobs, each a collapsible item with the pages that do it ───────────────────
@@ -541,17 +541,7 @@ class SidebarItem:
     badge: int | None = None
 
 
-def _waiting_approvals(user) -> int | None:
-    """What the approvals inbox lists for this person: the number shown beside Approvals."""
-    try:
-        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
-
-        return AIChatApprovalService(getattr(user, "id", None)).count_approver_queue()
-    except Exception:  # noqa: BLE001 - a count must not 500 a page
-        return None
-
-
-_COUNTERS = {"approvals": _waiting_approvals}
+_COUNTERS: dict = {}
 
 
 def _here(link: NavLink, endpoint: str | None, values: dict | None) -> bool:

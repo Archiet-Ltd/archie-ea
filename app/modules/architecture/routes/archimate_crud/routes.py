@@ -1880,7 +1880,7 @@ def _product_page(element, element_type, ae_id):
                 "choose": url_for("archimate_crud.detail_element", layer="business", element_type="Product",
                                   element_id=product.id, ae=1, bring_in=1) + "#bring-in",
                 "scan": url_for("archimate_crud.scan_product_repositories", product_id=product.id),
-                "review": url_for("m365_connector.github_review"),
+                "review": url_for("unified_ai_chat.approval_inbox", source="github_connector"),
                 "element": lambda el: _element_href((el.layer or "").strip().lower(), el.type, el.id),
             },
         )
