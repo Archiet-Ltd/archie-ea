@@ -7,12 +7,12 @@
   {% for step in steps %}
   {% set note = (notes or {}).get(step.label) %}
   <li data-testid="completeness-step" data-step="{{ step.label }}">
-    {% if editable %}
+    {% if editable and step.href %}
     <a class="font-medium text-foreground underline underline-offset-2 hover:no-underline" href="{{ step.href }}">{{ step.label }}</a>
     {% else %}
     <span class="font-medium">{{ step.label }}</span>
     {% endif %}
-    <span class="text-warning-emphasis">set in {{ step.where }}</span>
+    {% if step.where %}<span class="text-warning-emphasis">set in {{ step.where }}</span>{% endif %}
     {% if note %}
     <span>({{ note.text }}; <a class="underline underline-offset-2 hover:no-underline" href="{{ url_for('unified_applications.application_detail', id=app.id, tab=note.tab) }}">see it</a>)</span>
     {% endif %}

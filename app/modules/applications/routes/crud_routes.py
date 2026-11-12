@@ -52,6 +52,7 @@ from app.models.models import (  # dead-code-ok
     ArchitectureModel,
 )
 from app.services.application_fact_sheet import detail_tab
+from app.utils.role_access import can_see_costs
 from app.services.archimate.archimate_llm_service import ArchiMateLLMService
 from app.core.auth.decorators import require_permission
 from app.decorators import audit_log, require_roles
@@ -843,6 +844,7 @@ def application_edit(id):
                 return render_template(
                     "applications/edit.html", application=app,
                     abacus_connected=_abacus_connected(g.current_org_id),
+                    show_cost=can_see_costs(current_user),
                     lifecycle_stage_choices=APPLICATION_LIFECYCLE_STAGES,
                     lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
                     return_tab=detail_tab(request.form.get("return_tab")),
@@ -864,7 +866,6 @@ def application_edit(id):
                 "integration_pattern",
                 "authentication_method",
                 "data_classification",
-                "vendor_name",
                 # Technical profile / compliance / notes fields the edit form
                 # gained alongside the fact sheet that already displayed
                 # them -- the form having the input was not enough on its
@@ -889,6 +890,17 @@ def application_edit(id):
             if "competitive_advantage" in request.form:
                 app.competitive_advantage = request.form.get("competitive_advantage") == "yes"
 
+            # The vendor is recorded through the one vendor writer, so the application and
+            # its supplier record always name the same vendor.
+            posted_vendor = request.form.get("vendor_name")
+            if posted_vendor is not None:
+                from app.services import vendor_register
+
+                vendor_label = vendor_register.clean_name(sanitize_html(posted_vendor))
+                if vendor_label != (app.vendor_name or "") or app.vendor_organization_id is None:
+                    vendor_register.set_application_vendor(
+                        app, vendor_register.resolve_vendor(vendor_label, g.current_org_id))
+
             cost_fields = {}
             cost_field_names = [
                 "license_cost_annual",
@@ -896,7 +908,9 @@ def application_edit(id):
                 "maintenance_cost_annual",
                 "total_cost_of_ownership",
             ]
-            for field in cost_field_names:
+            # Cost is read and written only by a person the one cost rule allows.
+            allowed_cost_fields = cost_field_names if can_see_costs(current_user) else []
+            for field in allowed_cost_fields:
                 value = request.form.get(field)
                 if value is not None and hasattr(app, field):
                     try:
@@ -976,6 +990,7 @@ def application_edit(id):
             lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
             application_owners=application_owners,
             abacus_connected=_abacus_connected(org_id),
+            show_cost=can_see_costs(current_user),
             return_tab=detail_tab(request.args.get("tab")),
         )
 

@@ -138,10 +138,17 @@ def completeness_steps(app: Any, missing: List[str], tab: Optional[str] = None) 
     Needs a request context (it builds links).
     """
     from flask import url_for  # noqa: PLC0415
+    from flask_login import current_user  # noqa: PLC0415
+
+    from app.utils.role_access import can_see_costs  # noqa: PLC0415
 
     steps: List[Dict[str, str]] = []
     for label in missing:
         page, anchor, where = _STEPS[label]
+        if label == "Total cost of ownership" and not can_see_costs(current_user):
+            # The name stays; the link and the place do not, as the field is not theirs to set.
+            steps.append({"label": label, "href": "", "where": "", "field": anchor})
+            continue
         if page == "edit":
             href = url_for("unified_applications.application_edit", id=app.id, tab=tab or None, _anchor=anchor)
         else:

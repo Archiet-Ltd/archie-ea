@@ -248,9 +248,11 @@
       <h2 class="text-lg font-semibold">Cost, vendor and resilience</h2>
 
       <div class="grid grid-cols-1 gap-4">
+        {% if show_cost %}
         {% call form_group(id='total_cost_of_ownership', label='Total cost of ownership (per year)') %}
           {{ input(type="number", id=("total_cost_of_ownership"), name=("total_cost_of_ownership"), value=(application.total_cost_of_ownership if application.total_cost_of_ownership is not none else ''), size='sm', class="w-full", attrs_dict={"min": "0", "step": "any"}) }}
         {% endcall %}
+        {% endif %}
         {% call form_group(id='vendor_name', label='Vendor') %}
           {{ input(type="text", id=("vendor_name"), name=("vendor_name"), value=(application.vendor_name or ''), size='sm', class="w-full", attrs_dict={"maxlength": "100"}) }}
         {% endcall %}
