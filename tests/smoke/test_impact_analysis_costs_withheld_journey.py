@@ -39,6 +39,7 @@ def test_the_architect_whose_costs_are_withheld_reads_no_cost_in_analyze_impact(
         expect(figure).to_have_text("Withheld")
         expect(reason).to_contain_text(WITHHELD)
         assert not MONEY.search(page.locator("main").inner_text()), page.locator("main").inner_text()
+        figure.scroll_into_view_if_needed()
         _shot(page, "impact-cost-withheld", viewport, scheme)
     finally:
         context.close()
@@ -54,6 +55,7 @@ def test_an_architect_who_may_read_costs_reads_the_cost_at_risk_in_analyze_impac
         expect(figure).to_contain_text(MONEY)
         expect(reason).to_contain_text("Yearly running cost")
         assert WITHHELD not in page.locator("main").inner_text()
+        figure.scroll_into_view_if_needed()
         _shot(page, "impact-cost-admitted", viewport, scheme)
     finally:
         context.close()
