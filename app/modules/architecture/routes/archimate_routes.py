@@ -2552,8 +2552,6 @@ def api_elements_search():
         query = query.filter(ArchiMateElement.layer.ilike(layer))
 
     search_q = request.args.get("q", "").strip()
-    if search_q:
-        query = query.filter(ArchiMateElement.name.ilike(f"%{search_q}%"))
 
     solution_id = request.args.get("solution_id", type=int)
     if solution_id:
@@ -2606,7 +2604,20 @@ def api_elements_search():
     except (ValueError, TypeError):
         limit = _default_limit
 
-    elements = query.order_by(ArchiMateElement.name).limit(limit).all()
+    if search_q:
+        # Typed text is matched by the one matcher the global search uses, inside the signed-in
+        # organisation, so a name the global search finds is listed here too.
+        from app.middleware.tenant_context import current_org_id
+        from app.routes.sidebar_api_hardened import search_elements_as_global
+
+        org_id = current_org_id()
+        if not org_id:
+            return jsonify({"data": []})
+        elements = search_elements_as_global(
+            search_q, ArchiMateElement, ArchiMateElement.name, org_id, limit, base_query=query,
+        )
+    else:
+        elements = query.order_by(ArchiMateElement.name).limit(limit).all()
 
     # ARCH-002: Include relationship + solution counts
     el_ids = [el.id for el in elements]

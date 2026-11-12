@@ -84,7 +84,12 @@ def _global_element_ids(client, login_as, user, text):
     login_as(client, user)
     response = client.get(GLOBAL_SEARCH, query_string={"q": text})
     assert response.status_code == 200
-    return {r["id"] for r in response.get_json()["results"] if r["type"] == "archimate_element"}
+    # The global search labels a model element with its plain-word type and links it to its element page.
+    return {
+        int(r["id"])
+        for r in response.get_json()["results"]
+        if re.fullmatch(r"/architecture/[a-z_]+/element/%s" % r["id"], r.get("url", ""))
+    }
 
 
 def test_picker_uses_the_canonical_element_search_not_a_layer_listing(
@@ -280,3 +285,25 @@ def test_percent_underscore_and_backslash_can_be_matched_literally(
     assert ids(f"Rate {tag} 50%") == {percent.id, other_percent.id}, "unescaped, % is a wildcard"
     assert ids(f"Path {tag} A{bs}{bs}B") == {backslash.id}
     assert ids(f"{bs}_{bs}_") == set(), "two escaped underscores match no name with two underscores in a row"
+
+
+def test_a_spelling_the_global_search_folds_is_found_by_the_picker_and_stays_inside_the_organisation(
+    app, db_session, make_org, client, login_as
+):
+    """Typing the British spelling finds the element named with the American one, as in the global search,
+    and an element of another organisation with the same name is offered by neither."""
+    org = make_org("impact-picker-folding")
+    other_org = make_org("impact-picker-folding-other")
+    user = _make_user(db_session, org)
+    tag = uuid.uuid4().hex[:6]
+    own = _element(db_session, org, f"Organization {tag} register", "application_component", "application")
+    foreign = _element(db_session, other_org, f"Organization {tag} register", "application_component", "application")
+
+    endpoint, limit, _ = _picker_request(client, login_as, user)
+    text = f"Organisation {tag}"
+    global_ids = _global_element_ids(client, login_as, user, text)
+    picker_ids = {r["id"] for r in _picker_rows(client, login_as, user, endpoint, limit, text)}
+
+    assert global_ids == {own.id}, "the global search finds the element under either spelling"
+    assert picker_ids == {own.id}, "the picker offers the same element and nothing from another organisation"
+    assert foreign.id not in picker_ids

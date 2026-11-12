@@ -464,7 +464,7 @@ def get_quick_access_items():
         return jsonify({"error": "Internal server error"}), 500
 
 
-def _search_filter(query, model_class, column, org_id, limit=100):
+def _search_filter(query, model_class, column, org_id, limit=100, base_query=None, fuzzy_fill=True):
     """
     Two-pass candidate search so an exact name is never lost to a limit:
     1. Exact-substring match on the normalised name (ilike %query%) — up to `limit`,
@@ -472,6 +472,11 @@ def _search_filter(query, model_class, column, org_id, limit=100):
     2. Fill the remainder from a 3-letter-chunk OR query ordered by the number of
        chunks matched (CASE sum DESC), then exact/prefix/name, excluding ids already found.
     Returns at most `limit` rows from the model, with exact matches first.
+
+    `base_query` lets a caller that narrows by other criteria (layer, type) keep this one matcher:
+    both passes start from it instead of the bare model query. `fuzzy_fill=False` stops after pass 1,
+    for a list that must hold only names containing what was typed. Defaults keep the global search
+    exactly as it was.
     """
     from sqlalchemy import case, func, or_
     from app.utils.search_text import normalise_search_text
@@ -483,8 +488,9 @@ def _search_filter(query, model_class, column, org_id, limit=100):
     prefix_order = case((func.lower(column).ilike(q_norm + "%"), 0), else_=1)
 
     # Pass 1: exact-substring match — catches exact names and close spellings
+    start = base_query if base_query is not None else model_class.query
     exact_matches = (
-        model_class.query
+        start
         .filter(model_class.organization_id == org_id)
         .filter(column.ilike(f"%{q_norm}%"))
         .order_by(exact_order, prefix_order, func.length(column), column)
@@ -493,7 +499,7 @@ def _search_filter(query, model_class, column, org_id, limit=100):
     )
 
     remaining = limit - len(exact_matches)
-    if remaining <= 0:
+    if remaining <= 0 or not fuzzy_fill:
         return list(exact_matches)
 
     exact_ids = {row.id for row in exact_matches}
@@ -528,7 +534,7 @@ def _search_filter(query, model_class, column, org_id, limit=100):
 
     # Exclude ids already found in pass 1
     base = (
-        model_class.query
+        start
         .filter(model_class.organization_id == org_id)
         .filter(chunk_or)
     )
@@ -543,6 +549,37 @@ def _search_filter(query, model_class, column, org_id, limit=100):
     )
 
     return list(exact_matches) + chunk_matches
+
+
+# How many records (not pages) the global search lists once they are ranked.
+GLOBAL_SEARCH_RECORDS_SHOWN = 5
+
+
+def search_elements_as_global(query, model_class, column, org_id, limit, base_query=None):
+    """Elements a person who typed `query` is offered: every name that contains it, and then the
+    near matches the global search would also list for it, all through `_search_filter`. A near
+    match is a name in which every typed word is found, in any order. They are added to names
+    that contain the text, never offered in place of them: a text no name contains lists nothing.
+
+    `base_query` narrows first (layer, type); the organisation is always `org_id`.
+    """
+    from app.utils.search_text import fuzzy_match_score, normalise_search_text
+
+    named = _search_filter(query, model_class, column, org_id, limit, base_query=base_query, fuzzy_fill=False)
+    everything = _search_filter(query, model_class, column, org_id, 100, base_query=base_query)
+    if not named:
+        return []
+    q_norm = normalise_search_text(query)
+    scored = []
+    typed_words = len(q_norm.split())
+    for idx, row in enumerate(everything):
+        exact, fuzzy = fuzzy_match_score(q_norm, normalise_search_text(row.name))
+        if exact >= typed_words > 0:
+            scored.append((-exact, -fuzzy, idx, row))
+    scored.sort(key=lambda item: item[:3])
+    near = [row for *_, row in scored[:GLOBAL_SEARCH_RECORDS_SHOWN]]
+    seen = {row.id for row in named}
+    return (list(named) + [row for row in near if row.id not in seen])[:limit]
 
 
 def _type_label(element_type):
@@ -681,7 +718,7 @@ def api_global_search():
 
         # Sort: exact matches first, then fuzzy matches, then by original order
         scored_records.sort()
-        top_records = [r for _, _, _, r in scored_records[:5]]
+        top_records = [r for _, _, _, r in scored_records[:GLOBAL_SEARCH_RECORDS_SHOWN]]
 
         # Combine: pages first, then top records
         final_results = modules + top_records
