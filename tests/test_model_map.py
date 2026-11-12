@@ -236,7 +236,9 @@ def test_the_legend_and_the_nodes_read_the_same_layer_tokens(app, db_session, ma
     dots = {}
     for layer, markup in re.findall(r'<li[^>]*data-layer="(\w+)"[^>]*>(.*?)</li>', html, flags=re.S):
         dots[layer] = re.search(r'class="([^"]*bg-notation-[^"]*)"', markup).group(1)
-    assert set(dots) == {"strategy", "business", "application", "technology", "physical", "motivation", "implementation"}
+    # The rack is Physical by its stored layer and Technology by its type: the map counts it with Technology,
+    # as the dashboard tab and the Composer card do, so there is no Physical row.
+    assert set(dots) == {"strategy", "business", "application", "technology", "motivation", "implementation"}
     for layer, classes in dots.items():
         assert ("bg-notation-%s " % layer) in (classes + " ") and "border-notation-%s-stroke" % layer in classes
     assert len(set(dots.values())) == len(dots)

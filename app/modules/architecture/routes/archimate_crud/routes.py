@@ -1236,7 +1236,7 @@ def api_layer_elements(layer):
             # layer's count has no type filter, and a list narrower than its own count read as a second number.
             from app.services.archimate_viewpoint_service import _type_key, _type_key_column, layer_model_query
 
-            ae_q = layer_model_query(layer)
+            ae_q = layer_model_query(layer, g.current_org_id)
             if type_filter:
                 ae_q = ae_q.filter(_type_key_column().in_([_type_key(t) for t in query_types]))
             if search:

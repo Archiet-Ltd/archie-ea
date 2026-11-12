@@ -37,18 +37,19 @@
            {% if layer_key == selected_layer.key %}style="border-left-color: hsl(var({{ layer_info.color_token }}));"{% endif %}
            class="flex shrink-0 items-center justify-between gap-2 whitespace-nowrap rounded-md border-l-4 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {% if layer_key == selected_layer.key %}border-y border-r border-border bg-muted/50 text-foreground{% else %}border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground{% endif %}">
             <span class="truncate">{{ layer_info.short_name }}</span>
-            {# Until the counts answer the tab says it is counting; only a count that failed leaves it blank. #}
-            <span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground"
-                  x-cloak x-show="countsLoading && layerCounts['{{ layer_key }}'] === undefined"
-                  data-testid="layer-count-loading" role="status" aria-label="Counting {{ layer_info.short_name }}">&hellip;</span>
-            {# The count appears only once it is known; a dash where a count would go told nobody anything.
-               x-show reads layerCounts['{{ layer_key }}'] by bracket access (not hasOwnProperty, which
-               goes through getOwnPropertyDescriptor and Alpine's reactivity does not track that as a
-               dependency): layerCounts starts as {} and keys are added once counts load, so a
-               hasOwnProperty-based guard evaluates once at init and never re-runs when the key appears. #}
-            <span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground"
-                  x-cloak x-show="layerCounts['{{ layer_key }}'] !== undefined && layerCounts['{{ layer_key }}'] !== null"
-                  x-text="layerCounts['{{ layer_key }}']"></span>
+            {# Until the counts answer the tab says it is counting, in plain text with no count styling; the count
+               itself is not in the page until it is known. A count that failed leaves the tab without either. #}
+            <template x-if="countsLoading && layerCounts['{{ layer_key }}'] === undefined">
+                <span class="shrink-0 px-2 text-xs text-muted-foreground" data-testid="layer-count-loading"
+                      role="status" aria-label="Counting {{ layer_info.short_name }}">&hellip;</span>
+            </template>
+            {# A dash where a count would go told nobody anything. layerCounts starts as {} and keys are added once
+               counts load; the guard reads layerCounts['{{ layer_key }}'] by bracket access, which Alpine tracks
+               (hasOwnProperty would evaluate once at init and never re-run). #}
+            <template x-if="layerCounts['{{ layer_key }}'] !== undefined && layerCounts['{{ layer_key }}'] !== null">
+                <span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground"
+                      data-testid="layer-count" x-text="layerCounts['{{ layer_key }}']"></span>
+            </template>
         </a>
         {% endfor %}
     </div>

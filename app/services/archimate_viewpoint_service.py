@@ -44,10 +44,9 @@ STANDARD_VIEWPOINTS = {
     'layered': {
         'name': 'Layered',
         'description': 'All elements organised in horizontal layer bands: strategy, motivation, business, '
-                       'application, technology, physical, implementation',
-        'layers': ['Strategy', 'Motivation', 'Business', 'Application', 'Technology', 'Physical', 'Implementation'],
-        'layer_order': ['strategy', 'motivation', 'business', 'application', 'technology', 'physical',
-                        'implementation'],
+                       'application, technology (physical elements included), implementation',
+        'layers': ['Strategy', 'Motivation', 'Business', 'Application', 'Technology', 'Implementation'],
+        'layer_order': ['strategy', 'motivation', 'business', 'application', 'technology', 'implementation'],
         'element_types': [],  # all types, grouped by layer
         # Whole-portfolio viewpoint (roles: ['Enterprise'] only) -- see
         # enterprise_scope in get_viewpoint_data()'s docstring.
@@ -463,7 +462,7 @@ def _most_connected(query, org_id):
 PHYSICAL_TYPES = frozenset({"equipment", "facility", "distributionnetwork", "material"})
 
 
-def _register_only_count(dashboard_layer: str) -> int:
+def _register_only_count(dashboard_layer: str, org_id=None) -> int:
     """Records of the layer's own tables that have no model element (a gap entered in the gap register).
 
     The layer lists them and counts them, the model map does not draw them. A type held in a table that
@@ -478,20 +477,26 @@ def _register_only_count(dashboard_layer: str) -> int:
             if not model_class:
                 continue
             query = model_class.query
+            if org_id is not None and hasattr(model_class, "organization_id"):
+                query = query.filter(model_class.organization_id == org_id)
             if hasattr(model_class, "archimate_element_id"):
                 query = query.filter(model_class.archimate_element_id.is_(None))
             records += query.count()
     return records
 
 
-def layer_model_query(layer: str):
-    """The organisation's model elements of one layer, the rows count_layers counts for it. Physical, which is
-    no layer of its own, answers with the Physical types alone."""
+def layer_model_query(layer: str, org_id=None):
+    """The model elements of one layer, the rows count_layers counts for it. Physical, which is no layer of its
+    own, answers with the Physical types alone. With ``org_id`` the query names that organisation itself, as
+    count_layers does, instead of relying on the tenant filter alone."""
     from app.models.archimate_core import ArchiMateElement
 
+    base = ArchiMateElement.query
+    if org_id is not None:
+        base = base.filter(ArchiMateElement.organization_id == org_id)
     if layer == "physical":
-        return ArchiMateElement.query.filter(_type_key_column().in_(list(PHYSICAL_TYPES)))
-    return _filter_to_layer(ArchiMateElement.query, layer, [t.lower() for t in _types_for_layer(layer)])
+        return base.filter(_type_key_column().in_(list(PHYSICAL_TYPES)))
+    return _filter_to_layer(base, layer, [t.lower() for t in _types_for_layer(layer)])
 
 
 def count_layers(org_id, allowed_types=None) -> list:
@@ -516,7 +521,7 @@ def count_layers(org_id, allowed_types=None) -> list:
     rows = []
     for layer, title in LAYER_TITLES.items():
         try:
-            records = 0 if layer == COMPOSITE_LAYER else _register_only_count(layer)
+            records = 0 if layer == COMPOSITE_LAYER else _register_only_count(layer, org_id)
         except Exception as exc:  # a table that cannot be read leaves the layer uncounted, not under-counted
             logger.warning("count_layers: records of %s could not be counted: %s", layer, exc)
             _db.session.rollback()
