@@ -13,7 +13,10 @@ from tests.test_account_mail_flows import _anonymous, mail_off  # noqa: F401  (f
 from tests.test_team_invite_acceptance import PASSWORD
 
 NO_ACCESS = "You don&#39;t have access to this page"
-BROWSER = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}
+BROWSER = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,"
+              "*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+}
 
 
 class _Person:
@@ -144,9 +147,10 @@ def test_a_refused_chat_admin_page_is_the_standard_refusal_page(app, db_session,
     assert "<h1" in html
     assert "/dashboard/overview" in html
     # A script still gets JSON.
-    script = client.get(path, headers={"Accept": "application/json"})
-    assert script.status_code == 403
-    assert script.is_json
+    for accept in ("application/json", "*/*"):
+        script = client.get(path, headers={"Accept": accept})
+        assert script.status_code == 403
+        assert script.is_json, accept
 
 
 def test_a_browser_that_times_out_on_the_patterns_address_gets_a_page(app, two_owners, monkeypatch):

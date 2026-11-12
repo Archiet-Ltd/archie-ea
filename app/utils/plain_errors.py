@@ -62,7 +62,12 @@ def is_browser_page_request() -> bool:
         return False
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return False
-    return request.accept_mimetypes.best == "text/html"
+    accepted = request.accept_mimetypes
+    # A browser names text/html outright; a script or fetch() sends */* or JSON. (``best`` is not
+    # used: a browser's list ends in signed-exchange, which it picks over text/html.)
+    return any(value == "text/html" for value, _quality in accepted) and (
+        accepted.quality("text/html") >= accepted.quality("application/json")
+    )
 
 
 def plain_json(status: int, error_type: str, **extra):

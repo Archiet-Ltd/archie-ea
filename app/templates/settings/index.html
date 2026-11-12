@@ -41,12 +41,11 @@
         {{ button(text='Save all changes', variant='primary', icon='save', testid='btn-save-all', aria_label='Save all settings', on_click='save()', attrs_dict={':disabled': 'saving'}) }}
     </div>
     {% endmacro %}
-    {% if may_change_settings %}
-    {{ page_shell(title='System Settings', breadcrumb=[('Home', '/'), ('System Settings', none)], subtitle='Platform-wide configuration. Changes apply to every organisation.', actions_caller=_ps_actions) }}
-    {% else %}
-    {{ page_shell(title='System Settings', breadcrumb=[('Home', '/'), ('System Settings', none)], subtitle='Platform-wide configuration. It applies to every organisation.') }}
-    <div data-testid="settings-read-only">
-        {{ quiet_alert(kind='info', title='You can read these settings but not change them', text='They are set by the administrators of the platform and apply to every organisation, including yours. Ask a platform administrator if one needs to change.') }}
+    {{ page_shell(title='System Settings', breadcrumb=[('Home', '/'), ('System Settings', none)], subtitle=('Platform-wide configuration. Changes apply to every organisation.' if may_change_settings else 'Platform-wide configuration. It applies to every organisation.'), actions_caller=(_ps_actions if may_change_settings else none)) }}
+    {% if not may_change_settings %}
+    <div data-testid="settings-read-only" class="rounded-md border border-border bg-muted px-4 py-3 text-sm" role="status">
+        <p class="font-medium text-foreground">You can read these settings but not change them</p>
+        <p class="mt-1 text-muted-foreground">They are set by the administrators of the platform and apply to every organisation, including yours. Ask a platform administrator if one needs to change.</p>
     </div>
     {% endif %}
 
