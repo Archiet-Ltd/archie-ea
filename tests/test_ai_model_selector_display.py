@@ -17,7 +17,7 @@ from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
 from playwright.sync_api import expect, sync_playwright
 
 from tests.chat_opening_fixture import (
-    APPLICATIONS, APPLICATIONS_PATH, close_chat_options, open_chat_options,
+    APPLICATIONS, APPLICATIONS_PATH, FIRST_QUESTIONS, FIRST_QUESTIONS_PATH, close_chat_options, open_chat_options,
 )
 from app.modules.ai_chat.services.failure_messages import FEATURE_INTROS
 from tests.render_context import app_template_context
@@ -122,6 +122,8 @@ def launch(browser):
                     return self.respond({'elements': [], 'applications': []})
                 if path == APPLICATIONS_PATH:
                     return self.respond(APPLICATIONS)
+                if path == FIRST_QUESTIONS_PATH:
+                    return self.respond(FIRST_QUESTIONS)
                 if path == '/ai-chat/recommendations':
                     return self.respond({'alerts': [], 'recommendations': [],
                                          'summary': {'total': 0}})

@@ -168,28 +168,248 @@ from app.modules.ai_chat.services.model_defaults import (
 _llm_cache_fallback = {}  # cache-tenancy-ok: the key is a SHA-256 of the full prompt and model, so only a caller sending the identical prompt can read an entry
 _cache_expiry_fallback = {}  # cache-tenancy-ok: expiry times for the prompt-hash keys above; holds no tenant data
 
-# ENT-040: field patterns that must be scrubbed before prompt transmission.
-# Keys are human-readable labels; values are (pattern, replacement) tuples.
-_SENSITIVE_PATTERNS: List[Tuple[re.Pattern, str]] = [
+# ENT-040: everything that leaves the server for a model goes through scrub_for_model, the one scrub.
+#
+# Structured data is walked before it is written out as text: a value is replaced when its key names a
+# secret. The text that is finally sent is then scrubbed by shape, so a secret pasted into a sentence, or
+# written out as escaped JSON or as a Python repr, is caught as well.
+# one marker for every redacted secret, keyed or by shape (an existing test pins the JSON form of it)
+_CREDENTIAL = "[CREDENTIAL_REDACTED]"
+REDACTED = _CREDENTIAL
+
+# A key is split into word parts (on _ - . spaces and camelCase), lower-cased, trailing digits dropped.
+# It names a secret when it is one of the closed names below: a last part that is a secret word (or its
+# plural), a one-word form such as accesstoken, "key" beside a qualifier, a name ending in password, passwd
+# or secret with no word break (PGPASSWORD), pwd, or pass as the whole key.
+_SECRET_LAST_PARTS = frozenset({
+    "secret", "password", "passwd", "passphrase", "token", "authorization", "credential", "credentials",
+    "bearer", "pwd", "cookie", "secrets", "passwords", "passwds", "passphrases", "cookies",
+})
+_KEY_QUALIFIERS = frozenset({"api", "access", "secret", "private", "client", "signing", "encryption"})
+_SECRET_ONE_WORD = frozenset({
+    "apikey", "accesskey", "secretkey", "privatekey", "clientkey", "signingkey",
+    "accesstoken", "clientsecret", "authtoken", "refreshtoken", "idtoken", "sessiontoken", "bearertoken",
+    "setcookie",
+})
+_NOT_A_SECRET_TOKEN = frozenset({"max", "count", "num", "limit"})
+_KEY_PARTS = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")
+
+
+def is_secret_key(name: Any) -> bool:
+    """True when a field name says its value is a secret (api_key, accessToken, Client-Secret ...)."""
+    if not isinstance(name, str) or not name:
+        return False
+    parts = [re.sub(r"\d+$", "", part.lower()) for part in _KEY_PARTS.findall(name)]
+    parts = [part for part in parts if part]
+    if not parts:
+        return False
+    joined = "".join(parts)
+    if parts[-1] == "token" and len(parts) > 1 and parts[-2] in _NOT_A_SECRET_TOKEN:
+        return False
+    if parts[-1] in _SECRET_LAST_PARTS or joined in _SECRET_ONE_WORD or joined.rstrip("s") in _SECRET_ONE_WORD:
+        return True
+    if parts == ["pass"] or re.search(r"(?:password|passwd|secret)s?$", joined):
+        return True
+    return parts[-1] in ("key", "keys") and len(parts) > 1 and parts[-2] in _KEY_QUALIFIERS
+
+
+_SECRET_SHAPES: List[Tuple[re.Pattern, str]] = [
+    # A secret is recognised by its own shape, with or without a keyword beside it.
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:.*?-----END [A-Z ]*PRIVATE KEY-----|[A-Za-z0-9+/=\\\s]*)",
+                re.S), _CREDENTIAL),
+    (re.compile(r"eyJ[A-Za-z0-9_\-]{5,}\.[A-Za-z0-9_\-]{5,}\.[A-Za-z0-9_\-]*"), _CREDENTIAL),
+    (re.compile(r"\b(?i:authorization)(?:\\*[\"'])?\s*[:=]\s*(?:\\*[\"'])?(?i:bearer|basic|token)\s+[^\s\"',\\}]+"),
+     _CREDENTIAL),
+    # a bearer value is a token, not the word that follows "bearer" in a sentence: it has a digit or a symbol
+    (re.compile(r"\b(?i:bearer)[\s:]+(?=[A-Za-z0-9._~+/=\-]*(?:\d|[_~+/=]|\.[A-Za-z0-9]))[A-Za-z0-9._~+/=\-]{8,}"), _CREDENTIAL),
+    (re.compile(r"(?i:basic)\s+(?=[A-Za-z0-9+/]*\d)[A-Za-z0-9+/]{12,}={0,2}"), _CREDENTIAL),
+    # sk- keys: a long body with a digit; when a letter comes before it ("task-"), it must also mix cases
+    (re.compile(r"sk-(?:ant|proj|svcacct|admin|or-v1)-[A-Za-z0-9_\-]{8,}"), _CREDENTIAL),
+    (re.compile(r"(?<![A-Za-z])sk-(?=[A-Za-z0-9_\-]*\d)[A-Za-z0-9_\-]{20,}"), _CREDENTIAL),
+    (re.compile(r"(?<![A-Za-z])sk-(?=[A-Za-z0-9_\-]*\d{4})(?=[A-Za-z0-9_\-]*[A-Z])[A-Za-z0-9_\-]{12,}"), _CREDENTIAL),
+    (re.compile(r"(?<=[A-Za-z])sk-(?=[A-Za-z0-9_\-]*\d)(?=[A-Za-z0-9_\-]*[A-Z])[A-Za-z0-9_\-]{20,}"), _CREDENTIAL),
+    (re.compile(r"[sprk]k_(?:live|test)_[A-Za-z0-9]{8,}"), _CREDENTIAL),
+    (re.compile(r"(?:AKIA|ASIA)[A-Z0-9]{16}(?![A-Z0-9])"), _CREDENTIAL),
+    (re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"), _CREDENTIAL),
+    (re.compile(r"github_pat_[A-Za-z0-9_]{20,}"), _CREDENTIAL),
+    (re.compile(r"glpat-[A-Za-z0-9_\-]{20,}"), _CREDENTIAL),
+    (re.compile(r"hf_(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{20,}"), _CREDENTIAL),
+    (re.compile(r"SG\.[A-Za-z0-9_\-]{16,}\.[A-Za-z0-9_\-]{16,}"), _CREDENTIAL),
+    (re.compile(r"xapp-\d-[A-Za-z0-9\-]{10,}"), _CREDENTIAL),
+    (re.compile(r"xox[abeprs]-[A-Za-z0-9\-]{10,}"), _CREDENTIAL),
+    (re.compile(r"whsec_[A-Za-z0-9]{16,}"), _CREDENTIAL),
+    (re.compile(r"AIza[0-9A-Za-z_\-]{30,}"), _CREDENTIAL),
+    # user:password@host inside an address
+    (re.compile(r"(?<=://)([^\s:/@\"']+):[^\s/@\"']+(?=@)"), r"\1:" + _CREDENTIAL),
+]
+
+# A secret keyword form: <secret key name> then = or : (a line break may follow) or, for the long names,
+# only spaces. The key is a word, or "<word> key"; it is checked by is_secret_key, so only a closed list of
+# names ever has its value redacted. Any other word is skipped without consuming what follows it, so a
+# secret written inside the value of an ordinary key is still found.
+_KEYWORD_HEAD = re.compile(
+    r"(?<![A-Za-z0-9])(?P<key>[A-Za-z][A-Za-z0-9_.\-]*(?:[ _\-](?i:keys?))?)(?:\\*[\"'])?"
+    r"(?P<sep>[ \t]*[:=][ \t]*(?:\r?\n[ \t]*)?|[ \t]+)"
+)
+_QUOTED_VALUE = re.compile(r"b?(?P<quote>\\*[\"'])(?P<quoted>(?:(?!(?P=quote)).)*)(?P=quote)")
+_BARE_VALUE = re.compile(r"[^\s\"',;&\\}\])]+")
+_PLACEHOLDER_VALUES = frozenset({
+    "required", "optional", "none", "null", "true", "false", "yes", "no", "n/a", "tbd", "unknown", "hidden",
+    "masked", "***",
+})
+_PROSE_KEYS = frozenset({"credential", "credentials", "authorization", "cookie", "cookies"})
+_NO_SPACE_FORM = frozenset({"pass", "pwd", "cookie", "cookies", "authorization"})
+_CARD_NUMBER = re.compile(
+    r"(?<![\d.])(?:\d{13,19}|\d{4}([ .\-])\d{4}\1\d{4}\1\d{4}(?:\1\d{3})?|\d{4}([ .\-])\d{6}\2\d{5})(?![\d]|\.\d)"
+)
+_ZERO_WIDTH = re.compile("[​‌‍⁠﻿]")
+_PROVIDER_RUN = re.compile(
+    r"(?<![A-Za-z0-9])((?:sk-|ghp_|gho_|ghu_|ghs_|ghr_|glpat-|AKIA|ASIA|AIza|xox[abeprs]-|github_pat_|whsec_|hf_)"
+    r"[A-Za-z0-9_\-]+)(?:\r?\n|\\n)([A-Za-z0-9_\-]{6,})"
+)
+_COOKIE_LINE = re.compile(r"(?i)\b((?:set-)?cookie\s*:[ \t]*)[^\r\n]+")
+_CURL_USER = re.compile(r"(\bcurl\b[^\n]*?\s(?:-u|--user)[ =]['\"]?)([^\s:'\"]+):[^\s'\"]+")
+_URL_QUERY_PAIR = re.compile(r"(?<=[?&;])(?P<key>[A-Za-z0-9_.\-]+)=(?P<value>[^&\s\"'#<>]+)")
+_SIGNATURE_KEYS = frozenset({"sig", "signature", "x-amz-signature", "x-amz-security-token"})
+
+
+def _luhn_ok(digits: str) -> bool:
+    total = 0
+    for index, char in enumerate(reversed(digits)):
+        n = int(char)
+        if index % 2:
+            n = n * 2 - 9 if n > 4 else n * 2
+        total += n
+    return total % 10 == 0
+
+
+def _scrub_cards(text: str) -> str:
+    def replace(match: "re.Match") -> str:
+        digits = re.sub(r"\D", "", match.group(0))
+        return "[CARD_REDACTED]" if 13 <= len(digits) <= 19 and _luhn_ok(digits) else match.group(0)
+
+    return _CARD_NUMBER.sub(replace, text)
+
+
+def _glue_broken_keys(text: str) -> str:
+    """Remove zero-width characters, and join a provider-prefixed key that a line break split in two."""
+    text = _ZERO_WIDTH.sub("", text)
+
+    def join(match: "re.Match") -> str:
+        glued = match.group(1) + match.group(2)
+        if len(glued) >= 16 and re.search(r"\d", glued):
+            return glued
+        return match.group(0)
+
+    while True:
+        joined = _PROVIDER_RUN.sub(join, text)
+        if joined == text:
+            return text
+        text = joined
+
+
+# A calendar date (2026-11-10, or 10/11/2026) is neither a credential nor a phone number. This is the one place
+# that says what a date looks like; the secret rule and the phone rule both use it.
+_CALENDAR_DATE = re.compile(
+    r"(?<![\d\-/])(?:(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])"
+    r"|(?:0?[1-9]|[12]\d|3[01])/(?:0?[1-9]|1[0-2])/(?:19|20)\d{2})(?![\d\-/])"
+)
+
+
+def _is_calendar_date(value: str) -> bool:
+    return _CALENDAR_DATE.fullmatch(value.strip()) is not None
+
+
+def _value_is_a_secret(key: str, value: str, spaced: bool, quoted: bool = False) -> bool:
+    plain = value.strip()
+    lowered = plain.lower()
+    if not plain or lowered in _PLACEHOLDER_VALUES or plain.startswith("[") or re.fullmatch(r"<[^<>]*>", plain):
+        return False
+    if plain.isdigit() and len(plain) <= 6:
+        return False  # a count or a limit ("Max token: 4096"), not a secret
+    if not spaced and key.lower() not in _PROSE_KEYS:
+        # <secret word> then = or : gives the value: it is redacted whatever its characters, down to one.
+        return True
+    if spaced and _is_calendar_date(plain):
+        return False
+    marked = bool(re.search(r"[\d!@#$%^&*]", plain))
+    return marked and len(plain) >= 6 and not (quoted and re.search(r"\s", plain))
+
+
+def _structure_value_is_a_secret(key: Any, item: Any) -> bool:
+    """A value under a secret key: a placeholder word is not one, and neither is a sentence under a prose key."""
+    if not isinstance(item, str):
+        return True
+    plain = item.strip()
+    if plain.lower() in _PLACEHOLDER_VALUES or re.fullmatch(r"<[^<>]*>", plain) or plain.startswith("["):
+        return False
+    if plain.isdigit() and len(plain) <= 6:
+        return False
+    parts = [part.lower() for part in _KEY_PARTS.findall(str(key))]
+    if parts and parts[-1] in _PROSE_KEYS:
+        return bool(re.search(r"[\d!@#$%^&*]", plain)) and len(plain) >= 6 and not re.search(r"\s", plain)
+    return True
+
+
+def _scrub_keyword_values(text: str) -> str:
+    out: List[str] = []
+    pos = 0
+    scan = 0
+    while True:
+        head = _KEYWORD_HEAD.search(text, scan)
+        if head is None:
+            break
+        key = head.group("key")
+        scan = head.end("key")
+        if not is_secret_key(key):
+            continue
+        spaced = not re.search(r"[:=]", head.group("sep"))
+        if spaced and key.lower() in _NO_SPACE_FORM:
+            continue
+        start = head.end()
+        quoted = _QUOTED_VALUE.match(text, start)
+        if quoted is not None and not spaced:
+            inner = quoted.group("quoted")
+            if inner and _value_is_a_secret(key, inner, False, quoted=True):
+                out.append(text[pos:quoted.start("quoted")])
+                out.append(REDACTED)
+                pos = scan = quoted.end("quoted")
+            continue
+        bare = _BARE_VALUE.match(text, start)
+        if bare is None or not _value_is_a_secret(key, bare.group(0), spaced):
+            continue
+        out.append(text[pos:start])
+        out.append(REDACTED)
+        pos = scan = bare.end()
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def _scrub_url_queries(text: str) -> str:
+    def replace(match: "re.Match") -> str:
+        key = match.group("key")
+        if (is_secret_key(key) or key.lower() in _SIGNATURE_KEYS) and _value_is_a_secret(key, match.group("value"), False):
+            return key + "=" + REDACTED
+        return match.group(0)
+
+    return _URL_QUERY_PAIR.sub(replace, text)
+
+
+# Masks for personal data that the chat path applies (the reviewer must see names, numbers and dates).
+_PII_PATTERNS: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", re.I), "[EMAIL_REDACTED]"),
     (re.compile(r"\b\+?[\d\s\-().]{7,15}\d\b"), "[PHONE_REDACTED]"),
-    # Match only actual credential values — NOT Python type annotations (token: TokenPayload).
-    # Three accepted value shapes:
-    #   1. Quoted string of >=4 chars:  token="abc..."
-    #   2. Lowercase/digit string >=8 chars (no leading uppercase → not a Python type):
-    #      password=changeme123   api_key=abcdef12
-    #   3. Base64/JWT blob >=16 chars (explicit A-Za-z0-9):
-    #      bearer eyJhbGciOiJSUzI1NiJ9...
-    # Separator is [:=] for key=value, or \s for "bearer <token>" HTTP header style.
-    # re.I applied ONLY to the keyword group via inline flag (?i:...), not to value group,
-    # so [a-z0-9] in the value alternatives stays strictly lowercase-only.
-    (re.compile(
-        r"\b(?i:password|passwd|secret|api[_-]?key|token|bearer)(?:\s*[:=]\s*|\s+)"
-        r"(?:['\"][^'\"]{4,}['\"]"        # quoted string
-        r"|[a-z][a-z0-9_\-]{7,}"          # lowercase >=8 chars (excludes CamelCase types)
-        r"|[A-Za-z0-9+/]{16,}={0,2})"     # base64/JWT >=16 chars
-    ), "[CREDENTIAL_REDACTED]"),
 ]
+
+
+def _mask_pii(text: str) -> str:
+    """Mask e-mail addresses and phone numbers; a calendar date between them is left as it is."""
+    pieces = re.split("(%s)" % _CALENDAR_DATE.pattern, text)
+    # re.split with the one capturing group returns text, date, text, date ...
+    for index in range(0, len(pieces), 2):
+        for pattern, replacement in _PII_PATTERNS:
+            pieces[index] = pattern.sub(replacement, pieces[index])
+    return "".join(pieces)
 
 
 # OpenRouter data-policy setting sent with every request.
@@ -197,11 +417,75 @@ OPENROUTER_PROVIDER_POLICY = {"data_collection": "deny"}
 OPENROUTER_PUBLIC_POLICY = {"data_collection": "allow"}  # text a company published on its own website
 
 
-def _scrub_prompt(prompt: str) -> str:
-    """Replace known sensitive patterns in a prompt string before LLM transmission (ENT-040)."""
-    for pattern, replacement in _SENSITIVE_PATTERNS:
-        prompt = pattern.sub(replacement, prompt)
-    return prompt
+def _scrub_text(text: str, mask_pii: bool) -> str:
+    text = _glue_broken_keys(text)
+    for pattern, replacement in _SECRET_SHAPES:
+        text = pattern.sub(replacement, text)
+    text = _COOKIE_LINE.sub(lambda m: m.group(1) + REDACTED, text)
+    text = _CURL_USER.sub(lambda m: m.group(1) + m.group(2) + ":" + REDACTED, text)
+    text = _scrub_url_queries(text)
+    text = _scrub_keyword_values(text)
+    text = _scrub_cards(text)
+    if mask_pii:
+        text = _mask_pii(text)
+    return text
+
+
+# {"name": "API_KEY", "value": ...}: the label names the secret, the value is the secret
+_LABEL_KEYS = ("name", "key", "header", "field", "variable")
+
+
+def _scrub_structure(value: Any, mask_pii: bool, depth: int = 0) -> Any:
+    if depth > 40:
+        return REDACTED
+    if isinstance(value, dict):
+        cleaned = {}
+        names_a_secret = any(
+            isinstance(value.get(label), str) and is_secret_key(value[label]) for label in _LABEL_KEYS
+        )
+        for key, item in value.items():
+            if (is_secret_key(key) or (names_a_secret and key == "value")) and item is not None \
+                    and not isinstance(item, bool) and _structure_value_is_a_secret(key, item):
+                cleaned[key] = REDACTED
+            else:
+                cleaned[key] = _scrub_structure(item, mask_pii, depth + 1)
+        return {(_scrub_text(k, mask_pii) if isinstance(k, str) else k): v for k, v in cleaned.items()}
+    if isinstance(value, (list, tuple)):
+        return [_scrub_structure(item, mask_pii, depth + 1) for item in value]
+    if isinstance(value, int) and not isinstance(value, bool):
+        digits = str(abs(value))
+        return "[CARD_REDACTED]" if 13 <= len(digits) <= 19 and _luhn_ok(digits) else value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped[:1] in ("{", "[") and stripped[-1:] in ("}", "]"):
+            try:
+                inner = json.loads(stripped)
+            except ValueError:
+                inner = None
+            if isinstance(inner, (dict, list)):
+                return _scrub_text(json.dumps(_scrub_structure(inner, mask_pii, depth + 1), default=str), mask_pii)
+        return _scrub_text(value, mask_pii)
+    return value
+
+
+def scrub_for_model(value: Any, mask_pii: bool = True) -> Any:
+    """The one scrub for anything that leaves the server for a model.
+
+    A dict or list is walked first (a value whose key names a secret becomes ``[CREDENTIAL_REDACTED]``, a string that
+    holds JSON is walked too) and a string is scrubbed by shape. ``mask_pii`` also masks e-mail addresses
+    and phone numbers: the chat path does, a reviewer that has to check names and figures does not.
+    Known limits: base64 or hex encodings are not decoded, and a key split across two fields is not joined.
+    """
+    if isinstance(value, str):
+        return _scrub_structure(value, mask_pii) if value.lstrip()[:1] in ("{", "[") else _scrub_text(value, mask_pii)
+    if value is None:
+        return value
+    return _scrub_structure(value, mask_pii)
+
+
+def _scrub_prompt(prompt: Any, mask_pii: bool = True) -> Any:
+    """Replace secrets (and, on the chat path, personal data) in a prompt before LLM transmission (ENT-040)."""
+    return scrub_for_model(prompt, mask_pii)
 
 
 _REF_MARKER = re.compile(r"(\[ref:[^\]\s]+\])")
@@ -217,11 +501,22 @@ def scrub_for_transmission(text):
     )
 
 
+def _scrub_tool_arguments(arguments: Any) -> Any:
+    """A tool call's arguments: a dict, or the JSON text a provider returns."""
+    if isinstance(arguments, str):
+        try:
+            parsed = json.loads(arguments)
+        except ValueError:
+            return scrub_for_transmission(arguments)
+        return json.dumps(scrub_for_model(parsed), default=str)
+    return scrub_for_model(arguments)
+
+
 def scrub_chat_messages(messages):
     """A copy of chat *messages* with every outgoing text scrubbed (the chat path).
 
-    Covers plain string content and the text of content blocks (tool results
-    included). Roles, tool-call ids and structure are left alone.
+    Covers plain string content, the text of content blocks (tool results included), the input of a
+    ``tool_use`` block and the arguments of ``tool_calls``. Roles, tool-call ids and structure are left alone.
     """
     cleaned = []
     for message in messages or []:
@@ -240,8 +535,24 @@ def scrub_chat_messages(messages):
                     for key in ("text", "content"):
                         if isinstance(block.get(key), str):
                             block[key] = scrub_for_transmission(block[key])
+                        elif key == "content" and isinstance(block.get(key), list):
+                            block[key] = scrub_chat_messages([{"content": block[key]}])[0]["content"]
+                    if "input" in block:
+                        block["input"] = scrub_for_model(block["input"])
                 blocks.append(block)
             message["content"] = blocks
+        if isinstance(message.get("tool_calls"), list):
+            calls = []
+            for call in message["tool_calls"]:
+                if isinstance(call, dict):
+                    call = dict(call)
+                    function = call.get("function")
+                    if isinstance(function, dict) and "arguments" in function:
+                        call["function"] = dict(function, arguments=_scrub_tool_arguments(function["arguments"]))
+                    if "arguments" in call:
+                        call["arguments"] = _scrub_tool_arguments(call["arguments"])
+                calls.append(call)
+            message["tool_calls"] = calls
         cleaned.append(message)
     return cleaned
 

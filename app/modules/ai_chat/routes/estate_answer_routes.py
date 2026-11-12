@@ -9,7 +9,12 @@ from app import db
 from app.middleware.tenant_context import current_org_id
 from app.modules.ai_chat.services import model_defaults
 from app.modules.ai_chat.services.catalogue_answer import answer_catalogue_question
-from app.modules.ai_chat.services.estate_answer import answer_estate_question, explanations_for, recorded_text
+from app.modules.ai_chat.services.estate_answer import (
+    answer_estate_question,
+    explanations_for,
+    owned_element_id,
+    recorded_text,
+)
 from app.modules.ai_chat.services.lens_answer import answer_lens_question
 from app.modules.intelligence.services import answer_envelope as envelope
 
@@ -155,15 +160,16 @@ def _what_it_depends_on(answer):
 
 
 def _recorded_links(answer):
-    """How many recorded relationships touch the element asked about, counted by the reader the
-    overview's "most connected" line and the chat's first questions use. ``None`` when the
-    question names no single element."""
-    from app.modules.dashboard.services.overview_figures import relationship_ends
+    """The recorded relationships touching the element asked about (the total is the figure the
+    overview's "most connected" line and the chat's first questions use), with how many lead from it,
+    how many lead to it and how many other elements they reach. ``None`` when the question names no
+    single element."""
+    from app.modules.dashboard.services.overview_figures import relationship_split
 
     element_id = (answer.get("params") or {}).get("element_id")
     if answer.get("question_kind") != envelope.KIND_IMPACT or not element_id:
         return None
-    return relationship_ends(int(current_org_id())).get(int(element_id), 0)
+    return relationship_split(int(current_org_id()), int(element_id))
 
 
 @unified_ai_chat_bp.route("/estate-answer", methods=["POST"])
@@ -181,7 +187,9 @@ def estate_answer():
         return jsonify({"success": False, "error": "Ask a question first."}), 400
     thread_id = body.get("thread_id") if isinstance(body.get("thread_id"), str) else None
     keep = body.get("remember") is not False
-    lens = answer_lens_question(message[:MAX_QUESTION_CHARS])
+    posted_element = body.get("element_id") if isinstance(body.get("element_id"), int) else None
+    # A card names its element: the question is about that element, not about a lens its name sounds like.
+    lens = None if owned_element_id(posted_element, current_org_id()) else answer_lens_question(message[:MAX_QUESTION_CHARS])
     if lens is not None:
         component_id = ((lens["data"] or {}).get("application_component_id")) if lens["lens"] == "portfolio" else None
         kept = _remember(thread_id, message, _lens_line(lens), keep=keep) if lens["data"] is not None else None
@@ -205,7 +213,11 @@ def estate_answer():
             }
         )
     try:
-        record = answer_estate_question(message[:MAX_QUESTION_CHARS], user_id=current_user.id)
+        record = answer_estate_question(
+            message[:MAX_QUESTION_CHARS],
+            user_id=current_user.id,
+            element_id=posted_element,
+        )
     except envelope.AnswerNotAskable:
         record = None
     if record is None:

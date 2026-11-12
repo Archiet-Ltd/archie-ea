@@ -170,11 +170,13 @@ def test_4_an_organisation_with_no_link_is_offered_no_question_about_its_applica
         text = host.inner_text()
         assert not any(n in text for n in UNLINKED + LINKED), text
         assert "General questions to start with" in text
+        assert "Your applications are recorded, but not how they connect" in text, text
+        assert "Once your applications are in" not in text, text
         assert host.get_by_text("Connect GitHub").first.is_visible()
         assert len(_cards(page)) == 4
         shoot(page, "no-links")
         offered = page.request.get(world["base"] + "/ai-chat/first-questions").json()
-        assert offered == {"questions": []}
+        assert offered == {"questions": [], "applications": 2}
     finally:
         context.close()
 

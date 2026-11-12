@@ -54,7 +54,7 @@
             say('Working them out…');
             try {
                 await ArchieChat.transport.recomputeConnections();
-                const again = await ArchieChat.transport.askEstate(holder.getAttribute('data-question') || '', { remember: false });
+                const again = await ArchieChat.transport.askEstate(holder.getAttribute('data-question') || '', { remember: false, elementId: Number(holder.getAttribute('data-element-id')) || undefined });
                 if (again.found && window.DOMPurify) {
                     const fresh = document.createElement('div');
                     fresh.innerHTML = ArchieChat.render.sanitiseAnswerHtml(again.html);
@@ -354,9 +354,18 @@
         _submitTurn().finally(() => _setSendingUI(false));
     });
 
+    /* A first-question card names the element it asks about by id. The id travels with the question it
+       was set for, so a question the person edited, or typed, is answered by name as before. */
+    const _askedElement = new Map();
+
     async function _submitTurn() {
         const message = userInput.value.trim();
         if (!message) return;
+        if (userInput.dataset.elementId && userInput.dataset.elementQuestion === message) {
+            _askedElement.set(message, Number(userInput.dataset.elementId));
+        }
+        delete userInput.dataset.elementId;
+        delete userInput.dataset.elementQuestion;
         _setSendingUI(true);
 
         // Clear input
@@ -419,7 +428,7 @@
         // from those records, as cited cards, before any model is asked.
         const _sentAt = performance.now();
         try {
-            const estate = await ArchieChat.transport.askEstate(message);
+            const estate = await ArchieChat.transport.askEstate(message, { elementId: _askedElement.get(message) });
             if (estate.found) {
                 // The answer is kept in the conversation like any other: remember the
                 // thread it went to and refresh the history rail.
@@ -464,7 +473,9 @@
 
         // Stream the reply token-by-token (like ChatGPT). If streaming can't be
         // established, fall through to the non-streaming request below.
-        try { if (await streamAiReply(_payload, loadingId, startTime, timestamp)) return; }
+        /* A slash command is run by the server before any model is asked, on the non-streaming endpoint;
+           the streaming endpoint hands every message to the model. */
+        try { if (!message.startsWith('/') && await streamAiReply(_payload, loadingId, startTime, timestamp)) return; }
         catch (_streamErr) {
             /* A user-initiated stop is not a transport failure: re-issuing the
                turn against the non-streaming endpoint would be the opposite of
@@ -758,7 +769,8 @@
                 },
                 onDone: async (result) => {
                     dropLoading();
-                    if (result.error && !result.paused) {
+                    if ((result.error && !result.paused) || result.retryable) {
+                        dropBubble();
                         /* A failed turn is a failure card with Retry, not a bubble in the assistant's voice. */
                         let _msg = '';
                         try { _msg = JSON.parse(payload).message; } catch (_) { /* swallow-ok: the payload is built here from JSON.stringify; if it cannot be read the failure card still shows, without a Retry that re-asks */ }
@@ -857,12 +869,27 @@
     // =========================================================================
     // CSP-safe event delegation — handles all dynamically-injected data-action buttons
     // =========================================================================
+    document.addEventListener('keydown', (event) => {
+        const offered = event.target.closest && event.target.closest('[data-run-command]');
+        if (offered && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            runQuickQuery(offered.dataset.runCommand);
+        }
+    });
+
     document.addEventListener('click', (event) => {
         // --- quick-query (sidebar NL query suggestions) ---
         const quickQueryButton = event.target.closest('[data-quick-query]');
         if (quickQueryButton) {
             event.preventDefault();
             runQuickQuery(quickQueryButton.dataset.quickQuery);
+            return;
+        }
+
+        const offered = event.target.closest('[data-run-command]');
+        if (offered) {
+            event.preventDefault();
+            runQuickQuery(offered.dataset.runCommand);
             return;
         }
 

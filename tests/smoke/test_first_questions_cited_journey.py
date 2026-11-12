@@ -90,7 +90,7 @@ def test_3_each_offered_question_is_answered_with_a_citation_and_agreeing_counts
         assert sources.count() == rows.count(), question
         for i in range(sources.count()):
             assert sources.nth(i).inner_text().strip() not in ("", "Source not recorded"), question
-        recorded = int(re.search(r"has (\d+) relationships? recorded, the figure your overview gives", text).group(1))
+        recorded = int(re.search(r"has (\d+) relationships? recorded:", text).group(1))
         on_card = int(re.search(r"(\d+) relationships? recorded", detail).group(1))
         assert recorded == on_card, (question, recorded, on_card)
         if question == "What breaks if %s fails?" % world["overview_top"][0]:

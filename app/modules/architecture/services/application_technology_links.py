@@ -93,6 +93,28 @@ def list_links(application_id: int) -> List[Dict[str, Any]]:
     return [_link_dict(rel, el) for rel, el in rows if is_technology_element(el)]
 
 
+def list_linked(application_id: int) -> List[Dict[str, Any]]:
+    """Nodes and system software the model links to this application by any relationship
+    other than a recorded "runs on" (an association, say), each with that relationship's type.
+
+    These are not runs-on links and are never counted as such; ``add_link`` records one.
+    """
+    from app.services.application_model_links import linked_technology
+
+    application, _ = _application_and_element(application_id)
+    return [
+        {
+            "relationship_id": row["relationship_id"],
+            "element_id": row["id"],
+            "name": row["name"],
+            "type": row["type"],
+            "type_label": TECHNOLOGY_TYPES.get(_normalised_type(row["type"]), row["type"]),
+            "relationship_type": (row["rel_type"] or "").replace("Relationship", "").lower(),
+        }
+        for row in linked_technology(application)
+    ]
+
+
 def add_link(application_id: int, element_id: int, *, user_id: Optional[int] = None) -> Dict[str, Any]:
     """Record that the chosen node or system software realises the application.
 

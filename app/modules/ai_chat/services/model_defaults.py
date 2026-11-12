@@ -57,7 +57,7 @@ DEFAULT_MODELS = {
     "azure": "gpt-4o",
     "huggingface": "meta-llama/Llama-2-7b-chat-hf",
     "openrouter": "google/gemma-4-31b-it:free",
-    "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
+    "nvidia": "mistralai/mistral-large-4-1t-a52b",
 }
 
 # Founder's decision of 1 Nov 2026: DeepSeek is the platform model, capped at USD 62 a month. It supersedes the
@@ -98,6 +98,18 @@ def deepseek_request_for(model: str, tools: bool = False) -> tuple:
     mode = "enabled" if thinking and not tools else "disabled"
     return served, {"thinking": {"type": mode}}
 
+# The model that reviews a change when the drafter's own provider is the only one configured: the provider's
+# other model, so a change is never reviewed by the model that drafted it. Production has only DeepSeek, which
+# serves two models: a deepseek-flash draft is reviewed by deepseek-v4-pro and a deepseek-v4-pro draft by
+# deepseek-flash. One place for this pairing.
+PLATFORM_REVIEWER_MODELS = {
+    "deepseek": "deepseek-v4-pro",
+}
+
+# When a second provider is configured, the reviewer comes from the first of these that differs from the
+# drafter's provider.
+REVIEWER_PROVIDER_ORDER = ("anthropic", "openai", "gemini")
+
 # Ordered free fallback models tried within OpenRouter and NVIDIA before
 # moving on to the next provider when the primary free model is rate-limited
 # or unavailable.
@@ -111,11 +123,13 @@ FALLBACK_MODELS = {
         "openrouter/free",
     ),
     "nvidia": (
-        "nvidia/nemotron-3-ultra-550b-a55b",
+        "mistralai/mistral-large-4-1t-a52b",
+        "nvidia/nemotron-3.5-super-vl-120b-a12b",
         "nvidia/llama-3.1-nemotron-ultra-253b-v1",
         "nvidia/llama-3.1-nemotron-70b-instruct",
         "openai/gpt-oss-20b",
         "google/gemma-4-31b-it",
+        "nvidia/nemotron-3-ultra-550b-a55b",
     ),
 }
 
@@ -240,6 +254,36 @@ def platform_default_model_for(provider: str) -> str:
     """The model id for a provider named in the platform's order, or the ordinary default, or ""."""
     provider = (provider or "").strip().lower()
     return PLATFORM_DEFAULT_MODELS.get(provider) or default_model_for(provider)
+
+
+def models_of_provider(provider: str) -> list[str]:
+    """The models the platform itself names for *provider*, the working model first."""
+    provider = (provider or "").strip().lower()
+    names = [
+        platform_default_model_for(provider),
+        PLATFORM_REVIEWER_MODELS.get(provider),
+        ECONOMY_MODELS.get(provider),
+    ]
+    return list(dict.fromkeys(n for n in names if n))
+
+
+def reviewer_model_for(provider: str, drafter_model: str = "") -> str:
+    """A model of *provider* other than *drafter_model*, or "" when the provider offers no other one.
+
+    A provider with a named reviewer model uses it unless that is the drafter, in which case the working
+    model reviews. Any other provider uses the first of its named models that is not the drafter."""
+    provider = (provider or "").strip().lower()
+    drafter_model = (drafter_model or "").strip()
+    if provider == "deepseek" and drafter_model:
+        # A stored retired name is the served model it maps to, by the one rule that names what is sent.
+        drafter_model = deepseek_request_for(drafter_model)[0]
+    named = PLATFORM_REVIEWER_MODELS.get(provider)
+    if named and named != drafter_model:
+        return named
+    for model in models_of_provider(provider):
+        if model != drafter_model:
+            return model
+    return ""
 
 
 def price_for(model: str) -> dict:

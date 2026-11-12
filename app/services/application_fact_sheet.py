@@ -103,6 +103,42 @@ def compute_completeness(app: Any, owner_count: Optional[int] = None) -> Dict[st
             "of": len(_COMPLETENESS_FIELDS)}
 
 
+def _count_phrase(count: int, singular: str, plural: str) -> str:
+    return "%d %s" % (count, singular if count == 1 else plural)
+
+
+def linked_notes(app: Any, missing: List[str]) -> Dict[str, Dict[str, str]]:
+    """For a missing field the model already has links for, what is linked and where to record it.
+
+    The score counts only recorded facts, so a field stays missing; the note says the
+    model links something to it, so the banner and the tabs tell one story. Keyed by the
+    missing field's label; ``tab`` is the application tab that records it.
+    """
+    from app.services.application_model_links import (  # noqa: PLC0415
+        linked_suppliers,
+        linked_technology,
+        recorded_technology,
+    )
+
+    notes: Dict[str, Dict[str, str]] = {}
+    if "Hosting / deployment" in missing and not recorded_technology(app):
+        count = len(linked_technology(app))
+        if count:
+            notes["Hosting / deployment"] = {
+                "text": "%s linked, none recorded as runs on" % _count_phrase(
+                    count, "technology element", "technology elements"),
+                "tab": "technology",
+            }
+    if "Vendor" in missing:
+        count = len(linked_suppliers(app))
+        if count:
+            notes["Vendor"] = {
+                "text": "%s linked, none recorded as vendor" % _count_phrase(count, "supplier", "suppliers"),
+                "tab": "vendors",
+            }
+    return notes
+
+
 def _lifecycle_signal(app: Any) -> Dict[str, Any]:
     """End-of-life / obsolescence read: stage, retirement date, days remaining."""
     stage = (getattr(app, "lifecycle_status", None)
@@ -239,9 +275,12 @@ def build_fact_sheet(app: Any) -> Dict[str, Any]:
 
     application_owners = ApplicationOwner.get_display_rows_for_application(app.id, org_id) if org_id else []
 
+    completeness = compute_completeness(app, owner_count=len(application_owners))
+    completeness["notes"] = linked_notes(app, completeness["missing"])
+
     return {
         "app": app,
-        "completeness": compute_completeness(app, owner_count=len(application_owners)),
+        "completeness": completeness,
         "lifecycle": _lifecycle_signal(app),
         "capabilities": _capabilities(app.id, org_id),
         "dependencies": _dependencies(app),

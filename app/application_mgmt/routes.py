@@ -328,11 +328,12 @@ def _validate_and_clean_import_row(row, clean_func):
     cleaned["version"] = _truncate_to_length(
         _get_column_value(row, "version", clean_func), "version"
     )
-    cleaned["deployment_status"] = (
-        _truncate_to_length(
-            _get_column_value(row, "deployment_status", clean_func), "deployment_status"
-        )
-        or "planned"
+    # One list of statuses: a known word is stored in the list's form, a blank
+    # stores nothing, anything else is refused for this row.
+    from app.services.application_status import status_for_write
+
+    cleaned["deployment_status"], cleaned["status_error"] = status_for_write(
+        _get_column_value(row, "deployment_status", clean_func)
     )
     cleaned["business_domain"] = _truncate_to_length(
         _get_column_value(row, "business_domain", clean_func), "business_domain"
@@ -1895,11 +1896,14 @@ def _sync_vendor_products(archimate_element_id, target_ids):
         )
 
 
-def render_application_detail(id):
+def render_application_detail(id, form_values=None, form_errors=None, status=200):
     """Render the Application Detail page.
 
     Called by unified_applications_bp (canonical /applications/<id>).
     Restored after BE-054 god-file decomposition dropped this shared handler.
+
+    A refused Overview save comes back through here in edit mode with the typed
+    values and one error per field, so nothing the person typed is lost.
     """
     from app.models.application_portfolio import ApplicationComponent
 
@@ -2060,29 +2064,17 @@ def render_application_detail(id):
             db.session.rollback()
 
     # --- ArchiMate relationships for this app ---
+    # One reader of what the model links to the application: the Architecture tab, the
+    # Technology and Vendors tabs and the completeness banner all read it.
     archimate_relationships = {'incoming': [], 'outgoing': []}
     if app_obj.archimate_element_id:
         try:
-            from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
-            ae_id = app_obj.archimate_element_id
+            from app.services.application_model_links import linked_elements
 
-            outgoing = db.session.query(ArchiMateRelationship, ArchiMateElement).join(
-                ArchiMateElement, ArchiMateRelationship.target_id == ArchiMateElement.id
-            ).filter(ArchiMateRelationship.source_id == ae_id).all()
-
-            incoming = db.session.query(ArchiMateRelationship, ArchiMateElement).join(
-                ArchiMateElement, ArchiMateRelationship.source_id == ArchiMateElement.id
-            ).filter(ArchiMateRelationship.target_id == ae_id).all()
-
-            for rel, elem in outgoing:
-                archimate_relationships['outgoing'].append({
-                    'id': elem.id, 'name': elem.name, 'type': elem.type,
-                    'layer': (elem.layer or '').title(), 'rel_type': rel.type,
-                })
-            for rel, elem in incoming:
-                archimate_relationships['incoming'].append({
-                    'id': elem.id, 'name': elem.name, 'type': elem.type,
-                    'layer': (elem.layer or '').title(), 'rel_type': rel.type,
+            for item in linked_elements(app_obj):
+                archimate_relationships[item['direction']].append({
+                    'id': item['id'], 'name': item['name'], 'type': item['type'],
+                    'layer': item['layer'], 'rel_type': item['rel_type'],
                 })
         except Exception:
             db.session.rollback()
@@ -2094,6 +2086,27 @@ def render_application_detail(id):
         "product_count": 0,
         "has_archimate": bool(app_obj.archimate_element_id),
     }
+    # The vendor the one register holds for this application, and the suppliers the
+    # model links to it that are not yet recorded as its vendor.
+    vendor_organisations = []
+    supplier_links = []
+    primary_vendor_label = "None recorded"
+    try:
+        from app.services import vendor_register
+        from app.services.application_model_links import linked_suppliers
+
+        vendor_id = vendor_register.vendor_of(app_obj)
+        vendor = db.session.get(VendorOrganization, vendor_id) if vendor_id else None
+        if vendor is not None:
+            vendor_organisations = [{"id": vendor.id, "name": vendor.name}]
+            primary_vendor_label = vendor.name
+        vendor_summary["vendor_count"] = len(vendor_organisations)
+        vendor_summary["product_count"] = 1 if app_obj.primary_vendor_product is not None else 0
+        supplier_links = linked_suppliers(app_obj, vendor.name if vendor is not None else None)
+    except Exception:
+        logger.exception("Could not load vendors for application %s", app_obj.id)
+        db.session.rollback()
+    vendors_tab_count = len(vendor_organisations) + len(supplier_links)
     # Populate vendor product dropdown from VendorProduct table
     all_products = []
     try:
@@ -2354,13 +2367,34 @@ def render_application_detail(id):
         db.session.rollback()
 
     from app.services import technology_cost
+    from flask_login import current_user
+
+    from app.core.auth.permissions import can as _can
+    from app.services.application_overview_fields import overview_limits
+    from app.services.application_status import status_options
 
     technology_cost_shares = technology_cost.shares_for_application(
         app_obj.organization_id, app_obj.id)
 
+    technology_linked_count = 0
+    completeness_notes = {}
+    try:
+        from app.services.application_fact_sheet import linked_notes
+        from app.services.application_model_links import linked_technology
+
+        technology_linked_count = len(linked_technology(app_obj))
+        completeness_notes = linked_notes(app_obj, app_obj.completeness_gaps)
+    except Exception:
+        logger.exception("Could not read the model links for application %s", app_obj.id)
+        db.session.rollback()
+
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
+        form_values=form_values or {},
+        form_errors=form_errors or {},
+        status_options=status_options,
+        field_limits=overview_limits(),
         technology_cost_shares=technology_cost_shares,
         linked_requirements=linked_requirements,
         requirement_options=requirement_options,
@@ -2373,7 +2407,9 @@ def render_application_detail(id):
         compliance_score=None,
         compliance_results=None,
         capabilities_with_compliance=[],
-        edit_mode=request.args.get("edit") == "1",
+        # Only a person the permission matrix lets edit an application gets the form.
+        edit_mode=(request.args.get("edit") == "1" or bool(form_errors))
+        and _can(current_user, "edit", "application"),
         edit_mode_motivation=request.args.get("edit_motivation") == "1",
         edit_mode_strategy=request.args.get("edit_strategy") == "1",
         edit_mode_business=request.args.get("edit_business") == "1",
@@ -2388,6 +2424,12 @@ def render_application_detail(id):
         interfaces=interfaces,
         vendor_footprint=vendor_footprint,
         vendor_summary=vendor_summary,
+        vendor_organisations=vendor_organisations,
+        supplier_links=supplier_links,
+        primary_vendor_label=primary_vendor_label,
+        vendors_tab_count=vendors_tab_count,
+        technology_linked_count=technology_linked_count,
+        completeness_notes=completeness_notes,
         vendor_form_config=vendor_form_config,
         metric_cards=metric_cards,
         dashboard_config=dashboard_config,
@@ -2473,4 +2515,4 @@ def render_application_detail(id):
         linked_solutions=linked_solutions,
         archimate_info=archimate_info,
         archimate_relationships=archimate_relationships,
-    )
+    ), status

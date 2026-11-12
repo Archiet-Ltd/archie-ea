@@ -41,6 +41,7 @@ from ..models.physical_layer import (
 from ..models.strategy_layer import CourseOfAction, ValueStream
 from ..models.technology_layer import Device, Node, SystemSoftware
 from ..models.application_layer import ApplicationInterface, ApplicationService, DataObject
+from app.core.auth.decorators import require_permission
 from app.utils.deprecation import deprecated_route
 from . import application_mgmt
 from .routes import (
@@ -610,15 +611,40 @@ def api_export_architecture_csv(id):
     )
 
 
-@application_mgmt.route(
-    "/api/applications/<string:id>/architecture/documents", methods=["GET"]
-)
-@login_required
-def api_get_architecture_documents(id):
-    """Get all architecture documents for an application."""
+def _own_application_or_404(application_id):
+    """The application, only when it belongs to the active organisation; otherwise 404."""
+    from app.middleware.tenant_context import current_org_id
+
+    org_id = current_org_id()
+    if org_id is None:
+        abort(404)
+    return ApplicationComponent.query.filter(
+        ApplicationComponent.id == application_id,
+        ApplicationComponent.organization_id == org_id,
+    ).first_or_404()
+
+
+def _own_document_or_404(application_id, doc_id):
+    """The document, found through its application in the active organisation; otherwise 404."""
     from ..models.miscellaneous import ArchitectureDocument
 
-    ApplicationComponent.query.get_or_404(id)
+    _own_application_or_404(application_id)
+    return ArchitectureDocument.query.filter(
+        ArchitectureDocument.id == doc_id,
+        ArchitectureDocument.application_id == application_id,
+    ).first_or_404()
+
+
+@application_mgmt.route(
+    "/api/applications/<int:id>/architecture/documents", methods=["GET"]
+)
+@login_required
+@require_permission("read", "application")
+def api_get_architecture_documents(id):
+    """Get all architecture documents for one of the active organisation's applications."""
+    from ..models.miscellaneous import ArchitectureDocument
+
+    _own_application_or_404(id)
     documents = (
         ArchitectureDocument.query.filter_by(application_id=id)
         .order_by(ArchitectureDocument.created_at.desc())
@@ -634,18 +660,19 @@ def api_get_architecture_documents(id):
 
 
 @application_mgmt.route(
-    "/api/applications/<string:id>/architecture/documents", methods=["POST"]
+    "/api/applications/<int:id>/architecture/documents", methods=["POST"]
 )
 @login_required
+@require_permission("edit", "application")
 def api_upload_architecture_document(id):
-    """Upload new architecture document."""
+    """Upload a new architecture document to one of the active organisation's applications."""
     import os
 
     from werkzeug.utils import secure_filename
 
     from ..models.miscellaneous import ArchitectureDocument
 
-    ApplicationComponent.query.get_or_404(id)
+    _own_application_or_404(id)
 
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
@@ -700,30 +727,12 @@ def api_upload_architecture_document(id):
     methods=["GET"],
 )
 @login_required
+@require_permission("read", "application")
 def api_download_architecture_document(id, doc_id):
-    """Download an architecture document of the signed-in organisation; any other answers 404."""
+    """Download the file of a document of one of the active organisation's applications."""
     import os
 
-    from app.middleware.tenant_context import current_org_id
-    from ..models.miscellaneous import ArchitectureDocument
-
-    org_id = current_org_id()
-    # The document has no organisation column of its own: it belongs to the organisation its application does.
-    doc = (
-        ArchitectureDocument.query.join(
-            ApplicationComponent, ApplicationComponent.id == ArchitectureDocument.application_id
-        )
-        .filter(
-            ArchitectureDocument.id == doc_id,
-            ArchitectureDocument.application_id == id,
-            ApplicationComponent.organization_id == org_id,
-        )
-        .first()
-        if org_id is not None
-        else None
-    )
-    if doc is None:
-        abort(404)
+    doc = _own_document_or_404(id, doc_id)
 
     return send_file(
         os.path.abspath(doc.file_path),
@@ -734,33 +743,54 @@ def api_download_architecture_document(id, doc_id):
 
 
 @application_mgmt.route(
-    "/api/applications/<string:id>/architecture/documents/<string:doc_id>",
+    "/api/applications/<int:id>/architecture/documents/<int:doc_id>",
     methods=["DELETE"],
 )
 @login_required
+@require_permission("delete", "application")
 def api_delete_architecture_document(id, doc_id):
-    """Delete architecture document."""
+    """Delete an architecture document of one of the active organisation's applications."""
     import os
 
-    from ..models.miscellaneous import ArchitectureDocument
+    doc = _own_document_or_404(id, doc_id)
 
-    doc = ArchitectureDocument.query.filter_by(
-        id=doc_id, application_id=id
-    ).first_or_404()
+    # Record and stored file go together: the file is first moved aside, the record is then removed,
+    # and only a committed removal discards the file. If either step fails, nothing is lost.
+    file_path = doc.file_path
+    aside_path = None
+    try:
+        if file_path and os.path.exists(file_path):
+            aside_path = f"{file_path}.deleting"
+            os.replace(file_path, aside_path)
+    except OSError:
+        current_app.logger.exception("Stored document file could not be set aside")
+        return (
+            jsonify(
+                {"error": "The document was not deleted because its stored file could not be removed"}
+            ),
+            500,
+        )
 
     try:
-        if os.path.exists(doc.file_path):
-            os.remove(doc.file_path)
-
         db.session.delete(doc)
         db.session.commit()
-
-        return jsonify({"success": True, "message": "Document deleted"})
-
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting document: {e}")
+        if aside_path:
+            try:
+                os.replace(aside_path, file_path)
+            except OSError:
+                current_app.logger.exception("Stored document file could not be put back")
         return jsonify({"error": "An internal error occurred"}), 500
+
+    if aside_path:
+        try:
+            os.remove(aside_path)
+        except OSError:
+            current_app.logger.warning("Document deleted; leftover stored file could not be removed")
+
+    return jsonify({"success": True, "message": "Document deleted"})
 
 
 @application_mgmt.route(

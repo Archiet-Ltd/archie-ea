@@ -83,7 +83,7 @@
             resp = await apiFetch('/ai-chat/estate-answer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember }),
+                body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember, element_id: (options && options.elementId) || undefined }),
                 signal: limit.signal
             });
             data = await resp.json().catch(function () { return {}; });
@@ -282,6 +282,7 @@
                             answeredBy: ev.answered_by || null,
                             genomeHtml: (ev.genome_answer && ev.genome_answer.html) || null,
                             paused: !!ev.paused,
+                            retryable: !!ev.retryable,
                             notSetUp: !!ev.not_set_up,
                             error: ev.error || null,
                             turnId: ev.turn_id || null
@@ -323,6 +324,7 @@
             answeredBy: meta.answeredBy || null,
             genomeHtml: meta.genomeHtml || null,
             paused: !!meta.paused,
+            retryable: !!meta.retryable,
             notSetUp: !!meta.notSetUp,
             error: meta.error || null,
             turnId: meta.turnId || null
