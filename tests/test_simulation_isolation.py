@@ -27,6 +27,7 @@ def _user(db_session, org):
         last_name="Tester",
         confirmed=True,
         organization_id=org.id,
+        enterprise_role="cto",
         password_hash=generate_password_hash("x"),
     )
     db_session.add(user)

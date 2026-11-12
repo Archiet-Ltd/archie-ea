@@ -167,6 +167,10 @@ def _error_status(exc) -> Optional[int]:
     return status if isinstance(status, int) else None
 
 
+class EmptyModelReply(Exception):
+    """A model answered with no words and no tool call: a failure of that model, as a timeout is."""
+
+
 def is_retryable_llm_error(exc) -> bool:
     """True when another provider or model may answer what this one refused.
 
@@ -174,6 +178,8 @@ def is_retryable_llm_error(exc) -> bool:
     model or function the provider does not have. Anything else (a malformed
     request, a rejected key) would fail the same way elsewhere.
     """
+    if isinstance(exc, EmptyModelReply):
+        return True
     status = _error_status(exc)
     text = str(exc).lower()
     if "answers are paused" in text:
@@ -454,8 +460,16 @@ class AgentRunner:
         name unlinked in that case - still verifiable, since the id travels with
         it.
         """
-        from flask import url_for
+        from flask import current_app, has_request_context, url_for
 
+        if not has_request_context():
+            # A streamed turn runs on a background thread with only an application context,
+            # where url_for cannot build a path: borrow a request context so the link is drawn.
+            try:
+                with current_app.test_request_context("/"):
+                    return AgentRunner._source_url(entity_type, row)
+            except Exception:
+                return None
         try:
             if entity_type == "application":
                 return url_for("unified_applications.application_detail", id=row["id"])
@@ -851,6 +865,9 @@ class AgentRunner:
                         stream=stream_mode,
                         base_url=base_url,
                     )
+                    if not llm_resp.get("tool_calls") and not (llm_resp.get("text") or "").strip():
+                        llm_resp = None
+                        raise EmptyModelReply("empty reply from " + str(model))
                 except Exception as e:
                     self._release_held_tokens(False)
                     from app.modules.ai_chat.services.llm_service_impl import AnswersPaused
@@ -1028,7 +1045,7 @@ class AgentRunner:
             {
                 "response": (
                     "I've completed the available steps. Here's what was done:\n"
-                    + "\n".join(f"- {a['message']}" for a in actions_taken)
+                    + "\n".join(f"- {m}" for m in dict.fromkeys(a["message"] for a in actions_taken))
                     if actions_taken
                     else "I reached the action limit without completing all steps. Please try again with a simpler request."
                 ),
@@ -1743,6 +1760,9 @@ class AgentRunner:
             from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE
 
             msg = PAUSED_MESSAGE
+        elif "empty reply" in reason_l:
+            msg = "The assistant could not answer this time. Press Retry."
+            busy = True
         elif busy:
             msg = (
                 "The assistant is busy right now. Wait a minute, then press Retry."
@@ -1762,12 +1782,15 @@ class AgentRunner:
                 "The AI request couldn't be completed. See the error detail below "
                 "or check Admin → AI settings."
             )
-        return {
+        out = {
             "response": msg,
             "actions_taken": [],
             "pending_approvals": [],
             "error": reason,
         }
+        if busy:
+            out["retryable"] = True  # the chat offers Retry beside this sentence
+        return out
 
     def _record_run(
         self,
