@@ -406,7 +406,7 @@
         const question = it.question;
         const detail = ArchieChat.render.escapeForHtml((it.detail || '').slice(0, 120));
         return '<button type="button" class="js-briefing-item group h-auto w-full rounded-lg border ' +
-                 'border-border bg-background p-4 text-left transition-colors hover:border-primary ' +
+                 'border-border bg-background p-3 text-left sm:p-4 transition-colors hover:border-primary ' +
                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" ' +
                  'data-index="' + i + '" data-question="' + ArchieChat.render.escapeForHtml(question) + '" data-testid="first-question-suggestion">' +
                  '<span class="flex items-start justify-between gap-3">' +
@@ -420,23 +420,21 @@
     }).join('');
 
     /* ── Opening screen: this tenant's portfolio, not 21 generic buttons ─────
-       Uses /ai-chat/recommendations, which the page already called into a
-       sidebar tab nobody opens.
+       Uses /ai-chat/first-questions: the applications this organisation has recorded relationships for,
+       each a question with a cited answer.
 
        Every state is designed, because each is a real state a real customer is
        in on a real day:
 
          loading      the most prominent element now depends on a network call
-         failed       the endpoint answers 500 with EMPTY ARRAYS, so "no items"
-                      and "outage" are the same payload unless status is checked
-         empty        day one, zero applications — the moment the product has to
-                      be most persuasive, so the empty state IS the onboarding
+         failed       a failed read is told apart from an empty portfolio, with a Retry
+         empty        day one, zero applications: the empty state IS the onboarding
                       path rather than a blank panel
-         populated    with the denominator, because "3 items" out of an unstated
-                      total is an editorial claim the user cannot audit
+         not linked   applications are recorded, how they connect is not: general
+                      questions, and the two ways to record the connections
+         populated    cards carry their own figure, so the count is auditable
 
-       Nothing here invents a number. A count that was not returned renders as
-       an em dash, never as 0.                                              */
+       Nothing here invents a number.                                        */
     async function loadPortfolioBriefing() {
         const host = document.getElementById('portfolio-briefing');
         if (!host) return;
@@ -448,51 +446,57 @@
         };
 
         try {
-            const persona = state.currentPersona || '';
-            const data = await Platform.fetch.get('/ai-chat/recommendations', { persona: persona }, { silent: true });
-            // Platform.fetch.get throws on non-ok responses, so we only reach here on success.
-
-            const alerts = Array.isArray(data.alerts) ? data.alerts : [];
-
-            /* A card is a question about one application in this organisation's own records, because
-               only a question that names a recorded element is answered from the records with its
-               sources. Findings that name an application come first; the rest of the four are the
-               organisation's other applications. Generic programme advice is not a question about
-               the records and never becomes a card. */
-            const named = alerts.filter((it) => it.entity_name);
-            const seen = new Set(named.map((it) => it.entity_name));
-            const questions = named.map((it) => ({
-                question: 'What breaks if ' + it.entity_name + ' fails?',
-                detail: it.description || it.detail || ''
-            }));
-            if (questions.length < 4) {
-                try {
-                    const list = await Platform.fetch.get('/applications/api/list',
-                        { per_page: 12, sort: 'relevance' }, { silent: true });
-                    const apps = Array.isArray(list) ? list : (list && (list.applications || list.items)) || [];
-                    apps.forEach((a) => {
-                        if (questions.length < 4 && a && a.name && !a.unpromoted_import && !seen.has(a.name)) {
-                            seen.add(a.name);
-                            questions.push({ question: 'What breaks if ' + a.name + ' fails?', detail: '' });
-                        }
-                    });
-                } catch (listErr) {
-                    /* swallow-ok: the cards are a convenience; the findings above still stand and the box below still works */
-                }
+            /* A card is a question about one application in this organisation's own records, and only an
+               application with recorded relationships has an answer that cites where its links were read
+               from, most connected first (the server chooses them, through the overview's own reader). An
+               organisation with fewer than four such applications is offered fewer application questions and
+               general ones for the rest: never a question whose answer is that nothing is recorded. */
+            /* Platform.fetch.get throws on a non-ok response, so an outage reaches the error below. */
+            const offered = await Platform.fetch.get('/ai-chat/first-questions', {}, { silent: true });
+            const linked = Array.isArray(offered && offered.questions) ? offered.questions : [];
+            const questions = linked.slice(0, 4);
+            /* The general questions fit the organisation's own kind: a startup is asked what to write
+               down first, a larger company how it governs and rationalises what it already holds. */
+            const startup = host.getAttribute('data-company-kind') !== 'enterprise';
+            const general = startup ? [
+                { question: 'What should a startup write down about its software first?', detail: '' },
+                { question: 'Which architecture decisions are worth recording early?', detail: '' },
+                { question: 'When does a monolith stop being enough?', detail: '' },
+                { question: 'What should a first architecture review cover?', detail: '' }
+            ] : [
+                { question: 'How should we decide which applications to retire or consolidate?', detail: '' },
+                { question: 'Which architecture decisions should go to a review board?', detail: '' },
+                { question: 'When does a monolith stop being enough?', detail: '' },
+                { question: 'What should an architecture review cover?', detail: '' }
+            ];
+            if (questions.length > 0) {
+                general.forEach((item) => {
+                    if (questions.length < 4) questions.push(item);
+                });
             }
             const shown = questions.slice(0, 4);
 
             const startupSteps = document.getElementById('startup-first-steps');
+            const applications = Number(offered && offered.applications) || 0;
+            if (shown.length === 0 && applications > 0) {
+                /* Applications are recorded and how they connect is not: the questions that need no links,
+                   and the two ways to record the connections. */
+                /* The note comes before the cards: below four stacked cards it sits past the end of the
+                   scrolling box at 390 wide, under the notice above the composer. */
+                done('<div data-linkless-next-step></div>' +
+                    '<p class="mt-2 text-center text-xs text-muted-foreground" data-linkless-note>General questions to start with. ' +
+                    'Your applications are recorded, but not how they connect.</p>' +
+                    '<div class="mt-3 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(general) + '</div>');
+                const linklessSteps = document.getElementById('linkless-next-step');
+                if (linklessSteps) host.querySelector('[data-linkless-next-step]').appendChild(linklessSteps.content.cloneNode(true));
+                host._items = general;
+                return;
+            }
             if (shown.length === 0 && startupSteps) {
                 /* A startup with nothing recorded: the next step first, then four questions that need no records. */
-                const startupQuestions = [
-                    { question: 'What should a startup write down about its software first?', detail: '' },
-                    { question: 'Which architecture decisions are worth recording early?', detail: '' },
-                    { question: 'When does a monolith stop being enough?', detail: '' },
-                    { question: 'What should a first architecture review cover?', detail: '' }
-                ];
+                const startupQuestions = general;
                 done('<div data-startup-next-step></div>' +
-                    '<div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">' + cardRows(startupQuestions) + '</div>' +
+                    '<div class="mt-4 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(startupQuestions) + '</div>' +
                     '<p class="mt-3 text-center text-xs text-muted-foreground">General questions to start with. Once your applications are in, these become questions about them.</p>');
                 host.querySelector('[data-startup-next-step]').appendChild(startupSteps.content.cloneNode(true));
                 lockWhileLoading(host.querySelector('[data-sample-form]'));
@@ -515,25 +519,22 @@
                           'hover:bg-accent transition-colors">' +
                           '<i data-lucide="plus-circle" class="h-3 w-3" aria-hidden="true"></i>Design a solution</button>' +
                       '</div>' +
-                    '</div>'
+                    '</div>' +
+                    '<div class="mt-4 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + cardRows(general) + '</div>' +
+                    '<p class="mt-3 text-center text-xs text-muted-foreground">General questions to start with. Once your applications are in, these become questions about them.</p>'
                 );
+                host._items = general;
                 return;
             }
-
-            const total = (data.summary && typeof data.summary.total === 'number')
-                ? data.summary.total : null;
-            const scope = total === null
-                ? named.length + (named.length === 1 ? ' item' : ' items')
-                : named.length + ' of ' + total + ' open finding' + (total === 1 ? '' : 's');
 
             const rows = cardRows(shown);
 
             done(
-                '<div class="grid grid-cols-1 gap-3 md:grid-cols-2">' + rows + '</div>' +
+                '<div class="grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2">' + rows + '</div>' +
                 '<p class="mt-3 text-center text-xs text-muted-foreground">' +
-                  (named.length
-                    ? 'Questions from your own records: ' + ArchieChat.render.escapeForHtml(scope) + ', ranked by impact'
-                    : 'Questions about the applications in your records') + '</p>'
+                  (linked.length < 4
+                    ? 'Linked applications first, then general questions.'
+                    : 'Questions about your most connected applications') + '</p>'
             );
 
             host._items = shown;
@@ -579,6 +580,11 @@
         /* Ask about the finding in the user's own terms; the assistant then
            looks it up rather than being handed a conclusion to agree with. */
         input.value = picked.question;
+        /* A card names one element: the answer is about that element, not about whichever shares its name. */
+        if (picked.element_id) {
+            input.dataset.elementId = String(picked.element_id);
+            input.dataset.elementQuestion = picked.question;
+        }
         form.requestSubmit();
     });
 

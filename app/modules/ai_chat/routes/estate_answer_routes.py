@@ -8,7 +8,12 @@ from flask_login import current_user, login_required
 from app import db
 from app.middleware.tenant_context import current_org_id
 from app.modules.ai_chat.services.catalogue_answer import answer_catalogue_question
-from app.modules.ai_chat.services.estate_answer import answer_estate_question, explanations_for, recorded_text
+from app.modules.ai_chat.services.estate_answer import (
+    answer_estate_question,
+    explanations_for,
+    owned_element_id,
+    recorded_text,
+)
 from app.modules.ai_chat.services.lens_answer import answer_lens_question
 from app.modules.intelligence.services import answer_envelope as envelope
 
@@ -130,6 +135,40 @@ def _catalogue_response(message, thread_id, keep):
     )
 
 
+def _what_it_depends_on(answer):
+    """The connections an element has the other way round, when nothing depends on it.
+
+    "What breaks if X fails" follows what depends on X. An element whose recorded links
+    all point the other way (it runs on, or is part of, something else) has none, yet
+    the overview counts those links, so the answer names them with their sources instead
+    of saying nothing is connected. Same query service, same organisation, asked in both directions.
+    ``None`` when the element has no links in either direction."""
+    params = dict(answer.get("params") or {})
+    if answer.get("question_kind") != envelope.KIND_IMPACT or not params.get("element_id"):
+        return None
+    # The links as recorded, one step. The count of relationships touching the element is the
+    # overview's (``_recorded_links``); this lists the distinct elements those links reach.
+    params.update(direction="both", include_derived=False, max_depth=1)
+    try:
+        upstream = envelope.present(envelope.ask_and_store(envelope.KIND_IMPACT, params, user_id=current_user.id))
+    except envelope.AnswerParamError:
+        return None
+    return upstream if upstream["rows"] else None
+
+
+def _recorded_links(answer):
+    """The recorded relationships touching the element asked about (the total is the figure the
+    overview's "most connected" line and the chat's first questions use), with how many lead from it,
+    how many lead to it and how many other elements they reach. ``None`` when the question names no
+    single element."""
+    from app.modules.dashboard.services.overview_figures import relationship_split
+
+    element_id = (answer.get("params") or {}).get("element_id")
+    if answer.get("question_kind") != envelope.KIND_IMPACT or not element_id:
+        return None
+    return relationship_split(int(current_org_id()), int(element_id))
+
+
 @unified_ai_chat_bp.route("/estate-answer", methods=["POST"])
 @login_required
 def estate_answer():
@@ -145,7 +184,9 @@ def estate_answer():
         return jsonify({"success": False, "error": "Ask a question first."}), 400
     thread_id = body.get("thread_id") if isinstance(body.get("thread_id"), str) else None
     keep = body.get("remember") is not False
-    lens = answer_lens_question(message[:MAX_QUESTION_CHARS])
+    posted_element = body.get("element_id") if isinstance(body.get("element_id"), int) else None
+    # A card names its element: the question is about that element, not about a lens its name sounds like.
+    lens = None if owned_element_id(posted_element, current_org_id()) else answer_lens_question(message[:MAX_QUESTION_CHARS])
     if lens is not None:
         component_id = ((lens["data"] or {}).get("application_component_id")) if lens["lens"] == "portfolio" else None
         kept = _remember(thread_id, message, _lens_line(lens), keep=keep) if lens["data"] is not None else None
@@ -169,7 +210,11 @@ def estate_answer():
             }
         )
     try:
-        record = answer_estate_question(message[:MAX_QUESTION_CHARS], user_id=current_user.id)
+        record = answer_estate_question(
+            message[:MAX_QUESTION_CHARS],
+            user_id=current_user.id,
+            element_id=posted_element,
+        )
     except envelope.AnswerNotAskable:
         record = None
     if record is None:
@@ -187,13 +232,22 @@ def estate_answer():
         ),
     )
     total = answer["summary"].get("total") or 0
-    kept = _remember(
-        thread_id,
-        message,
-        "Answer from your records: %d connection%s. [Open this answer](%s)"
-        % (total, "" if total == 1 else "s", answer["page_url"]),
-        keep=keep,
-    )
+    depends_on = _what_it_depends_on(answer) if not total else None
+    if depends_on:
+        # What the card showed: nothing depends on it, and the connections it has of its own.
+        count = depends_on["summary"]["total"]
+        line = "Answer from your records: nothing depends on this; it is connected to %d other element%s. [Open this answer](%s)" % (
+            count,
+            "" if count == 1 else "s",
+            depends_on["page_url"],
+        )
+    else:
+        line = "Answer from your records: %d connection%s. [Open this answer](%s)" % (
+            total,
+            "" if total == 1 else "s",
+            answer["page_url"],
+        )
+    kept = _remember(thread_id, message, line, keep=keep)
     return jsonify(
         {
             "success": True,
@@ -208,6 +262,8 @@ def estate_answer():
                 question=message[:MAX_QUESTION_CHARS],
                 derivation=_derivation_status(),
                 shown_limit=SHOWN_LIMIT,
+                depends_on=depends_on,
+                recorded_links=_recorded_links(answer),
                 explanations=explanations_for(answer, SHOWN_LIMIT),
                 recorded_text=recorded_text,
             ),

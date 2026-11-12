@@ -106,9 +106,12 @@ class EntityResolver:
                 from app.models.archimate_core import ArchiMateElement
             except ImportError:
                 from app.models.models import ArchiMateElement
-            exact = ArchiMateElement.query.filter(
-                ArchiMateElement.name.ilike(name)
-            ).first()
+            from app.middleware.tenant_context import current_org_id
+            from app.modules.dashboard.services.overview_figures import element_named
+
+            org_id = current_org_id()
+            meant = element_named(org_id, name) if org_id is not None else None
+            exact = ArchiMateElement.query.filter_by(id=meant, organization_id=org_id).first() if meant else None
             if exact:
                 return {"resolved": True, "id": exact.id, "name": exact.name, "type": exact.type, "layer": exact.layer}
             candidates = ArchiMateElement.query.filter(
