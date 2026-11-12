@@ -723,6 +723,7 @@ def investment_priorities():
     # The tenant's configured currency, never a literal "$".
     from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
         currency_symbol as _currency_symbol,
+        limit_costs_to_viewer,
     )
 
     currency_symbol = _currency_symbol()
@@ -743,6 +744,8 @@ def investment_priorities():
     from app.services import result_footer_service
 
     result_footer_service.attach_capability_footers(current_org_id(), analysis["capability_scores"])
+    # After the footers, which read the figures to say where each came from.
+    limit_costs_to_viewer(analysis)
 
     return render_template(
         "strategic/investment_matrix.html",
@@ -846,7 +849,12 @@ def ai_investment_suggestions():
 
     # analysis spans every organization on the install (see
     # _org_scoped_investment_context) — never hand it to the LLM as-is.
-    org_context = _org_scoped_investment_context(analysis)
+    # A person without spend authority gets suggestions drawn from an analysis with the money out.
+    from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
+        limit_costs_to_viewer,
+    )
+
+    org_context = _org_scoped_investment_context(limit_costs_to_viewer(analysis))
     if org_context is None:
         return jsonify({
             "suggestions": None,

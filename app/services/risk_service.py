@@ -439,8 +439,18 @@ def _other_links_by_risk(org_id):
     return out
 
 
-def ranked_risks():
-    """Every risk of the caller's organisation, ranked by exposure.
+def footers_by_risk(organization_id=None):
+    """Each risk's footer as the register shows it, by risk id: the one confidence a risk has.
+
+    Every screen that lists a risk beside its own footer (the prioritised actions, the recommendations)
+    takes the footer from here, so a risk reads the same confidence, with the same reason, wherever it
+    is shown.
+    """
+    return {row["risk_id"]: row["footer"] for row in ranked_risks(organization_id)["rows"]}
+
+
+def ranked_risks(organization_id=None):
+    """Every risk of the caller's organisation (or of ``organization_id``), ranked by exposure.
 
     Exposure is how many elements the risk reaches, read from
     ``IntelligenceQueryService.set_impact`` (the one blast-radius answer) in
@@ -458,7 +468,7 @@ def ranked_risks():
         IntelligenceQueryService,
     )
 
-    org_id = current_org_id()
+    org_id = organization_id if organization_id is not None else current_org_id()
     if org_id is None:
         return {"rows": [], "total": 0, "rule": RANKING_RULE}
     risks = db.session.execute(

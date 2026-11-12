@@ -43,6 +43,25 @@ def count_capabilities():
     return UnifiedCapability.query.count()
 
 
+def capability_totals(organization_id):
+    """How many capabilities an organisation has by the one visibility rule, by a count query.
+
+    ``own`` are the organisation's own capabilities and ``shared`` the shared catalogue's
+    (``UnifiedCapability.visibility_predicate``). A row with no owner that is not marked shared is
+    neither: it may be another organisation's, so it is not counted for anyone.
+    """
+    is_shared = UnifiedCapability.organization_id.is_(None)
+    rows = (
+        db.session.query(is_shared, func.count(UnifiedCapability.id))
+        .filter(UnifiedCapability.visibility_predicate(organization_id))
+        .group_by(is_shared)
+        .all()
+    )
+    counted = {bool(shared): n for shared, n in rows}
+    own, shared = counted.get(False, 0), counted.get(True, 0)
+    return {"total": own + shared, "own": own, "shared": shared}
+
+
 def count_domains():
     """Distinct business domains that have at least one level-1 capability
     visible to the current tenant.

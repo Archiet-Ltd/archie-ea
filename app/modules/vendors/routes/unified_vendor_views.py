@@ -104,50 +104,22 @@ unified_vendors_bp = Blueprint(
 @unified_vendors_bp.route("/integration")
 @login_required
 def integration_dashboard():
-    """Integration Architect dashboard - renders vendor catalog."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: Integration is the Mapping tab of Vendors."""
+    return redirect(url_for("unified_applications.vendors", tab="mapping"), code=301)
 
 
 @unified_vendors_bp.route("/integration/mapping")
 @login_required
 def vendor_mapping_tool():
-    """Application-to-vendor mapping tool - renders vendor applications portfolio."""
-    vendor = type("Vendor", (), {"id": 0, "name": "All Vendors"})()
-    try:
-        # Neither application_vendor_product_mappings nor vendor_products has an
-        # organization_id, so this listed every tenant's applications. The
-        # predicate belongs on application_components, which does carry one.
-        from flask import g as _g
-        _org = getattr(_g, "current_org_id", None)
-        _org_where = " WHERE ac.organization_id = :org" if _org is not None else ""
-        rows = db.session.execute(text(f"""
-            SELECT ac.id, ac.name, ac.vendor_name, vp.name AS product_name,
-                   m.role_type, ac.description, ac.deployment_status,
-                   ac.business_criticality, ac.business_owner
-            FROM application_vendor_product_mappings m
-            JOIN application_components ac ON ac.id = m.application_component_id
-            JOIN vendor_products vp ON vp.id = m.vendor_product_id{_org_where}
-            ORDER BY ac.vendor_name, ac.name
-        """), ({"org": _org} if _org is not None else {})).fetchall()
-        applications = [_app_portfolio_item(r) for r in rows]
-    except Exception:
-        applications = []
-    stats = _portfolio_stats(applications)
-    return render_template(
-        "vendors/vendor_applications_portfolio.html",
-        vendor=vendor,
-        stats=stats,
-        applications=applications,
-    )
+    """Old address: the application-to-vendor mapping is the Mapping tab of Vendors."""
+    return redirect(url_for("unified_applications.vendors", tab="mapping"), code=301)
 
 
 @unified_vendors_bp.route("/integration/patterns")
 @login_required
 def integration_patterns():
-    """Vendor-specific integration pattern library - renders vendor list."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: Integration patterns are read on the Mapping tab of Vendors."""
+    return redirect(url_for("unified_applications.vendors", tab="mapping"), code=301)
 
 
 # =============================================================================
@@ -158,17 +130,15 @@ def integration_patterns():
 @unified_vendors_bp.route("/technical")
 @login_required
 def technical_dashboard():
-    """Technical Architect dashboard - renders vendor list."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: The technical view is the vendor-capability coverage matrix."""
+    return redirect(url_for("main.dashboards_vendor_capability_matrix"), code=301)
 
 
 @unified_vendors_bp.route("/technical/comparison")
 @login_required
 def vendor_comparison():
-    """Vendor comparison workbench - renders vendor list."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: Comparing vendors is done in vendor analysis."""
+    return redirect(url_for("application_mgmt.vendor_analysis_list"), code=301)
 
 
 def _app_portfolio_item(r):
@@ -270,9 +240,8 @@ def vendor_applications_portfolio(vendor_id):
 @unified_vendors_bp.route("/technical/scenarios")
 @login_required
 def scenario_analyzer():
-    """What-if scenario analyzer - renders vendor list."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: Vendor scenarios are run from vendor analysis."""
+    return redirect(url_for("application_mgmt.vendor_analysis_list"), code=301)
 
 
 # =============================================================================
@@ -283,42 +252,38 @@ def scenario_analyzer():
 @unified_vendors_bp.route("/data")
 @login_required
 def data_dashboard():
-    """Data Architect dashboard - renders vendor list."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: Vendors has no separate data page; it opens the Vendors list."""
+    return redirect(url_for("unified_applications.vendors"), code=301)
 
 
 @unified_vendors_bp.route("/data/quality")
 @login_required
 def data_quality():
-    """Vendor data quality dashboard - renders vendor list."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: Vendors has no separate data page; it opens the Vendors list."""
+    return redirect(url_for("unified_applications.vendors"), code=301)
 
 
 @unified_vendors_bp.route("/data/duplicates")
 @login_required
 def duplicate_management():
-    """Duplicate vendor management - redirects to duplicate detection."""
-    return redirect(url_for("unified_duplicate.simple_dashboard"))
+    """Old address: the duplicates page lists applications, not vendors; opens the Vendors list."""
+    return redirect(url_for("unified_applications.vendors"), code=301)
 
 
 @unified_vendors_bp.route("/data/import", methods=["GET", "POST"])
 @login_required
 def vendor_import():
-    """Bulk vendor import - renders vendor list for GET, processes import for POST."""
+    """Bulk vendor import - GET redirects to the vendor list, POST processes the import."""
     if request.method == "GET":
-        stats = {"total": 0, "active": 0, "strategic": 0, "total_products": 0, "domain_distribution": {}}
-        return render_template("vendors/list.html", stats=stats, vendors=[], pagination=None)
+        return redirect(url_for("unified_applications.vendors"), code=301)
     return import_vendors()
 
 
 @unified_vendors_bp.route("/data/reconciliation")
 @login_required
 def vendor_reconciliation():
-    """Vendor reconciliation - renders vendor list."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: Vendors has no separate data page; it opens the Vendors list."""
+    return redirect(url_for("unified_applications.vendors"), code=301)
 
 
 # =============================================================================
@@ -329,33 +294,29 @@ def vendor_reconciliation():
 @unified_vendors_bp.route("/selection")
 @login_required
 def selection_dashboard():
-    """Solution Architect dashboard - renders vendor list."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: Vendor selection is done in vendor analysis."""
+    return redirect(url_for("application_mgmt.vendor_analysis_list"), code=301)
 
 
 @unified_vendors_bp.route("/selection/requirements")
 @login_required
 def requirements_definition():
-    """Define requirements - renders vendor list."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: Selection requirements are entered when a vendor analysis is started."""
+    return redirect(url_for("application_mgmt.vendor_analysis_new"), code=301)
 
 
 @unified_vendors_bp.route("/selection/discovery")
 @login_required
 def vendor_discovery():
-    """AI-powered vendor discovery - renders vendor list."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: Discovering vendors is browsing the vendor catalogue."""
+    return redirect(url_for("unified_applications.vendor_catalogue"), code=301)
 
 
 @unified_vendors_bp.route("/selection/analysis")
 @login_required
 def selection_analysis():
-    """Vendor selection analysis - renders vendor list."""
-    stats, vendors = _get_vendor_list_context()
-    return render_template("vendors/list.html", stats=stats, vendors=vendors, pagination=None)
+    """Old address: Selection analysis is vendor analysis."""
+    return redirect(url_for("application_mgmt.vendor_analysis_list"), code=301)
 
 
 # =============================================================================
@@ -600,8 +561,7 @@ def import_vendors():
     if request.method == "GET":
         if request.headers.get("Accept") == "application/json":
             return jsonify({"success": True, "message": "Use POST to import vendors"})
-        stats = {"total": 0, "active": 0, "strategic": 0, "total_products": 0, "domain_distribution": {}}
-        return render_template("vendors/list.html", stats=stats, vendors=[], pagination=None)
+        return redirect(url_for("unified_applications.vendors"), code=301)
 
     # POST - process import
     if "file" not in request.files:
