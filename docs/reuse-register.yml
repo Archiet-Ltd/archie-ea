@@ -596,6 +596,17 @@ entries:
         scope: [app/static/js, app/templates]
         suffixes: [.js, .html]
 
+  - id: composer-radial-arrangement
+    concept: Arranging the elements of a view round one element, each step away on its own ring (the Composer's neighbourhood view)
+    status: active
+    canonical:
+      path: app/static/js/archimate/composer.js
+      symbols: [applyRadialLayout, applyLayerBanding]
+    reuse: >
+      applyRadialLayout is the one radial arrangement, beside applyLayerBanding, which arranges by layer. It shares
+      LAYER_Y_ORDER with layer banding, and the drawing is then fitted by the one fitCanvas. A view about one element
+      calls it; do not write a second radial, circular or ring layout or a second fit or zoom routine in the Composer.
+
   - id: diagram-editor-shell
     concept: The editor chrome around an ArchiMate diagram (toolbar, element palette, finder, relationship legend, minimap, status line, header, properties sheet)
     status: active

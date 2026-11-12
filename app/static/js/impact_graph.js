@@ -137,6 +137,7 @@
             if (!nodes.length) { show('impact-empty'); text('impact-counts', 'No elements in this layer.'); return; }
             var clusters = data.mode === 'clusters';
             var edges = data.edges || [];
+            var ringLabel = null;
             var isolated = clusters ? [] : nodes.filter(function (d) { return d.connected === false; });
             var cx = width / 2, cy = height / 2;
             var ringRadius = Math.min(width, height) * 0.44;
@@ -154,7 +155,7 @@
                 ring.append('circle').attr('cx', cx).attr('cy', cy).attr('r', ringRadius + 22).attr('fill', 'none')
                     .attr('stroke', 'currentColor').attr('class', 'text-border').attr('stroke-width', 1)
                     .attr('stroke-dasharray', '4 4');
-                ring.append('text').attr('x', cx).attr('y', cy - ringRadius - 32).attr('text-anchor', 'middle')
+                ringLabel = ring.append('text').attr('x', cx).attr('y', cy - ringRadius - 32).attr('text-anchor', 'middle')
                     .attr('font-size', 13).attr('fill', 'currentColor').attr('class', 'text-muted-foreground')
                     .attr('data-testid', 'model-map-unconnected-label')
                     .text('Not connected to anything (' + isolated.length + ')');
@@ -227,9 +228,16 @@
                 gravity: 0.06, alphaDecay: many ? 0.06 : 0.04,
                 outerRing: isolated.length ? ringRadius : 0,
                 label: (clusters || !many) ? function (d) { return labelBox(d, radius(d) + 4, labelText); } : null,
-                end: function () { if (!touched) fit(nodes); svgEl.setAttribute('data-settled', '1'); }
+                end: function () { placeRingLabel(); if (!touched) fit(nodes); svgEl.setAttribute('data-settled', '1'); }
             });
             paint();
+            // The ring's label sits above the highest dot of the settled map, so no dot or dot name can lie on it.
+            function placeRingLabel() {
+                if (!ringLabel) return;
+                var top = cy - ringRadius - 32;
+                nodes.forEach(function (d) { top = Math.min(top, d.y - radius(d) - 14); });
+                ringLabel.attr('y', top);
+            }
             // When the layout settles, zoom to show every element with a margin.
             function fit(list) {
                 var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -238,7 +246,7 @@
                     x0 = Math.min(x0, d.x - r); y0 = Math.min(y0, d.y - r);
                     x1 = Math.max(x1, d.x + r + (many ? 0 : 150)); y1 = Math.max(y1, d.y + r);
                 });
-                if (isolated.length) { y0 = Math.min(y0, cy - ringRadius - 48); }
+                if (ringLabel) { y0 = Math.min(y0, parseFloat(ringLabel.attr('y')) - 18); }
                 var w = x1 - x0, h = y1 - y0;
                 if (!(w > 0 && h > 0)) return;
                 var k = Math.max(0.1, Math.min(1, 0.92 * Math.min(width / w, height / h)));

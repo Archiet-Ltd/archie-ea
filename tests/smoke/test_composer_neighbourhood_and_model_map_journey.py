@@ -363,6 +363,17 @@ def test_ring_of_unconnected_elements_says_what_it_is(browser, live_server, worl
             """() => Array.from(document.querySelectorAll('#impact-svg g[data-node-id]')).length""")
         assert flagged == 1 + DIRECT + BEYOND + UNCONNECTED
         expect(page.get_by_test_id("model-map-unconnected")).to_contain_text("Not connected to anything (%d)" % UNCONNECTED)
+        # The ring's label is readable: no dot and no dot's name sits on it.
+        covered = page.evaluate(
+            """() => {
+              const l = document.querySelector('[data-testid="model-map-unconnected-label"]').getBoundingClientRect();
+              return Array.from(document.querySelectorAll('#impact-svg g[data-node-id]')).map(g => {
+                const r = g.getBoundingClientRect();
+                return {name: g.querySelector('title').textContent, x: r.x, y: r.y, w: r.width, h: r.height,
+                        hit: r.x < l.right && r.right > l.x && r.y < l.bottom && r.bottom > l.y};
+              }).filter(n => n.hit);
+            }""")
+        assert not covered, "the ring's label is covered by %d element(s): %r" % (len(covered), covered[:3])
         _shot(page, "model-map-unconnected", scheme)
     finally:
         context.close()
