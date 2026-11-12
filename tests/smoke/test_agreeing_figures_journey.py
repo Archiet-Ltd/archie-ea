@@ -7,8 +7,9 @@ against the one on the implementation page, and the gap register's Resolved figu
 the board's Closed figure. The organisation holds more critical gaps than the implementation
 page lists, closed risks beside open ones and critical risks that are closed, so a screen that
 counts the wrong population shows a different number. A second organisation holds its own
-elements, risks and gaps so a leak between organisations would change a number. A layer's
-figures read as loading while the list is fetched and say unavailable only when it failed.
+elements, risks and gaps so a leak between organisations would change a number. A layer counts
+every element stored in it, whatever its type, as the model map does. A layer's figures read as
+loading while they are fetched and say unavailable only when the requests failed.
 """
 import os
 import re
@@ -30,7 +31,7 @@ VIEWPORTS = [
 
 
 def _seed(org_id, noun, *, goals, stray, critical_gaps, closed_gaps=0, closed_risks=0):
-    """Motivation elements (mirrored, unmirrored and one of a type the layer does not hold), risks and gaps."""
+    """Motivation elements (mirrored, unmirrored and one of a type the layer's form does not offer), risks and gaps."""
     from app import create_app, db
     from app.models.archimate_core import ArchiMateElement
     from app.models.implementation_migration import Plateau
@@ -89,9 +90,9 @@ def _db_layer_total(org_id, layer_value):
     from app.models.motivation import Goal
 
     with create_app("testing").app_context():
+        # Every model element stored in the layer, whatever its type: the number the model map draws.
         architecture = ArchiMateElement.query.filter(
             ArchiMateElement.organization_id == org_id,
-            ArchiMateElement.type.in_(["Goal", "Assessment"]),  # a risk is mirrored as an assessment
             db.func.lower(ArchiMateElement.layer) == layer_value).count()
         recorded = Goal.query.filter(Goal.organization_id == org_id,
                                      Goal.archimate_element_id.is_(None)).count()
@@ -163,12 +164,15 @@ def test_layer_risk_and_gap_figures_agree(browser, live_server, viewport, theme)
                   timeout=PAGE_TIMEOUT)
         list_total = _list_total(page)
         tab_after = _tab_count(page, "Motivation")
-        card = page.locator('[data-testid="repository-elements-card"]')
+        card = page.locator('[data-testid="layer-elements-card"]')
         expect(card).to_have_attribute("aria-busy", "false", timeout=PAGE_TIMEOUT)
-        card_total = _number(page, "repository-elements-card")
+        card_total = _number(page, "layer-elements-card")
         expected = _db_layer_total(mine["org_id"], "motivation")
-        # 3 goals + 3 open and 4 closed risk assessments + 2 goals held only in the goal table; the 2 nodes are not motivation elements
-        assert expected == 12, expected
+        # 3 goals + 3 open and 4 closed risk assessments + 2 nodes stored in the layer (12 on the model map)
+        # + 2 goals held only in the goal table, which the model map does not draw
+        assert expected == 14, expected
+        expect(page.get_by_test_id("layer-count-label")).to_have_text(
+            "14 elements in this layer, 2 of them not on the model map")
         assert tab_before == tab_after == list_total == card_total == expected, (
             tab_before, tab_after, list_total, card_total, expected)
         assert other not in page.locator("body").inner_text()
@@ -263,48 +267,59 @@ def test_layer_figures_read_as_loading_then_the_total_and_unavailable_only_on_fa
     org = _business_org(noun)
     context, page = _new_page(browser, viewport)
     held = []
-    page.route("**/architecture/api/layer/business/elements*", lambda route: held.append(route))
+    released = []
+
+    def hold(route):
+        # Every layer request (the counts sweep and the list) waits until the test lets it through.
+        if released:
+            route.continue_()
+        else:
+            held.append(route)
+
+    page.route("**/architecture/api/layer/**", hold)
     try:
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
         page.goto(live_server + "/architecture/dashboard?layer=business", wait_until="domcontentloaded",
                   timeout=PAGE_TIMEOUT)
-        card = page.locator('[data-testid="repository-elements-card"]')
-        # The list request is held: the figures say they are loading, with the loading state, not a dash.
+        card = page.locator('[data-testid="layer-elements-card"]')
+        # The counts and the list are held: the figures say they are loading, with the loading state, not a dash.
         expect(card).to_have_attribute("aria-busy", "true", timeout=PAGE_TIMEOUT)
         expect(card.locator('[data-state="loading"]')).to_be_visible()
         body = page.locator("body").inner_text()
         assert "total unavailable" not in body.lower() and "— total" not in body, body[:600]
-        expect(page.locator('[data-testid="layer-header-total"]')).to_have_text("loading repository items")
-        expect(page.locator('[data-testid="layer-total"]')).to_have_text("Loading")
+        expect(page.locator('[data-testid="layer-count-label"]')).to_have_text("loading layer total")
+        expect(page.locator('[data-testid="layer-list-total"]')).to_have_text("Loading")
         _frame(page, "layer-loading", viewport["width"], theme)
 
-        while not held:
+        while not any("/elements" in r.request.url for r in held):
             page.wait_for_timeout(100)
-        held.pop().continue_()
+        released.append(True)
+        while held:
+            held.pop().continue_()
         expect(card).to_have_attribute("aria-busy", "false", timeout=PAGE_TIMEOUT)
-        assert _number(page, "repository-elements-card") == 4
-        expect(page.locator('[data-testid="layer-header-total"]')).to_have_text("4 repository items")
-        expect(page.locator('[data-testid="layer-total"]')).to_have_text("4 total")
+        assert _number(page, "layer-elements-card") == 4
+        expect(page.locator('[data-testid="layer-count-label"]')).to_have_text("4 elements in this layer")
+        expect(page.locator('[data-testid="layer-list-total"]')).to_have_text("4 total")
         assert _tab_count(page, "Business") == 4 == _list_total(page)
     finally:
         context.close()
 
     context, page = _new_page(browser, viewport)
-    page.route("**/architecture/api/layer/business/elements*", lambda route: route.fulfill(
+    page.route("**/architecture/api/layer/**", lambda route: route.fulfill(
         status=500, content_type="application/json", body='{"error": "down"}'))
     try:
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
         page.goto(live_server + "/architecture/dashboard?layer=business", wait_until="domcontentloaded",
                   timeout=PAGE_TIMEOUT)
-        # The request failed: now, and only now, the page says the total is unavailable.
-        expect(card_of(page)).to_contain_text("Repository total unavailable", timeout=PAGE_TIMEOUT)
+        # The requests failed: now, and only now, the page says the total is unavailable.
+        expect(card_of(page)).to_contain_text("Layer total unavailable", timeout=PAGE_TIMEOUT)
         expect(card_of(page)).to_have_attribute("aria-busy", "false")
-        expect(page.locator('[data-testid="layer-total"]')).to_have_text("— total")
-        expect(page.locator('[data-testid="layer-header-total"]')).to_have_text("repository total unavailable")
+        expect(page.locator('[data-testid="layer-list-total"]')).to_have_text("— total")
+        expect(page.locator('[data-testid="layer-count-label"]')).to_have_text("layer total unavailable")
         _frame(page, "layer-failed", viewport["width"], theme)
     finally:
         context.close()
 
 
 def card_of(page):
-    return page.locator('[data-testid="repository-elements-card"]')
+    return page.locator('[data-testid="layer-elements-card"]')
