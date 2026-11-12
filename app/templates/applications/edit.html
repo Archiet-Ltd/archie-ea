@@ -7,15 +7,6 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Edit — {{ application.name }}{% endblock %}
 
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Applications', 'href': url_for('unified_applications.application_list')},
-    {'text': 'Edit', 'current': true}
-]) }}
-{% endblock %}
-
 {% block content %}
 <div class="p-6 space-y-6 mx-auto max-w-3xl">
 
@@ -40,13 +31,16 @@
       {% endcall %}
 
       <div class="grid grid-cols-1 gap-4">
-        {% call form_group(id='application_code', label='Application Code', help_text='Managed by Abacus sync') %}
-          <!-- entity-picker-ok: readonly, Abacus-managed ID -->
+        {% call form_group(id='application_code', label='Application Code', help_text=('Managed by Abacus sync' if abacus_connected else none)) %}
+          <!-- entity-picker-ok: readonly, connector-managed ID -->
           {{ input(type="text", id=("application_code"), name=("application_code"), value=(application.application_code or ''), size='sm', class="w-full", attrs_dict={"readonly": "readonly"}) }}
         {% endcall %}
         {% call form_group(id='application_type', label='Application Type') %}
           <!-- entity-picker-ok: free-text classification, no canonical type list -->
           {{ input(type="text", id=("application_type"), name=("application_type"), value=(application.component_type or ''), size='sm', class="w-full") }}
+        {% endcall %}
+        {% call form_group(id='competitive_advantage', label='Competitive Advantage') %}
+          {% call native_select(id='competitive_advantage', name='competitive_advantage', size='sm', class='w-full', selected=('yes' if application.competitive_advantage else ''), options=[('', 'Not recorded'), ('yes', 'Yes')]) %}{% endcall %}
         {% endcall %}
       </div>
     </section>

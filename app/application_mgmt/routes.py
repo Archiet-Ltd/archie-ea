@@ -2166,7 +2166,11 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
             "delta": (
                 "Among its connections"
                 if interface_count
-                else "None yet; add one in Architecture"
+                else (
+                    "None linked yet; link one in the Composer"
+                    if archimate_info
+                    else "None linked"
+                )
             ),
             "icon_svg": "",
         },
