@@ -76,8 +76,9 @@ def contracts_list():
     """List all vendor contracts for current organization."""
     org_id = current_user.organization_id
 
-    contracts = VendorContract.query.filter_by(organization_id=org_id).all()
-    from app.services.vendor_register import contract_renewal_due, is_active
+    from app.services.vendor_register import contract_renewal_due, is_active, register_contracts
+
+    contracts = register_contracts(org_id)
 
     # The page's status filter: the stats below still count every contract. "Active" is the ledger's one
     # definition (status active, no end date or one not yet past), so a contract that ended is never listed
