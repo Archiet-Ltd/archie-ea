@@ -69,7 +69,7 @@ def render_plain_error(status: int, standalone_template: str | None = None, *, t
     held allowance) passes ``standalone=True`` so the page does not draw a
     sidebar of links that would be refused too, and ``offer_links=False`` when
     no link on the page could land. ``next_step`` is a (label, address) pair that
-    replaces the dashboard link, for a visitor who is not signed in.
+    replaces the dashboard link, for a visitor who is not signed in or a member sent to the person who can act.
     """
     icon, default_title, default_message = PLAIN[status]
     title = title or default_title
@@ -80,6 +80,8 @@ def render_plain_error(status: int, standalone_template: str | None = None, *, t
                 "errors/plain_error.html",
                 error_status=status, error_icon=icon,
                 error_title=title, error_message=message,
+                next_label=next_step[0] if next_step else "Go to the dashboard",
+                next_href=next_step[1] if next_step else "/dashboard/overview",
             ), status
     except Exception:
         # The full shell needs the database; a failing request may have broken it.

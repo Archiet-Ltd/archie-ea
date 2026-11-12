@@ -27,7 +27,7 @@ Step zero of onboarding: read your public pages, propose your segment and templa
 published packs your pages already point to, and suggest where to start — all as proposals you
 confirm, nothing created until you say so.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 
