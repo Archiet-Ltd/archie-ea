@@ -1,0 +1,89 @@
+{
+  "about": "Recorded shape of the Microsoft Graph answers the SharePoint list connector reads: two customer tenants, each with its own registration, site, lists and columns.",
+  "tenants": {
+    "contoso": {
+      "client_id": "contoso-app",
+      "client_secret": "contoso-secret-7731",
+      "access_token": "graph-token-contoso-5521",
+      "sites": [
+        {
+          "id": "contoso.sharepoint.com,arch-site,arch-web",
+          "name": "Architecture",
+          "lists": [
+            {
+              "id": "list-apps-contoso",
+              "name": "ApplicationInventory",
+              "displayName": "Application Inventory",
+              "list": {"hidden": false, "template": "genericList"},
+              "columns": [
+                {"name": "Title", "displayName": "Title"},
+                {"name": "Description", "displayName": "Description"},
+                {"name": "Owner", "displayName": "Owner"},
+                {"name": "Budget", "displayName": "Budget"},
+                {"name": "Lifecycle", "displayName": "Lifecycle"},
+                {"name": "Created", "displayName": "Created", "readOnly": true},
+                {"name": "ContentType", "displayName": "Content Type", "hidden": true}
+              ]
+            },
+            {
+              "id": "list-notes-contoso",
+              "name": "MeetingNotes",
+              "displayName": "Meeting Notes",
+              "list": {"hidden": false, "template": "genericList"},
+              "columns": [
+                {"name": "Title", "displayName": "Title"},
+                {"name": "Notes", "displayName": "Notes"}
+              ]
+            },
+            {
+              "id": "list-appdata-contoso",
+              "name": "appdata",
+              "displayName": "App Data",
+              "list": {"hidden": true, "template": "genericList"},
+              "columns": [{"name": "Title", "displayName": "Title"}]
+            }
+          ]
+        },
+        {
+          "id": "contoso.sharepoint.com,fin-site,fin-web",
+          "name": "Finance",
+          "lists": [
+            {
+              "id": "list-finance-contoso",
+              "name": "FinanceApps",
+              "displayName": "Finance Apps",
+              "list": {"hidden": false, "template": "genericList"},
+              "columns": [{"name": "Title", "displayName": "Title"}]
+            }
+          ]
+        }
+      ]
+    },
+    "fabrikam": {
+      "client_id": "fabrikam-app",
+      "client_secret": "fabrikam-secret-9042",
+      "access_token": "graph-token-fabrikam-8810",
+      "sites": [
+        {
+          "id": "fabrikam.sharepoint.com,plat-site,plat-web",
+          "name": "Platform",
+          "lists": [
+            {
+              "id": "list-apps-fabrikam",
+              "name": "ApplicationInventory",
+              "displayName": "Application Inventory",
+              "list": {"hidden": false, "template": "genericList"},
+              "columns": [
+                {"name": "Title", "displayName": "Title"},
+                {"name": "Description", "displayName": "Description"},
+                {"name": "Owner", "displayName": "Business Owner"},
+                {"name": "AnnualCost", "displayName": "Annual Cost"},
+                {"name": "Status", "displayName": "Status"}
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

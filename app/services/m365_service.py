@@ -227,6 +227,15 @@ class M365Service:
             logger.debug("COM-017: Could not load M365 config", exc_info=True)
             return None
 
+    def graph_token(self, config) -> Optional[str]:
+        """The organisation's own Microsoft Graph access token for *config*.
+
+        Public wrapper over the one token routine, so a reader of Graph data
+        (the SharePoint connector) does not reach into a private method and
+        no second token code exists.
+        """
+        return self._get_token(config)
+
     def _get_token(self, config) -> Optional[str]:
         """Return a valid OAuth2 access token, refreshing if expired.
 

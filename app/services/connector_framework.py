@@ -709,6 +709,7 @@ def _register_concrete_connectors():
     from app.connectors.github import GitHubConnector
     from app.connectors.jira import JiraALMConnector
     from app.connectors.servicenow import ServiceNowCMDBConnector
+    from app.connectors.sharepoint import SharePointConnector
 
     _CONNECTOR_CLASSES.update(
         {
@@ -717,6 +718,7 @@ def _register_concrete_connectors():
             "github": GitHubConnector,
             "jira": JiraALMConnector,
             "servicenow": ServiceNowCMDBConnector,
+            "sharepoint_read": SharePointConnector,
         }
     )
 
