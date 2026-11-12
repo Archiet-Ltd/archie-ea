@@ -14,7 +14,7 @@ from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
 from .fresh_org import create_fresh_org
-from .overview_data import purge_org, seed_overview_org
+from .overview_data import add_imported_records, purge_org, seed_overview_org
 from .test_company_kind_first_screen_journey import _empty_organisation_user
 from .test_first_screen_one_message_journey import FOLD, PHONE, _page
 from .test_try_sample_company_journey import _login
@@ -403,6 +403,41 @@ def test_year_card_sets_last_year_beside_this_year(browser, live_server, orgs):
         card = page.locator('[data-testid="year-card"]')
         assert "No records were added last year" in card.locator('[data-testid="year-empty"]').inner_text()
         assert card.locator("svg").count() == 0
+    finally:
+        context.close()
+
+
+@pytest.fixture(scope="module")
+def imported_org(live_server):
+    """A company whose landscape came in from a file: 12 elements and 9 relationships with no history
+    row, beside two applications and their relationship entered by hand."""
+    info = seed_overview_org("imported", APPS_B, [], spread=False)
+    add_imported_records(info["org_id"], 12, 9)
+    yield info
+    purge_org(info["org_id"])
+
+
+@pytest.mark.parametrize("viewport,theme", [(FOLD, "light"), (PHONE, "dark")], ids=["1440-light", "390-dark"])
+def test_year_card_counts_every_record_the_page_counts(browser, live_server, imported_org, viewport, theme):
+    """The architect reads how much entered the model this year: the figure is the elements the facts
+    card counts plus the relationships the relationships card counts, imported and hand-made alike."""
+    context, page = _page(browser, viewport)
+    try:
+        _open(page, live_server, _signed_in_as_the_architect(imported_org))
+        page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
+        _shot(page, "overview-imported", viewport["width"], theme)
+        sentence = page.locator('[data-testid="sourced-sentence"]').inner_text()
+        elements = _int(re.search(r"(\d[\d,]*) elements", sentence).group(1))
+        relationships = _int(page.locator('[data-testid="card-relationships-value"]').inner_text())
+        assert (elements, relationships) == (14, 10)
+        card = page.locator('[data-testid="year-card"]')
+        value = card.locator('[data-testid="year-value"]').inner_text().strip()
+        assert value == "%d added this year" % (elements + relationships), value
+        assert "No records were added last year" in card.locator('[data-testid="year-empty"]').inner_text()
+        # the relationships the year card counts are the ones the relationships card opens
+        page.locator('[data-testid="card-relationships"]').click()
+        page.wait_for_url("**/architecture/**", timeout=PAGE_TIMEOUT)
+        assert len(_content(page)) > 50
     finally:
         context.close()
 

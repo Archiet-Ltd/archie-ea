@@ -107,3 +107,30 @@ def purge_org(org_id):
             db.session.execute(text("DELETE FROM %s WHERE organization_id = :o" % table), {"o": org_id})
         db.session.commit()
         db.session.remove()
+
+
+def add_imported_records(org_id, elements, relationships):
+    """Write ``elements`` elements and ``relationships`` relationships between them as an import's
+    direct insert writes rows: the rows alone, with the file named as their source and no history row."""
+    from sqlalchemy import insert
+
+    from app import create_app, db
+    from app.models import ArchiMateElement, ArchiMateRelationship
+
+    app = create_app("testing")
+    with app.app_context():
+        now = dt.datetime.utcnow()
+        ids = []
+        for number in range(elements):
+            result = db.session.execute(insert(ArchiMateElement.__table__).values(
+                name="Imported service %d" % number, type="ApplicationService", layer="Application",
+                organization_id=org_id, source_kind="import", source_label="landscape.xlsx", source_recorded_at=now,
+            ))
+            ids.append(result.inserted_primary_key[0])
+        for number in range(relationships):
+            db.session.execute(insert(ArchiMateRelationship.__table__).values(
+                type="serving", source_id=ids[number % len(ids)], target_id=ids[(number + 1) % len(ids)],
+                organization_id=org_id, source_kind="import", source_label="landscape.xlsx",
+            ))
+        db.session.commit()
+        db.session.remove()
