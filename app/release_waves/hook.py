@@ -105,15 +105,15 @@ def enforce():
             import secrets
 
             g.csp_nonce = secrets.token_urlsafe(32)
-        from app.release_waves.routes import coming_entries
+        from app.release_waves.routes import hub_context
 
-        out = make_response(render_template("public/early_access_hub.html", entries=coming_entries()))
+        out = make_response(render_template("public/early_access_hub.html", **hub_context()))
         out.headers["X-Robots-Tag"] = "noindex"
         return out
     if wants_json():
         response = jsonify(
             error="early_access",
-            message=f"{info['title']} is not open yet. Join the waiting list and we will tell you the day it opens.",
+            message=f"{info['title']} is not open yet. Join the waiting list and we will email you when you can use it.",
             early_access=f"/early-access/{slug}",
         )
         response.status_code = 404
@@ -122,10 +122,14 @@ def enforce():
         import secrets
 
         g.csp_nonce = secrets.token_urlsafe(32)
+    from app.release_waves.routes import named_by_the_list
+
+    # the page answered in place says what the hub and the features list call the capability
+    named = named_by_the_list(slug, features_only=True)
     out = make_response(render_template(
         "public/early_access.html",
         group_slug=slug,
-        group=info,
+        group={**info, **named},
         thanks=False,
         error=None,
         form_action=url_for("early_access.join", slug=slug),
