@@ -556,3 +556,11 @@ z-index: 45;
     stroke: hsl(var(--primary)) !important;
     stroke-width: 4px !important;
 }
+
+/* On a phone the unsaved-view card spans the canvas instead of shrinking to half its width, so it stays short
+   and leaves room below it for the drawing. */
+@media (max-width: 640px) {
+    #composer-focus-banner {
+        left: 8px; right: 8px; transform: none; max-width: none; padding: 8px 12px;
+    }
+}
