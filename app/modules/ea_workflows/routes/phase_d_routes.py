@@ -56,6 +56,124 @@ def _risk_tier(score: float) -> str:
     return "low"
 
 
+_DEBT_INPUTS = ("end-of-life date", "version", "support status")
+
+_OLD_VERSION_RULE_MAX_MAJOR = 7  # keep in step with TechnologyRoadmapService.score_technology_debt
+
+
+def _plain_list(names):
+    names = list(names)
+    if len(names) <= 1:
+        return "".join(names)
+    return ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def _debt_factors(result):
+    """Plain names for the inputs that raised an application's debt score."""
+    factors = []
+    eol = result.get("eol_score", 0)
+    if eol >= 100:
+        factors.append("End of life has passed")
+    elif eol >= 75:
+        factors.append("End of life within 12 months")
+    elif eol >= 50:
+        factors.append("End of life within 24 months")
+    if result.get("version_score", 0) > 0:
+        major = result.get("major_version")
+        factors.append(
+            "Major version %s (version %d or lower counts as old)" % (major, _OLD_VERSION_RULE_MAX_MAJOR)
+            if major is not None
+            else "Version counts as old"
+        )
+    support = result.get("support_status_score", 0)
+    if support >= 80:
+        factors.append("Unsupported by the vendor")
+    elif support > 0:
+        factors.append("Limited vendor support")
+    return factors
+
+
+def _debt_basis(result):
+    """Which of the three inputs a score was worked from, which are missing, which are unreadable."""
+    missing = [name for name in _DEBT_INPUTS if name in (result.get("missing_data") or [])]
+    unreadable = [name for name in _DEBT_INPUTS if name in (result.get("unreadable_data") or [])]
+    used = [name for name in _DEBT_INPUTS if name not in missing and name not in unreadable]
+    return used, missing, unreadable
+
+
+_SUPPORT_TEXT_SHOWN = 24
+
+
+def _shown_support_text(support_text):
+    """The recorded support text as quoted on a row: long values are cut with an ellipsis."""
+    if support_text and len(support_text) > _SUPPORT_TEXT_SHOWN:
+        return support_text[:_SUPPORT_TEXT_SHOWN] + "\u2026"
+    return support_text
+
+
+def _gaps_sentence(missing, unreadable, support_text=None, shorten=True):
+    parts = []
+    quoted = _shown_support_text(support_text) if shorten else support_text
+    if missing:
+        parts.append("%s not recorded" % _plain_list(missing))
+    if unreadable:
+        others = [name for name in unreadable if not (name == "support status" and support_text)]
+        if others:
+            parts.append("%s could not be read" % _plain_list(others))
+        if support_text and "support status" in unreadable:
+            parts.append("support status not recognised (recorded as \u201c%s\u201d)" % quoted)
+    return "; ".join(parts)
+
+
+def _debt_row(app_id, app_name, result):
+    """One Tech Debt row. Never states an input is in good standing unless it was recorded and read."""
+    row = {
+        "app_id": app_id,
+        "app_name": app_name,
+        "debt_score": None,
+        "risk_tier": None,
+        "factors": [],
+        "scored_from": [],
+        "missing": [],
+        "unreadable": [],
+        "reason": None,
+        "detail": None,
+        "detail_full": None,
+    }
+    if not result or result.get("missing_data") is None:
+        # The scorer failed or found nothing: say so, not that nothing was recorded.
+        row["reason"] = "Not rated: the score could not be worked out. Try again in a moment."
+        row["detail"] = row["reason"]
+        return row
+    used, missing, unreadable = _debt_basis(result)
+    support_text = result.get("unrecognised_support_status")
+    row.update(scored_from=used, missing=missing, unreadable=unreadable)
+    if not used:
+        if not unreadable:
+            row["reason"] = "Not rated: no " + ", ".join(_DEBT_INPUTS) + " recorded"
+        else:
+            row["reason"] = "Not rated: " + _gaps_sentence(missing, unreadable, support_text) + ". Record or correct them to get a score."
+            row["detail_full"] = "Not rated: " + _gaps_sentence(missing, unreadable, support_text, shorten=False) + ". Record or correct them to get a score."
+        row["detail"] = row["reason"]
+        return row
+    debt_score = result.get("debt_score", 0)
+    tier = _risk_tier(float(debt_score))
+    factors = _debt_factors(result)
+    row.update(debt_score=debt_score, risk_tier=tier, factors=factors)
+    if len(used) == len(_DEBT_INPUTS):
+        row["detail"] = ", ".join(factors) or (
+            "No debt factors: end of life, version and support status are all in good standing"
+        )
+    else:
+        lead = ", ".join(factors) or "No debt factors found in the recorded inputs"
+        template = "%s. Scored from the %s only; %s. Record the rest for a full score."
+        row["detail"] = template % (lead, _plain_list(used), _gaps_sentence(missing, unreadable, support_text))
+        row["detail_full"] = template % (
+            lead, _plain_list(used), _gaps_sentence(missing, unreadable, support_text, shorten=False)
+        )
+    return row
+
+
 @phase_d_bp.route("/api/ea/phase-d/debt-scores", methods=["GET"])
 @login_required
 def debt_scores():
@@ -75,24 +193,18 @@ def debt_scores():
         apps = ApplicationComponent.query.all()
         svc = TechnologyRoadmapService()
         scores = []
-        summary = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+        summary = {"critical": 0, "high": 0, "medium": 0, "low": 0, "not_rated": 0}
         for app in apps:
-            result = svc.score_technology_debt(app.id)
-            debt_score = result.get("debt_score", 0) if result else 0
-            tier = _risk_tier(float(debt_score))
-            summary[tier] += 1
-            scores.append(
-                {
-                    "app_id": app.id,
-                    "app_name": app.name,
-                    "debt_score": debt_score,
-                    "risk_tier": tier,
-                }
-            )
+            row = _debt_row(app.id, app.name, svc.score_technology_debt(app.id) or {})
+            if row["debt_score"] is None:
+                summary["not_rated"] += 1
+            else:
+                summary[row["risk_tier"]] += 1
+            scores.append(row)
         return jsonify({"scores": scores, "summary": summary}), 200
     except Exception as exc:
         logger.error("debt-scores error: %s", exc, exc_info=True)
-        return jsonify({"error": "Failed to compute debt scores", "detail": str(exc)}), 500
+        return jsonify({"error": "Could not compute the debt scores. Try again in a moment."}), 500
 
 
 # ---------------------------------------------------------------------------

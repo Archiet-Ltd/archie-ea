@@ -91,12 +91,17 @@ SCORED = {
 }
 
 
-def _open_dialog(browser, live_server, app, seeded, viewport, scheme, saved):
-    _seed_scenarios(app, seeded["emails"]["enterprise_architect"], saved)
+# the chief technology officer of the same organisation, whom the cost rule lets read cost figures: a journey
+# that reads a financial risk, or a ranking worked out from one, opens the dialog as them
+COST_READER = "cto"
+
+
+def _open_dialog(browser, live_server, app, seeded, viewport, scheme, saved, persona="enterprise_architect"):
+    _seed_scenarios(app, seeded["emails"][persona], saved)
     ctx = browser.new_context(viewport=viewport, color_scheme=scheme, ignore_https_errors=True,
                               accept_downloads=True)
     page = ctx.new_page()
-    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    _login(page, live_server, seeded["emails"][persona])
     page.goto(live_server + "/strategic/impact-analysis", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.wait_for_timeout(1500)
     trigger = page.get_by_role("button", name="Compare Scenarios")
@@ -116,7 +121,8 @@ def _compare(dialog, *names):
 @pytest.mark.journey
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=["1440-light", "390-dark"])
 def test_missing_figures_are_stated_not_shown_as_zero(browser, live_server, app, seeded, viewport, scheme, tmp_path):
-    ctx, page, trigger, dialog = _open_dialog(browser, live_server, app, seeded, viewport, scheme, SAVED + [SCORED])
+    ctx, page, trigger, dialog = _open_dialog(browser, live_server, app, seeded, viewport, scheme, SAVED + [SCORED],
+                                              persona=COST_READER)
     _compare(dialog, "Retire the legacy billing system", "Consolidate the billing databases")
     table = dialog.locator("table")
     expect(table).to_be_visible()
@@ -265,7 +271,8 @@ def _scored(scenario_id, name, severity, cost):
 def test_two_equal_scenarios_are_named_as_a_tie_and_a_lower_one_is_named_alone(browser, live_server, app, seeded, viewport, scheme):
     tied = [_scored("t1", "Retire the ledger", "HIGH", 25200), _scored("t2", "Replace the ledger", "HIGH", 25200)]
     lower = _scored("t3", "Keep the ledger", "LOW", 1000)
-    ctx, page, trigger, dialog = _open_dialog(browser, live_server, app, seeded, viewport, scheme, tied + [lower])
+    ctx, page, trigger, dialog = _open_dialog(browser, live_server, app, seeded, viewport, scheme, tied + [lower],
+                                              persona=COST_READER)
     _compare(dialog, "Retire the ledger", "Replace the ledger")
     sentence = dialog.get_by_test_id("scenario-recommendation")
     expect(sentence).to_have_text(

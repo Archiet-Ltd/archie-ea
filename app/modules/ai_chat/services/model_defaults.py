@@ -57,7 +57,7 @@ DEFAULT_MODELS = {
     "azure": "gpt-4o",
     "huggingface": "meta-llama/Llama-2-7b-chat-hf",
     "openrouter": "google/gemma-4-31b-it:free",
-    "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
+    "nvidia": "mistralai/mistral-large-4-1t-a52b",
 }
 
 # Founder's decision of 1 Nov 2026: DeepSeek is the platform model, capped at USD 62 a month. It supersedes the
@@ -123,11 +123,13 @@ FALLBACK_MODELS = {
         "openrouter/free",
     ),
     "nvidia": (
-        "nvidia/nemotron-3-ultra-550b-a55b",
+        "mistralai/mistral-large-4-1t-a52b",
+        "nvidia/nemotron-3.5-super-vl-120b-a12b",
         "nvidia/llama-3.1-nemotron-ultra-253b-v1",
         "nvidia/llama-3.1-nemotron-70b-instruct",
         "openai/gpt-oss-20b",
         "google/gemma-4-31b-it",
+        "nvidia/nemotron-3-ultra-550b-a55b",
     ),
 }
 
