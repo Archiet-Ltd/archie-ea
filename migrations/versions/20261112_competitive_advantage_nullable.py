@@ -2,8 +2,12 @@
 
 The field stored False both for an explicit No and for a field nobody had set, so the page
 could not say which. The column becomes a nullable boolean with no default: unset is NULL,
-Yes is true, No is false. A False already stored was never chosen by anyone, so it becomes
-unset and keeps reading "Not recorded". True rows are untouched.
+Yes is true, No is false.
+
+Every stored value is kept as it is. An import can record No on purpose, and the import
+records do not name every row an import created or changed, so no stored False can be proved
+unchosen. A row that was never set and still holds False keeps reading "No" until someone
+edits it; an answer somebody gave is never erased.
 
 The downgrade turns unset back into False, the form the column had before; no row is lost.
 
@@ -35,9 +39,11 @@ def upgrade():
         return
     op.execute(f"ALTER TABLE {_TABLE} ALTER COLUMN {_COLUMN} DROP DEFAULT")
     op.execute(f"ALTER TABLE {_TABLE} ALTER COLUMN {_COLUMN} DROP NOT NULL")
+    # A column that was text keeps its meaning: true-like text is Yes, false-like text is No.
     op.execute(
         f"ALTER TABLE {_TABLE} ALTER COLUMN {_COLUMN} TYPE boolean USING "
-        f"CASE WHEN lower({_COLUMN}::text) IN ('true', 't', 'yes', '1') THEN true ELSE NULL END"
+        f"CASE WHEN lower({_COLUMN}::text) IN ('true', 't', 'yes', '1') THEN true "
+        f"WHEN lower({_COLUMN}::text) IN ('false', 'f', 'no', '0') THEN false ELSE NULL END"
     )
 
 

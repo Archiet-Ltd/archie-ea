@@ -226,3 +226,11 @@ def test_there_is_one_title_case_helper(app):
     assert filters["humanize_key"] is title_keep_caps
     assert title_keep_caps("arb_submission") == ENUM_LABEL_OVERRIDES["arb_submission"]
     assert title_keep_caps("some_new_SaaS_code") == "Some New SaaS Code"
+
+
+def test_a_hyphen_in_a_typed_label_is_kept_and_each_part_is_capitalised():
+    from app.utils.template_utils import title_keep_caps
+
+    assert title_keep_caps("off-the-shelf") == "Off-The-Shelf"
+    assert title_keep_caps("line-of-business app") == "Line-Of-Business App"
+    assert title_keep_caps("single_sign_on") == "Single Sign On"

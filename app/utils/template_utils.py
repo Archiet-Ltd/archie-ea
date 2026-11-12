@@ -97,7 +97,11 @@ def title_keep_caps(value):
     spaces, a word with a capital after its first letter (SaaS, IoT, eCommerce)
     or an all-capital word of two to five letters (AI, SAML, API) stays as it
     was typed, and every other word is title-cased. The stored value is never
-    changed."""
+    changed.
+
+    A hyphen is kept: the values people type for an application type or category
+    (off-the-shelf, line-of-business) are hyphenated on purpose. Every key that goes
+    through humanize_key is snake_case, so no caller needs a hyphen read as a space."""
     if value is None:
         return value
     text = str(value)
