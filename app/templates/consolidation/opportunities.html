@@ -37,9 +37,12 @@
     <h2 class="text-lg font-semibold">Consolidation plans</h2>
     {% if forecast_failed %}
     {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'The savings forecast could not be calculated. Try again in a moment.', 'testid': 'opportunities-savings'}]) }}
+    {% elif not with_cost %}
+    {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'Savings figures are not shown for your role.', 'testid': 'opportunities-savings'}]) }}
     {% elif opportunities_included == 0 %}
     {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'No savings estimated yet: no opportunity has been included', 'testid': 'opportunities-savings'}]) }}
-    {% if 'unified_low_priority.consolidation_candidates' in flask.current_app.view_functions %}
+    {# With nothing ranked the one next step is the empty state above; it is not repeated here. #}
+    {% if ranked_items and 'unified_low_priority.consolidation_candidates' in flask.current_app.view_functions %}
     <p class="text-sm text-muted-foreground">A saving is estimated once a plan is approved. Start from a consolidation candidate.
         <a href="{{ url_for('unified_low_priority.consolidation_candidates') }}" class="text-primary hover:underline" data-testid="savings-next-step">Review consolidation candidates</a></p>
     {% endif %}
@@ -59,7 +62,7 @@
        consolidates into is the record the decision is made against. #}
     {% call(opp) list_table(rows=opportunities, columns=[('Opportunity', ''), ('Consolidate into', ''), ('Status', ''), ('Impact', '')], caption='Consolidation opportunities',
                             testid='opportunities-table', row_testid='opportunity-row', search_placeholder='Filter opportunities...',
-                            empty_message=empty_text, empty_action=_next_step) %}
+                            empty_message=empty_text, empty_action=(_next_step if ranked_items and with_cost and opportunities_included > 0 else none)) %}
         {% call table_cell(class='font-medium') %}{{ opp.name|default(opp.title|default('Unnamed')) }}{% endcall %}
         {% call table_cell() %}
             {% if opp.target_application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}

@@ -20,6 +20,7 @@ from .fresh_org import sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 DEMO_EMAIL = "demo@lantern-quay.example.com"
+RESTRICTED_EMAIL = "reader.nocost@lantern-quay.example.com"
 SHOTS = os.environ.get("CONSOLIDATION_OPPORTUNITY_SHOTS")
 VIEWPORTS = [
     pytest.param({"width": 1440, "height": 900}, "light", id="1440-light"),
@@ -52,6 +53,15 @@ def demo(live_server, app):
             user.password = PASSWORD
             user.is_org_admin = True
             OrgRole.set_role(org_id, user.id, "org_admin", granted_by_id=user.id)
+            reader = User.query.filter_by(email=RESTRICTED_EMAIL).first()
+            if reader is None:
+                # a person with no budget authority in the same organisation
+                reader = User(email=RESTRICTED_EMAIL, first_name="Reader", last_name="NoCost",
+                              organization_id=org_id, enterprise_role="solution_architect", confirmed=True)
+                reader.password = PASSWORD
+                db.session.add(reader)
+                db.session.flush()
+                OrgRole.set_role(org_id, reader.id, "viewer", granted_by_id=user.id)
             db.session.commit()
             db.session.remove()
     finally:
@@ -117,5 +127,29 @@ def test_both_pages_list_the_same_opportunities_and_savings_is_never_a_dead_end(
             response = page.goto(live_server + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
             text = page.locator("main, body").first.inner_text()
             assert response.status == 200 and len(text) > 200, (href, response.status, text[:200])
+    finally:
+        page.close()
+
+
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS)
+def test_a_person_without_budget_authority_sees_the_opportunities_but_no_cost(browser, live_server, demo, viewport, scheme):
+    page = browser.new_page(viewport=viewport, color_scheme=scheme)
+    try:
+        sign_in(page, live_server, RESTRICTED_EMAIL)
+        page.goto(live_server + "/enterprise/consolidation/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "/consolidation/opportunities" in page.url, page.url
+        expect(page.get_by_test_id("ranked-opportunity-row").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        main = page.locator("main").inner_text()
+        assert "Cost figures are not shown for your role" in main
+        for sign in ("$", "£", "€"):
+            assert sign not in main, (sign, main)
+        costs = page.get_by_test_id("opportunity-cost")
+        assert costs.count() >= 5
+        for i in range(costs.count()):
+            cell = costs.nth(i).inner_text()
+            assert not any(ch.isdigit() for ch in cell) and cell.strip(), cell
+        assert page.locator("[data-testid^='opportunities-savings-2']").count() == 0
+        expect(page.get_by_test_id("opportunities-savings")).to_contain_text("not shown for your role")
+        _shot(page, "consolidation-opportunities-restricted", viewport["width"])
     finally:
         page.close()
