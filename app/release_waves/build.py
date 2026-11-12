@@ -102,6 +102,14 @@ PREFIX_OVERRIDES: tuple = (
     ("/api/archimate/viewpoints/<viewpoint_key>/diagram$", "W1", "PG-APP", "the application cooperation diagram on the applications page"),
     ("/dashboard/api/archimate-elements/<int:element_id>/correct$", "W1", "PG-APP", "correct an element's type from the application page"),
     ("/api/ea-workflows/instances$", "W1", "PG-APP", "workflow list shown on the application page"),
+    # The Product page is an element page (wave 2); its add-an-element form and its export belong to it.
+    ("/architecture/products/<int:product_id>/elements$", "W2", "PG-ELE", "add an element to a Product from its page: the element pages open in wave 2"),
+    ("/architecture/products/<int:product_id>/export$", "W2", "PG-ELE", "download a Product page as a file: the element pages open in wave 2"),
+    # The capability picker on the element new and edit forms, which open in wave 3 with the composer and diagrams.
+    ("/architecture/api/capability-choices$", "W3", "PG-DIA", "the capabilities the element form's picker lists: the forms open in wave 3"),
+    # The whole-model map is the element impact graph with every element shown, so it opens with the element pages.
+    ("/archimate/model-map$", "W2", "PG-ELE", "the whole model as one graph: the element impact graph's whole-model mode"),
+    ("/archimate/api/model-map$", "W2", "PG-ELE", "the graph data the model map page reads"),
     ("/offers/inquire", "W1", "PG-PUB", "public enquiry and waiting-list form"),
     ("/t/plan-click", "W1", "PG-PUB", "public plan click counter"),
     ("/signup", "W1", "PG-ACC", "sign-up address"),
