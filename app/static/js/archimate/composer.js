@@ -4182,6 +4182,18 @@ function composerApp() {
             this._scheduleMiniMapUpdate();
         },
 
+        /* Every way of opening a drawing (a viewpoint, a saved view, a snapshot) fits it, then keeps it
+           readable: a large model fitted whole is a wall of shapes at 10%, so it opens at 50% on the
+           top-left of the drawing (Ctrl+0 still fits all). */
+        fitCanvasReadable: function() {
+            this.fitCanvas();
+            if (!this.paper || this.zoomPercent >= 50) return;
+            let area = this.graph.getBBox(this.graph.getElements());
+            this.setZoom(50);
+            if (area) this.paper.translate(40 - area.x * 0.5, 40 - area.y * 0.5);
+            this._scheduleMiniMapUpdate();
+        },
+
         /* CMP-026: Sanitize HTML for x-html bindings */
         sanitizeHtml: function(text) { return _sanitizeForHtml(text); },
 
