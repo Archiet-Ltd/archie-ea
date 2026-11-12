@@ -139,6 +139,49 @@ def find_restore_point(org_id: int):
     return None
 
 
+def written_by_the_sample(org_id: int, removed_only: bool = False) -> set:
+    """What the sample company wrote in this organisation, loaded now or removed since.
+
+    Pairs of (the change history's name for the table, the record's id). The restore point keeps
+    the ids of everything a load brought in, and keeps them after the removal, so the history of a
+    removed sample can still be told from the history of anything the organisation added itself.
+    With ``removed_only`` only the loads since removed are read.
+    """
+    from app.models.import_audit import ImportSessionLog
+    from app.services.import_snapshot_service import IMPORT_SOURCE
+
+    history_name = {
+        "archimate_elements": "archimate_elements", "archimate_relationships": "archimate_relationships",
+        "application_components": "application_component", "business_capability": "business_capability",
+        "solutions": "solution", "unified_capabilities": "unified_capabilities",
+    }
+    keys = set()
+    for log in ImportSessionLog.query.filter(
+        ImportSessionLog.organization_id == org_id, ImportSessionLog.import_source == IMPORT_SOURCE
+    ):
+        data = log.snapshot_data or {}
+        if data.get("model_name") != SAMPLE_MODEL_NAME or (removed_only and not log.is_rolled_back):
+            continue
+        keys |= {("archimate_elements", int(i)) for i in data.get("created_element_ids") or []}
+        keys |= {("archimate_relationships", int(i)) for i in data.get("created_relationship_ids") or []}
+        for item in data.get(_ROWS_KEY) or []:
+            if item["table"] in history_name:
+                keys.add((history_name[item["table"]], int(item["id"])))
+        # each contract also stands as an element of the model, which the removal takes with the rest
+        contracts = [int(i["id"]) for i in data.get(_ROWS_KEY) or [] if i["table"] == "vendor_contracts"]
+        if contracts:
+            from app.models.application_portfolio import VendorContract
+
+            keys |= {
+                ("archimate_elements", int(element_id))
+                for (element_id,) in db.session.query(VendorContract.archimate_element_id).filter(
+                    VendorContract.id.in_(contracts), VendorContract.organization_id == org_id,
+                    VendorContract.archimate_element_id.isnot(None),
+                )
+            }
+    return keys
+
+
 def _remember(log, rows: List[Dict[str, Any]], mirrors: List[int]) -> None:
     """Keep the added rows on the restore point, and the elements mirrored for them."""
     data = dict(log.snapshot_data or {})
@@ -148,7 +191,7 @@ def _remember(log, rows: List[Dict[str, Any]], mirrors: List[int]) -> None:
     flag_modified(log, "snapshot_data")
 
 
-def _cite(org_id: int, mirrored_elements: List[int], relationships_before: set, recorded_at) -> None:
+def _cite(org_id: int, mirrored_elements: List[int], relationships_before: set, recorded_at) -> List[int]:
     """Give what the added rows brought into the model the file's own source.
 
     The mirrored elements and the links drawn from the capability mappings are
@@ -161,6 +204,8 @@ def _cite(org_id: int, mirrored_elements: List[int], relationships_before: set, 
     who clicked Load the sample company as its drawer. These rows are the sample
     file's, not that person's, so this overwrites whatever that listener set for
     exactly the rows this load just added — never anything it did not add.
+
+    Returns the ids of the relationships it cited, so the restore point can name them.
     """
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
@@ -171,11 +216,14 @@ def _cite(org_id: int, mirrored_elements: List[int], relationships_before: set, 
             ArchiMateElement.id.in_(mirrored_elements), ArchiMateElement.organization_id == org_id,
         ):
             element.source_kind, element.source_label, element.source_recorded_at = SOURCE_KIND, SOURCE_LABEL, when
+    cited = []
     for rel in ArchiMateRelationship.query.filter(
         ArchiMateRelationship.organization_id == org_id,
     ):
         if rel.id not in relationships_before:
             rel.source_kind, rel.source_label, rel.source_recorded_at = SOURCE_KIND, SOURCE_LABEL, when
+            cited.append(int(rel.id))
+    return cited
 
 
 class LoadBusy(Exception):
@@ -286,6 +334,8 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
             organization_id=org_id, source_table=SOURCE_TABLE, source_id=str(row.id),
         ).first()
         if projected is not None:
+            # the sample corrects the projection, so the change history lists it among the sample's writes
+            note("unified_capabilities", projected)
             projected.capability_type = _CAPABILITY_TYPES[name]
             db.session.refresh(row)
             if projected.archimate_element_id is None and row.archimate_element_id:
@@ -389,7 +439,11 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     for solution in solutions:
         note("solutions", solution)
 
-    _cite(org_id, mirrors, relationships_before, log.started_at)
+    # the links the model's sync drew for the sample are the sample's too, so its restore point names them
+    noted.extend(
+        {"table": "archimate_relationships", "id": rid}
+        for rid in _cite(org_id, mirrors, relationships_before, log.started_at)
+    )
     _remember(log, noted, mirrors)
     return {"applications": len(applications), "capabilities": len(capabilities), "risks": len(_RISKS),
             "solutions": len(_SOLUTIONS)}
