@@ -257,6 +257,7 @@ def impact_analysis():
     """Impact analysis dashboard — architecture change ripple-effect visualization."""
     from app.middleware.tenant_context import current_org_id
     from app.services.priority_action_service import limit_for, prioritised_actions
+    from app.services.risk_service import footers_by_risk
 
     return render_template(
         "strategic/impact_analysis.html",
@@ -264,7 +265,8 @@ def impact_analysis():
         scenario_list_limit=SCENARIO_LIST_LIMIT,
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
-        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
         **_model_state(),
     )
 
@@ -334,6 +336,7 @@ def simulations_page():
     """The simulations page: the impact analysis screen in its "try it on a copy" form."""
     from app.middleware.tenant_context import current_org_id
     from app.services.priority_action_service import limit_for, prioritised_actions
+    from app.services.risk_service import footers_by_risk
 
     return render_template(
         "strategic/impact_analysis.html",
@@ -342,7 +345,8 @@ def simulations_page():
         scenario_list_limit=SCENARIO_LIST_LIMIT,
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
-        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
         **_model_state(),
     )
 
