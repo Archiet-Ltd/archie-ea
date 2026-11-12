@@ -66,7 +66,7 @@ def _seed(org_id, admin_id, label):
         out["config_name"] = "Framework %s %s" % (label, suffix)
         cfg = CapabilityFrameworkConfiguration(
             configuration_name=out["config_name"], configuration_code="J-%s-%s" % (label, suffix),
-            organization_id=org_id, status="draft",
+            organization_id=org_id, organization_name="Org %s" % label, status="draft",
         )
         db.session.add(cfg)
         db.session.commit()
@@ -156,6 +156,8 @@ def test_org_admin_works_their_own_requests_and_framework_configuration(
         page.get_by_role("link", name=mine["config_name"]).first.click()
         page.wait_for_url("**/framework-config/configuration/%d" % mine["config_id"], timeout=PAGE_TIMEOUT)
         assert "could not be found" not in page.content()
+        assert "No framework configuration yet" not in page.content()
+        expect(page.get_by_text("Capability levels").first).to_be_visible()
         expect(page.locator("h1").first).to_be_visible()
         page.screenshot(path=str(shots / ("framework-configuration-%s.png" % tag)))
         gone = page.goto(live_server + "/framework-config/configuration/%d" % theirs["config_id"],

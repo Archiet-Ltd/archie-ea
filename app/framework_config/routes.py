@@ -158,6 +158,7 @@ def view_configuration(config_id):
         return render_template(
             "framework_config/dashboard.html",
             configuration=configuration,
+            active_config=configuration,
             validation_result=validation_result,
             instances=instances,
             enabled_extensions=extension_details,
