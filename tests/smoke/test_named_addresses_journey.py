@@ -219,11 +219,11 @@ def test_compare_scenarios_opens_a_dialog(browser, server):
 
 def test_consolidation_opportunities_list_agrees_with_its_savings_and_links_to_the_application(browser, server):
     suffix = uuid.uuid4().hex[:6]
-    mine = create_fresh_org("enterprise_architect")
+    mine = create_fresh_org("portfolio_manager")
     opportunity_id, target_id = _seed_opportunity(mine["org_id"], suffix)
     try:
         page = _context(browser).new_page()
-        sign_in(page, server, mine["emails"]["enterprise_architect"])
+        sign_in(page, server, mine["emails"]["portfolio_manager"])
         page.goto(server + "/enterprise/consolidation/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         if page.get_by_test_id("early-access-page").count():
             # the first release closes this screen: it says so and offers the waiting list
@@ -244,7 +244,7 @@ def test_consolidation_opportunities_list_agrees_with_its_savings_and_links_to_t
         expect(page.get_by_test_id("opportunities-savings-row-1")).to_contain_text("From 1 opportunity")
         _shot(page, "opportunities-list-1440-light")
         phone = _context(browser, 390, dark=True).new_page()
-        sign_in(phone, server, mine["emails"]["enterprise_architect"])
+        sign_in(phone, server, mine["emails"]["portfolio_manager"])
         phone.goto(server + "/enterprise/consolidation/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(phone.get_by_test_id("opportunities-table")).to_be_visible()
         _shot(phone, "opportunities-list-390-dark")
@@ -422,3 +422,42 @@ def test_an_organisation_with_fewer_than_two_applications_is_told_to_add_applica
     again = _open_candidates(browser, server, bare["emails"]["enterprise_architect"])
     assert "at least two applications" not in again.locator("main").inner_text()
     expect(again.locator("main")).to_contain_text("Run the comparison")
+
+
+def test_the_empty_consolidation_opportunities_page_offers_its_next_step_once(browser, server):
+    empty = create_fresh_org("enterprise_architect")
+    page = _context(browser).new_page()
+    sign_in(page, server, empty["emails"]["enterprise_architect"])
+    page.goto(server + "/enterprise/consolidation/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    if page.get_by_test_id("early-access-page").count():
+        # the first release closes this screen: it says so and offers the waiting list
+        expect(page.get_by_test_id("early-access-submit")).to_be_visible()
+        return
+    expect(page.locator("main")).to_contain_text("No opportunity has been found")
+    links = page.locator("main").get_by_role("link", name="Review consolidation candidates")
+    assert links.count() == 1, links.count()
+    links.first.click()
+    page.wait_for_load_state("domcontentloaded")
+    expect(page.get_by_role("heading", name="Consolidation Candidates").first).to_be_visible()
+
+
+def test_a_person_without_budget_authority_sees_no_savings_figure_on_consolidation_opportunities(browser, server):
+    suffix = uuid.uuid4().hex[:6]
+    mine = create_fresh_org("enterprise_architect")
+    opportunity_id, target_id = _seed_opportunity(mine["org_id"], suffix)
+    try:
+        for width, dark in ((1440, False), (390, True)):
+            page = _context(browser, width, dark).new_page()
+            sign_in(page, server, mine["emails"]["enterprise_architect"])
+            page.goto(server + "/enterprise/consolidation/opportunities", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            if page.get_by_test_id("early-access-page").count():
+                expect(page.get_by_test_id("early-access-submit")).to_be_visible()
+                return
+            expect(page.get_by_test_id("opportunities-savings")).to_contain_text("not shown for your role")
+            main = page.locator("main").inner_text()
+            for sign in ("$", "£", "€"):
+                assert sign not in main, (sign, main)
+            assert page.locator("[data-testid^='opportunities-savings-2']").count() == 0
+            _shot(page, "opportunities-restricted-%d" % width)
+    finally:
+        _drop_opportunity(opportunity_id, target_id)
