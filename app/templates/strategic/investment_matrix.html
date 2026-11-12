@@ -9,16 +9,24 @@
 {% from 'components/badge.html' import badge %}
 {% import 'basecoat/index.html' as ui %}
 
-{% block title %}Investment Prioritization Matrix{% endblock %}
+{% block title %}Investment prioritisation matrix{% endblock %}
 
 {% block breadcrumb %}
 {% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Strategy Layer', 'href': url_for('archimate_crud.dashboard') + '#strategy'},
-    {'text': 'Strategic Planning', 'href': url_for('enterprise.strategic_planning_dashboard')},
-    {'text': 'Investment Matrix', 'current': true}
-]) }}
+{#- The trail reads the way the sidebar is laid out: Home, its section, then this page's entry. -#}
+{%- set _where = page_trail() if page_trail is defined else {'trail': [], 'home': url_for('main.index')} -%}
+{%- set _crumbs = namespace(items=[{'text': 'Home', 'href': _where.home, 'icon': 'home'}]) -%}
+{%- for label, href in _where.trail -%}
+{%- if loop.last -%}
+{%- set _crumbs.items = _crumbs.items + [{'text': label, 'current': true}] -%}
+{%- else -%}
+{%- set _crumbs.items = _crumbs.items + [{'text': label, 'href': href} if href else {'text': label}] -%}
+{%- endif -%}
+{%- endfor -%}
+{%- if not _where.trail -%}
+{%- set _crumbs.items = _crumbs.items + [{'text': 'Investments', 'current': true}] -%}
+{%- endif -%}
+{{ breadcrumb_nav(items=_crumbs.items) }}
 {% endblock %}
 
 {% block content %}
@@ -36,7 +44,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
 
 <div class="space-y-6" x-data="investmentMatrix()" x-cloak>
     {{ page_header(
-        title='Investment Prioritization Matrix',
+        title='Investment prioritisation matrix',
         description='Data-driven investment recommendations based on strategic importance, coverage gaps, and risk assessment',
         actions=[
             {'text': 'Compare Scenarios', 'icon': 'git-compare', 'onclick': "$dispatch('open-scenario-comparison')", 'variant': 'outline'},
@@ -52,6 +60,15 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                 <div data-slot="card-title" class="text-2xl font-bold tabular-nums text-primary">{% if scores_error %}Unavailable{% else %}{{ portfolio_metrics.total_capabilities if portfolio_metrics.total_capabilities is not none else '—' }}{% endif %}</div>
                 <i data-lucide="layers" class="absolute top-4 right-4 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
             </div>
+            {% if not scores_error %}
+            <div class="px-6 pb-4 text-sm text-muted-foreground" data-testid="total-capabilities-scope">
+                {%- if portfolio_metrics.shared_capabilities -%}
+                {{ portfolio_metrics.own_capabilities }} of your own and {{ portfolio_metrics.shared_capabilities }} from the shared catalogue
+                {%- else -%}
+                Your organisation's capabilities
+                {%- endif -%}
+            </div>
+            {% endif %}
         </div>
         <div data-slot="card" data-testid="critical-priorities" class="rounded-lg border bg-card text-card-foreground @container/card">
             <div data-slot="card-header" class="relative flex flex-col space-y-1.5 p-6 pb-2">
