@@ -122,11 +122,11 @@ def _gap_rows(organization_id: int) -> List[Dict[str, Any]]:
         sev = _severity_label(gap_register_service.effective_severity(gap))
         lead = ("%s severity" % sev) if sev else "Severity not recorded"
         if addressed:
-            action = "Close the %s once its work is done" % name
+            action = "Close the gap \u201c%s\u201d once its work is done" % name
             why = "%s; work is linked but the gap is still open." % lead
             group = _GROUP_GAP_COVERED
         else:
-            action = "Convert the %s to a work package" % name
+            action = "Convert the gap \u201c%s\u201d to a work package" % name
             why = "%s; no work package addresses it yet." % lead
             group = _GROUP_GAP_UNCOVERED
         record = result_footer_service.page_link(
