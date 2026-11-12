@@ -1210,3 +1210,86 @@ entries:
         regex: 'def\s+_?normali[sz]ed_type\s*\('
         scope: [app]
         suffixes: [.py]
+
+  - id: connector-framework
+    concept: How a connector changes its configuration, keeps its credentials, and makes the inventory row for an element it reads
+    status: active
+    canonical:
+      path: app/services/connector_framework.py
+      symbols: [propose_connector_change, apply_connector_change, BaseConnector.persist_records, propose_connector_sync, MULTI_CONNECTION_CREDENTIAL_TYPES, OWN_PAGE_CONNECTOR_TYPES, ensure_application_row]
+    reuse: >
+      A connector changes its configuration only through the change path (propose_connector_change,
+      apply_connector_change). A connector type that keeps one credential for each connection is named in
+      MULTI_CONNECTION_CREDENTIAL_TYPES; do not write a second per-connection credential scheme. The inventory row
+      of a connector element is made by ensure_application_row; do not write a second one.
+    must_not_create:
+      - id: second-multi-connection-list
+        regex: 'MULTI_CONNECTION_CREDENTIAL_TYPES\s*='
+        scope: [app]
+        suffixes: [.py]
+      - id: second-application-row-helper
+        regex: 'def\s+ensure_application_row\s*\('
+        scope: [app]
+        suffixes: [.py]
+
+  - id: outbound-address-guard
+    concept: The check that an address a customer or a customer's server supplied is one the server may call
+    status: active
+    canonical:
+      path: app/utils/ssrf_guard.py
+      symbols: [validate_user_supplied_url, validate_outbound_url, clamp_timeout]
+    reuse: >
+      Every address a connector requests that a customer or a customer's server supplied passes
+      validate_connector_url, which calls the guard. Do not write a second address check.
+    must_not_create:
+      - id: second-address-check-function
+        regex: 'def\s+_?(is_private_ip|is_internal_ip|is_internal_url|is_internal_host|is_blocked_ip|is_blocked_url|is_safe_url|validate_url_safe|is_public_ip)\s*\('
+        scope: [app]
+        suffixes: [.py]
+      - id: hand-rolled-private-range-test
+        regex: '\.(is_private|is_loopback|is_link_local)\b'
+        scope: [app]
+        suffixes: [.py]
+
+  - id: mcp-client
+    concept: Entelim as a client of a customer's MCP server (the only sender of resource reads)
+    status: pending
+    pending_branch: ui/mcpsrc01
+    canonical:
+      path: app/services/api_clients/mcp_client.py
+      symbols: [McpClient, ALLOWED_METHODS]
+    reuse: >
+      Requests to a customer's MCP server are sent only by McpClient. Do not write a second sender of
+      resources/read or a second session header handler.
+    must_not_create:
+      - id: second-resource-read-sender
+        regex: '"method":\s*"resources/'
+        scope: [app]
+        suffixes: [.py]
+      - id: second-session-header
+        regex: 'Mcp-Session-Id'
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/modules/mcp/
+        reason: that module is Entelim as a server, the opposite direction
+
+  - id: mcp-source-connector
+    concept: The connector that reads a customer's MCP server resources into the model, and cleans the text it reads
+    status: pending
+    pending_branch: ui/mcpsrc01
+    canonical:
+      path: app/connectors/mcp_source.py
+      symbols: [McpSourceConnector, clean_source_text, LIMITS]
+    reuse: >
+      Text read from an MCP server is cleaned by clean_source_text and records are written by McpSourceConnector.
+      Do not write a second text cleaner for connector text or a second writer of source_system mcp_source.
+    must_not_create:
+      - id: second-connector-text-cleaner
+        regex: 'def\s+clean_source_text\s*\('
+        scope: [app]
+        suffixes: [.py]
+      - id: second-source-system-writer
+        regex: 'source_system\s*=\s*["'']mcp_source["'']'
+        scope: [app]
+        suffixes: [.py]
