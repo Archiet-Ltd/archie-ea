@@ -8,10 +8,14 @@
    stored answer's own element map. The card for a connection opens that element in the
    Composer; the answer card opens the answer at its permanent address. #}
 {% set kind = answer.question_kind %}
-{% set upstream = kind == 'impact' and (answer.params or {}).get('direction') == 'upstream' %}
+{% set walks_up = kind == 'impact' and (answer.params or {}).get('direction') == 'upstream' %}
+{# Nothing depends on the element but it has links of its own: those links are the answer's rows,
+   read with their sources, and the wording says that nothing depends on it. #}
+{% set upstream = depends_on if (depends_on and not answer.rows) else none %}
+{% set shown = upstream or answer %}
 {% set shown_limit = shown_limit | default(25) %}
 {% macro name_of(element_id) -%}
-{%- set known = answer.elements.get(element_id | string) -%}{{ known.name if known else '—' }}
+{%- set known = shown.elements.get(element_id | string) -%}{{ known.name if known else '—' }}
 {%- endmacro %}
 {% macro name_list(names) -%}
 {%- if names | length > 1 -%}{{ names[:-1] | join(', ') }} and {{ names[-1] }}{%- else -%}{{ names | join('') }}{%- endif -%}
@@ -28,20 +32,22 @@
     {% set heading = 'Risks that reach ' ~ name_of(answer.params.element_id) %}
 {% elif kind == 'set_impact' %}
     {% set heading = 'What breaks if these fail together' %}
-{% elif upstream %}
+{% elif walks_up %}
     {% set heading = 'What ' ~ name_of(answer.params.element_id) ~ ' depends on' %}
 {% else %}
     {% set heading = 'What breaks if ' ~ name_of(answer.params.element_id) ~ ' fails' %}
 {% endif %}
 {% set total = answer.summary.total %}
-<div class="space-y-3" data-answer-cards data-question="{{ question }}" data-answer-address="{{ answer.address }}" data-answer-kind="{{ kind }}"{% if part %} data-part="{{ part }}"{% endif %}>
+<div class="space-y-3" data-answer-cards data-question="{{ question }}"{% if answer.params.element_id and kind == 'impact' %} data-element-id="{{ answer.params.element_id }}"{% endif %} data-answer-address="{{ answer.address }}" data-answer-kind="{{ kind }}"{% if part %} data-part="{{ part }}"{% endif %}>
     {% call card() %}
         {% call card_header() %}
             {% call card_title(class='text-base') %}{{ heading }}{% endcall %}
             {% call card_description() %}
                 {% set sources = answer | connection_sources %}
                 {% if total %}<span data-source-summary>{{ total }} connection{{ '' if total == 1 else 's' }} in your records{% if sources.sentence %}{% if sources.shown != total %}; of the first {{ sources.shown }} shown, {% else %}: {% endif %}{{ sources.sentence }}{% endif %}.</span>
+                {% elif upstream %}<span data-source-summary>Nothing is recorded as depending on {{ name_of(answer.params.element_id) }}. It is itself connected to others: {{ upstream.summary.total }} other element{{ '' if upstream.summary.total == 1 else 's' }}.</span>
                 {% else %}Nothing is recorded as connected to this yet.{% endif %}
+                {% if (total or upstream) and recorded_links is not none %}<span data-recorded-links>{{ name_of(answer.params.element_id) }} has {{ recorded_links.total }} relationship{{ '' if recorded_links.total == 1 else 's' }} recorded: {{ recorded_links.from_it }} {{ 'leads' if recorded_links.from_it == 1 else 'lead' }} from it and {{ recorded_links.to_it }} {{ 'leads' if recorded_links.to_it == 1 else 'lead' }} to it, reaching {{ recorded_links.reached }} other element{{ '' if recorded_links.reached == 1 else 's' }}.</span>{% endif %}
             {% endcall %}
         {% endcall %}
         {% if kind not in ('risk_propagation', 'set_impact') and answer.rows %}
@@ -55,7 +61,7 @@
         {# A system reached by several paths is named once, and one reached directly is not named again as indirect. #}
         {% set near = ns.near | unique | list %}{% set far = ns.far | unique | reject('in', near) | list %}
         {% if near %}{% call card_content(class='pb-0') %}
-            {% if upstream %}<p class="text-sm" data-testid="answer-sentence">{{ name_of(answer.params.element_id) }} depends directly on {{ name_list(near[:shown_limit]) }}{% if far %}, and through {{ 'it' if near | length == 1 else 'them' }} on {{ name_list(far[:shown_limit]) }}{% endif %}.</p>
+            {% if walks_up %}<p class="text-sm" data-testid="answer-sentence">{{ name_of(answer.params.element_id) }} depends directly on {{ name_list(near[:shown_limit]) }}{% if far %}, and through {{ 'it' if near | length == 1 else 'them' }} on {{ name_list(far[:shown_limit]) }}{% endif %}.</p>
         {% else %}<p class="text-sm" data-testid="answer-sentence">If {{ name_of(answer.params.element_id) }} fails, {{ name_list(near[:shown_limit]) }} {{ 'is' if near | length == 1 else 'are' }} affected directly{% if far %}, and {{ name_list(far[:shown_limit]) }} through {{ 'it' if near | length == 1 else 'them' }}{% endif %}.</p>{% endif %}
         {% endcall %}{% endif %}
         {% endif %}
@@ -77,17 +83,19 @@
         {% endcall %}
         {% endif %}
         {% call card_footer(class='flex-wrap gap-2') %}
-            {{ button(text='Open this answer', variant='outline', size='sm', href=answer.page_url, icon='external-link', testid='answer-open') }}
+            {{ button(text='Open this answer', variant='outline', size='sm', href=shown.page_url, icon='external-link', testid='answer-open') }}
         {% endcall %}
     {% endcall %}
 
-    {% if not answer.rows %}
-        {{ empty_state(icon='search', title=('Nothing is recorded as something this depends on yet' if upstream else 'Nothing is recorded as depending on this yet'), description=('No connections lead into it. Nothing is missing: there is simply nothing recorded.' if upstream else 'No connections lead from here. Nothing is missing: there is simply nothing recorded.'), padding='py-6') }}
+    {% if upstream %}
+        <p class="text-sm text-muted-foreground" data-depends-on>{{ name_of(answer.params.element_id) }} is connected to {% set ns_up = namespace(names=[]) %}{% for row in upstream.rows %}{% set up_name = (upstream.elements.get(row.element_id | string) or {}).get('name') %}{% if up_name %}{% set ns_up.names = ns_up.names + [up_name] %}{% endif %}{% endfor %}{{ name_list(ns_up.names | unique | list) }}.</p>
+    {% elif not answer.rows %}
+        {{ empty_state(icon='search', title=('Nothing is recorded as something this depends on yet' if walks_up else 'Nothing is recorded as depending on this yet'), description=('No connections lead into it. Nothing is missing: there is simply nothing recorded.' if walks_up else 'No connections lead from here. Nothing is missing: there is simply nothing recorded.'), padding='py-6') }}
     {% endif %}
 
-    {% for row in answer.rows[:shown_limit] %}
+    {% for row in shown.rows[:shown_limit] %}
     {% set relation = row.relation or {} %}
-    {% set element = answer.elements.get(row.element_id | string) or {} %}
+    {% set element = shown.elements.get(row.element_id | string) or {} %}
     {% set owner_names = (row.owners or []) | map(attribute='name') | select | unique | list %}
     {% call card(class='p-4') %}
         <div class="flex flex-wrap items-center justify-between gap-2" data-answer-row data-kind="{{ relation.kind }}">
@@ -205,10 +213,10 @@
         </section>
     {% endcall %}
 
-    {% if answer.rows | length > shown_limit %}
+    {% if shown.rows | length > shown_limit %}
     <p class="text-sm text-muted-foreground" data-answer-more>
-        Showing {{ shown_limit }} of {{ answer.rows | length }}.
-        <a class="underline underline-offset-4" href="{{ answer.page_url }}">See every connection</a>
+        Showing {{ shown_limit }} of {{ shown.rows | length }}.
+        <a class="underline underline-offset-4" href="{{ shown.page_url }}">See every connection</a>
     </p>
     {% endif %}
 </div>

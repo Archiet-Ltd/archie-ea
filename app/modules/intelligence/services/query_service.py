@@ -871,8 +871,11 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
     Cycle-safe: a node already visited is never re-queued, so this
     terminates even on a cyclic graph within ``max_depth`` iterations.
     """
-    from app.models import ArchiMateRelationship
+    from app.models import ArchiMateElement, ArchiMateRelationship
 
+    # A relationship with a deleted element at either end is not walked: the row stays for a
+    # restore, but no answer reads it, so no row is named for an element that is gone.
+    live = db.select(ArchiMateElement.id).where(ArchiMateElement.deleted_at.is_(None))
     frontier: Dict[int, Dict[str, List[int]]] = {root_id: {"chain": [], "chain_elements": [root_id]}}
     visited = {root_id}
     rows: List[Dict[str, Any]] = []
@@ -890,7 +893,13 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
             break
 
         rels = (
-            db.session.execute(db.select(ArchiMateRelationship).where(db.or_(*conditions)))
+            db.session.execute(
+                db.select(ArchiMateRelationship).where(
+                    db.or_(*conditions),
+                    ArchiMateRelationship.source_id.in_(live),
+                    ArchiMateRelationship.target_id.in_(live),
+                )
+            )
             .scalars()
             .all()
         )
