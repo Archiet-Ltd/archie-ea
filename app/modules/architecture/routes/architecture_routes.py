@@ -15,7 +15,7 @@ import logging
 
 from flask import Blueprint, current_app, flash, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 
@@ -356,16 +356,17 @@ def solutions_architecture_dashboard():
     """Solutions architecture dashboard."""
     try:
         from app import db
-        from app.models.truly_missing_models import (
-            Solution,
-            SolutionContract,
-            SolutionPattern,
-        )
+        from app.decorators.requires_role import may_see_contract_pages
+        from app.models.truly_missing_models import Solution, SolutionPattern
+        from app.services.vendor_register import register_contracts
 
         # Get counts for metrics cards
         solution_count = Solution.query.count()
         pattern_count = SolutionPattern.query.count()
-        contract_count = SolutionContract.query.count()
+        # The Contracts register's own reader, shown only to people who may open that register.
+        contract_count = (
+            len(register_contracts(current_user.organization_id)) if may_see_contract_pages(current_user) else None
+        )
 
         # Get solutions with their capability counts
         solutions_objs = Solution.query.limit(500).all()
