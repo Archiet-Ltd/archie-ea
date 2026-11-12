@@ -294,22 +294,16 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
                 fmt_args["interface_type"] = getattr(obj, "interface_type", name)
             description = template.format(**fmt_args)
 
-        # A gap record's own element does not get a second record made for it.
-        mark = _element_for_gap_record.set(True) if type_name == "Gap" else None
-        try:
-            element = create_backbone_element(
-                element_type=element_type,
-                layer=layer,
-                name=name,
-                description=description,
-                organization_id=org_id,
-                session=session,
-                provenance=properties,
-                flush=flush,
-            )
-        finally:
-            if mark is not None:
-                _element_for_gap_record.reset(mark)
+        element = create_backbone_element(
+            element_type=element_type,
+            layer=layer,
+            name=name,
+            description=description,
+            organization_id=org_id,
+            session=session,
+            provenance=properties,
+            flush=flush,
+        )
         obj.archimate_element_id = element.id
         return element
     finally:
@@ -389,23 +383,47 @@ def _pending_map(session):
     return _PENDING[sid]
 
 
-_element_for_gap_record: ContextVar = ContextVar("element_for_gap_record", default=False)
+_NEW_GAP_ELEMENTS = "new_gap_elements"
 
 
-def _add_gap_record(session, element):
-    """A new Gap element of an organisation gets its gap record in the same flush, so the Gaps page lists it.
+def _note_gap_element(session, element):
+    """Remember a new element; a Gap element of an organisation gets its gap record when the work is committed."""
+    if (element.type or "").lower() == "gap":
+        session.info.setdefault(_NEW_GAP_ELEMENTS, []).append(element)
 
-    Whoever writes the element (Composer, model map, import, create form) writes the record with it; a
-    read of the register writes nothing. A record already pointing at the element is left alone."""
-    if (element.type or "").lower() != "gap" or not element.organization_id or element.superseded_at is not None:
+
+def _on_before_commit(session):
+    """Give each Gap element written in this transaction its gap record, unless a record already points at it.
+
+    Whoever writes the element (Composer, model map, import, create form) writes the record with it, so the
+    Gaps page lists it and a read of the register writes nothing. It runs at commit because a writer that
+    makes its own record links the element to it after the element is flushed. No other transaction can see
+    the element before this commit, so two records for one element cannot be made here at the same time."""
+    if session.new or session.dirty or session.deleted:
+        session.flush()  # the elements still waiting for the commit's own flush are noted here
+    elements = session.info.pop(_NEW_GAP_ELEMENTS, None)
+    if not elements:
         return
-    if _element_for_gap_record.get():
-        return
+    from app.models.implementation_migration import Gap
     from app.services.gap_register_service import gap_record_for_element
 
-    if element.gap:
+    live = [e for e in elements
+            if e.id is not None and e.organization_id and e.superseded_at is None and e in session]
+    if not live:
         return
-    session.add(gap_record_for_element(element))
+    claimed = {
+        row[0] for row in session.query(Gap.archimate_element_id).filter(
+            Gap.archimate_element_id.in_([e.id for e in live]))
+    }
+    for element in live:
+        if element.id not in claimed:
+            claimed.add(element.id)
+            session.add(gap_record_for_element(element))
+    session.flush()
+
+
+def _forget_gap_elements(session, *_):
+    session.info.pop(_NEW_GAP_ELEMENTS, None)
 
 
 def _on_before_flush(session, flush_context, instances):
@@ -424,7 +442,7 @@ def _on_before_flush(session, flush_context, instances):
     for obj in list(session.new):
         type_name = type(obj).__name__
         if type_name == "ArchiMateElement":
-            _add_gap_record(session, obj)
+            _note_gap_element(session, obj)
             continue
         if type_name not in FLUSH_LISTENER_ALLOW_LIST:
             continue
@@ -483,6 +501,10 @@ def register_archimate_listeners():
         _sa_event.listen(db.session, "after_flush", _on_after_flush)
     if not _sa_event.contains(db.session, "after_rollback", _on_after_rollback):
         _sa_event.listen(db.session, "after_rollback", _on_after_rollback)
+    if not _sa_event.contains(db.session, "before_commit", _on_before_commit):
+        _sa_event.listen(db.session, "before_commit", _on_before_commit)
+    if not _sa_event.contains(db.session, "after_soft_rollback", _forget_gap_elements):
+        _sa_event.listen(db.session, "after_soft_rollback", _forget_gap_elements)
 
 
 def _on_after_rollback(session):

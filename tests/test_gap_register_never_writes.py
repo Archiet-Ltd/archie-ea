@@ -39,10 +39,13 @@ def _bare_gap_element(db_session, org, name):
     return row
 
 
-def _gap_rows():
-    from app.models.implementation_migration import Gap
+def _gap_rows(db_session, *orgs):
+    """Gap rows of these organisations, counted in SQL so no request's organisation filter applies."""
+    from sqlalchemy import text
 
-    return Gap.query.count()
+    return db_session.execute(
+        text("SELECT count(*) FROM gaps WHERE organization_id = ANY(:ids)"), {"ids": [o.id for o in orgs]}
+    ).scalar_one()
 
 
 def test_no_way_of_reading_the_register_writes_a_record(client, login_as, db_session, make_org):
@@ -54,7 +57,9 @@ def test_no_way_of_reading_the_register_writes_a_record(client, login_as, db_ses
     _bare_gap_element(db_session, theirs, "Their gap %s" % tag)
     architect = _user_in(db_session, mine, "Architect", "enterprise_architect")
     viewer = _user_in(db_session, mine, "Viewer", "viewer")
-    before = _gap_rows()
+    db_session.commit()
+    before = _gap_rows(db_session, mine, theirs)
+    assert before == 0
 
     for person in (architect, viewer):
         login_as(client, person)
@@ -62,14 +67,14 @@ def test_no_way_of_reading_the_register_writes_a_record(client, login_as, db_ses
         assert client.get(PAGE + "?severity=high").status_code == 200
         assert client.get("/api/roadmap/gaps").status_code == 200
         assert client.get("/implementation/reports/generate").status_code == 200
-        assert _gap_rows() == before, "a read by %s wrote a record" % person.enterprise_role
+        assert _gap_rows(db_session, mine, theirs) == before, "a read by %s wrote a record" % person.enterprise_role
     count_gaps(mine.id)
     count_gaps(theirs.id, severity="critical")
     list_gaps(mine.id)
     from app.services import gap_register_service
 
     gap_register_service.gap_register_query(mine.id).all()
-    assert _gap_rows() == before
+    assert _gap_rows(db_session, mine, theirs) == before
 
 
 def test_a_gap_element_gets_its_record_in_its_own_organisation_when_it_is_written(db_session, make_org):
@@ -84,7 +89,7 @@ def test_a_gap_element_gets_its_record_in_its_own_organisation_when_it_is_writte
             source_kind="import")
         db_session.add(element)
         elements[org.id] = element
-    db_session.flush()
+    db_session.commit()
 
     for org in (mine, theirs):
         record = Gap.query.filter_by(archimate_element_id=elements[org.id].id).one()

@@ -39,7 +39,7 @@ def _element(db_session, org, name, kind="Gap", source_kind="import"):
     element = ArchiMateElement(
         name=name, type=kind, layer="Implementation", organization_id=org.id, source_kind=source_kind)
     db_session.add(element)
-    db_session.flush()
+    db_session.commit()
     return element
 
 
