@@ -346,6 +346,55 @@ def application_footer(app, owner_names: Optional[List[str]], now: Optional[date
     return build_footer(facts, now)
 
 
+def ownership_footer(organization_id: Optional[int], owners: Iterable[Dict[str, Any]],
+                     now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Footer for an owner answer: one fact for each element whose ownership record names an owner, linked
+    to the page where that owner is recorded (the application's page for an application, the element in the
+    Composer for any other) and dated by the newest record on it.
+
+    ``owners`` are the owner reader's rows (``element_id`` says where each is recorded, ``since`` the day the
+    record was made). An element that is not in this organisation's model is a missing input, never named.
+    """
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+
+    owners = list(owners)
+    ordered: List[int] = []
+    for owner in owners:
+        element_id = owner.get("element_id")
+        if element_id is not None and element_id not in ordered:
+            ordered.append(element_id)
+    known = element_facts(organization_id, ordered)
+    components: Dict[int, int] = {}
+    if ordered and organization_id is not None:
+        components = {
+            row.archimate_element_id: row.id
+            for row in db.session.execute(
+                db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id).where(
+                    ApplicationComponent.organization_id == organization_id,
+                    ApplicationComponent.archimate_element_id.in_(ordered))
+            ).all()
+        }
+    facts: List[Dict[str, Any]] = []
+    unlisted = False
+    for element_id in ordered:
+        info = known.get(element_id)
+        if info is None:
+            if not unlisted:
+                facts.append(fact(NOT_IN_MODEL, missing=True))
+                unlisted = True
+            continue
+        days = [datetime.strptime(o["since"], "%Y-%m-%d") for o in owners
+                if o.get("element_id") == element_id and o.get("since")]
+        if element_id in components:
+            href = page_link("unified_applications.application_detail", id=components[element_id])
+        else:
+            href = page_link("archimate.composer_page", element=element_id)
+        facts.append(fact("Ownership record: %s" % info["name"], href=href, source_kind="manual",
+                          as_of=max(days) if days else info["as_of"], subject="Ownership record"))
+    return build_footer(facts, now)
+
+
 def systems_facts(organization_id: int, system_ids: List[int], total: Optional[int] = None,
                   more_href: Optional[str] = None) -> List[Dict[str, Any]]:
     """Facts for the first few systems named in a result; the rest are counted, not listed."""
