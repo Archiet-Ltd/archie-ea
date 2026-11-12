@@ -341,13 +341,22 @@ def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
     from app.models.application_portfolio import ApplicationComponent
     from app.services.element_ownership_service import owner_label
 
+    from app.modules.dashboard.services.overview_figures import _active_applications
+    from app.services.vendor_register import system_coverage
+
+    # The applications in use: the Systems list's own definition (not a copy, not
+    # decommissioned, not an unpromoted import), so the count here is that list's count.
     apps = (
-        ApplicationComponent.query.filter(
-            ApplicationComponent.organization_id == organization_id,
+        db.session.execute(
+            _active_applications()
+            .where(ApplicationComponent.organization_id == organization_id, ApplicationComponent.deleted_at.is_(None))
+            .order_by(ApplicationComponent.name)
         )
-        .order_by(ApplicationComponent.name)
+        .scalars()
         .all()
     )
+    coverage = system_coverage(organization_id)
+    decommissioned = (coverage or {}).get("decommissioned") or 0
 
     owners_by_app: Dict[int, List[str]] = {}
     if apps:
@@ -402,9 +411,10 @@ def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
         citations.append(application_citation(app.id, app.name))
 
     return {
-        "answer": "the applications we run, with each one's accountable owner and annual cost",
+        "answer": "the applications in use, with each one's accountable owner and annual cost",
         "rows": rows,
         "total": len(rows),
+        "decommissioned_left_out": decommissioned,
         "citations": citations,
         "reason": None if rows else "no applications are recorded in this organisation",
     }
