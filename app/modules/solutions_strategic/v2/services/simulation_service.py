@@ -6,7 +6,7 @@ The impact analysis engine (ImpactAnalysisService) says what a change reaches. T
 the change happened. The after figures are worked out in memory from the real figures; nothing is
 written to the model and the run is not stored in the analysis history.
 """
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from flask import url_for
 
@@ -186,6 +186,27 @@ def _figure(label: str, before: Any, after: Any, note: str, money: bool = False)
     return {"label": label, "before": before, "after": after, "change": change, "note": note, "money": money}
 
 
+def no_effect_sentence(figures: Any) -> Optional[str]:
+    """The one sentence for a change that moves none of the figures, or None when any figure moves.
+
+    The Scenarios screen and the saved-scenario comparison both word it here, from the figures' own notes.
+    """
+    if not isinstance(figures, list) or not figures:
+        return None
+    by_label = {f.get("label"): f for f in figures if isinstance(f, dict)}
+    elements = by_label.get("Elements in the model")
+    links = by_label.get("Links between elements")
+    cost = by_label.get("Yearly running cost of all applications")
+    if not (elements and links and cost):
+        return None
+    if not all(f.get("change") in (0, None) for f in figures if isinstance(f, dict)):
+        return None
+    lower = lambda text: text[:1].lower() + text[1:]  # noqa: E731
+    return "This change moves none of these figures: %s, %s, and %s" % (
+        lower((elements.get("note") or "").rstrip(".")), lower((links.get("note") or "").rstrip(".")),
+        lower(cost.get("note") or ""))
+
+
 def simulate_change(element_id: int, change_type: str = "MODIFY") -> Dict[str, Any]:
     """Work out what a change would do to the model, on a copy. Reads only; writes nothing."""
     from app.modules.solutions_strategic.v2.services.impact_analysis_service import ImpactAnalysisService
@@ -267,11 +288,7 @@ def simulate_change(element_id: int, change_type: str = "MODIFY") -> Dict[str, A
         _figure("Open risks touching the change", len(risks), len(risks), risk_note),
     ]
     unchanged = _model_figures(org_id) == before
-    no_effect = None
-    if all(f["change"] in (0, None) for f in figures):
-        lower = lambda text: text[0].lower() + text[1:]  # noqa: E731
-        no_effect = "This change moves none of these figures: %s, %s, and %s" % (
-            lower(element_note.rstrip(".")), lower(rel_note.rstrip(".")), lower(cost_note))
+    no_effect = no_effect_sentence(figures)
     return {
         **analysis,
         "simulation": {

@@ -398,6 +398,12 @@ def _scenario_figures(server):
 def _scenario_for_caller(row):
     """A saved scenario as the caller may read it: the running costs are left out for a person the cost rule withholds from."""
     data = row.to_dict()
+    result = data.get("analysis_result")
+    if isinstance(result, dict):
+        # the same sentence the Scenarios screen gives, worked out from the saved figures before any cost is withheld
+        no_effect = simulation_service.no_effect_sentence(result.get("figures"))
+        if no_effect:
+            data["analysis_result"] = {**result, "no_effect": no_effect}
     if not simulation_service.may_see_costs(current_user):
         data["analysis_result"] = simulation_service.withhold_costs(data["analysis_result"])
     return data
