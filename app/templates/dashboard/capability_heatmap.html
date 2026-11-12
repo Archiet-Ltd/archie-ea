@@ -14,11 +14,13 @@
       <select x-model="viewMode" @change="fetchData()"
               class="rounded-md border border-border bg-background text-foreground text-sm px-3 py-1.5 focus:ring-2 focus:ring-ring" aria-label="View">
         <option value="maturity">Maturity Only</option>
-        <option value="investment">With Investment</option>
+        {% if not costs_withheld %}<option value="investment">With Investment</option>{% endif %}
       </select>
     </div>
   {% endmacro %}
   {{ page_shell(title='Capability Heatmap', breadcrumb=[('Home', '/'), ('Capability Heatmap', none)], subtitle='Maturity levels by domain with investment overlay', actions_caller=_ps_actions) }}
+
+  {% if costs_withheld %}<p class="text-sm text-muted-foreground" data-testid="heatmap-costs-withheld">{{ costs_withheld_text }}</p>{% endif %}
 
   {# Loading state #}
   <div x-show="loading" x-cloak class="flex items-center justify-center py-16">
