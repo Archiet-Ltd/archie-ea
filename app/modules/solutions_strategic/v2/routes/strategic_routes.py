@@ -39,6 +39,7 @@ from app.modules.solutions_strategic.v2.services.impact_analysis_service import 
 from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
     currency_symbol,
     InvestmentPrioritizationService,
+    limit_costs_to_viewer,
 )
 from app.modules.solutions_strategic.v2.services.process_optimization_service import (
     ProcessOptimizationService,
@@ -177,6 +178,8 @@ def investment_matrix():
         from app.services import result_footer_service
 
         result_footer_service.attach_capability_footers(current_org_id(), analysis["capability_scores"])
+        # After the footers, which read the figures to say where each came from.
+        limit_costs_to_viewer(analysis)
 
         return render_template(
             "strategic/investment_matrix.html",
@@ -205,7 +208,7 @@ def api_investment_analysis():
     try:
         service = InvestmentPrioritizationService()
         analysis = service.analyze_investment_priorities(include_risk_analysis=True)
-        return jsonify(analysis)
+        return jsonify(limit_costs_to_viewer(analysis))
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
@@ -257,6 +260,7 @@ def impact_analysis():
     """Impact analysis dashboard — architecture change ripple-effect visualization."""
     from app.middleware.tenant_context import current_org_id
     from app.services.priority_action_service import limit_for, prioritised_actions
+    from app.services.risk_service import footers_by_risk
 
     return render_template(
         "strategic/impact_analysis.html",
@@ -264,7 +268,8 @@ def impact_analysis():
         scenario_list_limit=SCENARIO_LIST_LIMIT,
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
-        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
         **_model_state(),
     )
 
@@ -334,6 +339,7 @@ def simulations_page():
     """The simulations page: the impact analysis screen in its "try it on a copy" form."""
     from app.middleware.tenant_context import current_org_id
     from app.services.priority_action_service import limit_for, prioritised_actions
+    from app.services.risk_service import footers_by_risk
 
     return render_template(
         "strategic/impact_analysis.html",
@@ -342,7 +348,8 @@ def simulations_page():
         scenario_list_limit=SCENARIO_LIST_LIMIT,
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
-        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
         **_model_state(),
     )
 
