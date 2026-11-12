@@ -302,8 +302,8 @@ def init_security(app):
 
                 request_path = _req.path
                 request_versioned = bool(_req.args.get("v"))
-            except RuntimeError:
-                pass
+            except (RuntimeError, UnicodeDecodeError):
+                pass  # no request, or a query string that is not valid text: not a versioned address
 
             if request_path.startswith("/static/"):
                 # Only cache-forever assets whose URL changes when their bytes

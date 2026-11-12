@@ -9,10 +9,9 @@ Provides routes for:
 - Integration with existing gap analyses
 """
 
-from flask import current_app, jsonify, render_template, request, url_for
+from flask import current_app, jsonify, redirect, request, url_for
 from flask_login import login_required
 
-from ..models.application_portfolio import ApplicationComponent
 from ..services.ai_impact_analysis_service import AIImpactAnalysisService
 from ..services.llm_service import LLMService
 from . import application_mgmt
@@ -21,31 +20,10 @@ from . import application_mgmt
 @application_mgmt.route("/impact-analysis")
 @login_required
 def impact_hub():
-    """
-    Impact Analysis Hub - Unified entry point for all impact analyses.
-
-    Provides:
-    - Application impact analysis (single app)
-    - Portfolio impact analysis (multiple apps)
-    - Scenario comparison
-    - Links to existing gap analyses (COBIT, Portfolio, Strategic)
-    """
-    # Get all applications for the dropdown
-    applications = ApplicationComponent.query.order_by(ApplicationComponent.name).all()
-
-    # Pre-select app if passed in query param
-    selected_app_id = request.args.get("app_id", type=int)
-
-    # Check if AI is configured
-    ai_status = LLMService.configuration_status()
-
-    return render_template(
-        "applications/dashboard.html",
-        applications=applications,
-        selected_app_id=selected_app_id,
-        ai_available=ai_status.get("ready", False),
-        ai_providers=ai_status.get("providers", []),
-    )
+    """Old address: the impact analysis page lives under /enterprise/analysis."""
+    target = url_for("enterprise.impact_analysis")
+    query = request.query_string.decode("utf-8", errors="replace")
+    return redirect(target + ("?" + query if query else ""), code=301)
 
 
 @application_mgmt.route("/impact-analysis/simulate", methods=["POST"])

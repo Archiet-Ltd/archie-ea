@@ -697,6 +697,13 @@ def generate_application_archimate(id):
     return redirect(url_for("unified_applications.application_detail", id=id))
 
 
+def _abacus_connected(org_id):
+    """True when this organisation has an active Abacus connector."""
+    from app.models.connector_config import ConnectorConfig
+
+    return "abacus" in ConnectorConfig.live_connector_types(org_id)
+
+
 @unified_applications_bp.route("/<int:id>/edit", methods=["GET", "POST"])
 @login_required
 @require_permission("edit", "application")
@@ -834,6 +841,7 @@ def application_edit(id):
                     flash(error, "error")
                 return render_template(
                     "applications/edit.html", application=app,
+                    abacus_connected=_abacus_connected(g.current_org_id),
                     lifecycle_stage_choices=APPLICATION_LIFECYCLE_STAGES,
                     lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
                 ), 400
@@ -874,6 +882,9 @@ def application_edit(id):
                 value = request.form.get(field)
                 if value is not None and hasattr(app, field):
                     setattr(app, field, sanitize_html(value))
+
+            if "competitive_advantage" in request.form:
+                app.competitive_advantage = request.form.get("competitive_advantage") == "yes"
 
             cost_fields = {}
             cost_field_names = [
@@ -955,6 +966,7 @@ def application_edit(id):
             lifecycle_stage_choices=APPLICATION_LIFECYCLE_STAGES,
             lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
             application_owners=application_owners,
+            abacus_connected=_abacus_connected(org_id),
         )
 
     except HTTPException:

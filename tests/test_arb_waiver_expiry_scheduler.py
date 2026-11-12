@@ -20,6 +20,7 @@ ESTABLISHED_JOBS = {
     "owner_digest",
     "date_alerts",
     "approval_escalation",
+    "change_review_sweep",
     "teams_subscription_renewal",
     "event_log_relay",
     "change_feed_consumer",

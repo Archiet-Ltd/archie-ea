@@ -18,6 +18,7 @@
 {% from 'components/form_field.html' import form_field, form_footer %}
 {% from 'components/provenance.html' import result_footer %}
 {% from 'components/button.html' import button %}
+{% from 'components/checkbox.html' import checkbox %}
 {% from 'components/input.html' import input %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
@@ -140,7 +141,8 @@
         {% set k3_value = 'Not set' %}
         {% set k3_hint = 'Edit to add one' %}
     {% endif %}
-    {% set changed = element.updated_at or element.created_at %}
+    {% set changed = element.updated_at or element.created_at or element.recorded_at %}
+    {% set changed_is_recorded = not (element.updated_at or element.created_at) and element.recorded_at %}
 
     <div class="grid grid-cols-2 gap-4 lg:grid-cols-4" data-testid="kpi-band">
         <div data-testid="kpi-depends-on" class="flex [&>*]:w-full">
@@ -173,7 +175,7 @@
         </div>
         <div data-testid="kpi-updated" class="flex [&>*]:w-full">
             {% if changed %}
-                {{ stat_card('Last updated', changed.strftime('%d %b %Y'), hint=('Reviewed ' ~ element.last_reviewed_date.strftime('%d %b %Y')) if element.last_reviewed_date else 'Not reviewed yet') }}
+                {{ stat_card('Recorded' if changed_is_recorded else 'Last updated', changed.strftime('%d %b %Y'), hint=('Reviewed ' ~ element.last_reviewed_date.strftime('%d %b %Y')) if element.last_reviewed_date else ('Date it was added to the model' if changed_is_recorded else 'Not reviewed yet')) }}
             {% else %}
                 {{ stat_card('Last updated', 'Not recorded', hint='Shown after the next edit') }}
             {% endif %}
@@ -231,6 +233,73 @@
         {% endif %}
     </section>
 
+    {% if product.bring_in %}
+    {% set bi = product.bring_in %}
+    <section id="bring-in" class="rounded-lg border border-border bg-card p-6" data-testid="product-bring-in" aria-labelledby="bring-in-heading">
+        <h2 id="bring-in-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Bring in repositories</h2>
+        {% if bi.state == 'not_connected' %}
+        <p class="mt-2 max-w-[720px] text-sm text-muted-foreground">Connect GitHub once and Entelim can read this product's repositories, propose the applications, services, interfaces, data and technology they show, and cite the file each came from.</p>
+        <div class="mt-4">
+            {% call button(variant='default', href=bi.connect_url, testid='product-connect-github', class='gap-2') %}
+                <i data-lucide="github" class="h-4 w-4" aria-hidden="true"></i>Connect GitHub
+            {% endcall %}
+        </div>
+        {% else %}
+        <p class="mt-2 max-w-[720px] text-sm text-muted-foreground">Choose repositories of <span class="font-medium text-foreground">{{ bi.organization }}</span>. Entelim reads them and proposes what they show, linked to {{ elem_name }}. Nothing is added until you approve it.</p>
+        {% if bi.last %}
+        <div class="mt-4 text-sm" data-testid="product-scan-state" data-state="{{ bi.last.state }}">
+            {% if bi.last.state in ('waiting', 'reading') %}
+            <p>Reading {{ bi.last.repositories | join(', ') }}. This page shows the result when the read has finished; reload it in a moment.</p>
+            {% elif bi.last.state == 'failed' %}
+            <p class="text-destructive-emphasis">The last read did not finish: {{ bi.last.error }}</p>
+            {% else %}
+            <p>Read {{ bi.last.repositories | length }} repositor{{ 'y' if bi.last.repositories | length == 1 else 'ies' }}: {{ bi.last.repositories | join(', ') }}.</p>
+            {% if bi.last.already_in_model %}
+            <p class="mt-1 text-muted-foreground" data-testid="product-scan-already">Already in your model, so nothing new is proposed for {{ bi.last.already_in_model | join(', ') }}. Join the application to this product with Add in its layer.</p>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if bi.waiting %}
+        <p class="mt-3 text-sm" data-testid="product-scan-waiting">{{ bi.waiting }} proposal{{ '' if bi.waiting == 1 else 's' }} read for this product {{ 'is' if bi.waiting == 1 else 'are' }} waiting for your decision. <a href="{{ bi.review_url }}" class="font-medium text-primary underline hover:underline" data-testid="product-review-link">Review and approve them</a></p>
+        {% endif %}
+        {% if bi.choosing %}
+        {% if bi.error %}
+        <p class="mt-4 text-sm text-destructive-emphasis" role="alert" data-testid="product-repositories-error">{{ bi.error }}</p>
+        {% elif not bi.repositories %}
+        <p class="mt-4 text-sm text-muted-foreground" data-testid="product-repositories-empty">GitHub lists no repository for {{ bi.organization }} that this connection can read.</p>
+        {% else %}
+        <form method="post" action="{{ bi.scan_url }}" class="mt-4 space-y-4" data-testid="product-repositories-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <fieldset>
+                <legend class="text-sm font-medium text-foreground">Repositories ({{ bi.repositories | length }}), up to {{ bi.limit }} at a time</legend>
+                <ul class="mt-3 grid gap-3 sm:grid-cols-2">
+                    {% for r in bi.repositories %}
+                    <li data-testid="product-repository-option">
+                        {{ checkbox(id='repo-' ~ loop.index, name='repository', value=r.full_name, label=r.full_name,
+                                    description=(r.description or 'No description') ~ (' · ' ~ r.language if r.language else '') ~ (' · archived' if r.archived else '')) }}
+                        {% if r.href %}<p class="ml-6 mt-1 text-xs text-muted-foreground">Already in your model: <a href="{{ r.href }}" class="text-primary underline hover:underline">{{ r.element.name }}</a></p>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </fieldset>
+            <div class="flex flex-wrap gap-3">
+                {% call button(variant='default', type='submit', testid='product-repositories-submit') %}Read the chosen repositories{% endcall %}
+                {% call button(variant='outline', href=url_for('archimate_crud.detail_element', layer='business', element_type='Product', element_id=source_ae_id, ae=1) ~ '#bring-in') %}Cancel{% endcall %}
+            </div>
+        </form>
+        {% endif %}
+        {% else %}
+        <div class="mt-4">
+            {% call button(variant='default', href=bi.choose_url, testid='product-choose-repositories', class='gap-2') %}
+                <i data-lucide="github" class="h-4 w-4" aria-hidden="true"></i>Choose repositories
+            {% endcall %}
+        </div>
+        {% endif %}
+        {% endif %}
+    </section>
+    {% endif %}
+
     <div id="layers" class="space-y-6" data-testid="product-layers">
         {% for sec in product.sections %}
         <section class="rounded-lg border border-border bg-card" data-testid="product-layer" data-layer="{{ sec.key }}" aria-labelledby="layer-{{ sec.key }}-heading" x-data="{ addOpen: false }">
@@ -247,10 +316,11 @@
             </div>
             <div class="p-6">
                 {% if sec.rows %}
-                {% call(row) element_table(rows=sec.rows, columns=[('Type', ''), ('Relationship', ''), ('Owner', '')], caption=sec.label ~ ' elements of this product', testid='product-layer-table-' ~ sec.key, row_testid='product-element-row', link_testid='product-element-link', page_size=25, toolbar=false) %}
+                {% call(row) element_table(rows=sec.rows, columns=[('Type', ''), ('Relationship', ''), ('Owner', ''), ('Source', '')], caption=sec.label ~ ' elements of this product', testid='product-layer-table-' ~ sec.key, row_testid='product-element-row', link_testid='product-element-link', page_size=25, toolbar=false) %}
                     {% call table_cell() %}{{ row.type_label }}{% endcall %}
                     {% call table_cell() %}{{ row.relationship }}{% endcall %}
                     {% call table_cell() %}{{ row.owner }}{% endcall %}
+                    {% call table_cell() %}<span data-testid="product-element-source">{% if row.source.href %}<a href="{{ row.source.href }}" class="text-primary underline hover:underline" rel="noopener noreferrer" data-testid="product-element-source-link">{{ row.source.text }}</a>{% else %}{{ row.source.text }}{% endif %}</span>{% endcall %}
                 {% endcall %}
                 {% else %}
                 <p class="text-sm text-muted-foreground" data-testid="layer-empty">{{ sec.empty_reason }}{% if sec.add %} Use Add to join one with the relationship already chosen.{% endif %}</p>
@@ -423,6 +493,7 @@
                 No description yet.{% if can_change_model() %} <a href="{{ edit_url }}" class="text-primary underline hover:underline">Edit to add one</a> so the next person knows what this is.{% else %} An architect can add one.{% endif %}
             </p>
             {% endif %}
+            {% if page.description_origin %}<p class="text-xs text-muted-foreground" data-testid="element-description-origin">{{ page.description_origin }}</p>{% endif %}
 
             <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 text-sm">
                 {% if has_owner_field %}
@@ -561,8 +632,19 @@
 function archimateDetail() {
     return {
         async deleteElement() {
-            if (!(await Platform.modal.confirm('Delete "' + {{ elem_name | tojson }} + '"? This cannot be undone.'))) return;
             try {
+                const check = await Platform.fetch(
+                    '{{ url_for("archimate_crud.delete_check", layer=layer, element_type=element_type, element_id=element.id, **id_scope) }}',
+                    { silent: true }
+                );
+                if (!check.allowed) {
+                    Platform.toast.error(check.reason || 'This element cannot be deleted.');
+                    return;
+                }
+                const links = check.relationships
+                    ? ' Its ' + check.relationships + (check.relationships === 1 ? ' relationship is' : ' relationships are') + ' removed with it.'
+                    : '';
+                if (!(await Platform.modal.confirm('Delete "' + {{ elem_name | tojson }} + '"?' + links + ' This cannot be undone.'))) return;
                 const data = await Platform.fetch(
                     '{{ url_for("archimate_crud.delete_element", layer=layer, element_type=element_type, element_id=element.id, **id_scope) }}',
                     {
