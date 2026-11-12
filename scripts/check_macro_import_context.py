@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import pathlib
+import re
 import sys
 
 from jinja2 import Environment, nodes
@@ -56,18 +57,52 @@ def _rel(path: pathlib.Path, root: pathlib.Path) -> str:
     return str(path.relative_to(root)).replace("\\", "/")
 
 
+_SCRIPT_TAG_RE = re.compile(r"<script\b", re.IGNORECASE)
+_TYPE_ATTR_RE = re.compile(r"""\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.IGNORECASE)
+_JAVASCRIPT_TYPE_RE = re.compile(
+    r"^(?:(?:text|application)/(?:x-)?(?:java|ecma)script|text/(?:jscript|livescript|javascript1\.[0-5]))$",
+    re.IGNORECASE,
+)
+
+
+def _script_tag_runs_code(text: str, start: int) -> bool:
+    """True when the <script> opening at ``start`` is one a browser executes.
+
+    A script element with no type, an empty type, ``module`` or a JavaScript MIME type is
+    executed, so CSP applies to it. Any other type (``application/json`` for a chart's data
+    block, ``application/ld+json``, ``text/template``) is a data block the browser never
+    runs, so an empty nonce on it costs nothing. A tag whose attributes are cut short by a
+    Jinja expression cannot be read, so it counts as executable.
+    """
+    end = text.find(">", start)
+    if end == -1:
+        return True
+    attrs = text[start + len("<script"):end]
+    match = _TYPE_ATTR_RE.search(attrs)
+    if match is None:
+        return True
+    script_type = (match.group(1) or match.group(2) or match.group(3) or "").strip()
+    if script_type == "" or script_type.lower() == "module":
+        return True
+    return bool(_JAVASCRIPT_TYPE_RE.match(script_type))
+
+
 def _has_script_in_macro(tree) -> bool:
-    """True when a <script> appears in template text inside a macro body.
+    """True when an executable <script> appears in template text inside a macro body.
 
     Checked against the parsed tree rather than the raw source so that a
     ``<script`` mentioned in a ``{# … #}`` comment does not count — Jinja strips
     comments before this point. components/modal.html is exactly that case: its
     only ``<script`` is a usage example in a doc comment and never renders.
+
+    A data block such as ``<script type="application/json">`` is not executable, so a
+    macro holding only data blocks may be imported without context.
     """
     for macro in tree.find_all(nodes.Macro):
         for data in macro.find_all(nodes.TemplateData):
-            if "<script" in data.data.lower():
-                return True
+            for found in _SCRIPT_TAG_RE.finditer(data.data):
+                if _script_tag_runs_code(data.data, found.start()):
+                    return True
     return False
 
 
