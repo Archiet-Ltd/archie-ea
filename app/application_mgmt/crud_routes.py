@@ -7,8 +7,8 @@ Handles create, read (legacy redirect), update, and delete operations for Applic
 from datetime import datetime
 from decimal import Decimal
 
-from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask import current_app, flash, g, jsonify, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 
 from .. import db
 from ..models.application_portfolio import ApplicationComponent
@@ -17,6 +17,7 @@ from ..models.requirements import Requirement
 from ..services.application_cost_accessor import set_annual_cost
 from ..services.application_status import status_for_write
 from ..utils.html_sanitizer import sanitize_html
+from ..utils.role_access import can_see_costs
 from ..utils.validators import (
     validate_application_name,
     validate_description,
@@ -27,11 +28,37 @@ from . import application_mgmt
 from .forms import ApplicationComponentForm
 from .routes import _build_vendor_product_choices, _sync_vendor_products
 
+_COST_NOT_SAVED = ("The cost was not saved. Only a person who may set costs can record one; "
+                   "the rest of the application was saved.")
+
+
+_COST_FORM_FIELDS = ("license_cost_annual", "infrastructure_cost_monthly",
+                     "development_cost_annual", "maintenance_cost_annual",
+                     "total_cost_of_ownership")
+
+
+def _cost_was_posted(form):
+    return any(getattr(form, f).data not in (None, "") for f in _COST_FORM_FIELDS)
+
+
+def _cost_was_changed(form, app):
+    return any(getattr(form, f).data not in (None, "") and
+               str(getattr(form, f).data) != str(getattr(app, f, None))
+               for f in _COST_FORM_FIELDS)
+
+
+def _app_in_active_org_or_404(app_id):
+    """The application only when it belongs to the signed-in organisation."""
+    from ..modules.applications.routes._helpers import _verify_app_in_org  # noqa: PLC0415
+
+    return _verify_app_in_org(app_id, g.current_org_id, raise_not_found=True)
+
 @application_mgmt.route("/applications/create", methods=["GET", "POST"])
 @login_required
 def application_create():
     """Create new Application Component"""
     form = ApplicationComponentForm()
+    may_set_cost = can_see_costs(current_user)
     vendor_choices = _build_vendor_product_choices()
     form.vendor_products.choices = vendor_choices
 
@@ -276,10 +303,10 @@ def application_create():
             data_classification=form.data_classification.data,
             master_data_source=form.master_data_source.data,
             license_type=form.license_type.data,
-            license_cost_annual=form.license_cost_annual.data,
-            infrastructure_cost_monthly=form.infrastructure_cost_monthly.data,
-            development_cost_annual=form.development_cost_annual.data,
-            maintenance_cost_annual=form.maintenance_cost_annual.data,
+            license_cost_annual=form.license_cost_annual.data if may_set_cost else None,
+            infrastructure_cost_monthly=form.infrastructure_cost_monthly.data if may_set_cost else None,
+            development_cost_annual=form.development_cost_annual.data if may_set_cost else None,
+            maintenance_cost_annual=form.maintenance_cost_annual.data if may_set_cost else None,
             cost_center=form.cost_center.data,
             go_live_date=form.go_live_date.data,
             last_major_release_date=form.last_major_release_date.data,
@@ -315,7 +342,7 @@ def application_create():
             notes=form.notes.data,
         )
 
-        if form.total_cost_of_ownership.data is not None:
+        if may_set_cost and form.total_cost_of_ownership.data is not None:
             set_annual_cost(app, Decimal(str(form.total_cost_of_ownership.data)))
 
         db.session.add(app)
@@ -327,6 +354,8 @@ def application_create():
         db.session.commit()
 
         flash(f'Application Component "{app.name}" created successfully!', "success")
+        if not may_set_cost and _cost_was_posted(form):
+            flash(_COST_NOT_SAVED, "warning")
         if (
             app.deployment_status or ""
         ).lower() == "production" and not selected_vendor_ids:
@@ -366,7 +395,8 @@ def legacy_application_detail_redirect(id):
 @login_required
 def application_edit(id):
     """Edit Application Component"""
-    app = ApplicationComponent.query.get_or_404(id)
+    app = _app_in_active_org_or_404(id)
+    may_set_cost = can_see_costs(current_user)
     form = ApplicationComponentForm(obj=app)
 
     vendor_choices = _build_vendor_product_choices()
@@ -473,14 +503,17 @@ def application_edit(id):
         app.data_classification = form.data_classification.data
         app.master_data_source = form.master_data_source.data
         app.license_type = form.license_type.data
-        app.license_cost_annual = form.license_cost_annual.data
-        app.infrastructure_cost_monthly = form.infrastructure_cost_monthly.data
-        app.development_cost_annual = form.development_cost_annual.data
-        app.maintenance_cost_annual = form.maintenance_cost_annual.data
-        if form.total_cost_of_ownership.data is not None:
-            set_annual_cost(app, Decimal(str(form.total_cost_of_ownership.data)))
-        else:
-            set_annual_cost(app, None)
+        if may_set_cost:
+            app.license_cost_annual = form.license_cost_annual.data
+            app.infrastructure_cost_monthly = form.infrastructure_cost_monthly.data
+            app.development_cost_annual = form.development_cost_annual.data
+            app.maintenance_cost_annual = form.maintenance_cost_annual.data
+            if form.total_cost_of_ownership.data is not None:
+                set_annual_cost(app, Decimal(str(form.total_cost_of_ownership.data)))
+            else:
+                set_annual_cost(app, None)
+        elif _cost_was_changed(form, app):
+            flash(_COST_NOT_SAVED, "warning")
         app.cost_center = form.cost_center.data
         app.go_live_date = form.go_live_date.data
         app.last_major_release_date = form.last_major_release_date.data
@@ -788,7 +821,7 @@ def application_quick_fill(app_id):
     Body: {"field": "<field_name>", "value": "<value>"}
     Returns: {"success": true, "completeness_score": <int>}
     """
-    app_obj = ApplicationComponent.query.get_or_404(app_id)
+    app_obj = _app_in_active_org_or_404(app_id)
 
     data = request.get_json(silent=True)
     if not data:
@@ -815,6 +848,9 @@ def application_quick_fill(app_id):
         "description": "description",
     }
     model_field = _FIELD_MAP[field]
+
+    if field == "annual_cost" and not can_see_costs(current_user):
+        return jsonify({"success": False, "error": _COST_NOT_SAVED}), 403
 
     try:
         setattr(app_obj, model_field, value.strip())

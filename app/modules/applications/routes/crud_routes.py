@@ -84,6 +84,9 @@ from ._helpers import (  # dead-code-ok
 )
 from app.models.archimate_element_types import is_application_kind
 
+_COST_NOT_SAVED = ("The cost was not saved. Only a person who may set costs can record one; "
+                   "the rest of the application was saved.")
+
 logger = logging.getLogger(__name__)
 
 
@@ -311,7 +314,9 @@ def application_create():
             "maintenance_cost_annual",
             "total_cost_of_ownership",
         ]
-        for field in cost_field_names:
+        # Cost is accepted only from a person the one cost rule allows; the rest saves.
+        allowed_cost_fields = cost_field_names if can_see_costs(current_user) else []
+        for field in allowed_cost_fields:
             value = data.get(field)
             if value and hasattr(app, field):
                 try:
@@ -322,14 +327,21 @@ def application_create():
         
         if cost_fields:
             apply_cost_to_application(app, cost_fields)
+        cost_refused = not allowed_cost_fields and any(
+            data.get(f) for f in cost_field_names)
 
         db.session.add(app)
         db.session.commit()
 
         if is_json:
-            return jsonify({"success": True, "id": app.id, "name": app.name}), 201
+            body = {"success": True, "id": app.id, "name": app.name}
+            if cost_refused:
+                body["cost_not_saved"] = _COST_NOT_SAVED
+            return jsonify(body), 201
 
         flash("Application created successfully!", "success")
+        if cost_refused:
+            flash(_COST_NOT_SAVED, "warning")
         return redirect(
             url_for(
                 "unified_applications.application_detail", id=app.id, tab="architecture"
