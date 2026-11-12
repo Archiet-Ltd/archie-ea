@@ -270,6 +270,7 @@
                             answeredBy: ev.answered_by || null,
                             genomeHtml: (ev.genome_answer && ev.genome_answer.html) || null,
                             paused: !!ev.paused,
+                            retryable: !!ev.retryable,
                             error: ev.error || null
                         };
                     } else if (ev.error) {
@@ -309,6 +310,7 @@
             answeredBy: meta.answeredBy || null,
             genomeHtml: meta.genomeHtml || null,
             paused: !!meta.paused,
+            retryable: !!meta.retryable,
             error: meta.error || null
         });
         return true;

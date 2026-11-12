@@ -19,7 +19,7 @@ from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD, boot_live_server
 from .fresh_org import create_fresh_org, sign_in
-from .test_simulation_journey import DEMO_EMAIL, ELEMENT, VIEWPORT_IDS, VIEWPORTS, _pick, demo  # noqa: F401
+from .test_simulation_journey import DEMO_EMAIL, ELEMENT, VIEWPORT_IDS, VIEWPORTS, _cost_reader, _member, _pick, demo  # noqa: F401
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -97,7 +97,7 @@ def test_the_status_page_lists_scenarios_as_available_and_the_link_opens_the_scr
         link.click()
         page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
-        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
     finally:
         context.close()
 
@@ -117,7 +117,7 @@ def test_the_status_page_lists_scenarios_as_available_and_the_link_opens_the_scr
         page.locator("#submit").click()
         page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
-        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
         page.goto(server + "/early-access", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", level=1)).to_be_visible()
         assert "Simulation scenarios" not in page.locator("main").inner_text()
@@ -147,7 +147,7 @@ def test_a_signed_in_person_opens_scenarios_from_the_sidebar(browser, server, de
         link.click()
         page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
-        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
     finally:
         context.close()
 
@@ -165,19 +165,21 @@ def test_a_saved_scenario_is_listed_for_a_colleague_and_not_for_another_organisa
         colleague = User.query.filter_by(email=COLLEAGUE_EMAIL).first()
         if colleague is None:
             colleague = User(email=COLLEAGUE_EMAIL, first_name="Second", last_name="Architect", organization_id=org_id,
-                             confirmed=True, enterprise_role="enterprise_architect")
+                             confirmed=True, enterprise_role="cto")
             colleague.role = Role.query.filter_by(name="Architect").one()
             db.session.add(colleague)
+        # both people may read running costs, so the dialog's figure can be held to the run card's
+        colleague.enterprise_role = "cto"
         colleague.password = PASSWORD
         db.session.commit()
         db.session.remove()
 
     architect_ctx = _context(browser, viewport, scheme)
     try:
-        page = _sign_in_as(architect_ctx, server, DEMO_EMAIL)
+        page = _sign_in_as(architect_ctx, server, _cost_reader(app))
         page.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(page, change="Decommission / Retirement")
-        page.get_by_role("button", name="Run simulation").click()
+        page.get_by_role("button", name="Run scenario").click()
         expect(page.get_by_test_id("simulation-panel")).to_be_visible(timeout=PAGE_TIMEOUT)
         cost_at_risk = page.get_by_test_id("tco-at-risk").inner_text().strip()
         on_screen = {"capabilities": _screen_count(page, "Capabilities"), "processes": _screen_count(page, "Processes")}
@@ -245,24 +247,6 @@ def test_a_saved_scenario_is_listed_for_a_colleague_and_not_for_another_organisa
             db.session.remove()
 
 
-def _member(app, email, role):
-    """A person of the demonstration organisation holding one enterprise role."""
-    from app import db
-    from app.models.user import Role, User
-
-    with app.app_context():
-        org_id = db.session.execute(db.text("select id from organizations where slug = 'lantern-quay'")).scalar_one()
-        member = User.query.filter_by(email=email).first()
-        if member is None:
-            member = User(email=email, first_name="Role", last_name="Tester", organization_id=org_id, confirmed=True,
-                          enterprise_role=role)
-            member.role = Role.query.filter_by(name="Architect").one()
-            db.session.add(member)
-        member.password = PASSWORD
-        db.session.commit()
-        db.session.remove()
-
-
 def _element_id(app):
     from app import db
 
@@ -303,7 +287,7 @@ def test_a_data_architect_is_not_offered_save_and_still_compares_what_an_archite
         architect = _sign_in_as(context, server, DEMO_EMAIL)
         architect.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(architect, change="Decommission / Retirement")
-        architect.get_by_role("button", name="Run simulation").click()
+        architect.get_by_role("button", name="Run scenario").click()
         expect(architect.get_by_test_id("simulation-panel")).to_be_visible(timeout=PAGE_TIMEOUT)
         architect.get_by_role("button", name="Save Scenario for Comparison", exact=True).click()
         dialog = architect.get_by_role("dialog", name="Save scenario")
@@ -316,7 +300,7 @@ def test_a_data_architect_is_not_offered_save_and_still_compares_what_an_archite
             person = _sign_in_as(other_ctx, server, email)
             person.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
             _pick(person, change="Decommission / Retirement")
-            person.get_by_role("button", name="Run simulation").click()
+            person.get_by_role("button", name="Run scenario").click()
             expect(person.get_by_test_id("simulation-panel")).to_be_visible(timeout=PAGE_TIMEOUT)
             # no control that would only refuse them, and the page says who can save
             assert person.get_by_role("button", name="Save Scenario for Comparison").count() == 0
