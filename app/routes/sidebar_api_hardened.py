@@ -465,13 +465,20 @@ def get_quick_access_items():
 
 
 def _search_filter(query, model_class, column, org_id, limit=100, base_query=None, fuzzy_fill=True):
+    """See `_search_passes`: the rows of both passes, one list."""
+    contain, pieces = _search_passes(query, model_class, column, org_id, limit, base_query, fuzzy_fill)
+    return contain + pieces
+
+
+def _search_passes(query, model_class, column, org_id, limit=100, base_query=None, fuzzy_fill=True):
     """
     Two-pass candidate search so an exact name is never lost to a limit:
     1. Exact-substring match on the normalised name (ilike %query%) — up to `limit`,
        ordered so exact and prefix matches come first.
     2. Fill the remainder from a 3-letter-chunk OR query ordered by the number of
        chunks matched (CASE sum DESC), then exact/prefix/name, excluding ids already found.
-    Returns at most `limit` rows from the model, with exact matches first.
+    Returns (names containing the text, the further rows pass 2 found), at most `limit` rows in all,
+    with exact matches first.
 
     `base_query` lets a caller that narrows by other criteria (layer, type) keep this one matcher:
     both passes start from it instead of the bare model query. `fuzzy_fill=False` stops after pass 1,
@@ -500,14 +507,14 @@ def _search_filter(query, model_class, column, org_id, limit=100, base_query=Non
 
     remaining = limit - len(exact_matches)
     if remaining <= 0 or not fuzzy_fill:
-        return list(exact_matches)
+        return list(exact_matches), []
 
     exact_ids = {row.id for row in exact_matches}
 
     # Pass 2: 3-letter chunks, ordered by how many chunks hit, then exact/prefix/name
     words = [w for w in q_norm.split() if len(w) >= 3]
     if not words:
-        return list(exact_matches)
+        return list(exact_matches), []
 
     chunks = []
     for w in words:
@@ -515,7 +522,7 @@ def _search_filter(query, model_class, column, org_id, limit=100, base_query=Non
             chunks.append(w[i : i + 3])
 
     if not chunks:
-        return list(exact_matches)
+        return list(exact_matches), []
 
     # Unique chunks while preserving the list order for the CASE sum
     seen = set()
@@ -548,7 +555,7 @@ def _search_filter(query, model_class, column, org_id, limit=100, base_query=Non
         .all()
     )
 
-    return list(exact_matches) + chunk_matches
+    return list(exact_matches), chunk_matches
 
 
 # How many records (not pages) the global search lists once they are ranked.
@@ -556,30 +563,30 @@ GLOBAL_SEARCH_RECORDS_SHOWN = 5
 
 
 def search_elements_as_global(query, model_class, column, org_id, limit, base_query=None):
-    """Elements a person who typed `query` is offered: every name that contains it, and then the
-    near matches the global search would also list for it, all through `_search_filter`. A near
-    match is a name in which every typed word is found, in any order. They are added to names
-    that contain the text, never offered in place of them: a text no name contains lists nothing.
+    """The one element-name search. The global search and the Impact Analysis picker both call it, so
+    the same typed text lists the same elements in both boxes.
 
-    `base_query` narrows first (layer, type); the organisation is always `org_id`.
+    Every name that contains the text is listed. So is every name in which each typed word starts a word
+    or is a letter or two off one (`holds_every_word`), so a misspelling of a name lists it too; a name
+    that holds only some of the words is not listed. Best score first, then the order `_search_passes`
+    gave (exact name, prefix, shorter, alphabetical).
+
+    The picker sends its text with `%`, `_` and a backslash escaped for the database; they are read
+    back as the characters the person typed before the words are compared.
+
+    `base_query` narrows first (layer, type); the organisation is always `org_id`. At most `limit` rows.
     """
-    from app.utils.search_text import fuzzy_match_score, normalise_search_text
+    from app.utils.search_text import fuzzy_match_score, holds_every_word, normalise_search_text
 
-    named = _search_filter(query, model_class, column, org_id, limit, base_query=base_query, fuzzy_fill=False)
-    everything = _search_filter(query, model_class, column, org_id, 100, base_query=base_query)
-    if not named:
-        return []
-    q_norm = normalise_search_text(query)
+    contain, pieces = _search_passes(query, model_class, column, org_id, max(limit, 100), base_query=base_query)
+    typed = normalise_search_text(_re.sub(r"\\(.)", r"\1", query))
     scored = []
-    typed_words = len(q_norm.split())
-    for idx, row in enumerate(everything):
-        exact, fuzzy = fuzzy_match_score(q_norm, normalise_search_text(row.name))
-        if exact >= typed_words > 0:
+    for idx, row in enumerate(contain + pieces):
+        exact, fuzzy = fuzzy_match_score(typed, normalise_search_text(row.name))
+        if idx < len(contain) or holds_every_word(typed, row.name):
             scored.append((-exact, -fuzzy, idx, row))
     scored.sort(key=lambda item: item[:3])
-    near = [row for *_, row in scored[:GLOBAL_SEARCH_RECORDS_SHOWN]]
-    seen = {row.id for row in named}
-    return (list(named) + [row for row in near if row.id not in seen])[:limit]
+    return [row for *_, row in scored[:limit]]
 
 
 def _type_label(element_type):
@@ -663,7 +670,7 @@ def api_global_search():
         # ArchiMate elements — labelled with their actual type in plain words
         try:
             from app.models.models import ArchiMateElement
-            elems = _search_filter(q, ArchiMateElement, ArchiMateElement.name, org_id, fetch_limit)
+            elems = search_elements_as_global(q, ArchiMateElement, ArchiMateElement.name, org_id, fetch_limit)
             for e in elems:
                 if e.id in linked_element_ids:
                     continue

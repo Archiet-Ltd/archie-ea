@@ -307,3 +307,34 @@ def test_a_spelling_the_global_search_folds_is_found_by_the_picker_and_stays_ins
     assert global_ids == {own.id}, "the global search finds the element under either spelling"
     assert picker_ids == {own.id}, "the picker offers the same element and nothing from another organisation"
     assert foreign.id not in picker_ids
+
+
+def test_a_misspelt_name_lists_the_element_in_the_picker_and_the_global_search_and_in_no_other_organisation(
+    app, db_session, make_org, client, login_as
+):
+    """One matcher answers both boxes: a word a letter off still lists the element, a name holding only
+    one of the words does not, and another organisation's element of the same name is listed by neither."""
+    org = make_org("impact-picker-misspelt")
+    other_org = make_org("impact-picker-misspelt-other")
+    user = _make_user(db_session, org)
+    other_user = _make_user(db_session, other_org)
+    tag = uuid.uuid4().hex[:6]
+    own = _element(db_session, org, f"Harbour {tag} Gateway", "application_component", "application")
+    partial = _element(db_session, org, f"Harbour {tag} Ledger", "application_component", "application")
+    foreign = _element(db_session, other_org, f"Harbour {tag} Gateway", "application_component", "application")
+
+    endpoint, limit, _ = _picker_request(client, login_as, user)
+    for text in (f"Harbour {tag} Gateway", f"Harbuor {tag} Gateway", f"Harbour {tag} Gatewya"):
+        picker_ids = {r["id"] for r in _picker_rows(client, login_as, user, endpoint, limit, text)}
+        assert own.id in picker_ids, text
+        assert foreign.id not in picker_ids, text
+        assert own.id in _global_element_ids(client, login_as, user, text), text
+        assert foreign.id not in _global_element_ids(client, login_as, user, text), text
+    # A name that holds one of two typed words is not offered for the misspelt pair.
+    assert partial.id not in {
+        r["id"] for r in _picker_rows(client, login_as, user, endpoint, limit, f"Harbuor {tag} Gateway")
+    }
+    # The other organisation sees its own element, spelt either way, and not the first organisation's.
+    endpoint, limit, _ = _picker_request(client, login_as, other_user)
+    other_ids = {r["id"] for r in _picker_rows(client, login_as, other_user, endpoint, limit, f"Harbuor {tag} Gateway")}
+    assert other_ids == {foreign.id}

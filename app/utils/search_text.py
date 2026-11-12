@@ -74,9 +74,17 @@ def _levenshtein(a: str, b: str, max_dist: int = 2) -> int:
     return previous_row[-1]
 
 
+def _letters_only(word: str) -> bool:
+    return word.replace("-", "").replace("'", "").isalpha()
+
+
 def words_match_fuzzy(query_word: str, label_word: str, max_dist: int = 2) -> bool:
     """True if query_word matches label_word with up to max_dist edits (for words >= 5 letters)."""
     if len(query_word) < 5 or len(label_word) < 5:
+        return query_word == label_word
+    # A slip is forgiven in a word of letters. A code, a number or a symbol must be spelt as typed,
+    # or "W1_Billing" would match "W1XBilling".
+    if not (_letters_only(query_word) and _letters_only(label_word)):
         return query_word == label_word
     return _levenshtein(query_word, label_word, max_dist) <= max_dist
 
@@ -108,3 +116,17 @@ def fuzzy_match_score(query: str, label: str) -> tuple[int, int]:
                 break
 
     return (exact, fuzzy)
+
+
+def holds_every_word(query: str, label: str) -> bool:
+    """True if each word of `query` starts a word of `label` or is one or two letters off one.
+
+    This is the test for a name that does not contain the typed text but is plainly the one meant
+    ("Custumer Portal" for "Customer Portal"). A word has to start a word of the label, so "05" does not
+    find "005".
+    """
+    label_words = normalise_search_text(label).split()
+    words = normalise_search_text(query).split()
+    return bool(words) and all(
+        any(lw.startswith(qw) or words_match_fuzzy(qw, lw) for lw in label_words) for qw in words
+    )

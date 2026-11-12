@@ -37,6 +37,22 @@ entries:
       template, and do not write a second footer, "Source:" line or confidence label beside it.
       The rule is in the service docstring and in docs/adr/0013-result-footer.md.
 
+  - id: element-name-search
+    concept: Finding model elements by a name a person typed (the global search box and the Impact Analysis picker)
+    status: active
+    canonical:
+      path: app/routes/sidebar_api_hardened.py
+      symbols: [search_elements_as_global, _search_passes]
+    reuse: >
+      List elements for typed text with search_elements_as_global, so the global search and every element
+      picker answer the same text with the same elements in the signed-in organisation: names that contain
+      the text, then names whose every word starts, or is a letter or two off, a typed word. Narrow by layer
+      or type through its base_query. Do not write a second name matcher, and do not filter elements by
+      ilike on the name in a new endpoint or beside a picker.
+    must_not_create:
+      - id: second-element-name-matcher
+        regex: 'def (search|find|match)_elements?_(by_name|for_picker|fuzzy|like_global)\b'
+
   - id: cost-masker
     concept: Withholding a figure in pounds from a person who may not see spend (investment figures, budgets, costs)
     status: active
