@@ -32,9 +32,9 @@
     <!-- Risk Summary -->
     <div class="grid gap-4 md:grid-cols-4">
         {{ metrics_card(title='Total Gaps', value=gaps|length|default(0), icon='target') }}
-        {{ metrics_card(title='High Risk', value=gaps|selectattr('priority', 'equalto', 'High')|list|length|default(0), icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
-        {{ metrics_card(title='Medium Risk', value=gaps|selectattr('priority', 'equalto', 'Medium')|list|length|default(0), icon='alert-circle', icon_class='!text-warning', value_class='text-warning') }}
-        {{ metrics_card(title='Low Risk', value=gaps|selectattr('priority', 'equalto', 'Low')|list|length|default(0), icon='info', icon_class='!text-success', value_class='text-success') }}
+        {{ metrics_card(title='High Risk', value=gaps|selectattr('rated_severity', 'in', ['high', 'critical'])|list|length|default(0), icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
+        {{ metrics_card(title='Medium Risk', value=gaps|selectattr('rated_severity', 'equalto', 'medium')|list|length|default(0), icon='alert-circle', icon_class='!text-warning', value_class='text-warning') }}
+        {{ metrics_card(title='Low Risk', value=gaps|selectattr('rated_severity', 'equalto', 'low')|list|length|default(0), icon='info', icon_class='!text-success', value_class='text-success') }}
     </div>
 
     <!-- Gaps Table -->
@@ -62,10 +62,10 @@
                             </td>
                             <td class="p-3">
                                 <span class="px-2 py-1 text-xs rounded-full
-                                    {% if (gap.priority or '')|lower in ['high', 'critical'] %}bg-destructive/20 text-destructive-emphasis
-                                    {% elif (gap.priority or '')|lower == 'medium' %}bg-warning/20 text-warning-emphasis
+                                    {% if (gap.rated_severity or '')|lower in ['high', 'critical'] %}bg-destructive/20 text-destructive-emphasis
+                                    {% elif (gap.rated_severity or '')|lower == 'medium' %}bg-warning/20 text-warning-emphasis
                                     {% else %}bg-success/20 text-success-emphasis{% endif %}">
-                                    {{ gap.priority|default('—', true)|title }}
+                                    {{ gap.rated_severity|default('—', true)|title }}
                                 </span>
                             </td>
                             <td class="p-3">{{ gap.resolution_status|default('—', true) }}</td>

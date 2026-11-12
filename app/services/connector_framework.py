@@ -1286,6 +1286,7 @@ def run_connector_sync(
     approval=None,
     delegated: bool = False,
     sync_type: str = "manual",
+    scope: dict | None = None,
 ) -> dict:
     """Run one connector sync, unless that connector is already being read.
 
@@ -1309,6 +1310,7 @@ def run_connector_sync(
                     approval=approval,
                     delegated=delegated,
                     sync_type=sync_type,
+                    scope=scope,
                 )
                 # The read's record is committed while the claim is still held, so a second
                 # reader cannot start in the gap between the end of this read and the
@@ -1339,6 +1341,7 @@ def _run_connector_sync_locked(
     approval=None,
     delegated: bool = False,
     sync_type: str = "manual",
+    scope: dict | None = None,
 ) -> dict:
     """Run one connector sync and record health, last synchronisation and
     the identifier crosswalk links for every element touched.
@@ -1382,6 +1385,10 @@ def _run_connector_sync_locked(
         sync_log.completed_at = datetime.utcnow()
         db.session.flush()
         return {"success": False, "error": str(exc)}
+
+    if scope:
+        # A read narrowed to part of the source (for GitHub: the repositories a person chose).
+        connector.scope = dict(scope)
 
     try:
         call = connector.batch_sync()

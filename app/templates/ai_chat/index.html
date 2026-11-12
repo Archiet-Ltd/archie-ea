@@ -97,16 +97,16 @@
 
             <div id="messages-container" class="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite" aria-relevant="additions">
                 {# The welcome. It goes once the first message is sent. #}
-                <div id="domain-welcome-grid" class="mx-auto flex w-full max-w-3xl flex-col items-center py-4 text-center">
+                <div id="domain-welcome-grid" class="mx-auto flex w-full max-w-3xl flex-col items-center py-2 text-center">
                     <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">How can I help you today?</h1>
                     <p class="mt-3 hidden max-w-xl text-muted-foreground sm:block">Ask about your company in plain words. A question that names one of your applications or services is answered from your own records, with where each fact came from.</p>
 
-                    <div id="domain-welcome-suggestions" class="mt-8 w-full text-left">
+                    <div id="domain-welcome-suggestions" class="mt-4 w-full text-left">
                         {# Four questions from what this organisation's records flag now. panels.js fills it, including the failed and empty states. #}
                         {% if startup_first_steps and startup_first_steps.show %}
                         {# The empty-workspace next step for a startup. panels.js shows it when no application is recorded. #}
                         <template id="startup-first-steps">
-                            <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center" data-testid="startup-first-steps">
+                            <div class="flex flex-wrap items-center justify-center gap-2" data-testid="startup-first-steps">
                                 {% if startup_first_steps.connect %}
                                 {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='chat-first-connect') }}
                                 {% endif %}
@@ -121,7 +121,21 @@
                             </div>
                         </template>
                         {% endif %}
-                        <div id="portfolio-briefing" aria-live="polite" aria-busy="true" data-testid="first-questions">
+                        {# The next step for an organisation whose applications are recorded but not how they connect. panels.js shows it then. #}
+                        <template id="linkless-next-step">
+                            <div class="flex flex-wrap items-center justify-center gap-2" data-testid="linkless-next-step">
+                                {% if linkless_next_steps and linkless_next_steps.connect %}
+                                {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='chat-linkless-connect') }}
+                                {% endif %}
+                                {% if linkless_next_steps and linkless_next_steps.record %}
+                                {{ button(text='Record how they connect', href=url_for('archimate.composer_page'), variant='outline' if linkless_next_steps and linkless_next_steps.connect else 'default', testid='chat-linkless-record') }}
+                                {% endif %}
+                                {% if not (linkless_next_steps and (linkless_next_steps.connect or linkless_next_steps.record)) %}
+                                <p class="text-sm text-muted-foreground">Ask an administrator to connect a source, or to record how your applications connect.</p>
+                                {% endif %}
+                            </div>
+                        </template>
+                        <div id="portfolio-briefing" aria-live="polite" aria-busy="true" data-testid="first-questions" data-company-kind="{{ 'startup' if startup_first_steps and startup_first_steps.show else 'enterprise' }}">
                             <p class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                                 <i data-lucide="loader-2" class="h-3.5 w-3.5 animate-spin" aria-hidden="true"></i>Reading your portfolio…
                             </p>
@@ -137,7 +151,7 @@
                not url_for: the admin blueprint is selected at boot and a missing endpoint would 500 this whole page. #}
             <div class="shrink-0 px-4 pb-2">
                 {% if current_user.is_admin() %}
-                {{ alert('warning', text=('AI paused. Records still answer.' if llm_paused else 'No AI model. Records still answer.'), link_href='/admin/api-settings', link_text='API Settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {{ alert('warning', text=('AI paused. Records still answer.' if llm_paused else 'No AI model. Records still answer.'), link_href='/admin/api-settings', link_text='AI settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
                 {% else %}
                 {{ alert('warning', text=('AI paused. Records still answer.' if llm_paused else 'No AI model. Ask an administrator.'), testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
                 {% endif %}

@@ -911,6 +911,15 @@ class ToolExecutor:
     # ------------------------------------------------------------------ #
 
     def _tool_update_application_status(self, args: dict) -> dict:
+        from app.services.application_status import status_for_write
+
+        new_status, refusal = status_for_write(args.get("new_status"))
+        args = {**args, "new_status": new_status}
+        if new_status is None:
+            return {
+                "success": False,
+                "error": refusal or "Status must not be blank.",
+            }
         app_r = self._resolver.resolve_application(args["application_name"])
         if not app_r["resolved"]:
             return self._clarify("application", app_r)

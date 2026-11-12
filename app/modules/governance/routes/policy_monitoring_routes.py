@@ -28,15 +28,17 @@ policy_monitoring_bp = Blueprint("policy_monitoring", __name__, url_prefix="/pol
 @login_required
 @require_roles("admin", "architect", "compliance_officer")
 def policy_dashboard():
-    """Main policy enforcement dashboard"""
+    """Controls: the checks that ran on this organisation's AI operations, and what is covered."""
     try:
-        monitoring_data = get_policy_monitoring_data()
-        compliance_report = get_policy_compliance_report()
+        from app.modules.ai_chat.services import change_review
+        from app.utils.tenant import current_organization_id
 
+        org_id = current_organization_id()
         return render_template(
             "policy_monitoring/dashboard.html",
-            monitoring_data=monitoring_data,
-            compliance_report=compliance_report,
+            checks=change_review.checks_report(org_id),
+            covered=change_review.CHECKS_COVER,
+            not_covered=change_review.CHECKS_DO_NOT_COVER,
         )
     except Exception as e:
         logger.error(f"Error loading policy dashboard: {str(e)}")

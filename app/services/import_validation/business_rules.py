@@ -6,6 +6,8 @@ Cross-field dependencies and domain-specific rules.
 from datetime import date
 from typing import Any, Dict, List, Tuple
 
+from app.services.application_status import is_end_of_life
+
 from .validation_result import RowValidationResult
 
 
@@ -45,10 +47,9 @@ class BusinessRuleValidator:
 
         if retirement_date:
             valid_lifecycle = {"sunset", "retired", "deprecated", "maintenance"}
-            valid_deployment = {"deprecated", "retired"}
 
             lifecycle_ok = lifecycle_status and lifecycle_status.lower() in valid_lifecycle
-            deployment_ok = deployment_status and deployment_status.lower() in valid_deployment
+            deployment_ok = is_end_of_life(deployment_status)
 
             if not lifecycle_ok and not deployment_ok:
                 row_result.add_warning(

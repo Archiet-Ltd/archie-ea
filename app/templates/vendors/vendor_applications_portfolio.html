@@ -16,6 +16,8 @@
       ],
       actions=[
           {'text': 'Back to Vendor', 'href': url_for('unified_applications.vendor_detail', vendor_id=vendor.id), 'variant': 'outline'}
+          if vendor.id else
+          {'text': 'Back to Vendors', 'href': url_for('application_mgmt.vendors_dashboard'), 'variant': 'outline'}
       ]
   ) }}
 

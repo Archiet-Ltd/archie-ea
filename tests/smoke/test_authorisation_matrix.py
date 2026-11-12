@@ -85,6 +85,9 @@ POLICY = {
     # Viewer role, which is refused, is pinned in tests/test_application_registration_check.py.
     "/applications/api/registration-check": set(ARCHETYPES),
     "/ai-chat":                set(ARCHETYPES),
+    # The applications the chat offers first questions about: @login_required only, like the page,
+    # and read through the signed-in person's own organisation.
+    "/ai-chat/first-questions": set(ARCHETYPES),
     # The RACI matrix page is @login_required only, so every archetype reads it; setting,
     # clearing and adding a stakeholder carry the same require_roles("admin", "architect",
     # "business_architect") and are pinned in tests/smoke/test_raci_clear_journey.py.
@@ -706,6 +709,23 @@ def test_data_entity_page_authorisation(archetype, page, live_server, seeded, se
     assert actual == ALLOWED, "%s could not reach %s: expected ALLOWED" % (archetype, path)
 
 
+CAPABILITY_CHOICES_PATH = "/architecture/api/capability-choices?q=a"
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_capability_choices_are_listed_to_every_signed_in_archetype(archetype, page, live_server, seeded):
+    """The capability picker on the Create form reads this list; every persona that can open the form can read it."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.get(live_server + CAPABILITY_CHOICES_PATH)
+    assert response.status == 200, "%s could not read the capability choices: %s" % (archetype, response.status)
+    assert isinstance(response.json(), list)
+
+
+def test_capability_choices_reject_anonymous(page, live_server):
+    response = page.request.get(live_server + CAPABILITY_CHOICES_PATH, max_redirects=0)
+    assert response.status in (301, 302, 401, 403), "capability choices were served without signing in"
+
+
 def test_data_entity_page_rejects_anonymous(page, live_server, seeded_data_entity):
     path = "/architecture/data-entities/%d" % seeded_data_entity
     response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -740,6 +760,10 @@ def seeded_processes(seeded):
         with app.app_context():
             BusinessProcess.query.filter(BusinessProcess.id.in_([ids["own"], ids["foreign"]])).delete(
                 synchronize_session=False)
+            # Creating the processes wrote audit rows naming this organisation; they are this fixture's own
+            # rows, removed by its organisation id so the organisation can then be deleted.
+            db.session.execute(db.text("DELETE FROM soc2_audit_log WHERE organization_id = :org"),
+                               {"org": ids["other_org"]})
             Organization.query.filter_by(id=ids["other_org"]).delete(synchronize_session=False)
             db.session.commit()
 
@@ -1160,6 +1184,28 @@ def test_saved_scenarios_are_listed_by_everyone_and_saved_by_architects(archetyp
     expected = ALLOWED if archetype in SCENARIO_SAVE_ARCHETYPES else DENIED
     actual = DENIED if response.status in (401, 403) else ALLOWED
     assert actual == expected, "%s saving a scenario: expected %s, got %s" % (archetype, expected, response.status)
+
+
+# Renaming and deleting a saved scenario take the same roles as saving one. A scenario that does not exist
+# answers 404 to a role the route admits, after the role is asked; anyone else is refused with a 403 first.
+# The export is a read, open to every signed-in person, and refuses an empty choice with a 400.
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_saved_scenarios_are_renamed_and_deleted_by_architects_and_exported_by_everyone(archetype, page, live_server, seeded):
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    expected = ALLOWED if archetype in SCENARIO_SAVE_ARCHETYPES else DENIED
+    address = live_server + "/strategic/api/scenarios/scenario-999999999"
+    for verb, response in (
+        ("rename", page.request.patch(address, data={"name": "x"}, headers={"X-CSRFToken": csrf}, max_redirects=0)),
+        ("delete", page.request.delete(address, headers={"X-CSRFToken": csrf}, max_redirects=0)),
+    ):
+        actual = DENIED if response.status in (401, 403) else ALLOWED
+        assert actual == expected, "%s trying to %s a scenario: expected %s, got %s" % (archetype, verb, expected, response.status)
+        if expected == ALLOWED:
+            assert response.status == 404, (archetype, verb, response.status)
+    exported = page.request.get(live_server + "/strategic/api/scenarios/export.csv?ids=scenario-999999999")
+    assert exported.status == 400, "%s export of nothing: %s" % (archetype, exported.status)
 
 
 # Role-gated ARB writes. Each is probed with an id that does not exist, except
@@ -2087,3 +2133,153 @@ def test_decision_tables_reject_anonymous(page, live_server):
         live_server + "/architecture/decision-tables/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT
     )
     assert "/account/login" in page.url or (response is not None and response.status >= 400)
+
+
+# Every write on the roadmap API is refused to a read-only account before the handler reads the body.
+ROADMAP_WRITE_PATHS = [
+    ("POST", "/api/roadmap/plateaus"),
+    ("POST", "/api/roadmap/work-packages"),
+    ("PUT", "/api/roadmap/work-packages/1"),
+    ("DELETE", "/api/roadmap/work-packages/1"),
+    ("POST", "/api/roadmap/deliverables"),
+    ("PUT", "/api/roadmap/deliverables/1"),
+    ("DELETE", "/api/roadmap/deliverables/1"),
+    ("POST", "/api/roadmap/gaps"),
+    ("POST", "/api/roadmap/automation/generate-work-packages"),
+    ("POST", "/api/roadmap/sync/capabilities"),
+    ("POST", "/api/roadmap/archimate/generate-roadmap"),
+]
+
+
+@pytest.fixture(scope="module")
+def roadmap_viewer(seeded):
+    """A Viewer-role account whose persona is Viewer too, so no persona grants it model editing."""
+    import uuid
+
+    from app import create_app, db
+    from app.models.user import Role, User
+
+    app = create_app("testing")
+    with app.app_context():
+        Role.insert_roles()
+        user = User(
+            email="smoke.roadmap.viewer.%s@example.com" % uuid.uuid4().hex[:8],
+            first_name="Smoke", last_name="Viewer",
+            organization_id=seeded["ids"]["org"], enterprise_role="viewer", confirmed=True,
+        )
+        user.role = Role.query.filter_by(name="Viewer").one()
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.commit()
+        return user.email
+
+
+@pytest.mark.parametrize("method,path", ROADMAP_WRITE_PATHS)
+def test_roadmap_write_routes_refuse_a_read_only_account(method, path, page, live_server, roadmap_viewer):
+    _login(page, live_server, roadmap_viewer)
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.fetch(
+        live_server + path, method=method, data={}, headers={"X-CSRFToken": csrf_token}, max_redirects=0
+    )
+    assert response.status == 403, "a Viewer reached %s %s: %s" % (method, path, response.status)
+
+
+# ── Changing the model: a read-only account is refused and nothing changes; a write role acts ───────────────────
+#
+# Observed on a Viewer and an Architect, each in an organisation of its own with a Goal, and a gap, plus a second
+# real organisation whose Goal must stay as it was whoever acts.
+
+def _model_change_setup(platform_role):
+    persona = "enterprise_architect" if platform_role == "Architect" else "data_analyst"
+    import uuid
+
+    from app import create_app, db
+    from app.models.implementation_migration import Gap
+    from .fresh_org import create_fresh_org
+    from .test_element_number_links_journey import _seed
+
+    org = create_fresh_org(persona, platform_role=platform_role)
+    other = create_fresh_org("enterprise_architect")
+    tag = uuid.uuid4().hex[:6]
+    goals = {
+        key: _seed(o, "Goal", "%s goal %s" % (key, tag), "%s second goal %s" % (key, tag), with_solution=False)
+        for key, o in (("mine", org), ("theirs", other))
+    }
+    with create_app("testing").app_context():
+        gap = Gap(organization_id=org["org_id"], name="Matrix gap " + tag, gap_type="coverage",
+                  priority="medium", severity="medium")
+        db.session.add(gap)
+        db.session.commit()
+        gap_id = gap.id
+        db.session.remove()
+    return org, other, goals, gap_id, tag
+
+
+def _model_state(org, other, goals, gap_id):
+    from app import create_app
+    from app.models.implementation_migration import Gap
+    from app.modules.architecture.routes.archimate_crud.routes import MODEL_REGISTRY
+
+    with create_app("testing").app_context():
+        model = MODEL_REGISTRY["Goal"]
+        field = "name" if hasattr(model, "name") else "title"
+        gap = Gap.query.filter_by(id=gap_id).first()
+        return {
+            "goal": getattr(model.query.filter_by(id=goals["mine"]["a"]).first(), field, None),
+            "other goal": getattr(model.query.filter_by(id=goals["theirs"]["a"]).first(), field, None),
+            "gap": (gap.name, gap.priority) if gap else None,
+        }
+
+
+@pytest.mark.parametrize("platform_role,writes", [("Viewer", False), ("Architect", True)])
+@pytest.mark.parametrize("change", ["element edit", "gap edit", "element delete", "bulk delete"])
+def test_model_changes_are_refused_to_a_read_only_account_and_made_by_a_write_role(
+    change, platform_role, writes, browser, live_server,
+):
+    from .fresh_org import sign_in
+
+    org, other, goals, gap_id, tag = _model_change_setup(platform_role)
+    before = _model_state(org, other, goals, gap_id)
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1280, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, next(iter(org["emails"].values())))
+        page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+        record = goals["mine"]["a"]
+        headers = {"X-CSRFToken": csrf, "Content-Type": "application/json"}
+        import json
+        if change == "element edit":
+            response = page.request.post(
+                live_server + "/architecture/motivation/Goal/%d/edit" % record,
+                data=json.dumps({"name": "Renamed " + tag, "title": "Renamed " + tag}), headers=headers, max_redirects=0)
+        elif change == "gap edit":
+            response = page.request.post(
+                live_server + "/architecture/implementation/Gap/%d/edit" % gap_id,
+                data=json.dumps({"name": "Renamed " + tag, "priority": "high"}), headers=headers, max_redirects=0)
+        elif change == "element delete":
+            response = page.request.post(
+                live_server + "/architecture/motivation/Goal/%d/delete" % record, headers=headers, max_redirects=0)
+        else:
+            response = page.request.post(
+                live_server + "/architecture/motivation/Goal/bulk-delete",
+                data=json.dumps({"ids": [record, goals["theirs"]["a"]]}), headers=headers, max_redirects=0)
+        after = _model_state(org, other, goals, gap_id)
+        assert after["other goal"] == before["other goal"], "another organisation's Goal changed"
+        if not writes:
+            assert response.status == 403, "%s by a read-only account: expected 403, got %s" % (change, response.status)
+            assert after == before, "a refused %s still changed the record: %s -> %s" % (change, before, after)
+        else:
+            assert response.status < 400, "%s by a write role was refused: %s" % (change, response.status)
+            assert after != before, "%s by a write role changed nothing" % change
+            expected = {
+                "element edit": ("goal", lambda v: v == "Renamed " + tag),
+                "gap edit": ("gap", lambda v: v == ("Renamed " + tag, "high")),
+                "element delete": ("goal", lambda v: v is None),
+                "bulk delete": ("goal", lambda v: v is None),
+            }[change]
+            assert expected[1](after[expected[0]]), (change, after)
+    finally:
+        context.close()

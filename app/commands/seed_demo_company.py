@@ -30,8 +30,8 @@ _ORG_SLUG = "lantern-quay"
 # ── demo user ──────────────────────────────────────────────────────────────
 
 _DEMO_USER_EMAIL = "demo@lantern-quay.example.com"
-_DEMO_USER_FIRST = "Demo"
-_DEMO_USER_LAST = "User"
+_DEMO_USER_FIRST = "Alex"
+_DEMO_USER_LAST = "Brooks"
 
 # ── five organisational units ──────────────────────────────────────────────
 
@@ -813,52 +813,52 @@ _ARB_REVIEWS = [
 # ApplicationOwner junction table has valid user_id FKs.
 _OWNER_USERS = [
     ("Ivo", "Reed", "ivo.reed@lantern-quay.example.com"),
-    ("Morgan", "Calibrator", "morgan.calibrator@lantern-quay.example.com"),
-    ("Riley", "Logistics", "riley.logistics@lantern-quay.example.com"),
-    ("Casey", "Inventory", "casey.inventory@lantern-quay.example.com"),
-    ("Jordan", "FieldEng", "jordan.fieldeng@lantern-quay.example.com"),
-    ("Avery", "Compliance", "avery.compliance@lantern-quay.example.com"),
-    ("Taylor", "Procurement", "taylor.procurement@lantern-quay.example.com"),
-    ("Quinn", "Production", "quinn.production@lantern-quay.example.com"),
-    ("Blake", "Quality", "blake.quality@lantern-quay.example.com"),
-    ("Drew", "DataAnalyst", "drew.dataanalyst@lantern-quay.example.com"),
-    ("Sage", "ITOps", "sage.itops@lantern-quay.example.com"),
-    ("Finley", "Support", "finley.support@lantern-quay.example.com"),
-    ("Rowan", "SharedSvc", "rowan.sharedsvc@lantern-quay.example.com"),
-    ("Ellis", "DataSteward", "ellis.datasteward@lantern-quay.example.com"),
-    ("Cameron", "SysAdmin", "cameron.sysadmin@lantern-quay.example.com"),
-    ("Ainsley", "NetEng", "ainsley.neteng@lantern-quay.example.com"),
-    ("Bryn", "BusinessArch", "bryn.businessarch@lantern-quay.example.com"),
+    ("Morgan", "Hale", "morgan.hale@lantern-quay.example.com"),
+    ("Riley", "Fenwick", "riley.fenwick@lantern-quay.example.com"),
+    ("Casey", "Marsh", "casey.marsh@lantern-quay.example.com"),
+    ("Jordan", "Whitlock", "jordan.whitlock@lantern-quay.example.com"),
+    ("Avery", "Lindqvist", "avery.lindqvist@lantern-quay.example.com"),
+    ("Taylor", "Brennan", "taylor.brennan@lantern-quay.example.com"),
+    ("Quinn", "Aldridge", "quinn.aldridge@lantern-quay.example.com"),
+    ("Blake", "Sutherland", "blake.sutherland@lantern-quay.example.com"),
+    ("Drew", "Holloway", "drew.holloway@lantern-quay.example.com"),
+    ("Sage", "Okafor", "sage.okafor@lantern-quay.example.com"),
+    ("Finley", "Barrett", "finley.barrett@lantern-quay.example.com"),
+    ("Rowan", "Pryce", "rowan.pryce@lantern-quay.example.com"),
+    ("Ellis", "Kowalski", "ellis.kowalski@lantern-quay.example.com"),
+    ("Cameron", "Doyle", "cameron.doyle@lantern-quay.example.com"),
+    ("Ainsley", "Cormac", "ainsley.cormac@lantern-quay.example.com"),
+    ("Bryn", "Tanaka", "bryn.tanaka@lantern-quay.example.com"),
 ]
 
 # The one demo user who can look but not change the model: a business analyst
 # on the Viewer platform role, so the demonstration carries a read-only persona
 # beside its sixteen architects. Matches an entry of _OWNER_USERS.
-_DEMO_READER_EMAIL = "drew.dataanalyst@lantern-quay.example.com"
+_DEMO_READER_EMAIL = "drew.holloway@lantern-quay.example.com"
 _DEMO_READER_PERSONA = "business_analyst"
 
 # The one business architect in the demonstration, so what that persona does and
 # does not see (Connections yes, Billing no) can be walked signed in as them.
-_DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.businessarch@lantern-quay.example.com"
+_DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.tanaka@lantern-quay.example.com"
 
 # Map from display name (as used in BusinessActor elements) to User email.
 _OWNER_NAME_TO_EMAIL = {
     "Ivo Reed": "ivo.reed@lantern-quay.example.com",
-    "Calibration Specialist": "morgan.calibrator@lantern-quay.example.com",
-    "Logistics Planner": "riley.logistics@lantern-quay.example.com",
-    "Inventory Controller": "casey.inventory@lantern-quay.example.com",
-    "Field Service Engineer": "jordan.fieldeng@lantern-quay.example.com",
-    "Regulatory Compliance Officer": "avery.compliance@lantern-quay.example.com",
-    "Procurement Officer": "taylor.procurement@lantern-quay.example.com",
-    "Production Supervisor": "quinn.production@lantern-quay.example.com",
-    "Quality Assurance Lead": "blake.quality@lantern-quay.example.com",
-    "Data Analyst": "drew.dataanalyst@lantern-quay.example.com",
-    "IT Operations Lead": "sage.itops@lantern-quay.example.com",
-    "Support Team Lead": "finley.support@lantern-quay.example.com",
-    "Shared Services Director": "rowan.sharedsvc@lantern-quay.example.com",
-    "Data Steward": "ellis.datasteward@lantern-quay.example.com",
-    "System Administrator": "cameron.sysadmin@lantern-quay.example.com",
-    "Network Engineer": "ainsley.neteng@lantern-quay.example.com",
+    "Calibration Specialist": "morgan.hale@lantern-quay.example.com",
+    "Logistics Planner": "riley.fenwick@lantern-quay.example.com",
+    "Inventory Controller": "casey.marsh@lantern-quay.example.com",
+    "Field Service Engineer": "jordan.whitlock@lantern-quay.example.com",
+    "Regulatory Compliance Officer": "avery.lindqvist@lantern-quay.example.com",
+    "Procurement Officer": "taylor.brennan@lantern-quay.example.com",
+    "Production Supervisor": "quinn.aldridge@lantern-quay.example.com",
+    "Quality Assurance Lead": "blake.sutherland@lantern-quay.example.com",
+    "Data Analyst": "drew.holloway@lantern-quay.example.com",
+    "IT Operations Lead": "sage.okafor@lantern-quay.example.com",
+    "Support Team Lead": "finley.barrett@lantern-quay.example.com",
+    "Shared Services Director": "rowan.pryce@lantern-quay.example.com",
+    "Data Steward": "ellis.kowalski@lantern-quay.example.com",
+    "System Administrator": "cameron.doyle@lantern-quay.example.com",
+    "Network Engineer": "ainsley.cormac@lantern-quay.example.com",
 }
 
 _APP_OWNERS = [
@@ -994,14 +994,55 @@ _CAPABILITY_OWNERS = {
 # inventory row, which is left without an accountable person on purpose so the
 # matrix shows its "no one is accountable" flag with real data.
 _RACI_ROWS = [
-    ("LQ-CAP-CALIBRATION", {"quinn.production": "R", "ivo.reed": "A", "blake.quality": "C", "bryn.businessarch": "I"}),
-    ("LQ-CAP-WATER-QUALITY", {"blake.quality": "R", "ivo.reed": "A", "sage.itops": "C", "bryn.businessarch": "I"}),
-    ("LQ-CAP-FIELD-SERVICE", {"riley.logistics": "R", "quinn.production": "A", "sage.itops": "C"}),
-    ("LQ-CAP-INVENTORY", {"riley.logistics": "R", "blake.quality": "C", "bryn.businessarch": "I"}),
-    ("LQ-CAP-FULFILMENT", {"quinn.production": "R", "riley.logistics": "A", "ivo.reed": "I"}),
-    ("LQ-CAP-COMPLIANCE", {"bryn.businessarch": "R", "blake.quality": "A", "ivo.reed": "C"}),
-    ("LQ-CAP-INCIDENT", {"sage.itops": "R", "ivo.reed": "A", "riley.logistics": "C"}),
+    ("LQ-CAP-CALIBRATION", {"quinn.aldridge": "R", "ivo.reed": "A", "blake.sutherland": "C", "bryn.tanaka": "I"}),
+    ("LQ-CAP-WATER-QUALITY", {"blake.sutherland": "R", "ivo.reed": "A", "sage.okafor": "C", "bryn.tanaka": "I"}),
+    ("LQ-CAP-FIELD-SERVICE", {"riley.fenwick": "R", "quinn.aldridge": "A", "sage.okafor": "C"}),
+    ("LQ-CAP-INVENTORY", {"riley.fenwick": "R", "blake.sutherland": "C", "bryn.tanaka": "I"}),
+    ("LQ-CAP-FULFILMENT", {"quinn.aldridge": "R", "riley.fenwick": "A", "ivo.reed": "I"}),
+    ("LQ-CAP-COMPLIANCE", {"bryn.tanaka": "R", "blake.sutherland": "A", "ivo.reed": "C"}),
+    ("LQ-CAP-INCIDENT", {"sage.okafor": "R", "ivo.reed": "A", "riley.fenwick": "C"}),
 ]
+
+
+def _rename_retired_people(org_id) -> int:
+    """Rename, in place, demonstration people seeded under earlier names, so a re-run leaves exactly
+    the people a fresh seed creates. Ids are kept, so ownership, responsibilities and links survive.
+    An earlier person is the one demo-domain account with the same first name and a different address."""
+    from app.models.vendor.vendor_organization import EnterpriseInitiative
+    from app.models.user import User
+
+    domain = _DEMO_USER_EMAIL.split("@", 1)[1]
+    users = db.session.query(User).filter(User.organization_id == org_id).all()
+    current = {email for _, _, email in _OWNER_USERS} | {_DEMO_USER_EMAIL}
+    renamed = 0
+
+    def _rename_text(old_name, new_name):
+        for initiative in db.session.query(EnterpriseInitiative).filter(
+            EnterpriseInitiative.organization_id == org_id,
+            EnterpriseInitiative.program_manager == old_name,
+        ):
+            initiative.program_manager = new_name
+
+    demo = next((u for u in users if u.email == _DEMO_USER_EMAIL), None)
+    if demo is not None and (demo.first_name, demo.last_name) != (_DEMO_USER_FIRST, _DEMO_USER_LAST):
+        demo.first_name, demo.last_name = _DEMO_USER_FIRST, _DEMO_USER_LAST
+        renamed += 1
+    for first, last, email in _OWNER_USERS:
+        if any(u.email == email for u in users):
+            continue
+        earlier = [
+            u for u in users
+            if u.first_name == first and u.email.endswith("@" + domain) and u.email not in current
+        ]
+        if len(earlier) != 1:
+            continue
+        person = earlier[0]
+        _rename_text("%s %s" % (person.first_name, person.last_name), "%s %s" % (first, last))
+        person.email, person.last_name = email, last
+        renamed += 1
+    if renamed:
+        db.session.flush()
+    return renamed
 
 
 def _seed_raci(org_id) -> dict:
@@ -1012,7 +1053,7 @@ def _seed_raci(org_id) -> dict:
     caps = _resolve_caps(org_id)
     users = {email.split("@")[0]: u for email, u in _resolve_users(org_id).items()}
     existing = {
-        (a.stakeholder_type, a.stakeholder_id, a.capability_id)
+        (a.stakeholder_type, a.stakeholder_id, a.capability_id): a
         for a in db.session.query(EnterpriseRaciAssignment)
         .filter(EnterpriseRaciAssignment.organization_id == org_id)
     }
@@ -1023,7 +1064,14 @@ def _seed_raci(org_id) -> dict:
             continue
         for handle, letter in cells.items():
             user = users.get(handle)
-            if user is None or ("user", user.id, cap.id) in existing:
+            if user is None:
+                raise RuntimeError(
+                    "The responsibility matrix names %s for %s, and no such person exists in the "
+                    "demonstration organisation." % (handle, code)
+                )
+            kept = existing.get(("user", user.id, cap.id))
+            if kept is not None:
+                kept.stakeholder_name = f"{user.first_name} {user.last_name}"
                 continue
             db.session.add(EnterpriseRaciAssignment(
                 organization_id=org_id,
@@ -1084,6 +1132,216 @@ def _seed_decisions(org_id, user_id) -> dict:
     if created:
         db.session.flush()
     return {"architecture_decisions_created": created}
+
+
+# ── saved scenarios ────────────────────────────────────────────────────────
+
+# (name, system it is tried on, kind of change): two ways to deal with the same system, so Compare Scenarios
+# has two saved scenarios to put side by side.
+_SCENARIOS = [
+    ("Retire Calibration Ledger", "Calibration Ledger", "RETIRE"),
+    ("Replace Calibration Ledger with a managed service", "Calibration Ledger", "REPLACE"),
+]
+
+
+def _seed_scenarios(org_id, user_id) -> dict:
+    """Two saved scenarios on one system, worked out by the same analysis a person's save uses.
+    Idempotent: a scenario whose name the organisation already has is left as it is."""
+    from flask import g
+
+    from app.models.saved_scenario import SavedScenario
+    from app.modules.solutions_strategic.v2.routes.strategic_routes import _scenario_figures
+    from app.modules.solutions_strategic.v2.services import simulation_service
+    from app.modules.solutions_strategic.v2.services.impact_analysis_service import ImpactAnalysisService
+
+    elements = _resolve_elements(org_id)
+    existing = {
+        row.name for row in db.session.query(SavedScenario.name).filter(SavedScenario.organization_id == org_id)
+    }
+    created = 0
+    had_org = hasattr(g, "current_org_id")
+    previous = getattr(g, "current_org_id", None)
+    g.current_org_id = org_id  # the analysis reads the organisation the way a request does
+    try:
+        for name, system, change_type in _SCENARIOS:
+            element = elements.get(system)
+            if element is None or name in existing:
+                continue
+            server = ImpactAnalysisService.analyze_change_impact(element.id, change_type, record=False)
+            db.session.add(SavedScenario(
+                organization_id=org_id, name=name, element_id=element.id, element_name=element.name,
+                element_type=element.type, change_type=change_type,
+                change_label=simulation_service.change_label(change_type),
+                analysis_result=_scenario_figures(server), created_by_id=user_id,
+            ))
+            created += 1
+    finally:
+        if had_org:
+            g.current_org_id = previous
+        else:
+            del g.current_org_id
+    if created:
+        db.session.flush()
+    return {"saved_scenarios_created": created}
+
+
+# ── products ───────────────────────────────────────────────────────────────
+
+# (product, what it is, [(relationship, direction, other element name, type, layer)]). "out" is product to element,
+# "in" is element to product; an element joined to one of the product's own elements goes in _PRODUCT_CHAINS.
+_PRODUCTS = [
+    ("Calibrated Sensor Service",
+     "Calibrated sensors sold to water utilities with a certificate for every batch, and the remote diagnostics and "
+     "maintenance agreement that keep them accurate.",
+     [("Aggregation", "out", "Calibrated sensors with a certificate for every batch", "BusinessService", "business"),
+      ("Aggregation", "out", "Remote diagnostics that cut site visits", "BusinessService", "business"),
+      ("Composition", "out", "Annual calibration and maintenance agreement", "Contract", "business"),
+      ("Association", "out", "Sensor Calibration", "Capability", "strategy"),
+      ("Association", "out", "Operators know their readings can be trusted", "Value", "motivation"),
+      ("Association", "out", "Calibration throughput gap", "Gap", "implementation")]),
+    ("Recertified Assembly Programme",
+     "Recovered sensor assemblies recertified and resold instead of scrapped.",
+     [("Aggregation", "out", "Recovered assemblies recertified instead of scrapped", "BusinessService", "business"),
+      ("Composition", "out", "Recertified assembly resale terms", "Contract", "business"),
+      ("Association", "out", "Asset Lifecycle Management", "Capability", "strategy")]),
+]
+# (product, relationship, source element name, source type, source layer, target element name): one step outward.
+_PRODUCT_CHAINS = [
+    ("Calibrated Sensor Service", "Serving", "Calibration Ledger", "ApplicationComponent", "application",
+     "Calibrated sensors with a certificate for every batch"),
+    ("Calibrated Sensor Service", "Realization", "Calibration Automation Phase 1", "WorkPackage", "implementation",
+     "Calibrated sensors with a certificate for every batch"),
+    ("Recertified Assembly Programme", "Serving", "Inventory Manager", "ApplicationComponent", "application",
+     "Recovered assemblies recertified instead of scrapped"),
+    ("Recertified Assembly Programme", "Realization", "Recertify recovered assembly", "BusinessProcess", "business",
+     "Recovered assemblies recertified instead of scrapped"),
+]
+
+
+# A diagram box is drawn up to 130 high and 180 wide; each step is the box plus a gap, so boxes never overlap.
+_DIAGRAM_ORIGIN = 40
+_DIAGRAM_COLUMN_STEP = 220
+_DIAGRAM_ROW_STEP = 170
+
+
+def _seed_products(org_id) -> dict:
+    """Two Products with linked elements across five layers, a diagram showing each, and the decisions the
+    members already carry. A Product is an ArchiMate element (with its product record); elements already in the
+    model are joined by name and type, and are made only when the model holds none. Idempotent."""
+    from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.models.archimate_core import SavedDiagram, SavedDiagramElement
+    from app.models.archimate_missing_elements import Product
+    from app.services.archimate_backbone import create_backbone_element
+
+    created = 0
+    by_key = {}
+    for e in db.session.query(ArchiMateElement).filter(ArchiMateElement.organization_id == org_id).order_by(
+            ArchiMateElement.id.desc()):
+        by_key[(e.name, e.type)] = e
+    by_name = {}
+    for (name, _type), e in by_key.items():
+        by_name.setdefault(name, e)
+
+    def element(name, type_, layer):
+        nonlocal created
+        found = by_key.get((name, type_)) or by_name.get(name)
+        if found is None:
+            found = create_backbone_element(
+                element_type=type_, layer=layer, name=name, organization_id=org_id,
+                provenance={"created_from": "demo company seed"})
+            by_key[(name, type_)] = found
+            by_name[name] = found
+            created += 1
+        return found
+
+    def join(source, target, rel_type):
+        nonlocal created
+        if not db.session.query(ArchiMateRelationship.id).filter_by(
+                source_id=source.id, target_id=target.id, type=rel_type, organization_id=org_id).first():
+            db.session.add(ArchiMateRelationship(
+                source_id=source.id, target_id=target.id, type=rel_type, organization_id=org_id))
+            created += 1
+
+    made = {}
+    for name, description, links in _PRODUCTS:
+        product = element(name, "Product", "business")
+        made[name] = [product]
+        if not db.session.query(Product.id).filter_by(organization_id=org_id, archimate_element_id=product.id).first():
+            db.session.add(Product(
+                organization_id=org_id, name=name, description=description, archimate_element_id=product.id,
+                product_status="active", product_category="customer_facing"))
+            product.description = product.description or description
+        for rel_type, direction, other_name, other_type, other_layer in links:
+            other = element(other_name, other_type, other_layer)
+            made[name].append(other)
+            if direction == "out":
+                join(product, other, rel_type)
+            else:
+                join(other, product, rel_type)
+    for name, rel_type, src_name, src_type, src_layer, target_name in _PRODUCT_CHAINS:
+        source = element(src_name, src_type, src_layer)
+        target = element(target_name, "BusinessService", "business")
+        made[name].extend([source, target])
+        join(source, target, rel_type)
+    db.session.flush()
+    for name, elements in made.items():
+        title = "%s: what it is made of" % name
+        diagram = db.session.query(SavedDiagram).filter_by(organization_id=org_id, name=title).first()
+        existing = diagram is not None
+        if not existing:
+            diagram = SavedDiagram(organization_id=org_id, name=title, viewpoint_type="layered",
+                                   description="The product and every element that makes it up.")
+            db.session.add(diagram)
+            db.session.flush()
+        placed = {row.element_id: row for row in db.session.query(SavedDiagramElement).filter_by(
+            diagram_id=diagram.id).all()}
+        seen = set()
+        for index, el in enumerate(elements):
+            if el.id in seen:
+                continue
+            seen.add(el.id)
+            x = _DIAGRAM_ORIGIN + _DIAGRAM_COLUMN_STEP * (index % 4)
+            y = _DIAGRAM_ORIGIN + _DIAGRAM_ROW_STEP * (index // 4)
+            row = placed.get(el.id)
+            if row is None:
+                db.session.add(SavedDiagramElement(diagram_id=diagram.id, element_id=el.id, position_x=x, position_y=y))
+            else:
+                row.position_x, row.position_y = x, y
+        if not existing:
+            created += 1
+    db.session.flush()
+    created += _seed_product_document(org_id)
+    return {"product_elements_created": created}
+
+
+_PRODUCT_DOCUMENT = "calibration-ledger-design.pdf"
+
+
+def _seed_product_document(org_id) -> int:
+    """One real design document, file and record, on the Calibration Ledger application. Idempotent."""
+    import os
+    from flask import current_app
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.miscellaneous import ArchitectureDocument
+
+    application = db.session.query(ApplicationComponent).filter_by(
+        organization_id=org_id, name="Calibration Ledger").first()
+    if application is None or db.session.query(ArchitectureDocument).filter_by(
+            application_id=application.id, filename=_PRODUCT_DOCUMENT).first():
+        return 0
+    folder = os.path.abspath(os.path.join(
+        current_app.config.get("UPLOAD_FOLDER", "uploads"), "architecture_docs", str(application.id)))
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, _PRODUCT_DOCUMENT)
+    body = (b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+            b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n")
+    with open(path, "wb") as handle:
+        handle.write(body)
+    db.session.add(ArchitectureDocument(
+        application_id=application.id, filename=_PRODUCT_DOCUMENT, document_type="Design Document",
+        description="How the calibration ledger records and certifies each measurement.", version="1.0",
+        file_path=path, file_size=len(body), mime_type="application/pdf"))
+    return 1
 
 
 # ── capabilities with maturity ─────────────────────────────────────────────
@@ -1411,22 +1669,22 @@ _INITIATIVES = [
      750000, 485000, 790000, 55, "Chief Operations Officer", "Ivo Reed", "modernization",
      ("Calibration Automation Phase 1", "Calibration Automation Phase 2")),
     ("Field Service Transformation", "LQ-INI-FIELD-SVC", "implementation", "active", "green",
-     420000, 210000, 415000, 50, "Chief Operations Officer", "Jordan FieldEng", "transformation",
+     420000, 210000, 415000, 50, "Chief Operations Officer", "Jordan Whitlock", "transformation",
      ("Field Tester Rollout",)),
     ("Event Backbone Hardening", "LQ-INI-EVENT-BACKBONE", "design", "active", "red",
-     600000, 540000, 720000, 30, "Chief Technology Officer", "Sage ITOps", "migration",
+     600000, 540000, 720000, 30, "Chief Technology Officer", "Sage Okafor", "migration",
      ("Event Backbone Migration",)),
     ("Supplier Optimisation", "LQ-INI-SUPPLIER", "planning", "planning", "green",
-     240000, 30000, 240000, 10, "Chief Financial Officer", "Taylor Procurement", "consolidation",
+     240000, 30000, 240000, 10, "Chief Financial Officer", "Taylor Brennan", "consolidation",
      ("Supplier Consolidation Programme",)),
     ("Predictive Operations", "LQ-INI-PREDICTIVE", "planning", "planning", "yellow",
-     310000, 45000, 330000, 8, "Chief Technology Officer", "Drew DataAnalyst", "transformation",
+     310000, 45000, 330000, 8, "Chief Technology Officer", "Drew Holloway", "transformation",
      ("Predictive Maintenance Pilot",)),
     ("Compliance System Upgrade", "LQ-INI-COMPLIANCE", "testing", "active", "green",
-     180000, 150000, 175000, 80, "Chief Operations Officer", "Avery Compliance", "upgrade",
+     180000, 150000, 175000, 80, "Chief Operations Officer", "Avery Lindqvist", "upgrade",
      ("Compliance System Upgrade",)),
     ("Inventory Accuracy Drive", "LQ-INI-INVENTORY", "deployment", "active", "green",
-     95000, 88000, 95000, 90, "Chief Operations Officer", "Casey Inventory", "upgrade",
+     95000, 88000, 95000, 90, "Chief Operations Officer", "Casey Marsh", "upgrade",
      ("Inventory Accuracy Drive",)),
 ]
 
@@ -1592,6 +1850,110 @@ _WORK_PACKAGES = [
         -20, 45, 65000, 38000,
         "Inventory Accuracy Drive", "Inventory Control",
     ),
+    # The other capabilities each carry the work that changes them, so every
+    # capability on the investment pages has a recorded figure with its source.
+    (
+        "Install online water quality probes",
+        "in_progress", "high",
+        -40, 150, 185000, 72000,
+        "Predictive Maintenance Pilot", "Water Quality Monitoring",
+    ),
+    (
+        "Streamline order-to-dispatch hand-offs",
+        "in_progress", "medium",
+        -25, 100, 88000, 31000,
+        "Inventory Accuracy Drive", "Order Fulfilment",
+    ),
+    (
+        "Introduce skills-based rostering",
+        "planned", "medium",
+        45, 110, 72000, 0,
+        "Field Tester Rollout", "Workforce Planning",
+    ),
+    (
+        "Stand up a 24-hour incident desk",
+        "in_progress", "high",
+        -35, 90, 120000, 54000,
+        "Event Backbone Migration", "Incident Response",
+    ),
+    (
+        "Build demand forecasting model",
+        "planned", "medium",
+        75, 130, 98000, 0,
+        "Predictive Maintenance Pilot", "Demand Forecasting",
+    ),
+    (
+        "Automate batch quality checks",
+        "in_progress", "medium",
+        -20, 80, 64000, 22000,
+        "Compliance System Upgrade", "Quality Assurance",
+    ),
+    (
+        "Launch the shared analytics workspace",
+        "planned", "high",
+        30, 140, 175000, 0,
+        "Predictive Maintenance Pilot", "Data Analytics",
+    ),
+    (
+        "Replace point-to-point interfaces with the bus",
+        "in_progress", "high",
+        -55, 160, 230000, 96000,
+        "Event Backbone Migration", "Integration Management",
+    ),
+    (
+        "Introduce single sign-on for field tools",
+        "planned", "high",
+        40, 75, 82000, 0,
+        "Compliance System Upgrade", "Identity and Access",
+    ),
+    (
+        "Move controlled documents to one register",
+        "in_progress", "low",
+        -15, 70, 46000, 15000,
+        "Compliance System Upgrade", "Document Control",
+    ),
+    (
+        "Add alert routing and on-call rotas",
+        "planned", "medium",
+        50, 60, 58000, 0,
+        "Event Backbone Migration", "Monitoring and Alerting",
+    ),
+    (
+        "Enrol field devices in central management",
+        "in_progress", "medium",
+        -30, 110, 92000, 35000,
+        "Field Tester Rollout", "Device Management",
+    ),
+    (
+        "Sign and stage firmware releases",
+        "planned", "medium",
+        60, 90, 69000, 0,
+        "Calibration Automation Phase 2", "Firmware Distribution",
+    ),
+    (
+        "Renew the site network links",
+        "in_progress", "medium",
+        -45, 120, 135000, 68000,
+        "Event Backbone Migration", "Network Operations",
+    ),
+    (
+        "Test restore of the calibration ledger",
+        "planned", "high",
+        25, 45, 41000, 0,
+        "Event Backbone Migration", "Backup and Recovery",
+    ),
+    (
+        "Plan capacity for peak calibration season",
+        "planned", "low",
+        90, 60, 36000, 0,
+        "Event Backbone Migration", "Capacity Planning",
+    ),
+    (
+        "Segment the lab and field networks",
+        "in_progress", "high",
+        -10, 100, 115000, 29000,
+        "Compliance System Upgrade", "Security Operations",
+    ),
 ]
 
 # ── plateaus ───────────────────────────────────────────────────────────────
@@ -1645,12 +2007,18 @@ _PLATEAU_DESCRIPTIONS = {
     "Future State": "Platform services with governed data, full integration coverage and complete monitoring.",
 }
 
-# The two work packages that close no gap, and the plateau each one realises.
+# The work packages that close no gap, and the plateau each one realises.
 # Every other package realises the plateau its gap is closed on.
 _WORK_PACKAGE_PLATEAUS = {
     "Procure handheld field testers": "Transition State 1",
     "Consolidate supplier base": "Target Architecture",
 }
+# Packages that close no gap sit on the plateau their status points to: under way is
+# Transition State 1, planned is Target Architecture.
+_WORK_PACKAGE_PLATEAUS.update({
+    spec[0]: ("Target Architecture" if spec[1] == "planned" else "Transition State 1")
+    for spec in _WORK_PACKAGES[12:]
+})
 
 # gap name -> (gap type, impact): what kind of shortfall it is and what it costs.
 _GAP_DETAILS = {
@@ -2885,7 +3253,7 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
 # of implemented, in progress and planned: the controls still planned are the findings.
 _ISO_STATUS_BY_APP = {
     "Event Relay": ("implemented", "implemented", "verified"),
-    "Calibration Ledger": ("implemented", "in_progress", "planned"),
+    "Calibration Ledger": ("implemented", "in_progress", "verified"),
     "Dispatch Planner": ("verified", "implemented", "in_progress"),
     "Inventory Manager": ("in_progress", "planned", "planned"),
     "Field Service Scheduler": ("implemented", "implemented", "implemented"),
@@ -2897,12 +3265,67 @@ _ISO_STATUS_BY_APP = {
 }
 
 
+def _evidence_text(status, app_name) -> str:
+    """What the evidence for a finished control says, in words a reader needs no context for."""
+    if status == "verified":
+        return "The control is assessed and the result is recorded against %s." % app_name
+    if status == "implemented":
+        return "The control is in place for %s and its owner keeps the working record." % app_name
+    return "The work to put the control in place for %s is under way; this is the plan so far." % app_name
+
+
+def _compliance_evidence_document(org_id, app, rows) -> None:
+    """The evidence register of one application, kept as a document of the application.
+
+    The register is an ApplicationDocument with its file in the folder uploaded documents are saved to and
+    served from (the upload route's folder), so the application's documents tab lists it and downloads it.
+    One document per application, one section per finished control. A control's own evidence page does not
+    depend on the file: the evidence text is kept on the mapping.
+    """
+    import os
+
+    from flask import current_app
+
+    from app.models.miscellaneous import ApplicationDocument
+
+    title = "ISO 27001 control evidence"
+    lines = ["%s: %s" % (title, app.name), ""]
+    for control, status in rows:
+        lines += [
+            "%s  %s" % (control.control_code, control.title),
+            "Status: %s" % status.replace("_", " "),
+            "Evidence: %s" % _evidence_text(status, app.name),
+            "",
+        ]
+    body = "\n".join(lines)
+    file_name = "iso27001-control-evidence-%s.txt" % "-".join(app.name.lower().split())
+    document = ApplicationDocument.query.filter_by(
+        organization_id=org_id, application_component_id=app.id, title=title).first()
+    if document is None:
+        document = ApplicationDocument(
+            organization_id=org_id, application_component_id=app.id, title=title,
+            description="What shows each ISO 27001 control the application has in hand.",
+            file_name=file_name, file_extension="TXT", uploaded_by="Seeded demonstration")
+        db.session.add(document)
+        db.session.flush()
+    folder = current_app.config.get("UPLOAD_FOLDER", os.path.join(current_app.root_path, "uploads", "documents"))
+    os.makedirs(folder, exist_ok=True)
+    document.file_path = os.path.join(folder, "%s_%s" % (document.id, file_name))
+    with open(document.file_path, "w", encoding="utf-8") as handle:
+        handle.write(body)
+    document.file_size = len(body.encode("utf-8"))
+
+
 def _seed_compliance(org_id) -> int:
     """Adopt ISO 27001 for the demonstration organisation and map its controls to the applications.
 
     Written through the starter-data adoption and ApplicabilityService.link_requirement, the same paths a
-    person's sign-up and a mapping use. A mapping that exists is left as it is. Returns mappings created.
+    person's sign-up and a mapping use. A mapping that exists keeps its status, its evidence text and its
+    evidence address: the seed fills only what a mapping has none of, so a change a person made in the
+    demonstration survives a second seed. Returns mappings created.
     """
+    from flask import current_app, url_for
+
     from app.models.application_compliance import ApplicationComplianceControl
     from app.models.compliance_models import ComplianceControl, RegulatoryFramework
     from app.modules.account.services.onboarding_service import FRAMEWORK_CATALOGUES, _adopt_frameworks
@@ -2918,16 +3341,32 @@ def _seed_compliance(org_id) -> int:
         statuses = _ISO_STATUS_BY_APP.get(app_name)
         if statuses is None:
             continue
-        for index, control in enumerate(controls):
-            if ApplicationComplianceControl.query.filter_by(
+        plan = [(control, statuses[index % len(statuses)]) for index, control in enumerate(controls)]
+        finished = [(c, st) for c, st in plan if st in ("implemented", "verified", "in_progress")]
+        if finished:
+            _compliance_evidence_document(org_id, app, finished)
+        for control, status in plan:
+            mapping = ApplicationComplianceControl.query.filter_by(
                 organization_id=org_id, application_id=app.id, control_id=control.id
-            ).first():
+            ).first()
+            if mapping is None:
+                mapping = ApplicabilityService.link_requirement(org_id, app.id, control.id, status)
+                if status == "verified":
+                    mapping.verified_date = _dt.datetime.utcnow()
+                created += 1
+            elif not mapping.implementation_status:
+                mapping.implementation_status = status
+            current = mapping.implementation_status
+            if current not in ("implemented", "verified", "in_progress"):
                 continue
-            status = statuses[index % len(statuses)]
-            link = ApplicabilityService.link_requirement(org_id, app.id, control.id, status)
-            if status == "verified":
-                link.verified_date = _dt.datetime.utcnow()
-            created += 1
+            if not mapping.notes:
+                mapping.notes = _evidence_text(current, app.name)
+            # an address the seed gave in an earlier version (the bare text file) is the seed's to replace;
+            # an address a person recorded stays
+            held = mapping.evidence_url or ""
+            if not held or held.startswith("/applications/documents/"):
+                with current_app.test_request_context():
+                    mapping.evidence_url = url_for("application_mgmt.compliance_control_evidence", mapping_id=mapping.id)
     db.session.flush()
     return created
 
@@ -3070,6 +3509,8 @@ def _seed_demo_company() -> dict:
                 if architect_role is not None:
                     existing_user.role = architect_role
                     db.session.flush()
+
+        stats["people_renamed"] = _rename_retired_people(org_id)
 
         # ── 3. ArchiMate elements ───────────────────────────────────────
         existing_elements = _resolve_elements(org_id)
@@ -4091,6 +4532,8 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_data_flows(org_id))
         stats.update(_seed_raci(org_id))
         stats.update(_seed_decisions(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_scenarios(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_products(org_id))
 
         # The portfolio opens already scored: run the existing scoring
         # service once over this organisation's applications, rather than

@@ -84,7 +84,7 @@ def element_href(el):
     layer = (el.layer or "").lower()
     if layer not in ("motivation", "strategy", "business", "application", "technology", "physical", "implementation"):
         layer = _LAYER_BY_TYPE.get(el.type, "business")
-    return url_for("archimate_crud.detail_element", layer=layer, element_type=el.type, element_id=el.id)
+    return url_for("archimate_crud.detail_element", layer=layer, element_type=el.type, element_id=el.id, ae=1)
 
 
 def normalise(name):

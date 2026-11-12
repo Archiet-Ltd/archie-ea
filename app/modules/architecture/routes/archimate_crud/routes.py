@@ -3,8 +3,13 @@ Architecture CRUD Routes
 Unified dashboard for managing Motivation, Strategy, and Business layer elements
 """
 
+import math
 import re
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
+
+from app.modules.architecture.services.gap_archimate_service import PRIORITY_SEVERITY_MAP, apply_rating_rule
+from app.services.gap_register_service import effective_severity
 
 from flask import (
     abort,
@@ -18,18 +23,20 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+import sqlalchemy as sa
 from sqlalchemy import or_
 
 from app import db
 from app.core.auth.decorators import admit_model_changers
 from app.decorators import require_roles
 from app.utils.tenant_users import escape_like_literal
-from . import archimate_crud
+from . import archimate_crud, element_page, product_page
 from .services.ai_generation_service import AIGenerationService
 from .services.field_configs import (
     create_empty_form_data,
     get_all_element_types,
     get_element_config,
+    GAP_RATING_LABEL,
     get_element_field_names,
 )
 
@@ -453,7 +460,11 @@ _SKIP_FIELDS = frozenset(
 
 
 # Columns a person never needs to read; administrators see them under "Technical details".
-_TECHNICAL_FIELDS = frozenset({"color", "auto_generated"})
+# The provenance columns are said in words on the page (where the element came from, and the date card), so
+# their raw values are kept to the Technical details panel.
+_TECHNICAL_FIELDS = frozenset({
+    "color", "auto_generated", "recorded_at", "source_kind", "source_ref", "source_label", "source_recorded_at",
+})
 _SNAKE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _ACRONYMS = ("Acm", "Api", "Id", "Url", "Sap", "Rfc", "Bapi", "Arb")
 
@@ -529,10 +540,20 @@ def _element_owner_target(element, element_type, organization_id):
     if element_type == "Capability":
         # Capability owners are recorded on the unified capability this row
         # projects into (by provenance), never on the source row's own id.
+        from app.models.business_capabilities import BusinessCapability
         from app.models.unified_capability import UnifiedCapability
 
+        if isinstance(element, BusinessCapability):
+            source_id = element.id
+        else:
+            # A generic element page: the capability record is the one whose mapping points at this element.
+            record = BusinessCapability.query.filter_by(
+                archimate_element_id=element.id, organization_id=organization_id).first()
+            source_id = record.id if record is not None else None
+        if source_id is None:
+            return None
         unified = UnifiedCapability.query.filter_by(
-            source_table="business_capability", source_id=str(element.id),
+            source_table="business_capability", source_id=str(source_id),
             organization_id=organization_id,
         ).first()
         return ("capability", unified.id) if unified is not None else None
@@ -732,9 +753,10 @@ def _mirror_process_owner(process_id, org_id):
     db.session.commit()
 
 
-def _get_display_fields(element, model_class):
+def _get_display_fields(element, model_class, element_type=None):
     """Introspect a model instance and return a list of (label, value) tuples
-    for all non-empty, non-private, non-FK columns worth displaying."""
+    for all non-empty, non-private, non-FK columns worth displaying. A column the record's form
+    shows keeps the form's label and, for a choice, the form's words for the saved value."""
     from sqlalchemy import inspect as sa_inspect
 
     fields = []
@@ -742,6 +764,7 @@ def _get_display_fields(element, model_class):
         mapper = sa_inspect(model_class)
     except Exception:
         return fields
+    form_fields = {f.name: f for f in _form_fields(element_type)}
 
     for col in mapper.columns:
         col_name = col.key
@@ -755,6 +778,9 @@ def _get_display_fields(element, model_class):
         value = getattr(
             element, col_name, None
         )  # model-safety-ok: dynamic column iteration via sa_inspect mapper
+        if col_name == "severity" and hasattr(element, "rated_severity"):
+            # A gap's severity is its one rating, the same words every list and count shows.
+            value = element.rated_severity
         if value is None or value == "":
             continue
         # Skip 0 for numeric types only (not booleans)
@@ -770,12 +796,22 @@ def _get_display_fields(element, model_class):
         # that .title() mangles (Acm -> ACM) rather than leaving the wrong
         # case on a screen a real architect reads.
         label = _plain_label(col_name)
+        form_field = form_fields.get(col_name)
+        if form_field is not None:
+            label = form_field.label
 
         # Format special types
-        if isinstance(value, bool):
+        if form_field is not None and form_field.options and any(
+            str(value) == option.value for option in form_field.options
+        ):
+            value = next(option.label for option in form_field.options if str(value) == option.value)
+        elif isinstance(value, bool):
             value = "Yes" if value else "No"
         elif hasattr(value, "strftime"):
-            value = value.strftime("%Y-%m-%d %H:%M")
+            if getattr(value, "year", 1900) < 1900:
+                # An empty date stored as year 1 is not a recorded date.
+                continue
+            value = value.strftime("%d %b %Y")
         elif isinstance(value, float):
             value = f"{value:.2f}" if value != int(value) else str(int(value))
         elif isinstance(value, dict):
@@ -791,6 +827,30 @@ def _get_display_fields(element, model_class):
         fields.append({"label": label, "value": str(value), "technical": col_name in _TECHNICAL_FIELDS})
 
     return fields
+
+
+def _capability_fact(element, element_type):
+    """The capability a business function belongs to, named, and linked to that capability's fact sheet
+    when the capability has one (its recorded provenance names the business capability the sheet is
+    kept on). Nothing when the record has none or the capability is not this organisation's."""
+    capability_id = getattr(element, "capability_id", None) if element_type == "BusinessFunction" else None
+    if not capability_id:
+        return []
+    from app.models.unified_capability import UnifiedCapability
+
+    capability = UnifiedCapability.query.filter_by(id=capability_id).first()
+    if capability is None:
+        return []
+    href = None
+    source_id = str(capability.source_id or "")
+    if (
+        capability.source_table == "business_capability"
+        and source_id.isdigit()
+        and BusinessCapability.query.filter_by(id=int(source_id)).first() is not None
+        and "enterprise_crud.capability_fact_sheet" in current_app.view_functions
+    ):
+        href = url_for("enterprise_crud.capability_fact_sheet", capability_id=int(source_id))
+    return [{"label": "Capability", "value": capability.name, "technical": False, "href": href}]
 
 
 @archimate_crud.route("/")
@@ -840,8 +900,41 @@ def api_field_configs():
     return resp
 
 
+@archimate_crud.route("/api/capability-choices")
+@login_required
+def api_capability_choices():
+    """The capabilities this organisation can pick on a form (its own and the shared reference ones),
+    narrowed by the name typed so far. The form's capability picker reads this."""
+    from app.models.unified_capability import UnifiedCapability
+
+    typed = (request.args.get("q") or "").strip()
+    query = UnifiedCapability.query.filter(
+        UnifiedCapability.visibility_predicate(getattr(g, "current_org_id", None))
+    )
+    if typed:
+        query = query.filter(UnifiedCapability.name.ilike(f"%{escape_like_literal(typed)}%", escape="\\"))
+    rows = query.order_by(UnifiedCapability.name).limit(50).all()
+    chosen = request.args.get("selected", type=int)
+    if chosen and all(row.id != chosen for row in rows):
+        # The capability already saved on the record stays in the list, however the search narrows it.
+        saved = UnifiedCapability.visible_to_organization(chosen, getattr(g, "current_org_id", None))
+        if saved is not None:
+            rows.insert(0, saved)
+    return jsonify([{"value": str(row.id), "label": row.name} for row in rows])
+
+
 def _count_layer_elements(layer):
-    """Total element count for one layer, or None if it could not be counted.
+    """Total element count for one layer, or None if it could not be counted."""
+    parts = _layer_count_parts(layer)
+    return None if parts is None else parts[0] + parts[1]
+
+
+def _layer_count_parts(layer):
+    """The two parts of one layer's count: (records not in the model, model elements), or None.
+
+    The model elements are what the model map draws for the layer; the records are rows of the layer's own
+    tables that have no model element (a gap entered in the gap register), listed on the layer's page but
+    not drawn on the map. The page states the second number beside the first, so the two pages agree.
 
     Shared by the per-layer and batched endpoints so the two can never drift.
 
@@ -860,7 +953,7 @@ def _count_layer_elements(layer):
         return None
 
     layer_types = LAYER_CONFIG[layer]["elements"]
-    total = 0
+    records = 0
     # Count from dedicated per-type tables, EXCLUDING rows that are mirrored into
     # archimate_elements — those are added below, and counting both sides made the
     # page report every mirrored entity twice. A tenant with 71 elements was told
@@ -874,7 +967,7 @@ def _count_layer_elements(layer):
             q = model_class.query
             if hasattr(model_class, "archimate_element_id"):
                 q = q.filter(model_class.archimate_element_id.is_(None))
-            total += q.count()
+            records += q.count()
         except Exception as e:
             current_app.logger.warning(f"_count_layer_elements: count failed for {etype}: {e}")
             return None
@@ -891,12 +984,11 @@ def _count_layer_elements(layer):
         ae_count = ArchiMateElement.query.filter(
             db.func.lower(ArchiMateElement.layer).in_(_aliases),
         ).count()
-        total += ae_count
     except Exception as e:
         current_app.logger.warning(f"_count_layer_elements: archimate_elements count failed for {layer}: {e}")
         return None
 
-    return total
+    return records, ae_count
 
 
 @archimate_crud.route("/api/layer/<layer>/count")
@@ -930,8 +1022,11 @@ def api_layer_counts():
     """
     # A layer that could not be counted is null, never 0 -- the dashboard renders
     # null as an em dash and falls back to the per-layer endpoint for it.
-    counts = {layer: _count_layer_elements(layer) for layer in LAYER_CONFIG}
-    return jsonify({"counts": counts})
+    parts = {layer: _layer_count_parts(layer) for layer in LAYER_CONFIG}
+    counts = {layer: None if p is None else p[0] + p[1] for layer, p in parts.items()}
+    # How many of each layer's records the model map does not draw, so the page can say so beside its count.
+    not_on_model_map = {layer: None if p is None else p[0] for layer, p in parts.items()}
+    return jsonify({"counts": counts, "not_on_model_map": not_on_model_map})
 
 
 @archimate_crud.route("/api/layer/<layer>/elements")
@@ -974,7 +1069,7 @@ def api_layer_elements(layer):
                 # Same fix as _count_layer_elements (ARCH — "a tenant with 71
                 # elements was told it had 142"): a dedicated-table row that has
                 # been mirrored into archimate_elements is added again below as
-                # its own "architecture" entry — the seen_pairs check at line 728
+                # its own "architecture" entry — the old seen-pairs check
                 # keyed on (element_type, elem.id), never the actual mirror's
                 # own id, so it never recognised the mirror as already seen. Every
                 # correctly-mirrored element therefore appeared twice, as
@@ -1011,6 +1106,7 @@ def api_layer_elements(layer):
                 ]
                 linked_ae_ids = [i for i in linked_ae_ids if i]
                 plateau_by_ae_id = {}
+                custom_by_ae_id = {}
                 # H6: this branch always shipped rel_count=None for every
                 # "portfolio"-sourced element (a Driver/Goal/etc. row synced
                 # to ArchiMateElement per CLAUDE.md's "ArchiMate is the
@@ -1029,6 +1125,9 @@ def api_layer_elements(layer):
                             ArchiMateElement.id, ArchiMateElement.togaf_plateau
                         ).filter(ArchiMateElement.id.in_(linked_ae_ids))
                     )
+                    custom_by_ae_id = {
+                        row.id: row for row in ArchiMateElement.query.filter(ArchiMateElement.id.in_(linked_ae_ids))
+                    }
                     rel_rows = (
                         db.session.query(ArchiMateRelationship.source_id)
                         .filter(ArchiMateRelationship.source_id.in_(linked_ae_ids))
@@ -1041,7 +1140,7 @@ def api_layer_elements(layer):
                     )
                     for (ae_id_hit,) in rel_rows:
                         rel_count_by_ae_id[ae_id_hit] = rel_count_by_ae_id.get(ae_id_hit, 0) + 1
-                # F-08(a), Capgemini dry-run: the edit modal's typedFieldDefaults()
+                # The edit modal's typedFieldDefaults()
                 # (dashboard.js) reads source[name] for each of this type's
                 # configured fields (goal_type, driver_type, category, ...) —
                 # this dict never had any of them, so every typed field looked
@@ -1063,6 +1162,7 @@ def api_layer_elements(layer):
                     ae_id = getattr(elem, "archimate_element_id", None)
                     elem_dict = {
                         "id": elem.id,
+                        "record_id": elem.id,
                         "name": name,
                         "description": getattr(elem, "description", "")
                         or "",  # model-safety-ok: polymorphic ArchiMate elements
@@ -1081,8 +1181,11 @@ def api_layer_elements(layer):
                     # under both keys so typedFieldDefaults finds it.
                     elem_dict["architecture_state"] = elem_dict["plateau"] or ""
                     for field_name in typed_field_names:
-                        value = getattr(elem, field_name, None)
-                        elem_dict[field_name] = value if value is not None else ""
+                        if hasattr(elem, field_name):  # model-safety-ok: polymorphic ArchiMate elements
+                            value = getattr(elem, field_name, None)
+                        else:
+                            value = _custom_field_value(elem, custom_by_ae_id.get(ae_id), field_name)
+                        elem_dict[field_name] = _form_text(value)
                     all_elements.append(elem_dict)
             except Exception as e:
                 current_app.logger.warning(f"Error querying {etype}: {e}")
@@ -1091,16 +1194,18 @@ def api_layer_elements(layer):
     # found in dedicated tables (handles data imported via other paths).
     if source_filter != "portfolio":  # skip archimate_elements when filtering to portfolio-only
         try:
-            seen_pairs = {(el["element_type"], el["id"]) for el in all_elements}
             # Same alias matching as api_layer_count (ARCH-010) — otherwise the
             # listing silently omits the elements the count now includes, and the
             # catalogue page keeps rendering the layer as empty.
+            # With no type asked for, every element of the layer is listed, whatever its stored type: the
+            # layer's count has no type filter, and a list narrower than its own count read as a second number.
             ae_q = ArchiMateElement.query.filter(
                 db.func.lower(ArchiMateElement.layer).in_(
                     [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
                 ),
-                ArchiMateElement.type.in_(query_types),
             )
+            if type_filter:
+                ae_q = ae_q.filter(ArchiMateElement.type.in_(query_types))
             if search:
                 safe_s = escape_like_literal(search)
                 ae_q = ae_q.filter(
@@ -1110,47 +1215,54 @@ def api_layer_elements(layer):
                     )
                 )
             for ae in ae_q.all():
-                if (ae.type, ae.id) not in seen_pairs:
-                    _rel_count = ArchiMateRelationship.query.filter(
-                        db.or_(
-                            ArchiMateRelationship.source_id == ae.id,
-                            ArchiMateRelationship.target_id == ae.id,
-                        )
-                    ).count()
-                    ae_dict = {
-                        "id": ae.id,
-                        "name": ae.name or "",
-                        "description": ae.description or "",
-                        "element_type": ae.type,
-                        "status": None,
-                        "layer": layer,
-                        "source": "architecture",
-                        "properties": ae.properties or "",
-                        "plateau": ae.togaf_plateau,
-                        "rel_count": _rel_count,
-                    }
-                    ae_dict["architecture_state"] = ae_dict["plateau"] or ""
-                    # F-08(a): the F-04 dedup fix means every MIRRORED element
-                    # (the overwhelming majority — anything created through
-                    # the normal form) is now listed from here, not from the
-                    # dedicated-table branch above. Without this lookup, this
-                    # branch's elements would still lose their typed fields —
-                    # trading the double-listing bug for a "typed fields only
-                    # populate for the rare unmirrored row" bug instead.
-                    ae_type_config = get_element_config(ae.type)
-                    if ae_type_config:
-                        dedicated_model = MODEL_REGISTRY.get(ae.type)
-                        dedicated_row = None
-                        if dedicated_model is not None and hasattr(dedicated_model, "archimate_element_id"):
-                            dedicated_row = dedicated_model.query.filter_by(
-                                archimate_element_id=ae.id
-                            ).first()
-                        for f in ae_type_config.fields:
-                            if f.name == "architecture_state":
-                                continue
-                            value = getattr(dedicated_row, f.name, None) if dedicated_row else None
-                            ae_dict[f.name] = value if value is not None else ""
-                    all_elements.append(ae_dict)
+                _rel_count = ArchiMateRelationship.query.filter(
+                    db.or_(
+                        ArchiMateRelationship.source_id == ae.id,
+                        ArchiMateRelationship.target_id == ae.id,
+                    )
+                ).count()
+                ae_dict = {
+                    "id": ae.id,
+                    "name": ae.name or "",
+                    "description": ae.description or "",
+                    "element_type": ae.type,
+                    "status": None,
+                    "layer": layer,
+                    "source": "architecture",
+                    "properties": ae.properties or "",
+                    "plateau": ae.togaf_plateau,
+                    "rel_count": _rel_count,
+                }
+                ae_dict["architecture_state"] = ae_dict["plateau"] or ""
+                # The duplicate-listing fix means every MIRRORED element
+                # (the overwhelming majority — anything created through
+                # the normal form) is now listed from here, not from the
+                # dedicated-table branch above. Without this lookup, this
+                # branch's elements would still lose their typed fields —
+                # trading the double-listing bug for a "typed fields only
+                # populate for the rare unmirrored row" bug instead.
+                ae_type_config = get_element_config(ae.type)
+                dedicated_model = MODEL_REGISTRY.get(ae.type)
+                dedicated_row = None
+                if dedicated_model is not None and hasattr(dedicated_model, "archimate_element_id"):
+                    dedicated_row = dedicated_model.query.filter_by(
+                        archimate_element_id=ae.id
+                    ).first()
+                # The record's own page, Edit page and Delete are addressed by the record's id,
+                # which is not the architecture element's id (the two number spaces overlap), for
+                # every type whether or not it has a form configuration. An element held with no
+                # record has none, and is addressed as an element.
+                if dedicated_row is not None:
+                    ae_dict["record_id"] = dedicated_row.id
+                if ae_type_config:
+                    for f in ae_type_config.fields:
+                        if f.name == "architecture_state":
+                            continue
+                        value = getattr(dedicated_row, f.name, None) if dedicated_row else None
+                        ae_dict[f.name] = value if value is not None else ""
+                    if dedicated_row is None:
+                        ae_dict["saveable_fields"] = ["architecture_state"]
+                all_elements.append(ae_dict)
         except Exception as e:
             current_app.logger.warning(f"Error supplementing from archimate_elements: {e}")
 
@@ -1351,6 +1463,16 @@ REQUIRED_RELATIONSHIP_FIELDS = {
 }
 
 
+def _create_page_config(layer, element_type):
+    """What opens the Create form on its own page: the layer tab the type belongs to, and the type chosen."""
+    initial_layer, initial_element_type = _validated_layer_filter(layer, element_type)
+    return {
+        "initial_layer": initial_layer,
+        "initial_element_type": initial_element_type,
+        "create_element_type": element_type,
+    }
+
+
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/new", methods=["GET", "POST"])
 @login_required
 @write_role_required
@@ -1381,6 +1503,14 @@ def create_element(layer, element_type):
                 except (TypeError, ValueError):
                     relationship_field_value = None
 
+                if relationship_field_value is not None and element_type == "BusinessFunction":
+                    from app.models.unified_capability import UnifiedCapability
+
+                    if UnifiedCapability.visible_to_organization(
+                        relationship_field_value, getattr(g, "current_org_id", None)
+                    ) is None:
+                        relationship_field_value = None
+
                 if relationship_field_value is None:
                     error_message = f"{field_label} is required"
                     if request.is_json:
@@ -1399,6 +1529,7 @@ def create_element(layer, element_type):
                             field_config=get_element_config(element_type),
                             form_data=create_empty_form_data(element_type),
                             element_field_configs=ELEMENT_FIELD_CONFIGS,
+                            **_create_page_config(layer, element_type),
                         ),
                         400,
                     )
@@ -1410,11 +1541,11 @@ def create_element(layer, element_type):
             if hasattr(
                 element, "name"
             ):  # model-safety-ok: polymorphic ArchiMate elements
-                element.name = data.get("name", "").strip()
+                element.name = _checked_name(element, "name", data.get("name", ""))
             elif hasattr(
                 element, "title"
             ):  # model-safety-ok: polymorphic ArchiMate elements
-                element.title = data.get("name", "").strip()
+                element.title = _checked_name(element, "title", data.get("name", ""))
 
             if hasattr(
                 element, "description"
@@ -1422,7 +1553,16 @@ def create_element(layer, element_type):
                 element.description = data.get("description", "").strip()
 
             # Set layer-specific fields based on model
-            _set_model_fields(element, data, model_class, element_type)
+            _set_model_fields(element, data, model_class, element_type, creating=True)
+            if hasattr(element, "discovered_by_ai"):  # model-safety-ok: polymorphic ArchiMate elements
+                # Typed in by a person on this form, not found by the AI.
+                element.discovered_by_ai = False
+            if element_type == "Gap":
+                # A new gap is rated by the same rule an edit uses: its priority and severity move together.
+                chosen = (element.priority or "").strip().lower()
+                if chosen in PRIORITY_SEVERITY_MAP:
+                    rated = apply_rating_rule(None, element.severity, {"priority": chosen})
+                    element.priority, element.severity = rated["priority"], rated["severity"]
 
             # Apply the validated required relationship field (e.g.
             # BusinessFunction.capability_id) — not part of the legacy
@@ -1446,6 +1586,7 @@ def create_element(layer, element_type):
                 db.session.add(archimate_element)
                 db.session.flush()
                 element.archimate_element_id = archimate_element.id
+                _store_custom_fields(element, data, element_type, ae_row=archimate_element)
 
             # As-is / to-be state (ArchiMateElement.plateau), if the form set it.
             _apply_architecture_state(element, data)
@@ -1472,6 +1613,12 @@ def create_element(layer, element_type):
                 )
             )
 
+        except FieldValueError as exc:
+            db.session.rollback()
+            if request.is_json:
+                return jsonify({"success": False, "error": str(exc)}), 400
+            flash(str(exc), "error")
+            return redirect(request.url)
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(
@@ -1495,6 +1642,7 @@ def create_element(layer, element_type):
                 field_config=get_element_config(element_type),
                 form_data=create_empty_form_data(element_type),
                 element_field_configs=ELEMENT_FIELD_CONFIGS,
+                **_create_page_config(layer, element_type),
             )
 
     return render_template(
@@ -1506,7 +1654,44 @@ def create_element(layer, element_type):
         field_config=get_element_config(element_type),
         form_data=create_empty_form_data(element_type),
         element_field_configs=ELEMENT_FIELD_CONFIGS,
+        **_create_page_config(layer, element_type),
     )
+
+
+def _resolve_element(model_class, element_type, element_id, any_type=False):
+    """The one place that says which row an address means. Returns (row, held_as_element).
+
+    A record page is addressed by the record's own number, or by its element's number (the links the
+    solution and agent pages build). The two number spaces overlap, so ?ae=1 says the number is an element's.
+    Whichever way it arrives, the record behind the element is the answer when one exists; the element
+    itself is the answer only when no record holds it. filter_by always emits SQL, so the organisation
+    filter applies even when the row is already in the session (Query.get would skip it)."""
+    if model_class is None:
+        # A type with no record table of its own: the number can only be an element's.
+        element_query = ArchiMateElement.query.filter_by(id=element_id)
+        if not any_type:
+            element_query = element_query.filter_by(type=element_type)
+        element = element_query.first()
+        return (element, True) if element is not None else (None, False)
+    if request.args.get("ae") != "1":
+        record = model_class.query.filter_by(id=element_id).first()
+        if record is not None:
+            return record, False
+    element_query = ArchiMateElement.query.filter_by(id=element_id)
+    if not any_type:
+        element_query = element_query.filter_by(type=element_type)
+    element = element_query.first()
+    if element is None:
+        if request.args.get("ae") == "1" and hasattr(model_class, "archimate_element_id"):  # model-safety-ok: polymorphic ArchiMate elements
+            record = model_class.query.filter_by(archimate_element_id=element_id).first()
+            if record is not None:
+                return record, False
+        return None, False
+    if hasattr(model_class, "archimate_element_id"):  # model-safety-ok: polymorphic ArchiMate elements
+        record = model_class.query.filter_by(archimate_element_id=element.id).first()
+        if record is not None:
+            return record, False
+    return element, True
 
 
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/<int:element_id>")
@@ -1519,22 +1704,14 @@ def detail_element(layer, element_type, element_id):
         abort(404)
     model_class = MODEL_REGISTRY.get(element_type)
 
-    # filter_by always emits SQL, so the tenant filter applies even when the row
-    # is already in the session identity map (Query.get would skip it).
-    element = None
-    # ?ae=1 means the id is an archimate_elements id, which is what a connection row carries; without it
-    # the id is the dedicated table's own id, which is what the lists carry. The two number spaces overlap,
-    # so a connection must say which one it holds or it can open another element's page.
-    if model_class and request.args.get("ae") == "1":
-        if hasattr(model_class, "archimate_element_id"):  # model-safety-ok: polymorphic ArchiMate elements
-            element = model_class.query.filter_by(archimate_element_id=element_id).first()
-    elif model_class:
-        element = model_class.query.filter_by(id=element_id).first()
-
-    # Fall back to archimate_elements table (native ArchiMate elements)
+    element, _from_ae = _resolve_element(model_class, element_type, element_id, any_type=True)
     if element is None:
-        element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
+        abort(404)
+    if _from_ae:
         model_class = ArchiMateElement
+        # An address that names no type ("element", from a search hit) or a type with no record table:
+        # the page, its chip and its Edit and Delete speak the element's own ArchiMate type.
+        element_type = element.type or element_type
 
     # Get relationships
     relationships = _get_element_relationships(element, element_id)
@@ -1549,14 +1726,16 @@ def detail_element(layer, element_type, element_id):
         ae_id = element.id
 
     # Auto-discover displayable fields from the model
-    all_fields = _get_display_fields(element, model_class)
+    all_fields = _get_display_fields(element, model_class, element_type)
     display_fields = [f for f in all_fields if not f["technical"]]
+    display_fields[:0] = _capability_fact(element, element_type)
     # These two are the element's own dates; the owner's assignment date is
     # shown with the owner, so the labels say whose date each is.
     for field in display_fields:
         if field["label"] in ("Valid from", "Recorded at"):
             field["label"] = "Element " + field["label"][0].lower() + field["label"][1:]
     technical_fields = [f for f in all_fields if f["technical"]]
+    display_fields = _with_custom_fields(display_fields, element, element_type)
     external_links = CrosswalkService.get_links_for_element(ae_id or element.id)
     fact_row = element if isinstance(element, ArchiMateElement) else (
         ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
@@ -1587,8 +1766,12 @@ def detail_element(layer, element_type, element_id):
         getattr(element, "process_owner", None) if element_type == "BusinessProcess" else None
     )
     if element_type == "Gap":
-        # The Status figure above is the gap's resolution status, said once.
-        display_fields = [f for f in display_fields if f["label"] != "Resolution status"]
+        # The Status figure above is the gap's resolution status, said once. The rating is one row, under
+        # the label the Edit form gives it, with the value that form opens on.
+        display_fields = [f for f in display_fields if f["label"] not in ("Resolution status", "Priority", "Severity", GAP_RATING_LABEL)]
+        rating = _gap_rating(element)
+        if rating:
+            display_fields.append({"label": GAP_RATING_LABEL, "value": rating.capitalize(), "technical": False})
     if element_type == "BusinessProcess":
         # The Owner row above is the one place the owner is shown.
         display_fields = [f for f in display_fields if f["label"] != "Process owner"]
@@ -1604,6 +1787,9 @@ def detail_element(layer, element_type, element_id):
     connectors_url = url_for("m365_connector.connectors_index")
 
     page = _element_page(element, element_type, ae_id, relationships)
+    if (page.get("stage") or {}).get("target_date"):
+        # The stage facts show the date; the field list does not say it a second time.
+        display_fields = [f for f in display_fields if f["label"] != "Target date"]
 
     # A business process lists the decision tables it applies (None for every other type).
     decisions_applied = None
@@ -1619,13 +1805,22 @@ def detail_element(layer, element_type, element_id):
             ae_id, getattr(element, "organization_id", None)
         )
 
+    product = _product_page(element, element_type, ae_id)
+
     return render_template(
         "archimate_crud/detail.html",
+        product=product,
         decisions_applied=decisions_applied,
         decision_table_id=decision_table_id,
         layer=layer,
         element_type=element_type,
         element=element,
+        # Where Delete lands: the type's list, or the Model page for a type with no list of its own.
+        after_delete_url=(
+            url_for("archimate_crud.list_elements", layer=layer, element_type=element_type)
+            if MODEL_REGISTRY.get(element_type) is not None
+            else url_for("archimate_crud.dashboard")
+        ),
         relationships=relationships,
         source_ae_id=ae_id,
         page=page,
@@ -1642,7 +1837,150 @@ def detail_element(layer, element_type, element_id):
         connectors_url=connectors_url,
         technology_cost=_technology_cost_panel(ae_id),
         layer_config=LAYER_CONFIG,
+        registered_types=list(MODEL_REGISTRY),
     )
+
+
+def _owner_names_for(element):
+    """``(whether this type keeps owners, the names recorded)`` for one element, from the one owner record."""
+    org_id = getattr(element, "organization_id", None)
+    if _element_owner_target(element, element.type, org_id) is None:
+        # A capability keeps owners even before its record exists; nothing is recorded yet.
+        return element.type == "Capability", []
+    return True, [row["user_name"] for row in _element_owner_rows(element, element.type, org_id)]
+
+
+def _element_href(layer_spelling, kind, element_id):
+    key = element_page._layer_key(layer_spelling, LAYER_ALIASES)
+    if key is None or key not in LAYER_CONFIG or not kind or not element_id:
+        return None
+    return url_for("archimate_crud.detail_element", layer=key, element_type=kind, element_id=element_id, ae=1)
+
+
+def _product_page(element, element_type, ae_id):
+    """The Product's sections, or None for any other element."""
+    org_id = getattr(g, "current_org_id", None)
+    if element_type != "Product" or not ae_id or org_id is None:
+        return None
+    from app.core.auth.permissions import can_change_model
+    from app.template_helpers import _plain_name
+
+    product_ae = ArchiMateElement.query.filter_by(id=ae_id, organization_id=org_id).first()
+    if product_ae is None:
+        return None
+    editable = can_change_model(current_user)
+    from app.utils.role_access import may_open_connector_pages
+
+    def _bring_in(product):
+        return product_page.bring_in(
+            product, org_id=org_id, allowed=may_open_connector_pages(current_user, org_id),
+            choosing=request.args.get("bring_in") == "1",
+            urls={
+                "connect": url_for("m365_connector.github_connect", product=product.id),
+                "choose": url_for("archimate_crud.detail_element", layer="business", element_type="Product",
+                                  element_id=product.id, ae=1, bring_in=1) + "#bring-in",
+                "scan": url_for("archimate_crud.scan_product_repositories", product_id=product.id),
+                "review": url_for("m365_connector.github_review"),
+                "element": lambda el: _element_href((el.layer or "").strip().lower(), el.type, el.id),
+            },
+        )
+
+    return product_page.build(
+        product_ae, org_id=org_id, href_for=_element_href, owner_for=_owner_names_for, plain_name=_plain_name,
+        user=current_user,
+        add_url=url_for("archimate_crud.add_product_element", product_id=ae_id) if editable else None,
+        export_url=url_for("archimate_crud.export_product", product_id=ae_id),
+        status_words=_plain_label,
+        bring_in_for=_bring_in,
+    )
+
+
+@archimate_crud.route("/products/<int:product_id>/repositories", methods=["POST"])
+@login_required
+def scan_product_repositories(product_id):
+    """Read the repositories a person chose on a Product's page: the read proposes what they show, each
+    proposal tied to this Product, and nothing enters the model until a person approves it."""
+    from app.connectors import github as gh
+    from app.utils.role_access import may_open_connector_pages
+
+    org_id = getattr(g, "current_org_id", None)
+    product_ae = ArchiMateElement.query.filter_by(id=product_id, type="Product", organization_id=org_id).first()
+    if product_ae is None:
+        abort(404)
+    if not may_open_connector_pages(current_user, org_id):
+        abort(403)
+    back = url_for("archimate_crud.detail_element", layer="business", element_type="Product",
+                   element_id=product_id, ae=1) + "#bring-in"
+    try:
+        started = gh.start_product_scan(org_id, product_id, request.form.getlist("repository"))
+    except gh.ConnectRefused as exc:
+        flash(str(exc), "error")
+        return redirect(back)
+    flash("Reading %d repositor%s for %s. What is found waits for your approval below." % (
+        len(started["repositories"]), "y" if len(started["repositories"]) == 1 else "ies", product_ae.name), "success")
+    return redirect(back)
+
+
+@archimate_crud.route("/products/<int:product_id>/elements", methods=["POST"])
+@login_required
+@write_role_required
+def add_product_element(product_id):
+    """Add one element to a Product from one of its layers, joined to it by the layer's preset relationship."""
+    from app.modules.architecture.services.archimate_relationship_service import ArchiMateRelationshipService
+    from app.services.archimate_backbone import create_backbone_element
+
+    org_id = getattr(g, "current_org_id", None)
+    product_ae = ArchiMateElement.query.filter_by(id=product_id, type="Product", organization_id=org_id).first()
+    if product_ae is None:
+        abort(404)
+    back = url_for("archimate_crud.detail_element", layer="business", element_type="Product",
+                   element_id=product_id, ae=1) + "#layers"
+    section = {key: (types, rel) for key, _label, _sp, types, rel in product_page.SECTIONS}.get(
+        request.form.get("section", ""))
+    element_type = request.form.get("element_type", "")
+    name = (request.form.get("name") or "").strip()
+    if section is None or element_type not in section[0]:
+        flash("Choose a layer and one of its element types.", "error")
+        return redirect(back)
+    if not name:
+        flash("Give the new element a name.", "error")
+        return redirect(back)
+    try:
+        new = create_backbone_element(
+            element_type=element_type, layer=product_page.filing_layer(element_type), name=name,
+            organization_id=org_id, provenance={"created_from": "product page"},
+        )
+        joined = ArchiMateRelationshipService.create_relationship(
+            product_ae, new, section[1].lower(), architecture_id=None, organization_id=org_id, rollback=False)
+        if joined is None:
+            raise ValueError("relationship not allowed")
+        db.session.commit()
+    except Exception:  # noqa: BLE001 - the person sees one plain sentence, the log keeps the cause
+        db.session.rollback()
+        current_app.logger.exception("Adding an element to product %s failed", product_id)
+        flash("The element could not be added. Nothing was changed.", "error")
+        return redirect(back)
+    flash("%s added to %s." % (name, product_ae.name), "success")
+    return redirect(back)
+
+
+@archimate_crud.route("/products/<int:product_id>/export", methods=["GET"])
+@login_required
+def export_product(product_id):
+    """One JSON file holding every section of a Product's page."""
+    org_id = getattr(g, "current_org_id", None)
+    product_ae = ArchiMateElement.query.filter_by(id=product_id, type="Product", organization_id=org_id).first()
+    if product_ae is None:
+        abort(404)
+    from app.template_helpers import _plain_name
+
+    page = product_page.build(
+        product_ae, org_id=org_id, href_for=_element_href, owner_for=_owner_names_for, plain_name=_plain_name,
+        user=current_user, add_url=None, export_url=None,
+        status_words=_plain_label)
+    response = jsonify(product_page.export_payload(product_ae, page))
+    response.headers["Content-Disposition"] = "attachment; filename=product_%d.json" % product_id
+    return response
 
 
 _SOURCE_FACT_LABELS = (
@@ -1746,11 +2084,25 @@ def remove_technology_cost(element_id):
     return redirect(back)
 
 
+def _description_origin(ae_row):
+    """Where this element and its first description came from, in words, from the element's provenance record."""
+    kind = (getattr(ae_row, "source_kind", None) or "").strip().lower()
+    label = (getattr(ae_row, "source_label", None) or "").strip()
+    if kind == "import":
+        return "This element was imported from %s." % (label or "a model file")
+    if kind == "connector":
+        return "This element was brought in by %s." % (label or "a connected tool")
+    if kind == "derived":
+        return "This element was worked out from the rest of the model, not entered by a person."
+    if kind == "sample":
+        return "This element is sample data."
+    return ""
+
+
 def _element_page(element, element_type, ae_id, relationships):
     """Everything the detail page says about this element in words, from the one impact walk."""
     from flask_login import current_user
 
-    from app.modules.architecture.routes.archimate_crud import element_page
     from app.template_helpers import _plain_layer, _plain_name
 
     def href_for(layer_key, kind, target_ae_id):
@@ -1770,11 +2122,29 @@ def _element_page(element, element_type, ae_id, relationships):
     return {
         "subtitle": element_page.subtitle_for(element_type, current_user, _plain_name),
         # The dedicated table may hold no description while the model-graph row does; show whichever has words.
-        "description": (getattr(element, "description", None) or getattr(ae_row, "description", None) or "").strip(),
+        "description": (
+            getattr(element, "description", None) or getattr(ae_row, "description", None) or ""
+        ).strip(),
+        "description_origin": _description_origin(ae_row),
         "connections": connections,
         "lines": element_page.answer_lines(element_type, connections, **common),
         **element_page.plateau_facts(element, element_type, ae_row, href_for=href_for),
     }
+
+
+def _typed_record(element, from_ae, element_type):
+    """The record that holds an element's typed values (Goal type, service type, ...), or None.
+
+    A dedicated record is its own; for a model-graph row it is the dedicated record that mirrors it.
+    """
+    if not from_ae:
+        return element
+    model_class = MODEL_REGISTRY.get(element_type)
+    if model_class is None or not hasattr(model_class, "archimate_element_id"):
+        return None
+    return model_class.query.filter_by(  # tenant-scoping-ok: keyed by the id of an archimate_elements row already loaded under the tenant filter
+        archimate_element_id=element.id
+    ).first()
 
 
 @archimate_crud.route(
@@ -1786,21 +2156,17 @@ def update_element(layer, element_type, element_id):
     """Update an element"""
     model_class = MODEL_REGISTRY.get(element_type)
 
-    if not model_class:
-        flash(f"Element type {element_type} is not yet supported", "warning")
-        return redirect(url_for("archimate_crud.dashboard"))
-
-    element = model_class.query.filter_by(id=element_id).first()
-    # Fall back to archimate_elements for elements stored there directly
-    _from_ae = False
-    if element is None:
-        element = ArchiMateElement.query.filter_by(id=element_id).first()
-        _from_ae = True
+    # A type with no record table is an element held by id: _resolve_element answers 404 for another
+    # organisation's element or one of another type.
+    element, _from_ae = _resolve_element(model_class, element_type, element_id)
     if element is None:
         if request.is_json:
             return jsonify({"success": False, "error": "Element not found"}), 404
         from flask import abort
         abort(404)
+
+    if request.method == "POST" and isinstance(element, Gap):
+        return _save_gap_edit(layer, element)
 
     if request.method == "POST":
         try:
@@ -1810,21 +2176,21 @@ def update_element(layer, element_type, element_id):
             if hasattr(
                 element, "name"
             ):  # model-safety-ok: polymorphic ArchiMate elements
-                element.name = data.get("name", "").strip()
+                element.name = _checked_name(element, "name", data.get("name", ""))
             elif hasattr(
                 element, "title"
             ):  # model-safety-ok: polymorphic ArchiMate elements
-                element.title = data.get("name", "").strip()
+                element.title = _checked_name(element, "title", data.get("name", ""))
 
             if hasattr(
                 element, "description"
             ):  # model-safety-ok: polymorphic ArchiMate elements
                 element.description = data.get("description", "").strip()
 
-            if not _from_ae:
-                # Update layer-specific fields only for dedicated model instances
-                _set_model_fields(element, data, model_class, element_type)
+            # Typed fields are saved on the record that holds them; one it has no place for answers 400.
+            _set_model_fields(element, data, model_class, element_type)
 
+            if not _from_ae:
                 # Update ArchiMateElement if linked
                 if getattr(element, "archimate_element_id", None):
                     archimate_element = ArchiMateElement.query.get(
@@ -1839,6 +2205,19 @@ def update_element(layer, element_type, element_id):
                         archimate_element.description = getattr(
                             element, "description", ""
                         )  # model-safety-ok: polymorphic ArchiMate elements
+            elif MODEL_REGISTRY.get(element_type) is not None and hasattr(
+                MODEL_REGISTRY[element_type], "archimate_element_id"
+            ):  # model-safety-ok: polymorphic ArchiMate elements
+                # The dedicated record that mirrors this row says the same name.
+                for mirror in MODEL_REGISTRY[element_type].query.filter_by(  # tenant-scoping-ok: keyed by the id of an archimate_elements row already loaded under the tenant filter
+                    archimate_element_id=element.id
+                ).all():
+                    if hasattr(mirror, "name"):  # model-safety-ok: polymorphic ArchiMate elements
+                        mirror.name = element.name
+                    if hasattr(mirror, "description"):  # model-safety-ok: polymorphic ArchiMate elements
+                        mirror.description = element.description
+                    # Every typed value the form offers (Goal type, service type, ...) is kept on that record.
+                    _set_model_fields(mirror, data, type(mirror), element_type)
             # As-is / to-be state (ArchiMateElement.plateau), if the form set it.
             # Works for a native ArchiMateElement (element itself) and a linked one.
             _apply_architecture_state(element, data)
@@ -1857,9 +2236,15 @@ def update_element(layer, element_type, element_id):
                     layer=layer,
                     element_type=element_type,
                     element_id=element.id,
+                    **_id_scope(element),
                 )
             )
 
+        except FieldValueError as exc:
+            db.session.rollback()
+            if request.is_json:
+                return jsonify({"success": False, "error": str(exc)}), 400
+            flash(str(exc), "error")
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(
@@ -1871,17 +2256,207 @@ def update_element(layer, element_type, element_id):
                     {"success": False, "error": "Invalid request parameters"}
                 ), 400
 
-            flash("Error updating {element_type}. Please try again.", "error")
+            flash(f"Error updating {element_type}. Please try again.", "error")
 
     return render_template(
         "archimate_crud/dashboard.html",
         layer=layer,
+        initial_layer=layer,
         element_type=element_type,
         element=element,
         layer_config=LAYER_CONFIG,
         selected_layer=_selected_layer_for(layer),
         element_field_configs=ELEMENT_FIELD_CONFIGS,
+        editing_element=_editing_element_payload(element, element_type, layer),
     )
+
+
+def _plain_table_words(table_name):
+    """A table's records in plain words: "archimate_elements" reads "model elements"."""
+    words = table_name.replace("_", " ")
+    return "model " + words[len("archimate "):] if words.startswith("archimate ") else words
+
+
+def _delete_blockers(ae_row):
+    """What still points at this element and would stop its delete, as (words, count) pairs.
+
+    Relationships are cleared by the delete and the dedicated record that
+    mirrors the row goes with it; any other table holding a restricting
+    foreign key to the row is a reference the person must remove first.
+    """
+    if ae_row is None:
+        return []
+    own = {m.__table__.name for m in set(MODEL_REGISTRY.values()) if hasattr(m, "__table__")}
+    own.add("archimate_relationships")
+    blockers = []
+    for table in db.metadata.sorted_tables:
+        if table.name in own:
+            continue
+        for fk in table.foreign_keys:
+            if fk.column.table.name != "archimate_elements" or fk.column.name != "id":
+                continue
+            if (fk.ondelete or "").upper() in ("CASCADE", "SET NULL", "SET DEFAULT"):
+                continue
+            count = db.session.execute(
+                db.select(db.func.count()).select_from(table).where(fk.parent == ae_row.id)
+            ).scalar() or 0
+            if count:
+                blockers.append((_plain_table_words(table.name), count))
+    return blockers
+
+
+@archimate_crud.route(
+    f"/{_LAYER_URL_PATTERN}/<element_type>/<int:element_id>/delete-check", methods=["GET"]
+)
+@login_required
+def delete_check(layer, element_type, element_id):
+    """Say whether this delete can happen, before the person is asked to confirm it."""
+    from app.core.auth.permissions import can_change_model
+
+    element, from_ae = _resolve_element(MODEL_REGISTRY.get(element_type), element_type, element_id)
+    if element is None:
+        return jsonify({"allowed": False, "reason": "This element no longer exists."}), 404
+    if not can_change_model(current_user):
+        return jsonify({
+            "allowed": False,
+            "reason": "Only an architect can delete elements. Ask an administrator in Team settings.",
+        })
+    ae_row = element if from_ae else ArchiMateElement.query.filter_by(
+        id=getattr(element, "archimate_element_id", None)
+    ).first()
+    blockers = _delete_blockers(ae_row)
+    if blockers:
+        listed = ", ".join(f"{w} ({n})" for w, n in blockers)
+        return jsonify({
+            "allowed": False,
+            "reason": f"It is still used by {listed}. Remove those links first.",
+        })
+    ae_ids = [ae_row.id] if ae_row is not None else []
+    relationships = ArchiMateRelationship.query.filter(
+        db.or_(
+            ArchiMateRelationship.source_id.in_(ae_ids),
+            ArchiMateRelationship.target_id.in_(ae_ids),
+        )
+    ).count() if ae_ids else 0
+    return jsonify({"allowed": True, "relationships": relationships})
+
+
+def _id_scope(element):
+    """The query that says which number space an address's id is in. A record is always addressed by its own
+    number, with no query. An element held with no record keeps the address it was opened by: opened with
+    ?ae=1 it lands with ?ae=1 (the number may also be a record's), opened without, it lands without, because
+    no record of that number existed or the page would have opened the record."""
+    if isinstance(element, ArchiMateElement) and request.args.get("ae") == "1":
+        return {"ae": 1}
+    return {}
+
+
+def _editing_element_payload(element, element_type, layer):
+    """The record this Edit page opens its form on: its type, name, description and the
+    typed fields the form shows, plus where the record's own page is."""
+    payload = {
+        "id": element.id,
+        "element_type": element_type,
+        "name": getattr(element, "name", None) or getattr(element, "title", None) or "",
+        "description": getattr(element, "description", None) or "",
+        "detail_url": url_for(
+            "archimate_crud.detail_element", layer=layer, element_type=element_type, element_id=element.id,
+            **_id_scope(element),
+        ),
+    }
+    if not isinstance(element, ArchiMateElement):
+        # The record's own id, so saving this form addresses the record and not an element of the same number.
+        payload["record_id"] = element.id
+    graph_row = _model_graph_row(element)
+    held_here = _saveable_fields(element, element_type)
+    for field in get_element_field_names(element_type):
+        if field == "architecture_state" or field not in held_here:
+            continue
+        if hasattr(element, field):  # model-safety-ok: polymorphic ArchiMate elements
+            value = getattr(element, field, None)
+        else:
+            # A value the record has no column for is kept with the element's properties and read from there.
+            value = _custom_field_value(element, graph_row, field)
+        # A field with nothing stored opens empty, so a save that changes only the name sends back what is stored.
+        if isinstance(value, (date, datetime)):
+            payload[field] = value.isoformat()
+        else:
+            payload[field] = _form_text(value)
+    if isinstance(element, Gap):
+        payload["priority"] = _gap_rating(element)
+    payload["architecture_state"] = _architecture_state(element)
+    payload["saveable_fields"] = _saveable_fields(element, element_type)
+    return payload
+
+
+def _saveable_fields(element, element_type):
+    """The names of the form's typed fields this record can hold. A record held only as an architecture
+    element has a name, a description and an architecture state, and none of the type's other fields."""
+    held = [spec.name for spec in _form_fields(element_type) if hasattr(element, spec.name)]
+    held += [name for name in _custom_field_names(element, element_type) if name not in held]
+    return held + ["architecture_state"]
+
+
+def _architecture_state(element):
+    """The as-is / to-be state the record is saved with (blank when none), as the form's select values it."""
+    holder = element if isinstance(element, ArchiMateElement) else None
+    if holder is None and getattr(element, "archimate_element_id", None):
+        holder = ArchiMateElement.query.filter_by(id=element.archimate_element_id).first()
+    state = getattr(holder, "togaf_plateau", None) or ""
+    return state if state in _ARCHITECTURE_STATES else ""
+
+
+def _gap_rating(gap):
+    """The word a gap's Edit form opens on: its one rating, else its priority."""
+    return effective_severity(gap) or (getattr(gap, "priority", None) or "").strip().lower()
+
+
+def _save_gap_edit(layer, gap):
+    """Save a gap's Edit page through the one gap update, so a priority is stored and
+    rated the way every other gap write does it."""
+    from app.modules.architecture.services.gap_archimate_service import GapArchiMateService
+
+    data = request.get_json(silent=True) if request.is_json else request.form.to_dict()
+    data = data or {}
+    updates = {}
+    name = (data.get("name") or "").strip()
+    if name:
+        updates["name"] = name
+    if "description" in data:
+        updates["description"] = (data.get("description") or "").strip()
+    if data.get("priority"):
+        updates["priority"] = data["priority"]
+        # The form opens on the gap's rating. Saving that same rating leaves the gap as it is; choosing a
+        # different one sets the priority and the severity together, so one save is enough.
+        shown = _gap_rating(gap)
+        chosen = str(data["priority"]).strip().lower()
+        if chosen == shown:
+            del updates["priority"]
+        else:
+            # The gap's rating is what it shows, so the rating rule sets the severity too, even when the
+            # chosen word equals the stored priority and only the stored severity disagreed with it.
+            updates.update(apply_rating_rule(None, None, {"priority": updates["priority"]}))
+    if data.get("resolution_status"):
+        updates["resolution_status"] = data["resolution_status"]
+    try:
+        GapArchiMateService().update_gap(gap.id, updates)
+        if updates.get("name") and gap.archimate_element_id:
+            linked = ArchiMateElement.query.filter_by(id=gap.archimate_element_id).first()
+            if linked:
+                linked.name = gap.name
+                linked.description = gap.description
+        _apply_architecture_state(gap, data)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        if request.is_json:
+            return jsonify({"success": False, "error": str(exc)}), 400
+        flash(str(exc), "error")
+        return redirect(request.url)
+    if request.is_json:
+        return jsonify({"success": True, "message": "Gap updated successfully"})
+    flash("Gap updated successfully", "success")
+    return redirect(url_for("archimate_crud.detail_element", layer=layer, element_type="Gap", element_id=gap.id))
 
 
 @archimate_crud.route(
@@ -1893,19 +2468,9 @@ def delete_element(layer, element_type, element_id):
     """Delete an element"""
     model_class = MODEL_REGISTRY.get(element_type)
 
-    if not model_class:
-        if request.is_json:
-            return jsonify(
-                {"success": False, "error": "Element type not supported"}
-            ), 400
-        flash(f"Element type {element_type} is not yet supported", "warning")
-        return redirect(url_for("archimate_crud.dashboard"))
-
-    element = model_class.query.filter_by(id=element_id).first()
-    # Fall back to archimate_elements for elements stored there directly
-    _from_ae = False
+    element, _from_ae = _resolve_element(model_class, element_type, element_id)
     if element is None:
-        element = ArchiMateElement.query.filter_by(id=element_id).first()
+        element = ArchiMateElement.query.filter_by(id=element_id, type=element_type).first()
         _from_ae = True
     if element is None:
         if request.is_json:
@@ -1979,6 +2544,9 @@ def delete_element(layer, element_type, element_id):
             )
 
         flash(f"{element_type} deleted successfully", "success")
+        if model_class is None:
+            # A type with no list of its own: land on the Model page, which has content.
+            return redirect(url_for("archimate_crud.dashboard"))
         return redirect(
             url_for(
                 "archimate_crud.list_elements", layer=layer, element_type=element_type
@@ -2005,6 +2573,7 @@ def delete_element(layer, element_type, element_id):
                 layer=layer,
                 element_type=element_type,
                 element_id=element_id,
+                **({"ae": 1} if _from_ae else {}),
             )
         )
 
@@ -2030,6 +2599,16 @@ def validate_archimate_element(element_id):
     return jsonify({'issues': issues, 'valid': len(issues) == 0})
 
 
+def _clear_relationships(element_ids):
+    """Remove every relationship touching these architecture element ids, so the element can be deleted."""
+    ArchiMateRelationship.query.filter(
+        db.or_(
+            ArchiMateRelationship.source_id.in_(element_ids),
+            ArchiMateRelationship.target_id.in_(element_ids),
+        )
+    ).delete(synchronize_session=False)
+
+
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/bulk-delete", methods=["POST"])
 @login_required
 @write_role_required
@@ -2040,26 +2619,37 @@ def bulk_delete(layer, element_type):
     if not model_class:
         return jsonify({"success": False, "error": "Element type not supported"}), 400
 
-    data = request.get_json()
-    element_ids = data.get("ids", [])
+    data = request.get_json() or {}
+    # "ids" are the records' own ids; "element_ids" are architecture element ids of records held
+    # only as an element. The two number spaces overlap, so each list says which it is.
+    record_ids = data.get("ids", [])
+    element_only_ids = data.get("element_ids", [])
 
-    if not element_ids:
+    if not record_ids and not element_only_ids:
         return jsonify({"success": False, "error": "No elements selected"}), 400
 
     try:
         deleted_count = 0
-        for element_id in element_ids:
-            element = model_class.query.filter_by(id=element_id).first()
+        for record_id in record_ids:
+            element = model_class.query.filter_by(id=record_id).first()
             if element:
-                # Delete linked ArchiMateElement
-                if element.archimate_element_id:
-                    archimate_element = ArchiMateElement.query.get(
-                        element.archimate_element_id
-                    )
+                mirror_id = getattr(element, "archimate_element_id", None)
+                if mirror_id:
+                    _clear_relationships([mirror_id])
+                    archimate_element = ArchiMateElement.query.get(mirror_id)
                     if archimate_element:
                         db.session.delete(archimate_element)
 
                 db.session.delete(element)
+                deleted_count += 1
+
+        for element_id in element_only_ids:
+            archimate_element = ArchiMateElement.query.filter_by(
+                id=element_id, type=element_type
+            ).first()
+            if archimate_element:
+                _clear_relationships([archimate_element.id])
+                db.session.delete(archimate_element)
                 deleted_count += 1
 
         db.session.commit()
@@ -2303,26 +2893,38 @@ def _apply_architecture_state(element, data):
     architecture as distinct states of the model — before this, the plateau
     column existed but no create/edit path ever wrote it.
 
-    Set-only: an empty or unrecognised value is ignored, never a clear. The edit
-    modal does not pre-load the current state, so treating blank as "clear" would
-    silently wipe an element's state on any unrelated edit — set-only makes that
-    impossible. Applies to a native ArchiMateElement directly, or to the element
-    linked from a domain model.
+    A client that does not send the state never changes it. Sending it blank (the form's
+    "Not set") clears it, and a word that is not a state is refused by the field's label. The Edit
+    form opens on the saved state (``_architecture_state``). Applies to a native ArchiMateElement
+    directly, or to the element linked from a domain model.
     """
-    raw = (data.get("architecture_state") or "").strip()
-    if raw not in _ARCHITECTURE_STATES:
+    if "architecture_state" not in data:
         return
+    raw = (data.get("architecture_state") or "").strip()
+    if raw and raw not in _ARCHITECTURE_STATES:
+        raise FieldValueError("Architecture state must be one of: As-Is (baseline), To-Be (target), Transition")
+    value = raw or None
     if isinstance(element, ArchiMateElement):
-        element.togaf_plateau = raw
+        element.togaf_plateau = value
         return
     ae_id = getattr(element, "archimate_element_id", None)
     if ae_id:
-        ae = ArchiMateElement.query.get(ae_id)
+        ae = ArchiMateElement.query.filter_by(id=ae_id).first()
         if ae is not None:
-            ae.togaf_plateau = raw
+            ae.togaf_plateau = value
 
 
-def _set_model_fields(element, data, model_class, element_type=None):
+def _form_fields(element_type):
+    """The typed fields the form shows for a record type (none for a type with no form fields)."""
+    config = get_element_config(element_type) if element_type else None
+    return list(config.fields) if config else []
+
+
+def _is_blank(value):
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def _set_model_fields(element, data, model_class, element_type=None, creating=False):
     """Set model-specific fields from data.
 
     Applied fields come from two merged sources: the legacy ``field_mappings``
@@ -2408,11 +3010,271 @@ def _set_model_fields(element, data, model_class, element_type=None):
     if element_type:
         allowed_fields.update(get_element_field_names(element_type))
 
+    form_fields = {f.name: f for f in _form_fields(element_type)}
+
+    saved = set()
     for field in allowed_fields:
-        if (
-            hasattr(element, field) and field in data
-        ):  # model-safety-ok: polymorphic ArchiMate elements
-            setattr(element, field, data[field])
+        if not hasattr(element, field):  # model-safety-ok: polymorphic ArchiMate elements
+            continue
+        spec = form_fields.get(field)
+        if field not in data:
+            # A new record is created with the type's documented default for a field left unchosen.
+            if creating and spec is not None and spec.default:
+                setattr(element, field, _column_value(element, field, spec.default, spec.label))
+            continue
+        value = data[field]
+        if spec is not None and not spec.allow_empty and _is_blank(value):
+            # A field that cannot be empty: unchosen on create is the default, on edit it is left as it is.
+            if creating and spec.default:
+                setattr(element, field, _column_value(element, field, spec.default, spec.label))
+            saved.add(field)
+            continue
+        if spec is not None and spec.options and not _is_blank(value) and not _is_stored_choice(element, field, value):
+            _require_option(spec, value)
+        if spec is not None and spec.field_type == "capability":
+            _require_visible_capability(spec, value)
+        setattr(element, field, _column_value(element, field, value, spec.label if spec else _plain_label(field)))
+        saved.add(field)
+
+    # A form field the record has no column for is kept with the element's other properties.
+    kept_as_property = set(_custom_field_names(element, element_type)) if element_type else set()
+    if element_type:
+        _store_custom_fields(element, data, element_type)
+
+    # A value the record has no place for is refused by the field's label, never reported as saved.
+    for field, value in data.items():
+        if field in saved or field in kept_as_property or field in _FORM_ENVELOPE_FIELDS:
+            continue
+        if _is_blank(value):
+            continue
+        spec = form_fields.get(field)
+        if spec is not None:
+            raise FieldValueError(f"{spec.label} cannot be saved on this record")
+        raise FieldValueError(f"{field} is not a field of this record")
+
+    # A field the form marks required is not saved empty.
+    for spec in form_fields.values():
+        if spec.required and spec.name in saved and _is_blank(getattr(element, spec.name, None)):
+            raise FieldValueError(f"{spec.label} is required")
+        if spec.required and creating and spec.name not in saved and hasattr(element, spec.name) \
+                and _is_blank(getattr(element, spec.name, None)):
+            raise FieldValueError(f"{spec.label} is required")
+
+
+def _require_visible_capability(spec, value):
+    """A capability picked on a form is one this organisation can see; anything else is refused by label."""
+    from app.models.unified_capability import UnifiedCapability
+
+    try:
+        capability_id = int(str(value).strip())
+    except ValueError:
+        capability_id = None
+    if capability_id is None or UnifiedCapability.visible_to_organization(
+        capability_id, getattr(g, "current_org_id", None)
+    ) is None:
+        raise FieldValueError(f"{spec.label} is required")
+
+
+def _is_stored_choice(element, field, value):
+    """A choice the record already holds, sent back unchanged by a save that touched other fields. An older
+    import can leave a value the form does not offer; keeping it is not a new choice, so it is not refused."""
+    stored = getattr(element, field, None)
+    return stored is not None and str(stored) == str(value)
+
+
+def _require_option(spec, value):
+    """A choice the form does not offer is refused by the field's label."""
+    if str(value) not in {option.value for option in spec.options}:
+        offered = ", ".join(option.label for option in spec.options)
+        raise FieldValueError(f"{spec.label} must be one of: {offered}")
+
+
+class FieldValueError(ValueError):
+    """A posted field the record cannot hold; its message names the field and is shown to the person."""
+
+
+_FORM_ENVELOPE_FIELDS = frozenset({
+    "name", "title", "description", "architecture_state", "element_type", "csrf_token",
+    *(field for field, _label in REQUIRED_RELATIONSHIP_FIELDS.values()),
+})
+
+
+def _checked_name(element, field, value):
+    """A record's name, trimmed; one that the record or its architecture element cannot hold is refused
+    by its field and limit, like every other field."""
+    name = (value or "").strip()
+    _column_value(element, field, name, label="Name")
+    mirror_limit = ArchiMateElement.__table__.columns["name"].type.length
+    if mirror_limit and len(name) > mirror_limit:
+        raise FieldValueError(f"Name is at most {mirror_limit} characters")
+    return name
+
+
+def _column_value(element, field, value, label=None):
+    """A posted form value as its column holds it: a blank for a date, time or number column is no
+    value (NULL), never an empty string the database refuses; a blank for text the column may leave
+    empty clears it; a date, number or text the column cannot hold answers with the field's label and
+    the limit."""
+    column = getattr(getattr(element, "__table__", None), "columns", {}).get(field)
+    if column is None or not isinstance(value, str):
+        return value
+    label = label or _plain_label(field)
+    try:
+        kind = column.type.python_type
+    except NotImplementedError:
+        return value
+    text = value.strip()
+    if kind is str:
+        if not text and column.nullable:
+            return None
+        limit = getattr(column.type, "length", None)
+        if limit and len(value) > limit:
+            raise FieldValueError(f"{label} is at most {limit} characters")
+        return value
+    if not text:
+        return None
+    try:
+        if kind is date:
+            if not re.match(r"\d{4}-\d{2}-\d{2}([ T]|$)", text):
+                raise ValueError(text)
+            return date.fromisoformat(text[:10])
+        if kind is datetime:
+            return datetime.fromisoformat(text)
+    except ValueError:
+        raise FieldValueError(f"{label} must be a date (YYYY-MM-DD)") from None
+    if kind in (int, float, Decimal):
+        try:
+            number = Decimal(text)
+            if not number.is_finite():
+                raise ArithmeticError(text)
+            if kind is int:
+                if number != number.to_integral_value():
+                    raise ArithmeticError(text)
+                number = int(number)
+            elif kind is float:
+                number = float(number)
+                if not math.isfinite(number):
+                    raise ArithmeticError(text)
+        except (ValueError, ArithmeticError):
+            raise FieldValueError(f"{label} must be a number") from None
+        largest = _largest_number(column)
+        if largest is not None and abs(number) > largest:
+            raise FieldValueError(f"{label} must be a number up to {largest:,}")
+        return number
+    return value
+
+
+def _largest_number(column):
+    """The largest absolute value a number column holds, or None when it has no practical limit."""
+    ctype = column.type
+    precision = getattr(ctype, "precision", None)
+    scale = getattr(ctype, "scale", None)
+    if isinstance(ctype, sa.Numeric) and not isinstance(ctype, sa.Float) and precision:
+        digits = precision - (scale or 0)
+        return Decimal(10) ** digits - Decimal(10) ** -(scale or 0) if scale else 10 ** digits - 1
+    if isinstance(ctype, sa.SmallInteger):
+        return 32767
+    if isinstance(ctype, sa.BigInteger):
+        return 9223372036854775807
+    if isinstance(ctype, sa.Integer):
+        return 2147483647
+    return None
+
+
+def _custom_field_names(element, element_type):
+    """The form's fields for this type that the element's own record has no column for. An element held with
+    no record has no place for any typed field, so it has none."""
+    if isinstance(element, ArchiMateElement):
+        return []
+    return [
+        name for name in get_element_field_names(element_type)
+        if name != "architecture_state" and not hasattr(element, name)  # model-safety-ok: polymorphic ArchiMate elements
+    ]
+
+
+def _model_graph_row(element):
+    """The archimate_elements row an element's values are kept on: itself, or the row its record links to."""
+    if isinstance(element, ArchiMateElement):
+        return element
+    ae_id = getattr(element, "archimate_element_id", None)
+    return ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
+
+
+# A form value the record has no column for is kept in custom_properties under the field's name with this prefix.
+# A property a model file brought in keeps its own name, so the two can never be taken for each other.
+_FORM_PROPERTY_PREFIX = "form_field."
+
+
+def _form_property_key(name):
+    return _FORM_PROPERTY_PREFIX + name
+
+
+def _store_custom_fields(element, data, element_type, ae_row=None):
+    """Keep each posted form value the element's record has no column for in the model-graph row's
+    custom_properties, under the field's prefixed key. An empty value removes that key. No other key of
+    custom_properties is read or changed, so a property a model file brought in is left as it was."""
+    names = [n for n in _custom_field_names(element, element_type) if n in data]
+    ae_row = ae_row or _model_graph_row(element)
+    if not names or ae_row is None:
+        return
+    props = dict(ae_row.custom_properties or {})
+    for name in names:
+        value = data[name]
+        value = value.strip() if isinstance(value, str) else value
+        if value in (None, ""):
+            props.pop(_form_property_key(name), None)
+        else:
+            props[_form_property_key(name)] = value
+    ae_row.custom_properties = props
+
+
+def _custom_field_value(element, ae_row, name):
+    """The stored value of a form field that lives in custom_properties, or None. Only the form's own key is
+    read: an imported property of the same name is not the form's value."""
+    return (getattr(ae_row, "custom_properties", None) or {}).get(_form_property_key(name))
+
+
+def _with_custom_fields(display_fields, element, element_type):
+    """The page's facts with each value the form keeps in custom_properties added under the form's own label.
+
+    A model-graph row also lists custom_properties as one line of its own; the keys shown here are left out of
+    it so no value is said twice.
+    """
+    record = _typed_record(element, isinstance(element, ArchiMateElement), element_type)
+    ae_row = _model_graph_row(element)
+    config = ELEMENT_FIELD_CONFIGS.get(element_type) or {}
+    if record is None or ae_row is None or not config:
+        return display_fields
+    shown = []
+    for field in config.get("fields", []):
+        name = field["name"]
+        if name not in _custom_field_names(record, element_type):
+            continue
+        value = _custom_field_value(record, ae_row, name)
+        if value in (None, ""):
+            continue
+        labels = {str(opt["value"]): opt["label"] for opt in field.get("options") or []}
+        # A stored value that is not text (a list or a mapping an import left) is shown as readable text.
+        text = value if isinstance(value, str) else str(_readable(value))
+        shown.append({"label": field["label"], "value": str(labels.get(text, text)), "technical": False})
+    if not shown:
+        return display_fields
+    rest = {k: v for k, v in (ae_row.custom_properties or {}).items() if not k.startswith(_FORM_PROPERTY_PREFIX)}
+    kept = [f for f in display_fields if f["label"] != "Custom properties"]
+    if rest and len(kept) != len(display_fields):
+        kept.append({"label": "Custom properties", "value": str(_readable(rest)), "technical": False})
+    return kept + shown
+
+
+def _form_text(value):
+    """A stored value as the form's box holds it: a date as 2027-03-15, nothing as an empty box."""
+    if value is None:
+        return ""
+    if isinstance(value, (datetime, date)):
+        return value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
+    if isinstance(value, (dict, list, tuple, set)):
+        return _readable(value)
+    return value
 
 
 def _get_element_relationships(element, element_id):

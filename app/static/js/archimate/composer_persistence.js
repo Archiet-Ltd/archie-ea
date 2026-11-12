@@ -229,6 +229,8 @@ let ComposerPersistence = (function() {
             let self = this;
             /* An unsaved focus-mode view is saved only by its own Save as diagram action. */
             if (self.focusView) return;
+            /* The layer cards are a way into the model, not elements of a diagram. */
+            if (self.layerCards && self.layerCards.length) return;
             if (!self.viewpointDirty || self._creatingAutosave) return;
             /* BA-01: a payload the server rejected on its merits (4xx) will be
                rejected identically on every retry. Stop the loop rather than
@@ -417,6 +419,10 @@ let ComposerPersistence = (function() {
 
         saveViewpoint: function() {
             let self = this;
+            if (self.layerCards && self.layerCards.length) {
+                _toast('info', 'Open a layer first. The layer cards are not elements, so there is nothing to save yet.');
+                return;
+            }
             let elements = self.graph.getElements().filter(function(c) { return !c.get('isLayerZone') && !c.get('isAnnotation'); });
             if (elements.length === 0) {
                 _toast('info', 'Add elements to the canvas before saving.');
@@ -774,6 +780,7 @@ let ComposerPersistence = (function() {
         loadSavedViewpoint: function(vpId, vpName) {
             let self = this;
             self.savedVpOpen = false;
+            self.layerCards = [];
             self.viewpointLoading = true;
             self.selectedNode = null;
             self.selectedEdge = null;
@@ -886,8 +893,10 @@ let ComposerPersistence = (function() {
                 self.checkRelationshipHealth();
 
                 self.$nextTick(function() {
-                    self.fitCanvas();
+                    self.fitCanvasReadable();
                     self.refreshMaturityOverlay();
+                    /* the quality figure and warnings count a viewpoint switch shows */
+                    if (self._diagramChanged) self._diagramChanged();
                     /* CMP2-001: Re-apply state overlay after loading viewpoint */
                     if (self.stateViewMode !== 'all') { self.applyStateOverlay(); }
                     if (window.lucide) lucide.createIcons();
@@ -2507,7 +2516,8 @@ let ComposerPersistence = (function() {
                 self.statusText = 'Viewing snapshot: ' + data.name;
 
                 self.$nextTick(function() {
-                    self.fitCanvas();
+                    self.fitCanvasReadable();
+                    if (self._diagramChanged) self._diagramChanged();
                     if (window.lucide) lucide.createIcons();
                 });
             })

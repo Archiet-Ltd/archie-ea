@@ -1,7 +1,7 @@
 {% from 'components/skeleton.html' import skeleton_table %}
 
-{% macro repository_metric(label, value_expression, hint_expression, icon) %}
-<div class="rounded-lg border border-border bg-card p-5 text-card-foreground" data-slot="metric-card">
+{% macro repository_metric(label, value_expression, hint_expression, icon, testid=None) %}
+<div class="rounded-lg border border-border bg-card p-5 text-card-foreground" data-slot="metric-card"{% if testid %} data-testid="{{ testid }}"{% endif %}>
     <div class="flex items-start gap-3">
         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
             <i data-lucide="{{ icon }}" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
@@ -69,7 +69,7 @@
 </script>
 
 <section data-testid="figure-cards" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="{{ selected_layer.short_name }} repository metrics">
-    {{ repository_metric('Elements', "layerTotalKnown ? layerTotal : '—'", "layerTotalKnown ? 'Repository-wide in this layer' : 'Repository total unavailable'", 'layers') }}
+    {{ repository_metric('Elements', "layerCountKnown ? layerCount : '—'", "layerCountHint", 'layers', 'layer-elements-card') }}
     {{ repository_metric('Connected', "relationshipMetrics.known ? relationshipMetrics.connected : '—'", "relationshipHint", 'git-branch') }}
     {{ repository_metric('Documentation', "pageCount ? documentationPercent + '%' : '—'", "documentationHint", 'file-text') }}
     {{ repository_metric('Validation posture', "validationSummary.value", "validationSummary.hint", 'shield-check') }}
@@ -82,7 +82,7 @@
             <p class="text-xs text-muted-foreground">Names, provenance, documentation and connections for the selected layer.</p>
         </div>
         <span class="rounded-full bg-muted px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground"
-              x-text="layerTotalKnown ? layerTotal + ' total' : '— total'">&mdash; total</span>
+              data-testid="layer-list-total" x-text="listTotalLabel">&mdash; total</span>
     </div>
 
     <div class="border border-b border-border bg-muted/20 px-4 py-2" data-testid="architecture-filter-bar">
@@ -237,8 +237,8 @@
 
     <div x-cloak x-show="!loading && !loadError && visibleElements.length === 0 && !hasActiveFilters()" class="px-6 py-14 text-center" data-testid="architecture-true-empty-state" role="status">
         <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted"><i data-lucide="layers" class="h-7 w-7 text-muted-foreground" aria-hidden="true"></i></div>
-        <h3 class="mt-4 font-semibold text-foreground">No {{ selected_layer.short_name|lower }} elements yet</h3>
-        <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Create the first element to begin this layer of the enterprise repository.</p>
+        <h3 class="mt-4 font-semibold text-foreground" x-text="pageType() ? 'No ' + pageTypePlural() + ' yet' : 'No {{ selected_layer.short_name|lower }} elements yet'">No {{ selected_layer.short_name|lower }} elements yet</h3>
+        <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground" x-text="pageType() ? 'Add the first ' + formatTypeName(pageType()) + ' to start listing what you offer.' : 'Create the first element to begin this layer of the enterprise repository.'">Create the first element to begin this layer of the enterprise repository.</p>
         <button type="button" @click="openCreateModal()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-5 items-center" aria-label="Create element in {{ selected_layer.title }}">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Create element
         </button>
@@ -286,7 +286,7 @@
                     </tr>
                     <template x-for="el in group.elements" :key="group.type + '-' + el.source + '-' + el.id">
                         <tr x-cloak x-show="!groupByType || !collapsedTypes[group.type]" class="transition-colors hover:bg-muted/20" @click="if (!$event.target.closest('a,button,input')) openDetailPanel(el)">
-                            <td x-cloak x-show="bulkMode" class="px-4 py-3"><input type="checkbox" :value="el.id + ':' + el.element_type" x-model="selectedIds" class="h-4 w-4 rounded border-input" :aria-label="'Select ' + el.name"></td>
+                            <td x-cloak x-show="bulkMode" class="px-4 py-3"><input type="checkbox" :value="selectionKey(el)" x-model="selectedIds" class="h-4 w-4 rounded border-input" :aria-label="'Select ' + el.name"></td>
                             <td class="px-4 py-3" data-field="element-name"><button type="button" @click="openDetailPanel(el)" class="h-8 max-w-[240px] truncate rounded-md text-left text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50" x-text="el.name" :title="el.name" :aria-label="'Open details for ' + el.name"></button></td>
                             <td class="px-4 py-3" data-field="element-type"><span class="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground" x-text="formatTypeName(el.element_type)"></span></td>
                             <td class="px-4 py-3" data-field="element-source"><span class="text-sm capitalize text-muted-foreground" x-text="el.source || '—'"></span></td>

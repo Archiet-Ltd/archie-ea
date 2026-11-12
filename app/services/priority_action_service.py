@@ -119,7 +119,7 @@ def _gap_rows(organization_id: int) -> List[Dict[str, Any]]:
     for gap, addressed in gap_register_service.open_gaps_with_coverage(organization_id):
         name = _bare_name(gap.name)
         key = (name.lower(), bool(addressed))
-        sev = _severity_label(gap.severity)
+        sev = _severity_label(gap_register_service.effective_severity(gap))
         lead = ("%s severity" % sev) if sev else "Severity not recorded"
         if addressed:
             action = "Close the %s once its work is done" % name
@@ -136,9 +136,9 @@ def _gap_rows(organization_id: int) -> List[Dict[str, Any]]:
         analysis = "%s#gap-%d" % (analysis, gap.id) if analysis else None
         href = record if addressed else analysis
         # The footer points at the other page about the same gap, never at the action's own address.
-        row = _item("gap", gap.id, name, action, gap.severity, group, 0, why, covered=bool(addressed),
+        row = _item("gap", gap.id, name, action, gap_register_service.effective_severity(gap), group, 0, why, covered=bool(addressed),
                     href=href, footer=_footer("The gap record", analysis if addressed else record,
-                                              gap.severity, gap.updated_at, gap.created_at, subject="Gap"))
+                                              gap_register_service.effective_severity(gap), gap.updated_at, gap.created_at, subject="Gap"))
         row["_records"] = 1
         kept = best.get(key)
         if kept is None:
@@ -203,7 +203,9 @@ def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]
     return rows
 
 
-def _risk_rows(organization_id: int) -> List[Dict[str, Any]]:
+def _risk_rows(organization_id: int, risk_footers: Optional[Dict[int, Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    """The open risks, highest score first. ``risk_footers`` (``risk_service.footers_by_risk``) gives each
+    risk the footer the register shows for it, so its confidence is the register's."""
     from app.models.risk import Risk, RiskStatus
 
     risks = Risk.query.filter(
@@ -218,16 +220,22 @@ def _risk_rows(organization_id: int) -> List[Dict[str, Any]]:
             r._effective_score,
             "%s risk, %s of 25." % (r.risk_level.capitalize(), r.score_text),
             href=href,
-            footer=_footer("%s: %s" % (r.score_word.capitalize(), r.score_pair_text),
-                           None, r.risk_level, r.updated_at, r.created_at, who=r.owner, subject="Score"),
+            footer=(risk_footers or {}).get(r.id) or _footer(
+                "%s: %s" % (r.score_word.capitalize(), r.score_pair_text),
+                None, r.risk_level, r.updated_at, r.created_at, who=r.owner, subject="Score"),
         ))
     return rows
 
 
-def prioritised_actions(organization_id: int, limit: Optional[int] = None, today: Optional[date] = None) -> Dict[str, Any]:
-    """The ordered rows, the total before any limit, and the one-sentence rule."""
+def prioritised_actions(organization_id: int, limit: Optional[int] = None, today: Optional[date] = None,
+                        risk_footers: Optional[Dict[int, Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """The ordered rows, the total before any limit, and the one-sentence rule.
+
+    A screen that shows the rows passes ``risk_footers=risk_service.footers_by_risk(organization_id)``, so
+    a risk reads the confidence the register gives it."""
     today = today or datetime.utcnow().date()
-    rows = _gap_rows(organization_id) + _work_package_rows(organization_id, today) + _risk_rows(organization_id)
+    rows = (_gap_rows(organization_id) + _work_package_rows(organization_id, today)
+            + _risk_rows(organization_id, risk_footers))
     rows.sort(key=lambda r: r["_key"])
     for position, row in enumerate(rows, start=1):
         row["position"] = position

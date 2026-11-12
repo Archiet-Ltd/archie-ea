@@ -22,7 +22,7 @@ from app.modules.ai_chat.services.llm_service_impl import LLMService
 
 REAL_CHAIN = ar.build_provider_chain
 SECRET = "sk-or-v1-very-secret-key-value"
-NVIDIA_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
+NVIDIA_MODEL = "mistralai/mistral-large-4-1t-a52b"
 CHAIN = [
     ("openrouter", "google/gemma-4-31b-it:free", SECRET, ar._PROVIDER_BASE_URLS["openrouter"]),
     ("nvidia", NVIDIA_MODEL, "nvapi-secret", ar._PROVIDER_BASE_URLS["nvidia"]),
@@ -246,3 +246,66 @@ def test_one_organisations_key_is_never_used_for_another(db_session, make_org, t
     with tenant_ctx(org_b.id):
         chain_b = ar.build_provider_chain("anthropic", "claude-a")
     assert "key-of-a" not in {e[2] for e in chain_b}
+
+
+# --- an empty reply is a failure of that model -------------------------------------------------
+
+SECOND_NVIDIA_MODEL = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+NVIDIA_CHAIN = [
+    ("nvidia", "mistralai/mistral-large-4-1t-a52b", "nvapi-secret", ar._PROVIDER_BASE_URLS["nvidia"]),
+    ("nvidia", SECOND_NVIDIA_MODEL, "nvapi-secret", ar._PROVIDER_BASE_URLS["nvidia"]),
+]
+
+
+def _nvidia_runner(runner, monkeypatch):
+    monkeypatch.setattr(ar, "build_provider_chain", lambda *a, **k: list(NVIDIA_CHAIN))
+    return runner
+
+
+def test_a_model_that_returns_no_words_hands_the_question_to_the_next_model(runner, monkeypatch):
+    _nvidia_runner(runner, monkeypatch)
+    calls = _script(monkeypatch, runner, ["", "Three applications are recorded."])
+    result = runner.run("How many applications do we run?")
+    assert result["response"] == "Three applications are recorded."
+    assert not result.get("error")
+    assert [c[1] for c in calls] == [c[1] for c in NVIDIA_CHAIN]
+    assert result["answered_by"]["model"] == SECOND_NVIDIA_MODEL
+
+
+def test_a_reply_of_only_spaces_counts_as_no_words(runner, monkeypatch):
+    _nvidia_runner(runner, monkeypatch)
+    _script(monkeypatch, runner, ["  \n ", "Three applications are recorded."])
+    assert runner.run("q")["response"] == "Three applications are recorded."
+
+
+def test_every_model_returning_no_words_shows_one_plain_sentence_and_a_retry(runner, monkeypatch):
+    _nvidia_runner(runner, monkeypatch)
+    _script(monkeypatch, runner, ["", ""])
+    result = runner.run("q")
+    assert result["response"].strip()
+    assert "could not answer" in result["response"].lower() and "Retry" in result["response"]
+    assert result["response"].count(".") == 2  # one sentence for the problem, one for the retry
+    assert not result.get("answered_by")
+
+
+def test_the_completed_steps_summary_never_lists_a_line_twice(runner, monkeypatch):
+    import app.modules.ai_chat.tools.executor as executor_module
+
+    monkeypatch.setattr(ar, "MAX_ITERATIONS", 3)
+    monkeypatch.setattr(
+        executor_module.ToolExecutor, "execute",
+        lambda self, tc: {"success": True, "message": "Found 1 application(s) - this is the complete set.", "result": {}},
+    )
+    count = {"n": 0}
+
+    def fake(provider, model, api_key, *a, **k):
+        count["n"] += 1
+        return {
+            "text": "", "raw": None,
+            "tool_calls": [{"id": f"c{count['n']}", "name": "find_applications", "arguments": {}}],
+        }
+
+    monkeypatch.setattr(runner, "_call_llm", fake)
+    result = runner.run("What applications do we have?")
+    lines = [ln for ln in result["response"].splitlines() if ln.startswith("- ")]
+    assert lines == ["- Found 1 application(s) - this is the complete set."]

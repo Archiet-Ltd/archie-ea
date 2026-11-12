@@ -34,6 +34,7 @@ from flask_login import current_user, login_required  # dead-code-ok
 from app.middleware.tenant_context import current_org_id
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import case, or_  # dead-code-ok
+from app.services.gap_register_service import effective_severity_expr
 from sqlalchemy.exc import SQLAlchemyError
 
 from .. import db
@@ -881,13 +882,13 @@ def plateaus():
         )
 
 
-_GAP_SEVERITIES = ("critical", "high", "medium", "low")
+_GAP_SEVERITIES = ("critical", "high", "medium", "low", "unrated")
 
 _GAP_SORT_COLUMNS = {
     "name": Gap.name,
     "gap_type": Gap.gap_type,
     # critical sorts above high, not alphabetically; an unrecorded severity ranks below low
-    "severity": case({"low": 1, "medium": 2, "high": 3, "critical": 4}, value=Gap.severity, else_=0),
+    "severity": case({"low": 1, "medium": 2, "high": 3, "critical": 4}, value=effective_severity_expr(), else_=0),
     "priority": Gap.priority,
     "resolution_status": Gap.resolution_status,
     "impact": Gap.impact,
@@ -913,15 +914,13 @@ def gap_analysis():
     column = _GAP_SORT_COLUMNS.get(sort_key, Gap.name)
     order = column.desc() if direction == "desc" else column.asc()
     try:
-        from app.services.gap_register_service import count_gaps, get_gaps_not_addressed
+        from app.services.gap_register_service import count_gaps, gap_register_query, get_gaps_not_addressed
 
         # ?severity=high lists only the gaps of that severity (the links on Architecture Intelligence)
         severity_filter = (request.args.get("severity") or "").strip().lower()
         if severity_filter not in _GAP_SEVERITIES:
             severity_filter = ""
-        query = Gap.query.filter(Gap.gap_kind != "plateau_transition")
-        if severity_filter:
-            query = query.filter(Gap.severity == severity_filter)
+        query = gap_register_query(current_org_id(), severity_filter or None)
         gaps = query.order_by(order, Gap.id).limit(500).all()
         total_gap_count = count_gaps(current_org_id())
         not_addressed_gaps = get_gaps_not_addressed(current_org_id())
@@ -957,7 +956,6 @@ def ai_architecture_analysis():
     """AI Architecture Analysis — displays architectural intelligence dashboard"""
     try:
         from app.models.ai_recommendations import AIRecommendation
-        from app.models.implementation_migration import Gap
         from app.models.application_portfolio import ApplicationComponent
 
         # Fetch recent AI recommendations
@@ -968,13 +966,9 @@ def ai_architecture_analysis():
         )
 
         # Count gaps by severity
-        _cap_gaps = Gap.query.filter(Gap.gap_kind != "plateau_transition")
-        gaps_by_severity = {
-            "critical": _cap_gaps.filter_by(severity="critical").count(),
-            "high": _cap_gaps.filter_by(severity="high").count(),
-            "medium": _cap_gaps.filter_by(severity="medium").count(),
-            "low": _cap_gaps.filter_by(severity="low").count(),
-        }
+        from app.services.gap_register_service import count_gaps as _count_gaps
+
+        gaps_by_severity = {level: _count_gaps(current_org_id(), severity=level) for level in _GAP_SEVERITIES}
 
         # Applications needing review: the ones marked for review and the ones in their sunset stage, which
         # the recommendations ask a person to plan the retirement of
@@ -1012,10 +1006,12 @@ def ai_architecture_analysis():
         total_gaps = count_gaps(current_org_id())
 
         from app.services.priority_action_service import limit_for, prioritised_actions
+        from app.services.risk_service import footers_by_risk
 
         return render_template(
             "enterprise/ai_architecture_analysis.html",
-            priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+            priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
             ai_recommendations=ai_recommendations,
             gaps_by_severity=gaps_by_severity,
             apps_needing_review=apps_needing_review,

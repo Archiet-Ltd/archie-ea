@@ -19,7 +19,7 @@ from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD, boot_live_server
 from .fresh_org import create_fresh_org, sign_in
-from .test_simulation_journey import DEMO_EMAIL, ELEMENT, VIEWPORT_IDS, VIEWPORTS, _pick, demo  # noqa: F401
+from .test_simulation_journey import DEMO_EMAIL, ELEMENT, VIEWPORT_IDS, VIEWPORTS, _cost_reader, _member, _pick, demo  # noqa: F401
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -97,7 +97,7 @@ def test_the_status_page_lists_scenarios_as_available_and_the_link_opens_the_scr
         link.click()
         page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
-        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
     finally:
         context.close()
 
@@ -117,7 +117,7 @@ def test_the_status_page_lists_scenarios_as_available_and_the_link_opens_the_scr
         page.locator("#submit").click()
         page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
-        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
         page.goto(server + "/early-access", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", level=1)).to_be_visible()
         assert "Simulation scenarios" not in page.locator("main").inner_text()
@@ -147,7 +147,7 @@ def test_a_signed_in_person_opens_scenarios_from_the_sidebar(browser, server, de
         link.click()
         page.wait_for_url(re.compile(r"/simulations$"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", level=1)).to_have_text("Scenarios")
-        expect(page.get_by_role("button", name="Run simulation")).to_be_visible()
+        expect(page.get_by_role("button", name="Run scenario")).to_be_visible()
     finally:
         context.close()
 
@@ -165,19 +165,21 @@ def test_a_saved_scenario_is_listed_for_a_colleague_and_not_for_another_organisa
         colleague = User.query.filter_by(email=COLLEAGUE_EMAIL).first()
         if colleague is None:
             colleague = User(email=COLLEAGUE_EMAIL, first_name="Second", last_name="Architect", organization_id=org_id,
-                             confirmed=True, enterprise_role="enterprise_architect")
+                             confirmed=True, enterprise_role="cto")
             colleague.role = Role.query.filter_by(name="Architect").one()
             db.session.add(colleague)
+        # both people may read running costs, so the dialog's figure can be held to the run card's
+        colleague.enterprise_role = "cto"
         colleague.password = PASSWORD
         db.session.commit()
         db.session.remove()
 
     architect_ctx = _context(browser, viewport, scheme)
     try:
-        page = _sign_in_as(architect_ctx, server, DEMO_EMAIL)
+        page = _sign_in_as(architect_ctx, server, _cost_reader(app))
         page.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(page, change="Decommission / Retirement")
-        page.get_by_role("button", name="Run simulation").click()
+        page.get_by_role("button", name="Run scenario").click()
         expect(page.get_by_test_id("simulation-panel")).to_be_visible(timeout=PAGE_TIMEOUT)
         cost_at_risk = page.get_by_test_id("tco-at-risk").inner_text().strip()
         on_screen = {"capabilities": _screen_count(page, "Capabilities"), "processes": _screen_count(page, "Processes")}
@@ -245,24 +247,6 @@ def test_a_saved_scenario_is_listed_for_a_colleague_and_not_for_another_organisa
             db.session.remove()
 
 
-def _member(app, email, role):
-    """A person of the demonstration organisation holding one enterprise role."""
-    from app import db
-    from app.models.user import Role, User
-
-    with app.app_context():
-        org_id = db.session.execute(db.text("select id from organizations where slug = 'lantern-quay'")).scalar_one()
-        member = User.query.filter_by(email=email).first()
-        if member is None:
-            member = User(email=email, first_name="Role", last_name="Tester", organization_id=org_id, confirmed=True,
-                          enterprise_role=role)
-            member.role = Role.query.filter_by(name="Architect").one()
-            db.session.add(member)
-        member.password = PASSWORD
-        db.session.commit()
-        db.session.remove()
-
-
 def _element_id(app):
     from app import db
 
@@ -303,7 +287,7 @@ def test_a_data_architect_is_not_offered_save_and_still_compares_what_an_archite
         architect = _sign_in_as(context, server, DEMO_EMAIL)
         architect.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _pick(architect, change="Decommission / Retirement")
-        architect.get_by_role("button", name="Run simulation").click()
+        architect.get_by_role("button", name="Run scenario").click()
         expect(architect.get_by_test_id("simulation-panel")).to_be_visible(timeout=PAGE_TIMEOUT)
         architect.get_by_role("button", name="Save Scenario for Comparison", exact=True).click()
         dialog = architect.get_by_role("dialog", name="Save scenario")
@@ -316,7 +300,7 @@ def test_a_data_architect_is_not_offered_save_and_still_compares_what_an_archite
             person = _sign_in_as(other_ctx, server, email)
             person.goto(server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
             _pick(person, change="Decommission / Retirement")
-            person.get_by_role("button", name="Run simulation").click()
+            person.get_by_role("button", name="Run scenario").click()
             expect(person.get_by_test_id("simulation-panel")).to_be_visible(timeout=PAGE_TIMEOUT)
             # no control that would only refuse them, and the page says who can save
             assert person.get_by_role("button", name="Save Scenario for Comparison").count() == 0
@@ -348,6 +332,7 @@ def test_a_data_architect_is_not_offered_save_and_still_compares_what_an_archite
 def test_the_empty_compare_dialog_offers_saving_only_to_a_person_who_may_save(browser, server, app, demo, viewport, scheme):
     from app import db
     from app.models.saved_scenario import SavedScenario
+    from app.commands import seed_demo_company as seed_demo
     from app.models.user import User
 
     email = "data.architect@lantern-quay.example.com"
@@ -355,27 +340,36 @@ def test_the_empty_compare_dialog_offers_saving_only_to_a_person_who_may_save(br
     with app.app_context():
         org_id = User.query.filter_by(email=DEMO_EMAIL).one().organization_id
         SavedScenario.query.filter(SavedScenario.organization_id == org_id, SavedScenario.name.like(SCENARIO + "%")).delete(synchronize_session=False)
+        # the demonstration keeps two scenarios to compare: they are taken out by name for this run and put back after
+        SavedScenario.query.filter(SavedScenario.organization_id == org_id, SavedScenario.name.in_(
+            [name for name, _system, _change in seed_demo._SCENARIOS])).delete(synchronize_session=False)
         has_others = SavedScenario.query.filter(SavedScenario.organization_id == org_id).count()
         db.session.commit()
         db.session.remove()
-    assert has_others == 0, "the demonstration organisation must hold no saved scenario for its dialog to be empty"
-    for who, may_save in ((DEMO_EMAIL, True), (email, False)):
-        context = _context(browser, viewport, scheme)
-        try:
-            page = _sign_in_as(context, server, who)
-            dialog = _compare(page, server)
-            step = dialog.get_by_test_id("empty-next-step")
-            expect(step).to_be_visible()
-            if may_save:
-                expect(step).to_have_text("Run an analysis and save it to compare scenarios")
-            else:
-                expect(step).to_contain_text("Ask ")
-                expect(step).to_contain_text("solution architects")
-                assert "Run an analysis and save it to compare" not in step.inner_text()
-            _inside_viewport(page, step, viewport)
-            _shot(page, "empty-compare-%s" % ("architect" if may_save else "data-architect"), viewport, scheme)
-        finally:
-            context.close()
+    try:
+        assert has_others == 0, "the demonstration organisation must hold no saved scenario for its dialog to be empty"
+        for who, may_save in ((DEMO_EMAIL, True), (email, False)):
+            context = _context(browser, viewport, scheme)
+            try:
+                page = _sign_in_as(context, server, who)
+                dialog = _compare(page, server)
+                step = dialog.get_by_test_id("empty-next-step")
+                expect(step).to_be_visible()
+                if may_save:
+                    expect(step).to_have_text("Run an analysis and save it to compare scenarios")
+                else:
+                    expect(step).to_contain_text("Ask ")
+                    expect(step).to_contain_text("solution architects")
+                    assert "Run an analysis and save it to compare" not in step.inner_text()
+                _inside_viewport(page, step, viewport)
+                _shot(page, "empty-compare-%s" % ("architect" if may_save else "data-architect"), viewport, scheme)
+            finally:
+                context.close()
+    finally:
+        with app.app_context():
+            seed_demo._seed_scenarios(org_id, User.query.filter_by(email=DEMO_EMAIL).one().id)
+            db.session.commit()
+            db.session.remove()
 
 
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
@@ -467,6 +461,52 @@ def test_carried_scenarios_leave_browser_storage_one_by_one_and_one_that_fails_c
         with app.app_context():
             assert SavedScenario.query.filter(SavedScenario.name.in_(names)).count() == 2
             db.session.remove()
+    finally:
+        context.close()
+        with app.app_context():
+            SavedScenario.query.filter(SavedScenario.name.in_(names)).delete(synchronize_session=False)
+            db.session.commit()
+            db.session.remove()
+
+
+@pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=VIEWPORT_IDS)
+def test_while_carried_scenarios_are_still_moving_the_notice_already_says_how_many_have_moved(browser, server, app, demo, viewport, scheme):
+    from app import db
+    from app.models.saved_scenario import SavedScenario
+
+    element_id = _element_id(app)
+    names = (LEGACY + " moved early", LEGACY + " moved next")
+    storage = """localStorage.setItem('impactAnalysisScenarios', JSON.stringify([
+        {id: 's1', name: %r, element: {id: %d, name: %r}, change_type: 'RETIRE', analysis_result: {}},
+        {id: 's2', name: %r, element: {id: %d, name: %r}, change_type: 'RETIRE', analysis_result: {}},
+        {id: 's3', name: 'Points at nothing', element: {id: 2000000000, name: 'Gone'}, change_type: 'RETIRE', analysis_result: {}}]));""" % (
+        names[0], element_id, ELEMENT, names[1], element_id, ELEMENT)
+    context = _context(browser, viewport, scheme)
+    context.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); %s }" % storage)
+    try:
+        page = _sign_in_as(context, server, DEMO_EMAIL)
+        held = []
+
+        def hold_the_last(route):
+            # the server is slow to answer for the last one: the person is still waiting for it
+            if route.request.method == "POST" and json.loads(route.request.post_data)["element"]["id"] == 2000000000:
+                held.append(route)
+            else:
+                route.continue_()
+
+        page.route("**/strategic/api/scenarios", hold_the_last)
+        compare = _compare(page, server)
+        notice = compare.get_by_test_id("carried-notice")
+        # before the last answer arrives the person already reads how many have moved
+        expect(notice).to_contain_text("2 scenarios saved earlier in this browser were moved to your organisation")
+        assert len(held) == 1
+        assert page.evaluate("JSON.parse(localStorage.getItem('impactAnalysisScenarios')).map(s => s.name)") == ["Points at nothing"]
+        _shot(page, "carried-moving", viewport, scheme)
+        held[0].continue_()
+        expect(notice).to_contain_text("1 could not be moved (its element may no longer exist)")
+        expect(notice).to_contain_text("2 scenarios saved earlier in this browser were moved to your organisation")
+        expect(compare.get_by_text(names[0])).to_be_visible()
+        expect(compare.get_by_text(names[1])).to_be_visible()
     finally:
         context.close()
         with app.app_context():

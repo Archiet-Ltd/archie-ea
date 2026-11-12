@@ -166,6 +166,11 @@ def application_import():
                         failed += 1
                         continue
 
+                    if cleaned["status_error"]:
+                        row_errors.append((index, cleaned["status_error"]))
+                        failed += 1
+                        continue
+
                     # Normalize name for duplicate checking (case-insensitive)
                     name_lower = name.lower()
 
@@ -208,7 +213,8 @@ def application_import():
                         ]
                         existing_app.technology_stack = cleaned["technology_stack"]
                         existing_app.version = cleaned["version"]
-                        existing_app.deployment_status = cleaned["deployment_status"]
+                        if cleaned["deployment_status"]:
+                            existing_app.deployment_status = cleaned["deployment_status"]
                         existing_app.business_domain = cleaned["business_domain"]
                         existing_app.business_owner = cleaned["business_owner"]
                         existing_app.development_team = cleaned["development_team"]
@@ -384,6 +390,11 @@ def application_import():
                         failed += 1
                         continue
 
+                    if cleaned["status_error"]:
+                        row_errors.append((index, cleaned["status_error"]))
+                        failed += 1
+                        continue
+
                     # Normalize name for duplicate checking (case-insensitive)
                     name_lower = name.lower()
 
@@ -414,7 +425,8 @@ def application_import():
                         ]
                         existing_app.technology_stack = cleaned["technology_stack"]
                         existing_app.version = cleaned["version"]
-                        existing_app.deployment_status = cleaned["deployment_status"]
+                        if cleaned["deployment_status"]:
+                            existing_app.deployment_status = cleaned["deployment_status"]
                         existing_app.business_domain = cleaned["business_domain"]
                         existing_app.business_owner = cleaned["business_owner"]
                         existing_app.development_team = cleaned["development_team"]

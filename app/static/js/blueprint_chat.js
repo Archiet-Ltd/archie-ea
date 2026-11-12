@@ -183,7 +183,7 @@ function blueprintChat() {
                             // Use buffered response if no tokens were streamed (non-streaming LLM path)
                             /* Order matters, and it used to be wrong. The
                                AgentRunner fallback sends BOTH `response` (the
-                               "add an API key under Admin -> API Settings"
+                               "add an API key under Admin -> AI settings"
                                text) and `error`. Assigning `response` first
                                made the `event.error` branch unreachable — its
                                own `!text` guard was already false — so an

@@ -15,34 +15,32 @@ from .conftest import PAGE_TIMEOUT, PASSWORD
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
-def test_pricing_buy_button_leads_a_visitor_to_that_plans_checkout(browser, live_server, seeded):
+def test_pricing_with_payment_closed_leads_a_visitor_to_start_free_or_to_talk_to_us(browser, live_server, seeded):
     context = browser.new_context()
     page = context.new_page()
     try:
         page.goto(live_server + "/pricing", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        buy = page.get_by_test_id("buy-startup")
-        expect(buy).to_be_visible(timeout=PAGE_TIMEOUT)
-        # Routed through the click-tracking redirect (app/main/views.py::
-        # track_plan_click) before landing on /contact.
+        start = page.get_by_test_id("buy-startup")
+        expect(start).to_have_text("Start free")
+        # Routed through the click-tracking redirect (app/main/views.py::track_plan_click).
         expect(page.get_by_test_id("buy-enterprise")).to_have_attribute(
             "href", "/t/plan-click?plan=enterprise&next=/contact")
+        expect(page.get_by_test_id("talk-startup")).to_have_attribute(
+            "href", "/t/plan-click?plan=startup&next=/contact")
 
-        buy.click()
-        # Not signed in yet: the button opens registration and keeps the plan;
-        # someone with an account signs in from there and keeps it too.
-        page.wait_for_url(lambda url: "/account/register" in url and "plan=startup" in url,
-                          timeout=PAGE_TIMEOUT)
+        start.click()
+        page.wait_for_url(lambda url: "/account/register" in url, timeout=PAGE_TIMEOUT)
         page.get_by_test_id("register-signin").get_by_role("link", name="Sign in").click()
-        page.wait_for_url(lambda url: "/account/login" in url and "plan=startup" in url,
-                          timeout=PAGE_TIMEOUT)
+        page.wait_for_url(lambda url: "/account/login" in url, timeout=PAGE_TIMEOUT)
         page.fill("#email", seeded["emails"]["platform_admin"])
         page.fill("#password", PASSWORD)
         page.locator("#submit").click()
-        page.wait_for_url(lambda url: "/admin/billing" in url and "plan=startup" in url,
-                          timeout=PAGE_TIMEOUT)
+        page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
 
+        page.goto(live_server + "/admin/billing/?plan=startup", wait_until="domcontentloaded",
+                  timeout=PAGE_TIMEOUT)
         checkout = page.locator("#checkout")
-        expect(checkout.get_by_role("heading", name="Buy Startup")).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(checkout.get_by_role("heading", name="Startup", exact=True)).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("plan-card-startup")).to_be_visible()
         # No keys on this server: say so, and offer no payment button that cannot work.
         expect(page.get_by_test_id("checkout-unavailable")).to_contain_text(
@@ -73,18 +71,18 @@ def test_administrator_sees_plan_limits_and_can_choose_a_plan(browser, live_serv
 
         page.get_by_test_id("plan-card-team").get_by_role("link", name="Choose Team").click()
         page.wait_for_url(lambda url: "plan=team" in url, timeout=PAGE_TIMEOUT)
-        expect(page.locator("#checkout").get_by_role("heading", name="Buy Team")).to_be_visible(
+        expect(page.locator("#checkout").get_by_role("heading", name="Team", exact=True)).to_be_visible(
             timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("checkout-unavailable")).to_be_visible()
 
         # The state survives a reload: the chosen plan is in the address.
         page.reload(wait_until="domcontentloaded")
-        expect(page.locator("#checkout").get_by_role("heading", name="Buy Team")).to_be_visible(
+        expect(page.locator("#checkout").get_by_role("heading", name="Team", exact=True)).to_be_visible(
             timeout=PAGE_TIMEOUT)
 
         # Invoices say why they are empty and what to do next, instead of showing zeros.
         expect(page.get_by_text("No invoices yet")).to_be_visible()
-        expect(page.get_by_text("Invoices appear here once online payment is open")).to_be_visible()
+        expect(page.get_by_text("We send an invoice when a paid plan is set up with you")).to_be_visible()
         page.get_by_role("link", name="Contact us").last.click()
         page.wait_for_url(lambda url: "/contact" in url, timeout=PAGE_TIMEOUT)
         expect(page.locator("main").first).not_to_be_empty()
@@ -211,8 +209,9 @@ def test_administrator_saves_billing_details_and_they_survive_a_reload(browser, 
         form.get_by_label("Purchase-order number").fill(po_number)
         form.get_by_role("button", name="Save billing details").click()
         page.wait_for_load_state("domcontentloaded")
-        expect(page.get_by_test_id("billing-page").get_by_text(
-            "Billing details saved. Future invoices carry them.")).to_be_visible(timeout=PAGE_TIMEOUT)
+        # The confirmation is the layout's toast, which sits outside the billing section.
+        expect(page.get_by_text("Billing details saved. Future invoices carry them.").first).to_be_visible(
+            timeout=PAGE_TIMEOUT)
 
         page.reload(wait_until="domcontentloaded")
         form = page.get_by_test_id("billing-details-form")

@@ -76,7 +76,7 @@
         var resp = await apiFetch('/ai-chat/estate-answer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember })
+            body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember, part: (options && options.part) || null, element_id: (options && options.elementId) || undefined })
         });
         var data = await resp.json().catch(function () { return {}; });
         if (!resp.ok || data.success === false) throw new Error(data.error || 'estate answer ' + resp.status);
@@ -270,6 +270,7 @@
                             answeredBy: ev.answered_by || null,
                             genomeHtml: (ev.genome_answer && ev.genome_answer.html) || null,
                             paused: !!ev.paused,
+                            retryable: !!ev.retryable,
                             error: ev.error || null
                         };
                     } else if (ev.error) {
@@ -309,6 +310,7 @@
             answeredBy: meta.answeredBy || null,
             genomeHtml: meta.genomeHtml || null,
             paused: !!meta.paused,
+            retryable: !!meta.retryable,
             error: meta.error || null
         });
         return true;

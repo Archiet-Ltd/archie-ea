@@ -111,7 +111,7 @@ def test_opening_screen_questions_name_the_organisations_applications_and_a_clic
     page, payloads = chat(launch)
     initial_url = page.url
     questions = page.locator('#portfolio-briefing')
-    # four questions, each naming an application in the seeded organisation's records, in list order
+    # four questions, each naming a linked application in the seeded organisation's records, most connected first
     for application in APPLICATIONS[:4]:
         expect(questions).to_contain_text(f"What breaks if {application['name']} fails?")
     expect(questions).not_to_contain_text(APPLICATIONS[4]['name'])

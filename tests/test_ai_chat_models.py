@@ -123,3 +123,14 @@ def test_requested_model_resolves_its_provider_too():
         "the requested model no longer resolves its provider"
     )
     assert "provider, model = resolved" in block
+
+
+def test_the_settings_page_names_the_model_the_service_uses_for_nvidia():
+    from app.modules.ai_chat.services.model_defaults import default_model_for, fallback_models_for
+
+    assert default_model_for("nvidia") == "mistralai/mistral-large-4-1t-a52b"
+    page = (ROOT / "app/templates/admin/api_settings.html").read_text(encoding="utf-8")
+    assert "<strong>NVIDIA:</strong> %s</p>" % default_model_for("nvidia") in page
+    order = fallback_models_for("nvidia", "")
+    assert order[:2] == ["mistralai/mistral-large-4-1t-a52b", "nvidia/nemotron-3.5-super-vl-120b-a12b"]
+    assert order[-1] == "nvidia/nemotron-3-ultra-550b-a55b"

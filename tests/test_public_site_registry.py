@@ -39,6 +39,7 @@ PRODUCT_ITEMS = [
 ]
 PRODUCT_SOON = [
     ("Software and tool discovery", "Coming soon: discover the software and tools you actually pay for and use."),
+    ("Bring your SysML models", "Early access: see what an engineering change reaches across the business."),
 ]
 SOLUTIONS = [
     ("Application rationalisation", "Find overlapping applications and decide which to keep, consolidate or retire."),
@@ -343,7 +344,7 @@ def test_the_features_page_opens_scenarios_on_the_working_screen_for_a_signed_in
         assert "Scenarios" not in waiting.split("</ul>")[0]
         assert "planned" not in available.split('id="simulation-and-scenario-planning"')[1].split("<h3")[0]
         landing = client.get("/simulations")
-        assert landing.status_code == 200 and "Run simulation" in landing.data.decode()
+        assert landing.status_code == 200 and "Run scenario" in landing.data.decode()
 
 
 def test_no_page_in_the_registry_is_a_redirect_or_a_merged_page(app):

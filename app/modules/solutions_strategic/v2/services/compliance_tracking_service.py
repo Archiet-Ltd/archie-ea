@@ -9,6 +9,7 @@ computation of a compliance percentage; this service lists and words it.
 from datetime import datetime
 from typing import Dict, List
 
+from app.services import result_footer_service as footers
 from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService
 
 from .decorators import transactional
@@ -25,7 +26,8 @@ class ComplianceTrackingService:
         capabilities = self._get_all_capabilities()
         assessments = ComplianceInheritanceService.assess_capabilities([c["id"] for c in capabilities])
 
-        rows = [self._row(cap, assessments[cap["id"]]) for cap in capabilities]
+        origins = self._origins(capabilities, assessments)
+        rows = [self._row(cap, assessments[cap["id"]], origins) for cap in capabilities]
         # Findings first, then lowest score, then the unassessed.
         rows.sort(key=lambda r: (r["score"] is None, -r["missing_count"], r["score"] or 0, r["capability_name"]))
 
@@ -63,7 +65,24 @@ class ComplianceTrackingService:
         }
 
     @staticmethod
-    def _row(capability: Dict, assessment: Dict) -> Dict:
+    def _origins(capabilities: List[Dict], assessments: Dict[int, Dict]) -> Dict[int, Dict]:
+        """What the model records about the elements behind the capabilities and their newest control records:
+        read once for the page, by id and organisation."""
+        from app.middleware.tenant_context import current_org_id
+
+        ids = [c.get("element_id") for c in capabilities] + [a["newest_element_id"] for a in assessments.values()]
+        return footers.element_facts(current_org_id(), ids)
+
+    @staticmethod
+    def _origin(element_id, origins: Dict[int, Dict]) -> Dict:
+        """The source_kind and label of a record, from the element that mirrors it. A record with no element, or
+        whose element states no origin, reads as entered by hand, which is what every form writes."""
+        info = origins.get(element_id) or {}
+        return {"source_kind": info.get("source_kind") or "manual", "source_label": info.get("source_label"),
+                "as_of": info.get("as_of")}
+
+    @staticmethod
+    def _row(capability: Dict, assessment: Dict, origins: Dict[int, Dict] = None) -> Dict:
         figure = ComplianceInheritanceService.figure(assessment)
         status = ComplianceInheritanceService.status(assessment)
         missing = assessment["not_in_place"]
@@ -87,7 +106,44 @@ class ComplianceTrackingService:
             "next_step": next_step,
             "last_review": last_review.strftime("%d %b %Y") if last_review else None,
             "findings": assessment["findings"],
+            "footer": ComplianceTrackingService._footer(capability, assessment, origins or {}),
         }
+
+    @staticmethod
+    def _footer(capability: Dict, assessment: Dict, origins: Dict[int, Dict] = None) -> Dict:
+        """Evidence, source, confidence and date for one capability's figure, from the one result footer.
+        Each fact states the origin its own record carries (its mirrored model element)."""
+        origins = origins or {}
+        cap_origin = ComplianceTrackingService._origin(capability.get("element_id"), origins)
+        control_origin = ComplianceTrackingService._origin(assessment["newest_element_id"], origins)
+        facts = [
+            footers.fact(
+                capability["name"],
+                href=footers.page_link("archimate_crud.detail_element", layer="strategy",
+                                       element_type="Capability", element_id=capability["id"]),
+                source_kind=cap_origin["source_kind"], source_label=cap_origin["source_label"],
+                as_of=capability.get("updated_at"), subject="Capability"),
+        ]
+        total = assessment["assessed_controls"]
+        if not total:
+            facts.append(footers.fact("No control is mapped to the applications that support it", missing=True))
+            return footers.build_footer(facts)
+        in_place = assessment["implemented"]
+        facts.append(footers.fact(
+            "%d control%s mapped, %d in place" % (total, "" if total == 1 else "s", in_place),
+            href=footers.page_link("application_mgmt.compliance_frameworks_dashboard"),
+            source_kind=control_origin["source_kind"], source_label=control_origin["source_label"],
+            as_of=assessment["newest_record"], subject="Controls"))
+        documented = assessment["with_evidence"]
+        if documented:
+            facts.append(footers.fact(
+                "Evidence document recorded for %d of %d controls" % (documented, total),
+                source_kind=control_origin["source_kind"], source_label=control_origin["source_label"],
+                as_of=assessment["newest_record"], subject="Document"))
+        else:
+            facts.append(footers.fact("No evidence document is recorded for any of its %d control%s"
+                                      % (total, "" if total == 1 else "s"), missing=True))
+        return footers.build_footer(facts)
 
     @staticmethod
     def _recommendations(rows: List[Dict]) -> List[str]:
@@ -121,10 +177,19 @@ class ComplianceTrackingService:
 
     def _get_all_capabilities(self) -> List[Dict]:
         """Every business capability of the organisation. Errors propagate so the page reports the failure
-        instead of an empty portfolio."""
+        instead of an empty portfolio. The query is ORM-level (BusinessCapability.query), which the tenant fence
+        filters by organisation, and it also names the organisation so it holds even if the fence is absent. With no
+        organisation it returns an empty list."""
+        from app.middleware.tenant_context import current_org_id
         from app.models.business_capability import BusinessCapability
 
+        org_id = current_org_id()
+        if org_id is None:
+            # No organisation known: no records, never every organisation's.
+            return []
+        query = BusinessCapability.query.filter(BusinessCapability.organization_id == org_id)
         return [
-            {"id": cap.id, "name": cap.name, "domain": cap.business_domain}
-            for cap in BusinessCapability.query.order_by(BusinessCapability.name).all()
+            {"id": cap.id, "name": cap.name, "domain": cap.business_domain,
+             "element_id": cap.archimate_element_id, "updated_at": cap.updated_at or cap.created_at}
+            for cap in query.order_by(BusinessCapability.name).all()
         ]

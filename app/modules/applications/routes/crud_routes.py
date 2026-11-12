@@ -192,6 +192,12 @@ def application_create():
     )
     if not is_valid:
         validation_errors.append(error)
+    else:
+        from app.services.application_status import status_for_write
+
+        validated_status, status_refusal = status_for_write(validated_status)
+        if status_refusal:
+            validation_errors.append(status_refusal)
 
     business_owner = data.get("business_owner")
     is_valid, validated_owner, error = validate_string(
@@ -691,6 +697,13 @@ def generate_application_archimate(id):
     return redirect(url_for("unified_applications.application_detail", id=id))
 
 
+def _abacus_connected(org_id):
+    """True when this organisation has an active Abacus connector."""
+    from app.models.connector_config import ConnectorConfig
+
+    return "abacus" in ConnectorConfig.live_connector_types(org_id)
+
+
 @unified_applications_bp.route("/<int:id>/edit", methods=["GET", "POST"])
 @login_required
 @require_permission("edit", "application")
@@ -798,10 +811,16 @@ def application_edit(id):
                 is_valid, validated_status, error = validate_string(
                     deployment_status, max_length=50, field_name="deployment_status"
                 )
+                from app.services.application_status import same_status, status_for_write
+
                 if not is_valid:
                     validation_errors.append(error)
-                else:
-                    app.deployment_status = validated_status
+                elif not same_status(validated_status, app.deployment_status):
+                    stored_status, status_refusal = status_for_write(validated_status)
+                    if status_refusal:
+                        validation_errors.append(status_refusal)
+                    else:
+                        app.deployment_status = stored_status
 
             # Validate business_purpose
             business_purpose = request.form.get("business_purpose")
@@ -822,6 +841,7 @@ def application_edit(id):
                     flash(error, "error")
                 return render_template(
                     "applications/edit.html", application=app,
+                    abacus_connected=_abacus_connected(g.current_org_id),
                     lifecycle_stage_choices=APPLICATION_LIFECYCLE_STAGES,
                     lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
                 ), 400
@@ -862,6 +882,9 @@ def application_edit(id):
                 value = request.form.get(field)
                 if value is not None and hasattr(app, field):
                     setattr(app, field, sanitize_html(value))
+
+            if "competitive_advantage" in request.form:
+                app.competitive_advantage = request.form.get("competitive_advantage") == "yes"
 
             cost_fields = {}
             cost_field_names = [
@@ -943,6 +966,7 @@ def application_edit(id):
             lifecycle_stage_choices=APPLICATION_LIFECYCLE_STAGES,
             lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
             application_owners=application_owners,
+            abacus_connected=_abacus_connected(org_id),
         )
 
     except HTTPException:
