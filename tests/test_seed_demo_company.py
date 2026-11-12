@@ -130,7 +130,15 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
     assert counts["relationships"] > 150
     assert counts["applications"] == 20
     assert counts["capabilities"] == 24
-    assert counts["risks"] == 10
+    # The register holds the ten portfolio risks (linked to an element) and the
+    # twelve risks of the demonstration solutions (linked to their solution).
+    from app.models.risk import Risk
+    portfolio_risks = Risk.query.filter_by(organization_id=org_id, solution_id=None).count()
+    solution_risks = Risk.query.filter(
+        Risk.organization_id == org_id, Risk.solution_id.isnot(None)).count()
+    assert portfolio_risks == 10
+    assert solution_risks == 12
+    assert counts["risks"] == portfolio_risks + solution_risks
     assert counts["programmes"] == 5
     assert counts["work_packages"] == 12
     # Every seeded work package must carry the organisation so it is visible
@@ -621,14 +629,30 @@ def test_all_application_owners_reference_existing_users_and_apps(app, db_sessio
     user_ids = {
         u.id for u in User.query.filter_by(organization_id=org_id).all()
     }
+    from app.services.element_ownership_service import _ELEMENTS
+
     owners = ApplicationOwner.query.filter_by(organization_id=org_id).all()
+    assert owners
     for ao in owners:
-        assert ao.application_id in app_ids, (
-            f"owner {ao.id} references unknown app {ao.application_id}"
-        )
+        if ao.element_type is None:
+            # An application owner: it points at an application of this organisation.
+            assert ao.application_id in app_ids, (
+                f"owner {ao.id} references unknown app {ao.application_id}"
+            )
+        else:
+            # An owner of another kind of element: it points at a record of that
+            # kind in this organisation, and carries no application.
+            assert ao.application_id is None, f"owner {ao.id} carries an application"
+            assert ao.element_type in _ELEMENTS, f"owner {ao.id} has unknown kind {ao.element_type}"
+            assert _ELEMENTS[ao.element_type][0](ao.element_id, org_id) is not None, (
+                f"owner {ao.id} references unknown {ao.element_type} {ao.element_id}"
+            )
         assert ao.user_id in user_ids, (
             f"owner {ao.id} references unknown user {ao.user_id}"
         )
+    # No row is stored as an application owner without an application.
+    assert ApplicationOwner.query.filter_by(
+        organization_id=org_id, element_type=None, application_id=None).count() == 0
 
 
 def test_capabilities_have_maturity_levels(app, db_session, make_org):
