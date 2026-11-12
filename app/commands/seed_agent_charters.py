@@ -33,6 +33,14 @@ ALL_WRITE_TOOLS = sorted([
     "upsert_license", "poll_infrastructure",
 ])
 
+# The changes a technical founder alone in a workspace makes to keep their own model current.
+# The server's role check still decides who may apply any of them.
+FOUNDER_CHANGE_TOOLS = sorted([
+    "update_application_status", "bulk_update_application_status", "create_archimate_element",
+    "create_archimate_relationship", "create_solution", "link_capability_to_solution",
+    "record_capability_maturity", "score_rationalization",
+])
+
 SOLUTION_DESIGN_TOOLS = sorted([
     "create_solution", "create_archimate_element", "run_inference_engine",
     "create_archimate_relationship", "create_driver", "create_goal",
@@ -101,9 +109,10 @@ _CHARTER_BOUNDS = {
     ),
     "cto_founder": (
         "Technical founder's view — what breaks, who owns it, what it costs, what to fix first.",
-        ["application", "capability", "risk"],
-        [],
-        ALL_WRITE_TOOLS,
+        ["application", "capability", "risk", "solution", "archimate_element"],
+        FOUNDER_CHANGE_TOOLS,
+        # Only what needs a board or another person stays forbidden (submitting to the ARB).
+        sorted(set(ALL_WRITE_TOOLS) - set(FOUNDER_CHANGE_TOOLS)),
     ),
     "procurement": (
         "Commercial steward — contracts, licences, spend legible and governed.",

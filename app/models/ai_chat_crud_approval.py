@@ -126,6 +126,21 @@ class AIChatCRUDApproval(TenantMixin, db.Model):
     # different user than the requester, and the charter must still apply.
     persona = db.Column(db.String(80), nullable=True)
 
+    # The review the server runs before a change is applied (see
+    # app/modules/ai_chat/services/change_review.py). Every column is nullable:
+    # a row written before the review existed carries none of it.
+    # "provider/model" of the model that drafted the change; NULL when a rule or a form drafted it.
+    drafter_model = db.Column(db.String(160), nullable=True)
+    # "provider/model" of the model that reviewed it.
+    reviewer_model = db.Column(db.String(160), nullable=True)
+    review_rounds = db.Column(db.Integer, nullable=True)
+    # The checks that ran and, for each round, the reviewer's result per criterion with its reason.
+    review_reasons = db.Column(db.JSON, nullable=True)
+    # The version of the written rubric the reviewer judged against.
+    rubric_version = db.Column(db.String(20), nullable=True)
+    # The fields the change writes, as they were just before it was applied (used to undo it).
+    before_snapshot = db.Column(db.JSON, nullable=True)
+
     def to_dict(self):
         """Convert approval record to dictionary."""
         return {
@@ -148,6 +163,11 @@ class AIChatCRUDApproval(TenantMixin, db.Model):
             "chat_session_id": self.chat_session_id,
             "agent_turn_id": self.agent_turn_id,
             "persona": self.persona,
+            "drafter_model": self.drafter_model,
+            "reviewer_model": self.reviewer_model,
+            "review_rounds": self.review_rounds,
+            "review_reasons": self.review_reasons,
+            "rubric_version": self.rubric_version,
         }
 
     def approve(self, user_id):
@@ -269,7 +289,8 @@ class AIChatApprovalAuditLog(db.Model):
     )
     from_status = db.Column(db.String(20), nullable=True)
     to_status = db.Column(db.String(20), nullable=False)
-    event = db.Column(db.String(30), nullable=False)  # created|approved|rejected|expired|executed|execution_refused
+    # created|checked|reviewed|revised|applied|declined|approved|rejected|expired|executed|execution_refused
+    event = db.Column(db.String(30), nullable=False)
     actor_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     actor_type = db.Column(db.String(20), nullable=False, default="user")  # user|system
     reason = db.Column(db.Text, nullable=True)
