@@ -268,16 +268,12 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                         <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Priority</dt><dd class="font-medium" data-testid="phone-priority" x-text="cap.priority_level"></dd></div>
                                         <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Investment</dt><dd class="font-medium" data-testid="phone-investment" x-text="cap.investment_need.cost_hidden ? 'Restricted to roles with budget authority' : (cap.investment_need.estimated_cost === null ? 'Not estimated' : '{{ shown_symbol }}' + (cap.investment_need.estimated_cost / 1000).toFixed(1) + 'k ' + (cap.investment_need.source ? 'from ' + cap.investment_need.source : ''))"></dd></div>
                                     </dl>
-                                    
                                     <div class="mt-3 flex flex-wrap gap-2" data-testid="cell-actions">
                                         {% if not costs_hidden %}{% call ui.button(variant='outline', size='sm', attrs={'type': 'button', '@click': "$dispatch('open-roi-calculator', normalizeCapability(cap))", 'title': 'Calculate ROI', 'aria-label': 'Calculate ROI'}) %}{{ lucide('calculator') }}Calculate ROI{% endcall %}{% endif %}
                                         {% call ui.button(variant='outline', size='sm', attrs={'type': 'button', '@click': "$dispatch('open-arb-submission-modal', normalizeCapability(cap))", 'title': 'Submit to Architecture Review Board', 'aria-label': 'Submit to ARB'}) %}{{ lucide('shield-check') }}Submit to ARB{% endcall %}
                                     </div>
                                     <div class="mt-2 font-normal" x-data="{ open: false }">
-                                        <button type="button" class="text-xs font-medium text-primary underline md:hidden" data-testid="evidence-toggle"
-                                            @click="open = !open" :aria-expanded="open ? 'true' : 'false'">
-                                            <span x-text="open ? 'Hide evidence' : 'Show evidence'"></span>
-                                        </button>
+                                        {% call ui.button(variant='link', size='sm', class='md:hidden', attrs={'type': 'button', 'data-testid': 'evidence-toggle', '@click': 'open = !open', ':aria-expanded': "open ? 'true' : 'false'"}) %}<span x-text="open ? 'Hide evidence' : 'Show evidence'"></span>{% endcall %}
                                         <p class="mt-2 text-xs font-normal text-muted-foreground" :class="open ? 'block' : 'hidden md:block'" data-testid="capability-recommendation" x-text="cap.recommendation"></p>
                                         <div :class="open ? 'block' : 'hidden md:block'" x-html="cap.footer_html" data-testid="capability-footer"></div>
                                     </div>
