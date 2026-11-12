@@ -12,8 +12,11 @@ Features:
 - Migration support
 """
 
-from flask import Blueprint, current_app, jsonify, render_template, request
-from app.middleware.tenant_decorators import platform_admin_required
+from functools import wraps
+
+from flask import Blueprint, abort, current_app, jsonify, render_template, request
+from flask_login import current_user, login_required
+from app.middleware.tenant_decorators import is_platform_admin, platform_admin_required
 
 from app import db
 from app.models.framework_configuration import (
@@ -35,13 +38,41 @@ framework_config_ui_bp = Blueprint(
 )
 
 
+def org_admin_or_platform_admin_required(view):
+    """Platform administrators, and the administrator of the caller's own
+    organisation (the same ``is_org_admin`` check every page uses). Anyone else
+    gets 403."""
+
+    @wraps(view)
+    @login_required
+    def decorated(*args, **kwargs):
+        if not (is_platform_admin(current_user) or current_user.is_org_admin):
+            abort(403)
+        return view(*args, **kwargs)
+
+    return decorated
+
+
+def _own_configurations():
+    """The configurations that belong to the caller's organisation, newest first.
+    Shared (platform-wide) rows and other organisations' rows are not included."""
+    return CapabilityFrameworkConfiguration.query.filter(
+        CapabilityFrameworkConfiguration.organization_id == current_user.organization_id
+    ).order_by(CapabilityFrameworkConfiguration.created_at.desc())
+
+
 @framework_config_ui_bp.route("/")
-@platform_admin_required
+@org_admin_or_platform_admin_required
 def framework_config_dashboard():
-    """Framework configuration dashboard"""
+    """Framework configuration dashboard.
+
+    A platform administrator sees every configuration. An organisation
+    administrator sees their own organisation's, and the shared catalogue
+    read-only: changing the catalogue changes every organisation's, so it stays
+    with the platform administrator and the page says so.
+    """
     try:
-        # Get active configuration
-        active_config = FrameworkConfigurationService.get_active_configuration()
+        platform_view = is_platform_admin(current_user)
 
         # Get available templates
         templates = FrameworkConfigurationTemplate.query.filter_by(
@@ -51,14 +82,20 @@ def framework_config_dashboard():
         # Get available extensions
         extensions = FrameworkExtension.query.filter_by(status="active").all()
 
-        # Get recent configurations
-        recent_configs = (
-            CapabilityFrameworkConfiguration.query.order_by(
-                CapabilityFrameworkConfiguration.created_at.desc()
+        if platform_view:
+            # Get active configuration
+            active_config = FrameworkConfigurationService.get_active_configuration()
+            # Get recent configurations
+            recent_configs = (
+                CapabilityFrameworkConfiguration.query.order_by(
+                    CapabilityFrameworkConfiguration.created_at.desc()
+                )
+                .limit(10)
+                .all()
             )
-            .limit(10)
-            .all()
-        )
+        else:
+            active_config = _own_configurations().filter_by(status="active").first()
+            recent_configs = _own_configurations().limit(10).all()
 
         return render_template(
             "framework_config/dashboard.html",
@@ -66,6 +103,7 @@ def framework_config_dashboard():
             templates=templates,
             extensions=extensions,
             recent_configs=recent_configs,
+            platform_view=platform_view,
         )
 
     except Exception as e:
@@ -86,11 +124,19 @@ def new_configuration():
 
 
 @framework_config_ui_bp.route("/configuration/<int:config_id>")
-@platform_admin_required
+@org_admin_or_platform_admin_required
 def view_configuration(config_id):
     """View framework configuration details"""
     try:
         configuration = FrameworkConfigurationService.get_configuration_by_id(config_id)
+
+        # An organisation administrator reads only their own organisation's
+        # configurations; another organisation's, and the shared ones, read as
+        # not found.
+        if configuration and not is_platform_admin(current_user) and (
+            configuration.organization_id != current_user.organization_id
+        ):
+            configuration = None
 
         if not configuration:
             return render_template("framework_config/not_found.html"), 404
@@ -115,6 +161,7 @@ def view_configuration(config_id):
             validation_result=validation_result,
             instances=instances,
             enabled_extensions=extension_details,
+            platform_view=is_platform_admin(current_user),
         )
 
     except Exception as e:
