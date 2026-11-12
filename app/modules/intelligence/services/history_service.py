@@ -42,6 +42,7 @@ AUDITED_TABLES = {
     "unified_capabilities": "Capability",
     "business_capability": "Business capability",
     "solution": "Solution",
+    "risk_entity_links": "Risk mapping",
 }
 #: Audit tables whose rows hold no name of their own but point at the application they concern.
 _APPLICATION_RECORDS = ("application_owners", "application_ownership")

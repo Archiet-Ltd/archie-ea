@@ -40,6 +40,8 @@ _CONTROLLED_MODELS = [
     ("app.models.enterprise_intelligence", "ApplicationOwnership", "application_ownership"),
     ("app.models.unified_capability", "UnifiedCapability", "unified_capabilities"),
     ("app.models.business_capabilities", "BusinessCapability", "business_capability"),
+    # A risk mapped to an application, solution, programme or capability.
+    ("app.models.risk_entity_link", "RiskEntityLink", "risk_entity_links"),
 ]
 
 #: The table labels this listener fires for -- the true boundary for anything that
@@ -108,10 +110,39 @@ def _json_safe(value):
     return str(value)
 
 
+#: Where the name of each thing a risk can be mapped to is kept.
+_MAPPED_NAME_TABLES = {
+    "application": "application_components",
+    "solution": "solutions",
+    "programme": "strategic_initiatives",
+    "capability": "business_capability",
+}
+
+
+def _risk_mapping_label(connection, target):
+    """"<risk> mapped to <name>" for a risk mapping, from the two rows' own keys."""
+    from sqlalchemy import text
+
+    table = _MAPPED_NAME_TABLES.get(target.entity_type)
+    risk = connection.execute(
+        text("SELECT title FROM risks WHERE id = :id"),  # tenancy-ok: title of the risk being mapped, read by its own key
+        {"id": target.risk_id},
+    ).scalar()
+    name = None
+    if table:
+        name = connection.execute(
+            text("SELECT name FROM %s WHERE id = :id" % table),  # tenancy-ok: name of the record being mapped to, read by its own key
+            {"id": target.entity_id},
+        ).scalar()
+    return "%s mapped to %s" % (risk or "A risk", name or "%s %s" % (target.entity_type, target.entity_id))
+
+
 def _label_of(connection, target):
     """What a person calls the changed record: its name, or for a relationship its two ends."""
     if target is None:
         return None
+    if getattr(target, "__tablename__", None) == "risk_entity_links":
+        return _risk_mapping_label(connection, target)
     for attr in ("name", "title"):
         label = getattr(target, attr, None)
         if label:
