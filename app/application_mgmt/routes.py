@@ -2389,6 +2389,15 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         skip_ids=unpromoted_import_ids(app_obj.organization_id, [app_obj.id]),
     ).get(app_obj.id)
 
+    # The one cost rule decides here; the page only prints what it is given.
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+    costs_withheld = not costs_visible(current_user)
+    if costs_withheld:
+        cost_breakdown = withhold_costs(cost_breakdown, keys=tuple(cost_breakdown))
+        technology_cost_shares = withhold_costs(
+            technology_cost_shares, keys=("total", "share", "currency"))
+
     technology_linked_count = 0
     completeness_notes = {}
     from app.services.application_fact_sheet import completeness_steps, detail_tab
@@ -2519,6 +2528,8 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         dependencies_downstream=[],
         dependency_graph_data={},
         cost_breakdown=cost_breakdown,
+        costs_withheld=costs_withheld,
+        costs_withheld_sentence=COSTS_WITHHELD,
         health_metrics=health_metrics,
         quality_metrics=quality_metrics,
         integration_mappings=[],

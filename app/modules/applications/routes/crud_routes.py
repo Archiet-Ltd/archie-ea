@@ -490,6 +490,12 @@ def application_fact_sheet(id):
 
     app_obj = _verify_app_in_org(id, g.current_org_id, raise_not_found=True)
     sheet = build_fact_sheet(app_obj)
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible  # noqa: PLC0415
+
+    sheet["costs_withheld"] = not costs_visible(current_user)
+    if sheet["costs_withheld"]:
+        sheet.update(annual_cost_formatted=None, license_cost_formatted=None, risk_losses={},
+                     costs_withheld_sentence=COSTS_WITHHELD)
     return render_template("applications/fact_sheet.html", **sheet)
 
 
