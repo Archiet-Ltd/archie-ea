@@ -168,9 +168,38 @@ class ConversationHistoryService:
             self.add_message(thread_id, "user", initial_message, model=None)
 
         # Invalidate cache
-        invalidate_cache("threads:user:*")
+        self._forget_thread_list(user_id, organization_id)
 
         return thread
+
+    @staticmethod
+    def _forget_thread_list(user_id, organization_id):
+        """Drop the cached thread list of this person in this organisation only.
+
+        The list is cached under a key that carries the user id (after the service
+        object) and the organisation id, so other people's and other organisations'
+        lists stay cached. Lists read without an organisation (the search's, limit 1000)
+        are dropped too, as they may hold this thread."""
+        if user_id is None:
+            return
+        base = f"threads:user:get_user_threads:*_{user_id}:"
+        if organization_id is not None:
+            invalidate_cache(f"{base}*organization_id={organization_id}")
+        invalidate_cache(f"{base}limit=1000")
+
+    @staticmethod
+    def _thread_owner(thread_id):
+        """(user id, organisation id) the thread belongs to, or None when it is not found."""
+        row = db.session.execute(  # tenant-filtered: scoped via parent FK (thread_id)
+            text("SELECT user_id, organization_id FROM conversation_threads WHERE id = :thread_id"),
+            {"thread_id": thread_id},
+        ).first()
+        return (row[0], row[1]) if row else None
+
+    def _forget_thread_list_of(self, thread_id):
+        owner = self._thread_owner(thread_id)
+        if owner:
+            self._forget_thread_list(*owner)
 
     def add_message(
         self,
@@ -251,8 +280,10 @@ class ConversationHistoryService:
             except Exception as e:
                 print(f"Warning: Vector indexing failed: {e}")
 
-        # Invalidate cache
+        # Invalidate caches: the thread's messages, and the person's thread list, which
+        # carries this thread's message count.
         invalidate_cache(f"thread:messages:*{thread_id}*")
+        self._forget_thread_list_of(thread_id)
 
         return ConversationMessage(
             id=message_id,
@@ -441,6 +472,7 @@ class ConversationHistoryService:
             except Exception as e:
                 print(f"Warning: Vector deletion failed: {e}")
 
+        owner = self._thread_owner(thread_id)
         # Delete from database
         db.session.execute(  # tenant-filtered: scoped via parent FK (thread_id)
             text("DELETE FROM conversation_messages WHERE thread_id = :thread_id"),
@@ -453,7 +485,8 @@ class ConversationHistoryService:
 
         # Invalidate cache
         invalidate_cache(f"thread:messages:*{thread_id}*")
-        invalidate_cache("threads:user:*")
+        if owner:
+            self._forget_thread_list(*owner)
 
     def update_thread_title(self, thread_id: str, title: str):
         """Update thread title."""
@@ -469,7 +502,7 @@ class ConversationHistoryService:
         )
         db.session.commit()
 
-        invalidate_cache("threads:user:*")
+        self._forget_thread_list_of(thread_id)
 
 
 # =====================================================================

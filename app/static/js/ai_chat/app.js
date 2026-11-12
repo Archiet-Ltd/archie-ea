@@ -54,7 +54,7 @@
             say('Working them out…');
             try {
                 await ArchieChat.transport.recomputeConnections();
-                const again = await ArchieChat.transport.askEstate(holder.getAttribute('data-question') || '', { remember: false, elementId: Number(holder.getAttribute('data-element-id')) || undefined });
+                const again = await ArchieChat.transport.askEstate(holder.getAttribute('data-question') || '', { remember: false, part: holder.getAttribute('data-part'), elementId: Number(holder.getAttribute('data-element-id')) || undefined });
                 if (again.found && window.DOMPurify) {
                     const fresh = document.createElement('div');
                     fresh.innerHTML = ArchieChat.render.sanitiseAnswerHtml(again.html);
@@ -427,10 +427,9 @@
                 // The answer is kept in the conversation like any other: remember the
                 // thread it went to and refresh the history rail.
                 if (estate.thread_id) {
-                    const _wasNew = estate.thread_id !== window.__threadId;
                     window.__threadId = estate.thread_id;
                     try { sessionStorage.setItem('archie_chat_thread_id', estate.thread_id); } catch (e) { /* swallow-ok: private-browsing storage denial; the server-saved thread and current page still work, only reload restoration is unavailable */ }
-                    if (_wasNew && window.loadSessionList) window.loadSessionList();
+                    if (window.loadSessionList) window.loadSessionList();
                 }
                 { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
                 appendAnswerCards(estate.html);
@@ -512,10 +511,9 @@
             // Remember the conversation this turn was saved to, and refresh the
             // history rail so a brand-new chat appears immediately.
             if (data.thread_id) {
-                const _wasNew = data.thread_id !== window.__threadId;
                 window.__threadId = data.thread_id;
                 try { sessionStorage.setItem('archie_chat_thread_id', data.thread_id); } catch (e) { /* swallow-ok: private-browsing storage denial; the server-saved thread and current page still work, only reload restoration is unavailable */ }
-                if (_wasNew && window.loadSessionList) window.loadSessionList();
+                if (window.loadSessionList) window.loadSessionList();
             }
             const endTime = performance.now();
             const processingTime = Math.round(endTime - startTime);
