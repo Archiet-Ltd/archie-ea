@@ -4348,6 +4348,8 @@ function composerApp() {
 
         miniMapPointerDown: function(e) {
             if (!this._mmTransform || !this.paper) return;
+            /* Only a press on the map itself moves the drawing; the header and its show/hide button do not. */
+            if (!e.target || e.target.id !== 'minimap-canvas') return;
             this._miniMapDragging = true;
             this._miniMapPanTo(e);
         },

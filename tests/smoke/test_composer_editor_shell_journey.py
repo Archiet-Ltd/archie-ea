@@ -105,14 +105,16 @@ def _free_spot(page):
 
 
 def _counts_text(elements, links):
-    return "%d %s, %d %s" % (elements, "element" if elements == 1 else "elements", links, "relationship" if links == 1 else "relationships")
+    # A focus view draws part of the model, so its status line says "shown" after each count.
+    return re.compile("^%d %s( shown)?, %d %s( shown)?$" % (
+        elements, "element" if elements == 1 else "elements", links, "relationship" if links == 1 else "relationships"))
 
 
 def _status_counts(page):
     text = page.get_by_test_id("status-counts").inner_text()
-    m = re.match(r"(\d+) elements?, (\d+) relationships?", text)
+    m = re.match(r"(\d+) elements?( shown)?, (\d+) relationships?( shown)?$", text)
     assert m, text
-    return int(m.group(1)), int(m.group(2))
+    return int(m.group(1)), int(m.group(3))
 
 
 @pytest.fixture(scope="module")
@@ -248,6 +250,17 @@ def test_architect_finds_adds_connects_edits_undoes_exports_and_deletes(browser,
         expect(page.locator("[data-testid='finder-list']")).to_contain_text(process_name)
 
         # CONNECT: with the Connect tool, let the gateway application serve the new process.
+        # A focus view opens with names large enough to read, so the drawing is wider than the canvas: Fit
+        # brings both elements into view before they are clicked, as a person would.
+        page.get_by_test_id("zoom-fit").click()
+        page.wait_for_timeout(400)
+        # The overview sits over the bottom-left corner; a person closes it to reach what it covers.
+        # Hiding it leaves the drawing where Fit put it.
+        if page.get_by_test_id("diagram-minimap").locator("canvas").is_visible():
+            placed = page.evaluate("(sel) => { const t = Alpine.$data(document.querySelector(sel)).paper.translate(); return [t.tx, t.ty]; }", APP)
+            page.get_by_role("button", name="Show or hide the overview").click()
+            expect(page.get_by_test_id("diagram-minimap").locator("canvas")).to_be_hidden()
+            assert page.evaluate("(sel) => { const t = Alpine.$data(document.querySelector(sel)).paper.translate(); return [t.tx, t.ty]; }", APP) == placed
         page.get_by_test_id("tool-connect").click()
         expect(page.get_by_test_id("tool-connect")).to_have_attribute("aria-pressed", "true")
         page.locator("g.joint-element", has_text=names["gateway"]).first.click()
@@ -261,8 +274,8 @@ def test_architect_finds_adds_connects_edits_undoes_exports_and_deletes(browser,
         assert connected["links"] == before["links"] + 1
         expect(page.get_by_test_id("status-counts")).to_have_text(_counts_text(connected["elements"], connected["links"]))
         # The legend names every relationship type the diagram draws, and nothing else.
-        expect(page.locator("[data-testid^='legend-']:not([data-testid='legend-empty'])")).to_have_count(len(connected["relTypes"]))
-        legend = page.locator("[data-testid^='legend-']:not([data-testid='legend-empty'])").evaluate_all(
+        expect(page.locator("[data-testid^='legend-']:not([data-testid='legend-empty']):not([data-testid='legend-overview'])")).to_have_count(len(connected["relTypes"]))
+        legend = page.locator("[data-testid^='legend-']:not([data-testid='legend-empty']):not([data-testid='legend-overview'])").evaluate_all(
             "els => els.map(e => e.getAttribute('data-testid').replace('legend-', ''))")
         assert sorted(legend) == connected["relTypes"] and "serving" in legend
         expect(page.get_by_test_id("legend-serving")).to_contain_text("Serving")

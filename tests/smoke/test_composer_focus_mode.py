@@ -2,10 +2,12 @@
 
 The page opens an element's impact neighbourhood as an unsaved view. The canvas must hold
 exactly what the impact endpoint answers for the same parameters, the centre must be selected
-with neighbour focus applied, worked-out links must be drawn as worked out (and recorded links
+and marked with nothing dimmed, worked-out links must be drawn as worked out (and recorded links
 must not), and the banner must offer Save as diagram and Discard. A failed fetch must never
 look like a view.
 """
+import re
+
 import pytest
 from playwright.sync_api import expect
 
@@ -113,10 +115,16 @@ def test_canvas_matches_the_impact_answer(browser, live_server, seeded, graph):
         assert canvas["linkKeys"] == answer["keys"]
         assert canvas["nodeIds"] == answer["ids"]
         assert str(centre) in canvas["nodeIds"]
-        # The centre is selected and neighbour focus is applied.
+        # The centre is selected and marked as the element the view is about. The whole neighbourhood is the
+        # subject, so nothing in it is dimmed.
         assert canvas["selected"] == [str(centre)]
-        assert canvas["focused"] is True
-        assert page.locator("g.highlighted").count() > 0
+        seed = page.locator("g.joint-element[data-focus-seed='true']")
+        expect(seed).to_have_count(1)
+        assert seed.get_attribute("model-id") == page.evaluate(
+            "(sel) => Alpine.$data(document.querySelector(sel))._selectedCells[0].id", APP)
+        expect(seed).to_have_class(re.compile(r"\bselected\b"))
+        assert canvas["focused"] is False
+        assert page.locator("#composer-canvas .dimmed").count() == 0
         # Worked-out links are marked and badged; recorded links are not.
         derived = page.locator('[data-kind="derived"]')
         recorded = page.locator('[data-kind="recorded"]')
