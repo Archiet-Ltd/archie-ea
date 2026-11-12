@@ -23,6 +23,7 @@ The typed text is matched literally: percent, underscore and backslash are escap
 Two people use this page: the solution architect and the enterprise architect fixtures.
 """
 
+import os
 import uuid
 from urllib.parse import parse_qs, urlparse
 
@@ -182,9 +183,9 @@ def bulk_data(seeded):
         db.session.commit()
 
 
-def _open(browser, live_server, seeded, persona, size=(1440, 900), history=None):
+def _open(browser, live_server, seeded, persona, size=(1440, 900), history=None, scheme="light"):
     """A signed-in page on Impact Analysis, ready. history: None = real, or a JSON body to answer with."""
-    ctx = browser.new_context(viewport={"width": size[0], "height": size[1]})
+    ctx = browser.new_context(viewport={"width": size[0], "height": size[1]}, color_scheme=scheme)
     ctx.set_default_timeout(PAGE_TIMEOUT)
     ctx.set_default_navigation_timeout(PAGE_TIMEOUT)
     page = ctx.new_page()
@@ -704,5 +705,71 @@ def test_the_analysis_request_carries_the_fields_it_always_carried(browser, live
         _analyze(page).click()
         _wait_for(page, lambda: len(posted) == 2, "the second analysis request")
         assert posted[1]["element_type"] == "Application" and posted[1]["element_id"] == posted[0]["element_id"]
+    finally:
+        ctx.close()
+
+
+@pytest.fixture(scope="module")
+def spelled_element(seeded):
+    """An element named with the American spelling, removed again afterwards."""
+    from app import create_app, db
+
+    app = create_app("testing")
+    tag = "Spell%s" % uuid.uuid4().hex[:6]
+    with app.app_context():
+        from app.models.archimate_core import ArchiMateElement
+
+        row = ArchiMateElement(
+            name="Organization %s register" % tag, type="application_component", layer="application",
+            organization_id=seeded["ids"]["org"],
+        )
+        db.session.add(row)
+        db.session.commit()
+        element_id = row.id
+    yield {"id": element_id, "name": "Organization %s register" % tag, "typed": "Organisation %s" % tag, "tag": tag}
+    with app.app_context():
+        from app.models.archimate_core import ArchiMateElement
+
+        ArchiMateElement.query.filter_by(id=element_id).delete(synchronize_session=False)
+        db.session.commit()
+
+
+def _picture(page, name):
+    """Evidence for the report, written only when JOURNEY_SHOT_DIR names a folder."""
+    folder = os.environ.get("JOURNEY_SHOT_DIR")
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+        page.screenshot(path=os.path.join(folder, name + ".png"), full_page=True)
+
+
+@pytest.mark.parametrize("size,scheme", [((1440, 900), "light"), ((390, 844), "dark")])
+def test_a_name_the_global_search_finds_is_offered_by_the_picker_and_opens_the_same_element(
+    browser, live_server, seeded, spelled_element, size, scheme
+):
+    ctx, page = _open(browser, live_server, seeded, "solution_architect", size=size, scheme=scheme)
+    try:
+        typed = spelled_element["typed"]
+
+        # The global search, asked the way its box asks, finds the element and links to its page.
+        found = page.evaluate(
+            "async (q) => (await (await fetch('/api/sidebar/search?q=' + encodeURIComponent(q))).json()).results", typed
+        )
+        hits = [r for r in found if r["id"] == spelled_element["id"] and "/element/" in r["url"]]
+        assert hits and hits[0]["name"] == spelled_element["name"], found
+
+        # The same text in the picker offers that same element.
+        page.fill(SEARCH, typed)
+        row = page.locator(ROWS).filter(has_text=spelled_element["name"])
+        expect(row).to_have_count(1)
+        assert "Application Layer" in row.inner_text()
+        _picture(page, "picker-%d-%s" % (size[0], scheme))
+
+        # Choosing it runs the analysis for it, and the global search's link lands on its page.
+        row.click()
+        expect(_analyze(page)).to_be_enabled()
+        _analyze(page).click()
+        expect(page.get_by_text("Impact of Minor Modification on " + spelled_element["name"])).to_be_visible()
+        page.goto(live_server + hits[0]["url"], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text(spelled_element["name"]).locator("visible=true").first).to_be_visible()
     finally:
         ctx.close()
