@@ -73,7 +73,7 @@ def test_an_owner_who_shares_a_name_does_not_block_the_next_save(world, client, 
     org = world["org_a"]
     pick = _user(db_session, org, "samone", first="Sam", last="Same")
     _user(db_session, org, "samtwo", first="Sam", last="Same")
-    _user(db_session, world["org_b"], "samother", first="Sam", last="Same")
+    outsider = _user(db_session, world["org_b"], "samother", first="Sam", last="Same")
     app_a = _application(db_session, org, f"Ledger {world['tag']}", description="Old description")
     login_as(client, world["editor"])
 
@@ -107,7 +107,11 @@ def test_an_owner_who_shares_a_name_does_not_block_the_next_save(world, client, 
     html = client.get(f"/applications/{other.id}?edit=1&tab=overview").get_data(as_text=True)
     refused = client.post(_form_action(html), data={
         "name": other.name, "businessOwner": "Sam Same", "csrf_token": _csrf(html)})
-    assert refused.status_code == 422 and "matches more than one person" in refused.get_data(as_text=True)
+    refusal = refused.get_data(as_text=True)
+    assert refused.status_code == 422 and "matches more than one person" in refusal
+    assert "2 people in this organisation" in refusal, "only the asker's organisation is counted"
+    assert pick.email in refusal
+    assert outsider.email not in refusal, "another organisation's person is never offered"
 
 
 # -- a chat change names one exact application ---------------------------------------
