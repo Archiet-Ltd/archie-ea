@@ -12,7 +12,7 @@ import uuid
 import pytest
 
 from tests.test_change_review import FakeReviewer, PASS_ALL, _application, _row, _user
-from tests.test_change_review_gaps import _backdate, _waiting_change
+from tests.test_change_review_gaps import _ask_for_status, _backdate, _waiting_change
 
 
 def _count_calls(monkeypatch):
@@ -134,10 +134,22 @@ def test_a_call_that_would_take_the_month_past_its_ceiling_is_not_sent(db_sessio
     assert len(calls) == 1
 
 
-def test_a_run_stops_at_the_call_cap_and_the_cap_is_a_small_share_of_the_month(monkeypatch):
+def test_a_run_stops_at_the_call_cap_and_the_cap_is_a_small_share_of_the_month(
+    db_session, make_org, tenant_ctx, monkeypatch
+):
     from app.modules.ai_chat.services import change_review as review
     from app.modules.ai_chat.services import llm_model_router as router
     from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+    # The prompt of a normal change (a one-field status change), as the review builds it for a real record.
+    org = make_org("budget-cap")
+    user = _user(db_session, org.id)
+    app_obj = _application(db_session, org.id, "Cap %s" % uuid.uuid4().hex[:6], "development")
+    reviewer = FakeReviewer([PASS_ALL]).install(monkeypatch)
+    with tenant_ctx(org.id):
+        _ask_for_status(user, app_obj.name, "production")
+    (_ref, real_prompt), = reviewer.review_prompts
+    prompt_tokens = len(real_prompt) // 4 + 1  # the same count _month_has_room uses
 
     calls = []
     monkeypatch.setattr(router.LLMModelRouter, "call_model",
@@ -154,7 +166,7 @@ def test_a_run_stops_at_the_call_cap_and_the_cap_is_a_small_share_of_the_month(m
     # One call at its dearest (the model's reply at full length, at the dearest price) times the cap stays
     # within one per cent of the USD 62 monthly ceiling.
     price_in, price_out = LLMService.price_per_mtok("deepseek", "deepseek-v4-pro")
-    dearest_call = 1018 * price_in / 1e6 + review.MAX_REPLY_TOKENS * price_out / 1e6
+    dearest_call = prompt_tokens * price_in / 1e6 + review.MAX_REPLY_TOKENS * price_out / 1e6
     assert dearest_call == pytest.approx(0.0338, abs=0.0001)
     assert review.CALLS_PER_RUN * dearest_call <= 0.01 * 62
 
@@ -206,3 +218,33 @@ def test_a_vendor_another_workspace_named_is_not_found_by_this_workspaces_review
     db.session.expire_all()
     assert VendorOrganization.query.filter_by(id=their_vendor.id).one().website == "https://old.example.com"
     assert reviewer.review_prompts == []
+
+
+def test_a_vendor_from_the_platform_list_is_read_by_the_review_of_every_workspace(
+    db_session, make_org, tenant_ctx, monkeypatch
+):
+    from app import db
+    from app.models.vendor.vendor_organization import VendorOrganization
+    from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
+
+    first = make_org("platform-vendor-a")
+    second = make_org("platform-vendor-b")
+    users = {first.id: _user(db_session, first.id), second.id: _user(db_session, second.id)}
+    platform_vendor = VendorOrganization(name="Platform %s" % uuid.uuid4().hex[:8],
+                                         website="https://old.example.com", named_by_organization_id=None)
+    db.session.add(platform_vendor)
+    db.session.flush()
+    reviewer = FakeReviewer([PASS_ALL]).install(monkeypatch)
+
+    for org in (first, second):
+        with tenant_ctx(org.id):
+            verdict = create_approval_record(
+                organization_id=org.id, operation_type="update", entity_type="vendor",
+                entity_id=platform_vendor.id, summary="Change the vendor website", user_id=users[org.id].id,
+                original_command="change the website", operation_payload={"website": "https://new.example.com"},
+                settle=True).review_verdict
+        # Found (not "no longer exists"); refused only because the platform list is shared by every workspace.
+        assert verdict["state"] == "declined" and "shared by every workspace" in verdict["message"], verdict
+        assert "no longer exists" not in verdict["message"]
+    db.session.expire_all()
+    assert VendorOrganization.query.filter_by(id=platform_vendor.id).one().website == "https://old.example.com"
