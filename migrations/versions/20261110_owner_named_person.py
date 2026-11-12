@@ -9,7 +9,7 @@ while any row names a person without an account.
 Imports nothing from ``app`` except the shared schema helpers.
 
 Revision ID: 20261110_owner_named_person
-Revises: 20261109_principle_description
+Revises: 20261110_founder_charter
 Create Date: 2026-11-10
 """
 import sqlalchemy as sa
@@ -19,7 +19,7 @@ from sqlalchemy import inspect, text
 from app.commands.schema_migrations import ContractBlocked, relax_not_null, tighten_not_null
 
 revision = "20261110_owner_named_person"
-down_revision = "20261109_principle_description"
+down_revision = "20261110_founder_charter"
 branch_labels = None
 depends_on = None
 
