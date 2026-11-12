@@ -18,6 +18,8 @@ from urllib.parse import urlsplit
 
 from flask import current_app
 
+from app.services.site_registry import as_signed_out_visitor
+
 # Crawler files and assets that must always be readable.
 CRAWLER_FILES = ("/robots.txt", "/sitemap.xml", "/llms.txt", "/llms-full.txt", "/favicon.ico", "/static/css/site.css")
 # Areas that are private whatever a signed-out request to them answers: programs, administrators and API documentation.
@@ -132,6 +134,29 @@ REDIRECT_SHIMS = {
 SIGN_IN_STEPS = {"main.login_redirect", "account.mfa_challenge"}
 
 
+def refuses_visitors_when(check):
+    """Mark a view that checks sign-in inside its own body, and only while ``check()`` is true.
+
+    The mark changes nothing about the view. robots.txt reads it, so such a page is disallowed while it sends a
+    signed-out visitor to sign-in, and allowed while it shows everyone a public page."""
+
+    def mark(view):
+        view.refuses_visitors_when = check
+        return view
+
+    return mark
+
+
+def _refuses_by_condition(view) -> bool:
+    function = view
+    while function is not None:
+        check = getattr(function, "refuses_visitors_when", None)
+        if check is not None:
+            return bool(check())
+        function = getattr(function, "__wrapped__", None)
+    return False
+
+
 def _blueprint_hooks_unreadable(blueprint: str) -> bool:
     hooks = current_app.before_request_funcs.get(blueprint, [])
     return any(not f"{hook.__module__}.{hook.__qualname__}".startswith(_NEUTRAL_HOOKS) for hook in hooks)
@@ -153,6 +178,8 @@ def _is_private(rule) -> bool:
             return False
         return target.endpoint != rule.endpoint and _is_private(target)
     view = current_app.view_functions[rule.endpoint]
+    if _refuses_by_condition(view):
+        return True
     verdicts = [_wrapper_guards(wrapper) for wrapper in _wrappers(view)]
     if any(verdict is True for verdict in verdicts):
         return True
@@ -295,6 +322,14 @@ def _build_sitemap() -> str:
     )
 
 
+def _conditional_refusals() -> tuple[str, ...]:
+    """The routes that refuse a visitor only while a switch is on, as they stand now: part of what the files are built from."""
+    return tuple(sorted(
+        rule.rule for rule in current_app.url_map.iter_rules()
+        if _refuses_by_condition(current_app.view_functions[rule.endpoint])
+    ))
+
+
 def _cached(name: str, build) -> str:
     """A file built once per process and rebuilt only when what it is built from changes: a route, a content file,
     the legal-pages switch or an early-access page."""
@@ -303,12 +338,13 @@ def _cached(name: str, build) -> str:
     from app.services.public_pages import _content_fingerprint
 
     key = (len(list(current_app.url_map.iter_rules())), _content_fingerprint(), legal_pages_enabled(),
-           tuple(early_access_paths()))
+           tuple(early_access_paths()), _conditional_refusals())
     with _lock:
         store = current_app.extensions.setdefault("crawl_rules", {})
         held = store.get(name)
         if held is None or held[0] != key:
-            held = store[name] = (key, build())
+            with as_signed_out_visitor():
+                held = store[name] = (key, build())
         return held[1]
 
 

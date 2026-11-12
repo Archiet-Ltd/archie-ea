@@ -12,6 +12,7 @@ from app.release_waves import (
     EARLY_ACCESS_PREFIX, code_slug, configured_wave, entry_for, group_by_slug, has_page, is_released_rule, legacy_slug,
     moved_slug, wave_map,
 )
+from app.services.crawl_rules import refuses_visitors_when
 from app.services.rate_limiter import rate_limit
 
 early_access_bp = Blueprint("early_access", __name__)
@@ -196,6 +197,7 @@ def recommendations():
 
 
 @early_access_bp.route("/simulations")
+@refuses_visitors_when(simulations_released)
 def simulations():
     """The simulation screen once it is released, for a signed-in person; a visitor is sent to sign in.
 

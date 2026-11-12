@@ -327,3 +327,38 @@ def test_when_ready_failing_to_build_does_not_stop_the_server(monkeypatch):
         raise RuntimeError("no application")
 
     conf.when_ready(SimpleNamespace(app=SimpleNamespace(wsgi=broken), log=logging.getLogger("when_ready_test")))
+
+
+def test_a_page_that_sends_visitors_to_sign_in_only_once_released_is_disallowed_only_then(app):
+    original = app.config.get("RELEASE_WAVE")
+    try:
+        app.config["RELEASE_WAVE"] = "1"  # the simulation screen is still closed: everyone is offered the waiting list
+        closed = app.test_client().get("/robots.txt").get_data(as_text=True)
+        app.config["RELEASE_WAVE"] = "3"  # released: a visitor is sent to sign-in
+        released = app.test_client().get("/robots.txt").get_data(as_text=True)
+        app.config["RELEASE_WAVE"] = "1"
+        closed_again = app.test_client().get("/robots.txt").get_data(as_text=True)
+    finally:
+        app.config["RELEASE_WAVE"] = original
+        app.extensions.pop("crawl_rules", None)
+    assert "Disallow: /simulations$" not in closed
+    assert "Disallow: /simulations$" in released
+    assert closed_again == closed
+
+
+def test_a_new_page_that_checks_sign_in_in_its_own_body_is_covered_by_marking_it(app):
+    from flask import Flask
+
+    from app.services import crawl_rules
+
+    scratch = Flask("scratch")
+    state = {"released": False}
+    scratch.add_url_rule("/later", "later", crawl_rules.refuses_visitors_when(lambda: state["released"])(lambda: "ok"))
+    scratch.add_url_rule("/plain", "plain", lambda: "ok")
+    with scratch.app_context():
+        rules = {r.rule: r for r in scratch.url_map.iter_rules() if r.endpoint != "static"}
+        before = {path: crawl_rules._is_private(rule) for path, rule in rules.items()}
+        state["released"] = True
+        after = {path: crawl_rules._is_private(rule) for path, rule in rules.items()}
+    assert before == {"/later": False, "/plain": False}
+    assert after == {"/later": True, "/plain": False}

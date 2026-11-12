@@ -14,6 +14,8 @@ page still to be written (:func:`items_needing_own_page`).
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import functools
 import re
 from pathlib import Path
@@ -96,10 +98,27 @@ def wave_released(item: dict[str, Any]) -> bool:
     return is_released_path(path)
 
 
+_as_visitor: contextvars.ContextVar[bool] = contextvars.ContextVar("site_registry_as_visitor", default=False)
+
+
+@contextlib.contextmanager
+def as_signed_out_visitor():
+    """Read the menus, footer and pages as a signed-out visitor sees them, whoever is asking.
+
+    Files built for crawlers use this, so what they list never depends on the person whose request built them."""
+    token = _as_visitor.set(True)
+    try:
+        yield
+    finally:
+        _as_visitor.reset(token)
+
+
 def _signed_in() -> bool:
     from flask import has_request_context
     from flask_login import current_user
 
+    if _as_visitor.get():
+        return False
     return has_request_context() and bool(current_user.is_authenticated)
 
 
