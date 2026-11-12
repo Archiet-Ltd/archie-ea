@@ -3,14 +3,14 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
-{% block title %}Risk Assessment{% endblock %}
+{% block title %}Gap Risk Assessment{% endblock %}
 
 {% block breadcrumb %}
 {% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
 {{ breadcrumb_nav(items=[
     {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
     {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Risk Assessment', 'current': true}
+    {'text': 'Gap Risk Assessment', 'current': true}
 ]) }}
 {% endblock %}
 
@@ -25,28 +25,31 @@
 <div class="flex flex-col space-y-8 animate-in fade-in duration-500">
     <!-- Header -->
     {{ page_header(
-        title='Risk Assessment',
-        description='Assess and mitigate risks across the architecture portfolio.'
+        title='Gap Risk Assessment',
+        description='Every recorded gap, rated by how severe it is. These figures count gaps, not risks.'
     ) }}
+    <p class="text-sm text-muted-foreground">
+        To see the risks themselves, open the <a href="{{ url_for('risk.risk_register') }}" class="font-medium text-primary hover:underline">Risks register</a>.
+    </p>
 
     <!-- Risk Summary -->
     <div class="grid gap-4 md:grid-cols-4">
-        {{ metrics_card(title='Total Gaps', value=gaps|length|default(0), icon='target') }}
-        {{ metrics_card(title='High Risk', value=gaps|selectattr('rated_severity', 'in', ['high', 'critical'])|list|length|default(0), icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
-        {{ metrics_card(title='Medium Risk', value=gaps|selectattr('rated_severity', 'equalto', 'medium')|list|length|default(0), icon='alert-circle', icon_class='!text-warning', value_class='text-warning') }}
-        {{ metrics_card(title='Low Risk', value=gaps|selectattr('rated_severity', 'equalto', 'low')|list|length|default(0), icon='info', icon_class='!text-success', value_class='text-success') }}
+        {{ metrics_card(title='Total gaps', value=gaps|length|default(0), icon='target') }}
+        {{ metrics_card(title='Critical or high gaps', value=gaps|selectattr('rated_severity', 'in', ['high', 'critical'])|list|length|default(0), icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
+        {{ metrics_card(title='Medium gaps', value=gaps|selectattr('rated_severity', 'equalto', 'medium')|list|length|default(0), icon='alert-circle', icon_class='!text-warning', value_class='text-warning') }}
+        {{ metrics_card(title='Low gaps', value=gaps|selectattr('rated_severity', 'equalto', 'low')|list|length|default(0), icon='info', icon_class='!text-success', value_class='text-success') }}
     </div>
 
     <!-- Gaps Table -->
     <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="p-6">
-            <h3 class="font-semibold mb-4">Risk Items</h3>
+            <h3 class="font-semibold mb-4">Gaps</h3>
             <div class="overflow-x-auto">
                 <table class="dense-table w-full">
                     <thead>
                         <tr class="border-b">
                             <th class="text-left p-3 font-medium">Gap</th>
-                            <th class="text-left p-3 font-medium">Risk Level</th>
+                            <th class="text-left p-3 font-medium">Gap rating</th>
                             <th class="text-left p-3 font-medium">Status</th>
                             <th class="text-left p-3 font-medium">Owner</th>
                         </tr>
@@ -73,7 +76,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="4" class="p-6 text-center text-muted-foreground">No risk items found</td>
+                            <td colspan="4" class="p-6 text-center text-muted-foreground">No gaps recorded yet</td>
                         </tr>
                         {% endfor %}
                     </tbody>
