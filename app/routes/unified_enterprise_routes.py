@@ -1006,10 +1006,12 @@ def ai_architecture_analysis():
         total_gaps = count_gaps(current_org_id())
 
         from app.services.priority_action_service import limit_for, prioritised_actions
+        from app.services.risk_service import footers_by_risk
 
         return render_template(
             "enterprise/ai_architecture_analysis.html",
-            priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+            priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
             ai_recommendations=ai_recommendations,
             gaps_by_severity=gaps_by_severity,
             apps_needing_review=apps_needing_review,

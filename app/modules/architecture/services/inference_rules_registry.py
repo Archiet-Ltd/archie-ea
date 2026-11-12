@@ -207,17 +207,14 @@ class InferenceRulesRegistry:
             return InferredElement(
                 element_type=target_type,
                 key={"name": name},
-                defaults={
-                    "description": "Inferred from %s: %s" % (node.element_type, root_name),
-                    "subtype": result.get("subtype"),
-                },
+                defaults={"subtype": result.get("subtype")},
                 rule_name="%s_to_%s" % (node.element_type, target_type),
             )
         # Fallback: generate a generic element if no rule matched
         return InferredElement(
             element_type=target_type,
             key={"name": name},
-            defaults={"description": "Inferred from %s: %s" % (node.element_type, root_name)},
+            defaults={},
             rule_name="generic_%s_to_%s" % (node.element_type, target_type),
         )
 

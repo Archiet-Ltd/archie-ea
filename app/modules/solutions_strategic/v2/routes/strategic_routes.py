@@ -257,6 +257,7 @@ def impact_analysis():
     """Impact analysis dashboard — architecture change ripple-effect visualization."""
     from app.middleware.tenant_context import current_org_id
     from app.services.priority_action_service import limit_for, prioritised_actions
+    from app.services.risk_service import footers_by_risk
 
     return render_template(
         "strategic/impact_analysis.html",
@@ -264,7 +265,9 @@ def impact_analysis():
         scenario_list_limit=SCENARIO_LIST_LIMIT,
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
-        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
+        **_model_state(),
     )
 
 
@@ -317,10 +320,23 @@ def api_impact_analysis():
         return jsonify({"error": "An internal error occurred"}), 500
 
 
+def _model_state():
+    """Whether the caller's model has any element at all, and whether they may open the GitHub connection page."""
+    from app.middleware.tenant_context import current_org_id
+    from app.models import ArchiMateElement
+    from app.utils.role_access import may_connect_github
+
+    return {
+        "model_empty": ArchiMateElement.query.count() == 0,
+        "may_connect_github": may_connect_github(current_user, current_org_id()),
+    }
+
+
 def simulations_page():
     """The simulations page: the impact analysis screen in its "try it on a copy" form."""
     from app.middleware.tenant_context import current_org_id
     from app.services.priority_action_service import limit_for, prioritised_actions
+    from app.services.risk_service import footers_by_risk
 
     return render_template(
         "strategic/impact_analysis.html",
@@ -329,7 +345,9 @@ def simulations_page():
         scenario_list_limit=SCENARIO_LIST_LIMIT,
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
-        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
+        **_model_state(),
     )
 
 
@@ -352,6 +370,8 @@ def api_simulation():
 
         result["footer_html"] = result_footer_service.render_footer(
             result_footer_service.impact_footer(current_org_id(), result))
+        if not simulation_service.may_see_costs(current_user):
+            result = simulation_service.withhold_costs(result)
         return jsonify(result)
     except simulation_service.ElementNotInModel:
         return jsonify({"error": "That element is not in your model."}), 404
@@ -375,7 +395,16 @@ def _scenario_figures(server):
         "dependencies": list(server["direct_dependencies"]),
         "indirect_dependencies": list(server["indirect_dependencies"]),
         "financial_risk_reason": server.get("financial_risk_reason") or "",
+        "figures": [dict(f) for f in (server.get("simulation") or {}).get("figures") or []],
     }
+
+
+def _scenario_for_caller(row):
+    """A saved scenario as the caller may read it: the running costs are left out for a person the cost rule withholds from."""
+    data = row.to_dict()
+    if not simulation_service.may_see_costs(current_user):
+        data["analysis_result"] = simulation_service.withhold_costs(data["analysis_result"])
+    return data
 
 
 @strategic_bp.route("/api/scenarios", methods=["GET"])
@@ -385,7 +414,7 @@ def api_list_scenarios():
     from app.models.saved_scenario import SavedScenario
 
     rows = SavedScenario.query.order_by(SavedScenario.created_at.desc(), SavedScenario.id.desc()).limit(SCENARIO_LIST_LIMIT).all()
-    return jsonify([r.to_dict() for r in rows])
+    return jsonify([_scenario_for_caller(r) for r in rows])
 
 
 @strategic_bp.route("/api/scenarios", methods=["POST"])
@@ -420,7 +449,7 @@ def api_save_scenario():
     if found is None:
         return jsonify({"error": "That element is not in your model."}), 404
     try:
-        server = ImpactAnalysisService.analyze_change_impact(found.id, change_type, record=False)
+        server = simulation_service.simulate_change(found.id, change_type)
     except Exception:
         current_app.logger.exception("Scenario analysis failed")
         return jsonify({"error": "The scenario could not be saved. Try again in a moment."}), 500
@@ -437,7 +466,72 @@ def api_save_scenario():
     )
     db.session.add(row)
     db.session.commit()
-    return jsonify(row.to_dict()), 201
+    return jsonify(_scenario_for_caller(row)), 201
+
+
+def _scenario_row(scenario_id):
+    """The organisation's own saved scenario for an id such as ``scenario-12``; another organisation's is not found."""
+    from app.models.saved_scenario import SavedScenario
+
+    text = str(scenario_id)
+    number = text[len("scenario-"):] if text.startswith("scenario-") else text
+    if not (number.isascii() and number.isdigit()) or not 0 < int(number) <= 2147483647:
+        return None
+    return SavedScenario.query.filter_by(id=int(number)).first()
+
+
+@strategic_bp.route("/api/scenarios/<scenario_id>", methods=["PATCH"])
+@login_required
+@require_role(*SCENARIO_SAVE_ROLES)
+@audit_log("scenario_rename")
+def api_rename_scenario(scenario_id):
+    """Give a saved scenario another name."""
+    row = _scenario_row(scenario_id)
+    if row is None:
+        return jsonify({"error": "That scenario is not saved for your organisation."}), 404
+    name = str((request.get_json(silent=True) or {}).get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Give the scenario a name so you can find it when you compare."}), 400
+    if len(name) > 200:
+        return jsonify({"error": "Use a name of 200 characters or fewer."}), 400
+    row.name = name
+    db.session.commit()
+    return jsonify(_scenario_for_caller(row))
+
+
+@strategic_bp.route("/api/scenarios/<scenario_id>", methods=["DELETE"])
+@login_required
+@require_role(*SCENARIO_SAVE_ROLES)
+@audit_log("scenario_delete")
+def api_delete_scenario(scenario_id):
+    """Remove a saved scenario. The model it was tried on is not touched."""
+    row = _scenario_row(scenario_id)
+    if row is None:
+        return jsonify({"error": "That scenario is not saved for your organisation."}), 404
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify({"deleted": "scenario-%d" % row.id})
+
+
+@strategic_bp.route("/api/scenarios/export.csv", methods=["GET"])
+@login_required
+def api_export_scenarios_csv():
+    """The chosen saved scenarios side by side as a CSV file (ids as ``?ids=scenario-1,scenario-2``)."""
+    from flask import Response
+
+    from app.modules.solutions_strategic.v2.services.scenario_comparison_csv import comparison_csv
+
+    rows = []
+    for raw in str(request.args.get("ids") or "").split(",")[:3]:
+        row = _scenario_row(raw.strip()) if raw.strip() else None
+        if row is not None:
+            rows.append(row)
+    if not rows:
+        return jsonify({"error": "Choose at least one saved scenario to export."}), 400
+    return Response(
+        comparison_csv([_scenario_for_caller(r) for r in rows]),
+        mimetype="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="scenario-comparison.csv"'})
 
 
 @strategic_bp.route("/api/impact-analysis/history", methods=["GET"])

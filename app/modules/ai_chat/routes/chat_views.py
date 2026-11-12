@@ -177,6 +177,14 @@ def index():
         "connect": may_connect_github(current_user, g.current_org_id),
         "sample": may_load_sample_company(current_user),
     }
+    # An organisation whose applications are recorded but not how they connect is shown the two
+    # ways to change that, to the people each opens for.
+    from app.core.auth.permissions import can as _can
+
+    linkless_next_steps = {
+        "connect": startup_first_steps["connect"],
+        "record": bool(_can(current_user, "create", "relationship")),
+    }
 
     from app.services import mfa_service, signup_attribution
 
@@ -221,6 +229,7 @@ def index():
         llm_paused=bool(llm_provider_info.get("paused")),
         llm_provider=llm_provider_info.get("provider"),
         startup_first_steps=startup_first_steps,
+        linkless_next_steps=linkless_next_steps,
         two_factor_notice=two_factor_notice,
         chat_persona_preference_key=f"archie_chat_persona_v2:{current_user.id}",
     )

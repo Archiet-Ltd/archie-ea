@@ -16,6 +16,7 @@ Primary entry points:
 """
 
 import concurrent.futures
+import contextvars
 import json
 import logging
 import time
@@ -70,7 +71,7 @@ def _log_orphaned_future_exception(future: "concurrent.futures.Future") -> None:
         )
 
 
-def _call_generate_from_prompt_in_app_context(app, prompt: str, org_id) -> str:
+def _call_generate_from_prompt_in_app_context(app, prompt: str, org_id, timeout=None) -> str:
     """Run LLMService.generate_from_prompt inside *app*'s application context.
 
     The executor thread has no Flask context of its own. generate_from_prompt
@@ -94,8 +95,13 @@ def _call_generate_from_prompt_in_app_context(app, prompt: str, org_id) -> str:
 
     with app.app_context():
         g.current_org_id = org_id
+        # A caller with no budget gets exactly the call it always had: same arguments, same retries.
+        extra = {} if timeout is None else {"time_limit": timeout}
         return LLMService.generate_from_prompt(
-            prompt, use_cache=True, timeout=LLM_CLASSIFY_TIMEOUT_SECONDS
+            prompt,
+            use_cache=True,
+            timeout=LLM_CLASSIFY_TIMEOUT_SECONDS if timeout is None else timeout,
+            **extra,
         )
 
 
@@ -205,6 +211,12 @@ def _rule_based_classify(app: ApplicationComponent) -> tuple:
     return "unknown", 0.40, ["no_signal"]  # fabricated-ok: designed confidence weight for the no-signal classifier fallthrough
 
 
+# What is left of the request budget, set around each batch by _classify_batches.
+_llm_timeout_override: contextvars.ContextVar = contextvars.ContextVar(
+    "llm_classify_timeout_override", default=None
+)
+
+
 def _llm_classify_batch(apps: List[ApplicationComponent]) -> List[Dict]:
     """
     Classify a batch of apps via LLM.
@@ -258,16 +270,21 @@ def _llm_classify_batch(apps: List[ApplicationComponent]) -> List[Dict]:
         from app.middleware.tenant_context import current_org_id as _current_org_id
 
         org_id = _current_org_id()
+        timeout_seconds = _llm_timeout_override.get()
+        limit = (
+            LLM_CLASSIFY_TIMEOUT_SECONDS
+            if timeout_seconds is None
+            else min(timeout_seconds, LLM_CLASSIFY_TIMEOUT_SECONDS)
+        )
         future = _llm_classify_executor.submit(
-            _call_generate_from_prompt_in_app_context, app, prompt, org_id
+            _call_generate_from_prompt_in_app_context, app, prompt, org_id, timeout_seconds
         )
         future.add_done_callback(_log_orphaned_future_exception)
         try:
-            raw = future.result(timeout=LLM_CLASSIFY_TIMEOUT_SECONDS)
+            raw = future.result(timeout=limit)
         except concurrent.futures.TimeoutError as exc:
             raise LLMClassificationTimeoutError(
-                f"LLM classification call exceeded the "
-                f"{LLM_CLASSIFY_TIMEOUT_SECONDS}s timeout"
+                f"LLM classification call exceeded the {limit}s timeout"
             ) from exc
         # Extract JSON array from response (LLM may wrap in markdown fences)
         raw = raw.strip()
@@ -337,6 +354,8 @@ class ApplicationPatternClassifierService:
         # True when a time budget stopped LLM classification partway; the
         # remaining apps were classified by rules and labelled as such.
         self.llm_truncated = False
+        # Plain line for the apps the AI provider did not reach in time; None when all were.
+        self.unfinished_note = None
 
     def classify_applications(
         self,
@@ -364,8 +383,12 @@ class ApplicationPatternClassifierService:
             query = query.filter(ApplicationComponent.id.in_(app_ids))
         apps: List[ApplicationComponent] = query.all()
 
-        results: List[Dict] = []
         self.llm_truncated = False
+        self.unfinished_note = None
+        return self._classify_batches(apps, batch_size, use_llm, time_budget_seconds)
+
+    def _classify_batches(self, apps, batch_size, use_llm, time_budget_seconds) -> List[Dict]:
+        results: List[Dict] = []
         deadline = (
             time.monotonic() + time_budget_seconds
             if time_budget_seconds is not None
@@ -378,28 +401,48 @@ class ApplicationPatternClassifierService:
         # The optional wall-clock budget stops issuing LLM calls once spent;
         # remaining apps get the service's documented deterministic fallback,
         # and every record says which engine produced it.
+        llm_answered = False
+        rules_count = 0
         for batch_start in range(0, len(apps), batch_size):
             batch = apps[batch_start: batch_start + batch_size]
 
-            llm_this_batch = use_llm
+            llm_this_batch = use_llm and not self.llm_truncated
             if llm_this_batch and deadline is not None and time.monotonic() > deadline:
                 llm_this_batch = False
                 self.llm_truncated = True
 
+            id_map = {}
             if llm_this_batch:
-                classified = _llm_classify_batch(batch)
-                id_map = {r["id"]: r for r in classified}
-            else:
-                id_map = {}
+                # Each call gets only what is left of the one request budget.
+                if deadline is not None:
+                    left = max(0.1, deadline - time.monotonic())
+                    token = _llm_timeout_override.set(left)
+                else:
+                    token = None
+                try:
+                    classified = _llm_classify_batch(batch)
+                    id_map = {r["id"]: r for r in classified}
+                    llm_answered = True
+                except LLMClassificationTimeoutError:
+                    if not llm_answered:
+                        raise  # nothing finished: an explicit error, never made-up answers
+                    # Keep the batches that finished; the rest are labelled as rules-based.
+                    self.llm_truncated = True
+                finally:
+                    if token is not None:
+                        _llm_timeout_override.reset(token)
 
             for app in batch:
                 if app.id in id_map:
                     pattern = id_map[app.id]["arch_pattern"]
                     confidence = id_map[app.id]["confidence"]
                     source = id_map[app.id].get("source", "llm")
+                    if source != "llm":
+                        rules_count += 1
                 else:
                     pattern, confidence, _ = _rule_based_classify(app)
                     source = "rules"
+                    rules_count += 1
 
                 # Persist
                 app.arch_pattern = pattern
@@ -411,6 +454,13 @@ class ApplicationPatternClassifierService:
                     "source": source,
                 })
 
+        if self.llm_truncated and rules_count:
+            self.unfinished_note = (
+                "The AI provider did not answer for %d applications in time, so their patterns come "
+                "from the built-in rules instead. Try again to have the AI classify them."
+                % rules_count
+            )
+
         try:
             db.session.commit()
         except Exception:
@@ -420,7 +470,9 @@ class ApplicationPatternClassifierService:
         return results
 
     def classify_portfolio(
-        self, batch_size: int = 50, time_budget_seconds: Optional[float] = None
+        self,
+        batch_size: int = 50,
+        time_budget_seconds: Optional[float] = None,
     ) -> Dict:
         """
         Classify the full application portfolio in batches.
@@ -459,5 +511,6 @@ class ApplicationPatternClassifierService:
             "by_pattern": by_pattern,
             "by_source": by_source,
             "llm_truncated": self.llm_truncated,
+            "note": self.unfinished_note,
             "confidence_distribution": confidence_distribution,
         }

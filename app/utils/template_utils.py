@@ -80,6 +80,19 @@ def humanize_error(error_msg):
     )
 
 
+def title_keep_caps(value):
+    """Title-case a stored label for display, leaving an all-capital word of
+    two to five letters (AI, SAML, ERP) as it was typed. Underscores read as
+    spaces. The stored value is never changed."""
+    if value is None:
+        return value
+    words = str(value).replace("_", " ").split()
+    return " ".join(
+        w if (w.isalpha() and w.isupper() and 2 <= len(w) <= 5) else w.title()
+        for w in words
+    )
+
+
 def register_template_utils(app):
     """Register template utilities with Flask app."""
     _register(app)
@@ -182,6 +195,8 @@ def _register(app):
         "arb_queue_empty": "No items in this queue",
         "arb_submission": "Architecture Review Board submission",
     }
+
+    app.add_template_filter(title_keep_caps, "title_keep_caps")
 
     @app.template_filter("humanize_key")
     def humanize_key_filter(value):

@@ -29,6 +29,9 @@ document.addEventListener('alpine:init', function() {
                 return Object.values(this.layerCounts).reduce(function(a, b) { return a + (b || 0); }, 0);
             },
             layerCounts: {},
+            // Per layer, how many of its records the model map does not draw (a gap entered in the gap
+            // register has no model element). Read from the same counts answer as layerCounts.
+            notOnModelMap: {},
             layerConfig: APP_CONFIG.layerConfig || {},
             popstateHandler: null,
             // ARCH-064: fieldConfigs used to be inlined into every dashboard
@@ -313,6 +316,52 @@ document.addEventListener('alpine:init', function() {
                 return typeof this.layerTotal === 'number';
             },
 
+            // The layer's own count: the number on its tab, its header and its Elements card. The list's
+            // total (layerTotal) is narrower whenever a search or filter is applied, so it is never shown as
+            // the layer's count.
+            get layerCount() {
+                let count = this.layerCounts[this.activeTab];
+                return typeof count === 'number' ? count : null;
+            },
+
+            get layerCountKnown() {
+                return typeof this.layerCount === 'number';
+            },
+
+            get layerNotOnModelMap() {
+                let count = this.notOnModelMap[this.activeTab];
+                return typeof count === 'number' ? count : 0;
+            },
+
+            get layerCountLabel() {
+                if (!this.layerCountKnown) return 'layer total unavailable';
+                let n = this.layerCount;
+                let text = n + (n === 1 ? ' element' : ' elements') + ' in this layer';
+                if (this.layerNotOnModelMap > 0) {
+                    text += ', ' + this.layerNotOnModelMap + ' of them not on the model map';
+                }
+                return text;
+            },
+
+            get layerCountHint() {
+                if (!this.layerCountKnown) return 'Layer total unavailable';
+                if (this.layerNotOnModelMap > 0) {
+                    return this.layerNotOnModelMap + ' entered in a register and not on the model map';
+                }
+                return 'Every element in this layer';
+            },
+
+            get listNarrowed() {
+                return !!(this.searchQuery || this.typeFilter || this.sourceFilter || this.kindFilter
+                    || this.viewpointTypeFilter.length);
+            },
+
+            get listTotalLabel() {
+                if (!this.layerTotalKnown) return '\u2014 total';
+                if (this.listNarrowed && this.layerCountKnown) return this.layerTotal + ' of ' + this.layerCount + ' match';
+                return this.layerTotal + ' total';
+            },
+
             // D-03: sourceCounts/healthStats are computed from `this.elements`,
             // which is only the currently-loaded page (per_page, default 25) —
             // not the full layer. pageCount names that scope explicitly so the
@@ -547,9 +596,12 @@ document.addEventListener('alpine:init', function() {
                     this.elements = data.elements || [];
                     this.pagination = data.pagination || { page: 1, pages: 0, per_page: this.perPage, total: null, has_next: false, has_prev: false };
                     this.currentPage = this.pagination.page || this.currentPage;
-                    this.layerCounts[this.activeTab] = data.pagination && typeof data.pagination.total === 'number'
-                        ? data.pagination.total
-                        : null;
+                    // Only an unnarrowed list is the whole layer; a search or filter total is not its count.
+                    if (!this.listNarrowed) {
+                        this.layerCounts[this.activeTab] = data.pagination && typeof data.pagination.total === 'number'
+                            ? data.pagination.total
+                            : null;
+                    }
                 } catch (err) {
                     // The template already renders an error state + Retry button on
                     // `loadError` (dashboard.html); nothing ever set it until now.
@@ -617,6 +669,7 @@ document.addEventListener('alpine:init', function() {
                     );
                     let payload = data.data || data;
                     batched = payload.counts || {};
+                    self.notOnModelMap = payload.not_on_model_map || {};
                 } catch (batchError) {
                     // Batched endpoint unavailable: every layer falls through below.
                     batched = {};

@@ -1,4 +1,4 @@
-"""Both vendor pages state one coverage, an Administrator reads annual cost on them, and another
+"""The vendor list states one coverage, an Administrator reads annual cost on them, and another
 organisation's systems and contracts never count."""
 from __future__ import annotations
 
@@ -69,17 +69,26 @@ def _answer(html):
 
 
 def test_both_vendor_pages_state_the_same_coverage_and_the_administrator_reads_cost(app, db_session, make_org):
+    """The Vendors list states its coverage and the administrator reads cost, for one organisation only;
+    the old second vendor page redirects away from the list, so the list is stated by one page."""
     mine, theirs = make_org("vend-a"), make_org("vend-b")
     tag = uuid.uuid4().hex[:6]
     _estate(db_session, mine, "mine" + tag)
     _estate(db_session, theirs, "theirs" + tag)
     client = _admin_client(app, db_session, mine)
     pages = {}
-    for path in ("/applications/vendors", "/vendors/technical/scenarios"):
+    for path in ("/applications/vendors",):
         _forget_cached_user()
         resp = client.get(path)
         assert resp.status_code == 200, path
         pages[path] = _answer(resp.get_data(as_text=True))
+    # Changed when the old vendor addresses stopped serving a copy of this list (intended, not
+    # weakened): the second page this test compared was that copy at /vendors/technical/scenarios.
+    # It now redirects to the page its name promises, so the list is stated once, by one page.
+    _forget_cached_user()
+    moved = client.get("/vendors/technical/scenarios")
+    assert moved.status_code == 301, moved.status_code
+    assert "/vendors" not in moved.headers["Location"].replace("/vendor-analysis", ""), moved.headers["Location"]
     for path, text in pages.items():
         found = re.search(r"(\d+) vendors? suppl(?:y|ies) (\d+) of your (\d+) systems?", text)
         assert found, (path, text[:600])

@@ -21,7 +21,7 @@ document.addEventListener('alpine:init', () => {
         dataLoaded: false,
         error: '',
         filters: { vendor: '', capability: '', minCoverage: '0', category: '' },
-        stats: { totalCaps: 0, totalVendors: 0, avgCoverage: null, strongCount: 0 },
+        stats: { totalCaps: 0, totalVendors: 0, avgCoverage: null, strongCount: null },
 
         init() { this.loadCategories(); },
 
@@ -210,7 +210,7 @@ document.addEventListener('alpine:init', () => {
         </div>
         <div class="bg-card border border-border rounded-lg p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Strong Fits (80%+)</p>
-            <p class="text-2xl font-bold text-success mt-1" x-text="stats.strongCount"></p>
+            <p class="text-2xl font-bold text-success mt-1" x-text="stats.strongCount != null ? stats.strongCount : '—'"></p>
         </div>
     </div>
 
@@ -302,7 +302,12 @@ document.addEventListener('alpine:init', () => {
         <div x-cloak x-show="!loading && !error && !dataLoaded"
              class="flex flex-col items-center justify-center py-24 gap-3">
             <i data-lucide="table-2" class="h-10 w-10 text-muted-foreground" aria-hidden="true"></i>
-            <p class="text-sm font-medium text-foreground">Select a product category to load the matrix</p>
+            <p class="text-sm font-medium text-foreground" x-show="loadingCategories || allCategories.length > 0">Select a product category to load the matrix</p>
+            <p class="text-sm font-medium text-foreground" x-cloak x-show="!loadingCategories && allCategories.length === 0" data-testid="no-categories">No vendor products are recorded yet, so there is no category to pick</p>
+            <p x-cloak class="text-xs text-muted-foreground" x-show="!loadingCategories && allCategories.length === 0">
+                Vendor products are added when vendor details are imported or detected, and a system's Vendors tab then links one to that system. None are recorded yet, so start by adding the vendor on the Vendors list.
+                <a href="{{ url_for('unified_applications.vendors') }}" class="text-primary underline underline-offset-2" data-testid="no-categories-next">Open the vendors list</a>
+            </p>
             <p x-cloak class="text-xs text-muted-foreground" x-show="loadingCategories">Loading categories…</p>
             <p x-cloak class="text-xs text-muted-foreground" x-show="!loadingCategories && allCategories.length > 0">
                 <span x-text="allCategories.length"></span> categories available — use the Category filter above
