@@ -11,7 +11,8 @@
 <div class="p-6 space-y-6 mx-auto max-w-3xl">
 
   {{ page_shell(
-      title='Edit Application'
+      title='Edit Application',
+      breadcrumb=[('Home', url_for('main.index')), ('Applications', url_for('unified_applications.application_list')), ('Edit Application', none)]
   ) }}
 
   <form method="POST" action="{{ url_for('unified_applications.application_edit', id=application.id) }}" class="space-y-8">
