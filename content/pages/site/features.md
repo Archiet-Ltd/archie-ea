@@ -257,7 +257,7 @@ Delivered today by: [AI Chat](/modules/ai-chat), [Digital Twin](/modules/digital
 
 <p id="until-simulations"><strong>Early access.</strong> Scenarios lets you branch the model, change it, and see the effect on
 cost, risk, resilience and capacity before money is committed. It is not open yet:
-<a href="/modules/scenario-modelling">join the waiting list for Scenarios</a> and we will email you when you can use it.</p>
+<a href="/modules/scenario-modelling">join the waiting list for Scenarios</a> and we will email you when it is open.</p>
 
 <p id="needs-simulations"><strong>Available.</strong> <a href="/modules/scenario-modelling">Scenarios</a> lets you run a change on a copy of
 the model and see the effect on the elements, applications, running cost and risks it reaches, save it under a name and

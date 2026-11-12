@@ -110,6 +110,8 @@ def _walk(browser, base, switch):
                     kinds[name] = "early-access"
                 elif module and path in sitemap_paths:
                     kinds[name] = "waiting-list module"
+                    page.screenshot(path=str(SHOTS / ("%s-switch-%s-%s-%d.png" % (
+                        path.rsplit("/", 1)[1], switch, scheme, width))), full_page=True)
                 else:
                     kinds[name] = "features-only"
                 assert early or module, "%s opens neither a waiting list nor a waiting-list page" % href

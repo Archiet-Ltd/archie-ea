@@ -22,6 +22,7 @@ from __future__ import annotations
 import functools
 import json
 import re
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -495,7 +496,16 @@ FAMILY_URL_PREFIX = {
     "connector": "/connectors",
 }
 
-_md = markdown.Markdown(extensions=["extra"])
+_md_local = threading.local()
+
+
+def _markdown() -> markdown.Markdown:
+    """This thread's Markdown converter. One converter keeps parse state between calls, so two pages rendered at
+    once by two request threads (a page and a closed address answered in place) must not share one."""
+    md = getattr(_md_local, "md", None)
+    if md is None:
+        md = _md_local.md = markdown.Markdown(extensions=["extra"])
+    return md
 
 # Tags and attributes produced by standard Markdown (plus extra extension).
 # Any HTML tag or attribute not in these lists is stripped by bleach.
@@ -1128,7 +1138,7 @@ def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     body_md = _apply_legal_blocks(body_md)
     if family == "function-per-segment":
         slug, url = _use_case_slug_and_url(front_matter, slug)
-    body_html = _sanitize_html(_md.reset().convert(body_md))
+    body_html = _sanitize_html(_markdown().reset().convert(body_md))
     title = _extract_title(body_html, front_matter)
     external_url = _build_external_url(front_matter)
     return PublicPage(

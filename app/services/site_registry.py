@@ -312,9 +312,9 @@ def hold_back_unreleased_capabilities(body_html: str) -> tuple[str, list[dict[st
     anchor its old links keep. Any other capability's item has no page.
     """
     from app.release_waves import EARLY_ACCESS_PREFIX, code_slug
-    from app.services.public_pages import load_page
+    from app.services.public_pages import _pages_by_url
 
-    features = load_page("site", slug="features")
+    features = _pages_by_url().get("/features")
     groups = dict((features.front_matter.get("waiting_list_group") if features is not None else None) or {})
     same_as = {anchor: f"{EARLY_ACCESS_PREFIX}/{code_slug(code)}" for anchor, code in groups.items()}
     text = str.__str__(body_html)
@@ -377,13 +377,14 @@ def _page_entries() -> list[dict[str, Any]]:
     """The coming capabilities that have a page to open, for the release switch and wave as they stand now.
 
     The early-access groups the release check keeps closed, and every module page that answers a waiting list:
-    its own, or the early-access page of the capability its screen belongs to. Each is one entry, named as the
-    page it opens names itself."""
+    its own, or the early-access page of the capability its screen belongs to. A module page with its own waiting
+    list that waits for a group's screen stands for that group: the group is not listed a second time. Each is one
+    entry, named as the page it opens names itself."""
     from flask import current_app
 
     from app.release_waves import EARLY_ACCESS_PREFIX, GENERIC_GROUP, code_slug, entry_for, group_for, has_page
     from app.release_waves.routes import coming_groups
-    from app.services.public_pages import MERGED_PAGES, load_all_pages
+    from app.services.public_pages import MERGED_PAGES, _pages_by_url
 
     found: list[dict[str, Any]] = [
         {"name": g["title"], "sentence": _first_sentence(g["blurb"]), "kind": EARLY_ACCESS,
@@ -391,7 +392,8 @@ def _page_entries() -> list[dict[str, Any]]:
         for g in coming_groups()
     ]
     listed = {item["url"] for item in found}
-    for page in load_all_pages():
+    replaced: set[str] = set()
+    for page in _pages_by_url().values():
         if page.family != "module" or page.url in MERGED_PAGES or page.front_matter.get("state") == "not_planned":
             continue
         own = page.cta == "waiting_list"
@@ -399,11 +401,9 @@ def _page_entries() -> list[dict[str, Any]]:
         group_url = f"{EARLY_ACCESS_PREFIX}/{code_slug(group_for(entry_for(str(screen)))[0])}" if screen else None
         name = str(page.front_matter.get("module_label") or page.title)
         if own and group_url in listed:
-            # the page waits for a screen whose capability is listed already: one capability, one entry,
-            # named and described as the page that waits for the screen names it
-            entry = next(item for item in found if item["url"] == group_url)
-            entry["name"], entry["sentence"] = name, _first_sentence(page.description or "") or entry["sentence"]
-            continue
+            # the page waits for a screen whose capability is listed already: one capability, one entry, the page
+            # that waits for the screen, under its own name; the menus, the footer and the home page link it too
+            replaced.add(group_url)
         if not own and page.wave_closed:
             endpoint = page.front_matter.get("endpoint")
             rule = next(iter(current_app.url_map.iter_rules(endpoint)), None) if endpoint in current_app.view_functions else None
@@ -423,7 +423,8 @@ def _page_entries() -> list[dict[str, Any]]:
                               "kind": WAITING_LIST_MODULE, "url": page.url})
     unique: dict[str, dict[str, Any]] = {}
     for item in found:
-        unique.setdefault(item["url"], item)
+        if item["url"] not in replaced:
+            unique.setdefault(item["url"], item)
     return list(unique.values())
 
 
@@ -433,12 +434,29 @@ def coming_capabilities() -> list[dict[str, Any]]:
     The one list the early-access hub, the features page's Coming soon list and the sitemap read. Each entry has
     its ``name``, its ``sentence``, its ``kind`` (``early_access``, ``waiting_list_module`` or ``features_only``) and
     the ``url`` of the page a visitor opens for it, or None for a capability the features page alone describes
-    (then ``anchor`` is where its inline links land; an entry that is also a heading's capability keeps that anchor). A capability is delivered or coming, never both: the
-    delivered lines of the features page and this list come from the same release check. Sorted by name."""
-    from app.services.public_pages import load_page
+    (then ``anchor`` is where its inline links land; an entry that is also a heading's capability keeps that
+    anchor). A capability is delivered or coming, never both: the delivered lines of the features page and this
+    list come from the same release check. Sorted by name, and built once per content and release wave."""
+    import copy
+
+    from flask import current_app
+
+    from app.services.public_pages import _content_fingerprint
+
+    # every closed address answered in place asks for it, so it is not rebuilt per request
+    cache = current_app.extensions.setdefault("coming_capabilities", {})
+    key = _content_fingerprint()
+    if key not in cache:
+        cache.clear()
+        cache[key] = _build_coming_capabilities()
+    return copy.deepcopy(cache[key])
+
+
+def _build_coming_capabilities() -> list[dict[str, Any]]:
+    from app.services.public_pages import _pages_by_url
 
     entries = _page_entries()
-    features = load_page("site", slug="features")
+    features = _pages_by_url().get("/features")
     if features is not None:
         _body, described = hold_back_unreleased_capabilities(features.body_html)
         taken = {e["name"].lower() for e in entries}
