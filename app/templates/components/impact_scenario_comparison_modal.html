@@ -96,7 +96,12 @@
                     element: { id: item.element && item.element.id },
                     change_type: item.change_type,
                     analysis_result: item.analysis_result || {}
-                }, { silent: true }).then(() => { savedNow.push(item); this.forgetCarried(item); }).catch(error => {
+                }, { silent: true }).then(() => {
+                    savedNow.push(item);
+                    this.forgetCarried(item);
+                    // say how many have moved so far, so a long list is not a blank wait
+                    this.carriedNotice = savedNow.length + (savedNow.length === 1 ? ' scenario' : ' scenarios') + ' saved earlier in this browser ' + (savedNow.length === 1 ? 'was' : 'were') + ' moved to your organisation. ';
+                }).catch(error => {
                     const status = error && error.status;
                     if (status === 404) { gone.push(item); } else if (status === 400) { refused.push(item); } else { retry.push(item); }
                 })
