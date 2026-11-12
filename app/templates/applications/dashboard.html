@@ -493,11 +493,11 @@
       <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="application-description">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Description</h3></div>
         <div class="p-6 pt-0">
-          {% call(p) fact_list(items=[{'label': 'Description', 'key': 'description'}], testid='application-description-facts') %}
-            {% if app.description %}<span class="block whitespace-pre-line text-left">{{ app.description }}</span>
+          <div class="text-sm text-foreground" data-testid="application-description-facts">
+            {% if app.description %}<span class="block whitespace-pre-line text-left" data-testid="property-description">{{ app.description }}</span>
             {% elif can('edit', 'application') %}No description yet. <a href="{{ url_for('unified_applications.application_detail', id=app.id, edit=1) }}" class="text-primary hover:underline">Add one</a>
             {% else %}<span class="text-muted-foreground">No description yet</span>{% endif %}
-          {% endcall %}
+          </div>
         </div>
       </div>
       {% endif %}
