@@ -550,3 +550,9 @@ z-index: 45;
     background: hsl(var(--background) / 0.95); border: 1px solid hsl(var(--border));
     border-radius: 12px; padding: 8px 16px;
 }
+
+/* The element a neighbourhood view is about: marked with the primary colour, whatever is selected after. */
+.composer-focus-seed [joint-selector="body"] {
+    stroke: hsl(var(--primary)) !important;
+    stroke-width: 4px !important;
+}
