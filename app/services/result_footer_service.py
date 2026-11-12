@@ -578,6 +578,25 @@ def roadmap_footer(work_packages: List[Any], total: int, now: Optional[datetime]
     return build_footer(facts, now)
 
 
+_DERIVATION_PAGES = {
+    "application": ("unified_applications.application_fact_sheet", "id"),
+}
+
+
+def _derivation_facts(derivation: Dict[str, Any], default_when: Optional[datetime]) -> List[Dict[str, Any]]:
+    """The facts a derived strategic score rests on: each application, link, value stream or risk, as the
+    team recorded it, with the date it was last recorded."""
+    facts = []
+    for item in derivation["facts"]:
+        endpoint, key = _DERIVATION_PAGES.get(item["kind"], (None, None))
+        when = datetime.fromisoformat(item["as_of"]) if item.get("as_of") else default_when
+        facts.append(fact(item["label"], href=page_link(endpoint, **{key: item["id"]}) if endpoint else None,
+                          source_kind="manual", as_of=when))
+    if derivation.get("more"):
+        facts.append(fact("and %d more" % derivation["more"], source_kind="manual", as_of=default_when))
+    return facts
+
+
 def capability_footers(organization_id: int, scores: List[Dict[str, Any]],
                        now: Optional[datetime] = None) -> Dict[int, Dict[str, Any]]:
     """Footer for each scored capability of the investment matrix: the capability record, the importance and
@@ -604,7 +623,16 @@ def capability_footers(organization_id: int, scores: List[Dict[str, Any]],
         when = row.updated_at or row.created_at
         facts = [fact(s["capability_name"], source_kind="derived" if row.source_table else "manual", as_of=when,
                       subject="Capability")]
-        if row.strategic_importance:
+        derivation = s.get("strategic_derivation") if s.get("strategic_basis") == "derived" else None
+        if derivation:
+            # Nobody rated it, so the score is worked out from the facts below, and the footer says the rating is
+            # missing: that is what keeps its confidence below a recorded rating's.
+            facts.append(fact("Strategic importance: not recorded, so the score is worked out from the model",
+                              missing=True))
+            facts.extend(_derivation_facts(derivation, when))
+            facts.append(fact("Strategic score %d/25 worked out from %s" % (s["strategic_score"], derivation["basis"]),
+                              source_kind="derived", subject="Strategic score", as_of=when))
+        elif row.strategic_importance:
             facts.append(fact("Strategic importance: %s" % row.strategic_importance, source_kind="manual",
                               subject="Importance", as_of=when))
         else:
