@@ -1179,3 +1179,21 @@ entries:
     note: >
       Searched before writing: joint, d3, mermaid, plantuml, cytoscape, dagre, bpmn, UMLModel, SavedDiagram across
       app/. dagre is a layout helper that composer.js and erd.js already use and is not a drawing library.
+
+  - id: application-model-links
+    concept: What the architecture model links to an application (technology, suppliers, every other element), and the
+      type spelling those links are read by
+    status: active
+    canonical:
+      path: app/services/application_model_links.py
+      symbols: [normalised_type, linked_elements, linked_technology, recorded_technology, linked_suppliers, linked_suppliers_by_application]
+    reuse: >
+      Read the elements linked to an application, its linked technology and its linked suppliers only through
+      application_model_links, so the application's tabs, its completeness banner and the Vendors portfolio state one
+      count. Compare element types through normalised_type ("Business Actor", "business_actor" and "BusinessActor"
+      read alike); do not write a second type normaliser or query the application's relationships beside it.
+    must_not_create:
+      - id: second-type-normaliser
+        regex: 'def\s+_?normali[sz]ed_type\s*\('
+        scope: [app]
+        suffixes: [.py]

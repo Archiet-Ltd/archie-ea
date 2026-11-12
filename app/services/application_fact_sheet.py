@@ -121,13 +121,22 @@ def linked_notes(app: Any, missing: List[str]) -> Dict[str, Dict[str, str]]:
     )
 
     notes: Dict[str, Dict[str, str]] = {}
-    if "Hosting / deployment" in missing and not recorded_technology(app):
-        count = len(linked_technology(app))
-        if count:
+    if "Hosting / deployment" in missing:
+        if not recorded_technology(app):
+            count = len(linked_technology(app))
+            if count:
+                notes["Hosting / deployment"] = {
+                    "text": "%s linked, none recorded as runs on" % _count_phrase(
+                        count, "technology element", "technology elements"),
+                    "tab": "technology",
+                }
+        else:
+            # What it runs on is recorded; the score reads the hosting description instead.
             notes["Hosting / deployment"] = {
-                "text": "%s linked, none recorded as runs on" % _count_phrase(
-                    count, "technology element", "technology elements"),
-                "tab": "technology",
+                "text": "what it runs on is recorded, but the score counts the hosting description",
+                "tab": "overview",
+                "edit": "1",
+                "action": "add the hosting description",
             }
     if "Vendor" in missing:
         count = len(linked_suppliers(app))
