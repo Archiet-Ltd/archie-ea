@@ -77,20 +77,21 @@ def test_removing_the_sample_leaves_the_panels_at_nothing_and_the_other_organisa
     assert _panel(_page(client)) == a_before
 
 
-def _history_rows(org_id):
-    """The organisation's own change history as (table, action, record id), read straight from the table."""
+def _history_rows(org_id, since=None):
+    """The organisation's own model history as (table, action, record id), read straight from the table."""
     from app.models.audit_log import AuditLog
+    from app.modules.intelligence.services.history_service import AUDITED_TABLES
 
-    return [
-        (r.table_name, r.action, r.record_id)
-        for r in AuditLog.query.filter_by(organization_id=org_id).order_by(AuditLog.id)
-    ]
+    query = AuditLog.query.filter(AuditLog.organization_id == org_id, AuditLog.table_name.in_(list(AUDITED_TABLES)))
+    if since is not None:
+        query = query.filter(AuditLog.created_at >= since)
+    return [(r.table_name, r.action, r.record_id) for r in query.order_by(AuditLog.id)]
 
 
 def test_a_real_record_added_then_deleted_still_counts_once_added_and_once_deleted_after_the_sample_is_removed(
     client, login_as, make_org
 ):
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
     from app.modules.dashboard.services import overview_figures as figures
     from app.services import sample_company_service
@@ -127,7 +128,9 @@ def test_a_real_record_added_then_deleted_still_counts_once_added_and_once_delet
     raw = _history_rows(org_b.id)
     assert ("archimate_elements", "create", mine_id) in raw and ("archimate_elements", "delete", mine_id) in raw, raw
     # the history table names an add "create"; the panels read it as an insert
-    own_inserts = [r for r in raw if r[0] == "archimate_elements" and r[1] == "create" and (r[0], r[2]) not in sample]
+    # the same period as the panel's "Last 3 months": from the start of the day 89 days ago
+    period = _history_rows(org_b.id, since=datetime.combine(now.date() - timedelta(days=89), datetime.min.time()))
+    own_inserts = [r for r in period if r[1] == "create" and (r[0], r[2]) not in sample]
 
     kept = figures._history(org_b.id, now)
     kept_rows = [(c.table_name, c.action, c.record_id) for c in kept]
