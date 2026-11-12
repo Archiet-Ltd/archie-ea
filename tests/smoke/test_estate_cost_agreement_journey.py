@@ -106,8 +106,8 @@ def test_administrator_reads_vendor_cost_and_every_page_agrees(browser, live_ser
         assert "Decommissioned systems are not counted (1)" in re.sub(r"\s+", " ", answer)
         _shot(page, "vendors-1440-light")
 
-        # The scenarios page states the same coverage and has the same table, with no "none" beside it.
-        assert page.goto(live_server + "/vendors/technical/scenarios", timeout=PAGE_TIMEOUT).status == 200
+        # The Vendors list, opened again, states the same coverage and has the same table, with no "none" beside it.
+        assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
         scenarios = re.sub(r"\s+", " ", page.get_by_test_id("vendors-answer").inner_text())
         assert coverage.group(1) in scenarios
         assert "None of your" not in _text(page)
