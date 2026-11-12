@@ -70,6 +70,18 @@
                         </div>
                     </div>
 
+                    {% if result.matches %}
+                    <div class="rounded-md border border-warning bg-warning/10 px-3 py-2 space-y-1" data-testid="import-matches">
+                        <p class="text-sm font-medium text-warning-emphasis">{{ result.matches | length }} imported {{ 'element matches' if result.matches | length == 1 else 'elements match' }} one already stored:</p>
+                        <ul class="list-disc list-inside text-sm text-foreground space-y-0.5">
+                            {% for m in result.matches %}
+                            <li data-testid="import-match">&ldquo;{{ m.name }}&rdquo; {{ 'is the same as' if m.kind == 'same' else 'looks like' }} {{ 'the one created earlier in this file,' if m.in_file else 'the stored' }} {{ m.type | plain_name(current_user) | lower }} <a class="text-primary underline hover:underline" href="{{ url_for('archimate_crud.detail_element', layer=(m.existing_layer or 'application') | lower, element_type='element', element_id=m.existing_id, ae=1) }}">&ldquo;{{ m.existing_name }}&rdquo;</a> &mdash; {{ {'created': 'both are kept.', 'updated': 'the stored one was updated.', 'skipped': 'the stored one was left as it is.'}[m.action] }}</li>
+                            {% endfor %}
+                        </ul>
+                        <p class="text-xs text-muted-foreground">Nothing is merged on its own. A same-named element is updated only when you choose Update existing; one that only looks alike is created separately. Open either one to edit or delete it.</p>
+                    </div>
+                    {% endif %}
+
                     {% if result.imported_kind != 'dmn' %}
                     <div class="space-y-3" data-testid="relationship-import-result">
                         <h3 class="text-sm font-semibold text-foreground">Relationships</h3>
@@ -256,7 +268,7 @@
                                               :class="statusClass(elem.status)" x-text="statusLabel(elem.status)"></span>
                                     </td>
                                     <td class="px-2 text-muted-foreground" data-testid="preview-decision-reason"
-                                        x-text="elem.application_kind_decision || ''"></td>
+                                        x-text="elem.similar_to ? ('Looks like the stored “' + elem.similar_to.name + '”. It will be created as a separate element.') : (elem.application_kind_decision || '')"></td>
                                 </tr>
                             </template>
                             {% endcall %}

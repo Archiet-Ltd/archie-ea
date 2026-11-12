@@ -513,8 +513,8 @@ def _git(cwd, *args):
                    capture_output=True)
 
 
-def _brief(path: Path, branch: str, model_changes: str = "", builds_on: str = "") -> Path:
-    lines = [f"# {path.stem}", "", f"SEAT NOTE: you work on branch {branch}, based on the line.", ""]
+def _task(path: Path, branch: str, model_changes: str = "", builds_on: str = "") -> Path:
+    lines = [f"# {path.stem}", "", f"Task notes: you work on branch {branch}, based on the line.", ""]
     if model_changes:
         lines.append(f"Model changes: {model_changes}")
     if builds_on:
@@ -542,9 +542,9 @@ def _repo_with_two_branches(tmp_path: Path):
 
 def test_a_second_brief_that_changes_the_same_file_is_refused_and_names_it(tmp_path):
     repo = _repo_with_two_branches(tmp_path)
-    first = mc.brief_elements(_brief(tmp_path / "first.md", "ui/first"), "line", repo)
-    second = mc.brief_elements(_brief(tmp_path / "second.md", "ui/second"), "line", repo)
-    third = mc.brief_elements(_brief(tmp_path / "third.md", "ui/third"), "line", repo)
+    first = mc.task_elements(_task(tmp_path / "first.md", "ui/first"), "line", repo)
+    second = mc.task_elements(_task(tmp_path / "second.md", "ui/second"), "line", repo)
+    third = mc.task_elements(_task(tmp_path / "third.md", "ui/third"), "line", repo)
     found = mc.check_collisions(second, [first])
     assert len(found) == 1 and "app/services/gap_register.py" in found[0]
     assert mc.check_collisions(third, [first, second]) == []
@@ -552,9 +552,9 @@ def test_a_second_brief_that_changes_the_same_file_is_refused_and_names_it(tmp_p
 
 def test_two_briefs_that_declare_the_same_requirement_collide_unless_one_builds_on_the_other(tmp_path):
     repo = _repo_with_two_branches(tmp_path)
-    a = mc.brief_elements(_brief(tmp_path / "a.md", "ui/none-a", model_changes="REQ-EDIT, REQ-X"), "line", repo)
-    b = mc.brief_elements(_brief(tmp_path / "b.md", "ui/none-b", model_changes="REQ-EDIT"), "line", repo)
-    c = mc.brief_elements(_brief(tmp_path / "c.md", "ui/none-c", model_changes="REQ-EDIT", builds_on="a"), "line", repo)
+    a = mc.task_elements(_task(tmp_path / "a.md", "ui/none-a", model_changes="REQ-EDIT, REQ-X"), "line", repo)
+    b = mc.task_elements(_task(tmp_path / "b.md", "ui/none-b", model_changes="REQ-EDIT"), "line", repo)
+    c = mc.task_elements(_task(tmp_path / "c.md", "ui/none-c", model_changes="REQ-EDIT", builds_on="a"), "line", repo)
     assert "REQ-EDIT" in mc.check_collisions(b, [a])[0]
     assert mc.check_collisions(c, [a]) == []
     assert len(mc.check_collisions(c, [a, b])) == 1
@@ -562,9 +562,9 @@ def test_two_briefs_that_declare_the_same_requirement_collide_unless_one_builds_
 
 def test_the_command_refuses_a_colliding_brief_and_lets_a_clean_one_through(tmp_path):
     repo = _repo_with_two_branches(tmp_path)
-    first = _brief(tmp_path / "first.md", "ui/first")
-    second = _brief(tmp_path / "second.md", "ui/second")
-    third = _brief(tmp_path / "third.md", "ui/third")
+    first = _task(tmp_path / "first.md", "ui/first")
+    second = _task(tmp_path / "second.md", "ui/second")
+    third = _task(tmp_path / "third.md", "ui/third")
     script = str(REPO_ROOT / "scripts/sysml/model_check.py")
     args = [sys.executable, script, "impact", "--repo", str(repo), "--base", "line", "--open", str(first)]
     refused = subprocess.run(args + ["--new", str(second)], capture_output=True, text=True)
@@ -584,9 +584,9 @@ def test_work_two_branches_inherit_from_a_shared_parent_is_not_a_collision_betwe
             (repo / "app/services/other.py").write_text(body)
             _git(repo, "commit", "-q", "-am", name)
     _git(repo, "checkout", "-q", "line")
-    a = mc.brief_elements(_brief(tmp_path / "a.md", "ui/child-a"), "line", repo)
-    b = mc.brief_elements(_brief(tmp_path / "b.md", "ui/child-b"), "line", repo)
-    c = mc.brief_elements(_brief(tmp_path / "c.md", "ui/child-c"), "line", repo)
+    a = mc.task_elements(_task(tmp_path / "a.md", "ui/child-a"), "line", repo)
+    b = mc.task_elements(_task(tmp_path / "b.md", "ui/child-b"), "line", repo)
+    c = mc.task_elements(_task(tmp_path / "c.md", "ui/child-c"), "line", repo)
     found = mc.check_collisions(b, [a])
     assert len(found) == 1 and "app/services/other.py" in found[0] and "gap_register" not in found[0]
     assert mc.check_collisions(c, [a]) == []
@@ -710,22 +710,22 @@ def test_the_check_command_exits_non_zero_over_a_ratchet_and_zero_at_or_below_it
 
 # ----------------------------------------------------------------------------------- check 5, the rest
 def test_a_brief_names_its_own_branch_from_its_seat_note_else_from_its_id_and_never_from_a_mention(tmp_path):
-    seat = "# x\n\nSEAT NOTE: you work on branch ui/sample02, based on ui/sample01.\nSee branch `ui/other` too.\n"
-    assert mc.own_branch(seat, "sample02") == "ui/sample02"
-    assert mc.own_branch("SEAT NOTE: you work on branch ui/sample02.\n", "x") == "ui/sample02"
+    notes = "# x\n\nTask notes: you work on branch ui/sample02, based on ui/sample01.\nSee branch `ui/other` too.\n"
+    assert mc.own_branch(notes, "sample02") == "ui/sample02"
+    assert mc.own_branch("Task notes: you work on branch ui/sample02.\n", "x") == "ui/sample02"
     assert mc.own_branch("you work on branch `ui/fix-1.2` today", "x") == "ui/fix-1.2"
     mention = "# T\n\nThe slice on branch `ui/sample01` already holds the rule.\n"
     assert mc.own_branch(mention, "K-sample-01-dispatch-impact-check") == "ui/K-sample-01"
-    assert mc.brief_id("K-sample-05b-interaction-model-and-checks") == "K-sample-05b"
-    assert mc.brief_id("odd") == "odd"
+    assert mc.task_id("K-sample-05b-interaction-model-and-checks") == "K-sample-05b"
+    assert mc.task_id("odd") == "odd"
 
 
 def test_the_real_dispatch_brief_prints_its_own_branch_and_not_the_one_it_mentions(tmp_path):
     repo = _repo_with_two_branches(tmp_path)
-    brief = tmp_path / "K-sample-01-dispatch-impact-check.md"
-    brief.write_text("# T\n\n- The slice on branch `ui/first` already holds the rule.\n")
+    task = tmp_path / "K-sample-01-dispatch-impact-check.md"
+    task.write_text("# T\n\n- The slice on branch `ui/first` already holds the rule.\n")
     script = str(REPO_ROOT / "scripts/sysml/model_check.py")
-    run = subprocess.run([sys.executable, script, "impact", "--repo", str(repo), "--base", "line", "--new", str(brief)],
+    run = subprocess.run([sys.executable, script, "impact", "--repo", str(repo), "--base", "line", "--new", str(task)],
                          capture_output=True, text=True)
     assert run.returncode == 0
     assert "own branch ui/K-sample-01 (not created yet)" in run.stdout and "ui/first" not in run.stdout
@@ -746,8 +746,8 @@ def test_two_branches_that_change_one_file_under_migrations_or_tests_collide(tmp
         _git(repo, "add", "-A")
         _git(repo, "commit", "-q", "-m", name)
     _git(repo, "checkout", "-q", "line")
-    p = mc.brief_elements(_brief(tmp_path / "p.md", "ui/p"), "line", repo)
-    q = mc.brief_elements(_brief(tmp_path / "q.md", "ui/q"), "line", repo)
+    p = mc.task_elements(_task(tmp_path / "p.md", "ui/p"), "line", repo)
+    q = mc.task_elements(_task(tmp_path / "q.md", "ui/q"), "line", repo)
     found = mc.check_collisions(q, [p])
     assert len(found) == 1 and "migrations/versions/m1.py" in found[0] and "tests/test_a.py" in found[0]
     assert "component-inventory" not in found[0]

@@ -15,7 +15,7 @@ The five checks (the model and its rules are described in model/README.md):
                                     The forms it reads and the forms it cannot read are as_built.FORMS_READ and
                                     as_built.FORMS_NOT_READ, and the check prints both under its findings
   4  satisfied and verified         every requirement has a part that satisfies it and a test that proves it
-  5  no collision                   no two open briefs change the same model element
+  5  no collision                   no two open tasks change the same model element
 and the screen check: every event on a screen reaches the route the model names, never a second one.
 """
 from __future__ import annotations
@@ -184,26 +184,26 @@ def _field(text: str, label: str) -> list[str]:
     return [x.strip().strip("`") for x in re.split(r"[,;]", m.group(1)) if x.strip()] if m else []
 
 
-def brief_id(stem: str) -> str:
+def task_id(stem: str) -> str:
     """`K-sample-01` from `K-sample-01-dispatch-impact-check`: the leading letters, name and number."""
     m = re.match(r"^([A-Za-z]+-[A-Za-z]+-\d+[a-z]?)(?:-|$)", stem)
     return m.group(1) if m else stem
 
 
 def own_branch(text: str, stem: str) -> str:
-    """The branch a brief is built on: the one its SEAT NOTE gives ("you work on branch ui/<id>"), else `ui/<brief id>`.
+    """The branch a task is built on: the one its task notes give ("you work on branch ui/<id>"), else `ui/<task id>`.
     Any other branch the text names is a mention of someone else's work."""
     m = re.search(r"\byou work on branch\s+`?(ui/(?:[\w-]+\.)*[\w-]+)", text, re.I)
-    return m.group(1) if m else f"ui/{brief_id(stem)}"
+    return m.group(1) if m else f"ui/{task_id(stem)}"
 
 
-def brief_elements(path: Path, base: str, git_dir: Path) -> dict:
-    """What one brief says it changes: the model ids it declares, and the branch it works on."""
+def task_elements(path: Path, base: str, git_dir: Path) -> dict:
+    """What one task says it changes: the model ids it declares, and the branch it works on."""
     text = path.read_text(encoding="utf-8")
     own = own_branch(text, path.stem)
     branch = own if _ref_exists(git_dir, own) else None
     return {
-        "brief": path.stem,
+        "task": path.stem,
         "own_branch": own,
         "declared": _field(text, "Model changes"),
         "builds_on": [b.removesuffix(".md") for b in _field(text, "Builds on")],
@@ -239,15 +239,15 @@ def _elements_since_common_ancestor(a: dict, b: dict) -> tuple[set, set]:
     return _changed(git_dir, since, a["branch"]), _changed(git_dir, since, b["branch"])
 
 
-def check_collisions(new: dict, open_briefs: list[dict]) -> list[str]:
-    """Check 5. The new brief may share an element with an open brief only when it says it builds on that brief."""
+def check_collisions(new: dict, open_tasks: list[dict]) -> list[str]:
+    """Check 5. The new task may share an element with an open task only when it says it builds on that task."""
     out = []
-    for o in open_briefs:
+    for o in open_tasks:
         mine_files, their_files = _elements_since_common_ancestor(new, o)
         shared = sorted((set(new["declared"]) & set(o["declared"])) | (mine_files & their_files))
-        if shared and o["brief"] not in new["builds_on"]:
+        if shared and o["task"] not in new["builds_on"]:
             shown = ", ".join(shared[:6]) + (f" and {len(shared) - 6} more" if len(shared) > 6 else "")
-            out.append(f"{new['brief']} and {o['brief']} both change {shown}")
+            out.append(f"{new['task']} and {o['task']} both change {shown}")
     return out
 
 
@@ -416,15 +416,15 @@ def cmd_selfcheck(a) -> int:
 def cmd_impact(a) -> int:
     git_dir = Path(a.repo).resolve()
     base = a.base
-    new = brief_elements(Path(a.new), base, git_dir)
-    opens = [brief_elements(Path(p), base, git_dir) for p in a.open]
-    print(f"{new['brief']}: declares {len(new['declared'])} model elements; own branch {new['own_branch']}"
+    new = task_elements(Path(a.new), base, git_dir)
+    opens = [task_elements(Path(p), base, git_dir) for p in a.open]
+    print(f"{new['task']}: declares {len(new['declared'])} model elements; own branch {new['own_branch']}"
           + ("" if new["branch"] else " (not created yet)"))
     clashes = check_collisions(new, opens)
     for c in clashes:
         print(f"  REFUSED {c}")
     if not clashes:
-        print(f"  clean: {new['brief']} shares no element with {len(opens)} open brief(s)")
+        print(f"  clean: {new['task']} shares no element with {len(opens)} open task(s)")
     return 1 if clashes else 0
 
 

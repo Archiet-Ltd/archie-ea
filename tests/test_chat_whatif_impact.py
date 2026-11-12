@@ -176,8 +176,9 @@ def test_impact_hub_page_still_renders(client, login_as, make_org):
     org = make_org("impact-hub")
     user = _architect(org, "impact-hub-a@example.com")
     login_as(client, user)
-    response = client.get("/dashboard/impact-analysis")
+    response = client.get("/dashboard/impact-analysis", follow_redirects=True)
     assert response.status_code == 200
+    assert response.request.path == "/enterprise/analysis/impact-analysis"
 
 
 # --------------------------------------------------------------------------- #

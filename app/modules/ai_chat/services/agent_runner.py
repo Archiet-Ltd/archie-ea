@@ -9,7 +9,8 @@ Flow per turn:
   5. Cap at MAX_ITERATIONS to prevent runaway chains
 
 Supports Anthropic (Claude) and OpenAI providers.
-Tools marked 'approve' tier are queued for user confirmation — not executed.
+A tool that writes is recorded, checked and reviewed by a model other than the drafter, then applied or
+declined by the server in the same turn.
 """
 
 from app.modules.ai_chat.tools.executor import ToolCall
@@ -52,18 +53,19 @@ Phase D — ArchiMate: run_inference_engine, diagnose_chain, explain_element, si
 Answers: answer (what breaks if X fails, what breaks if these fail together, which risks
          reach X): the same rows, citations and address the Ask and Impact pages show
 Phase E — Options: create_option, mark_option_recommended
-Phase G — Governance: submit_for_arb_review (requires confirmation)
+Phase G — Governance: submit_for_arb_review (checked and reviewed before it is applied)
 Solution state: get_solution_summary, get_completeness_score, update_solution_fields,
                 update_solution_phase, search_archimate_elements, find_applications,
                 query_capability_gaps
-Portfolio: update_application_status (requires confirmation)
-Blueprint: generate_blueprint_narrative (requires confirmation)
+Portfolio: update_application_status (checked and reviewed before it is applied)
+Blueprint: generate_blueprint_narrative (checked and reviewed before it is applied)
 
 HOW TO OPERATE:
 1. When the user asks to create, link, map, update, or submit — CALL THE TOOL. Do not describe it.
 2. If an entity name is ambiguous, ask the user to clarify BEFORE calling a write tool.
 3. After each successful tool call, confirm what was done in plain English.
-4. For 'approve' tier tools, state exactly what you will do and let the confirmation card handle it.
+4. A tool that changes records is checked and reviewed by the server, which applies it or declines it in the
+   same turn. Report the sentence it returns, starting "Applied:" or "Declined:"; nobody else is asked to sign it off.
 5. Never fabricate IDs. Always use names — the system resolves them to IDs.
 6. If solution_id is in the ACTIVE SOLUTION CONTEXT below, pass it to all tools automatically.
 
@@ -165,6 +167,10 @@ def _error_status(exc) -> Optional[int]:
     return status if isinstance(status, int) else None
 
 
+class EmptyModelReply(Exception):
+    """A model answered with no words and no tool call: a failure of that model, as a timeout is."""
+
+
 def is_retryable_llm_error(exc) -> bool:
     """True when another provider or model may answer what this one refused.
 
@@ -172,6 +178,8 @@ def is_retryable_llm_error(exc) -> bool:
     model or function the provider does not have. Anything else (a malformed
     request, a rejected key) would fail the same way elsewhere.
     """
+    if isinstance(exc, EmptyModelReply):
+        return True
     status = _error_status(exc)
     text = str(exc).lower()
     if "answers are paused" in text:
@@ -339,6 +347,11 @@ class AgentRunner:
         self._held_tokens: Optional[list] = None
         self._withheld_claims: list = []   # sentences refused (enforce mode)
         self._would_withhold: list = []    # sentences logged only (log mode)
+        # The verdict on each change this runner recorded, by record id, and the model drafting now
+        # (provider, model, the person's words), which the record names.
+        self._verdicts: dict = {}
+        self._drafter = None
+        self._review_budget = None
 
     GATE_MODES = ("log", "enforce", "off")
 
@@ -447,8 +460,16 @@ class AgentRunner:
         name unlinked in that case - still verifiable, since the id travels with
         it.
         """
-        from flask import url_for
+        from flask import current_app, has_request_context, url_for
 
+        if not has_request_context():
+            # A streamed turn runs on a background thread with only an application context,
+            # where url_for cannot build a path: borrow a request context so the link is drawn.
+            try:
+                with current_app.test_request_context("/"):
+                    return AgentRunner._source_url(entity_type, row)
+            except Exception:
+                return None
         try:
             if entity_type == "application":
                 return url_for("unified_applications.application_detail", id=row["id"])
@@ -684,7 +705,7 @@ class AgentRunner:
         dict with keys:
           response         : str   — final LLM text to show the user
           actions_taken    : list  — successfully executed tool calls
-          pending_approvals: list  — 'approve' tier tools queued for confirmation
+          pending_approvals: list  — the changes this turn asked for, each with its verdict
           error            : str   — set only on fatal failure
         """
         from app.modules.ai_chat.services.llm_service_impl import LLMService
@@ -696,6 +717,10 @@ class AgentRunner:
         # this id so it can be traced back to the specific run that raised it.
         import uuid as _uuid
         self._turn_id = str(_uuid.uuid4())
+
+        # A run may make at most this many review and revision calls, across every change it queues.
+        from app.modules.ai_chat.services.change_review import ReviewBudget
+        self._review_budget = ReviewBudget()
 
         self._context_struct = None
         # Build system prompt with live domain context
@@ -840,6 +865,9 @@ class AgentRunner:
                         stream=stream_mode,
                         base_url=base_url,
                     )
+                    if not llm_resp.get("tool_calls") and not (llm_resp.get("text") or "").strip():
+                        llm_resp = None
+                        raise EmptyModelReply("empty reply from " + str(model))
                 except Exception as e:
                     self._release_held_tokens(False)
                     from app.modules.ai_chat.services.llm_service_impl import AnswersPaused
@@ -952,27 +980,35 @@ class AgentRunner:
                         "code": "TOOL_NOT_OFFERED",
                     }
                 elif self._should_queue(schema, self.auto_execute):
-                    # Queue for user approval. Either the tool is always-approve
-                    # (destructive/significant regardless of the gate), or it
-                    # mutates and this session has auto-execute off - the
-                    # write-approval gate described in toggle_auto_execute.
+                    # A write is recorded, then checked and reviewed by a model other than
+                    # this one, and applied or declined by the server in this same turn.
+                    # Either the tool is always-reviewed (destructive/significant regardless
+                    # of the gate), or it mutates: nothing waits for a second person.
+                    self._drafter = (provider, model, user_message)
                     approval_id = self._queue_approval(tc, persona=persona)
+                    verdict = self._verdicts.get(approval_id) or {
+                        "state": "in_review", "approval_id": approval_id,
+                        "message": "In review: " + self._approval_summary(tc),
+                    }
                     pending_approvals.append({
                         "approval_id": approval_id,
                         "tool": tc.name,
                         "arguments": tc.arguments,
-                        "summary": self._approval_summary(tc),
+                        "summary": verdict.get("summary") or self._approval_summary(tc),
+                        "state": verdict.get("state"),
+                        "message": verdict.get("message"),
+                        "reasons": verdict.get("reasons") or [],
+                        "rounds": verdict.get("rounds"),
+                        "drafter_model": verdict.get("drafter_model"),
+                        "reviewer_model": verdict.get("reviewer_model"),
+                        "record_url": verdict.get("record_url"),
                     })
-                    result = {
-                        "success": False,
-                        "pending_approval": True,
-                        "approval_id": approval_id,
-                        "message": (
-                            f"Action queued for confirmation (approval #{approval_id}). "
-                            "The user must approve before this executes."
-                        ),
-                    }
-                    self._emit({"type": "approval_queued", "tool": tc.name, "approval_id": approval_id})
+                    result = self._verdict_result(approval_id, verdict)
+                    if verdict.get("state") == "in_review":
+                        self._emit({"type": "approval_queued", "tool": tc.name, "approval_id": approval_id})
+                    else:
+                        self._emit({"type": "change_settled", "tool": tc.name, "approval_id": approval_id,
+                                    "state": verdict.get("state"), "message": verdict.get("message")})
                 else:
                     # Auto-execute
                     self._emit({"type": "tool_start", "tool": tc.name, "args": tc.arguments})
@@ -1009,7 +1045,7 @@ class AgentRunner:
             {
                 "response": (
                     "I've completed the available steps. Here's what was done:\n"
-                    + "\n".join(f"- {a['message']}" for a in actions_taken)
+                    + "\n".join(f"- {m}" for m in dict.fromkeys(a["message"] for a in actions_taken))
                     if actions_taken
                     else "I reached the action limit without completing all steps. Please try again with a simpler request."
                 ),
@@ -1601,8 +1637,27 @@ class AgentRunner:
             return True
         return False
 
+    @staticmethod
+    def _verdict_result(approval_id: int, verdict: dict) -> dict:
+        """The tool result the model reads: what the server did with the change, in the words to repeat."""
+        state = verdict.get("state")
+        message = verdict.get("message") or ""
+        if state == "applied":
+            return {"success": True, "applied": True, "approval_id": approval_id, "message": message,
+                    "instruction": "Tell the person the change was made, using the sentence above."}
+        if state == "declined":
+            return {"success": False, "declined": True, "approval_id": approval_id, "message": message,
+                    "reasons": verdict.get("reasons") or [],
+                    "instruction": "Tell the person nothing was changed and give the reasons above."}
+        return {"success": False, "in_review": True, "approval_id": approval_id, "message": message,
+                "instruction": "Tell the person the change is being checked and its result will be on its record."}
+
     def _queue_approval(self, tc: "ToolCall", persona: Optional[str] = None) -> int:
-        """Write a pending AIChatCRUDApproval record and return its ID."""
+        """Write the AIChatCRUDApproval record for a write, settle it, and return its ID.
+
+        The record names the model drafting this turn and the person's own words. Settling (checks,
+        review by another model, apply or decline) runs at once; its verdict is kept in
+        ``self._verdicts`` under the record's id for the turn to report."""
         from app.modules.ai_chat.services.ai_chat_approval_service import (
             _load_acting_user,
             create_approval_record,
@@ -1615,12 +1670,13 @@ class AgentRunner:
         # the agent runner loops over tenants inside one session, and get()
         # returning an identity-map hit from a different organisation's turn
         # would bypass the tenant filter entirely.
+        provider, model, request_text = getattr(self, "_drafter", None) or (None, None, None)
         actor = _load_acting_user(self.user_id)
         approval = create_approval_record(
             organization_id=actor.organization_id if actor else None,
             operation_type="tool_use",
             entity_type=tc.name,
-            original_command=tc.name,
+            original_command=(request_text or tc.name)[:4000],
             operation_payload=tc.arguments,
             summary=self._approval_summary(tc),
             user_id=self.user_id,
@@ -1628,8 +1684,15 @@ class AgentRunner:
             agent_turn_id=self._turn_id,
             expiry_minutes=24 * 60,  # unchanged: this caller's own 24h window
             persona=persona,
+            drafter_model="%s/%s" % (provider, model) if provider and model else None,
+            settle=True,
+            review_budget=getattr(self, "_review_budget", None),
         )
-        return approval.id
+        approval_id = approval.id
+        verdict = getattr(approval, "review_verdict", None)
+        if verdict:
+            self._verdicts[approval_id] = verdict
+        return approval_id
 
     # Human-readable business-term label for a tool name, used by the generic
     # fallback in _approval_summary below (ARCH-023). Kept separate from the
@@ -1697,6 +1760,9 @@ class AgentRunner:
             from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE
 
             msg = PAUSED_MESSAGE
+        elif "empty reply" in reason_l:
+            msg = "The assistant could not answer this time. Press Retry."
+            busy = True
         elif busy:
             msg = (
                 "The assistant is busy right now. Wait a minute, then press Retry."
@@ -1716,12 +1782,15 @@ class AgentRunner:
                 "The AI request couldn't be completed. See the error detail below "
                 "or check Admin → AI settings."
             )
-        return {
+        out = {
             "response": msg,
             "actions_taken": [],
             "pending_approvals": [],
             "error": reason,
         }
+        if busy:
+            out["retryable"] = True  # the chat offers Retry beside this sentence
+        return out
 
     def _record_run(
         self,
