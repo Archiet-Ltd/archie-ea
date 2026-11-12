@@ -485,10 +485,42 @@ def _register_only_count(dashboard_layer: str, org_id=None) -> int:
     return records
 
 
+# A layer as an element's layer column may spell it (lower case, no spaces or underscores, "&" as "and").
+# Physical is Technology's: its elements are counted and listed there.
+STORED_LAYER_KEYS = {
+    "motivation": "motivation", "strategy": "strategy", "business": "business", "application": "application",
+    "technology": "technology", "physical": "technology", "implementation": "implementation",
+    "implementationmigration": "implementation", "implementationandmigration": "implementation",
+}
+
+
+def _stored_layer_key(raw) -> str:
+    """The stored layer column as the layer map spells it, or "" when it names no layer."""
+    spelled = (raw or "").lower().replace("&", "and").replace(" ", "").replace("_", "")
+    return STORED_LAYER_KEYS.get(spelled, "")
+
+
+def element_layer(stored_layer, element_type) -> str:
+    """The layer one element is counted in, whatever its type: the layer it is stored in. An element that
+    names no layer is placed by its type, and one whose type no layer holds is the composite row."""
+    return _stored_layer_key(stored_layer) or LAYER_TYPE_TO_LAYER.get(_type_key(element_type), COMPOSITE_LAYER)
+
+
+def _stored_layer_column():
+    """The same spelling as _stored_layer_key, on the stored column."""
+    from app import db as _db
+    from app.models.archimate_core import ArchiMateElement
+
+    spelled = _db.func.replace(_db.func.coalesce(_db.func.lower(ArchiMateElement.layer), ""), "&", "and")
+    return _db.func.replace(_db.func.replace(spelled, " ", ""), "_", "")
+
+
 def layer_model_query(layer: str, org_id=None):
-    """The model elements of one layer, the rows count_layers counts for it. Physical, which is no layer of its
-    own, answers with the Physical types alone. With ``org_id`` the query names that organisation itself, as
-    count_layers does, instead of relying on the tenant filter alone."""
+    """The model elements of one layer, the rows count_layers counts for it: every element stored in the layer,
+    whatever its type (element_layer is the rule). Physical, which is no layer of its own, answers with the
+    Physical types alone. With ``org_id`` the query names that organisation itself, as count_layers does,
+    instead of relying on the tenant filter alone."""
+    from app import db as _db
     from app.models.archimate_core import ArchiMateElement
 
     base = ArchiMateElement.query
@@ -496,27 +528,34 @@ def layer_model_query(layer: str, org_id=None):
         base = base.filter(ArchiMateElement.organization_id == org_id)
     if layer == "physical":
         return base.filter(_type_key_column().in_(list(PHYSICAL_TYPES)))
-    return _filter_to_layer(base, layer, [t.lower() for t in _types_for_layer(layer)])
+    stored = _stored_layer_column()
+    unplaced = _db.not_(stored.in_(list(STORED_LAYER_KEYS)))
+    if layer == COMPOSITE_LAYER:
+        return base.filter(unplaced, _db.not_(_type_key_column().in_(list(LAYER_TYPE_TO_LAYER))))
+    names = [name for name, key in STORED_LAYER_KEYS.items() if key == layer]
+    typed = [t.lower() for t in _types_for_layer(layer)]
+    return base.filter(_db.or_(stored.in_(names), _db.and_(unplaced, _type_key_column().in_(typed))))
 
 
 def count_layers(org_id, allowed_types=None) -> list:
     """The one count of every layer, read by the architecture dashboard's tabs and the Composer's layer cards.
 
-    One row per layer in LAYER_TITLES order: ``model`` is the organisation's model elements whose type
-    belongs to the layer (types the map does not know are the composite row), ``register_only`` the
-    records the layer lists that the model does not hold, and ``count`` their sum. ``count`` is None, never
+    One row per layer in LAYER_TITLES order: ``model`` is the organisation's model elements stored in the
+    layer, whatever their type (one that names no layer is placed by its type; types the map does not know are
+    the composite row), ``register_only`` the records the layer lists that the model does not hold, and ``count`` their sum. ``count`` is None, never
     a partial figure, when the records could not be counted. Physical is not a row: its types are Technology's.
     """
     from app import db as _db
     from app.models.archimate_core import ArchiMateElement
 
-    query = _db.select(_db.func.lower(ArchiMateElement.type), _db.func.count()).group_by(
-        _db.func.lower(ArchiMateElement.type)).where(ArchiMateElement.organization_id == org_id)
+    stored = _stored_layer_column()
+    query = _db.select(stored, _db.func.lower(ArchiMateElement.type), _db.func.count()).group_by(
+        stored, _db.func.lower(ArchiMateElement.type)).where(ArchiMateElement.organization_id == org_id)
     if allowed_types:
         query = query.where(ArchiMateElement.type.in_(allowed_types))
     model = {}
-    for type_name, n in _db.session.execute(query).all():
-        key = LAYER_TYPE_TO_LAYER.get(_type_key(type_name), COMPOSITE_LAYER)
+    for stored_layer, type_name, n in _db.session.execute(query).all():
+        key = element_layer(stored_layer, type_name)
         model[key] = model.get(key, 0) + n
     rows = []
     for layer, title in LAYER_TITLES.items():

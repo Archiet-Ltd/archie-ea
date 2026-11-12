@@ -22,12 +22,12 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 VIEWPORTS = [({"width": 1440, "height": 900}, "light"), ({"width": 390, "height": 844}, "dark")]
 
-# What the seed holds, by the layer each element's type belongs to.
+# What the seed holds, by the layer each element is stored in (one with no layer stored is placed by its type).
 EXPECTED = {
-    "Motivation": 14,
+    "Motivation": 12,
     "Strategy": 6,
     "Business": 14,
-    "Application": 8,
+    "Application": 10,
     "Technology": 6,
     "Implementation & Migration": 7,
     "Composite and other elements": 2,

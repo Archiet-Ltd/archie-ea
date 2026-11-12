@@ -29,11 +29,11 @@ LAYER_LABELS = {
 _PAGE_LAYERS = frozenset(LAYERS) - {"other"}
 
 
-def layer_key(element_type: Optional[str]) -> str:
-    """The layer an element's type belongs to, by the same map count_layers reads."""
+def layer_key(stored_layer: Optional[str], element_type: Optional[str]) -> str:
+    """The layer an element is drawn in, by the same rule count_layers reads: the layer it is stored in."""
     from app.services import archimate_viewpoint_service as counting
 
-    layer = counting.LAYER_TYPE_TO_LAYER.get(counting._type_key(element_type), counting.COMPOSITE_LAYER)
+    layer = counting.element_layer(stored_layer, element_type)
     return "other" if layer == counting.COMPOSITE_LAYER else layer
 
 
@@ -109,7 +109,7 @@ def build_model_map(layer: Optional[str] = None) -> Dict[str, Any]:
     from app.utils.tenant_sql import current_org_id
 
     query = counting.layer_model_query(_counting_layer(wanted), current_org_id()) if wanted else E.query
-    query = query.with_entities(E.id, E.name, E.type, E.source_kind, E.source_label, E.source_ref,
+    query = query.with_entities(E.id, E.name, E.type, E.layer, E.source_kind, E.source_label, E.source_ref,
                                 E.source_recorded_at, E.recorded_at).order_by(E.id)
     rows = query.limit(MAX_NODES + 1).all()
     truncated = len(rows) > MAX_NODES
@@ -117,7 +117,7 @@ def build_model_map(layer: Optional[str] = None) -> Dict[str, Any]:
 
     nodes = []
     for r in rows:
-        key = layer_key(r.type)
+        key = layer_key(r.layer, r.type)
         when = r.source_recorded_at or r.recorded_at
         nodes.append({
             "id": r.id, "name": r.name or "Element %d" % r.id, "type": r.type or "Element", "layer": key,
