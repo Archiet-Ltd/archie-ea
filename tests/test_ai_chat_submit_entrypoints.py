@@ -28,8 +28,14 @@ def chat(launch):
 
 def assert_one_reply(page, payloads, message, initial_url):
     expect(page.locator('#messages-container .message-content').last).to_contain_text('Fixture response.')
-    assert payloads == [{'message': message, 'domain': 'general', 'element_id': None,
-                         'context_type': None, 'persona': None, 'model': None, 'thread_id': None}]
+    # A first ask is not a Retry, and says how long the person has already waited (a small number here).
+    assert len(payloads) == 1
+    sent = dict(payloads[0])
+    waited = sent.pop('waited_seconds')
+    assert isinstance(waited, (int, float)) and 0 <= waited < 30
+    assert sent == {'message': message, 'domain': 'general', 'element_id': None,
+                    'context_type': None, 'persona': None, 'model': None, 'thread_id': None,
+                    'retry': False, 'failed_turn_id': None}
     assert page.url == initial_url
 
 
@@ -111,7 +117,7 @@ def test_opening_screen_questions_name_the_organisations_applications_and_a_clic
     page, payloads = chat(launch)
     initial_url = page.url
     questions = page.locator('#portfolio-briefing')
-    # four questions, each naming an application in the seeded organisation's records, in list order
+    # four questions, each naming a linked application in the seeded organisation's records, most connected first
     for application in APPLICATIONS[:4]:
         expect(questions).to_contain_text(f"What breaks if {application['name']} fails?")
     expect(questions).not_to_contain_text(APPLICATIONS[4]['name'])
