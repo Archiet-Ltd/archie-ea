@@ -26,7 +26,7 @@ which record is authoritative.
 An identifier crosswalk that matches records across your connected tools automatically, routing
 anything it isn't confident about to a review queue instead of guessing.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

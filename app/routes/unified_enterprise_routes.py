@@ -45,7 +45,6 @@ from ..exceptions import (  # dead-code-ok
 from ..utils.api_helpers import api_error
 from ..models import (  # dead-code-ok
     ConceptualDataModel,
-    Contract,
     DesignPattern,
     LogicalDataModel,
     PhysicalDataModel,
@@ -204,27 +203,8 @@ def api_data_models():
 @enterprise_bp.route("/solutions_architecture_dashboard")
 @login_required
 def solutions_architecture_dashboard():
-    """Solutions Architecture Dashboard"""
-    try:
-        solution_count = Solution.query.count()
-        pattern_count = SolutionPattern.query.count()
-        contract_count = Contract.query.count()
-
-        return render_template(
-            "enterprise/solutions_architecture_dashboard.html",
-            solution_count=solution_count,
-            pattern_count=pattern_count,
-            contract_count=contract_count,
-        )
-    except SQLAlchemyError as e:
-        current_app.logger.error(
-            f"Database error loading solutions architecture dashboard: {e}"
-        )
-        raise DatabaseError(
-            message=f"Failed to load solutions dashboard: {str(e)}",
-            user_message="Unable to load the solutions architecture dashboard.",
-            recovery_action="Refresh the page. If the problem persists, contact support.",
-        )
+    """The Enterprise page's link: the one Solutions Architecture dashboard, the page the sidebar opens."""
+    return redirect(url_for("architecture.solutions_architecture_dashboard"))
 
 
 @enterprise_bp.route("/api/solutions")
@@ -234,7 +214,10 @@ def api_solutions():
     try:
         solutions = Solution.query.limit(500).all()
         patterns = SolutionPattern.query.limit(500).all()
-        contracts = Contract.query.limit(500).all()
+        from app.decorators.requires_role import may_see_contract_pages
+        from app.services.vendor_register import register_contracts
+
+        contracts = register_contracts(current_user.organization_id)[:500] if may_see_contract_pages(current_user) else []
 
         return jsonify(
             {
@@ -257,7 +240,7 @@ def api_solutions():
                         "name": p.name,
                         "description": p.description,
                         "pattern_category": p.pattern_category,
-                        "applicability": p.applicability,
+                        "pattern_type": p.pattern_type,
                         "created_at": p.created_at.isoformat()
                         if p.created_at
                         else None,
@@ -267,9 +250,9 @@ def api_solutions():
                 "contracts": [
                     {
                         "id": c.id,
-                        "name": c.name,
+                        "name": c.contract_name,
                         "contract_type": c.contract_type,
-                        "provider": c.provider,
+                        "provider": c.vendor.name if c.vendor else None,
                         "status": c.status,
                         "created_at": c.created_at.isoformat()
                         if c.created_at
