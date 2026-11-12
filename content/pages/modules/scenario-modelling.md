@@ -5,6 +5,7 @@ module_label: "Scenarios"
 state: briefed
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
+description: Compare what-if plans side by side before you commit money to any one of them.
 released_variant: {screen: /simulations, file: _released/scenario-modelling.md}
 icon: git-compare
 headline: Compare what-if plans side by side (early access)
@@ -24,7 +25,7 @@ questions:
 steps_heading: What you can do while you wait.
 steps:
 - name: Join the waiting list
-  text: Tell us you need it and we will tell you the day it ships.
+  text: Tell us you need it and we will email you when you can use it.
 - name: See what depends on a system
   text: Pick a system in the twin map today.
 - name: Place programmes on a roadmap
@@ -45,7 +46,7 @@ Entelim is building scenarios, so you can set what-if plans side by side and com
 
 Pick a system in the [twin map](/modules/digital-twin) to see the applications and services that depend on it, and place programmes on a [roadmap](/modules/roadmaps).
 
-Coming soon. Join the waiting list and we will tell you the day it ships.
+Early access. Join the waiting list and we will email you when you can use it.
 
 ## Related
 
