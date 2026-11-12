@@ -332,6 +332,8 @@ class JobQueueService:
             return self._execute_model_health_scan(payload, job_id)
         elif task == "github_first_sync":
             return self._execute_github_first_sync(payload, job_id)
+        elif task == "settle_proposals":
+            return self._execute_settle_proposals(payload)
         elif task == "website_profile_crawl":
             from app.modules.organization.website_crawl import run_website_crawl_job
 
@@ -379,6 +381,18 @@ class JobQueueService:
             return loop.run_until_complete(sync_service.async_run_incremental_sync())
         else:
             raise ValueError(f"Unknown sync type: {sync_type}")
+
+    def _execute_settle_proposals(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Check, review and settle one organisation's waiting proposals (a blueprint's, a connection change)."""
+        org_id = payload.get("organization_id")
+        if org_id is None:
+            raise ValueError("settle_proposals job requires organization_id in payload")
+
+        from app.jobs.tenant_safe_job import tenant_scope
+        from app.modules.ai_chat.services import change_review
+
+        with tenant_scope(org_id):
+            return change_review.settle_proposals(org_id)
 
     def _execute_github_first_sync(self, payload: Dict[str, Any], job_id: int) -> Dict[str, Any]:
         """Read one organisation's GitHub repositories into proposals (the connect page's first sync

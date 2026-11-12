@@ -111,6 +111,18 @@ def _back_to_inbox(result, done_message):
     return redirect(url_for("unified_ai_chat.approval_inbox"))
 
 
+def _when(value):
+    """An ISO timestamp from the approval service as a datetime, or None."""
+    from datetime import datetime
+
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
 @unified_ai_chat_bp.route("/approvals/<int:approval_id>/undo", methods=["POST"])
 @login_required
 def undo_applied_approval(approval_id):
@@ -143,13 +155,34 @@ def approval_inbox():
         abort(403)
     from app.modules.ai_chat.services.change_review import SOURCE_WORDS
 
+    from datetime import datetime
+
     service = _approval_service()
     source = (request.args.get("source") or "").strip() or None
+    # Only a proposal from a source that is not settled by the server yet waits for a person; everything else
+    # is in the record below, with what became of it.
+    queue = service.get_approver_queue()
+    approvals = [a for a in (queue.get("approvals", []) if queue.get("success") else []) if not a.get("in_loop")]
+    now = datetime.utcnow()
+    for item in approvals:
+        item["created"] = _when(item.get("created_at"))
+        item["expires"] = _when(item.get("expires_at"))
+        expires = item["expires"]
+        if expires is not None and expires.tzinfo is not None:
+            expires = expires.replace(tzinfo=None)
+        item["overdue"] = bool(expires and expires < now)
     found = service.get_settled_records(source)
     records = found.get("records", []) if found.get("success") else []
     # The record of one reviewed item (checks, rounds, both models, every reason), read only, for the item the
     # person opened from the assistant's answer or from the list.
     focus_id = request.args.get("approval", type=int)
+    impact = None
+    if focus_id and any(item["id"] == focus_id for item in approvals):
+        try:
+            result = service.get_approval_impact(focus_id)
+            impact = result.get("impact") if result.get("success") else {"error": True}
+        except Exception:
+            impact = {"error": True}
     record = None
     record_missing = False
     if focus_id:
@@ -162,6 +195,9 @@ def approval_inbox():
         "ai_chat/approval_inbox.html",
         record=record,
         record_missing=record_missing,
+        approvals=approvals,
+        queue_error=None if queue.get("success") else "The approval inbox could not be loaded.",
+        impact=impact,
         records=records,
         records_error=None if found.get("success") else "The record could not be loaded.",
         source_label=(SOURCE_WORDS.get(source) or ("Asked for in the AI chat" if source == "chat" else source))

@@ -8,7 +8,7 @@ The structure (sentence case, the shadcn sidebar pattern, a group label, a colla
 its sub-items: two levels at most):
 
 - the organisation switcher, then one search box ("Search or ask...");
-- TOP: Home, AI chat and Approvals (the record of what was settled; it carries no number);
+- TOP: Home, AI chat and Approvals (the record of what was settled; its number is what still waits for a person);
 - WORK: Systems, Impact, Changes, Spend and Compliance, each opening onto its pages;
 - MODEL, shown to every role: one item per ArchiMate layer opening onto its element types
   (ADR-0018), then Frameworks and Composer. Frameworks are one gallery page (ADR-0017);
@@ -99,9 +99,10 @@ TOP: tuple = (
     _l("ai_chat", "AI chat", "unified_ai_chat.index", "message-square", job="6",
        aliases=("Ask", "Ask a question", "Assistant", "Chat", "Saved answers", "Question"),
        owns=("unified_ai_chat.", "intelligence_ui.ask", "intelligence_ui.answers")),
-    # The record of what was applied, linked, declined and retired. Nothing waits for a person, so no number.
+    # The record of what was applied, linked, declined and retired. Its number is the proposals still waiting
+    # for a person (only those of a source the server does not settle yet), so it is nothing when nothing waits.
     _l("approvals", "Approvals", "unified_ai_chat.approval_inbox", "inbox", job="6", requires="general",
-       aliases=("Approval inbox", "Pending changes", "Proposals", "Waiting for me")),
+       aliases=("Approval inbox", "Pending changes", "Proposals", "Waiting for me"), count="approvals"),
 )
 
 # ── Work: five jobs, each a collapsible item with the pages that do it ───────────────────
@@ -541,7 +542,17 @@ class SidebarItem:
     badge: int | None = None
 
 
-_COUNTERS: dict = {}
+def _waiting_approvals(user) -> int | None:
+    """The proposals waiting for a person, beside Approvals: none, once the server settles every source."""
+    try:
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        return AIChatApprovalService(getattr(user, "id", None)).count_waiting_for_a_person()
+    except Exception:  # noqa: BLE001 - a count must not 500 a page
+        return None
+
+
+_COUNTERS = {"approvals": _waiting_approvals}
 
 
 def _here(link: NavLink, endpoint: str | None, values: dict | None) -> bool:

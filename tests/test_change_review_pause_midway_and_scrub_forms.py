@@ -457,7 +457,8 @@ def test_the_approvals_page_claims_a_settlement_only_for_a_change_with_a_recorde
         db.session.flush()
         login_as(client, user)
         html = client.get("/ai-chat/approvals/inbox").get_data(as_text=True)
-    assert "approval-held-%d" % waiting_id in html and "approval-in-review-%d" % waiting_id not in html
+    held_reason = html.split('data-testid="approval-reason-%d"' % waiting_id)[1].split("</span>")[0]
+    assert "paused for this workspace" in held_reason and "approval-in-review-%d" % waiting_id not in html
     assert "approval-in-review-%d" % older.id not in html
     assert "/ai-chat/approvals/%d/approve" % older.id not in html
     assert "approval-own-request-%d" % connector.id in html

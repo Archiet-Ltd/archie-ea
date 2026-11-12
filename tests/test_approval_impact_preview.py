@@ -695,16 +695,26 @@ def test_inbox_page_has_the_impact_and_decided_regions(app, db_session, make_org
 
     html = client.get("/ai-chat/approvals/inbox").get_data(as_text=True)
 
-    assert 'data-testid="approval-card-%s"' % approval_id in html
-    assert 'data-testid="approval-impact-toggle-%s"' % approval_id in html
-    assert "/ai-chat/approvals/inbox?approval=%s#approval-%s" % (approval_id, approval_id) in html
-    assert 'data-testid="approval-decided"' in html
-    assert 'data-testid="approval-decided-empty"' in html
+    # A change the server settles is in the record with its outcome and reason, not waiting for a person.
+    assert 'data-testid="approval-record-link-%s"' % approval_id in html
+    assert 'data-testid="approval-card-%s"' % approval_id not in html
+
+    # A proposal from a source the server does not settle yet waits for a person, and still offers its impact.
+    waiting_id = _propose(
+        tenant_ctx, org, requester,
+        operation_type="agent_charter_change", entity_type="agent_registration", payload={"a": 1},
+        summary="Charter change n",
+    )
+    login_as(client, reviewer)
+    html = client.get("/ai-chat/approvals/inbox").get_data(as_text=True)
+    assert 'data-testid="approval-card-%s"' % waiting_id in html
+    assert 'data-testid="approval-impact-toggle-%s"' % waiting_id in html
+    assert "/ai-chat/approvals/inbox?approval=%s#approval-%s" % (waiting_id, waiting_id) in html
 
     # Opening the toggle renders that proposal's impact region.
     login_as(client, reviewer)
-    html = client.get("/ai-chat/approvals/inbox?approval=%s" % approval_id).get_data(as_text=True)
-    assert 'data-testid="approval-impact-%s"' % approval_id in html
+    html = client.get("/ai-chat/approvals/inbox?approval=%s" % waiting_id).get_data(as_text=True)
+    assert 'data-testid="approval-impact-%s"' % waiting_id in html
 
 
 # ---------------------------------------------------------------------------

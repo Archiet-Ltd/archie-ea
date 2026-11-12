@@ -957,6 +957,11 @@ def propose_connector_change(
         user_id=actor_user_id,
         source_table="connector_config",
     )
+    # The change (or read) is checked, reviewed and settled by the job worker as soon as the caller saves it;
+    # nobody approves it.
+    from app.modules.ai_chat.services.change_review import queue_settling
+
+    queue_settling(resolved)
     return approval
 
 

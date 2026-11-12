@@ -56,6 +56,11 @@ def create_solution_blueprint_proposal(**kwargs) -> "SolutionBlueprintProposal":
         # check (`WHERE retired_into_id IS NULL`) would re-copy this row and
         # create a second approval for it the next time it runs.
         proposal.retired_into_id = approval.id
+        # The proposal is checked, reviewed and settled by the job worker as soon as the caller saves it;
+        # nobody approves it.
+        from app.modules.ai_chat.services.change_review import queue_settling
+
+        queue_settling(proposal.organization_id)
         db.session.flush()
 
     return proposal

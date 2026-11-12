@@ -23,6 +23,9 @@
 
 {% macro _open_chat() %}{% call ui.button(href=url_for('unified_ai_chat.index'), variant='outline') %}{{ lucide('message-square') }}Open the AI chat{% endcall %}{% endmacro %}
 
+{%- set OPERATION = {'create': ('Create', 'positive'), 'update': ('Update', 'caution'), 'delete': ('Delete', 'negative'),
+                     'tool_use': ('Run a tool', 'neutral'), 'link': ('Link', 'neutral')} -%}
+
 {% block content %}
 <div class="p-6 space-y-6">
 {{ page_shell(title='Approvals', subtitle='Every proposal is checked and reviewed automatically. This is the record of what was applied, linked, declined or retired, and why',
@@ -98,6 +101,113 @@
   {{ ui.alert_title(text='That change was not found') }}
   {{ ui.alert_description(text='It may belong to another workspace or no longer exist. The changes you can open are listed below.') }}
 {% endcall %}
+{% endif %}
+
+{% if queue_error %}
+{% call ui.alert(variant='destructive', attrs={'data-testid': 'approval-inbox-unavailable', 'role': 'alert'}) %}
+  {{ lucide('circle-alert') }}
+  {{ ui.alert_title(text='The approval inbox could not be loaded') }}
+  {{ ui.alert_description(text='Refresh the page to try again. Nothing has been approved or rejected.') }}
+{% endcall %}
+{% elif approvals %}
+<section class="space-y-3" aria-labelledby="waiting-heading" data-testid="approval-waiting">
+<h2 id="waiting-heading" class="text-lg font-semibold">Waiting for a person</h2>
+<p class="text-sm text-muted-foreground">These come from sources that are not checked and reviewed automatically yet. Everything else is settled by the server and listed below.</p>
+<div class="space-y-4" data-testid="approval-queue">
+  {% for item in approvals %}
+  {%- set op = OPERATION.get(item.operation_type, ((item.operation_type or 'Change')|replace('_', ' ')|capitalize, 'neutral')) -%}
+  {%- set focused = (focus_id == item.id) -%}
+  {% call ui.card(id='approval-' ~ item.id, class=('ring-2 ring-ring/50' if focused else ''), attrs={'data-testid': 'approval-card-' ~ item.id}) %}
+    {% call ui.card_header() %}
+      {% call ui.card_title(class='flex flex-wrap items-center gap-2') %}
+        {{ state_badge(item.operation_label or op[0], tone=op[1]) }}
+        <span>{{ item.entity_label or ((item.entity_type or 'Record')|replace('_', ' ')|capitalize) }}</span>
+      {% endcall %}
+      {{ ui.card_description(text=item.summary or 'No summary was given for this proposal.') }}
+      {% if item.created %}{% call ui.card_action() %}<span class="text-sm text-muted-foreground whitespace-nowrap tabular-nums">{{ item.created.strftime('%d %b %Y, %H:%M') }}</span>{% endcall %}{% endif %}
+    {% endcall %}
+    {% call ui.card_content(class='space-y-4') %}
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
+        <span>Requested by <span class="text-foreground">{{ item.requester.display_name if item.requester and item.requester.display_name else 'The system' }}</span></span>
+        <span class="inline-flex items-center gap-2 whitespace-nowrap">
+          {% if item.overdue %}{{ state_badge('Overdue', tone='negative') }}{% endif %}
+          <span>Expires: <span class="text-foreground">{{ item.expires|format_date if item.expires else 'No expiry date' }}</span></span>
+        </span>
+        {% if item.source_label %}<span data-testid="approval-source">{{ item.source_label }}</span>{% elif item.source_table %}<span data-testid="approval-source">From {{ item.source_table|replace('_', ' ') }}{% if item.source_id %} number {{ item.source_id }}{% endif %}</span>{% endif %}
+      </div>
+
+      {# What approving this would affect, worked out for the one proposal the person opens #}
+      <div class="space-y-3">
+        {% if focused %}
+          {% call ui.button(href=url_for('unified_ai_chat.approval_inbox'), variant='outline', size='sm', attrs={'data-testid': 'approval-impact-toggle-' ~ item.id, 'aria-expanded': 'true'}) %}{{ lucide('chevron-up') }}Hide what this affects{% endcall %}
+          <div class="rounded-md border p-4 space-y-3 text-sm" data-testid="approval-impact-{{ item.id }}"{% if impact and impact.state %} data-impact-state="{{ impact.state }}"{% endif %}>
+            {% if not impact or impact.error %}
+              <p class="text-muted-foreground" role="alert">What this affects could not be worked out. Reload the page to try again.</p>
+            {% else %}
+              <p class="text-foreground">{{ impact.message }}</p>
+              {% if impact.subject_owners %}
+              <p class="text-muted-foreground">Owned by <span class="text-foreground">{% for o in impact.subject_owners %}{{ o.name }}{% if o.role %} ({{ o.role }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</span></p>
+              {% endif %}
+              {% for key, label in [('services', 'Services'), ('interfaces', 'Interfaces'), ('applications', 'Applications'), ('other', 'Other elements')] %}
+                {%- set group = (impact.affected or {}).get(key) or [] -%}
+                {% if group %}
+                <div>
+                  <p class="font-medium text-foreground">{{ label }} ({{ group|length }})</p>
+                  <ul class="mt-1 space-y-1">
+                    {% for el in group %}
+                    <li class="text-muted-foreground"><span class="text-foreground">{{ el.name }}</span>, owner: {% if el.owners %}{% for o in el.owners %}{{ o.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}{{ el.owner_unit or 'no owner recorded' }}{% endif %}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          </div>
+        {% else %}
+          {% call ui.button(href=url_for('unified_ai_chat.approval_inbox', approval=item.id) ~ '#approval-' ~ item.id, variant='outline', size='sm', attrs={'data-testid': 'approval-impact-toggle-' ~ item.id, 'aria-expanded': 'false'}) %}{{ lucide('git-branch') }}What does this affect?{% endcall %}
+        {% endif %}
+      </div>
+
+      {% if item.arguments is not none %}
+      <details class="text-sm">
+        <summary class="cursor-pointer text-muted-foreground hover:text-foreground select-none">View technical detail</summary>
+        <pre class="mt-2 whitespace-pre-wrap break-all rounded-md border px-3 py-2 text-xs text-muted-foreground">{{ item.arguments|tojson(indent=2) }}</pre>
+      </details>
+      {% endif %}
+    {% endcall %}
+    {% call ui.card_footer(class='flex flex-wrap items-start gap-2 border-t') %}
+      {% if item.pre_loop %}
+      <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-pre-loop-{{ item.id }}">This was recorded before changes by the assistant were checked and reviewed automatically, so nothing has checked it. A person approves or rejects it; when you approve it, it is checked and reviewed before it is applied.</p>
+      {% elif item.held_by_pause %}
+      <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-held-{{ item.id }}">Changes by the assistant are paused for this workspace, so this change waits. It is checked, reviewed and applied once they resume.{% if item.has_check_record %} <a href="{{ url_for('unified_ai_chat.approval_inbox', approval=item.id) }}#record-{{ item.id }}" class="underline hover:no-underline">See how it was checked</a>{% endif %}</p>
+      {% elif item.settled_by_review %}
+      <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-in-review-{{ item.id }}">This change is checked and reviewed automatically and is applied or declined without waiting for a person. <a href="{{ url_for('unified_ai_chat.approval_inbox', approval=item.id) }}#record-{{ item.id }}" class="underline hover:no-underline">See how it was checked</a></p>
+      {% endif %}
+      {% if item.can_approve %}
+      <form method="post" action="{{ url_for('unified_ai_chat.approve_pending_approval', approval_id=item.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="from_inbox" value="1">
+        {% call ui.button(type='submit', size='sm') %}{{ lucide('check') }}Approve{% endcall %}
+      </form>
+      {% elif item.approve_note %}
+      <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-own-request-{{ item.id }}">{{ item.approve_note }}</p>
+      {% endif %}
+      <details class="min-w-0 flex-1">
+        <summary role="button" class="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground select-none">{{ lucide('x') }}Reject</summary>
+        <form method="post" action="{{ url_for('unified_ai_chat.reject_pending_approval', approval_id=item.id) }}" class="mt-3 space-y-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="from_inbox" value="1">
+          {{ ui.label(text='Why are you rejecting this?', attrs={'for': 'reject-reason-' ~ item.id}) }}
+          {{ ui.textarea(id='reject-reason-' ~ item.id, name='reason', rows=2, class='w-full resize-none', placeholder='Say in a sentence why this should not go ahead') }}
+          <p class="text-sm text-muted-foreground">The reason stays with the proposal.</p>
+          {% call ui.button(type='submit', variant='destructive', size='sm') %}Confirm Reject{% endcall %}
+        </form>
+      </details>
+    {% endcall %}
+  {% endcall %}
+  {% endfor %}
+</div>
+</section>
 {% endif %}
 
 {% if records_error %}

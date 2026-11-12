@@ -87,6 +87,10 @@ BUDGET_USED_UP_REASON = (
 NO_SYSTEM_ACTOR_REASON = "The workspace has no active administrator account to make this change, so nothing was changed."
 ACCOUNT_OFF_REASON = "The account that asked for this change has been switched off, so the change was not made."
 MOVED_REASON = "The person who asked for this change is no longer in the workspace."
+PRE_LOOP_REASON = (
+    "This was recorded before changes by the assistant were checked and reviewed automatically, so nothing has "
+    "checked it."
+)
 WRITES_PAUSED_REASON = (
     "Changes by the assistant are paused for this workspace. This one is made, after it is checked and "
     "reviewed, when they resume."
@@ -1620,9 +1624,14 @@ def record_row(approval: AIChatCRUDApproval, people: Optional[Dict[int, str]] = 
     payload = _payload_of(approval)
     if approval.status == ApprovalStatus.PENDING:
         label, tone = "In review", "caution"
-        reason = saved["waiting_reason"] or (
-            "It is being checked and reviewed by the server." if in_scope(approval)
-            else "This kind of proposal is not checked automatically yet.")
+        if in_scope(approval) and is_before_the_loop(approval):
+            reason = PRE_LOOP_REASON
+        elif in_scope(approval) and _writes_paused(approval.organization_id):
+            reason = WRITES_PAUSED_REASON
+        else:
+            reason = (saved["waiting_reason"] if saved["waiting_reason"] != WRITES_PAUSED_REASON else None) or (
+                "It is being checked and reviewed by the server." if in_scope(approval)
+                else "This kind of proposal is not checked automatically yet.")
     elif approval.status == ApprovalStatus.APPROVED:
         label, tone = LOOP_OUTCOME_WORDS["linked" if saved["outcome"] == "linked" else "applied"]
         reason = " ".join(saved["outcome_reasons"]) if saved["outcome_reasons"] else (
@@ -1882,6 +1891,24 @@ def sweep_organisation(organization_id: int, budget: Optional[ReviewBudget] = No
         if budget.used >= budget.limit or budget.out_of_money:
             break
     return counts
+
+
+SETTLE_TASK = "settle_proposals"
+
+
+def queue_settling(organization_id: int) -> None:
+    """Ask the job worker to settle this organisation's waiting proposals. Adds the job to the caller's own
+    transaction (no commit of its own), so the proposal and the job are saved together, and adds nothing when
+    one is already queued. Nothing settles inside the web request that wrote the proposal."""
+    from app.models.job import Job, JobStatus
+
+    queued = Job.query.filter(
+        Job.task == SETTLE_TASK, Job.status == JobStatus.PENDING.value,
+        Job.payload["organization_id"].as_string() == str(organization_id),
+    ).first()
+    if queued is None:
+        db.session.add(Job(name="Settle proposals", task=SETTLE_TASK, status=JobStatus.PENDING.value,
+                           payload={"organization_id": organization_id}))
 
 
 def settle_proposals(

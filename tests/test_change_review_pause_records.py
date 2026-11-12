@@ -198,11 +198,11 @@ def test_a_row_from_before_automatic_review_does_not_promise_a_check(db_session,
         db.session.flush()
         login_as(client, user)
         html = client.get("/ai-chat/approvals/inbox").get_data(as_text=True)
-    assert "approval-pre-loop-%d" % old.id in html
-    assert "recorded before changes by the assistant were checked" in html
-    assert "approval-held-%d" % old.id not in html and "approval-held-%d" % held_id in html
-    pre_loop_card = html.split("approval-pre-loop-%d" % old.id)[1].split("approval-in-review")[0][:1500]
-    assert "See how it was checked" not in pre_loop_card
+    old_reason = html.split('data-testid="approval-reason-%d"' % old.id)[1].split("</span>")[0]
+    held_reason = html.split('data-testid="approval-reason-%d"' % held_id)[1].split("</span>")[0]
+    assert "recorded before changes by the assistant were checked" in old_reason
+    assert "paused for this workspace" not in old_reason and "paused for this workspace" in held_reason
+    assert "See how it was checked" not in old_reason
     with tenant_ctx(other.id):
         assert AIChatApprovalService(other_user.id).get_approver_queue()["approvals"] == []
 
