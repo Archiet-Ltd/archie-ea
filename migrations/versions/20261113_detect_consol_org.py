@@ -3,20 +3,22 @@
 unified_detection_runs and consolidation_list_entries were global: every
 organisation read every other's detection runs, savings figures and
 consolidation list entries. Each now carries ``organization_id`` (TenantMixin),
-NOT NULL, with a foreign key to organizations, an index, and row-level security
-as the other tenant tables have it.
+with a foreign key to organizations, an index, and row-level security as the
+other tenant tables have it.
 
 Backfill, in this order:
-  * a detection run takes the organisation of the user who triggered it
-    (user_id -> users.organization_id), or of the first application it analysed
-    (through unified_group_members -> application_components) when the user has
-    none;
+  * a detection run takes the organisation of the applications it analysed
+    (through unified_group_members -> application_components) when those
+    applications all belong to one organisation;
+  * a run whose analysed applications span more than one organisation is marked
+    ``cross_organization = TRUE`` and left with no organisation_id, so no
+    organisation's figures count it;
+  * a run with no analysed applications falls back to its triggering user's
+    home organisation (user_id -> users.organization_id);
   * a consolidation entry takes the organisation of its application
     (application_id -> application_components.organization_id).
-A row whose linked applications belong to more than one organisation is given
-the first organisation above and counted as ambiguous. A row with no
-organisation derivable at all is deleted and counted -- it cannot be shown to
-anyone safely.
+A row with no organisation derivable at all is deleted and counted -- it cannot
+be shown to anyone safely.
 
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
@@ -72,55 +74,71 @@ def _scalar(bind, sql):
 
 
 def _backfill_detection_runs(bind):
-    """A run takes the org of its triggering user, or of the first application
-    it analysed (through unified_group_members -> application_components)."""
+    """A run takes the org of the applications it analysed (through
+    unified_group_members -> application_components) when those all belong to
+    one organisation. A run whose analysed applications span more than one
+    organisation is marked cross_organization = TRUE and left with no
+    organization_id, so no organisation's figures count it. A run with no
+    analysed applications falls back to its triggering user's home
+    organisation."""
     rows = bind.execute(
         text(
             "SELECT r.id, r.user_id FROM unified_detection_runs r "
             "WHERE r.organization_id IS NULL"
         )
     ).all()
-    ambiguous = 0
+    cross_org = 0
     for run_id, user_id in rows:
-        org_id = None
-        if user_id is not None:
-            found = bind.execute(
-                text("SELECT organization_id FROM users WHERE id = :uid"),
-                {"uid": user_id},
-            ).scalar()
-            if found is not None:
-                org_id = found
-        if org_id is None:
-            # Derive from the applications the run analysed, through its groups.
-            found = bind.execute(
-                text(
-                    "SELECT DISTINCT ac.organization_id FROM unified_detection_runs r "
-                    "JOIN unified_duplicate_groups g ON g.detection_run_id = r.id "
-                    "JOIN unified_group_members ugm ON ugm.group_id = g.id "
-                    "JOIN application_components ac ON ac.id = ugm.application_id "
-                    "WHERE r.id = :rid AND ac.organization_id IS NOT NULL "
-                    "ORDER BY ac.organization_id LIMIT 1"
-                ),
-                {"rid": run_id},
-            ).scalar()
-            org_id = found
-        if org_id is not None:
+        # Derive from the applications the run analysed, through its groups.
+        orgs = bind.execute(
+            text(
+                "SELECT DISTINCT ac.organization_id FROM unified_detection_runs r "
+                "JOIN unified_duplicate_groups g ON g.detection_run_id = r.id "
+                "JOIN unified_group_members ugm ON ugm.group_id = g.id "
+                "JOIN application_components ac ON ac.id = ugm.application_id "
+                "WHERE r.id = :rid AND ac.organization_id IS NOT NULL"
+            ),
+            {"rid": run_id},
+        ).fetchall()
+        distinct_orgs = [row[0] for row in orgs if row[0] is not None]
+        if len(distinct_orgs) == 1:
+            org_id = distinct_orgs[0]
             bind.execute(
                 text("UPDATE unified_detection_runs SET organization_id = :o WHERE id = :i"),
                 {"o": org_id, "i": run_id},
             )
-    return ambiguous
+        elif len(distinct_orgs) > 1:
+            # Applications span multiple organisations: mark cross_organization,
+            # leave organization_id NULL so no org's figures count this run.
+            bind.execute(
+                text(
+                    "UPDATE unified_detection_runs SET cross_organization = TRUE WHERE id = :i"
+                ),
+                {"i": run_id},
+            )
+            cross_org += 1
+        else:
+            # No analysed applications: fall back to the triggering user's org.
+            org_id = None
+            if user_id is not None:
+                found = bind.execute(
+                    text("SELECT organization_id FROM users WHERE id = :uid"),
+                    {"uid": user_id},
+                ).scalar()
+                if found is not None:
+                    org_id = found
+            if org_id is not None:
+                bind.execute(
+                    text("UPDATE unified_detection_runs SET organization_id = :o WHERE id = :i"),
+                    {"o": org_id, "i": run_id},
+                )
+    return cross_org
 
 
 def _ambiguous_detection_runs(bind):
     return _scalar(
         bind,
-        "SELECT COUNT(*) FROM unified_detection_runs r "
-        "JOIN unified_duplicate_groups g ON g.detection_run_id = r.id "
-        "JOIN unified_group_members ugm ON ugm.group_id = g.id "
-        "JOIN application_components ac ON ac.id = ugm.application_id "
-        "WHERE r.organization_id IS NULL "
-        "GROUP BY r.id HAVING COUNT(DISTINCT ac.organization_id) > 1",
+        "SELECT COUNT(*) FROM unified_detection_runs WHERE cross_organization = TRUE",
     )
 
 
@@ -149,6 +167,14 @@ def _add_column(bind, table):
         op.add_column(table, sa.Column("organization_id", sa.Integer(), nullable=True))
 
 
+def _add_cross_organization_column(bind, table):
+    if not _has_column(bind, table, "cross_organization"):
+        op.add_column(
+            table,
+            sa.Column("cross_organization", sa.Boolean(), nullable=False, server_default=sa.false()),
+        )
+
+
 def _fence(bind, table):
     owned = bind.execute(
         text("SELECT pg_has_role(current_user, c.relowner, 'USAGE') FROM pg_class c WHERE c.oid = to_regclass(:t)"),
@@ -175,10 +201,13 @@ def upgrade():
     for table in present:
         _add_column(bind, table)
 
+    # cross_organization column only applies to unified_detection_runs
+    if "unified_detection_runs" in present:
+        _add_cross_organization_column(bind, "unified_detection_runs")
+
     if "unified_detection_runs" in present and _present(bind, "users"):
-        ambiguous = _ambiguous_detection_runs(bind) if _has_column(bind, "application_components", "organization_id") else 0
-        _backfill_detection_runs(bind)
-        print(f"detection org fence: {ambiguous} run(s) link applications of more than one organisation; given the first")
+        cross_org = _backfill_detection_runs(bind)
+        print(f"detection org fence: {cross_org} run(s) link applications of more than one organisation; marked cross_organization, counted by none")
 
     if "consolidation_list_entries" in present and _present(bind, "application_components"):
         ambiguous = _ambiguous_consolidation_entries(bind) if _has_column(bind, "application_components", "organization_id") else 0
@@ -186,9 +215,21 @@ def upgrade():
         print(f"consolidation org fence: {ambiguous} entry(ies) with no derivable organisation")
 
     # Rows nothing links to an organisation cannot be shown to anyone safely.
+    # cross_organization runs are intentionally left with NULL organization_id:
+    # they are not unattributable, they are deliberately unassigned so no
+    # organisation's figures count them.
     if "unified_detection_runs" in present:
-        gone = _scalar(bind, "SELECT COUNT(*) FROM unified_detection_runs WHERE organization_id IS NULL")
-        bind.execute(text("DELETE FROM unified_detection_runs WHERE organization_id IS NULL"))
+        gone = _scalar(
+            bind,
+            "SELECT COUNT(*) FROM unified_detection_runs "
+            "WHERE organization_id IS NULL AND NOT cross_organization",
+        )
+        bind.execute(
+            text(
+                "DELETE FROM unified_detection_runs "
+                "WHERE organization_id IS NULL AND NOT cross_organization"
+            )
+        )
         print(f"detection org fence: {gone} unattributable run(s) deleted")
     if "consolidation_list_entries" in present:
         gone = _scalar(bind, "SELECT COUNT(*) FROM consolidation_list_entries WHERE organization_id IS NULL")
@@ -196,12 +237,21 @@ def upgrade():
         print(f"consolidation org fence: {gone} unattributable entry(ies) deleted")
 
     for table in present:
-        op.alter_column(table, "organization_id", existing_type=sa.Integer(), nullable=False)
-        op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
-        fk = f"fk_{table}_organization_id"
-        if not bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
-            op.create_foreign_key(fk, table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
-        _fence(bind, table)
+        # unified_detection_runs keeps organization_id nullable: cross_organization
+        # runs have NULL organization_id and must not be forced to NOT NULL.
+        if table == "unified_detection_runs":
+            op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
+            fk = f"fk_{table}_organization_id"
+            if not bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
+                op.create_foreign_key(fk, table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
+            _fence(bind, table)
+        else:
+            op.alter_column(table, "organization_id", existing_type=sa.Integer(), nullable=False)
+            op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
+            fk = f"fk_{table}_organization_id"
+            if not bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
+                op.create_foreign_key(fk, table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
+            _fence(bind, table)
 
 
 def downgrade():
@@ -216,4 +266,6 @@ def downgrade():
         if bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
             op.drop_constraint(fk, table, type_="foreignkey")
         op.drop_index(f"ix_{table}_organization_id", table_name=table, if_exists=True)
+        if table == "unified_detection_runs" and _has_column(bind, table, "cross_organization"):
+            op.drop_column(table, "cross_organization")
         op.drop_column(table, "organization_id")
