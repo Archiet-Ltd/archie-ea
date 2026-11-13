@@ -74,6 +74,10 @@ def _base_ref() -> str:
     long-lived branch isn't blamed for files main already changed elsewhere),
     falls back to origin/main directly, then HEAD~1 for a repo with no
     fetched origin (a fresh clone, or an offline sandbox)."""
+    import os
+    override = os.environ.get("DESIGN_MAP_BASE_REF")
+    if override:
+        return override
     merge_base = _run(["git", "merge-base", "HEAD", "origin/main"])
     if merge_base:
         return merge_base

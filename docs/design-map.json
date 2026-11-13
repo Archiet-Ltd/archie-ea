@@ -12652,19 +12652,20 @@
     "badge",
     "breadcrumb",
     "button",
+    "checkbox",
+    "dropdown-menu",
     "empty",
+    "fact-list",
     "field",
+    "figures",
     "input",
+    "list-table",
     "page-header",
+    "page-shell",
     "pagination",
     "select",
     "table",
-    "tabs",
-    "checkbox",
-    "dropdown-menu",
-    "figures",
-    "list-table",
-    "page-shell"
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -13883,7 +13884,10 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/metrics_card.html"
+   ]
   },
   "app/templates/application_mgmt/vendor_analysis_detail.html": {
    "allowed_macros": [
@@ -14461,14 +14465,16 @@
     "button",
     "card",
     "empty",
+    "field",
     "input",
+    "item",
     "nav-macros-shadcn",
     "page-header",
     "page-shell",
+    "select",
     "table",
     "tabs",
-    "unified-mapping-modal",
-    "item"
+    "unified-mapping-modal"
    ],
    "confidence": "high",
    "controls": {
@@ -16022,7 +16028,10 @@
    ],
    "status": "mapped",
    "tier": "C3",
-   "type_changed": true
+   "type_changed": true,
+   "extra_macros": [
+    "components/table.html"
+   ]
   },
   "app/templates/arb/capability_governance.html": {
    "allowed_macros": [
@@ -16738,7 +16747,11 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/card.html",
+    "components/data_card.html"
+   ]
   },
   "app/templates/arb/review_detail.html": {
    "allowed_macros": [
@@ -17230,7 +17243,10 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/table.html"
+   ]
   },
   "app/templates/arb/standards.html": {
    "allowed_macros": [
@@ -18293,20 +18309,21 @@
     "breadcrumb",
     "button",
     "card",
+    "checkbox",
     "dialog",
-    "empty",
-    "input",
-    "page-header",
-    "page-shell",
-    "shadcn-compat",
-    "table",
-    "tabs",
-    "item",
     "disabled-action",
     "element-table",
+    "empty",
     "field",
+    "input",
+    "item",
+    "page-header",
+    "page-shell",
     "provenance",
-    "select"
+    "select",
+    "shadcn-compat",
+    "table",
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -21790,7 +21807,11 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/card.html",
+    "components/table.html"
+   ]
   },
   "app/templates/artefact_share/public.html": {
    "allowed_macros": [
@@ -37521,13 +37542,14 @@
     "button",
     "card",
     "empty",
-    "page-header",
-    "tabs",
-    "item",
-    "table",
+    "fact-list",
     "input",
+    "item",
+    "page-header",
     "progress",
-    "provenance"
+    "provenance",
+    "table",
+    "tabs"
    ],
    "confidence": "high",
    "controls": {
@@ -45951,10 +45973,11 @@
     "button",
     "card",
     "empty",
+    "list-table",
     "page-header",
     "progress",
-    "table",
-    "list-table"
+    "provenance",
+    "table"
    ],
    "confidence": "low",
    "controls": {
