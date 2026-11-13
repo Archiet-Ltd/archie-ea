@@ -70,10 +70,11 @@ def unestimated_org(live_server):
         run = UnifiedDetectionRun(
             run_name="unest-%s" % suffix, strategy="fast", status="completed",
             groups_found=1, estimated_savings=None,
+            organization_id=org.id,
         )
         db.session.add(run)
         db.session.flush()
-        group = UnifiedDuplicateGroup(name="Ledger pair %s" % suffix, detection_run_id=run.id)
+        group = UnifiedDuplicateGroup(name="Ledger pair %s" % suffix, detection_run_id=run.id, organization_id=org.id)
         db.session.add(group)
         db.session.commit()
         ids = (run.id, group.id)

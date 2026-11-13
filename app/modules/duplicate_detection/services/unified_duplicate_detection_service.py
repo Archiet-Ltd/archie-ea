@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from flask import g
+
 from app import db
 from app.models.application_duplicate_detection import (
     DuplicateAnalysis,
@@ -562,6 +564,7 @@ class UnifiedDuplicateDetectionService:
                 started_at=datetime.utcnow(),
                 applications_analyzed=0,
                 groups_found=0,
+                organization_id=getattr(g, "current_org_id", None),
             )
             db.session.add(run)
 
@@ -727,6 +730,7 @@ class UnifiedDuplicateDetectionService:
                 started_at=datetime.utcnow(),
                 applications_analyzed=0,
                 groups_found=0,
+                organization_id=getattr(g, "current_org_id", None),
             )
             db.session.add(run)
 

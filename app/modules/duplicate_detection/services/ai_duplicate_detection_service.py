@@ -18,7 +18,7 @@ from datetime import datetime
 from difflib import SequenceMatcher
 from typing import Any, Dict, List
 
-from flask import has_app_context
+from flask import g, has_app_context
 
 # Heavy ML libraries are imported lazily (inside functions) to avoid adding
 # ~50 seconds to application startup time on every boot.
@@ -756,6 +756,7 @@ class AIDuplicateDetectionService:
                 d.get("business_impact", {}).get("cost_savings", 0) for d in duplicates
             ),
             algorithm_version="ai_v1.0",
+            organization_id=getattr(g, "current_org_id", None),
         )
 
         db.session.add(run)

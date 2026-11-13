@@ -16,6 +16,7 @@ from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship, validates
 
 from .. import db
+from .mixins import TenantMixin
 
 
 class DetectionStrategy(str, Enum):
@@ -78,7 +79,7 @@ unified_group_members = db.Table(
 )
 
 
-class UnifiedDetectionRun(db.Model):
+class UnifiedDetectionRun(TenantMixin, db.Model):
     """
     Tracks individual detection run executions.
     Strategy-agnostic - stores results from any detection method.
@@ -161,7 +162,7 @@ class UnifiedDetectionRun(db.Model):
         }
 
 
-class UnifiedDuplicateGroup(db.Model):
+class UnifiedDuplicateGroup(TenantMixin, db.Model):
     """
     Represents a group of duplicate applications.
     Supports full workflow from detection to resolution.

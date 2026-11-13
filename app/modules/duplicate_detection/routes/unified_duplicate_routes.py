@@ -25,6 +25,7 @@ from datetime import datetime
 from flask import (  # dead-code-ok
     Blueprint,
     current_app,
+    g,
     jsonify,
     redirect,
     render_template,
@@ -446,14 +447,18 @@ def get_simple_statistics():
     """Get application consolidation statistics (simple mode)"""
     try:
         # Latest run for simple/fast strategies
-        latest_run = (
-            UnifiedDetectionRun.query.filter(
-                UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
-                UnifiedDetectionRun.status == "completed",
-            )
-            .order_by(UnifiedDetectionRun.created_at.desc())
-            .first()
+        org_id = getattr(g, "current_org_id", None)
+        latest_run_q = UnifiedDetectionRun.query.filter(
+            UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
+            UnifiedDetectionRun.status == "completed",
         )
+        if org_id:
+            latest_run_q = latest_run_q.filter(
+                UnifiedDetectionRun.organization_id == org_id
+            )
+        latest_run = latest_run_q.order_by(
+            UnifiedDetectionRun.created_at.desc()
+        ).first()
 
         # Count only groups that still have 2+ members (exclude orphaned groups)
         from app.models.unified_duplicate_detection import unified_group_members
@@ -1062,8 +1067,18 @@ def get_unified_stats():
         enterprise_groups = DuplicateGroup.query.count()
 
         # Get simple stats
-        simple_runs = UnifiedDetectionRun.query.count()
-        simple_groups = UnifiedDuplicateGroup.query.count()
+        org_id = getattr(g, "current_org_id", None)
+        simple_runs_q = UnifiedDetectionRun.query
+        simple_groups_q = UnifiedDuplicateGroup.query
+        if org_id:
+            simple_runs_q = simple_runs_q.filter(
+                UnifiedDetectionRun.organization_id == org_id
+            )
+            simple_groups_q = simple_groups_q.filter(
+                UnifiedDuplicateGroup.organization_id == org_id
+            )
+        simple_runs = simple_runs_q.count()
+        simple_groups = simple_groups_q.count()
 
         stats = {
             "enterprise": {

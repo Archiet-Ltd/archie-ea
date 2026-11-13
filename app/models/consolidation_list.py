@@ -12,6 +12,7 @@ from datetime import datetime
 from sqlalchemy import JSON, Column, DateTime, Integer, String, Text
 
 from .. import db
+from .mixins import TenantMixin
 
 
 # 7-stage consolidation lifecycle
@@ -40,7 +41,7 @@ class ConsolidationAction(enum.Enum):
     PENDING_REVIEW = "pending_review"
 
 
-class ConsolidationListEntry(db.Model):
+class ConsolidationListEntry(TenantMixin, db.Model):
     """
     Entry in the consolidation list - represents an application marked for consolidation.
 

@@ -59,7 +59,7 @@ def test_duplicate_detection_run_persists_after_reload(browser, live_server, see
         # ---- Open the real "Run Detection" control ---------------------------
         # exact: once the dashboard finishes loading with no groups, its empty
         # state adds a second control, "Run duplicate detection now".
-        page.get_by_role("button", name="Run duplicate detection", exact=True).click()
+        page.get_by_role("button", name="Run duplicate detection now", exact=True).click()
         expect(page.locator("#run-detection-modal-title")).to_be_visible(timeout=PAGE_TIMEOUT)
         page.fill('input[placeholder="e.g., Q1 2026 Detection"]', run_name)
 

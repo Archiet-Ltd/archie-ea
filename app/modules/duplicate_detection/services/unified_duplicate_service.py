@@ -12,6 +12,8 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Type
 
+from flask import g
+
 from psycopg2.errors import SerializationFailure
 from sqlalchemy.exc import OperationalError
 
@@ -86,6 +88,14 @@ class UnifiedDuplicateService:
     }
 
     @classmethod
+    def get_strategy(cls, strategy: str, threshold: float = 0.55, config: Optional[Dict] = None) -> DetectionStrategy:
+        """Get a strategy instance by name."""
+        strategy_class = cls.STRATEGIES.get(strategy)
+        if not strategy_class:
+            raise ValueError(f"Unknown strategy: {strategy}. Available: {list(cls.STRATEGIES.keys())}")
+        return strategy_class(threshold=threshold, config=config)
+
+    @classmethod
     @with_retry(max_retries=3)
     def run_detection(
         cls,
@@ -137,6 +147,7 @@ class UnifiedDuplicateService:
                     groups_found=0,
                     triggered_by="user" if user_id else "api",
                     user_id=user_id,
+                    organization_id=getattr(g, "current_org_id", None),
                 )
                 db.session.add(run)
                 db.session.commit()
@@ -176,6 +187,7 @@ class UnifiedDuplicateService:
                     estimated_savings=result.estimated_savings,
                     triggered_by="user" if user_id else "api",
                     user_id=user_id,
+                    organization_id=getattr(g, "current_org_id", None),
                 )
                 db.session.add(run)
                 db.session.flush()  # Get run.id

@@ -74,6 +74,7 @@ def _world(db_session, make_org):
         recommended_action="pending_review",
         priority="high",
         notes="org A's private note",
+        organization_id=org_a.id,
     )
     db_session.add(entry_a)
     db_session.commit()
@@ -219,6 +220,7 @@ def _two_org_world(db_session, make_org):
         source_group_name="probe",
         recommended_action="pending_review",
         priority="high",
+        organization_id=org_a.id,
     )
     entry_b = ConsolidationListEntry(
         application_id=app_b.id,
@@ -226,6 +228,7 @@ def _two_org_world(db_session, make_org):
         recommended_action="pending_review",
         priority="high",
         estimated_savings=999.0,
+        organization_id=org_b.id,
     )
     db_session.add_all([entry_a, entry_b])
     db_session.commit()

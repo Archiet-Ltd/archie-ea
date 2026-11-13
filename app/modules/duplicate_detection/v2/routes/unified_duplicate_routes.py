@@ -14,6 +14,7 @@ from difflib import SequenceMatcher
 from flask import (  # dead-code-ok
     Blueprint,
     current_app,
+    g,
     jsonify,
     redirect,
     render_template,
@@ -338,9 +339,13 @@ def get_simple_statistics():
                 UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
                 UnifiedDetectionRun.status == "completed",
             )
-            .order_by(UnifiedDetectionRun.created_at.desc())
-            .first()
         )
+        org_id = getattr(g, "current_org_id", None)
+        if org_id:
+            latest_run = latest_run.filter(
+                UnifiedDetectionRun.organization_id == org_id
+            )
+        latest_run = latest_run.order_by(UnifiedDetectionRun.created_at.desc()).first()
         # Count only groups that still have 2+ members (exclude orphaned groups)
         from app.models.unified_duplicate_detection import unified_group_members
         from sqlalchemy import func as sa_func
@@ -721,8 +726,18 @@ def get_unified_stats():
     try:
         enterprise_runs = DuplicateDetectionRun.query.count()
         enterprise_groups = DuplicateGroup.query.count()
-        simple_runs = UnifiedDetectionRun.query.count()
-        simple_groups = UnifiedDuplicateGroup.query.count()
+        org_id = getattr(g, "current_org_id", None)
+        simple_runs_q = UnifiedDetectionRun.query
+        simple_groups_q = UnifiedDuplicateGroup.query
+        if org_id:
+            simple_runs_q = simple_runs_q.filter(
+                UnifiedDetectionRun.organization_id == org_id
+            )
+            simple_groups_q = simple_groups_q.filter(
+                UnifiedDuplicateGroup.organization_id == org_id
+            )
+        simple_runs = simple_runs_q.count()
+        simple_groups = simple_groups_q.count()
         stats = {
             "enterprise": {"total_runs": enterprise_runs, "total_groups": enterprise_groups},
             "simple": {"total_runs": simple_runs, "total_groups": simple_groups},

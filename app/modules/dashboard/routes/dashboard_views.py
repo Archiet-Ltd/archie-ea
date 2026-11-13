@@ -88,9 +88,11 @@ def _build_overview_context():
     try:
         from app.models.consolidation_list import ConsolidationListEntry
 
-        nav_stats["consolidation"] = (
-            db.session.query(db.func.count(ConsolidationListEntry.id)).scalar() or 0
-        )
+        consolidation_q = db.session.query(db.func.count(ConsolidationListEntry.id))
+        org_id = getattr(g, "current_org_id", None)
+        if org_id:
+            consolidation_q = consolidation_q.filter(ConsolidationListEntry.organization_id == org_id)
+        nav_stats["consolidation"] = consolidation_q.scalar() or 0
     except Exception:
         db.session.rollback()
     try:
