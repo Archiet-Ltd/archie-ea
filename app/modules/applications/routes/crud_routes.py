@@ -890,7 +890,9 @@ def application_edit(id):
                     setattr(app, field, sanitize_html(value))
 
             if "competitive_advantage" in request.form:
-                app.competitive_advantage = request.form.get("competitive_advantage") == "yes"
+                app.competitive_advantage = {"yes": True, "no": False}.get(
+                    request.form.get("competitive_advantage")
+                )
 
             cost_fields = {}
             cost_field_names = [

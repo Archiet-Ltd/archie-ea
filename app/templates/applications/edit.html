@@ -41,7 +41,7 @@
           {{ input(type="text", id=("application_type"), name=("application_type"), value=(application.component_type or ''), size='sm', class="w-full") }}
         {% endcall %}
         {% call form_group(id='competitive_advantage', label='Competitive Advantage') %}
-          {% call native_select(id='competitive_advantage', name='competitive_advantage', size='sm', class='w-full', selected=('yes' if application.competitive_advantage else ''), options=[('', 'Not recorded'), ('yes', 'Yes')]) %}{% endcall %}
+          {% call native_select(id='competitive_advantage', name='competitive_advantage', size='sm', class='w-full', selected=('' if application.competitive_advantage is none else ('yes' if application.competitive_advantage else 'no')), options=[('', 'Not recorded'), ('yes', 'Yes'), ('no', 'No')]) %}{% endcall %}
         {% endcall %}
       </div>
     </section>
