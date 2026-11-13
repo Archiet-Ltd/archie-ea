@@ -13,7 +13,8 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
-from .cost_withheld_support import HELD_BACK, holds_none_of, open_page, seed_organisation, shot, shown_text
+from .cost_withheld_support import (
+    HELD_BACK, drop_enterprise_group, holds_none_of, open_page, seed_organisation, shot, shown_text)
 from .fresh_org import api
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -24,7 +25,9 @@ MONEY = ("group_savings", "run_savings", "app_tco", "savings")
 
 @pytest.fixture(scope="module")
 def organisations(live_server):
-    return seed_organisation(1), seed_organisation(2)
+    orgs = seed_organisation(1, enterprise_group=True), seed_organisation(2)
+    yield orgs
+    drop_enterprise_group(orgs[0])
 
 
 def _amounts(org):
@@ -48,6 +51,7 @@ def test_a_solution_architect_reads_one_sentence_and_no_amount_on_duplicate_dete
     context, page = open_page(browser, live_server, mine["emails"]["solution_architect"], width, scheme)
     try:
         everything = _amounts(mine) + _amounts(theirs)
+        tag = mine["tag"]
 
         # The dashboard: the savings card gives way to the sentence.
         page.goto(live_server + "/duplicate-detection/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -61,6 +65,8 @@ def test_a_solution_architect_reads_one_sentence_and_no_amount_on_duplicate_dete
         for path in ("/duplicate-detection/enterprise/groups",
                      "/duplicate-detection/simple/groups"):
             body = _reply(page, path)
+            # a real group is there, so the missing amount below is withholding, not an empty reply
+            assert any(tag in (g.get("name") or "") for g in body["groups"]), (path, body)
             assert holds_none_of(str(body), everything) == [], path
             assert body.get("costs_withheld_sentence") == HELD_BACK, path
 
@@ -88,6 +94,11 @@ def test_a_finance_person_reads_the_duplicate_detection_figures_unchanged(browse
         for path in ("/duplicate-detection/enterprise/groups",
                      "/duplicate-detection/simple/groups"):
             body = _reply(page, path)
+            mine_groups = [g for g in body["groups"] if mine["tag"] in (g.get("name") or "")]
+            assert mine_groups, (path, body)
+            assert any(g.get("estimated_savings") for g in mine_groups), path
+            if "enterprise" in path:
+                assert float(fig["group_savings"]) in [g.get("estimated_savings") for g in mine_groups], path
             assert holds_none_of(str(body), _amounts(theirs)) == [], path
             assert "costs_withheld_sentence" not in body, path
 

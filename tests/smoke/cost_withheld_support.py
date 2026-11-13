@@ -33,14 +33,19 @@ def digits(amount):
     return ("{:,.0f}".format(amount), str(int(amount)))
 
 
-def seed_organisation(base):
-    """One organisation with a finance person and a solution architect, and linked rationalisation records."""
+def seed_organisation(base, enterprise_group=False):
+    """One organisation with a finance person and a solution architect, and linked rationalisation records.
+
+    The enterprise duplicate group model carries no organisation, so a journey that wants one asks for it for a
+    single organisation only.
+    """
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
     from app.models.application_rationalization import (
         ApplicationRationalizationScore,
         RationalizationBenefitsTracker,
     )
+    from app.models.application_duplicate_detection import DuplicateDetectionRun, DuplicateGroup, DuplicateType
     from app.models.consolidation_list import ConsolidationListEntry
     from app.models.unified_duplicate_detection import (
         UnifiedDetectionRun,
@@ -93,6 +98,15 @@ def seed_organisation(base):
         db.session.flush()
         for row in apps:
             db.session.execute(unified_group_members.insert().values(group_id=group.id, application_id=row.id))
+        # the enterprise groups reply reads this model, so it carries a real group of its own
+        if enterprise_group:
+            enterprise_run = DuplicateDetectionRun(run_name="Ledger enterprise run " + tag, status="completed")
+            db.session.add(enterprise_run)
+            db.session.flush()
+            db.session.add(DuplicateGroup(
+                group_name="Ledger twins enterprise " + tag, duplicate_type=DuplicateType.FUNCTIONAL,
+                detection_run_id=enterprise_run.id, overall_similarity_score=0.91,
+                estimated_savings=float(fig["group_savings"]), consolidation_priority="high"))
         db.session.commit()
         org["entry_ids"] = [entry.id for entry in entries]
         org["app_ids"] = [row.id for row in apps]
@@ -102,6 +116,18 @@ def seed_organisation(base):
         org["run_id"] = run.id
     org["admin_email"] = "launch.admin.%s@example.com" % org["suffix"]
     return org
+
+
+def drop_enterprise_group(org):
+    """Remove the enterprise duplicate group (and its run) a seeded organisation created, by its own name."""
+    from app import create_app, db
+    from app.models.application_duplicate_detection import DuplicateDetectionRun, DuplicateGroup
+
+    with create_app("testing").app_context():
+        DuplicateGroup.query.filter(DuplicateGroup.group_name == "Ledger twins enterprise " + org["tag"]).delete()
+        DuplicateDetectionRun.query.filter(
+            DuplicateDetectionRun.run_name == "Ledger enterprise run " + org["tag"]).delete()
+        db.session.commit()
 
 
 def open_page(browser, live_server, email, width, scheme):

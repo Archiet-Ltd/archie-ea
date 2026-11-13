@@ -94,15 +94,40 @@ def test_a_solution_architect_reads_one_sentence_and_no_amount_on_the_rationalis
         # the replies behind the pages
         for path in _json_replies(mine):
             body = _reply(page, path)
+            # a reply that holds nothing proves nothing, so each carries something before the money check
+            assert body, path
+            assert any(value for value in (body.values() if isinstance(body, dict) else body)), (path, body)
             assert holds_none_of(str(body), everything) == [], path
         tiers = _reply(page, "/dashboard/api/tco/cost-tiers")
         assert tiers["data"] == [] and tiers["costs_withheld_sentence"] == HELD_BACK
         benefits = _reply(page, "/applications/rationalization/api/benefits/%d" % mine["app_ids"][0])
+        assert benefits["benefits"], benefits
         assert benefits["benefits"]["projected_annual_savings"] is None
         assert benefits["benefits"]["actual_annual_savings"] is None
         assert benefits["costs_withheld_sentence"] == HELD_BACK
         scores = _reply(page, "/applications/rationalization/api/portfolio-scores")
         assert scores and all(row["estimated_annual_savings"] is None for row in scores)
+
+        # the evidence trail names its cost factor, with no amount on it
+        trail = _reply(page, "/applications/rationalization/api/evidence-trail/%d" % mine["app_ids"][0])
+        factors = [sub.get("factor") for dim in trail["evidence_trail"] for sub in dim.get("sub_factors", [])]
+        assert "Annual Cost (TCO)" in factors, factors
+        assert holds_none_of(str(trail), everything) == []
+        assert trail["costs_withheld_sentence"] == HELD_BACK
+
+        # the business case download keeps the applications and carries no amount
+        for fmt in ("csv", "pdf"):
+            status, text = api(page, "POST", "/applications/rationalization/api/export", {"format": fmt})
+            assert status == 200 and mine["app_names"][0] in text, (fmt, status)
+            assert holds_none_of(text, everything) == [], fmt
+            assert "Savings" not in text.replace("Projected Savings", ""), fmt
+
+        # a detection run reports its groups and no estimated savings
+        status, run = api(page, "POST", "/applications/rationalization/api/run-detection",
+                          {"strategy": "fast", "similarity_threshold": 0.3})
+        assert status == 200 and run.get("success") is True and run.get("groups_found", 0) >= 1, run
+        assert holds_none_of(str(run), everything) == []
+        assert run["costs_withheld_sentence"] == HELD_BACK
     finally:
         context.close()
 
