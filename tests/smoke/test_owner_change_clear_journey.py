@@ -163,6 +163,9 @@ def test_owner_picker_is_a_combobox_driven_by_the_keyboard(page, live_server, or
     _open(page, "%s/applications/%d" % (live_server, ids["application_id"]))
 
     box = page.locator("[data-owner-picker] [data-owner-search]")
+    # The picker's script sets the role after the page loads; under load it can be late.
+    page.wait_for_function(
+        "el => el.getAttribute('role') === 'combobox'", arg=box.element_handle(), timeout=PAGE_TIMEOUT)
     assert box.get_attribute("role") == "combobox"
     assert box.get_attribute("aria-expanded") == "false"
     box.focus()

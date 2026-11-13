@@ -7,7 +7,9 @@ from flask import jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
+from app.decorators import audit_log
 from app.middleware.tenant_context import current_org_id
+from app.modules.ai_chat.services import application_change
 from app.modules.ai_chat.services.catalogue_answer import answer_catalogue_question
 from app.modules.ai_chat.services.estate_answer import (
     answer_estate_question,
@@ -26,6 +28,7 @@ from . import unified_ai_chat_bp
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION_CHARS = 2000
+MAX_CHANGE_CHARS = 8000
 ANSWERED_FROM_RECORDS = "records"  # kept with the saved answer; the chat page reads the same word
 SHOWN_LIMIT = 25  # connections drawn as cards; the template and its explanations agree on it
 
@@ -88,7 +91,7 @@ def _empty_steps(answer, organization_id):
     the one thing the question asked about when that is what is missing, or the
     general next steps (connect a source, or see them working with a sample) when
     the records hold nothing at all yet. ``None`` once there is anything to show
-    instead, or a finding that needs no next step (CLAUDE.md "never invent data" —
+    instead, or a finding that needs no next step (the rule is never to invent data:
     no button is shown unless the person it opens for could actually use it)."""
     if answer["records"] or answer.get("complete"):
         return None
@@ -135,6 +138,43 @@ def _catalogue_response(message, thread_id, keep):
             ),
         }
     )
+
+
+def _application_change_response(change, message, thread_id, keep):
+    """The preview card for "set <application>'s <field> to <value>", or the words for why not."""
+    organization_id = current_org_id()
+    result = application_change.propose(change, current_user, int(organization_id)) if organization_id else {
+        "state": "unknown", "label": change["label"], "typed_application": change["application"], "others": []}
+    line = {
+        "preview": "Change preview: the %s of %s. Nothing is saved until you press Save." % (
+            result.get("label"), result.get("application")),
+        "refused": "Not changed: your role cannot edit applications.",
+    }.get(result["state"], "Not changed: %s." % result["state"])
+    return jsonify({
+        "success": True,
+        "found": True,
+        "thread_id": _remember(thread_id, message, line, keep=keep),
+        "change_state": result["state"],
+        "html": render_template("ai_chat/_application_change.html", result=result),
+    })
+
+
+@unified_ai_chat_bp.route("/application-change/confirm", methods=["POST"])
+@login_required
+@audit_log("ai_chat_application_change")
+def confirm_application_change():
+    """Save the change a preview card described, once the person has pressed Save."""
+    body = request.get_json(silent=True)
+    token = body.get("token") if isinstance(body, dict) else None
+    organization_id = current_org_id()
+    if not isinstance(token, str) or not organization_id:
+        return jsonify({"success": False, "error": "Ask for the change again."}), 400
+    result = application_change.confirm(token, current_user, int(organization_id))
+    return jsonify({
+        "success": result["state"] == "saved",
+        "change_state": result["state"],
+        "html": render_template("ai_chat/_application_change.html", result=result),
+    })
 
 
 def _what_it_depends_on(answer):
@@ -310,8 +350,19 @@ def estate_answer():
     keep = body.get("remember") is not False
     posted_element = body.get("element_id") if isinstance(body.get("element_id"), int) else None
     card_element = owned_element_id(posted_element, current_org_id())
-    # A card names its element: the question is about that element, not about the parts or the
-    # lens its wording sounds like.
+    # A card names its element: the question is about that element, not about a change request,
+    # the parts or the lens its wording sounds like, so all three are skipped for it.
+    change = None
+    if not card_element:
+        # Read whole: cutting a long value short would save text the person did not write. The
+        # description limit refuses anything this cap leaves too long.
+        change = application_change.parse_change_request(message[:MAX_CHANGE_CHARS])
+        # Only a request whose subject is an application of this organisation is a change to
+        # one; a solution, a risk or a work package goes on to the model as it always did.
+        if change is not None and not application_change.names_an_application(change, current_org_id()):
+            change = None
+    if change is not None:
+        return _application_change_response(change, message, thread_id, keep)
     parts = [] if card_element else envelope.classify_estate_parts(message[:MAX_QUESTION_CHARS])
     if set(parts) & {envelope.PART_OWNER, envelope.PART_RUNS_ON, envelope.PART_DEPENDS_ON}:
         cards = _cards_asked(parts)
