@@ -174,6 +174,27 @@ class ArchiMateRelationshipService:
         return True, ""
 
     @classmethod
+    def _assert_same_organisation(
+        cls,
+        source_element: ArchiMateElement,
+        target_element: ArchiMateElement,
+        organization_id: int,
+    ) -> None:
+        """Refuse a relationship whose source or target belongs to another
+        organisation.
+
+        Raises ValueError with a plain message the caller can show.
+        """
+        if source_element.organization_id != organization_id:
+            raise ValueError(
+                f"source element {source_element.id} is not in organisation {organization_id}"
+            )
+        if target_element.organization_id != organization_id:
+            raise ValueError(
+                f"target element {target_element.id} is not in organisation {organization_id}"
+            )
+
+    @classmethod
     def create_relationship(
         cls,
         source_element: ArchiMateElement,
@@ -211,6 +232,20 @@ class ArchiMateRelationshipService:
         if not is_valid:
             logger.error(f"Relationship validation failed: {error_message}")
             return None
+
+        # Same-organisation guard: source and target must both belong to the
+        # relationship's owning organisation.
+        if organization_id is not None:
+            try:
+                cls._assert_same_organisation(
+                    source_element, target_element, organization_id
+                )
+            except ValueError as exc:
+                logger.error(f"Same-organisation check failed: {exc}")
+                if not rollback:
+                    raise
+                db.session.rollback()
+                return None
 
         try:
             # Where this relationship came from: the person drawing it.
@@ -396,11 +431,22 @@ class ArchiMateRelationshipService:
                 f"Suggestion {suggestion_id} already {suggestion.status}"
             )
 
+        # Same-organisation guard: source and target elements must belong to
+        # the same organisation, which becomes the relationship's owner.
+        source_el = db.session.get(ArchiMateElement, suggestion.source_element_id)
+        target_el = db.session.get(ArchiMateElement, suggestion.target_element_id)
+        if source_el is None or target_el is None:
+            raise ValueError(
+                f"Suggestion {suggestion_id} references a missing element"
+            )
+        cls._assert_same_organisation(source_el, target_el, source_el.organization_id)
+
         # Create the actual relationship
         relationship = ArchiMateRelationship(
             source_id=suggestion.source_element_id,
             target_id=suggestion.target_element_id,
             type=suggestion.relationship_type,
+            organization_id=source_el.organization_id,
         )
         db.session.add(relationship)
 

@@ -5,7 +5,7 @@ from datetime import datetime
 
 from flask import current_app  # dead-code-ok
 from flask_login import current_user  # dead-code-ok
-from sqlalchemy import types
+from sqlalchemy import event, types
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import validates
 
@@ -632,6 +632,35 @@ else:
                     val = float(val)
                 out[col.name] = val
             return out
+
+
+@event.listens_for(ArchiMateRelationship, "before_insert")
+@event.listens_for(ArchiMateRelationship, "before_update")
+def _guard_relationship_same_organisation(mapper, connection, target):
+    """Refuse an ArchiMateRelationship whose source or target element belongs
+    to an organisation other than the row's own organization_id.
+
+    Applies to every writer that persists the model directly (connectors,
+    imports, sync, backfills, seeds) as well as the service path, so no
+    code path can save a crossing row.
+    """
+    org_id = target.organization_id
+    if org_id is None:
+        return
+    from app.models.archimate_core import ArchiMateElement
+
+    source = db.session.get(ArchiMateElement, target.source_id)
+    target_el = db.session.get(ArchiMateElement, target.target_id)
+    if source is None or target_el is None:
+        return
+    if source.organization_id != org_id:
+        raise ValueError(
+            f"relationship source element {target.source_id} is not in organisation {org_id}"
+        )
+    if target_el.organization_id != org_id:
+        raise ValueError(
+            f"relationship target element {target.target_id} is not in organisation {org_id}"
+        )
 
 
 class WorkflowInstanceArchiMateElement(db.Model):
