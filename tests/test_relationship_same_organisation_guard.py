@@ -289,3 +289,148 @@ class TestImportPathSameOrg:
         with pytest.raises(ValueError):
             db_session.flush()
 
+
+class TestRequestScopedModelGuard:
+    """Inside a request (tenant context active) a direct model save of a
+    crossing row is still refused: the guard reads each end's
+    organization_id through the flush connection with plain SQL, which the
+    tenant filter on ORM queries cannot hide. Red at e36a5f952, where the
+    old guard's session.get was tenant-filtered, saw no foreign end and let
+    the row through."""
+
+    def test_request_scoped_direct_save_of_crossing_row_is_refused(
+        self, db_session, make_org, tenant_ctx
+    ):
+        from app.models.models import CrossOrganisationRelationship
+
+        org_a = make_org("req-a")
+        org_b = make_org("req-b")
+        source = _make_element(db_session, org_a, "Source")
+        target = _make_element(db_session, org_b, "Target")
+        db_session.commit()
+
+        rel = ArchiMateRelationship(
+            source_id=source.id,
+            target_id=target.id,
+            type="flow",
+            organization_id=org_a.id,
+        )
+        db_session.add(rel)
+        with tenant_ctx(org_a.id):
+            with pytest.raises(CrossOrganisationRelationship):
+                db_session.flush()
+
+
+class TestGuardKindResolution:
+    """The guard resolves each source_kind the column can hold from that
+    kind's own table and refuses a kind it cannot resolve or an end that is
+    missing from that table."""
+
+    def test_unresolvable_kind_is_refused(self, db_session, make_org):
+        from app.models.models import CrossOrganisationRelationship
+
+        org = make_org("kind-a")
+        source = _make_element(db_session, org, "Source")
+        target = _make_element(db_session, org, "Target")
+        db_session.commit()
+
+        rel = ArchiMateRelationship(
+            source_id=source.id,
+            target_id=target.id,
+            type="flow",
+            organization_id=org.id,
+            source_kind="no-such-kind",
+        )
+        db_session.add(rel)
+        with pytest.raises(CrossOrganisationRelationship):
+            db_session.flush()
+
+    def test_missing_end_is_refused(self, db_session, make_org):
+        from app.models.models import CrossOrganisationRelationship
+
+        org = make_org("miss-a")
+        source = _make_element(db_session, org, "Source")
+        db_session.commit()
+
+        rel = ArchiMateRelationship(
+            source_id=source.id,
+            target_id=source.id + 999999,
+            type="flow",
+            organization_id=org.id,
+        )
+        db_session.add(rel)
+        with pytest.raises(CrossOrganisationRelationship):
+            db_session.flush()
+
+    def test_each_documented_kind_resolves_to_its_table(self, db_session, make_org):
+        # Every kind the source_kind column documents (NULL reads as
+        # 'manual') resolves to archimate_elements and a same-org row of
+        # that kind saves fine.
+        from app.models.models import _RELATIONSHIP_END_TABLES
+
+        assert set(_RELATIONSHIP_END_TABLES) == {
+            None, "manual", "import", "connector", "derived", "sample",
+        }
+        assert set(_RELATIONSHIP_END_TABLES.values()) == {"archimate_elements"}
+
+        org = make_org("kinds-ok")
+        source = _make_element(db_session, org, "Source")
+        target = _make_element(db_session, org, "Target")
+        db_session.commit()
+        for kind in ("manual", "import", "connector", "derived", "sample", None):
+            rel = ArchiMateRelationship(
+                source_id=source.id,
+                target_id=target.id,
+                type="flow",
+                organization_id=org.id,
+                source_kind=kind,
+            )
+            db_session.add(rel)
+            db_session.flush()
+            db_session.delete(rel)
+            db_session.flush()
+
+
+class TestNamedError:
+    """One named error, CrossOrganisationRelationship, raised from the one
+    same-organisation function and reaching the service, accept_suggestion
+    and the model guard."""
+
+    def test_service_raises_named_error(self, db_session, make_org):
+        from app.models.models import CrossOrganisationRelationship
+
+        org_a = make_org("named-a")
+        org_b = make_org("named-b")
+        source = _make_element(db_session, org_a, "Source")
+        target = _make_element(db_session, org_b, "Target")
+        db_session.commit()
+
+        with pytest.raises(CrossOrganisationRelationship):
+            ArchiMateRelationshipService.create_relationship(
+                source, target, "flow",
+                architecture_id=None, organization_id=org_a.id, rollback=False,
+            )
+
+    def test_accept_suggestion_raises_named_error(self, db_session, make_org):
+        from app.models.archimate_core import RelationshipSuggestion
+        from app.models.models import CrossOrganisationRelationship
+
+        org_a = make_org("named-sugg-a")
+        org_b = make_org("named-sugg-b")
+        source = _make_element(db_session, org_a, "Source")
+        target = _make_element(db_session, org_b, "Target")
+        db_session.commit()
+
+        suggestion = RelationshipSuggestion(
+            source_element_id=source.id,
+            target_element_id=target.id,
+            relationship_type="flow",
+            confidence=0.9,
+            status="pending",
+        )
+        db_session.add(suggestion)
+        db_session.flush()
+
+        with pytest.raises(CrossOrganisationRelationship):
+            ArchiMateRelationshipService.accept_suggestion(suggestion.id, user_id=1)
+
