@@ -687,7 +687,6 @@
           Alpine.store('rdm').workPackages = this.workPackages;
         } catch (e) {
           this.workPackages = [];
-          this.workPackageCount = 0;
           Alpine.store('rdm').workPackages = [];
           this.workPackagesError = 'Failed to load work packages (' + e.message + ').';
         } finally {
