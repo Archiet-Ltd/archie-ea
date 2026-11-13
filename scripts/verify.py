@@ -917,6 +917,35 @@ def gate_public_repo_hygiene() -> Result:
     return Result("public-repo-hygiene", PASS if count == 0 else FAIL, detail, count, 0)
 
 
+def _sysml(*args: str) -> subprocess.CompletedProcess:
+    return _run([sys.executable, "scripts/sysml/" + args[0], *args[1:]])
+
+
+def gate_as_built_current() -> Result:
+    """The committed as-built model equals what the generator writes from the committed component inventory today.
+    A stale file fails; it needs no Java and no running app."""
+    proc = _sysml("as_built.py", "--check")
+    ok = proc.returncode == 0
+    return Result("as-built-current", PASS if ok else FAIL, "" if ok else (proc.stdout + proc.stderr)[-1500:],
+                  0 if ok else 1, 0)
+
+
+def gate_system_model() -> Result:
+    """The SysML parser and the model checks run together: the parser reads a small known model and the reader must
+    return its counts, then every check runs on the real model and none may exceed model/ratchet.json."""
+    first = _sysml("model_check.py", "selfcheck")
+    if first.returncode == 3:
+        how = "run scripts/sysml/install_parser.sh and set SYSML_HOME"
+        if not os.environ.get("CI"):
+            return Result("system-model", SKIP, f"the SysML parser is not installed on this machine: {how}")
+        return Result("system-model", FAIL, f"the SysML parser is not installed: {how}", 1, 0)
+    if first.returncode:
+        return Result("system-model", FAIL, first.stdout[-1500:], 1, 0)
+    proc = _sysml("model_check.py", "check")
+    ok = proc.returncode == 0
+    return Result("system-model", PASS if ok else FAIL, "" if ok else proc.stdout[-1800:], 0 if ok else 1, 0)
+
+
 def gate_unregistered_checks(baseline: int) -> Result:
     """A scripts/check_*.py file with no Gate(...) entry in build_gates() never
     runs, regardless of what any doc says it enforces. See F500-008 and
@@ -2386,6 +2415,18 @@ def build_gates(baseline: dict) -> list[Gate]:
                          "(DELIVERY_CONTRACT.md Rule 2), or mark its first line "
                          "'unregistered-check-ok: <reason>'",
              tags=["static", "qa"]),
+        Gate("as-built-current",
+             "the committed as-built system model equals what the generator writes from the code",
+             "zero", gate_as_built_current,
+             remediation="run python scripts/sysml/as_built.py --out model/as-built (after "
+                         "python scripts/component_inventory.py when a route or form changed) and commit the files",
+             tags=["static"]),
+        Gate("system-model",
+             "the SysML parser reads the model and every model check stays within model/ratchet.json",
+             "command", gate_system_model,
+             remediation="install the parser with scripts/sysml/install_parser.sh, then run "
+                         "python scripts/sysml/model_check.py check",
+             tags=["static"]),
         Gate("null-filters", "default() never feeds a len()-calling filter", "zero",
              gate_null_filters,
              remediation="add the boolean argument: default('x', true) - plain "

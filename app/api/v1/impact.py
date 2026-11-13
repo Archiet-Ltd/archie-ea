@@ -150,10 +150,10 @@ def analyze_impact():
         contract = _to_contract_shape(result)
         from flask_login import current_user
 
-        from app.modules.solutions_strategic.v2.services import simulation_service
+        from app.services.cost_visibility import costs_visible, withhold_costs
 
-        if not simulation_service.may_see_costs(current_user):
-            contract = simulation_service.withhold_costs(contract)
+        if not costs_visible(current_user):
+            contract = withhold_costs(contract)
 
         # T-004 (API-3/DE-10): additive only, and only on the element_id
         # branch -- the app_id branch has no equivalent projection today and

@@ -62,7 +62,7 @@ def test_architect_works_from_the_prioritised_action_list(browser, live_server):
 
         expect(page.get_by_test_id("priority-actions-rule")).to_contain_text("Ranked by severity, critical first")
         expected = [
-            "Convert the %s to a work package" % names["gap"],
+            "Convert the gap \u201c%s\u201d to a work package" % names["gap"],
             "Finish %s: due %s, 58 percent done" % (
                 names["work"], (datetime.utcnow() - timedelta(days=10)).strftime("%-d %b")),
             "Reduce the risk: %s" % names["risk"],

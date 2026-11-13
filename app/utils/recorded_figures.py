@@ -22,3 +22,11 @@ def sum_recorded(values):
 def as_figure(value):
     """A recorded figure as a float, or ``None`` when it was not recorded; a recorded 0 stays 0."""
     return None if value is None else float(value)
+
+
+def coverage_text(value):
+    """A capability coverage as words: "40%", or "Not recorded" when nobody entered one (a recorded 0 is "0%")."""
+    if value is None:
+        return "Not recorded"
+    number = float(value)
+    return f"{int(number)}%" if number == int(number) else f"{number:g}%"

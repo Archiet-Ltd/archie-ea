@@ -1134,6 +1134,57 @@ def _seed_decisions(org_id, user_id) -> dict:
     return {"architecture_decisions_created": created}
 
 
+# ── saved scenarios ────────────────────────────────────────────────────────
+
+# (name, system it is tried on, kind of change): two ways to deal with the same system, so Compare Scenarios
+# has two saved scenarios to put side by side.
+_SCENARIOS = [
+    ("Retire Calibration Ledger", "Calibration Ledger", "RETIRE"),
+    ("Replace Calibration Ledger with a managed service", "Calibration Ledger", "REPLACE"),
+]
+
+
+def _seed_scenarios(org_id, user_id) -> dict:
+    """Two saved scenarios on one system, worked out by the same analysis a person's save uses.
+    Idempotent: a scenario whose name the organisation already has is left as it is."""
+    from flask import g
+
+    from app.models.saved_scenario import SavedScenario
+    from app.modules.solutions_strategic.v2.routes.strategic_routes import _scenario_figures
+    from app.modules.solutions_strategic.v2.services import simulation_service
+    from app.modules.solutions_strategic.v2.services.impact_analysis_service import ImpactAnalysisService
+
+    elements = _resolve_elements(org_id)
+    existing = {
+        row.name for row in db.session.query(SavedScenario.name).filter(SavedScenario.organization_id == org_id)
+    }
+    created = 0
+    had_org = hasattr(g, "current_org_id")
+    previous = getattr(g, "current_org_id", None)
+    g.current_org_id = org_id  # the analysis reads the organisation the way a request does
+    try:
+        for name, system, change_type in _SCENARIOS:
+            element = elements.get(system)
+            if element is None or name in existing:
+                continue
+            server = ImpactAnalysisService.analyze_change_impact(element.id, change_type, record=False)
+            db.session.add(SavedScenario(
+                organization_id=org_id, name=name, element_id=element.id, element_name=element.name,
+                element_type=element.type, change_type=change_type,
+                change_label=simulation_service.change_label(change_type),
+                analysis_result=_scenario_figures(server), created_by_id=user_id,
+            ))
+            created += 1
+    finally:
+        if had_org:
+            g.current_org_id = previous
+        else:
+            del g.current_org_id
+    if created:
+        db.session.flush()
+    return {"saved_scenarios_created": created}
+
+
 # ── products ───────────────────────────────────────────────────────────────
 
 # (product, what it is, [(relationship, direction, other element name, type, layer)]). "out" is product to element,
@@ -2624,10 +2675,64 @@ def _seed_boards(org_id, demo_user_id) -> dict:
         ))
         stats["backlog_requirements_created"] += 1
     db.session.flush()
+    stats["backlog_scores_recorded"] = _seed_backlog_scores(org_id)
     stats.update(_seed_solution_blueprints(org_id, solutions))
     stats["solution_risks_created"] = _seed_solution_risks(org_id, solutions)
     stats["risk_records_completed"] = stats.get("risk_records_completed", 0) + _complete_risk_records(org_id)
     return stats
+
+
+# Score inputs the team has recorded for each backlog requirement, by name:
+# (business value, time criticality, risk reduction, job size, reach, impact, confidence %, story points).
+# The scores are worked out from these on the prioritisation page, never typed in.
+_BACKLOG_SCORE_INPUTS = {
+    "Record the as-found reading for every instrument": (8, 5, 8, 3, 400, 4, 80, 3),
+    "Show a customer the status of an open request": (5, 3, 2, 5, 1200, 2, 70, 5),
+    "Suggest the nearest qualified engineer": (8, 5, 3, 8, 90, 4, 60, 8),
+    "Suppliers confirm delivery dates in the portal": (8, 8, 5, 5, 300, 3, 80, 5),
+    "Reject certificates with a missing reference standard": (13, 8, 13, 3, 500, 5, 90, 3),
+    "Retry a failed event delivery three times": (3, 2, 8, 2, 40, 2, 90, 2),
+    "Publish every instrument change as an event": (5, 3, 5, 5, 60, 3, 80, 5),
+    "Export certificates as signed documents": (5, 2, 3, 3, 700, 2, 80, 3),
+}
+
+
+def _seed_backlog_scores(org_id) -> int:
+    """Record score inputs on the ranked copy of each backlog requirement that has none.
+
+    A requirement with any input already recorded is left as a person set it."""
+    from app.models.models import Requirement
+    from app.models.solution_architect_models import SolutionRequirement
+    from app.services.prioritisation_service import project_backlog_requirements
+
+    project_backlog_requirements(org_id)
+    db.session.flush()
+    filled = 0
+    rows = db.session.query(SolutionRequirement).filter(
+        SolutionRequirement.organization_id == org_id, SolutionRequirement.deleted_at.is_(None),
+        SolutionRequirement.archimate_requirement_id.isnot(None),
+    ).all()
+    for source in rows:
+        inputs = _BACKLOG_SCORE_INPUTS.get(source.name)
+        ranked = db.session.get(Requirement, source.archimate_requirement_id)
+        if inputs is None or ranked is None or ranked.organization_id != org_id:
+            continue
+        fields = ("business_value", "time_criticality", "risk_reduction", "job_size",
+                  "reach", "impact", "confidence", "story_points")
+        if any(getattr(ranked, f) is not None for f in fields):
+            continue
+        (business_value, time_criticality, risk_reduction, job_size,
+         reach, impact, confidence, story_points) = inputs
+        ranked.business_value = business_value
+        ranked.time_criticality = time_criticality
+        ranked.risk_reduction = risk_reduction
+        ranked.job_size = job_size
+        ranked.reach = reach
+        ranked.impact = impact
+        ranked.confidence = confidence
+        ranked.story_points = story_points
+        filled += 1
+    return filled
 
 
 # ── the blueprint of each seeded solution ─────────────────────────────────
@@ -4481,6 +4586,7 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_data_flows(org_id))
         stats.update(_seed_raci(org_id))
         stats.update(_seed_decisions(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_scenarios(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_products(org_id))
 
         # The portfolio opens already scored: run the existing scoring

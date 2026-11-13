@@ -56,7 +56,7 @@
                         <!-- ADM Phase -->
                         {% call form_group(id='adm_phase', label='TOGAF ADM Phase') %}
                         {% call native_select(id='adm_phase', name='adm_phase', aria_label='TOGAF ADM Phase') %}
-                            <option value="">None</option>
+                            <option value="">No phase</option>
                             {% for ph, label in [
                                 ('A','Phase A: Architecture Vision'),
                                 ('B','Phase B: Business Architecture'),

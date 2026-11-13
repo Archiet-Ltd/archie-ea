@@ -48,6 +48,13 @@ def seed_overview_org(label, apps, contracts, with_owner_user=True, spread=True,
         # a first record added last year gives the year card two years to set side by side
         days_ago = ((400,) + HISTORY_DAYS_AGO) if last_year else HISTORY_DAYS_AGO
         with dated_history(days_ago=days_ago) if spread else contextlib.nullcontext():
+            if last_year:
+                # The first record written takes the first date. An application's history row is left out of
+                # the count in favour of its model element's, so the record from last year is an element of
+                # its own, not an application.
+                db.session.add(ArchiMateElement(name="Archive Office %s" % info["suffix"], type="BusinessActor",
+                                                layer="business", organization_id=org_id))
+                db.session.commit()
             made = []
             for spec in apps:
                 row = ApplicationComponent(
@@ -105,5 +112,32 @@ def purge_org(org_id):
         for table in ("archimate_relationships", "vendor_contracts", "application_owners", "archimate_elements",
                       "application_components", "entity_history"):
             db.session.execute(text("DELETE FROM %s WHERE organization_id = :o" % table), {"o": org_id})
+        db.session.commit()
+        db.session.remove()
+
+
+def add_imported_records(org_id, elements, relationships):
+    """Write ``elements`` elements and ``relationships`` relationships between them as an import's
+    direct insert writes rows: the rows alone, with the file named as their source and no history row."""
+    from sqlalchemy import insert
+
+    from app import create_app, db
+    from app.models import ArchiMateElement, ArchiMateRelationship
+
+    app = create_app("testing")
+    with app.app_context():
+        now = dt.datetime.utcnow()
+        ids = []
+        for number in range(elements):
+            result = db.session.execute(insert(ArchiMateElement.__table__).values(
+                name="Imported service %d" % number, type="ApplicationService", layer="Application",
+                organization_id=org_id, source_kind="import", source_label="landscape.xlsx", source_recorded_at=now,
+            ))
+            ids.append(result.inserted_primary_key[0])
+        for number in range(relationships):
+            db.session.execute(insert(ArchiMateRelationship.__table__).values(
+                type="serving", source_id=ids[number % len(ids)], target_id=ids[(number + 1) % len(ids)],
+                organization_id=org_id, source_kind="import", source_label="landscape.xlsx",
+            ))
         db.session.commit()
         db.session.remove()

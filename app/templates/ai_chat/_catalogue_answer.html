@@ -33,7 +33,8 @@
         {% call card_header() %}
             {% call card_title(class='text-base') %}{{ answer.title }}{% endcall %}
             {% call card_description() %}
-                {% if answer.records %}{{ answer.summary[:1] | upper }}{{ answer.summary[1:] }}: {{ answer.total if answer.total is not none else answer.records | length }} in your records.
+                {% if answer.records and answer.sentence %}<span data-testid="catalogue-sentence">{{ answer.sentence }}</span>
+                {% elif answer.records %}{{ answer.summary[:1] | upper }}{{ answer.summary[1:] }}: {{ answer.total if answer.total is not none else answer.records | length }} in your records.
                 {% elif answer.complete %}{{ sentence }}.
                 {% elif answer.unmatched %}Nothing is recorded under that name.
                 {% else %}Your records cannot answer this yet.{% endif %}
@@ -50,6 +51,7 @@
                     <i data-lucide="external-link" class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"></i>
                     <span class="min-w-0">{{ record.name }}</span>
                 </a>
+                {% if record.detail %}<p class="mt-1 text-xs text-muted-foreground" data-catalogue-detail>{{ record.detail }}</p>{% endif %}
                 {% if record.dependents or record.source_line %}
                 <p class="mt-1 text-xs text-muted-foreground">
                     {% if record.dependents %}<span class="font-medium text-foreground" data-catalogue-count>{{ record.dependents }}</span>{% endif %}

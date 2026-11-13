@@ -234,23 +234,24 @@ def _post(client, app_id, html, **fields):
     return client.post(_form_action(html), data=dict(FORM_FIELDS, csrf_token=_csrf(html), **fields))
 
 
-def test_an_owner_name_matching_no_user_is_refused_beside_the_field(
+def test_an_owner_name_matching_no_user_is_recorded_as_a_named_person(
     two_orgs, client, login_as, db_session
 ):
+    from app.models.application_owner import ApplicationOwner
+
     org = two_orgs["org_a"]
     owner = _make_user(db_session, org, "olive", first="Olive", last="Owner")
     owned = _owned_app(db_session, org, owner)
     login_as(client, two_orgs["user_a"])
     html = _edit_page(client, owned.id)
     resp = _post(client, owned.id, html, businessOwner="Nobody Atall")
-    page = resp.get_data(as_text=True)
-    assert resp.status_code == 422
-    assert 'id="edit-businessOwner-error"' in page
-    assert "no one in this organisation is called" in page
-    assert "Nobody Atall" in page, "what was typed was dropped"
-    assert "Application updated" not in page
+    assert resp.status_code == 302, resp.get_data(as_text=True)[:400]
     db_session.expire_all()
-    assert db_session.get(type(owned), owned.id).business_owner == "Olive Owner"
+    assert db_session.get(type(owned), owned.id).business_owner == "Nobody Atall"
+    row = ApplicationOwner.query.filter_by(
+        application_id=owned.id, organization_id=org.id, ownership_type="business",
+    ).one()
+    assert row.user_id is None and row.person_name == "Nobody Atall"
 
 
 def test_a_cleared_owner_field_is_refused_in_words(two_orgs, client, login_as, db_session):
@@ -535,5 +536,9 @@ def test_an_owner_name_two_people_share_asks_for_an_email_not_a_missing_person(
     assert "2 people in this organisation are called" in page
     assert "Type the email of the one you mean" in page
     assert "no one in this organisation is called" not in page
-    page = _post(client, owned.id, html, businessOwner="Nobody Atall").get_data(as_text=True)
-    assert "no one in this organisation is called" in page
+    # A name no one has is recorded as a named person (see the test above), not refused.
+    resp = _post(client, owned.id, html, businessOwner="Nobody Atall")
+    assert resp.status_code == 302
+    assert "no one in this organisation is called" not in resp.get_data(as_text=True)
+    db_session.expire_all()
+    assert db_session.get(type(owned), owned.id).business_owner == "Nobody Atall"

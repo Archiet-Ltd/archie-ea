@@ -26,7 +26,7 @@ A derivation yield report per tenant — how many connections were entered direc
 by the product — alongside a screen where you can open any single derived connection and see exactly
 how it was reasoned.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

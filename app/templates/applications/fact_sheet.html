@@ -45,12 +45,16 @@
 {% endmacro %}
 
 {# One of the four figures along the top: a label, the figure, and the sentence that explains it. #}
-{% macro stat(label, value, sentence, sentence_class='text-muted-foreground') %}
+{% macro stat(label, value, sentence, sentence_class='text-muted-foreground', withheld=false) %}
 {% call ui.card(attrs={'data-testid': 'stat-card'}) %}
   {% call ui.card_header() %}{{ ui.card_description(text=label) }}{% endcall %}
   {% call ui.card_content(class='flex flex-col gap-1') %}
+    {% if withheld %}
+    <span class="text-sm text-muted-foreground" data-testid="costs-withheld">{{ sentence }}</span>
+    {% else %}
     <span class="text-2xl font-semibold tabular-nums">{% if value %}{{ value }}{% else %}{{ not_set() }}{% endif %}</span>
     <span class="text-sm {{ sentence_class }}">{{ sentence }}</span>
+    {% endif %}
   {% endcall %}
 {% endcall %}
 {% endmacro %}
@@ -72,12 +76,13 @@
 
   {# ── Top band: completeness + headline signals ──────────────────────── #}
   {% set lc = lifecycle %}
-  {% set no_cost = annual_cost_formatted | trim == '—' %}
-  {% set no_licence = license_cost_formatted | trim == '—' %}
+  {% set no_cost = costs_withheld or annual_cost_formatted | trim == '—' %}
+  {% set no_licence = costs_withheld or license_cost_formatted | trim == '—' %}
   <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 mb-6" data-testid="fact-sheet-stats">
     {{ stat('Record completeness', completeness.pct ~ '%', completeness.filled ~ ' of ' ~ completeness.of ~ ' key fields recorded') }}
     {{ stat('Total cost of ownership', none if no_cost else annual_cost_formatted,
-            'No licence cost recorded' if no_licence else 'License/yr: ' ~ license_cost_formatted) }}
+            costs_withheld_sentence if costs_withheld else 'No licence cost recorded' if no_licence else 'License/yr: ' ~ license_cost_formatted,
+            withheld=costs_withheld) }}
     {{ stat('Business criticality', app.business_criticality | capitalize if app.business_criticality else none,
             'DR enabled' if app.disaster_recovery_enabled else 'No DR recorded') }}
     {{ stat('Lifecycle', lc.stage | capitalize if lc.stage else none,
@@ -94,15 +99,8 @@
     <i data-lucide="clipboard-list" class="h-4 w-4 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
     <div>
       <p class="text-sm font-medium text-foreground">Missing to reach a complete record</p>
-      <div class="flex flex-wrap gap-2 mt-2">
-        {% for m in completeness.missing %}
-        {% set note = (completeness.notes or {}).get(m) %}
-        {% if note %}
-        <span class="text-xs text-warning-emphasis bg-warning/10 border border-warning/20 rounded px-2 py-0.5" data-testid="missing-record-linked">{{ m }}: {{ note.text }}. <a class="underline hover:no-underline" href="{{ url_for('unified_applications.application_detail', id=app.id, tab=note.tab) }}">Record it</a></span>
-        {% else %}
-        <span class="text-xs text-warning-emphasis bg-warning/10 border border-warning/20 rounded px-2 py-0.5">{{ m }}</span>
-        {% endif %}
-        {% endfor %}
+      <div class="text-xs text-warning-emphasis">
+        {% with steps = completeness.steps, notes = completeness.notes %}{% include 'applications/_completeness_steps.html' %}{% endwith %}
       </div>
       {% if completeness.notes %}
       <p class="text-xs text-muted-foreground mt-2">The score counts only facts recorded on the application. Links in the model are not counted until you record them.</p>

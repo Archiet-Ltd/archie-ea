@@ -515,10 +515,26 @@ CONCEPTS = {
     ],
     # /procurement/contracts renders VendorContract for the organisation as
     # HTML; its query is the orm:VendorContract surface.
+    # VendorContract is the contract store: the register, Spend, Renewals,
+    # Vendors and the assistant read it, and every row is mirrored as one
+    # Contract element in the architecture model, which is the list the
+    # architecture screens show (the Contract list is element-less
+    # typed rows plus those mirrored elements). The typed Contract table holds
+    # only records a person drew by hand with no element behind them, so it is
+    # not a second copy of the register and is not compared with it; it is
+    # declared under its own scope. The comparison that can fail is the
+    # register against the mirrored elements: a contract with no element node
+    # shows in the register and is missing from the architecture list.
     "contracts": [
         Surface("orm:VendorContract", "orm",
                 "app.models.application_portfolio.VendorContract"),
-        Surface("orm:Contract", "orm", "app.models.archimate_business.Contract"),
+        Surface("orm:VendorContract(on the architecture model)", "orm",
+                "app.models.application_portfolio.VendorContract",
+                filter_not_null="archimate_element_id"),
+        Surface("orm:Contract(drawn by hand, no vendor contract)", "orm",
+                "app.models.archimate_business.Contract",
+                filter_null="archimate_element_id",
+                scope="drawn by hand in the architecture model"),
     ],
     "vendors": [
         Surface("orm:VendorOrganization", "orm",

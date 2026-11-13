@@ -5,6 +5,7 @@
 {% from 'basecoat/table.html' import table_cell %}
 {% from 'components/figures.html' import stat_cards, state_badge, value_or_unset %}
 {% from 'components/list_table.html' import list_table %}
+{% from 'opportunities/_ranked_table.html' import ranked_opportunities_table %}
 
 {% block title %}Consolidation Opportunities{% endblock %}
 
@@ -19,10 +20,32 @@
     {% set forecast_by_year = forecast.forecast_by_year if forecast.forecast_by_year is mapping else {} %}
 
     <div class="flex flex-col gap-6">
+    {% macro _next_step() %}
+    {% if 'unified_low_priority.consolidation_candidates' in flask.current_app.view_functions %}
+    {{ ui.button(text='Review consolidation candidates', href=url_for('unified_low_priority.consolidation_candidates'), variant='outline', size='sm') }}
+    {% endif %}
+    {% endmacro %}
+
+    {# The opportunities are the ones /opportunities ranks, read through the same service. #}
+    {% if ranked_error %}
+    {{ stat_cards([{'label': 'Opportunities found', 'icon': 'lightbulb', 'sentence': ranked_error ~ ' Try again in a moment.', 'testid': 'consolidation-opportunities-total'}]) }}
+    {% else %}
+    {{ stat_cards([{'label': 'Opportunities found', 'value': ranked_total, 'icon': 'lightbulb', 'sentence': ('Showing the top ' ~ ranked_items|length ~ '. The full list is on the Opportunities page' if ranked_total > ranked_items|length else 'The same opportunities the Opportunities page ranks'), 'testid': 'consolidation-opportunities-total'}]) }}
+    {% endif %}
+    {{ ranked_opportunities_table(ranked_items, with_cost, ranked_error or 'No opportunity has been found. Opportunities come from applications that support the same capability, active contracts on systems being retired, and gaps nobody has started.', empty_action=_next_step, testid='ranked-opportunities-table', row_testid='ranked-opportunity-row') }}
+
+    <h2 class="text-lg font-semibold">Consolidation plans</h2>
     {% if forecast_failed %}
     {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'The savings forecast could not be calculated. Try again in a moment.', 'testid': 'opportunities-savings'}]) }}
     {% elif opportunities_included == 0 %}
     {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'No savings estimated yet: no opportunity has been included', 'testid': 'opportunities-savings'}]) }}
+    {# With nothing ranked the one next step is the empty state above; it is not repeated here. #}
+    {% if ranked_items and 'unified_low_priority.consolidation_candidates' in flask.current_app.view_functions %}
+    <p class="text-sm text-muted-foreground">A saving is estimated once a plan is approved. Start from a consolidation candidate.
+        <a href="{{ url_for('unified_low_priority.consolidation_candidates') }}" class="text-primary hover:underline" data-testid="savings-next-step">Review consolidation candidates</a></p>
+    {% endif %}
+    {% elif forecast_by_year and not with_cost %}
+    {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'Savings figures are not shown for your role.', 'testid': 'opportunities-savings'}]) }}
     {% elif forecast_by_year %}
     {% set years = [] %}
     {% for year, amount in forecast_by_year.items() %}
@@ -33,18 +56,13 @@
     {% for row in years|batch(4) %}{{ stat_cards(row, testid='opportunities-savings-row-' ~ loop.index) }}{% endfor %}
     {% endif %}
 
-    {% macro _next_step() %}
-    {% if 'unified_low_priority.consolidation_candidates' in flask.current_app.view_functions %}
-    {{ ui.button(text='Review consolidation candidates', href=url_for('unified_low_priority.consolidation_candidates'), variant='outline', size='sm') }}
-    {% endif %}
-    {% endmacro %}
     {% set empty_text = (load_error ~ ' Try again in a moment.') if load_error else 'No consolidation opportunity has been recorded. An opportunity is created from a consolidation candidate, so start with the candidates.' %}
 
     {# The opportunity has no page of its own; the target application it
        consolidates into is the record the decision is made against. #}
     {% call(opp) list_table(rows=opportunities, columns=[('Opportunity', ''), ('Consolidate into', ''), ('Status', ''), ('Impact', '')], caption='Consolidation opportunities',
                             testid='opportunities-table', row_testid='opportunity-row', search_placeholder='Filter opportunities...',
-                            empty_message=empty_text, empty_action=_next_step) %}
+                            empty_message=empty_text, empty_action=(_next_step if ranked_items and with_cost and opportunities_included > 0 else none)) %}
         {% call table_cell(class='font-medium') %}{{ opp.name|default(opp.title|default('Unnamed')) }}{% endcall %}
         {% call table_cell() %}
             {% if opp.target_application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}

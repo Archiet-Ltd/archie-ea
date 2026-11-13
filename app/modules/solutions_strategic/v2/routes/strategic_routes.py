@@ -39,7 +39,12 @@ from app.modules.solutions_strategic.v2.services.impact_analysis_service import 
 from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
     currency_symbol,
     InvestmentPrioritizationService,
-    limit_costs_to_viewer,
+)
+from app.services.cost_visibility import (
+    COSTS_WITHHELD,
+    INVESTMENT_MONEY_KEYS,
+    costs_visible,
+    withhold_costs,
 )
 from app.modules.solutions_strategic.v2.services.process_optimization_service import (
     ProcessOptimizationService,
@@ -179,7 +184,8 @@ def investment_matrix():
 
         result_footer_service.attach_capability_footers(current_org_id(), analysis["capability_scores"])
         # After the footers, which read the figures to say where each came from.
-        limit_costs_to_viewer(analysis)
+        if not costs_visible(current_user):
+            analysis = withhold_costs(analysis, keys=INVESTMENT_MONEY_KEYS)
 
         return render_template(
             "strategic/investment_matrix.html",
@@ -191,6 +197,7 @@ def investment_matrix():
             portfolio_metrics=analysis["portfolio_metrics"],
             recommendations=analysis["recommendations"],
             currency_symbol=currency_symbol(),
+            costs_withheld_text=COSTS_WITHHELD,
         )
     except Exception:
         current_app.logger.exception("Investment matrix scores could not be loaded")
@@ -208,7 +215,9 @@ def api_investment_analysis():
     try:
         service = InvestmentPrioritizationService()
         analysis = service.analyze_investment_priorities(include_risk_analysis=True)
-        return jsonify(limit_costs_to_viewer(analysis))
+        if not costs_visible(current_user):
+            analysis = withhold_costs(analysis, keys=INVESTMENT_MONEY_KEYS)
+        return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
@@ -318,8 +327,8 @@ def api_impact_analysis():
 
             analysis["footer_html"] = result_footer_service.render_footer(
                 result_footer_service.impact_footer(current_org_id(), analysis))
-            if not simulation_service.may_see_costs(current_user):
-                analysis = simulation_service.withhold_costs(analysis)
+            if not costs_visible(current_user):
+                analysis = withhold_costs(analysis)
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
@@ -375,8 +384,8 @@ def api_simulation():
 
         result["footer_html"] = result_footer_service.render_footer(
             result_footer_service.impact_footer(current_org_id(), result))
-        if not simulation_service.may_see_costs(current_user):
-            result = simulation_service.withhold_costs(result)
+        if not costs_visible(current_user):
+            result = withhold_costs(result)
         return jsonify(result)
     except simulation_service.ElementNotInModel:
         return jsonify({"error": "That element is not in your model."}), 404
@@ -407,8 +416,8 @@ def _scenario_figures(server):
 def _scenario_for_caller(row):
     """A saved scenario as the caller may read it: the running costs are left out for a person the cost rule withholds from."""
     data = row.to_dict()
-    if not simulation_service.may_see_costs(current_user):
-        data["analysis_result"] = simulation_service.withhold_costs(data["analysis_result"])
+    if not costs_visible(current_user):
+        data["analysis_result"] = withhold_costs(data["analysis_result"])
     return data
 
 
@@ -573,8 +582,8 @@ def api_portfolio_impact():
 
         service = ImpactAnalysisService()
         analysis = service.analyze_portfolio_impact(change_scenarios)
-        if not simulation_service.may_see_costs(current_user):
-            analysis = simulation_service.withhold_costs(analysis)
+        if not costs_visible(current_user):
+            analysis = withhold_costs(analysis)
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500

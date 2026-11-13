@@ -111,6 +111,12 @@ PREFIX_OVERRIDES: tuple = (
     ("/admin/billing/", "W1", "PG-ORG", "plan checkout, cancel and billing"),
     ("/architecture/sample-company/", "W1", "PG-NEW", "start the sample company"),
     ("/dashboard/api/onboarding-complete", "W1", "PG-NEW", "first sit-down progress"),
+    # Calls and pages that belong to a page already in the plan, named so they do not fall to a retired or unplanned entry.
+    ("/dashboard/applications/<int:id>/vendor-link$", "W1", "PG-APP", "link a vendor from the application page"),
+    ("/architecture/products/", "W2", "PG-ELE", "add an element, scan repositories and export on a Product's page, which is an element page"),
+    ("/architecture/api/capability-choices$", "W3", "PG-DIA", "the capability picker on the element form"),
+    ("/archimate/model-map$", "W2", "PG-DIA", "the whole model as one graph, the impact graph page in its whole-model mode"),
+    ("/archimate/api/model-map$", "W2", "PG-DIA", "the nodes and links the model map draws"),
 )
 
 # Rules whose path is ambiguous after normalisation (two rules read /<x>): named by endpoint.

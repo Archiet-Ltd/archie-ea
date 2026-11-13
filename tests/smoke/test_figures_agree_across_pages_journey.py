@@ -171,14 +171,23 @@ def test_the_figures_agree_on_every_page_and_with_the_seed(browser, live_server,
         page.wait_for_url(re.compile(r"/risks/\d+$"))
         expect(page.locator("main")).to_contain_text(mine["risk"])
 
-        # The simulations page: the same risk, the same confidence, the same reason.
+        # The simulations page carries no ranked list; it links to the one on Impact Analysis.
         page.goto(live_server + "/simulations", wait_until="domcontentloaded")
+        link = page.get_by_test_id("priority-actions-link")
+        expect(link).to_be_visible()
+        expect(page.get_by_test_id("priority-action-row")).to_have_count(0)
+        expect(page.locator("main")).not_to_contain_text(theirs["risk"])
+        _shot(page, "simulations", viewport, scheme)
+        link.click()
+
+        # Impact Analysis: the same risk, the same confidence, the same reason.
+        page.wait_for_url(re.compile(r"/strategic/impact-analysis#priority-actions$"))
         action = page.get_by_test_id("priority-action-row").filter(has_text=mine["risk"])
         expect(action).to_have_count(1)
         assert _footer_after(page, action) == on_register
         expect(page.locator("main")).not_to_contain_text(theirs["risk"])
         action.scroll_into_view_if_needed()
-        _shot(page, "simulations", viewport, scheme)
+        _shot(page, "impact-analysis", viewport, scheme)
         action.get_by_test_id("priority-action-link").click()
         page.wait_for_url(re.compile(r"/risks/\d+"))
         expect(page.locator("main")).to_contain_text(mine["risk"])

@@ -24,6 +24,7 @@ from app.services.element_ownership_service import (
     CrossOrganisationElementOwner,
     DuplicateElementOwner,
     set_element_owner,
+    set_named_person_owner,
 )
 
 from . import unified_applications_bp
@@ -50,6 +51,9 @@ def add_owner(app_id: int):
     """Add an owner to an application (JSON only).
 
     Body: {"user_id": int, "ownership_type": "primary"|"backup"|"technical"|"business"}
+    or, for a person with no account in the workspace,
+    {"person_name": str, "person_email": str (optional), "person_role": str (optional),
+    "ownership_type": ...}, recorded on the same owner record.
     Refuses assignment of a user from another organisation.  Also refuses
     writing to an application that does not belong to the caller.
     """
@@ -72,6 +76,24 @@ def add_owner(app_id: int):
             "success": False,
             "error": f"ownership_type must be one of {ApplicationOwner.OWNERSHIP_TYPES}",
         }), 400
+
+    person_name = " ".join(str(data.get("person_name") or "").split())
+    if person_name and user_id is None:
+        try:
+            owner = set_named_person_owner(
+                app,
+                person_name,
+                ownership_type,
+                organization_id=org_id,
+                email=data.get("person_email"),
+                role=data.get("person_role"),
+                assigned_by=current_user.id,
+                replace=bool(data.get("replace")),
+            )
+        except ValueError as problem:
+            return jsonify({"success": False, "error": str(problem)}), 400
+        db.session.commit()
+        return jsonify({"success": True, "owner": owner.to_dict()}), 201
 
     try:
         owner = set_element_owner(

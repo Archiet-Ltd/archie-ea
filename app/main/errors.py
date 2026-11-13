@@ -61,10 +61,40 @@ def forbidden(e):
     if api is not None:
         return api
     try:
+        buying = _buying_refusal()
+        if buying is not None:
+            title, message, next_step = buying
+            return render_plain_error(403, title=title, message=message, next_step=next_step)
         return render_plain_error(403)
     except Exception:
         _log_exception(e)
         return inline_error_page(403), 403
+
+
+def _buying_refusal():
+    """What a signed-in member is told when Buy takes them to the billing page: who can buy, and how to reach them."""
+    from flask import g
+    from flask_login import current_user
+
+    if not request.path.startswith("/admin/billing") or not current_user.is_authenticated:
+        return None
+    from app.services.administrator_guard import administrators_to_ask
+
+    admins = administrators_to_ask(getattr(g, "current_org_id", None) or current_user.organization_id)
+    title = "An administrator of your organisation buys the plan"
+    if not admins:
+        return (
+            title + ".",
+            "Plans are bought and changed by an administrator, and we could not find one to name. "
+            "Contact us and we will put you in touch with the right person.",
+            ("Contact us", "/contact"),
+        )
+    names = ", ".join("%s (%s)" % (a["name"], a["email"]) if a["name"] != a["email"] else a["email"] for a in admins)
+    return (
+        title,
+        "Plans are bought and changed by an administrator. Ask %s to buy the plan you chose." % names,
+        ("Email %s" % admins[0]["name"], "mailto:" + admins[0]["email"]),
+    )
 
 
 @main.app_errorhandler(404)

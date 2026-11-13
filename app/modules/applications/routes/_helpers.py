@@ -722,6 +722,7 @@ def _vendors_impl(
         register_rows=register_rows,
         vendor_footers=vendor_footers,
         system_counts=system_counts,
+        linked_suppliers=page["linked_suppliers"],
         stats=stats,
         vendor_type_filter_options=vendor_type_filter_options,
         vendor_type_filter=vendor_type_filter,

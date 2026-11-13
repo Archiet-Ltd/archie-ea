@@ -6,7 +6,8 @@
 {% block body_theme %}theme-marketing{% endblock %}
 {% block title %}Coming to Entelim{% endblock %}
 {% block meta_description %}
-<meta name="robots" content="noindex">
+{% from 'partials/_seo_meta.html' import seo_meta %}
+{{ seo_meta('https://entelim.org/early-access', 'The parts of Entelim you can join the waiting list for. Pick one and we will email you when you can use it.', not indexable) }}
 {% endblock %}
 {% block header %}
 {% include 'components/public_navbar.html' %}
@@ -16,12 +17,18 @@
   <article class="public-page-content public-prose prose max-w-none" data-testid="early-access-hub">
     <div class="style-vega">{{ ui.badge(text='Early access', variant='outline') }}</div>
     <h1>Coming to Entelim</h1>
+    {% if entries %}
     <p>Pick a part of Entelim to join its waiting list.</p>
     <ul>
       {% for e in entries %}
       <li><a href="{{ e.href }}">{{ e.title }}</a>{% if e.blurb %}: {{ e.blurb }}{% endif %}</li>
       {% endfor %}
     </ul>
+    {% elif elsewhere %}
+    <p data-testid="early-access-elsewhere">Nothing here has its own waiting list yet. <a href="/features#coming-soon">The features page</a> says what is coming.</p>
+    {% else %}
+    <p data-testid="early-access-none">Nothing is waiting: every part of Entelim is open to you now.</p>
+    {% endif %}
   </article>
 </div>
 {% include 'components/public_footer.html' %}

@@ -51,6 +51,24 @@ textarea:focus-visible {
     border-color: hsl(var(--ring));
 }
 
+/* The ring is there the moment the keyboard arrives. The library's buttons, sort
+   headers and menu triggers animate every property (transition-all), which faded
+   the outline and ring in from transparent, so a quick Tab landed on a control
+   that showed nothing. Focused controls keep their colour and size transitions
+   but never animate the outline or the ring. */
+:focus-visible {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke,
+        opacity, transform, translate, scale, rotate, width, height, padding;
+}
+
+/* And it leaves the moment the keyboard does. The library's outline-none is a
+   transparent solid outline, which those same transitions faded out over the
+   control Tab had left, so two controls looked focused at once. With no outline
+   at all when not focused, the ring is removed at once. */
+.outline-none:not(:focus-visible) {
+    outline-style: none;
+}
+
 /* Ensure mouse clicks don't show focus ring */
 *:focus:not(:focus-visible) {
     outline: none;

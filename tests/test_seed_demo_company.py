@@ -130,7 +130,15 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
     assert counts["relationships"] > 150
     assert counts["applications"] == 20
     assert counts["capabilities"] == 24
-    assert counts["risks"] == 10
+    # The register holds the ten portfolio risks (linked to an element) and the
+    # twelve risks of the demonstration solutions (linked to their solution).
+    from app.models.risk import Risk
+    portfolio_risks = Risk.query.filter_by(organization_id=org_id, solution_id=None).count()
+    solution_risks = Risk.query.filter(
+        Risk.organization_id == org_id, Risk.solution_id.isnot(None)).count()
+    assert portfolio_risks == 10
+    assert solution_risks == 12
+    assert counts["risks"] == portfolio_risks + solution_risks
     assert counts["programmes"] == 5
     assert counts["work_packages"] == 29
     # Every seeded work package must carry the organisation so it is visible
@@ -488,8 +496,18 @@ def test_demo_page_returns_200_with_description(app, db_session, make_org, clien
     assert "water-monitoring" in html
 
 
-def test_demo_page_shows_not_seeded_when_no_org(app, client):
-    """When the org hasn't been seeded, the page shows a helpful message."""
+def test_demo_page_shows_not_seeded_when_no_org(app, client, db_session):
+    """When the org hasn't been seeded, the page shows a helpful message.
+
+    A database another run has already seeded holds the organisation, so the
+    test sets aside any Lantern Quay organisation inside its own transaction
+    (rolled back with it) to start from the unseeded state it describes.
+    """
+    from app.models.organization import Organization
+
+    for existing in Organization.query.filter_by(slug="lantern-quay").all():
+        existing.slug = "set-aside-%d" % existing.id
+    db_session.flush()
     resp = client.get("/demo/lantern-quay")
     assert resp.status_code == 200
     html = resp.data.decode("utf-8")
@@ -621,14 +639,30 @@ def test_all_application_owners_reference_existing_users_and_apps(app, db_sessio
     user_ids = {
         u.id for u in User.query.filter_by(organization_id=org_id).all()
     }
+    from app.services.element_ownership_service import _ELEMENTS
+
     owners = ApplicationOwner.query.filter_by(organization_id=org_id).all()
+    assert owners
     for ao in owners:
-        assert ao.application_id in app_ids, (
-            f"owner {ao.id} references unknown app {ao.application_id}"
-        )
+        if ao.element_type is None:
+            # An application owner: it points at an application of this organisation.
+            assert ao.application_id in app_ids, (
+                f"owner {ao.id} references unknown app {ao.application_id}"
+            )
+        else:
+            # An owner of another kind of element: it points at a record of that
+            # kind in this organisation, and carries no application.
+            assert ao.application_id is None, f"owner {ao.id} carries an application"
+            assert ao.element_type in _ELEMENTS, f"owner {ao.id} has unknown kind {ao.element_type}"
+            assert _ELEMENTS[ao.element_type][0](ao.element_id, org_id) is not None, (
+                f"owner {ao.id} references unknown {ao.element_type} {ao.element_id}"
+            )
         assert ao.user_id in user_ids, (
             f"owner {ao.id} references unknown user {ao.user_id}"
         )
+    # No row is stored as an application owner without an application.
+    assert ApplicationOwner.query.filter_by(
+        organization_id=org_id, element_type=None, application_id=None).count() == 0
 
 
 def test_capabilities_have_maturity_levels(app, db_session, make_org):
@@ -1361,3 +1395,37 @@ def test_seeding_again_changes_no_compliance_figure(app, db_session, make_org, t
     _seed_once()
     with tenant_ctx(org_id):
         assert figures(org_id) == after
+
+
+def test_seeding_saved_scenarios_for_one_organisation_writes_only_that_organisations_rows(app, db_session, make_org):
+    """Two organisations hold a system of the same name: seeding the scenarios for one adds rows to that one only."""
+    from app.commands.seed_demo_company import _SCENARIOS, _seed_scenarios
+    from app.models import ArchiMateElement
+    from app.models.saved_scenario import SavedScenario
+
+    lantern_id = _seed_and_get_org_id()
+    system = _SCENARIOS[0][1]
+    other = make_org("scenarios")
+    other_id = other.id
+    db_session.add(ArchiMateElement(name=system, type="ApplicationComponent", layer="application", organization_id=other_id))
+    db_session.commit()
+
+    def rows(org_id):
+        return sorted(
+            (r.name, r.element_id, r.organization_id)
+            for r in db_session.query(SavedScenario).filter(SavedScenario.organization_id == org_id)
+        )
+
+    lantern_before = rows(lantern_id)
+    assert [name for name, _e, _o in lantern_before] == sorted(name for name, _s, _c in _SCENARIOS)
+    assert rows(other_id) == []
+
+    assert _seed_scenarios(other_id, None) == {"saved_scenarios_created": len(_SCENARIOS)}
+    db_session.commit()
+
+    own_element = db_session.query(ArchiMateElement).filter_by(organization_id=other_id, name=system).one()
+    assert rows(other_id) == sorted((name, own_element.id, other_id) for name, _s, _c in _SCENARIOS)
+    assert rows(lantern_id) == lantern_before
+    # a second run changes nothing in either organisation
+    assert _seed_scenarios(other_id, None) == {"saved_scenarios_created": 0}
+    assert rows(lantern_id) == lantern_before

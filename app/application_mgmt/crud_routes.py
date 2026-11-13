@@ -7,8 +7,8 @@ Handles create, read (legacy redirect), update, and delete operations for Applic
 from datetime import datetime
 from decimal import Decimal
 
-from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask import current_app, flash, g, jsonify, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 
 from .. import db
 from ..models.application_portfolio import ApplicationComponent
@@ -17,6 +17,7 @@ from ..models.requirements import Requirement
 from ..services.application_cost_accessor import set_annual_cost
 from ..services.application_status import status_for_write
 from ..utils.html_sanitizer import sanitize_html
+from app.services.cost_visibility import costs_visible
 from ..utils.validators import (
     validate_application_name,
     validate_description,
@@ -27,11 +28,42 @@ from . import application_mgmt
 from .forms import ApplicationComponentForm
 from .routes import _build_vendor_product_choices, _sync_vendor_products
 
+_COST_NOT_SAVED = ("The cost was not saved. Only a person who may set costs can record one; "
+                   "the rest of the application was saved.")
+
+
+_DRAWER_FIELDS = frozenset({
+    "csrf_token", "name", "description", "component_type", "deployment_status", "technology_stack", "version",
+    "business_domain", "business_owner", "user_count",
+})
+
+_COST_FORM_FIELDS = ("license_cost_annual", "infrastructure_cost_monthly",
+                     "development_cost_annual",
+                     "total_cost_of_ownership")
+
+
+def _cost_was_posted(form):
+    return any(getattr(form, f).data not in (None, "") for f in _COST_FORM_FIELDS)
+
+
+def _cost_was_changed(form, app):
+    return any(getattr(form, f).data not in (None, "") and
+               str(getattr(form, f).data) != str(getattr(app, f, None))
+               for f in _COST_FORM_FIELDS)
+
+
+def _app_in_active_org_or_404(app_id):
+    """The application only when it belongs to the signed-in organisation."""
+    from ..modules.applications.routes._helpers import _verify_app_in_org  # noqa: PLC0415
+
+    return _verify_app_in_org(app_id, g.current_org_id, raise_not_found=True)
+
 @application_mgmt.route("/applications/create", methods=["GET", "POST"])
 @login_required
 def application_create():
     """Create new Application Component"""
     form = ApplicationComponentForm()
+    may_set_cost = costs_visible(current_user)
     vendor_choices = _build_vendor_product_choices()
     form.vendor_products.choices = vendor_choices
 
@@ -42,9 +74,9 @@ def application_create():
             and request.form.get("component_type")
             and request.form.get("deployment_status")
         )
-        has_full_form_fields = request.form.get(
-            "application_category"
-        ) or request.form.get("architecture_style")
+        # The drawer saves only these; a post that carries any other field is the full form,
+        # so nothing the person typed is dropped.
+        has_full_form_fields = bool(set(request.form) - _DRAWER_FIELDS)
 
         # If it's a drawer submission (has basic fields but not full form), handle it directly
         if has_drawer_fields and not has_full_form_fields:
@@ -207,9 +239,17 @@ def application_create():
                 app=None,
             )
 
+        code = form.application_code.data
+        if code and ApplicationComponent.query.filter_by(application_code=code).first() is not None:
+            form.application_code.errors.append("That application code is already in use.")
+            flash("That application code is already in use. Choose another.", "error")
+            return render_template("applications/create.html", form=form, mode="create", app=None)
+
         app = ApplicationComponent(
             name=form.name.data,
             description=form.description.data,
+            application_code=code,
+            business_purpose=form.business_purpose.data,
             component_type=form.component_type.data,
             application_category=form.application_category.data,
             architecture_style=form.architecture_style.data,
@@ -241,7 +281,6 @@ def application_create():
             user_type=form.user_type.data,
             concurrent_users_max=form.concurrent_users_max.data,
             average_daily_users=form.average_daily_users.data,
-            geographic_distribution=form.geographic_distribution.data,
             response_time_target_ms=form.response_time_target_ms.data,
             throughput_target_tps=form.throughput_target_tps.data,
             current_response_time_ms=form.current_response_time_ms.data,
@@ -269,53 +308,20 @@ def application_create():
             dependencies_count=form.dependencies_count.data,
             integration_pattern=form.integration_pattern.data,
             exposes_api=form.exposes_api.data,
-            api_documentation_url=form.api_documentation_url.data,
             primary_data_store=form.primary_data_store.data,
             database_size_gb=form.database_size_gb.data,
-            data_retention_policy=form.data_retention_policy.data,
             data_classification=form.data_classification.data,
-            master_data_source=form.master_data_source.data,
             license_type=form.license_type.data,
-            license_cost_annual=form.license_cost_annual.data,
-            infrastructure_cost_monthly=form.infrastructure_cost_monthly.data,
-            development_cost_annual=form.development_cost_annual.data,
-            maintenance_cost_annual=form.maintenance_cost_annual.data,
-            cost_center=form.cost_center.data,
+            license_cost_annual=form.license_cost_annual.data if may_set_cost else None,
+            infrastructure_cost_monthly=form.infrastructure_cost_monthly.data if may_set_cost else None,
+            development_cost_annual=form.development_cost_annual.data if may_set_cost else None,
             go_live_date=form.go_live_date.data,
-            last_major_release_date=form.last_major_release_date.data,
-            next_planned_release_date=form.next_planned_release_date.data,
             end_of_life_date=form.end_of_life_date.data,
-            retirement_date=form.retirement_date.data,
-            replacement_application=form.replacement_application.data,
-            ci_cd_pipeline_url=form.ci_cd_pipeline_url.data,
-            build_tool=form.build_tool.data,
-            automated_testing_coverage=form.automated_testing_coverage.data,
-            deployment_frequency=form.deployment_frequency.data,
-            mean_time_to_recovery_hours=form.mean_time_to_recovery_hours.data,
-            change_failure_rate_percent=form.change_failure_rate_percent.data,
-            monitoring_enabled=form.monitoring_enabled.data,
-            monitoring_tool=form.monitoring_tool.data,
-            logging_enabled=form.logging_enabled.data,
-            logging_tool=form.logging_tool.data,
-            tracing_enabled=form.tracing_enabled.data,
-            tracing_tool=form.tracing_tool.data,
-            apm_enabled=form.apm_enabled.data,
-            health_check_url=form.health_check_url.data,
-            code_quality_score=form.code_quality_score.data,
-            technical_debt_hours=form.technical_debt_hours.data,
-            bugs_count=form.bugs_count.data,
-            vulnerabilities_count=form.vulnerabilities_count.data,
-            code_coverage_percent=form.code_coverage_percent.data,
-            last_code_quality_scan=form.last_code_quality_scan.data,
-            documentation_url=form.documentation_url.data,
-            architecture_diagram_url=form.architecture_diagram_url.data,
-            runbook_url=form.runbook_url.data,
-            user_manual_url=form.user_manual_url.data,
             tags=form.tags.data,
             notes=form.notes.data,
         )
 
-        if form.total_cost_of_ownership.data is not None:
+        if may_set_cost and form.total_cost_of_ownership.data is not None:
             set_annual_cost(app, Decimal(str(form.total_cost_of_ownership.data)))
 
         db.session.add(app)
@@ -327,6 +333,8 @@ def application_create():
         db.session.commit()
 
         flash(f'Application Component "{app.name}" created successfully!', "success")
+        if not may_set_cost and _cost_was_posted(form):
+            flash(_COST_NOT_SAVED, "warning")
         if (
             app.deployment_status or ""
         ).lower() == "production" and not selected_vendor_ids:
@@ -366,7 +374,8 @@ def legacy_application_detail_redirect(id):
 @login_required
 def application_edit(id):
     """Edit Application Component"""
-    app = ApplicationComponent.query.get_or_404(id)
+    app = _app_in_active_org_or_404(id)
+    may_set_cost = costs_visible(current_user)
     form = ApplicationComponentForm(obj=app)
 
     vendor_choices = _build_vendor_product_choices()
@@ -438,7 +447,6 @@ def application_edit(id):
         app.user_type = form.user_type.data
         app.concurrent_users_max = form.concurrent_users_max.data
         app.average_daily_users = form.average_daily_users.data
-        app.geographic_distribution = form.geographic_distribution.data
         app.response_time_target_ms = form.response_time_target_ms.data
         app.throughput_target_tps = form.throughput_target_tps.data
         app.current_response_time_ms = form.current_response_time_ms.data
@@ -466,52 +474,22 @@ def application_edit(id):
         app.dependencies_count = form.dependencies_count.data
         app.integration_pattern = form.integration_pattern.data
         app.exposes_api = form.exposes_api.data
-        app.api_documentation_url = form.api_documentation_url.data
         app.primary_data_store = form.primary_data_store.data
         app.database_size_gb = form.database_size_gb.data
-        app.data_retention_policy = form.data_retention_policy.data
         app.data_classification = form.data_classification.data
-        app.master_data_source = form.master_data_source.data
         app.license_type = form.license_type.data
-        app.license_cost_annual = form.license_cost_annual.data
-        app.infrastructure_cost_monthly = form.infrastructure_cost_monthly.data
-        app.development_cost_annual = form.development_cost_annual.data
-        app.maintenance_cost_annual = form.maintenance_cost_annual.data
-        if form.total_cost_of_ownership.data is not None:
-            set_annual_cost(app, Decimal(str(form.total_cost_of_ownership.data)))
-        else:
-            set_annual_cost(app, None)
-        app.cost_center = form.cost_center.data
+        if may_set_cost:
+            app.license_cost_annual = form.license_cost_annual.data
+            app.infrastructure_cost_monthly = form.infrastructure_cost_monthly.data
+            app.development_cost_annual = form.development_cost_annual.data
+            if form.total_cost_of_ownership.data is not None:
+                set_annual_cost(app, Decimal(str(form.total_cost_of_ownership.data)))
+            else:
+                set_annual_cost(app, None)
+        elif _cost_was_changed(form, app):
+            flash(_COST_NOT_SAVED, "warning")
         app.go_live_date = form.go_live_date.data
-        app.last_major_release_date = form.last_major_release_date.data
-        app.next_planned_release_date = form.next_planned_release_date.data
         app.end_of_life_date = form.end_of_life_date.data
-        app.retirement_date = form.retirement_date.data
-        app.replacement_application = form.replacement_application.data
-        app.ci_cd_pipeline_url = form.ci_cd_pipeline_url.data
-        app.build_tool = form.build_tool.data
-        app.automated_testing_coverage = form.automated_testing_coverage.data
-        app.deployment_frequency = form.deployment_frequency.data
-        app.mean_time_to_recovery_hours = form.mean_time_to_recovery_hours.data
-        app.change_failure_rate_percent = form.change_failure_rate_percent.data
-        app.monitoring_enabled = form.monitoring_enabled.data
-        app.monitoring_tool = form.monitoring_tool.data
-        app.logging_enabled = form.logging_enabled.data
-        app.logging_tool = form.logging_tool.data
-        app.tracing_enabled = form.tracing_enabled.data
-        app.tracing_tool = form.tracing_tool.data
-        app.apm_enabled = form.apm_enabled.data
-        app.health_check_url = form.health_check_url.data
-        app.code_quality_score = form.code_quality_score.data
-        app.technical_debt_hours = form.technical_debt_hours.data
-        app.bugs_count = form.bugs_count.data
-        app.vulnerabilities_count = form.vulnerabilities_count.data
-        app.code_coverage_percent = form.code_coverage_percent.data
-        app.last_code_quality_scan = form.last_code_quality_scan.data
-        app.documentation_url = form.documentation_url.data
-        app.architecture_diagram_url = form.architecture_diagram_url.data
-        app.runbook_url = form.runbook_url.data
-        app.user_manual_url = form.user_manual_url.data
         app.tags = form.tags.data
         app.notes = form.notes.data
         app.updated_at = datetime.utcnow()
@@ -788,7 +766,7 @@ def application_quick_fill(app_id):
     Body: {"field": "<field_name>", "value": "<value>"}
     Returns: {"success": true, "completeness_score": <int>}
     """
-    app_obj = ApplicationComponent.query.get_or_404(app_id)
+    app_obj = _app_in_active_org_or_404(app_id)
 
     data = request.get_json(silent=True)
     if not data:
@@ -815,6 +793,9 @@ def application_quick_fill(app_id):
         "description": "description",
     }
     model_field = _FIELD_MAP[field]
+
+    if field == "annual_cost" and not costs_visible(current_user):
+        return jsonify({"success": False, "error": _COST_NOT_SAVED}), 403
 
     try:
         setattr(app_obj, model_field, value.strip())

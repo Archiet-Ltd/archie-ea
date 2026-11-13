@@ -74,6 +74,7 @@ def world(db_session, make_org):
             duplicate_application_id=second.id,
             similarity_score=0.9,
             detection_method="name_match",
+            notes="The two applications carry near-identical names.",  # detection stores the reason with every pair
             status="pending_review",
         )
         opp = ConsolidationOpportunity(
@@ -151,7 +152,7 @@ def test_detection_and_new_opportunities_carry_the_active_organisation(
     with tenant_ctx(world.org_a.id):
         assert S.detect_duplicate_candidates()["success"]
         approved = S.review_candidate(world.cand_a.id, "approve")
-        assert approved["success"]
+        assert approved["success"], approved
         made = S.create_opportunity_from_candidates([world.cand_a.id], {"name": "Fresh A"})
         assert made["success"], made
         new_id = made["opportunity"]["id"]

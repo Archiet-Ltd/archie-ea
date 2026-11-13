@@ -103,6 +103,60 @@ def compute_completeness(app: Any, owner_count: Optional[int] = None) -> Dict[st
             "of": len(_COMPLETENESS_FIELDS)}
 
 
+# Where each missing item is set: (page, field or card id, what the person is sent to).
+# "edit" is the full editor, "detail" the application page. Every field named here is an
+# input on that page, so the link lands on the place that clears the item.
+_STEPS = {
+    "Owner": ("detail", "ownership", "the Ownership card"),
+    "Business domain": ("edit", "business_domain", "the editor, Business Domain"),
+    "Business criticality": ("edit", "criticality", "the editor, Business Criticality"),
+    "Lifecycle": ("edit", "lifecycle_status", "the editor, Lifecycle Status"),
+    "Total cost of ownership": ("edit", "total_cost_of_ownership", "the editor, Cost"),
+    "Technology stack": ("edit", "technology_stack", "the editor, Technology Stack"),
+    "Hosting / deployment": ("edit", "deployment_model", "the editor, Hosting model"),
+    "Data classification": ("edit", "data_classification", "the editor, Data classification"),
+    "Vendor": ("edit", "vendor_name", "the editor, Vendor"),
+    "Disaster recovery": ("edit", "disaster_recovery_enabled", "the editor, Disaster recovery"),
+    "Description": ("edit", "description", "the editor, Description"),
+}
+
+
+# The tabs of the application page; the editor returns to one of these after saving.
+DETAIL_TABS = ("overview", "architecture", "capabilities", "processes", "vendors", "technology",
+               "motivation", "compliance", "health", "cost", "dependencies", "ea-workflows")
+
+
+def detail_tab(value: Optional[str]) -> Optional[str]:
+    """The tab named by a request, or None when it names none of the page's tabs."""
+    return value if value in DETAIL_TABS else None
+
+
+def completeness_steps(app: Any, missing: List[str], tab: Optional[str] = None) -> List[Dict[str, str]]:
+    """For each missing item, the link to the field or card that sets it.
+
+    ``tab`` is the application tab the person is on; the editor returns to it after saving.
+    Needs a request context (it builds links).
+    """
+    from flask import url_for  # noqa: PLC0415
+    from flask_login import current_user  # noqa: PLC0415
+
+    from app.services.cost_visibility import costs_visible  # noqa: PLC0415
+
+    steps: List[Dict[str, str]] = []
+    for label in missing:
+        page, anchor, where = _STEPS[label]
+        if label == "Total cost of ownership" and not costs_visible(current_user):
+            # The name stays; the link and the place do not, as the field is not theirs to set.
+            steps.append({"label": label, "href": "", "where": "", "field": anchor})
+            continue
+        if page == "edit":
+            href = url_for("unified_applications.application_edit", id=app.id, tab=tab or None, _anchor=anchor)
+        else:
+            href = url_for("unified_applications.application_detail", id=app.id, tab="overview", _anchor=anchor)
+        steps.append({"label": label, "href": href, "where": where, "field": anchor})
+    return steps
+
+
 def _count_phrase(count: int, singular: str, plural: str) -> str:
     return "%d %s" % (count, singular if count == 1 else plural)
 
@@ -121,13 +175,23 @@ def linked_notes(app: Any, missing: List[str]) -> Dict[str, Dict[str, str]]:
     )
 
     notes: Dict[str, Dict[str, str]] = {}
-    if "Hosting / deployment" in missing and not recorded_technology(app):
-        count = len(linked_technology(app))
-        if count:
+    if "Hosting / deployment" in missing:
+        if not recorded_technology(app):
+            count = len(linked_technology(app))
+            if count:
+                notes["Hosting / deployment"] = {
+                    "text": "%s linked, none recorded as runs on" % _count_phrase(
+                        count, "technology element", "technology elements"),
+                    "tab": "technology",
+                }
+        else:
+            # What it runs on is recorded; the score reads the hosting description instead.
             notes["Hosting / deployment"] = {
-                "text": "%s linked, none recorded as runs on" % _count_phrase(
-                    count, "technology element", "technology elements"),
-                "tab": "technology",
+                "text": "what it runs on is recorded, but the score counts the hosting description",
+                "tab": "overview",
+                "page": "edit",
+                "field": "deployment_model",
+                "action": "add the hosting description",
             }
     if "Vendor" in missing:
         count = len(linked_suppliers(app))
@@ -277,6 +341,7 @@ def build_fact_sheet(app: Any) -> Dict[str, Any]:
 
     completeness = compute_completeness(app, owner_count=len(application_owners))
     completeness["notes"] = linked_notes(app, completeness["missing"])
+    completeness["steps"] = completeness_steps(app, completeness["missing"])
 
     return {
         "app": app,

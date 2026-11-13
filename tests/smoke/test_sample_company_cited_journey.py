@@ -24,9 +24,20 @@ FIVE = ["Process online payments", "Track customer orders", "Sell to customers o
         "Manage stock", "Run customer support"]
 
 
+# The one sentence every chat failure reads, with Retry beside it.
+FAILED_ANSWER = "The assistant could not answer just now. Your question is saved; try again in a moment."
+
+
 def _shot(page, name, width):
     if WALK:
         page.screenshot(path=os.path.join(WALK, "%s-%d.png" % (name, width)), full_page=True)
+
+
+def _load_sample(page, base):
+    """Press the sample company's button where the first screen offers it, and wait for the sample bar."""
+    page.goto(base + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.get_by_test_id("chat-first-sample").click()
+    expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
 
 def _ask_payments(page, base):
@@ -45,19 +56,17 @@ def test_first_answer_is_cited_and_the_figures_agree(browser, live_server, seede
     try:
         context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
         _login(page, live_server, email)
-        page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_test_id("first-action-sample").click()
-        expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        _load_sample(page, live_server)
 
-        # The toast counts what the card counts.
-        card = page.locator('[data-testid="health-kpi-elements"]').inner_text().strip()
+        # The toast counts what the card counts: the Overview's "Facts with a source" card counts the elements.
+        card = re.search(r"\b(\d+) elements", page.get_by_test_id("sourced-sentence").inner_text()).group(1)
         toast = page.get_by_text(re.compile(r"Sample company loaded: \d+ elements created")).first
         assert re.search(r"(\d+) elements", toast.inner_text()).group(1) == card
         _shot(page, "loaded", width)
 
         # The capability map and the list count the five capabilities.
         page.goto(live_server + "/capability-map/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.locator("#unified-cap-count")).to_have_text("5", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("capability-total")).to_have_text("5 capabilities", timeout=PAGE_TIMEOUT)
         _shot(page, "capability-map", width)
         page.goto(live_server + "/enterprise/capability-map/capabilities", wait_until="domcontentloaded",
                   timeout=PAGE_TIMEOUT)
@@ -74,14 +83,17 @@ def test_first_answer_is_cited_and_the_figures_agree(browser, live_server, seede
         cards = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]"))
         for i in range(cards.count()):
             source = cards.nth(i).locator("[data-citation]").inner_text()
-            assert "Sample company" in source or "Worked out from the model" in source, source
+            # the file's own links read "Imported from Sample company"; the links the load adds are of kind
+            # "sample" and read "Sample data"
+            assert "Sample company" in source or source.strip() == "Sample data" or "Worked out from the model" in source, source
         _shot(page, "first-answer", width)
 
         # An application shows its health and its owner once; a capability its computed health.
         web = cards.filter(has_text="Customer web app").first
         assert web.get_by_label(re.compile(r"^Health: ")).get_attribute("aria-label") == "Health: Healthy"
         owner = web.get_by_label(re.compile(r"^Owner: ")).get_attribute("aria-label")
-        assert owner == "Owner: Startup CTO", owner
+        # the sample's owners are plain names labelled as the sample's, never a person's account
+        assert owner == "Owner: Sam (sample owner)", owner
         capability = cards.filter(has_text="Process online payments").first
         assert re.match(r"Health: (Healthy|Warning|Critical)$",
                         capability.get_by_label(re.compile(r"^Health: ")).get_attribute("aria-label"))
@@ -97,9 +109,7 @@ def test_a_failed_answer_offers_try_again(browser, live_server, seeded):
     try:
         context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
         _login(page, live_server, email)
-        page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_test_id("first-action-sample").click()
-        expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        _load_sample(page, live_server)
 
         failures = {"left": 1}
 
@@ -112,10 +122,10 @@ def test_a_failed_answer_offers_try_again(browser, live_server, seeded):
 
         page.route(re.compile(r"/ai-chat/estate-answer"), refuse_once)
         _ask_payments(page, live_server)
-        expect(page.get_by_text("We could not answer that just now.").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text(FAILED_ANSWER).first).to_be_visible(timeout=PAGE_TIMEOUT)
         page.get_by_role("button", name="Retry").click()
         expect(page.locator("[data-answer-row]").first).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("We could not answer that just now.")).to_have_count(0)
+        expect(page.get_by_text(FAILED_ANSWER)).to_have_count(0)
     finally:
         context.close()
 
@@ -128,9 +138,7 @@ def test_the_removal_dialog_closes_by_its_name(browser, live_server, seeded):
     try:
         context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
         _login(page, live_server, email)
-        page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_test_id("first-action-sample").click()
-        expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        _load_sample(page, live_server)
         page.get_by_role("button", name="Remove it", exact=True).first.click()
         dialog = page.get_by_test_id("sample-company-indicator").get_by_role("dialog")
         expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
