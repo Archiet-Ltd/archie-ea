@@ -360,6 +360,9 @@ def run_session_analysis(session_id):
             RecommendationOptionType,
             SolutionRecommendation,
         )
+        from app.modules.architecture.services.solution_architect_orchestrator import (
+            withhold_analysis,
+        )
         from app.modules.solutions_strategic.v2.services.solution_architect_orchestrator import (
             SolutionArchitectOrchestrator,
         )
@@ -384,6 +387,9 @@ def run_session_analysis(session_id):
 
         orchestrator = SolutionArchitectOrchestrator()
 
+        # The session keeps the full estimate whoever ran the analysis; the cost rule is applied to
+        # what is returned to the person, here and when the saved results are read back.
+        keep_full_estimate = True
         result = orchestrator.analyze_problem(
             problem_description=problem.problem_description,
             capability_id=None,
@@ -398,7 +404,7 @@ def run_session_analysis(session_id):
             if problem.constraints
             else [],
             compliance_requirements=problem.compliance_requirements or [],
-            show_costs=costs_visible(current_user),
+            show_costs=keep_full_estimate,
         )
 
         if not result.get("success"):
@@ -449,8 +455,7 @@ def run_session_analysis(session_id):
         session.status = SolutionSessionStatus.IN_PROGRESS
         db.session.commit()
 
-        return jsonify(
-            {
+        reply = {
                 "success": True,
                 "recommendations": [
                     {
@@ -469,8 +474,10 @@ def run_session_analysis(session_id):
                 "existing_applications": result.get("existing_applications"),
                 "vendor_options": result.get("vendor_options"),
                 "gap_analysis": result.get("gap_analysis"),
-            }
-        )
+        }
+        if not costs_visible(current_user):
+            reply = withhold_analysis(reply)
+        return jsonify(reply)
 
     except Exception as e:
         current_app.logger.error(f"Error running session analysis: {e}")
@@ -500,8 +507,7 @@ def get_session_analysis_results(session_id):
             .all()
         )
 
-        return jsonify(
-            {
+        reply = {
                 "success": True,
                 "has_results": len(recommendations) > 0,
                 "recommendations": [
@@ -526,8 +532,13 @@ def get_session_analysis_results(session_id):
                     }
                     for rec in recommendations
                 ],
-            }
-        )
+        }
+        from app.services.cost_visibility import costs_visible
+
+        if not costs_visible(current_user):
+            from app.modules.architecture.services.solution_architect_orchestrator import withhold_analysis
+            reply = withhold_analysis(reply)
+        return jsonify(reply)
 
     except HTTPException:
         raise

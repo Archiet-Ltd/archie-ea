@@ -141,3 +141,87 @@ def test_the_orchestrator_reads_annual_cost_through_the_one_accessor(client, log
     assert response.status_code == 200
     existing = response.get_json().get("existing_applications") or {}
     assert [app.get("annual_cost") for app in existing.get("applications", [])] == [424242.0]
+
+
+AI_WRITTEN = {
+    "options": [{
+        "course_of_action": "Buy", "approach_name": "Buy a ledger", "description": "Buy one",
+        "cost_estimate": "£250,000", "pros": ["Licence about £40,000 a year", "Saves 61,500 GBP in support"],
+        "scores": {"weighted_total": 70},
+    }],
+    "recommendation": "BUY", "summary": "stand-in",
+}
+
+
+def _analyze_with(client, path, reply):
+    from app.modules.architecture.services.options_analysis_service import OptionsAnalysisService
+
+    with mock.patch.object(OptionsAnalysisService, "analyze_requirement_options", return_value=reply):
+        return client.post(path, json={"problem_description": "Replace the legacy ledger"})
+
+
+def test_an_amount_the_ai_writes_into_an_option_reaches_only_an_allowed_role(client, login_as, db_session, make_org):
+    mine = make_org("sa-f")
+    _seed(db_session, mine, uuid.uuid4().hex[:6], (300031, 300032))
+    login_as(client, _user(db_session, mine, "compliance"))
+    for path in ANALYZE_PATHS:
+        body = _analyze_with(client, path, AI_WRITTEN).get_json()
+        analysis = _analysis_body(body, path)
+        options = analysis["buy_build_analysis"]["options"]
+        assert options and options[0]["pros"], path
+        text = json.dumps(body, ensure_ascii=False)
+        for written in ("40,000", "250,000", "61,500"):
+            assert written not in text, (path, written)
+        assert text.count(HELD) == 1, path
+
+    login_as(client, _user(db_session, mine, "finance"))
+    for path in ANALYZE_PATHS:
+        text = json.dumps(_analyze_with(client, path, AI_WRITTEN).get_json(), ensure_ascii=False)
+        assert "Licence about £40,000 a year" in text, path
+
+
+def test_the_analysis_succeeds_when_one_matching_application_has_no_recorded_cost(client, login_as, db_session,
+                                                                                   make_org):
+    mine = make_org("sa-g")
+    apps = _seed(db_session, mine, uuid.uuid4().hex[:6], (300041, 300042))
+    apps[1].total_cost_of_ownership = None
+    db_session.flush()
+    login_as(client, _user(db_session, mine, "finance"))
+    for path in ANALYZE_PATHS:
+        body = _analyze(client, path).get_json()
+        analysis = _analysis_body(body, path)
+        assert analysis.get("success") is True, (path, analysis.get("error"))
+        existing = analysis["existing_applications"]
+        assert sorted(a["annual_cost"] is None for a in existing["applications"]) == [False, True], path
+        reuse = [r for r in analysis["recommendations"] if r["option_type"] == "REUSE"]
+        assert reuse and reuse[0]["estimated_cost"] == pytest.approx(300041 * 0.2), path
+
+
+def test_the_chat_solution_analysis_withholds_cost_from_a_role_without_spend_authority(client, login_as, db_session,
+                                                                                         make_org):
+    mine, theirs = make_org("sa-h"), make_org("sa-i")
+    _seed(db_session, mine, uuid.uuid4().hex[:6], (300051, 300052))
+    _seed(db_session, theirs, "t", (777051, 777052))
+    path = "/ai-chat/generate/solution-analysis"
+
+    login_as(client, _user(db_session, mine, "compliance"))
+    body = _analyze_with(client, path, AI_WRITTEN).get_json()
+    text = json.dumps(body, ensure_ascii=False)
+    assert body["existing_applications"]["found_count"] >= 2
+    assert [a["annual_cost"] for a in body["existing_applications"]["applications"]] == [None, None]
+    assert [form for form in _forms(300051, 300052, 777051, 777052, 40000) if form in text] == []
+    assert text.count(HELD) == 1
+
+    login_as(client, _user(db_session, mine, "finance"))
+    body = _analyze_with(client, path, AI_WRITTEN).get_json()
+    assert [a["annual_cost"] for a in body["existing_applications"]["applications"]] == [300051.0, 300052.0]
+    assert HELD not in json.dumps(body, ensure_ascii=False)
+
+
+def test_the_orchestrator_cannot_be_asked_without_the_persons_visibility():
+    import inspect
+
+    from app.modules.architecture.services.solution_architect_orchestrator import SolutionArchitectOrchestrator
+
+    parameter = inspect.signature(SolutionArchitectOrchestrator.analyze_problem).parameters["show_costs"]
+    assert parameter.default is inspect.Parameter.empty

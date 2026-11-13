@@ -15,6 +15,7 @@ Combines:
 """
 
 import logging
+import re
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -43,8 +44,36 @@ logger = logging.getLogger(__name__)
 ANALYZE_MONEY_KEYS = COST_KEYS + INVESTMENT_MONEY_KEYS + (
     "estimated_savings", "maintenance_cost_annual", "tco_total",
     "support_cost_annual", "license_cost_annual", "list_price_annual",
-    "cost_estimate",
+    "cost_estimate", "estimated_cost_min", "estimated_cost_max",
 )
+
+# A currency amount written into text: a symbol then digits, or digits then a currency word.
+_AMOUNT_IN_TEXT = re.compile(
+    r"(?:[£$€]\s?\d[\d,]*(?:\.\d+)?(?:\s?[kKmM]\b|bn\b)?"
+    r"|\b\d[\d,]*(?:\.\d+)?\s?(?:[kKmM]\s)?(?:GBP|USD|EUR|pounds|dollars|euros)\b)"
+)
+
+
+def _without_amounts(value: Any) -> Any:
+    """A copy of text, lists and dicts with every written currency amount replaced by a plain phrase."""
+    if isinstance(value, str):
+        return _AMOUNT_IN_TEXT.sub("a cost figure", value)
+    if isinstance(value, list):
+        return [_without_amounts(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _without_amounts(v) for k, v in value.items()}
+    return value
+
+
+def withhold_analysis(result: Dict[str, Any]) -> Dict[str, Any]:
+    """A copy of an analysis reply for a person the cost rule withholds from: no money key, no amount
+    written into the AI's option text, and the withheld sentence stated once."""
+    out = withhold_costs(result, keys=ANALYZE_MONEY_KEYS)
+    for part in ("buy_build_analysis", "recommendations", "justification", "pros", "cons"):
+        if part in out:
+            out[part] = _without_amounts(out[part])
+    out["costs_withheld_sentence"] = COSTS_WITHHELD
+    return out
 
 
 class SolutionArchitectOrchestrator:
@@ -78,7 +107,8 @@ class SolutionArchitectOrchestrator:
         industry_vertical: Optional[str] = None,
         existing_constraints: Optional[List[str]] = None,
         compliance_requirements: Optional[List[str]] = None,
-        show_costs: bool = True,
+        *,
+        show_costs: bool,
     ) -> Dict[str, Any]:
         """
         Perform comprehensive solution options analysis.
@@ -127,15 +157,9 @@ class SolutionArchitectOrchestrator:
                 "description": problem_description,
                 "category": "Functional",
             }
-            try:
-                buy_build_analysis = self.archimate_options.analyze_requirement_options(
-                    requirement=requirement, context=context
-                )
-            except Exception as ai_err:
-                # No AI provider (or it failed): the rest of the analysis still runs on the
-                # real data, so the reply is never an empty set because of the AI step alone.
-                logger.warning("Buy/Build/Reuse AI step unavailable: %s", ai_err)
-                buy_build_analysis = {"options": [], "recommendation": None, "error": str(ai_err)}
+            buy_build_analysis = self.archimate_options.analyze_requirement_options(
+                requirement=requirement, context=context
+            )
 
             # Phase 2: Find existing applications that might help
             logger.info("Phase 2: Analyzing existing applications...")
@@ -177,8 +201,7 @@ class SolutionArchitectOrchestrator:
             if not show_costs:
                 # The one cost rule, applied in this one place every analyse caller shares:
                 # a person it withholds from reads no money figure in the reply.
-                result = withhold_costs(result, keys=ANALYZE_MONEY_KEYS)
-                result["costs_withheld_sentence"] = COSTS_WITHHELD
+                result = withhold_analysis(result)
 
             logger.info(
                 f"Analysis complete. Top recommendation: {recommendations[0]['option_type']}"
@@ -274,7 +297,7 @@ class SolutionArchitectOrchestrator:
 
     def _research_vendor_options(
         self, problem_description: str, capability_id: Optional[int], context: Dict,
-        show_costs: bool = True,
+        show_costs: bool,
     ) -> Dict[str, Any]:
         """
         Research and score potential vendor solutions.
@@ -434,7 +457,7 @@ class SolutionArchitectOrchestrator:
         vendor_options: Dict,
         gap_analysis: Dict,
         context: Dict,
-        show_costs: bool = True,
+        show_costs: bool,
     ) -> List[Dict[str, Any]]:
         """
         Synthesize all analyses into ranked recommendations.
@@ -513,7 +536,8 @@ class SolutionArchitectOrchestrator:
                     "option_type": "REUSE",
                     "score": round(min(100, reuse_score), 1),
                     "estimated_cost": (
-                        sum(a.get("annual_cost", 0) for a in apps) * 0.2
+                        # An application with no recorded cost is left out of the sum, never added as a number
+                        sum(a["annual_cost"] for a in apps if a.get("annual_cost") is not None) * 0.2
                         if any(a.get("annual_cost") for a in apps)
                         else None
                     ),

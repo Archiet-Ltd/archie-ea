@@ -24,6 +24,8 @@ from html import escape
 from flask import jsonify, make_response, request
 from flask_login import current_user, login_required
 
+from app.services.cost_visibility import costs_visible
+
 from app.modules.ai_chat.services.structured_deliverable_service import (
     StructuredDeliverableService,
 )
@@ -63,6 +65,7 @@ def generate_solution_analysis():
         industry_vertical=data.get("industry_vertical", ""),
         existing_constraints=data.get("existing_constraints", []),
         compliance_requirements=data.get("compliance_requirements", []),
+        show_costs=costs_visible(current_user),
     )
     status = 200 if result.get("success") else 500
     return jsonify(result), status
@@ -236,6 +239,7 @@ def generate_full_package():
         industry_vertical=data.get("industry_vertical", ""),
         existing_constraints=data.get("existing_constraints", []),
         compliance_requirements=data.get("compliance_requirements", []),
+        show_costs=costs_visible(current_user),
     )
     status = 200 if result.get("success") else 500
     return jsonify(result), status
