@@ -9,6 +9,7 @@ organisation's id.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import text
 
@@ -16,7 +17,11 @@ import pytest
 
 from app.models.application_portfolio import ApplicationComponent
 from app.models.consolidation_list import ConsolidationListEntry
-from app.models.unified_duplicate_detection import UnifiedDetectionRun
+from app.models.unified_duplicate_detection import (
+    UnifiedDetectionRun,
+    UnifiedDuplicateGroup,
+    unified_group_members,
+)
 from app.models.user import User
 
 
@@ -179,3 +184,87 @@ def test_new_detection_run_carries_creators_org(
 
     run = db.session.get(UnifiedDetectionRun, run_id)
     assert run.organization_id == org_a
+
+
+def test_run_detection_does_not_delete_other_orgs_groups(
+    app, db_session, make_org, client, login_as, tenant_ctx
+):
+    """A detection run in org A must not delete org B's groups or members.
+
+    D1: run_detection() deletes unified_group_members for every organisation
+    with a raw DELETE, and UnifiedDuplicateGroup.query.delete() removes every
+    group regardless of organisation. This test proves both deletes are scoped
+    to the run's own organisation.
+    """
+    org_a = make_org("detect-a")
+    org_b = make_org("detect-b")
+    org_a_id = org_a.id
+    org_b_id = org_b.id
+    user_a = _user(db_session, org_a)
+
+    # Create an application, run and group in org B
+    app_b = ApplicationComponent(name="Org B's app", organization_id=org_b_id)
+    db_session.add(app_b)
+    db_session.flush()
+
+    run_b = UnifiedDetectionRun(
+        run_name="Org B's run",
+        strategy="fast",
+        status="completed",
+        organization_id=org_b_id,
+        applications_analyzed=1,
+        groups_found=1,
+    )
+    db_session.add(run_b)
+    db_session.flush()
+
+    group_b = UnifiedDuplicateGroup(
+        name="Org B's group",
+        detection_run_id=run_b.id,
+        organization_id=org_b_id,
+        duplicate_type="exact",
+        similarity_score=1.0,
+    )
+    db_session.add(group_b)
+    db_session.flush()
+
+    group_b_id = group_b.id
+    app_b_id = app_b.id
+
+    db_session.execute(
+        unified_group_members.insert().values(
+            group_id=group_b_id,
+            application_id=app_b_id,
+            similarity_to_primary=1.0,
+            is_primary=True,
+            added_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+
+    # Sign in as org A and run detection
+    _login(db_session, client, login_as, user_a.id)
+
+    with tenant_ctx(org_a_id):
+        from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
+            UnifiedDuplicateDetectionService,
+        )
+
+        service = UnifiedDuplicateDetectionService()
+        result = service.run_detection(similarity_threshold=0.55, strategy="fast")
+
+    assert result.get("success") is True
+
+    # Verify org B's group still exists
+    group_still_exists = db_session.execute(
+        text("SELECT count(*) FROM unified_duplicate_groups WHERE id = :gid"),
+        {"gid": group_b_id},
+    ).scalar()
+    assert group_still_exists == 1, "Org B's group was deleted by org A's run"
+
+    # Verify org B's group members still exist
+    member_count = db_session.execute(
+        text("SELECT count(*) FROM unified_group_members WHERE group_id = :gid"),
+        {"gid": group_b_id},
+    ).scalar()
+    assert member_count == 1, f"Org B's group members were deleted by org A's run: {member_count}"
