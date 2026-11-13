@@ -3,18 +3,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
-{% block title %}Strategic Planning Dashboard{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Strategic Planning', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Strategic Planning Dashboard{% endblock %}{% block content %}
 <div class="min-h-screen bg-background">
     <!-- Header -->
     <div class="border-b border-border bg-card">

@@ -4,18 +4,7 @@
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/badge.html' import badge %}
 
-{% block title %}Process Optimization{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Process Optimization', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Process Optimization{% endblock %}{% block content %}
 {# Builds the href for a row's record, or an empty string when the blueprint that
    owns the destination failed to register -- blueprints register non-fatally here,
    so an unguarded url_for would raise BuildError and 500 every page rendering the

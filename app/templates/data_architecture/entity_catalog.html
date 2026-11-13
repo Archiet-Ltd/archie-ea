@@ -9,18 +9,7 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
-{% block title %}Data objects — {{ config.APP_NAME }}{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Data objects', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Data objects — {{ config.APP_NAME }}{% endblock %}{% block content %}
 {% set filtered = search or classification or entity_type or domain_id %}
 {% set page_tabs = [('List', url_for('data_architecture.data_entity_catalog'), true), ('Diagram', url_for('data_architecture.data_entity_diagram', domain_id=domain_id or none), false)] %}
 {% set classification_options = [('', 'All'), ('public', 'Public'), ('internal', 'Internal'), ('confidential', 'Confidential'), ('restricted', 'Restricted')] %}
