@@ -1586,11 +1586,31 @@ def undo_problem(approval: AIChatCRUDApproval) -> Optional[str]:
     kind = snapshot.get("kind")
     if saved["outcome"] == "linked" or kind == "link":
         return "Nothing was added, so there is nothing to undo."
-    if snapshot.get("fields") and snapshot.get("id") and snapshot.get("record"):
+    if _restorable(snapshot):
         return None
     if kind == "create" and _created_ids(approval):
         return None
     return "This kind of change keeps no copy of what it replaced, so it cannot be undone here."
+
+
+# The records whose fields a snapshot may put back (the ones a change of this review overwrites).
+RESTORABLE_RECORDS = ("ApplicationComponent", "BusinessCapability", "VendorOrganization")
+
+
+def _restorable(snapshot: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The records (id and the fields they held) a before-snapshot can put back, else an empty list."""
+    if snapshot.get("record") not in RESTORABLE_RECORDS:
+        return []
+    items = snapshot.get("records") if isinstance(snapshot.get("records"), list) else [snapshot]
+    return [dict(i, record=snapshot["record"]) for i in items
+            if isinstance(i, dict) and i.get("id") and isinstance(i.get("fields"), dict) and i["fields"]]
+
+
+def _model_named(name: str):
+    for mapper in db.Model.registry.mappers:
+        if mapper.class_.__name__ == name:
+            return mapper.class_
+    return None
 
 
 def _result_of(approval: AIChatCRUDApproval) -> Dict[str, Any]:
@@ -1684,15 +1704,22 @@ def undo(service, approval: AIChatCRUDApproval, actor) -> Dict[str, Any]:
         return {"success": False, "code": "CONFLICT", "error": problem}
     org_id = approval.organization_id
     snapshot = approval.before_snapshot if isinstance(approval.before_snapshot, dict) else {}
-    if snapshot.get("fields") and snapshot.get("id") and snapshot.get("record"):
-        model = _entity_model(approval.entity_type)
-        row = _scoped_row(model, snapshot["id"], org_id) if model is not None else None
-        if row is None:
+    restorable = _restorable(snapshot)
+    if restorable:
+        model = _model_named(restorable[0]["record"])
+        restored, names = 0, set()
+        for item in restorable:
+            row = _scoped_row(model, item["id"], org_id) if model is not None else None
+            if row is None:
+                continue
+            for key, value in item["fields"].items():
+                if hasattr(row, key):
+                    setattr(row, key, value)
+                    names.add(key)
+            restored += 1
+        if not restored:
             return {"success": False, "code": "CONFLICT", "error": "The record it changed is no longer in this workspace."}
-        for key, value in snapshot["fields"].items():
-            if hasattr(row, key):
-                setattr(row, key, value)
-        what = "Put back %s on %s." % (", ".join(sorted(snapshot["fields"])), snapshot.get("name") or "the record")
+        what = "Put back %s on %d record%s." % (", ".join(sorted(names)), restored, "" if restored == 1 else "s")
     else:
         from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
