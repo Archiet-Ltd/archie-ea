@@ -340,7 +340,8 @@ def _resolve_application_owners_batch(
     so the owner fetch costs a constant number of reads however many rows
     the page holds.
 
-    Returns ``{element_id: [{"name": str, "role": str}, ...]}``, with an
+    Returns ``{element_id: [{"name": str, "role": str, "element_id": int, "since": str|None}, ...]}``
+    (``since`` is the day the ownership record was made, when it has one), with an
     empty list for elements that have no ApplicationOwner record or whose
     type has no owner store.
     """
@@ -432,7 +433,13 @@ def _resolve_application_owners_batch(
     }
     for eid, owners in pending.items():
         results[eid] = [
-            {"name": display_by_id[o.id]["user_name"], "role": display_by_id[o.id]["ownership_type_label"]}
+            {
+                "name": display_by_id[o.id]["user_name"],
+                "role": display_by_id[o.id]["ownership_type_label"],
+                # Where the owner is recorded and since when, so an answer can cite its record.
+                "element_id": eid,
+                "since": o.assigned_at.date().isoformat() if o.assigned_at else None,
+            }
             for o in owners
         ]
 
@@ -459,7 +466,9 @@ def _resolve_application_owners_batch(
             for column in ACCOUNTABLE_LEGACY_OWNER_COLUMNS:
                 text = (getattr(comp, column, None) or "").strip(OWNER_TEXT_BLANKS)
                 if text and text not in [o["name"] for o in results[comp.archimate_element_id]]:
-                    results[comp.archimate_element_id].append({"name": text, "role": labels.get(column, "Owner")})
+                    results[comp.archimate_element_id].append(
+                        {"name": text, "role": labels.get(column, "Owner"), "element_id": comp.archimate_element_id}
+                    )
 
     # The one owner store holds people only. A repository's code owner (a team or a handle) is
     # not a person in the organisation, so approval records it as a fact on the element with its
@@ -478,7 +487,11 @@ def _resolve_application_owners_batch(
             shown = ", ".join(owners) if owners else (props.get("github_owning_team") or {}).get("value")
             if shown:
                 results[eid] = [
-                    {"name": f"{shown} (from GitHub code owners; assign an owner)", "role": "GitHub code owner"}
+                    {
+                        "name": f"{shown} (from GitHub code owners; assign an owner)",
+                        "role": "GitHub code owner",
+                        "element_id": eid,
+                    }
                 ]
 
     return results
