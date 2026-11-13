@@ -50,6 +50,8 @@ document.addEventListener('alpine:init', function() {
             detailUrl: '/consolidation-list/api/entry/{id}/detail',
             onResponse: function(data) {
                 this.summary = data.summary || {};
+                // the summary reply has arrived: only now may a money card say a figure was not recorded
+                this.summaryLoaded = true;
                 // Store pagination info from API response
                 if (data.pagination) {
                     this.totalItems = data.pagination.total || 0;
@@ -59,6 +61,7 @@ document.addEventListener('alpine:init', function() {
         let pageSpecific = {
                 // ── Page-specific state ──────────────────────────────
                 summary: {},
+                summaryLoaded: false,
                 groupBy: '',
                 pipelineStatusFilter: '',
 
@@ -77,7 +80,10 @@ document.addEventListener('alpine:init', function() {
                 // ── Summary card data ────────────────────────────────
                 summaryCards: function() {
                     let s = this.summary;
-                    let fmtC = (v) => (v === null || v === undefined ? Platform.figure.NOT_RECORDED : this.fmt.currency(v));
+                    // Before the first summary reply arrives no money card states a value at all — at any
+                    // width — so a person the cost rule allows never reads "Not recorded" for a figure the
+                    // reply is still carrying; once the reply lands, a missing figure is stated as such.
+                    let fmtC = (v) => (!this.summaryLoaded ? '' : (v === null || v === undefined ? Platform.figure.NOT_RECORDED : this.fmt.currency(v)));
                     let others = [
                         { label: 'In Progress', value: String(s.active_count || 0), subtitle: (s.completed_count || 0) + ' completed', color: 'text-primary' },
                         { label: 'Requires Attention', value: String(s.attention_count || 0), color: (s.attention_count || 0) > 0 ? 'text-amber-600' : 'text-foreground' },
