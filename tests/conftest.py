@@ -306,11 +306,14 @@ def db_session(app, _schema):
 def make_org(db_session):
     """Factory for Organization rows with collision-free names."""
 
-    def _make(label: str = "org"):
+    def _make(label: str = "org", name: str | None = None, slug: str | None = None):
         from app.models.organization import Organization
 
         suffix = uuid.uuid4().hex[:10]
-        org = Organization(name=f"Test {label} {suffix}", slug=f"test-{label}-{suffix}")
+        org = Organization(
+            name=name or f"Test {label} {suffix}",
+            slug=slug or f"test-{label}-{suffix}",
+        )
         db_session.add(org)
         db_session.flush()
         return org
