@@ -710,7 +710,7 @@ def api_global_search():
             logger.debug(f"Search skip pages: {e}")
 
         # Apply fuzzy matching to records (non-module results) and re-rank
-        from app.utils.search_text import fuzzy_match_score, normalise_search_text
+        from app.utils.search_text import fuzzy_match_score, name_matches, normalise_search_text
         q_norm = normalise_search_text(q)
 
         modules = [r for r in results if r["type"] == "module"]
@@ -720,7 +720,7 @@ def api_global_search():
         scored_records = []
         for idx, r in enumerate(records):
             exact, fuzzy = fuzzy_match_score(q_norm, normalise_search_text(r["name"]))
-            if exact > 0 or fuzzy > 0:
+            if name_matches(q_norm, r["name"]):
                 scored_records.append((-exact, -fuzzy, idx, r))
 
         # Sort: exact matches first, then fuzzy matches, then by original order

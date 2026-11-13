@@ -130,3 +130,12 @@ def holds_every_word(query: str, label: str) -> bool:
     return bool(words) and all(
         any(lw.startswith(qw) or words_match_fuzzy(qw, lw) for lw in label_words) for qw in words
     )
+
+
+def name_matches(query: str, label: str) -> bool:
+    """True if `label` contains the typed text, or holds every typed word (`holds_every_word`).
+
+    The one test for "this name answers what was typed", used by the global search for every record
+    it lists and by the element search both boxes share.
+    """
+    return normalise_search_text(query) in normalise_search_text(label) or holds_every_word(query, label)
