@@ -109,7 +109,7 @@
                         {%- if not cost_visible %} · Not shown for your role{% elif supplied_cost is not none %}, {{ supplied_cost|currency }} a year{% endif %}
                         {%- if next_renewal %}, next renewal {{ next_renewal.strftime('%d %b %Y') }}{% endif %}
                     {% else %}
-                        None of your systems name {{ vendor.name }} as their vendor.
+                        No system of yours names {{ vendor.name }} as its vendor.
                     {% endif %}
                 {% endcall %}
             {% endcall %}
