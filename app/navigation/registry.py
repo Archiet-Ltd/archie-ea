@@ -505,9 +505,12 @@ def entry_for_endpoint(endpoint: str | None) -> NavLink | None:
             continue
         if endpoint == link.endpoint or (link.fallback is not None and endpoint == link.fallback.endpoint):
             return link
-    # ... then an exact owner, a sub-item, or a platform admin tool ...
+    # ... then an exact owner, a sub-item, or a platform admin tool. A sub-item whose page is its
+    # own endpoint (a canonical type page such as Capability map) answers for the page wherever it
+    # sits, including under a Model layer; a sub-item that is only a filtered view of a shared page
+    # (url_values) does not — those stay with the prefix owner below. ...
     for link in ALL_ENTRIES:
-        if endpoint in link.owns or (link.group != "model" and any(endpoint == c.endpoint for c in link.children)):
+        if endpoint in link.owns or any(endpoint == c.endpoint and not c.url_values for c in link.children):
             return link
     if any(endpoint == tool.endpoint for tool in PLATFORM_ADMIN_TOOLS):
         return _by_key("platform_admin")
