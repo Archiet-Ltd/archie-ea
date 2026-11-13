@@ -687,15 +687,13 @@ def _execute_relationship(approval, payload) -> Dict[str, Any]:
     return {"success": True, "relationship_id": link.id}
 
 
-def _technology_element(org_id, name, element_type, origin=None):
-    """The element of this organisation that is the technology called *name*: an existing one of
-    that name in the technology layer, else a new one."""
+def _find_technology_element(org_id, name):
+    """The element of this organisation that is the technology called *name* in the technology layer, or None."""
     from sqlalchemy import func
 
     from app.models.archimate_core import ArchiMateElement
-    from app.services.archimate_backbone import create_backbone_element
 
-    existing = (
+    return (
         ArchiMateElement.query.filter(
             ArchiMateElement.organization_id == org_id,
             func.lower(ArchiMateElement.name) == name.lower(),
@@ -704,6 +702,14 @@ def _technology_element(org_id, name, element_type, origin=None):
         .order_by(ArchiMateElement.id)
         .first()
     )
+
+
+def _technology_element(org_id, name, element_type, origin=None):
+    """The element of this organisation that is the technology called *name*: an existing one of
+    that name in the technology layer, else a new one."""
+    from app.services.archimate_backbone import create_backbone_element
+
+    existing = _find_technology_element(org_id, name)
     if existing is not None and not getattr(existing, "deleted_at", None):
         return existing, False
     element = create_backbone_element(
@@ -1270,6 +1276,12 @@ class _RepositoryEvidence:
             facts["github_repository_missing"] = False
 
         changed = _write_facts(element, facts)
+        if self.product_id:
+            # A read for a Product joins the repository's element, already in the model, to that
+            # Product: the page shows what the read found there, whatever settled it before.
+            _join_to_product(self.org_id, {"product_id": self.product_id}, element,
+                             repository=full_name, commit=self._commit(full_name),
+                             file=self._evidence_file(root))
         return self._apply_owner(element, full_name, owners) or changed
 
     def _person_for(self, owners: List[str]):
@@ -1435,12 +1447,26 @@ class _RepositoryEvidence:
 
     def _claim_for_product(self, approval, payload) -> None:
         """A proposal still waiting that no Product claimed is claimed by the Product this read is for.
-        A decided proposal, or one another Product already holds, is left as it is."""
+        A decided proposal is left as it is, except that the element it landed (when it landed one) is
+        joined to that Product now: a read for a Product shows what it found on that Product's page,
+        whether the proposal was settled before this read reached it or while it waited."""
         from app.models.ai_chat_crud_approval import ApprovalStatus
 
-        if not self.product_id or payload.get("product_id") or approval.status != ApprovalStatus.PENDING:
+        if not self.product_id or payload.get("product_id"):
             return
-        approval.operation_payload = json.dumps(dict(payload, product_id=self.product_id))
+        if approval.status == ApprovalStatus.PENDING:
+            approval.operation_payload = json.dumps(dict(payload, product_id=self.product_id))
+            return
+        repository = payload.get("repository") or payload.get("from")
+        element = _element_for_repository(self.org_id, repository, payload.get("path")) if repository else None
+        if element is None and approval.operation_type == OP_TECHNOLOGY and payload.get("technology"):
+            element = _find_technology_element(self.org_id, payload["technology"])
+        if element is not None:
+            _join_to_product(
+                self.org_id, {"product_id": self.product_id}, element,
+                repository=repository, commit=payload.get("commit"),
+                file=payload.get("file") or payload.get("evidence_file"),
+            )
 
     # ----- links between repositories ------------------------------------
 

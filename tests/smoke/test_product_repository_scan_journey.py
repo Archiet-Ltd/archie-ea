@@ -196,7 +196,7 @@ def test_3_the_record_shows_what_became_of_each_finding_and_the_product_page_sho
     expect(payments).to_contain_text("acme/payments-service")
     shoot(architect, "product-record-1440.png")
     # The record of one finding opens and says how it was checked: the link named after that finding's own record.
-    record_link = payments.get_by_role("link", name=re.compile(r"GitHub repository acme/payments-service"))
+    record_link = payments.get_by_role("link", name="GitHub repository acme/payments-service")
     expect(record_link).to_have_count(1)
     record_link.click()
     architect.wait_for_selector("[data-testid='review-record']")
