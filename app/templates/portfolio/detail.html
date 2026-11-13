@@ -130,17 +130,23 @@
   </div>
 
   {# ── Money ─────────────────────────────────────────────────────────────── #}
+  {% if costs_withheld %}
+  <div class="rounded-lg border border-border bg-card p-6" data-testid="portfolio-costs-withheld">
+    <p class="text-sm font-medium text-muted-foreground">Budget, spend, forecast and variance</p>
+    <p class="text-sm mt-3 text-muted-foreground">{{ costs_withheld_text }}</p>
+  </div>
+  {% else %}
   <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
     <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Approved budget</p>
       <p class="text-2xl font-bold mt-3">
-        {% if approved_budget is not none %}{{ '{:,.0f}'.format(approved_budget) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+        {% if approved_budget is not none %}{{ approved_budget|currency(currency_config.code) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
       </p>
     </div>
     <div class="rounded-lg border border-border bg-card p-6">
-      <p class="text-sm font-medium text-muted-foreground">Spent to date</p>
+      <p class="text-sm font-medium text-muted-foreground">Spent so far</p>
       <p class="text-2xl font-bold mt-3">
-        {% if spent_to_date is not none %}{{ '{:,.0f}'.format(spent_to_date) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+        {% if spent_to_date is not none %}{{ spent_to_date|currency(currency_config.code) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
       </p>
       {% if spent_to_date is none %}
       <p class="text-xs text-muted-foreground mt-1">No actuals feed connected</p>
@@ -149,34 +155,53 @@
     <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Forecast</p>
       <p class="text-2xl font-bold mt-3">
-        {% if forecast_cost is not none %}{{ '{:,.0f}'.format(forecast_cost) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+        {% if forecast_cost is not none %}{{ forecast_cost|currency(currency_config.code) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
       </p>
     </div>
-    <div class="rounded-lg border border-border bg-card p-6">
-      <p class="text-sm font-medium text-muted-foreground">Variance</p>
-      <p class="text-2xl font-bold mt-3">
-        {% if variance_pct is not none %}
-          <span class="{% if variance_pct > 10 %}text-destructive{% elif variance_pct > 0 %}text-warning{% else %}text-success{% endif %}">
-            {{ '%+.1f' | format(variance_pct) }}%
-          </span>
-        {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+    <div class="rounded-lg border border-border bg-card p-6 md:col-span-2">
+      <p class="text-sm font-medium text-muted-foreground">Budget position</p>
+      {% if variance_pct is not none and approved_budget is not none and forecast_cost is not none %}
+      {% set overrun_amount = (forecast_cost - approved_budget)|float %}
+      <p class="text-2xl font-bold mt-3 {% if variance_pct > 0 %}text-destructive{% elif variance_pct < 0 %}text-success{% else %}text-foreground{% endif %}">
+        {% if variance_pct > 0 %}
+          Forecast {{ forecast_cost|currency(currency_config.code) }} is {{ overrun_amount|currency(currency_config.code) }} ({{ '%.1f'|format(variance_pct) }}%) over the approved budget
+        {% elif variance_pct < 0 %}
+          Forecast {{ forecast_cost|currency(currency_config.code) }} is {{ (overrun_amount|abs)|currency(currency_config.code) }} ({{ '%.1f'|format(variance_pct|abs) }}%) under the approved budget
+        {% else %}
+          Forecast {{ forecast_cost|currency(currency_config.code) }} is on the approved budget
+        {% endif %}
       </p>
+      {% else %}
+      <p class="text-2xl font-bold mt-3 text-muted-foreground">&mdash;</p>
+      <p class="text-xs text-muted-foreground mt-1">No budget or forecast recorded</p>
+      {% endif %}
     </div>
   </div>
+  {% endif %}
 
   {# ── Benefits ──────────────────────────────────────────────────────────── #}
   <div class="rounded-lg border border-border bg-card">
     <div class="flex items-center justify-between border-b px-6 py-4">
       <h2 class="text-xl font-semibold">Benefits</h2>
       <div class="text-sm text-muted-foreground">
+        {% if not costs_withheld %}
+        {% if financial %}
+        {% if benefit_target is not none %}
         Financial target
         <span class="font-semibold text-foreground">
-          {% if benefit_target is not none %}{{ '{:,.0f}'.format(benefit_target) }}{% else %}&mdash;{% endif %}
+          {{ benefit_target|currency(currency_config.code) }}
         </span>
         &middot; realised
         <span class="font-semibold text-foreground">
-          {% if benefit_actual is not none %}{{ '{:,.0f}'.format(benefit_actual) }}{% else %}&mdash;{% endif %}
+          {% if benefit_actual is not none %}{{ benefit_actual|currency(currency_config.code) }}{% else %}not yet measured{% endif %}
         </span>
+        {% else %}
+        Not measured yet
+        {% endif %}
+        {% else %}
+        No financial benefit recorded yet
+        {% endif %}
+        {% endif %}
         {% if non_financial_count %}
         <span class="ml-2">+ {{ non_financial_count }} non-financial</span>
         {% endif %}
@@ -217,7 +242,7 @@
                 </span>
               {% else %}<span class="text-muted-foreground" title="Needs a baseline, a target and a measured actual">&mdash;</span>{% endif %}
             </td>
-            <td class="px-4 py-3">{{ b.owner.email if b.owner else '—' }}</td>
+            <td class="px-4 py-3">{{ b.owner or '—' }}</td>
             <td class="px-4 py-3">{{ b.status|replace('_',' ')|title }}</td>
             {# The measurement form for this benefit is on the same page; the row
                is the place a user looks for the way into it. #}

@@ -1261,6 +1261,46 @@ entries:
         scope: [app]
         suffixes: [.py]
 
+  - id: connector-framework
+    concept: How a connector changes its configuration, keeps its credentials, and makes the inventory row for an element it reads
+    status: active
+    canonical:
+      path: app/services/connector_framework.py
+      symbols: [propose_connector_change, apply_connector_change, BaseConnector.persist_records, propose_connector_sync, MULTI_CONNECTION_CREDENTIAL_TYPES, OWN_PAGE_CONNECTOR_TYPES, ensure_application_row]
+    reuse: >
+      A connector changes its configuration only through the change path (propose_connector_change,
+      apply_connector_change). A connector type that keeps one credential for each connection is named in
+      MULTI_CONNECTION_CREDENTIAL_TYPES; do not write a second per-connection credential scheme. The inventory row
+      of a connector element is made by ensure_application_row; do not write a second one.
+    must_not_create:
+      - id: second-multi-connection-list
+        regex: 'MULTI_CONNECTION_CREDENTIAL_TYPES\s*='
+        scope: [app]
+        suffixes: [.py]
+      - id: second-application-row-helper
+        regex: 'def\s+ensure_application_row\s*\('
+        scope: [app]
+        suffixes: [.py]
+
+  - id: outbound-address-guard
+    concept: The check that an address a customer or a customer's server supplied is one the server may call
+    status: active
+    canonical:
+      path: app/utils/ssrf_guard.py
+      symbols: [validate_user_supplied_url, validate_outbound_url, clamp_timeout]
+    reuse: >
+      Every address a connector requests that a customer or a customer's server supplied passes
+      validate_connector_url, which calls the guard. Do not write a second address check.
+    must_not_create:
+      - id: second-address-check-function
+        regex: 'def\s+_?(is_private_ip|is_internal_ip|is_internal_url|is_internal_host|is_blocked_ip|is_blocked_url|is_safe_url|validate_url_safe|is_public_ip)\s*\('
+        scope: [app]
+        suffixes: [.py]
+      - id: hand-rolled-private-range-test
+        regex: '\.(is_private|is_loopback|is_link_local)\b'
+        scope: [app]
+        suffixes: [.py]
+
   - id: capability-strategic-score
     concept: A capability's strategic score on the investment pages, recorded or worked out from the model
     status: active
