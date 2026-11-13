@@ -695,6 +695,17 @@ CONNECTOR_TYPE_LABELS = {
     "lucidchart": "Lucidchart",
 }
 
+# Connector types whose organisation may hold several connections of the one
+# type, each with its own access. Their access is kept under a credential type
+# of the connection's own (``<type>:<vault_slot>``, the slot being a non-secret
+# value in the connection's settings), never under the type-wide name, so one
+# connection's access is read, replaced and deleted without touching another's.
+MULTI_CONNECTION_CREDENTIAL_TYPES = frozenset({"mcp_source"})
+
+# Connector types that have a connection page of their own instead of the
+# shared connectors form.
+OWN_PAGE_CONNECTOR_TYPES = frozenset({"mcp_source"})
+
 # Concrete connector implementations available for sync (outside credential
 # storage, which lives in the per-organisation vault).
 _CONNECTOR_CLASSES: dict = {}
@@ -792,12 +803,37 @@ def _load_org_connector(org_id: int, connector_id=None, connector_type=None):
     return query.first()
 
 
-def _connector_credential_mask(org_id: int, connector_type: str):
+def connection_credential_type(connector_type: str, config) -> str | None:
+    """The credential type holding one connection's own access, or None.
+
+    Only for a type in ``MULTI_CONNECTION_CREDENTIAL_TYPES``: ``<type>:<vault_slot>``,
+    the slot read from the connection's settings. None when the connection has
+    no slot, so nothing is read, masked or deleted by accident.
+    """
+    slot = (config or {}).get("vault_slot") if isinstance(config, dict) else None
+    if connector_type not in MULTI_CONNECTION_CREDENTIAL_TYPES or not slot:
+        return None
+    return f"{connector_type}:{slot}"
+
+
+def _connector_credential_mask(org_id: int, connector_type: str, config=None):
     """Masked proof that this organisation stores a credential for the
-    connector type, across every credential type the change paths use."""
+    connector type, across every credential type the change paths use.
+
+    For a multi-connection type the proof is about the connection's own
+    access (its ``config`` names the slot), not any access of the type."""
     if not connector_type:
         return None
     from app.models.connector_config import OrgConnectorCredential
+
+    if connector_type in MULTI_CONNECTION_CREDENTIAL_TYPES:
+        own = connection_credential_type(connector_type, config)
+        if own is None:
+            return None
+        row = OrgConnectorCredential.query.filter_by(
+            organization_id=org_id, connector_type=connector_type, credential_type=own
+        ).first()
+        return "******" if row is not None else None
 
     row = (
         OrgConnectorCredential.query.filter_by(
@@ -831,8 +867,8 @@ def _connector_view(cfg: ConnectorConfig, org_id: int) -> dict:
         "sync_schedule": cfg.sync_schedule,
         "config": cfg.public_config(),
         "credential_ref": f"vault:{org_id}:{cfg.connector_type}",
-        "credential_masked": _connector_credential_mask(org_id, cfg.connector_type),
-        "credential_stored": bool(_connector_credential_mask(org_id, cfg.connector_type)),
+        "credential_masked": _connector_credential_mask(org_id, cfg.connector_type, cfg.config),
+        "credential_stored": bool(_connector_credential_mask(org_id, cfg.connector_type, cfg.config)),
         "last_sync": cfg.last_sync,
         "last_sync_status": latest_sync.status if latest_sync else None,
         "description": cfg.description,
@@ -873,8 +909,10 @@ def _proposal_connector_view(approval, org_id: int) -> dict:
         # proposal is still waiting for a decision.
         "config": _mask_sensitive(payload.get("config") or {}),
         "credential_ref": f"vault:{org_id}:{connector_type}" if connector_type else None,
-        "credential_masked": _connector_credential_mask(org_id, connector_type),
-        "credential_stored": bool(_connector_credential_mask(org_id, connector_type)),
+        "credential_masked": _connector_credential_mask(org_id, connector_type, payload.get("config")),
+        "credential_stored": bool(
+            _connector_credential_mask(org_id, connector_type, payload.get("config"))
+        ),
         "last_sync": None,
         "last_sync_status": None,
         "description": approval.summary,
@@ -1038,6 +1076,10 @@ def apply_connector_change(
         return cfg
 
     if action == CONNECTOR_ACTION_UPDATE:
+        if connector_type in MULTI_CONNECTION_CREDENTIAL_TYPES and not payload.get("connector_id"):
+            raise ConnectorWriteRefused(
+                "Changing or removing a connection of this type needs the connection's own id."
+            )
         cfg = _load_org_connector(
             resolved,
             connector_id=payload.get("connector_id"),
@@ -1100,6 +1142,10 @@ def apply_connector_change(
         return cfg
 
     if action == CONNECTOR_ACTION_DELETE:
+        if connector_type in MULTI_CONNECTION_CREDENTIAL_TYPES and not payload.get("connector_id"):
+            raise ConnectorWriteRefused(
+                "Changing or removing a connection of this type needs the connection's own id."
+            )
         cfg = _load_org_connector(
             resolved,
             connector_id=payload.get("connector_id"),
@@ -1115,9 +1161,24 @@ def apply_connector_change(
         # Remove every credential of the deleted connector (all credential
         # types — the ''credentials'' blob, legacy ''client_secret'' rows,
         # whatever else the connector used) from the per-organisation vault.
-        OrgConnectorCredential.query.filter_by(
-            organization_id=resolved, connector_type=connector_type
-        ).delete()
+        if connector_type in MULTI_CONNECTION_CREDENTIAL_TYPES:
+            # Only this connection's own access, live and staged: another
+            # connection of the same type keeps its access.
+            own = connection_credential_type(connector_type, cfg.config)
+            if own is not None:
+                column = OrgConnectorCredential.credential_type
+                OrgConnectorCredential.query.filter(
+                    OrgConnectorCredential.organization_id == resolved,
+                    OrgConnectorCredential.connector_type == connector_type,
+                    db.or_(
+                        column == own,
+                        db.and_(column.startswith("pending:"), column.endswith(f":{own}", autoescape=True)),
+                    ),
+                ).delete(synchronize_session=False)
+        else:
+            OrgConnectorCredential.query.filter_by(
+                organization_id=resolved, connector_type=connector_type
+            ).delete()
         db.session.delete(cfg)
         db.session.flush()
         return cfg
@@ -1504,9 +1565,50 @@ def _credential_field_map(connector_type: str, org_id: int, config: dict) -> dic
             "api_token": resolve_api_token(org_id),
         }
 
+    if connector_type in MULTI_CONNECTION_CREDENTIAL_TYPES:
+        # The access of this connection alone, from its own slot.
+        own = connection_credential_type(connector_type, config)
+        if own is None:
+            return {}
+        raw = vault.retrieve(org_id, connector_type, own)
+        if not raw:
+            return {}
+        try:
+            value = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+        return value if isinstance(value, dict) else {}
+
     # No field map for this connector type: fall back to the generic
     # credentials blob the connectors page itself writes, unchanged.
     return vault.retrieve_credentials(org_id, connector_type) or {}
+
+
+def ensure_application_row(org_id: int, element, name: str, description: str | None = None):
+    """The organisation's inventory row (``ApplicationComponent``) for an
+    element a connector has already made, creating it when there is none.
+
+    The row is made with ``archimate_element_id`` set, so the flush listener
+    makes no second element. An element of another organisation is refused.
+    Called twice for one element it returns the one row.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+
+    if element is None or getattr(element, "organization_id", None) != org_id:
+        raise ConnectorWriteRefused("The element does not belong to this organisation.")
+    row = ApplicationComponent.query.filter_by(
+        organization_id=org_id, archimate_element_id=element.id
+    ).first()
+    if row is None:
+        row = ApplicationComponent(
+            organization_id=org_id,
+            name=name,
+            description=description,
+            archimate_element_id=element.id,
+        )
+        db.session.add(row)
+        db.session.flush()
+    return row
 
 
 def build_connector(cfg: ConnectorConfig, org_id: int):
