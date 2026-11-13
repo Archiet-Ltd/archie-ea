@@ -42,16 +42,11 @@ READ_ONLY_ALLOWED = {
         "The owner of an analysis removes a stakeholder from it; the route checks the owner or an administrator."
     ),
     # Assistant connector (MCP): a viewer may read through the connector; write tools are refused
-    # by the MCP layer with a JSON-RPC error, not by the HTTP guard.
-    "mcp.mcp_endpoint": "Assistant connector JSON-RPC endpoint; read tools answer, write tools refuse with a plain sentence.",
-    "mcp.mcp_get": "Assistant connector metadata discovery; stores nothing.",
+    # by the MCP layer with a JSON-RPC error, not by the HTTP guard. See READ_ONLY_ALLOWED_PAGES.
     # Read-only POST actions that compute an answer and store nothing.
     "enterprise_export.export_archimate_xml": "Exports the model as XML; stores nothing.",
-    "application_mgmt.simulate_impact": "Computes an impact simulation; stores nothing.",
     "application_mgmt.search_templates_advanced": "Searches templates; stores nothing.",
-    "codegen.search_generated_files": "Searches generated code files; stores nothing.",
     # The person's own records (not tenant data).
-    "solution_design.mark_solution_notification_read": "Marks one of the person's own notifications as read.",
     "main.api_toggle_watch": "Toggles the person's own watch on a workflow instance.",
 }
 
@@ -76,14 +71,21 @@ READ_ONLY_ALLOWED_PAGES = {
     "account.join_from_invite": "Accepts the person's own invitation.",
     "account.accept_invitation": "Accepts the person's own invitation.",
     "account.decline_invitation": "Declines the person's own invitation.",
+    "solution_design.mark_solution_notification_read": "Marks one of the person's own notifications as read.",
     "service_status.update_subscription": "Saves the person's own choice of service status emails.",
     "main.product_inquiry_submit": "Sends the person's own enquiry to the team; it changes nothing in the model.",
+    # Assistant connector (MCP): a viewer may read through the connector; write tools are refused
+    # by the MCP layer with a JSON-RPC error, not by the HTTP guard.
+    "mcp.mcp_endpoint": "Assistant connector JSON-RPC endpoint; read tools answer, write tools refuse with a plain sentence.",
+    # Read-only POST actions on pages that compute an answer and store nothing.
+    "application_mgmt.simulate_impact": "Computes an impact simulation; stores nothing.",
+    "codegen.search_generated_files": "Searches generated code files; stores nothing.",
     # The person's own connected assistants (their own records, not tenant data).
-    "connected_assistants.index": "Lists the person's own connected assistants.",
     "connected_assistants.revoke": "Revokes one of the person's own assistant grants.",
     "connected_assistants.revoke_all": "Revokes all of the person's own assistant grants.",
     # OAuth authorization: the person's own consent to connect an assistant.
     "oauth_provider.authorize": "The person's own consent screen; stores nothing until they allow.",
+    "oauth_provider.token": "Issues the person's own connector token from a code they just consented to; the token is their own credential, not tenant data.",
     # Asking questions: the conversation belongs to the person, and a change the assistant is asked
     # to make is refused by the assistant's own write check.
     "unified_ai_chat.send_message": "Adds the person's own question to their own conversation.",

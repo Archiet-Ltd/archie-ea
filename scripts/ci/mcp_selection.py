@@ -46,6 +46,8 @@ MCP_TESTS = (
     "tests/test_two_factor_requirement_assistant_authorise.py::test_an_administrator_of_an_organisation_that_requires_nothing_keeps_the_week",
     "tests/test_viewer_cannot_write_anywhere.py::test_viewer_can_access_mcp_connector_endpoint",
     "tests/test_viewer_cannot_write_anywhere.py::test_viewer_can_access_connected_assistants_page",
+    "tests/test_viewer_cannot_write_anywhere.py::test_the_connector_reads_for_every_role_and_hides_every_write_tool",
+    "tests/test_viewer_cannot_write_anywhere.py::test_the_allow_list_names_a_real_route_and_a_true_reason_for_every_entry",
 )
 MARKER = "mcp"
 

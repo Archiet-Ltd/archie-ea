@@ -583,6 +583,63 @@ def test_viewer_can_access_connected_assistants_page(
     assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
 
 
+@pytest.mark.parametrize("org_role", ["viewer", "architect"])
+def test_the_connector_reads_for_every_role_and_hides_every_write_tool(
+    client, db_session, login_as, two_orgs, app, org_role
+):
+    """Both roles get the same read-only connector surface: initialize, tools/list and a read
+    tools/call succeed; a write tool name is simply not on the connector (Tool not found, never
+    executed); the person's own consent screen and revoke-all stay reachable."""
+    import json as _json
+
+    from app.modules.mcp.tests.test_tools import (
+        _clear_cached_identity,
+        _mcp_call,
+        _mcp_tools_list,
+        _mint_oauth_token,
+    )
+
+    app.config["MCP_ENABLED"] = True
+    app.config["PUBLIC_BASE_URL"] = "https://test.example.com"
+    org_a, _ = two_orgs
+    person = _member(db_session, org_a, org_role)
+    # Minting drives the person's own consent screen (POST /oauth/authorize) end to end.
+    token = _mint_oauth_token(client, db_session, org_a, person, login_as, app=app)
+    assert token
+
+    _clear_cached_identity()
+    bearer = client.application.test_client()
+    init = bearer.post(
+        "/mcp",
+        data=_json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}),
+        content_type="application/json",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert init.status_code == 200 and "result" in init.get_json(), init.get_data(as_text=True)[:300]
+
+    tools = _mcp_tools_list(client, token)
+    names = {t["name"] for t in tools}
+    assert names, "the connector served no tools"
+    for tool in tools:
+        assert tool["annotations"]["readOnlyHint"] is True, tool["name"]
+    assert "create_solution" not in names
+
+    read = _mcp_call(client, token, "search_elements", {"query": "Ledger"})
+    assert "error" not in read, read
+
+    write = _mcp_call(client, token, "create_solution", {"name": "Should never exist"})
+    assert "error" in write, write
+    assert "not found" in write["error"]["message"].lower(), write["error"]
+    from app.models.solution_models import Solution
+
+    db_session.expire_all()
+    assert Solution.query.filter_by(name="Should never exist").count() == 0
+
+    login_as(client, person)
+    revoked = client.post("/account/manage/connected-assistants/revoke-all")
+    assert revoked.status_code in (200, 302), revoked.status_code
+
+
 # -- GET routes that used to store tenant data for a viewer ----------------------------------------
 
 
