@@ -946,16 +946,21 @@ def init_context_processors(app):
     # when there is nothing to compare.
     def _days_until(value):
         import datetime as _dt
+        from app.services.vendor_register import days_until as _days_to
+
         if value is None:
             return None
         try:
             if isinstance(value, _dt.datetime):
                 value = value.date()
-            return (value - _dt.date.today()).days
+            return _days_to(value)
         except TypeError:
             return None
 
     app.jinja_env.globals["days_until"] = _days_until
+    from app.services.vendor_register import renewal_band as _renewal_band
+
+    app.jinja_env.globals["renewal_band"] = _renewal_band
 
     # Cache-busting: single build identifier shared with app/_bootstrap/assets.py
     # and the /version endpoint (ARCH-062) — see build_info.get_build_id().
