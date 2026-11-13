@@ -3,7 +3,7 @@
 A finance lead and a compliance lead of the same seeded organisation open Vendors. Finance reads
 the annual total, a cost in both cost columns of the costed vendor, a contract cost that agrees with
 the Costs page, and nothing from a second organisation that names one of the same vendors.
-Compliance reads no total, "Not shown for your role" in every row, and no cost from the register API.
+Compliance reads no total, "Cost figures are withheld for your role." in every row, and no cost from the register API.
 """
 import os
 import re
@@ -139,7 +139,7 @@ def test_compliance_reads_no_vendor_cost_on_the_page_or_from_the_api(browser, li
         rows = page.get_by_test_id("vendor-row")
         expect(rows).to_have_count(3)
         for i in range(3):
-            expect(rows.nth(i)).to_contain_text("Not shown for your role")
+            expect(rows.nth(i)).to_contain_text("Cost figures are withheld for your role.")
         body = _text(page)
         for figure in ("15,000", "12,000", "3,000", "2,000", "999", "4,444"):
             assert figure not in body, figure
@@ -162,7 +162,7 @@ def test_the_refused_view_fits_a_phone(browser, live_server, cost_world):
         _login(page, live_server, cost_world["seeded"]["emails"]["compliance"])
         assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
         expect(page.get_by_test_id("vendor-row").first).to_contain_text(
-            "Not shown for your role", timeout=PAGE_TIMEOUT)
+            "Cost figures are withheld for your role.", timeout=PAGE_TIMEOUT)
         assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
         _shot(page, "compliance-vendors-390-dark")
     finally:
@@ -181,7 +181,7 @@ def test_compliance_opens_a_vendor_from_the_list_and_reads_no_cost_there(browser
                 "vendor-link").click()
             expect(page.locator("#vendor-systems")).to_contain_text(systems, timeout=PAGE_TIMEOUT)
             section = re.sub(r"\s+", " ", page.locator("#vendor-systems").inner_text())
-            assert "Not shown for your role" in section, section
+            assert "Cost figures are withheld for your role." in section, section
             body = _text(page)
             for figure in ("15,000", "12,000", "3,000", "2,000", "999", "4,444", "from active contracts"):
                 assert figure not in body, (name, figure)
