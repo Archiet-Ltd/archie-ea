@@ -48,8 +48,10 @@ def test_gaps_failing_show_error_mark_never_zero(browser, live_server):
                         status=500,
                         body='{"success": false, "error": "gaps service unavailable"}',
                         headers={"Content-Type": "application/json"})
-                except Exception:
-                    pass
+                except Exception as e:
+                    # Only swallow Playwright's closed-target error; surface anything else.
+                    if "closed" not in str(e).lower():
+                        raise
 
             page.route(GAPS_RE, fail_gaps)
             page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
