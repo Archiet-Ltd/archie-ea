@@ -1018,7 +1018,7 @@ def get_gaps():
         gap_type = request.args.get("gap_type")
 
         # The register's own selection (plateau transitions left out), filtered by its one rating.
-        from app.services.gap_register_service import gap_register_query
+        from app.services.gap_register_service import effective_severity, gap_register_query
 
         query = gap_register_query(current_organization_id(), priority or request.args.get("severity"))
         if gap_type:
@@ -1034,7 +1034,8 @@ def get_gaps():
                         "name": g.name,
                         "description": g.description,
                         "gap_type": g.gap_type,
-                        "priority": g.priority,
+                        # The rating the filter above uses, so a row listed under one level reads that level.
+                        "priority": (effective_severity(g) or "").strip().lower() or "unrated",
                         "current_state": g.current_state_ref,
                         "target_state": g.target_state_ref,
                         "impact_assessment": getattr(g, "impact_assessment", None),

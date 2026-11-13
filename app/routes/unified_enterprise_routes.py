@@ -466,33 +466,14 @@ def investment_matrix():
 @enterprise_bp.route("/strategic/risk-assessment")
 @login_required
 def risk_assessment():
-    """Gap Risk Assessment: the gap register's gaps counted by severity.
+    """The earlier address of the gaps by severity; the gap register is the one place for them.
 
-    Every figure is the register's own count (`count_gaps`) for the organisation, so none is capped.
-    The table lists the first rows only and says how many of how many it shows."""
-    try:
-        from app.services.gap_register_service import count_gaps, list_gaps
-
-        org_id = current_organization_id()
-        shown_limit = 50
-        gaps = list_gaps(org_id, limit=shown_limit)
-        counts = {
-            "total": count_gaps(org_id),
-            "high": count_gaps(org_id, severity="critical") + count_gaps(org_id, severity="high"),
-            "medium": count_gaps(org_id, severity="medium"),
-            "low": count_gaps(org_id, severity="low"),
-        }
-
-        return render_template(
-            "enterprise/risk_assessment.html", gaps=gaps, counts=counts, shown=len(gaps)
-        )
-    except SQLAlchemyError as e:
-        current_app.logger.error(f"Database error loading risk assessment: {e}")
-        raise DatabaseError(
-            message=f"Failed to load risk assessment: {str(e)}",
-            user_message="Unable to load risk assessment data.",
-            recovery_action="Return to the dashboard and try again.",
-        )
+    A severity it knows is kept, so the register opens on the open gaps of that severity (the page this
+    address was always a count of); anything else is dropped."""
+    severity = (request.args.get("severity") or "").strip().lower()
+    if severity not in _GAP_SEVERITIES:
+        return redirect(url_for("enterprise.gap_analysis"), code=301)
+    return redirect(url_for("enterprise.gap_analysis", severity=severity, status="open"), code=301)
 
 
 @enterprise_bp.route("/strategic/technology-roadmap")
@@ -905,6 +886,10 @@ _GAP_SORT_COLUMNS = {
 }
 
 
+_GAP_STATUS_FILTERS = ("open", "closed", "in_progress")
+_GAP_PAGE_SIZE = 500
+
+
 @enterprise_bp.route("/implementation/gap-analysis")
 @login_required
 def gap_analysis():
@@ -926,15 +911,43 @@ def gap_analysis():
     try:
         from app.services.gap_register_service import count_gaps, gap_register_query, get_gaps_not_addressed
 
-        # ?severity=high lists only the gaps of that severity (the links on Architecture Intelligence)
+        # ?severity=high lists only the gaps of that severity (the links on Architecture Intelligence);
+        # ?status=open|closed|in_progress and ?work=covered|none list the gaps a count card counts.
         severity_filter = (request.args.get("severity") or "").strip().lower()
         if severity_filter not in _GAP_SEVERITIES:
             severity_filter = ""
-        query = gap_register_query(current_org_id(), severity_filter or None)
-        gaps = query.order_by(order, Gap.id).limit(500).all()
-        total_gap_count = count_gaps(current_org_id())
-        unclosed_gap_count = count_gaps(current_org_id(), has_work_package=False)
-        not_addressed_gaps = get_gaps_not_addressed(current_org_id())
+        status_filter = (request.args.get("status") or "").strip().lower()
+        if status_filter not in _GAP_STATUS_FILTERS:
+            status_filter = ""
+        work_filter = (request.args.get("work") or "").strip().lower()
+        if work_filter not in ("covered", "none"):
+            work_filter = ""
+        org_id = current_org_id()
+        query = gap_register_query(
+            org_id, severity_filter or None,
+            closed={"open": False, "closed": True}.get(status_filter),
+            in_progress=status_filter == "in_progress",
+            has_work_package={"covered": True, "none": False}.get(work_filter),
+        )
+        # Every figure is a count query over the register; the list below is one page of the rows it counts.
+        listed_count = query.order_by(None).count()
+        # a page past the end shows the last page, and a huge number never reaches the database as an offset
+        last_page = max(1, -(-listed_count // _GAP_PAGE_SIZE))
+        page_number = safe_int_arg("page", 1, minimum=1, maximum=last_page)
+        gaps = query.order_by(order, Gap.id).limit(_GAP_PAGE_SIZE).offset((page_number - 1) * _GAP_PAGE_SIZE).all()
+        open_by_severity = {level: count_gaps(org_id, severity=level, closed=False) for level in _GAP_SEVERITIES}
+        gap_counts = {
+            "recorded": count_gaps(org_id),
+            "critical": count_gaps(org_id, severity="critical"),
+            "critical_open": count_gaps(org_id, severity="critical", closed=False),
+            "in_progress": count_gaps(org_id, in_progress=True),
+            "resolved": count_gaps(org_id, closed=True),
+        }
+        total_gap_count = gap_counts["recorded"]
+        closed_gap_count = gap_counts["resolved"]
+        # the open gaps with no work package, whole register: the board's "No work planned" figure and rows
+        not_addressed_gaps = sorted(get_gaps_not_addressed(org_id), key=lambda g: ((g.name or "").lower(), g.id))
+        unclosed_gap_count = len(not_addressed_gaps)
         work_packages_by_gap = work_package_service.work_packages_for_gaps(
             [g.id for g in gaps], current_org_id())
 
@@ -942,8 +955,16 @@ def gap_analysis():
             "enterprise/gap_analysis.html", gaps=gaps,
             work_packages_by_gap=work_packages_by_gap,
             total_gap_count=total_gap_count,
+            closed_gap_count=closed_gap_count,
+            gap_counts=gap_counts,
+            open_by_severity=open_by_severity,
+            listed_count=listed_count,
+            page_number=page_number,
+            page_size=_GAP_PAGE_SIZE,
             unclosed_gap_count=unclosed_gap_count,
             severity_filter=severity_filter,
+            status_filter=status_filter,
+            work_filter=work_filter,
             not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",
             current_dir=direction if direction in ("asc", "desc") else "asc",
@@ -980,7 +1001,9 @@ def ai_architecture_analysis():
         # Count gaps by severity
         from app.services.gap_register_service import count_gaps as _count_gaps
 
-        gaps_by_severity = {level: _count_gaps(current_org_id(), severity=level) for level in _GAP_SEVERITIES}
+        # open gaps only: a resolved gap is not an open one, whatever its severity
+        gaps_by_severity = {
+            level: _count_gaps(current_org_id(), severity=level, closed=False) for level in _GAP_SEVERITIES}
 
         # Applications needing review: the ones marked for review and the ones in their sunset stage, which
         # the recommendations ask a person to plan the retirement of
@@ -1015,7 +1038,7 @@ def ai_architecture_analysis():
                 _active_applications().where(ApplicationComponent.organization_id == current_org_id()).subquery()
             )
         ).scalar_one()
-        total_gaps = count_gaps(current_org_id())
+        total_gaps = count_gaps(current_org_id(), closed=False)
 
         from app.services.priority_action_service import limit_for, prioritised_actions
         from app.services.risk_service import footers_by_risk

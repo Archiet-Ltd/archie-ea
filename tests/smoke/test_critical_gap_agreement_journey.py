@@ -199,7 +199,7 @@ def test_gap_marked_critical_on_the_roadmap_form_reaches_the_dashboard(browser, 
         expect(rows).to_have_count(1, timeout=PAGE_TIMEOUT)
         expect(rows.first).to_contain_text(name)
         assert "No critical gaps recorded yet" not in page.locator("body").inner_text()
-        expect(page.get_by_test_id("critical-gaps-total")).to_contain_text("1 critical gap")
+        expect(page.get_by_test_id("critical-gaps-total")).to_contain_text("1 open critical gap")
         page.get_by_test_id("critical-gaps-register-link").click()
         page.wait_for_url(re.compile("gap-analysis"), timeout=PAGE_TIMEOUT)
         register = page.locator('[data-severity="critical"]')
@@ -225,7 +225,7 @@ def test_dashboard_says_how_many_critical_gaps_it_does_not_list(browser, live_se
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
         page.goto(live_server + "/implementation/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("critical-gap-row")).to_have_count(5, timeout=PAGE_TIMEOUT)
-        expect(page.get_by_test_id("critical-gaps-total")).to_contain_text("Showing 5 of 7 critical gaps")
+        expect(page.get_by_test_id("critical-gaps-total")).to_contain_text("Showing 5 of 7 open critical gaps")
         page.get_by_test_id("critical-gaps-register-link").click()
         page.wait_for_url(re.compile("gap-analysis"), timeout=PAGE_TIMEOUT)
         expect(page.locator('[data-severity="critical"]')).to_have_count(7)
@@ -381,7 +381,7 @@ def test_editing_only_the_description_of_a_critical_gap_keeps_it_critical(browse
         rows = page.get_by_test_id("critical-gap-row")
         expect(rows).to_have_count(1, timeout=PAGE_TIMEOUT)
         expect(rows.first).to_contain_text(name)
-        expect(page.get_by_test_id("critical-gaps-total")).to_contain_text("1 critical gap")
+        expect(page.get_by_test_id("critical-gaps-total")).to_contain_text("1 open critical gap")
 
         page.goto(live_server + "/enterprise/analysis/ai-architecture", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         tile = page.locator("div.rounded-lg.border", has=page.get_by_test_id("view-gaps-critical")).first

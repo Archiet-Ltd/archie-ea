@@ -112,7 +112,7 @@ def implementation_dashboard():
         )
 
         # Get critical gaps
-        critical_gaps = gap_register_service.list_gaps(_org_id(), severity="critical", limit=5)
+        critical_gaps = gap_register_service.list_gaps(_org_id(), severity="critical", limit=5, closed=False)
 
         # Get capability implementation summary
         # Maps Capability -> List of Work Packages via Application mapping
@@ -947,8 +947,11 @@ def api_gaps():
         # the register and every critical-gap figure are one rule (plateau transitions left out).
         level = request.args.get("severity") or request.args.get("priority")
         limit = safe_int_arg('limit', None, minimum=1, maximum=500)
-        gaps = gap_register_service.list_gaps(_org_id(), severity=level, limit=limit)
-        total = gap_register_service.count_gaps(_org_id(), severity=level)
+        total = None
+        # `open` asks only for the gaps not yet closed, as the register's own list does.
+        only_open = False if request.args.get("open") else None
+        gaps = gap_register_service.list_gaps(_org_id(), severity=level, limit=limit, closed=only_open)
+        total = gap_register_service.count_gaps(_org_id(), severity=level, closed=only_open)
         shown = [_serialize_entity(gap) for gap in gaps]
         if request.args.get("footer"):
             # The page draws each gap in the browser, so the one footer travels with it as markup.
