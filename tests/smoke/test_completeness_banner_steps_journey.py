@@ -244,7 +244,7 @@ def test_another_organisations_application_stays_out_of_reach(cto, live_server, 
     for path in ("/applications/%d", "/applications/%d/edit", "/applications/%d/fact-sheet"):
         response = cto.goto(live_server + path % estate["rival_id"], wait_until="domcontentloaded",
                             timeout=PAGE_TIMEOUT)
-        assert response.status in (403, 404), (path, response.status)
+        assert response.status == 404, (path, response.status)
         assert estate["rival_name"] not in cto.content()
 
 

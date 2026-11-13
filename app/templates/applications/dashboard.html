@@ -1865,6 +1865,12 @@
         <p class="text-sm font-medium text-muted-foreground">Calculated Total (Licence + Infrastructure + Development + Maintenance)</p>
         <p class="text-xl font-bold text-foreground">{{ currency_symbol }}{{ '{:,.0f}'.format(cost_breakdown.calculated_total) }}</p>
       </div>
+      {% if cost_breakdown.total_tco|round(2) != cost_breakdown.calculated_total|round(2) %}
+      <p class="mt-2 text-sm text-muted-foreground" data-testid="cost-total-explained">
+        {% if cost_breakdown.total_tco %}The Total Cost of Ownership above ({{ currency_symbol }}{{ '{:,.0f}'.format(cost_breakdown.total_tco) }}) is the figure entered for this application; the calculated total ({{ currency_symbol }}{{ '{:,.0f}'.format(cost_breakdown.calculated_total) }}) is the sum of the figures above it, so the two can differ.
+        {% else %}No Total Cost of Ownership has been entered for this application; the calculated total is the sum of the figures above it.{% endif %}
+      </p>
+      {% endif %}
     </div>
     {% endif %}{# /costs_withheld #}
 

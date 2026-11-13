@@ -12,7 +12,8 @@
     {% else %}
     <span class="font-medium">{{ step.label }}</span>
     {% endif %}
-    {% if step.where %}<span class="text-warning-emphasis">set in {{ step.where }}</span>{% endif %}
+    {% if step.where and editable %}<span class="text-warning-emphasis">set in {{ step.where }}</span>
+    {% elif step.where %}<span class="text-warning-emphasis" data-testid="completeness-who">an Administrator or an architect can set this</span>{% endif %}
     {% if note %}
     <span>({{ note.text }}; <a class="underline underline-offset-2 hover:no-underline" href="{{ (url_for('unified_applications.application_edit', id=app.id) ~ '#' ~ note.field) if note.page == 'edit' else url_for('unified_applications.application_detail', id=app.id, tab=note.tab) }}">{{ note.action or 'see it' }}</a>)</span>
     {% endif %}
