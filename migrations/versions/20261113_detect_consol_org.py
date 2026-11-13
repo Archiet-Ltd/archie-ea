@@ -1,8 +1,7 @@
 """Give duplicate detection runs and consolidation entries an organisation.
 
 unified_detection_runs and consolidation_list_entries were global: every
-organisation read every other's detection runs, savings figures and
-consolidation list entries. Each now carries ``organization_id`` (TenantMixin),
+organisation read every other's detection runs and consolidation list entries. Each now carries ``organization_id`` (TenantMixin),
 with a foreign key to organizations, an index, and row-level security as the
 other tenant tables have it.
 
