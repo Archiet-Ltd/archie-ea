@@ -197,7 +197,7 @@
   {% for card_data in metric_cards %}
   <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-4">
     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ card_data.label }}</p>
-    <p class="mt-1 text-xl font-bold text-foreground break-words">{{ card_data.value }}</p>
+    <p class="mt-1 text-xl font-bold text-foreground break-words">{% if card_data.href %}<a class="hover:underline" href="{{ card_data.href }}" data-testid="metric-link">{{ card_data.value }}</a>{% else %}{{ card_data.value }}{% endif %}</p>
     {% if card_data.delta %}
     <p class="mt-1 text-xs text-muted-foreground truncate" title="{{ card_data.delta }}">{{ card_data.delta }}</p>
     {% endif %}
@@ -266,7 +266,7 @@
 {% if app.monitoring_enabled or app.sla_availability_percentage %}
   {% set _ = tabs.append({'id': 'health', 'label': 'Health & Quality', 'count': none}) %}
 {% endif %}
-{% if app.total_cost_of_ownership or app.license_cost_annual %}
+{% if app.total_cost_of_ownership or app.license_cost_annual or costs_withheld %}
   {% set _ = tabs.append({'id': 'cost', 'label': 'Cost', 'count': none}) %}
 {% endif %}
 
@@ -1160,7 +1160,7 @@
     </div>
 
     {% include "applications/_technology_stack_links.html" %}
-    {% include "applications/_technology_cost_shares.html" %}
+    {% if not costs_withheld %}{% include "applications/_technology_cost_shares.html" %}{% endif %}
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -1822,6 +1822,9 @@
   ═══════════════════════════════════════════════════════════════════════════ #}
   {% call tab_panel('cost', active=(resolved_tab == 'cost')) %}
   <div class="space-y-6">
+    {% if costs_withheld %}
+    <p class="text-sm text-muted-foreground" data-testid="costs-withheld">{{ costs_withheld_sentence }}</p>
+    {% else %}
     <div class="flex justify-end">
       {% if can('edit', 'application') %}
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
@@ -1857,6 +1860,7 @@
         <p class="text-xl font-bold text-foreground">{{ currency_symbol }}{{ '{:,.0f}'.format(cost_breakdown.calculated_total) }}</p>
       </div>
     </div>
+    {% endif %}{# /costs_withheld #}
 
   </div>
   {% endcall %}{# /tab_panel cost #}

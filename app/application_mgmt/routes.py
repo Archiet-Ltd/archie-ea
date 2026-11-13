@@ -1997,22 +1997,22 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         "maturity_levels": [(str(i), f"Level {i}") for i in range(1, 6)],
     }
 
-    # --- Requirements ---
-    requirements = []
+    # --- Requirements of the frameworks the organisation adopted, linked to this application.
+    # One call feeds both the figure at the top and the card that lists them.
+    linked_requirements = []
+    requirement_options = []
     try:
-        from app.models.requirements import Requirement
-        from app.models.relationship_tables import ApplicationRequirementMapping
+        from app.modules.compliance.services.applicability_service import ApplicabilityService
 
-        requirements = (
-            db.session.query(Requirement)
-            .join(
-                ApplicationRequirementMapping,
-                Requirement.id == ApplicationRequirementMapping.requirement_id,
-            )
-            .filter(ApplicationRequirementMapping.application_component_id == id)
-            .all()
-        )
+        org_for_requirements = getattr(g, "current_org_id", None)
+        linked_requirements = ApplicabilityService.requirements_of_application(org_for_requirements, app_obj.id)
+        linked_codes = {(row["framework"], row["code"]) for row in linked_requirements}
+        requirement_options = [
+            row for row in ApplicabilityService.requirements_to_link(org_for_requirements)
+            if (row["framework"], row["code"]) not in linked_codes
+        ]
     except Exception:
+        logger.exception("Could not load linked requirements for application %s", app_obj.id)
         db.session.rollback()
 
     # --- Interfaces ---
@@ -2190,9 +2190,10 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
             "icon_svg": "",
         },
         {
-            "label": "Linked Requirements",
-            "value": str(len(requirements)),
-            "delta": "Requirements implemented by this component",
+            "label": "Framework requirements",
+            "value": str(len(linked_requirements)),
+            "delta": "Linked to this application, listed below",
+            "href": "?tab=overview#application-requirements",
             "icon_svg": "",
         },
     ]
@@ -2353,23 +2354,6 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         logger.exception("Could not load owner rows for application %s", app_obj.id)
         db.session.rollback()
 
-    # --- Requirements of the frameworks the organisation adopted, linked to this application.
-    linked_requirements = []
-    requirement_options = []
-    try:
-        from app.modules.compliance.services.applicability_service import ApplicabilityService
-
-        org_for_requirements = getattr(g, "current_org_id", None)
-        linked_requirements = ApplicabilityService.requirements_of_application(org_for_requirements, app_obj.id)
-        linked_codes = {(row["framework"], row["code"]) for row in linked_requirements}
-        requirement_options = [
-            row for row in ApplicabilityService.requirements_to_link(org_for_requirements)
-            if (row["framework"], row["code"]) not in linked_codes
-        ]
-    except Exception:
-        logger.exception("Could not load linked requirements for application %s", app_obj.id)
-        db.session.rollback()
-
     from app.services import technology_cost
     from flask_login import current_user
 
@@ -2379,6 +2363,15 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
 
     technology_cost_shares = technology_cost.shares_for_application(
         app_obj.organization_id, app_obj.id)
+
+    # The one cost rule decides here; the page only prints what it is given.
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+    costs_withheld = not costs_visible(current_user)
+    if costs_withheld:
+        cost_breakdown = withhold_costs(cost_breakdown, keys=tuple(cost_breakdown))
+        technology_cost_shares = withhold_costs(
+            technology_cost_shares, keys=("total", "share", "currency"))
 
     technology_linked_count = 0
     completeness_notes = {}
@@ -2424,7 +2417,6 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         edit_mode_health_quality=request.args.get("edit_health_quality") == "1",
         changed_field_ids=[],
         capabilities=capabilities,
-        requirements=requirements,
         interfaces=interfaces,
         vendor_footprint=vendor_footprint,
         vendor_summary=vendor_summary,
@@ -2505,6 +2497,8 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         dependencies_downstream=[],
         dependency_graph_data={},
         cost_breakdown=cost_breakdown,
+        costs_withheld=costs_withheld,
+        costs_withheld_sentence=COSTS_WITHHELD,
         health_metrics=health_metrics,
         quality_metrics=quality_metrics,
         integration_mappings=[],
