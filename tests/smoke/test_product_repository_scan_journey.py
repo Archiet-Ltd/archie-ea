@@ -192,11 +192,13 @@ def test_3_the_record_shows_what_became_of_each_finding_and_the_product_page_sho
         assert row.locator("[data-testid^='approval-verdict-']").inner_text().strip()
         href = row.locator("[data-testid^='approval-source-link-']").get_attribute("href")
         assert re.match(r"https://github\.com/acme/[A-Za-z0-9._-]+(/blob/[0-9a-f]{40}/.+)?$", href), href
-    payments = rows.filter(has_text="Payments Service").first
+    payments = rows.filter(has_text="GitHub repository acme/payments-service").first
     expect(payments).to_contain_text("acme/payments-service")
     shoot(architect, "product-record-1440.png")
-    # The record of one finding opens and says how it was checked.
-    payments.get_by_role("link", name=re.compile("Payments Service")).first.click()
+    # The record of one finding opens and says how it was checked: the link named after that finding's own record.
+    record_link = payments.get_by_role("link", name=re.compile(r"GitHub repository acme/payments-service"))
+    expect(record_link).to_have_count(1)
+    record_link.click()
     architect.wait_for_selector("[data-testid='review-record']")
     expect(architect.get_by_test_id("review-record-checks")).to_contain_text("What it depends on is in the model")
     open_product(architect, world)
