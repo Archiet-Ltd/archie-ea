@@ -6,8 +6,10 @@ with a foreign key to organizations, an index, and row-level security.
 
 Backfill: a group takes the organisation of its detection run
 (detection_run_id -> unified_detection_runs.organization_id). A group with no
-run, or whose run has no organisation, is deleted -- it cannot be shown to
-anyone safely.
+run, or whose run has no organisation, takes the organisation of its members'
+applications when all members belong to one organisation. Only groups whose
+members span multiple organisations, or that have no members at all, are
+deleted -- they cannot be shown to anyone safely.
 
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
@@ -73,7 +75,27 @@ def upgrade():
         )
     )
 
-    # Groups with no attributable organisation cannot be shown to anyone safely.
+    # Groups with no run, or whose run has no organisation: try to assign from
+    # their members' organisation. A group whose members all belong to one
+    # organisation takes that organisation.
+    bind.execute(
+        text(
+            "UPDATE unified_duplicate_groups g SET organization_id = sub.org_id "
+            "FROM ("
+            "  SELECT g.id as gid, MIN(ac.organization_id) as org_id "
+            "  FROM unified_duplicate_groups g "
+            "  JOIN unified_group_members ugm ON ugm.group_id = g.id "
+            "  JOIN application_components ac ON ac.id = ugm.application_id "
+            "  WHERE g.organization_id IS NULL AND ac.organization_id IS NOT NULL "
+            "  GROUP BY g.id "
+            "  HAVING COUNT(DISTINCT ac.organization_id) = 1"
+            ") sub "
+            "WHERE g.id = sub.gid"
+        )
+    )
+
+    # Groups still without an organisation are unattributable: their members
+    # span multiple organisations, or they have no members at all.
     gone = bind.execute(text("SELECT COUNT(*) FROM unified_duplicate_groups WHERE organization_id IS NULL")).scalar()
     bind.execute(text("DELETE FROM unified_duplicate_groups WHERE organization_id IS NULL"))
     print(f"duplicate group org fence: {gone} unattributable group(s) deleted")
