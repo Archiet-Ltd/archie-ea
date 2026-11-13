@@ -83,10 +83,10 @@ def test_risk_assessment_pages_agree_with_the_risks_register(browser, live_serve
         register_critical = int(page.locator('[data-testid="register-critical"]').inner_text().strip())
         assert (register_open, register_critical) == (5, 2), (register_open, register_critical)
 
-        # The Strategic planning card that names Risk Assessment lands on a page whose figures
-        # are either the register's risks or plainly gaps.
+        # The Strategic planning card that names Gap analysis lands on the gap register,
+        # whose figures are the register's gaps.
         page.goto(live_server + "/enterprise/strategic", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        cards = page.get_by_role("link", name=re.compile("Risk Assessment"))
+        cards = page.get_by_role("link", name=re.compile("Gap analysis"))
         assert cards.count() >= 1
         card_texts = cards.all_inner_texts()
         assert all("gap" in t.lower() for t in card_texts), card_texts
@@ -95,8 +95,13 @@ def test_risk_assessment_pages_agree_with_the_risks_register(browser, live_serve
         expect(page.get_by_role("heading", level=1)).to_contain_text("Gap", timeout=PAGE_TIMEOUT)
         main = page.locator("main").inner_text()
         assert "gaps" in main.lower()
-        figures = _figures(page, ("Total gaps", "Critical or high gaps", "Medium gaps", "Low gaps"))
-        assert figures == {"Total gaps": "3", "Critical or high gaps": "2", "Medium gaps": "0", "Low gaps": "1"}, figures
+        recorded = page.locator('[data-testid="gap-stat-recorded-value"]').inner_text().strip()
+        assert recorded == "3", recorded
+        critical = int(page.locator('[data-testid="gap-open-critical-value"]').inner_text().strip())
+        high = int(page.locator('[data-testid="gap-open-high-value"]').inner_text().strip())
+        assert critical + high == 2, (critical, high)
+        assert page.locator('[data-testid="gap-open-medium-value"]').inner_text().strip() == "0"
+        assert page.locator('[data-testid="gap-open-low-value"]').inner_text().strip() == "1"
         assert "High Risk" not in main and "Medium Risk" not in main and "Low Risk" not in main
         assert "Their%s" % theirs["suffix"] not in main
         _frame(page, "gap-risk-assessment", viewport)
