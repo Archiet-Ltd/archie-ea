@@ -46,7 +46,11 @@ def unauthorized(error):
 
 @unified_ai_chat_bp.errorhandler(403)
 def forbidden(error):
-    """Handle 403 errors."""
+    """Handle 403 errors: the standard refusal page for a browser, JSON for a script."""
+    from app.utils.plain_errors import is_browser_page_request, render_plain_error
+
+    if is_browser_page_request():
+        return render_plain_error(403)
     return jsonify({"error": "Access forbidden"}), 403
 
 
