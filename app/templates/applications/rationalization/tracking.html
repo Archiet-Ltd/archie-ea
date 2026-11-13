@@ -13,6 +13,12 @@
     {% include 'applications/rationalization/_sub_nav.html' %}
 
     {# ── 1. Financial Summary ─────────────────────────────────────── #}
+    {% if costs_withheld %}
+    <div class="rounded-lg border border-border bg-card p-5 mb-8" data-testid="costs-withheld">
+        <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Projected and actual savings</p>
+        <p class="text-sm text-muted-foreground mt-2">{{ costs_withheld_text }}</p>
+    </div>
+    {% else %}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <div class="rounded-lg border border-border bg-card p-5">
             <div class="flex items-center gap-3 mb-2">
@@ -39,6 +45,7 @@
             <p class="text-xs text-muted-foreground">Realized annual savings from completed rationalization actions</p>
         </div>
     </div>
+    {% endif %}
 
     {# ── 2. Dependency Risk Detail ────────────────────────────────── #}
     <div id="dependencies" class="rounded-lg border border-border bg-card mb-8">

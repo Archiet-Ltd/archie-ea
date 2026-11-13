@@ -207,7 +207,10 @@
   {'label': 'Estimated savings a year', 'value': (_money(savings) if savings is not none else 'Not recorded'), 'icon': 'piggy-bank', 'testid': 'stat-savings',
    'sentence': ((stats.consolidation_count ~ ' on the consolidation list') if stats.consolidation_count else 'From duplicate groups and the consolidation list') if savings and savings > 0 else 'Appears once duplicates carry a cost'},
 ] -%}
+{#- The savings card is the last one; a role the cost rule withholds from reads the sentence in its place. -#}
+{%- if costs_withheld -%}{%- set cards = cards[:3] -%}{%- endif -%}
 {{ stat_cards(cards) }}
+{% if costs_withheld %}<p class="text-sm text-muted-foreground" data-testid="costs-withheld">{{ costs_withheld_text }}</p>{% endif %}
 
 {# ── Once anything is scored: health, disposition and the TIME quadrant in one section ── #}
 {% if scored %}
