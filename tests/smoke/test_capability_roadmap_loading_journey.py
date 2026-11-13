@@ -58,7 +58,7 @@ def test_each_source_is_asked_once_and_plateaus_show_before_work_packages(browse
             # where the tile starts at 0.
             wp_tile = page.get_by_test_id("rdm-work-packages-tile")
             tile_text = wp_tile.inner_text()
-            assert tile_text != "0", f"Work Packages tile showed '0' while answer held"
+            assert tile_text != "0", "Work Packages tile showed '0' while answer held"
             assert tile_text in ("6", "—"), f"Work Packages tile showed '{tile_text}' while answer held"
 
             _frame(page, "loading-early", width, theme)
@@ -119,7 +119,7 @@ def test_plateaus_tile_shows_evidence_figure_while_plateaus_answer_held(browser,
             # where the tile starts at 0.
             plateau_tile = page.get_by_test_id("rdm-plateaus-tile")
             tile_text = plateau_tile.inner_text()
-            assert tile_text != "0", f"Plateaus tile showed '0' while answer held"
+            assert tile_text != "0", "Plateaus tile showed '0' while answer held"
             assert tile_text in ("3", "—"), f"Plateaus tile showed '{tile_text}' while answer held"
 
             _frame(page, "loading-plateaus-held", width, theme)
@@ -176,7 +176,7 @@ def test_work_packages_query_failure_shows_error_state(browser, live_server):
             # Work packages tile should show loading mark or evidence figure, not "0"
             wp_tile = page.get_by_test_id("rdm-work-packages-tile")
             tile_text = wp_tile.inner_text()
-            assert tile_text != "0", f"Work Packages tile showed '0' on query failure"
+            assert tile_text != "0", "Work Packages tile showed '0' on query failure"
             # The tile shows the server-side count (6) since the API failed before updating it
             assert tile_text in ("6", "—"), f"Work Packages tile showed '{tile_text}' on query failure"
 

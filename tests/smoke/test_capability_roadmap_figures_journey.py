@@ -125,12 +125,12 @@ def test_tiles_and_timeline_agree_with_the_roadmap_board(browser, live_server):
             # the evidence figure or the loading mark, never "0".
             wp_tile = page.get_by_test_id("rdm-work-packages-tile")
             tile_text = wp_tile.inner_text()
-            assert tile_text != "0", f"Work Packages tile showed '0' while answer held"
+            assert tile_text != "0", "Work Packages tile showed '0' while answer held"
             assert tile_text in (str(board_packages), "—"), f"Work Packages tile showed '{tile_text}' while answer held"
 
             plateau_tile = page.get_by_test_id("rdm-plateaus-tile")
             tile_text = plateau_tile.inner_text()
-            assert tile_text != "0", f"Plateaus tile showed '0' while answer held"
+            assert tile_text != "0", "Plateaus tile showed '0' while answer held"
             assert tile_text in (str(len(names)), "—"), f"Plateaus tile showed '{tile_text}' while answer held"
 
             _frame(page, "figures-loading", width, theme)
