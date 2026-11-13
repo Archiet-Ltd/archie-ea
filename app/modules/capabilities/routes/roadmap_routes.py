@@ -1370,12 +1370,17 @@ def api_roadmap_work_packages():
                 item["footer_html"] = result_footer_service.render_footer(
                     result_footer_service.work_package_footer(wp, name_shown=True))
 
+        from app.services.cost_visibility import withhold_reply
+
         return jsonify(
-            {
-                "success": True,
-                "work_packages": serialized,
-                "total_count": len(serialized),
-            }
+            withhold_reply(
+                {
+                    "success": True,
+                    "work_packages": serialized,
+                    "total_count": len(serialized),
+                },
+                keys=("estimated_cost", "actual_cost", "total_cost"),
+            )
         )
 
     except Exception as e:
@@ -1620,10 +1625,17 @@ def api_roadmap_get_work_package(wp_id):
         if not wp:
             return jsonify({"success": False, "error": "Work package not found"}), 404
 
-        return jsonify({
-            "success": True,
-            "work_package": work_package_service.to_roadmap_dict(wp, org_id, include_children=True),
-        })
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(
+            withhold_reply(
+                {
+                    "success": True,
+                    "work_package": work_package_service.to_roadmap_dict(wp, org_id, include_children=True),
+                },
+                keys=("estimated_cost", "actual_cost", "total_cost"),
+            )
+        )
 
     except Exception as e:
         current_app.logger.error(f"Error getting work package: {e}", exc_info=True)

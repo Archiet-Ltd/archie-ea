@@ -29,7 +29,7 @@ Routes:
 from datetime import datetime
 
 from flask import current_app, g, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 
@@ -117,7 +117,13 @@ def api_applications():
                 }
             )
 
-        return jsonify({"applications": app_data})
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        reply = {"applications": app_data}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply, keys=("total_cost_of_ownership",))
+            reply["costs_withheld"] = COSTS_WITHHELD
+        return jsonify(reply)
     except SQLAlchemyError as e:
         current_app.logger.error(f"Database error fetching applications: {e}")
         raise DatabaseError(

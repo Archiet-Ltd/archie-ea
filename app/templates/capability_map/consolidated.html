@@ -42,6 +42,9 @@
         {% if total_capabilities is not none %}
         <p class="text-sm text-muted-foreground" data-testid="capability-total">{{ total_capabilities }} {{ 'capability' if total_capabilities == 1 else 'capabilities' }}</p>
         {% endif %}
+        {% if costs_withheld %}
+        <p class="text-sm text-muted-foreground" data-testid="capability-costs-withheld" role="status">{{ costs_withheld_text }}</p>
+        {% endif %}
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <!-- Lens ToggleGroup (six lenses) -->
             <div class="flex items-center gap-2 flex-wrap">
@@ -57,11 +60,13 @@
                             :class="lens === 'importance' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
                             class="px-3 py-1.5 rounded-sm text-sm font-medium transition-colors"
                             :aria-pressed="lens === 'importance'">Importance</button>
+                    {% if not costs_withheld %}
                     <button type="button"
                             @click="lens = 'investment'; applyFilters()"
                             :class="lens === 'investment' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
                             class="px-3 py-1.5 rounded-sm text-sm font-medium transition-colors"
                             :aria-pressed="lens === 'investment'">Investment</button>
+                    {% endif %}
                     <button type="button"
                             @click="lens = 'health'; applyFilters()"
                             :class="lens === 'health' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
@@ -366,7 +371,7 @@
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Level</th>
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Maturity</th>
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Importance</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Investment</th>
+                        {% if not costs_withheld %}<th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Investment</th>{% endif %}
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Health</th>
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Control</th>
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Apps</th>
@@ -417,6 +422,7 @@
                                     <span class="text-muted-foreground">—</span>
                                 </template>
                             </td>
+                            {% if not costs_withheld %}
                             <!-- Investment -->
                             <td class="px-4 py-3">
                                 <template x-if="cap.investmentNow !== null || cap.investmentPlanned !== null">
@@ -436,6 +442,7 @@
                                     <span class="text-muted-foreground italic">Not recorded</span>
                                 </template>
                             </td>
+                            {% endif %}
                             <!-- Health -->
                             <td class="px-4 py-3">
                                 <template x-if="cap.healthScore !== null">
@@ -571,6 +578,7 @@
                             <p class="text-sm text-muted-foreground italic">Not assessed</p>
                         </template>
                     </div>
+                    {% if not costs_withheld %}
                     <!-- Investment -->
                     <div class="rounded-lg border border-border bg-card p-3">
                         <p class="text-xs text-muted-foreground mb-1">Investment</p>
@@ -588,6 +596,7 @@
                             <p class="text-sm text-muted-foreground italic">Not recorded</p>
                         </template>
                     </div>
+                    {% endif %}
                     <!-- Health -->
                     <div class="rounded-lg border border-border bg-card p-3">
                         <p class="text-xs text-muted-foreground mb-1">Health</p>
@@ -763,6 +772,7 @@ function capabilityMap() {
         async init() {
             const params = new URLSearchParams(window.location.search);
             this.lens = params.get('lens') || 'maturity';
+            {% if costs_withheld %}if (this.lens === 'investment') this.lens = 'maturity';{% endif %}
             this.view = params.get('view') || 'map';
             // a link may carry the term as q (moved search links do); keep the key it came with
             if (params.get('q') && !params.get('search')) this.searchKey = 'q';
