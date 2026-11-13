@@ -35,7 +35,7 @@ def test_onboarding_company_kind_journey(page: Page, live_server, db_session, ma
         email=email1,
         password_hash=generate_password_hash(password1),
         organization_id=org1.id,
-        is_confirmed=True,
+        confirmed=True,
     )
     db_session.add(user1)
 
@@ -48,7 +48,7 @@ def test_onboarding_company_kind_journey(page: Page, live_server, db_session, ma
         email=email2,
         password_hash=generate_password_hash(password2),
         organization_id=org2.id,
-        is_confirmed=True,
+        confirmed=True,
     )
     db_session.add(user2)
     db_session.commit()
@@ -195,7 +195,7 @@ def test_github_connect_still_one_click(page: Page, live_server, db_session, mak
         email=email,
         password_hash=generate_password_hash(password),
         organization_id=org.id,
-        is_confirmed=True,
+        confirmed=True,
     )
     db_session.add(user)
     db_session.commit()
