@@ -904,7 +904,6 @@ def gap_analysis():
         severity_filter = (request.args.get("severity") or "").strip().lower()
         if severity_filter not in _GAP_SEVERITIES:
             severity_filter = ""
-<<<<<<< HEAD
         status_filter = (request.args.get("status") or "").strip().lower()
         if status_filter not in _GAP_STATUS_FILTERS:
             status_filter = ""
