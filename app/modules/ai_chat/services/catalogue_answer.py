@@ -28,8 +28,16 @@ NEXT_STEPS = {
     "duplicate_tooling_by_capability": "Map each application to the capabilities it covers.",
     "github_sourced_records": "Connect a GitHub repository so its records come into the model.",
     "risk_cost": "Open a risk in the register and enter the four Open FAIR factors to work out what it could cost each year.",
+    "capabilities_of_application": "Name an application in your model, or map capabilities to it on its Capabilities tab.",
     "what_breaks_if_fails": "Name a service that is in your model, or draw how your systems depend on each other.",
 }
+
+
+# What a question must name for a model's reading of it as "what came from GitHub" to stand. The
+# entry answers with a list of the records a GitHub connector brought in, so a question that only
+# mentions repositories or files while asking something else ("what does it run on") is not a
+# request for that list and goes on to be answered in words, as it is on any screen width.
+_ASKS_FOR_GITHUB_RECORDS = ("github", "connector", "imported", "discovered", "came from", "came into", "brought in")
 
 
 def _keep(question: str, interpretation: Dict[str, Any]) -> bool:
@@ -41,6 +49,9 @@ def _keep(question: str, interpretation: Dict[str, Any]) -> bool:
     """
     if interpretation.get("entry_id") not in CATALOGUE:
         return False
+    if interpretation["entry_id"] == "github_sourced_records" and interpretation.get("method") == "model":
+        lowered = question.lower()
+        return any(word in lowered for word in _ASKS_FOR_GITHUB_RECORDS)
     if interpretation["entry_id"] != "what_breaks_if_fails":
         return True
     return (
@@ -60,6 +71,8 @@ def _page_for(citation: Dict[str, Any]) -> Optional[str]:
         return None
     if citation.get("type") == "application":
         return url_for("unified_applications.application_detail", id=ident)
+    if citation.get("type") == "capability":
+        return url_for("enterprise_crud.capability_fact_sheet", capability_id=ident)
     if citation.get("type") == "risk":
         return url_for("risk.risk_page", risk_id=ident)
     if citation.get("type") == "element":
@@ -70,7 +83,7 @@ def _page_for(citation: Dict[str, Any]) -> Optional[str]:
 def answer_catalogue_question(message: str, organization_id: int) -> Optional[Dict[str, Any]]:
     """The catalogue's answer to *message* with each citation as a page link, or
     ``None`` when the question is not one the catalogue answers."""
-    interpretation = interpret(message)
+    interpretation = interpret(message, organization_id)
     if not _keep(message, interpretation):
         return None
     entry_id = interpretation["entry_id"]
