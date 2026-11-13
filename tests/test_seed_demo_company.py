@@ -1429,3 +1429,68 @@ def test_seeding_saved_scenarios_for_one_organisation_writes_only_that_organisat
     # a second run changes nothing in either organisation
     assert _seed_scenarios(other_id, None) == {"saved_scenarios_created": 0}
     assert rows(lantern_id) == lantern_before
+
+
+def test_second_organisation_gaps_untouched_by_reseeding(app, db_session, make_org):
+    """A second organisation's gaps are not touched when the demo company is
+    seeded or re-seeded: each organisation keeps only its own gap records."""
+    from app.models.implementation_migration import Gap
+    from app.models.archimate_core import ArchiMateElement
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+
+    other = make_org("second-org")
+    other_id = other.id
+    db_session.commit()
+
+    # A gap element in the second org: the hook writes its record unrated.
+    element = ArchiMateElement(
+        name="Second org gap", type="Gap", layer="Implementation",
+        organization_id=other_id,
+    )
+    db_session.add(element)
+    db_session.commit()
+
+    other_gap = Gap.query.filter_by(
+        organization_id=other_id, name="Second org gap"
+    ).one()
+    assert other_gap.severity is None
+    assert Gap.query.filter_by(organization_id=other_id).count() == 1
+
+    # Re-seed the demo company: the second org's gap must be untouched.
+    again = _seed_once()
+    assert again["gaps_created"] == 0
+
+    other_gap_after = Gap.query.filter_by(
+        organization_id=other_id, name="Second org gap"
+    ).one()
+    assert other_gap_after.severity is None
+    assert Gap.query.filter_by(organization_id=other_id).count() == 1
+
+
+def test_person_rated_gap_survives_reseeding(app, db_session, make_org):
+    """A person's severity and kind edits on a demo gap survive re-seeding,
+    and the re-seed reports gaps_created == 0."""
+    from app.models.implementation_migration import Gap
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+
+    # A person rates one demo gap.
+    gap = Gap.query.filter_by(
+        organization_id=org_id, name="Calibration throughput gap"
+    ).one()
+    gap.severity = "low"
+    gap.gap_kind = "plateau_transition"
+    db_session.flush()
+
+    # Re-seed: the person's values must survive, and nothing is created.
+    again = _seed_once()
+    assert again["gaps_created"] == 0
+
+    gap_after = Gap.query.filter_by(
+        organization_id=org_id, name="Calibration throughput gap"
+    ).one()
+    assert gap_after.severity == "low"
+    assert gap_after.gap_kind == "plateau_transition"
