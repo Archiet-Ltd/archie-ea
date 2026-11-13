@@ -16,6 +16,7 @@ from app.main.views import main
 from app.models.roadmap import RoadmapTask
 from app.models.implementation_migration import Deliverable
 from app.models.unified_capability import BusinessDomain, UnifiedCapability
+from app.models.unified_work_package import UnifiedWorkPackage
 from app.services import result_footer_service, work_package_service
 from app.utils.tenant import current_organization_id
 from app.utils.tenant_users import escape_like_literal
