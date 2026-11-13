@@ -367,11 +367,19 @@ def strategic_initiatives():
             else []
         )
 
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        withheld = not costs_visible(current_user)
+        if withheld:
+            initiatives_list = withhold_costs(
+                initiatives_list, keys=("budget_allocated", "budget_spent", "budget_remaining", "budget_utilization_percentage"))
         return render_template(
             "strategic/initiatives.html",
             initiatives=initiatives_list,
             health_scores=health_scores_list,
             status_filter=status_filter,
+            costs_withheld=withheld,
+            costs_withheld_text=COSTS_WITHHELD,
         )
     except Exception as e:
         db.session.rollback()
