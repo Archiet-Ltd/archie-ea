@@ -4,9 +4,10 @@ Changes: `from .. import csrf, db` -> `from app import csrf` + `from app.extensi
 Legacy file preserved at original location.
 """
 from flask import Blueprint, request, jsonify, current_app
-from flask_login import login_required
+from flask_login import current_user, login_required
 from app.decorators import audit_log
 from app.extensions import db
+from app.services.cost_visibility import vendor_analysis_reply
 from app.modules.vendors.services.analysis_service import (
     CapabilityService,
     ExportService,
@@ -119,7 +120,7 @@ def get_comparison(analysis_id):
     """Get vendor comparison matrix data."""
     try:
         comparison_data = analysis_service.get_comparison_data(analysis_id)
-        return jsonify(comparison_data)
+        return jsonify(vendor_analysis_reply(comparison_data, current_user))
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
     except Exception as e:
@@ -132,7 +133,7 @@ def get_results(analysis_id):
     """Get analysis results."""
     try:
         results = analysis_service.get_comparison_data(analysis_id)
-        return jsonify(results)
+        return jsonify(vendor_analysis_reply(results, current_user))
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
     except Exception as e:
@@ -153,7 +154,7 @@ def export_analysis(analysis_id, format_type):
             return missing
 
         data = export_service.export_analysis(analysis_id, format_type)
-        return jsonify({"data": data})
+        return jsonify(vendor_analysis_reply({"data": data}, current_user))
     except Exception as e:
         current_app.logger.error(f"Error exporting analysis: {e}")
         return jsonify({"error": "Failed to export analysis"}), 500
@@ -224,7 +225,7 @@ def get_provenance(analysis_id):
             }
         }
 
-        return jsonify({"provenance": provenance})
+        return jsonify(vendor_analysis_reply({"provenance": provenance}, current_user))
     except Exception as e:
         current_app.logger.error(f"Error getting provenance: {e}")
         return jsonify({"error": "Failed to load provenance"}), 500

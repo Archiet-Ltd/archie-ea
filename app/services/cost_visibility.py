@@ -19,12 +19,24 @@ INVESTMENT_MONEY_KEYS = (
     "total_estimated_investment", "critical_investment", "high_investment", "medium_investment", "low_investment",
 )
 
+# every key that holds a money amount in a vendor analysis reply, its comparison, export and provenance
+VENDOR_ANALYSIS_MONEY_KEYS = ("tco_total", "license_cost_annual", "support_cost_annual", "cost_delta")
+
 
 def costs_visible(user) -> bool:
     """The one rule the Overview applies to cost: whoever may read the spend pages."""
     from app.decorators.requires_role import may_see_spend_pages
 
     return may_see_spend_pages(user)
+
+
+def vendor_analysis_reply(reply: Any, user) -> Any:
+    """A vendor analysis reply for a person: unchanged when the cost rule allows them, otherwise with every
+    money amount left out and the one withheld sentence said once. The one place the vendor analysis routes
+    of both modules pass their replies through."""
+    if costs_visible(user):
+        return reply
+    return {**withhold_costs(reply, keys=VENDOR_ANALYSIS_MONEY_KEYS), "costs_withheld_sentence": COSTS_WITHHELD}
 
 
 def withhold_costs(result: Any, keys: Optional[Iterable[str]] = None) -> Any:
