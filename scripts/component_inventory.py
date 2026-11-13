@@ -12,6 +12,7 @@ import hashlib
 import importlib.util
 import inspect
 import json
+import os
 import re
 import textwrap
 import sys
@@ -300,19 +301,28 @@ def rebuild_html_from_lex(template_source: str, macro_calls: list, url_for_calls
             expr_text = "".join(expr_parts).strip()
             placeholder = f"__JINJA_EXPR_{placeholder_counter}__"
             placeholder_counter += 1
-            output.append(placeholder)
+            # the newlines the expression spanned are kept, so a line in the cleaned HTML is the line in the template
+            output.append(placeholder + "\n" * expr_text.count("\n"))
             placeholder_map[placeholder] = expr_text
         elif token_type == 'block_begin':
             # {% ... %} - skip the block but keep content for if/else
             i += 1
+            skipped = 0
             while i < len(tokens) and tokens[i][1] != 'block_end':
+                skipped += tokens[i][2].count("\n")
                 i += 1
+            output.append("\n" * skipped)
             # Content inside blocks is emitted as separate data tokens
         elif token_type == 'comment' or token_type == 'comment_begin':
             # {# ... #} - drop entirely
             # Skip until comment_end
+            skipped = 0
             while i < len(tokens) and tokens[i][1] not in ('comment_end', 'comment'):
+                skipped += tokens[i][2].count("\n")
                 i += 1
+            if i < len(tokens):
+                skipped += tokens[i][2].count("\n") if tokens[i][1] == 'comment' else 0
+            output.append("\n" * skipped)
         # variable_end, block_end, comment_end are handled above
 
         i += 1
@@ -402,7 +412,8 @@ class TemplateElementExtractor(HTMLParser):
         self._tag_attrs_stack.append(attrs_d)
         self._text_stack.append("")
         if tag_l == "form":
-            self._form_stack.append({"fields": [], "method": (attrs_d.get("method") or "GET").upper()})
+            self._form_stack.append({"fields": [], "method": (attrs_d.get("method") or "GET").upper(),
+                                     "line": self.getpos()[0], "formactions": []})
         elif tag_l == "script":
             self._in_script = True
         elif tag_l == "style":
@@ -438,10 +449,12 @@ class TemplateElementExtractor(HTMLParser):
         if tag_l == "button":
             if self._form_stack:
                 attrs = dict(attrs, **{"__form_method": self._form_stack[-1]["method"]})
+                if attrs.get("formaction"):
+                    self._form_stack[-1]["formactions"].append(self._resolve_placeholder(attrs["formaction"]))
             self._extract_button(attrs)
         elif tag_l == "form":
             fm = self._form_stack.pop() if self._form_stack else {"fields": []}
-            self._extract_form(attrs, fm["fields"])
+            self._extract_form(attrs, fm["fields"], fm.get("line"), fm.get("formactions"))
         elif tag_l == "table":
             self._extract_table(attrs)
         elif tag_l == "a":
@@ -634,7 +647,7 @@ class TemplateElementExtractor(HTMLParser):
 
         self.buttons.append(btn)
 
-    def _extract_form(self, attrs, fields=None):
+    def _extract_form(self, attrs, fields=None, line=None, formactions=None):
         btn_attrs = dict(attrs) if not isinstance(attrs, dict) else attrs
         for key, val in btn_attrs.items():
             if isinstance(val, str):
@@ -645,6 +658,9 @@ class TemplateElementExtractor(HTMLParser):
             "method": (btn_attrs.get("method") or "GET").upper(),
             "fields": sorted(set(fields or [])),
             "testid": btn_attrs.get("data-testid"),
+            "dom_id": btn_attrs.get("id"),
+            "line": line,
+            "formactions": sorted(set(formactions or [])),
             "source_template": self.template_path,
         }
         self.forms.append(form)
@@ -1121,6 +1137,62 @@ def _is_mutating(kind, c, methods_by_endpoint):
     return False
 
 
+def controls_for_template(rel, d):
+    """The controls of one template (links, buttons, forms, modals, tables, test ids) from what the extractor read."""
+    controls = []
+    counters = defaultdict(int)
+
+    def add(kind, c, target):
+        n = counters[kind]
+        counters[kind] += 1
+        controls.append({
+            "id": f"{rel}::{kind}::{n}",
+            "kind": kind,
+            "template": rel,
+            "label": c.get("label") or c.get("title") or "",
+            "testid": c.get("testid"),
+            "type": c.get("type"),
+            "via_macro": c.get("via_macro"),
+            "line": c.get("line"),
+            "target": {k: v for k, v in target.items() if v not in (None, "", [])},
+        })
+
+    for c in d["links"]:
+        add("link", c, {"href": c["href"], "endpoint": _endpoint_of(c["href"]),
+                        "modal_id": c.get("modal_id"), "handler": c.get("onclick")})
+    for c in d["buttons"]:
+        if c.get("from_anchor"):
+            continue
+        add("button", c, {"href": c.get("href"), "endpoint": _endpoint_of(c.get("href"), c.get("data_action")),
+                          "modal_id": c.get("modal_id"), "handler": c.get("handler"),
+                          "data_action": c.get("data_action"), "form_method": c.get("form_method"),
+                          "button_type": c.get("button_type")})
+    for c in d["forms"]:
+        add("form", c, {"action": c.get("action"), "endpoint": _endpoint_of(c.get("action")),
+                        "method": c.get("method"), "fields": c.get("fields"), "dom_id": c.get("dom_id"),
+                        "formactions": [{"action": a, "endpoint": _endpoint_of(a)} for a in c.get("formactions") or []]})
+    for c in d["modals"]:
+        add("modal", c, {"modal_id": c.get("id"), "handler": c.get("submit_handler")})
+    for c in d["tables"]:
+        add("table", c, {"endpoint": _endpoint_of(c.get("source_endpoint")), "href": c.get("source_endpoint")})
+    for c in d["testids"]:
+        if c["tag"] in ("a", "button", "form"):
+            continue  # the link, button or form control already carries its testid
+        add("testid", {"label": c["tag"], "testid": c["testid"]}, {})
+    return controls
+
+
+def controls_of_source(rel, src, macro_signatures=None):
+    """The controls of one template given as text: what the inventory would list for it."""
+    extra = {}
+    buttons, forms, tables, modals, errors, _refs, _calls, _urls = extract_elements_from_template(
+        rel, src, macro_signatures or {}, extra)
+    return controls_for_template(rel, {
+        "buttons": buttons, "forms": forms, "tables": tables, "modals": modals,
+        "links": extra.get("links", []), "testids": extra.get("testids", []),
+    })
+
+
 def build_template_inventory(template_files_list=None):
     """The template half of the inventory: needs no running app, so a test can regenerate it in seconds."""
     if template_files_list is None:
@@ -1152,45 +1224,7 @@ def build_template_inventory(template_files_list=None):
 
     controls = []
     for rel in sorted(per_template):
-        d = per_template[rel]
-        counters = defaultdict(int)
-
-        def add(kind, c, target):
-            n = counters[kind]
-            counters[kind] += 1
-            controls.append({
-                "id": f"{rel}::{kind}::{n}",
-                "kind": kind,
-                "template": rel,
-                "label": c.get("label") or c.get("title") or "",
-                "testid": c.get("testid"),
-                "type": c.get("type"),
-                "via_macro": c.get("via_macro"),
-                "line": c.get("line"),
-                "target": {k: v for k, v in target.items() if v not in (None, "", [])},
-            })
-
-        for c in d["links"]:
-            add("link", c, {"href": c["href"], "endpoint": _endpoint_of(c["href"]),
-                            "modal_id": c.get("modal_id"), "handler": c.get("onclick")})
-        for c in d["buttons"]:
-            if c.get("from_anchor"):
-                continue
-            add("button", c, {"href": c.get("href"), "endpoint": _endpoint_of(c.get("href"), c.get("data_action")),
-                              "modal_id": c.get("modal_id"), "handler": c.get("handler"),
-                              "data_action": c.get("data_action"), "form_method": c.get("form_method"),
-                              "button_type": c.get("button_type")})
-        for c in d["forms"]:
-            add("form", c, {"action": c.get("action"), "endpoint": _endpoint_of(c.get("action")),
-                            "method": c.get("method"), "fields": c.get("fields")})
-        for c in d["modals"]:
-            add("modal", c, {"modal_id": c.get("id"), "handler": c.get("submit_handler")})
-        for c in d["tables"]:
-            add("table", c, {"endpoint": _endpoint_of(c.get("source_endpoint")), "href": c.get("source_endpoint")})
-        for c in d["testids"]:
-            if c["tag"] in ("a", "button", "form"):
-                continue  # the link, button or form control already carries its testid
-            add("testid", {"label": c["tag"], "testid": c["testid"]}, {})
+        controls.extend(controls_for_template(rel, per_template[rel]))
 
     templates = {}
     for rel, d in sorted(per_template.items()):
@@ -1219,6 +1253,66 @@ def _closure(rel, templates):
     return sorted(seen)
 
 
+def handler_place(view, root=None):
+    """Where a view function is written: (file relative to the checkout, line of its `def`, name), or (None, None, name).
+
+    A view that cannot be traced to a source file inside the checkout (a lambda, a partial, a built-in, code outside
+    app/) is reported with no place: the inventory lists it as unresolved, it never guesses.
+    """
+    root = Path(os.path.abspath(root or ROOT))
+    view = getattr(view, "view_class", None) or view
+    try:
+        fn = inspect.unwrap(view)
+        name = getattr(fn, "__name__", None)
+        path = Path(os.path.abspath(inspect.getsourcefile(fn) or ""))
+        lines, start = inspect.getsourcelines(fn)
+        try:
+            rel = path.relative_to(root).as_posix()
+        except ValueError:
+            rel = path.resolve().relative_to(root.resolve()).as_posix()
+    except (TypeError, OSError, ValueError):
+        return None, None, getattr(view, "__name__", None)
+    offset = next((n for n, ln in enumerate(lines) if re.match(r"\s*(async\s+)?(def|class)\s", ln)), 0)
+    return rel, start + offset, name
+
+
+def route_entries(application, route_templates, index, templates, root=None):
+    """One entry per rule in the url_map of a booted app: what it answers, who may call it, where its handler is."""
+    entries, rendered_on = [], defaultdict(set)
+    for rule in application.url_map.iter_rules():
+        methods = sorted((rule.methods or {"GET"}) - {"HEAD", "OPTIONS"})
+        found = route_templates.get(rule.endpoint, [(None, None)])
+        names = sorted({t for t, _ in found if t})
+        unresolved = sorted({u for _, u in found if u})
+        primary = sorted({index[n] for n in names if n in index})
+        closure = sorted({c for p in primary for c in _closure(p, templates)})
+        for c in closure:
+            rendered_on[c].add(rule.rule)
+        view = application.view_functions.get(rule.endpoint)
+        guards = view_guards(view) if view else []
+        hfile, hline, hname = handler_place(view, root) if view else (None, None, None)
+        entries.append({
+            "id": f"{rule.endpoint} {rule.rule}",
+            "rule": rule.rule,
+            "endpoint": rule.endpoint,
+            "blueprint": rule.endpoint.rsplit(".", 1)[0] if "." in rule.endpoint else None,
+            "methods": methods,
+            "handler": hname,
+            "handler_file": hfile,
+            "handler_line": hline,
+            "login_required": bool(guards),
+            "guards": guards,
+            "templates": primary,
+            "templates_missing": sorted(n for n in names if n not in index),
+            "template_unresolved": unresolved,
+            "closure": closure,
+            "page": "GET" in methods and bool(primary),
+            "has_parameters": "<" in rule.rule,
+        })
+    entries.sort(key=lambda r: r["id"])
+    return entries, rendered_on
+
+
 def build_inventory(template_files_list=None, application=None):
     """Build the whole inventory dict (routes need the app booted; controls do not).
 
@@ -1240,37 +1334,8 @@ def build_inventory(template_files_list=None, application=None):
     for rule in application.url_map.iter_rules():
         methods_by_endpoint[rule.endpoint] |= set(rule.methods or ())
 
-    routes = []
-    rendered_on = defaultdict(set)
-    reached = set()
-    for rule in application.url_map.iter_rules():
-        methods = sorted((rule.methods or {"GET"}) - {"HEAD", "OPTIONS"})
-        found = route_templates.get(rule.endpoint, [(None, None)])
-        names = sorted({t for t, _ in found if t})
-        unresolved = sorted({u for _, u in found if u})
-        primary = sorted({index[n] for n in names if n in index})
-        closure = sorted({c for p in primary for c in _closure(p, templates)})
-        reached.update(closure)
-        for c in closure:
-            rendered_on[c].add(rule.rule)
-        view = application.view_functions.get(rule.endpoint)
-        guards = view_guards(view) if view else []
-        routes.append({
-            "id": f"{rule.endpoint} {rule.rule}",
-            "rule": rule.rule,
-            "endpoint": rule.endpoint,
-            "blueprint": rule.endpoint.rsplit(".", 1)[0] if "." in rule.endpoint else None,
-            "methods": methods,
-            "login_required": bool(guards),
-            "guards": guards,
-            "templates": primary,
-            "templates_missing": sorted(n for n in names if n not in index),
-            "template_unresolved": unresolved,
-            "closure": closure,
-            "page": "GET" in methods and bool(primary),
-            "has_parameters": "<" in rule.rule,
-        })
-    routes.sort(key=lambda r: r["id"])
+    routes, rendered_on = route_entries(application, route_templates, index, templates)
+    reached = {c for r in routes for c in r["closure"]}
 
     for c in controls:
         t = c["target"]
@@ -1289,6 +1354,7 @@ def build_inventory(template_files_list=None, application=None):
         kinds[c["kind"]] += 1
     counts = {
         "routes": len(routes),
+        "routes_without_a_handler_place": sum(1 for r in routes if not r["handler_file"]),
         "pages": sum(1 for r in routes if r["page"]),
         "pages_without_parameters": sum(1 for r in routes if r["page"] and not r["has_parameters"]),
         "controls": len(controls),
@@ -1317,10 +1383,14 @@ def write_inventory(inventory, output_path=None):
     return output_path
 
 
-def main():
-    """Boot the app, build the inventory, write docs/component-inventory.json."""
+def main(argv=None):
+    """Boot the app, build the inventory, write docs/component-inventory.json (or the file `--out` names)."""
+    out = None
+    args = list(sys.argv[1:] if argv is None else argv)
+    if "--out" in args:
+        out = args[args.index("--out") + 1]
     inventory = build_inventory()
-    path = write_inventory(inventory)
+    path = write_inventory(inventory, out)
     print(f"Component inventory written to {path}")
     for k, v in inventory["counts"].items():
         print(f"{k}: {v}")

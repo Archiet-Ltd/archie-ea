@@ -44,7 +44,7 @@ def _frame(page, name, viewport):
 def _tiles(page):
     text = page.locator("div.grid.md\\:grid-cols-4").first.inner_text()
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    return {lines[i]: lines[i + 1] for i in range(len(lines) - 1) if lines[i] in ("Total Gaps", "High Risk", "Medium Risk", "Low Risk")}
+    return {lines[i]: lines[i + 1] for i in range(len(lines) - 1) if lines[i] in ("Total gaps", "Critical or high gaps", "Medium gaps", "Low gaps")}
 
 
 @pytest.mark.parametrize("viewport", VIEWPORTS)
@@ -90,8 +90,8 @@ def test_risk_assessment_rates_each_gap_as_the_register_does(browser, live_serve
         page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_text(names["low"], exact=True)).to_be_visible(timeout=PAGE_TIMEOUT)
         tiles = _tiles(page)
-        assert tiles == {"Total Gaps": "5", "High Risk": "3", "Medium Risk": "1", "Low Risk": "1"}, tiles
-        assert tiles["High Risk"] == str(sum(1 for v in register.values() if v in ("critical", "high")))
+        assert tiles == {"Total gaps": "5", "Critical or high gaps": "3", "Medium gaps": "1", "Low gaps": "1"}, tiles
+        assert tiles["Critical or high gaps"] == str(sum(1 for v in register.values() if v in ("critical", "high")))
         for key, name in names.items():
             row = page.locator("tbody tr").filter(has=page.get_by_role("link", name=name, exact=True))
             expect(row).to_have_count(1)
@@ -114,8 +114,8 @@ def test_risk_assessment_with_no_gaps_says_so(browser, live_server):
     try:
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
         page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role("heading", name="Risk Assessment")).to_be_visible(timeout=PAGE_TIMEOUT)
-        assert _tiles(page) == {"Total Gaps": "0", "High Risk": "0", "Medium Risk": "0", "Low Risk": "0"}
+        expect(page.get_by_role("heading", name="Gap Risk Assessment")).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert _tiles(page) == {"Total gaps": "0", "Critical or high gaps": "0", "Medium gaps": "0", "Low gaps": "0"}
         expect(page.locator("tbody")).to_contain_text("No")
     finally:
         context.close()

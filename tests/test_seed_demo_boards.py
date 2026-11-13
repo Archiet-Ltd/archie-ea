@@ -100,9 +100,9 @@ def test_demo_organisation_has_three_solutions_each_with_deliverables(seeded):
 
 
 def test_value_stream_has_four_stages_each_mapped_to_a_capability(seeded):
-    from app import db
-    from app.models.relationship_tables import value_stream_stage_capabilities
-    from app.models.unified_capability import ValueStream, ValueStreamStage
+    from app.models.unified_capability import (
+        CapabilityValueStreamMapping, ValueStream, ValueStreamStage,
+    )
 
     streams = ValueStream.query.filter_by(organization_id=seeded["demo"]).all()
     assert len(streams) == 1
@@ -110,10 +110,8 @@ def test_value_stream_has_four_stages_each_mapped_to_a_capability(seeded):
               .order_by(ValueStreamStage.stage_order).all())
     assert len(stages) == 4
     for stage in stages:
-        linked = db.session.execute(
-            value_stream_stage_capabilities.select().where(
-                value_stream_stage_capabilities.c.value_stream_stage_id == stage.id)
-        ).fetchall()
+        linked = CapabilityValueStreamMapping.query.filter_by(
+            value_stream_stage_id=stage.id).all()
         assert linked, stage.name
 
 

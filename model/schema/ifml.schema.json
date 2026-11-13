@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://entelim.org/model/ifml.schema.json",
+  "title": "Interaction model of the screens, in the shape of the OMG Interaction Flow Modeling Language",
+  "description": "ViewContainer, ViewComponent, Event, Action and NavigationFlow keep the names and meaning of the IFML metamodel. The interchange format of IFML is XMI, which no free tool on the build machine reads; this JSON carries the same classes and is checked against this schema.",
+  "type": "object",
+  "required": ["ifml", "model", "viewContainers", "navigationFlows"],
+  "additionalProperties": false,
+  "properties": {
+    "ifml": {"const": "1.0"},
+    "model": {"type": "string", "minLength": 1},
+    "viewContainers": {"type": "array", "items": {"$ref": "#/$defs/ViewContainer"}},
+    "navigationFlows": {"type": "array", "items": {"$ref": "#/$defs/NavigationFlow"}}
+  },
+  "$defs": {
+    "ViewContainer": {
+      "description": "A screen: one template a person sees.",
+      "type": "object",
+      "required": ["id", "template", "viewComponents", "events"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string"},
+        "template": {"type": "string"},
+        "viewComponents": {"type": "array", "items": {"$ref": "#/$defs/ViewComponent"}},
+        "events": {"type": "array", "items": {"$ref": "#/$defs/Event"}}
+      }
+    },
+    "ViewComponent": {
+      "description": "Something on the screen that shows or collects: here a form.",
+      "type": "object",
+      "required": ["id", "type", "line"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string"},
+        "type": {"enum": ["Form"]},
+        "line": {"type": "integer", "minimum": 1}
+      }
+    },
+    "Event": {
+      "description": "What a person does: here pressing the button that submits a form.",
+      "type": "object",
+      "required": ["id", "type", "component", "line", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string"},
+        "type": {"enum": ["submit"]},
+        "component": {"type": "string"},
+        "line": {"type": "integer", "minimum": 1},
+        "action": {"$ref": "#/$defs/Action"}
+      }
+    },
+    "Action": {
+      "description": "The route the event calls. `dynamic` is true when the address is built at run time and cannot be read from the template.",
+      "type": "object",
+      "required": ["endpoint", "method", "dynamic", "route"],
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {"type": ["string", "null"]},
+        "method": {"enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]},
+        "dynamic": {"type": "boolean"},
+        "route": {
+          "type": ["object", "null"],
+          "required": ["rule", "file", "line"],
+          "additionalProperties": false,
+          "properties": {"rule": {"type": "string"}, "file": {"type": ["string", "null"]}, "line": {"type": ["integer", "null"]}}
+        }
+      }
+    },
+    "NavigationFlow": {
+      "description": "An event that moves a person to another screen. The first slice lists none; the interaction brief adds them.",
+      "type": "object",
+      "required": ["event", "target"],
+      "additionalProperties": false,
+      "properties": {"event": {"type": "string"}, "target": {"type": "string"}}
+    }
+  }
+}

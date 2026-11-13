@@ -99,6 +99,9 @@ function composerApp() {
         clear: function() { this._undo = []; this._redo = []; this._changed(); },
     };
 
+    /* A neighbourhood of this many elements or fewer opens whole; a larger one opens on its nearest ring. */
+    let FOCUS_OPEN_WHOLE_MAX = 24;
+
     /* ── Layer Y-band ordering ────────────────────────────── */
     let LAYER_Y_ORDER = {
         'strategy': 0, 'motivation': 1, 'business': 2,
@@ -507,6 +510,70 @@ function composerApp() {
         });
     }
 
+    /* ── Radial arrangement around one element ─────────────
+       The same engine as layer banding, for a view about one element: the seed in the middle, each step away
+       on its own ring around it, and within a ring the elements grouped by ArchiMate layer, so a person reads
+       outward from the seed. A ring with more elements than one circle holds takes further circles. Each
+       cell carries focusRing (0 for the seed); a cell without one counts as the first ring. */
+    function applyRadialLayout(graph, seedElementId) {
+        let cells = graph.getElements().filter(function(c) {
+            return !c.get('isLayerZone') && !c.get('isAnnotation');
+        });
+        if (cells.length === 0) return null;
+        let seed = null;
+        let rings = {};
+        cells.forEach(function(cell) {
+            if (seedElementId !== null && seedElementId !== undefined && String(cell.get('elementId')) === String(seedElementId)) {
+                seed = cell;
+                return;
+            }
+            let ring = cell.get('focusRing');
+            ring = ring > 0 ? ring : 1;
+            (rings[ring] = rings[ring] || []).push(cell);
+        });
+        let w = 0, h = 0;
+        cells.forEach(function(c) { w = Math.max(w, c.size().width); h = Math.max(h, c.size().height); });
+        /* Spacing that keeps neighbours on a circle, and on the next circle, from touching at any angle. */
+        let chord = Math.sqrt(w * w + h * h) + 10, gap = Math.max(w, h) + 20;
+        let placed = [];
+        if (seed) placed.push({ cell: seed, x: 0, y: 0 });
+        /* Nearest first, then by layer and name: the inner circles hold the nearest elements, and a circle left
+           part full by one ring is finished with the next, so the drawing stays as small as it can be. */
+        let list = [];
+        Object.keys(rings).map(Number).sort(function(a, b) { return a - b; }).forEach(function(ring) {
+            list = list.concat(rings[ring].sort(function(a, b) {
+                let la = LAYER_Y_ORDER[(a.get('elLayer') || '').toLowerCase()];
+                let lb = LAYER_Y_ORDER[(b.get('elLayer') || '').toLowerCase()];
+                la = la === undefined ? 99 : la; lb = lb === undefined ? 99 : lb;
+                return la !== lb ? la - lb : String(a.get('elName') || '').localeCompare(String(b.get('elName') || ''));
+            }));
+        });
+        let radius = Math.max(w, h) + 40;
+        let left = list.length, at = 0, circle = 0;
+        while (left > 0) {
+            let capacity = Math.max(3, Math.floor(2 * Math.PI * radius / chord));
+            let n = Math.min(capacity, left);
+            let offset = (circle % 2) * Math.PI / n;
+            for (let i = 0; i < n; i++) {
+                let angle = -Math.PI / 2 + offset + (i / n) * 2 * Math.PI;
+                placed.push({ cell: list[at++], x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
+            }
+            left -= n;
+            circle++;
+            radius += gap;
+        }
+        let minX = Infinity, minY = Infinity;
+        placed.forEach(function(p) {
+            minX = Math.min(minX, p.x - p.cell.size().width / 2);
+            minY = Math.min(minY, p.y - p.cell.size().height / 2);
+        });
+        placed.forEach(function(p) {
+            p.cell.position(Math.round(40 + p.x - p.cell.size().width / 2 - minX),
+                            Math.round(40 + p.y - p.cell.size().height / 2 - minY));
+        });
+        return seed;
+    }
+
     /* ── CMP-027: Toast helper ──────────────────────────── */
     function _toast(type, msg) {
         if (window.Platform && window.Platform.toast && window.Platform.toast[type]) {
@@ -568,6 +635,7 @@ function composerApp() {
         isContainerType: isContainerType,
         getNestingDepth: getNestingDepth,
         applyLayerBanding: applyLayerBanding,
+        applyRadialLayout: applyRadialLayout,
         VIEWPOINT_PALETTE_MAP: VIEWPOINT_PALETTE_MAP,
         applyCustomLabel: _applyCustomLabel,
         PALETTE: PALETTE,
@@ -3132,66 +3200,50 @@ function composerApp() {
                 });
                 let graph = Intelligence.buildGraph(rows, payload, elementId);
 
-                UndoStack.pause();
-                self.graph.clear();
-                self.canvasElements = {};
-                self._clearNeighborFocus();
-                let elements = graph.nodes.map(function(n) {
+                /* Which step away each element is: the seed is 0, an element reached in no recorded step counts as 1. */
+                let nodes = graph.nodes.map(function(n) {
                     return { id: n.id, name: n.name || (String(n.id) === String(elementId) ? centreName : null) || ('Element #' + n.id), type: n.type || 'ApplicationComponent',
-                             layer: n.layer || '', x: 0, y: 0 };
+                             layer: n.layer || '', ring: String(n.id) === String(elementId) ? 0 : (n.depth > 0 ? n.depth : 1) };
                 });
-                let relationships = graph.edges.map(function(e) {
+                let edges = graph.edges.map(function(e) {
                     return { id: e.key, source_id: e.from, target_id: e.to,
                              type: String(e.type || 'association').toLowerCase(), kind: e.kind, stale: e.stale };
                 });
-                let loaded = self._addCanvasCells(elements, relationships, function(link, rel) {
-                    ComposerRenderer.decorateEdge(link, {
-                        provenance: rel.kind === 'derived' ? 'derivation' : 'explicit',
-                        kind: rel.kind, stale: rel.stale === true, key: rel.id
-                    });
-                });
-                self.elementCount = elements.length;
-                self.relCount = relationships.length;
-                /* Layer bands (Motivation and Strategy on top, Technology below): the same
-                   top-down order the Twin Map reads, so a chain from the centre up to a
-                   Strategy or Goal element can be followed along the drawn connections. */
-                applyLayerBanding(self.graph);
-                self.componentsPanelOpen = false;
-                UndoStack.resume();
-                UndoStack.clear();
+                let maxRing = nodes.reduce(function(m, n) { return Math.max(m, n.ring); }, 0);
+                /* A neighbourhood that fits on one screen opens whole; a bigger one opens on the nearest ring
+                   alone, and the person asks for the next ring when ready for it. */
+                let firstRing = nodes.length <= FOCUS_OPEN_WHOLE_MAX ? maxRing : Math.min(1, maxRing);
 
+                self._focusData = { centreId: elementId, nodes: nodes, edges: edges };
                 self.currentSavedVpId = null;
                 self.mode = 'edit';
                 self.viewpointLoading = false;
                 self.focusView = {
                     name: centreName || ('Element #' + elementId),
                     depth: depth,
+                    stepsText: self._focusHopsText(depth).replace('hop', 'step'),
                     derived: includeDerived,
                     fromAnswer: !!fromAnswer,
-                    ids: elements.map(function(e) { return e.id; }),
-                    hasDerived: relationships.some(function(r) { return r.kind === 'derived'; }),
-                    empty: relationships.length === 0,
+                    ids: [],
+                    hasDerived: edges.some(function(r) { return r.kind === 'derived'; }),
+                    empty: edges.length === 0,
                     saving: false,
-                    rows: rows.map(function(r) {
-                        return { key: r.key, elementId: r.toId, from: r.fromName, name: r.toName,
+                    ring: 0,
+                    maxRing: maxRing,
+                    total: nodes.length,
+                    shownElements: 0,
+                    shownRelationships: 0,
+                    modelRelationships: null,
+                    moreCount: 0,
+                    rows: [],
+                    allRows: rows.map(function(r) {
+                        return { key: r.key, elementId: r.toId, fromId: r.fromId, from: r.fromName, name: r.toName,
                                  relation: r.relationType, kind: r.kindLabel, depth: r.depth };
                     }),
                     listOpen: false
                 };
-
-                let centre = loaded.cellMap[elementId];
-                if (centre) {
-                    let view = self.paper.findViewByModel(centre);
-                    self._clearSelection();
-                    self._selectedCells = [centre];
-                    if (view) self._highlightCell(view);
-                    self.selectedEdge = null;
-                    self.selectedNode = null;
-                    self._currentSelectedCell = centre;
-                    /* The whole neighbourhood is the subject here, so nothing in it is dimmed. */
-                }
-                self.statusText = relationships.length === 0 ? 'No connections at this depth' : 'Neighbourhood loaded';
-                self.viewpointDirty = false;
+                self._drawFocusRings(firstRing);
+                self._focusQuiet = true;
                 window.setTimeout(function() { self._focusQuiet = false; }, 3500);
                 /* Fit once the card is on screen, so the drawing sits below it. */
                 self.$nextTick(function() {
@@ -3200,6 +3252,148 @@ function composerApp() {
                 });
             })
             .catch(function(err) { UndoStack.resume(); fail(err); });
+        },
+
+        /* Draw the seed and every element up to the given ring (a step away from the seed), arranged round the
+           seed. Drawing again with a larger ring adds the next one; nothing is saved by either. */
+        _drawFocusRings: function(ring) {
+            let self = this;
+            let fv = self.focusView;
+            let data = self._focusData;
+            if (!fv || !data) return;
+            /* A drawing still being laid on the canvas cannot be taken down: draw again once it has finished. */
+            if (self._focusRendering) {
+                self.paper.once('render:done', function() { self._drawFocusRings(ring); });
+                return;
+            }
+            let wasQuiet = self._focusQuiet;
+            self._focusQuiet = true;
+            UndoStack.pause();
+            self._clearNeighborFocus();
+            let shown = data.nodes.filter(function(n) { return n.ring <= ring; });
+            let inView = {};
+            shown.forEach(function(n) { inView[n.id] = true; });
+            let relationships = data.edges.filter(function(e) { return inView[e.source_id] && inView[e.target_id]; });
+            let elements = shown.map(function(n) {
+                return { id: n.id, name: n.name, type: n.type, layer: n.layer, x: 0, y: 0, ring: n.ring };
+            });
+            /* Draw once, after every element has its place: a drawing that measures and routes each cell as it is
+               added, and again as the layout moves it, holds the tab for a long time on a few dozen elements. */
+            let seed = null;
+            self.graph.clear();
+            self.canvasElements = {};
+            self.paper.freeze();
+            try {
+                let loaded = self._addCanvasCells(elements, relationships, function(link, rel) {
+                    ComposerRenderer.decorateEdge(link, {
+                        provenance: rel.kind === 'derived' ? 'derivation' : 'explicit',
+                        kind: rel.kind, stale: rel.stale === true, key: rel.id
+                    });
+                });
+                shown.forEach(function(n) {
+                    let cell = loaded.cellMap[n.id];
+                    if (cell) cell.set('focusRing', n.ring);
+                });
+                seed = applyRadialLayout(self.graph, data.centreId);
+            } finally {
+                self._focusRendering = true;
+                self.paper.options.async = true;
+                self.paper.unfreeze({ batchSize: 40 });
+                self.paper.once('render:done', function() {
+                    self.paper.options.async = false;
+                    self._focusRendering = false;
+                    self._markFocusSeed(seed);
+                    if (self.focusView) ComposerRenderer.separateLabels(self.paper, self.graph);
+                });
+            }
+            self.elementCount = elements.length;
+            self.relCount = relationships.length;
+            self.componentsPanelOpen = false;
+            UndoStack.resume();
+            UndoStack.clear();
+
+            fv.ring = ring;
+            fv.ids = shown.map(function(n) { return n.id; });
+            fv.shownElements = shown.length;
+            fv.shownRelationships = relationships.length;
+            fv.moreCount = ring < fv.maxRing ? data.nodes.filter(function(n) { return n.ring === ring + 1; }).length : 0;
+            fv.rows = fv.allRows.filter(function(r) { return inView[r.elementId] && inView[r.fromId]; });
+            fv.empty = relationships.length === 0;
+            fv.modelRelationships = null;
+
+            self.statusText = relationships.length === 0 ? 'No connections at this depth' : 'Neighbourhood loaded';
+            self.viewpointDirty = false;
+            self._focusQuiet = wasQuiet;
+            self._fetchFocusModelRelationships(fv.ids);
+        },
+
+        /* The seed is selected and carries its own mark, which a later click elsewhere does not remove. */
+        _markFocusSeed: function(seed) {
+            let self = this;
+            if (!seed || !self.focusView) return;
+            let view = self.paper.findViewByModel(seed);
+            self._clearSelection();
+            self._selectedCells = [seed];
+            if (view) {
+                self._highlightCell(view);
+                view.el.classList.add('composer-focus-seed');
+                view.el.setAttribute('data-focus-seed', 'true');
+            }
+            self.selectedEdge = null;
+            self.selectedNode = null;
+            self._currentSelectedCell = seed;
+        },
+
+        /* How many relationships the model holds between the drawn elements: the figure a saved diagram would show. */
+        _fetchFocusModelRelationships: function(ids) {
+            let self = this;
+            let fv = self.focusView;
+            if (!fv || ids.length === 0) return;
+            Platform.fetch.get('/archimate/api/relationships', { element_ids: ids.join(','), per_page: 1 }, { silent: true })
+            .then(function(resp) {
+                let body = (resp && resp.data) ? resp.data : resp;
+                if (self.focusView === fv && fv.ids === ids && body && typeof body.total === 'number') {
+                    fv.modelRelationships = body.total;
+                }
+            })
+            .catch(function() { /* swallow-ok: the second figure is an addition to the count shown; without it the banner states only what is drawn */ });
+        },
+
+        showNextFocusRing: function() {
+            let self = this;
+            let fv = self.focusView;
+            if (!fv || fv.ring >= fv.maxRing) return;
+            self._drawFocusRings(fv.ring + 1);
+            self.$nextTick(function() { self._fitFocusViewWhileSettling(); });
+        },
+
+        focusCounts: function() {
+            if (!this.focusView) return '';
+            return this.shellElementTotal + (this.shellElementTotal === 1 ? ' element' : ' elements') + ' shown, '
+                + this.shellRelTotal + (this.shellRelTotal === 1 ? ' relationship' : ' relationships') + ' shown';
+        },
+
+        /* Where the focus view opens. A neighbourhood that fits the screen is fitted whole. A larger one opens at
+           reading size (full scale, so the smallest label is 12px) with the seed in the middle of the space below
+           the card; the Fit button shows all of it. */
+        _placeFocusView: function() {
+            let self = this;
+            let fv = self.focusView;
+            if (!fv) return;
+            self.fitCanvas();
+            if (fv.total <= FOCUS_OPEN_WHOLE_MAX) return;
+            let seed = self.graph.getElements().filter(function(c) { return c.get('focusRing') === 0; })[0];
+            let canvasEl = document.getElementById('composer-canvas');
+            if (!seed || !canvasEl) return;
+            let card = document.getElementById('composer-focus-banner');
+            let top = card && card.offsetHeight
+                ? Math.max(0, Math.round(card.getBoundingClientRect().bottom - canvasEl.getBoundingClientRect().top) + 8) : 0;
+            let box = seed.getBBox();
+            self.paper.scale(1, 1);
+            self.paper.translate(Math.round(canvasEl.clientWidth / 2 - (box.x + box.width / 2)),
+                                 Math.round((top + canvasEl.clientHeight) / 2 - (box.y + box.height / 2)));
+            self.zoomPercent = 100;
+            self._scheduleMiniMapUpdate();
         },
 
         /* Keep the focus drawing fitted while the canvas settles. A panel that is still
@@ -3212,8 +3406,8 @@ function composerApp() {
             if (!el) return;
             let fit = function() {
                 if (!self.focusView) return;
-                self.fitCanvas();
-                ComposerRenderer.separateLabels(self.paper, self.graph);
+                self._placeFocusView();
+                if (!self._focusRendering) ComposerRenderer.separateLabels(self.paper, self.graph);
             };
             self._focusFitUntil = Date.now() + 3000;
             fit();
@@ -4172,13 +4366,25 @@ function composerApp() {
             this.paper.scaleContentToFit({
                 padding: { top: topPadding, bottom: 40, left: 40, right: rightPadding },
                 maxScale: 1,
-                minScale: 0.1,
+                minScale: 0.02,
                 useModelGeometry: true,
                 /* Centre the diagram in the space the padding leaves; the default hugs the top-left corner. */
                 horizontalAlign: 'middle',
                 verticalAlign: 'middle'
             });
             this.zoomPercent = Math.round(this.paper.scale().sx * 100);
+            this._scheduleMiniMapUpdate();
+        },
+
+        /* Every way of opening a drawing (a viewpoint, a saved view, a snapshot) fits it, then keeps it
+           readable: a large model fitted whole is a wall of shapes at 10%, so it opens at 50% on the
+           top-left of the drawing (Ctrl+0 still fits all). */
+        fitCanvasReadable: function() {
+            this.fitCanvas();
+            if (!this.paper || this.zoomPercent >= 50) return;
+            let area = this.graph.getBBox(this.graph.getElements());
+            this.setZoom(50);
+            if (area) this.paper.translate(40 - area.x * 0.5, 40 - area.y * 0.5);
             this._scheduleMiniMapUpdate();
         },
 

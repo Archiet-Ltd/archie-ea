@@ -105,6 +105,9 @@ def _risks_reached(org_id: int, element_id: int, reached_ids: List[int]) -> List
         db.select(ArchiMateElement.id, ArchiMateElement.name).where(
             ArchiMateElement.organization_id == org_id, ArchiMateElement.id.in_(sorted(about_ids)))).all()
     ) if about_ids else {}
+    from app.release_waves import is_released_endpoint
+
+    register_open = is_released_endpoint("risk.risk_page")
     rows = []
     for risk in risks:
         about = risk.archimate_element_id if risk.archimate_element_id in element_ids else linked.get(risk.id)
@@ -115,7 +118,7 @@ def _risks_reached(org_id: int, element_id: int, reached_ids: List[int]) -> List
             "about_id": about,
             "about": names.get(about),
             "about_changed_element": about == element_id,
-            "href": url_for("risk.risk_page", risk_id=risk.id),
+            "href": url_for("risk.risk_page", risk_id=risk.id) if register_open else None,
         })
     return rows
 
@@ -229,12 +232,18 @@ def simulate_change(element_id: int, change_type: str = "MODIFY") -> Dict[str, A
         _figure("Open risks touching the change", len(risks), len(risks), risk_note),
     ]
     unchanged = _model_figures(org_id) == before
+    no_effect = None
+    if all(f["change"] in (0, None) for f in figures):
+        lower = lambda text: text[0].lower() + text[1:]  # noqa: E731
+        no_effect = "This change moves none of these figures: %s, %s, and %s" % (
+            lower(element_note.rstrip(".")), lower(rel_note.rstrip(".")), lower(cost_note))
     return {
         **analysis,
         "simulation": {
             "change_type": change_type,
             "change_label": change_label(change_type),
             "figures": figures,
+            "no_effect": no_effect,
             "risks": risks,
             "real_model": before,
             "real_model_unchanged": unchanged,

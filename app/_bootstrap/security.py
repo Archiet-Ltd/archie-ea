@@ -100,6 +100,12 @@ def init_security(app):
         else:
             response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
+        from flask import request
+
+        from app.services.crawl_rules import never_indexed
+
+        if never_indexed(request.url_rule):
+            response.headers["X-Robots-Tag"] = "noindex, nofollow"
         response.headers["Referrer-Policy"] = "same-origin"
 
         # ARCH-072: Permissions-Policy and Cross-Origin-Opener-Policy were
@@ -296,8 +302,8 @@ def init_security(app):
 
                 request_path = _req.path
                 request_versioned = bool(_req.args.get("v"))
-            except RuntimeError:
-                pass
+            except (RuntimeError, UnicodeDecodeError):
+                pass  # no request, or a query string that is not valid text: not a versioned address
 
             if request_path.startswith("/static/"):
                 # Only cache-forever assets whose URL changes when their bytes

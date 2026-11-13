@@ -79,13 +79,17 @@ class ComplianceInheritanceService:
         if not application_ids:
             return result
         org_id = organization_id if organization_id is not None else current_org_id()
+        if org_id is None:
+            # No organisation known: nothing is read, never every organisation's controls.
+            for row in result.values():
+                ComplianceInheritanceService._finish(row)
+            return result
         query = (
             db.session.query(ApplicationComplianceControl, ComplianceControl)
             .join(ComplianceControl, ComplianceControl.id == ApplicationComplianceControl.control_id)
             .filter(ApplicationComplianceControl.application_id.in_(application_ids))
+            .filter(ApplicationComplianceControl.organization_id == org_id)
         )
-        if org_id is not None:
-            query = query.filter(ApplicationComplianceControl.organization_id == org_id)
         for mapping, control in query.order_by(ComplianceControl.control_code).all():
             row = result[mapping.application_id]
             status = mapping.implementation_status or "planned"
@@ -94,6 +98,12 @@ class ComplianceInheritanceService:
             credit = _CONTROL_CREDIT.get(status, 0.0)
             row["assessed_controls"] += 1
             row["credit"] += credit
+            if mapping.evidence_url:
+                row["with_evidence"] += 1
+            recorded = mapping.updated_at or mapping.created_at
+            if recorded and (row["newest_record"] is None or recorded > row["newest_record"]):
+                row["newest_record"] = recorded
+                row["newest_element_id"] = mapping.archimate_element_id
             bucket = "implemented" if credit == 1.0 else "partial" if credit else "missing"
             row[bucket] += 1
             if bucket != "implemented":
@@ -132,11 +142,13 @@ class ComplianceInheritanceService:
         from app.models.application_compliance import ApplicationComplianceControl
 
         org_id = organization_id if organization_id is not None else current_org_id()
+        if org_id is None:
+            # No organisation known: nothing is counted, never every organisation's controls.
+            return {"not_started": 0, "in_progress": 0, "total": 0}
         query = db.session.query(ApplicationComplianceControl.implementation_status).filter(
-            ApplicationComplianceControl.application_id.isnot(None)
+            ApplicationComplianceControl.application_id.isnot(None),
+            ApplicationComplianceControl.organization_id == org_id,
         )
-        if org_id is not None:
-            query = query.filter(ApplicationComplianceControl.organization_id == org_id)
         not_started = in_progress = 0
         for (status,) in query.all():
             status = status or "planned"
@@ -171,12 +183,16 @@ class ComplianceInheritanceService:
         if not capability_ids:
             return result
         org_id = organization_id if organization_id is not None else current_org_id()
+        if org_id is None:
+            # No organisation known: nothing is read, never every organisation's mappings.
+            return result
         query = db.session.query(
             ApplicationCapabilityMapping.business_capability_id,
             ApplicationCapabilityMapping.application_component_id,
-        ).filter(ApplicationCapabilityMapping.business_capability_id.in_(capability_ids))
-        if org_id is not None:
-            query = query.filter(ApplicationCapabilityMapping.organization_id == org_id)
+        ).filter(
+            ApplicationCapabilityMapping.business_capability_id.in_(capability_ids),
+            ApplicationCapabilityMapping.organization_id == org_id,
+        )
         apps_by_capability: Dict[int, set] = {}
         for cap_id, app_id in query.all():
             apps_by_capability.setdefault(cap_id, set()).add(app_id)
@@ -186,8 +202,13 @@ class ComplianceInheritanceService:
             row = result[cap_id]
             for app_id in sorted(apps):
                 part = by_app[app_id]
-                for key in ("assessed_controls", "implemented", "partial", "missing", "credit"):
+                for key in ("assessed_controls", "implemented", "partial", "missing", "credit", "with_evidence"):
                     row[key] += part[key]
+                if part["newest_record"] and (
+                    row["newest_record"] is None or part["newest_record"] > row["newest_record"]
+                ):
+                    row["newest_record"] = part["newest_record"]
+                    row["newest_element_id"] = part["newest_element_id"]
                 row["findings"].extend(part["findings"])
                 if part["last_review"] and (
                     row["last_review"] is None or part["last_review"] > row["last_review"]
@@ -238,6 +259,9 @@ class ComplianceInheritanceService:
             "credit": 0.0,
             "findings": [],
             "last_review": None,
+            "with_evidence": 0,
+            "newest_record": None,
+            "newest_element_id": None,
         }
 
     @staticmethod

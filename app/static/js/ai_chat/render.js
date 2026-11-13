@@ -94,9 +94,26 @@
        formatting is an acceptable outcome; unsanitised HTML is not. */
     function renderMarkdown(text) {
         if (window.DOMPurify && window.marked) {
-            return DOMPurify.sanitize(marked.parse(text == null ? '' : String(text)));
+            return externalLinksInNewTab(DOMPurify.sanitize(marked.parse(text == null ? '' : String(text))));
         }
         return escapeForHtml(text);
+    }
+
+    /* A link in an answer that leaves this site (a file on GitHub, a source page) opens in
+       a new tab, marked noopener noreferrer, so reading a citation never replaces the
+       conversation. Links within the product stay where they are. */
+    function externalLinksInNewTab(html) {
+        var holder = document.createElement('div');
+        holder.innerHTML = html;
+        holder.querySelectorAll('a[href]').forEach(function (a) {
+            var url;
+            try { url = new URL(a.getAttribute('href'), window.location.href); } catch (e) { return; }
+            if ((url.protocol === 'http:' || url.protocol === 'https:') && url.origin !== window.location.origin) {
+                a.setAttribute('target', '_blank');
+                a.setAttribute('rel', 'noopener noreferrer');
+            }
+        });
+        return holder.innerHTML;
     }
 
     /* Records the answer was actually built from.
@@ -385,38 +402,45 @@
                '</div>';
     }
 
-    /* Pending approvals, attached to the answer that caused them rather than to
-       a badge in the header. Uses the endpoints the live modal already calls —
-       approval_modal.js — not approval_gate's 202 payload, which is a different
-       mechanism. The header modal stays as the roll-up.
-
-       The requester who triggers this card can never be the one who approves
-       it: AIChatApprovalService.get_approver_queue() deliberately excludes the
-       actor's own requests (dual control / segregation of duties), so the
-       modal this card's button opens will always read "No approvals waiting
-       for your review" for the person looking at their own pending card. A
-       "Review" button that always opens an empty modal for the only person
-       who can see this card reads as broken, not as enforcing a control -
-       state whose queue it is and who can act on it instead of offering a
-       dead-looking control. */
-    function renderPendingApprovals(pending) {
-        if (!Array.isArray(pending) || pending.length === 0) return '';
-        var rows = pending.map(function (p) {
-            return '<li class="py-0.5">' +
-                     escapeForHtml(String(p.operation_type || 'change')) + ' ' +
-                     escapeForHtml(String(p.entity_type || '')) +
-                     (p.summary ? ' — ' + escapeForHtml(p.summary) : '') +
+    /* What the server did with each change this answer asked for, attached to the answer that caused
+       it. The server checks the change, has a model other than the drafter review it, and applies it
+       or declines it in the same turn, so the card reads "Applied: ..." or "Declined: ..." with a link
+       to the record that shows the checks, the rounds, both models and every reason. A change that
+       could not be reviewed yet reads "In review" and is settled without anyone being asked to approve
+       it. */
+    function renderPendingApprovals(changes) {
+        if (!Array.isArray(changes) || changes.length === 0) return '';
+        var tones = {
+            applied: { box: 'border-success/30 bg-success/10', icon: 'check', color: 'text-success', word: 'Applied' },
+            declined: { box: 'border-destructive/30 bg-destructive/10', icon: 'circle-x', color: 'text-destructive', word: 'Declined' },
+            in_review: { box: 'border-warning/30 bg-warning/10', icon: 'clock', color: 'text-warning', word: 'In review' }
+        };
+        var rows = changes.map(function (c) {
+            var tone = tones[c.state] || tones.in_review;
+            var detail;
+            if (c.state === 'declined') {
+                detail = (c.reasons && c.reasons.length ? c.reasons.join(' ') : (c.summary || ''));
+            } else if (c.state === 'applied') {
+                detail = c.summary || '';
+            } else {
+                detail = 'Checking this change. ' + (c.reasons && c.reasons.length ? c.reasons.join(' ') : '');
+            }
+            var link = c.record_url
+                ? ' <a href="' + escapeForHtml(c.record_url) + '" class="underline hover:no-underline" ' +
+                  'data-testid="change-record-link">See how it was checked</a>'
+                : '';
+            return '<li class="flex items-start gap-2 py-1" data-testid="change-verdict" data-state="' +
+                     escapeForHtml(String(c.state || 'in_review')) + '">' +
+                     '<i data-lucide="' + tone.icon + '" class="h-3.5 w-3.5 mt-0.5 shrink-0 ' + tone.color + '" aria-hidden="true"></i>' +
+                     '<span><strong class="font-medium text-foreground">' + tone.word + ':</strong> ' +
+                       escapeForHtml(String(detail).trim()) + link + '</span>' +
                    '</li>';
         }).join('');
-        return '<div class="mt-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs" role="status">' +
-                 '<div class="font-medium text-warning-emphasis mb-1">' +
-                   pending.length + ' change' + (pending.length === 1 ? '' : 's') + ' awaiting approval' +
-                 '</div>' +
+        var worst = changes.some(function (c) { return c.state === 'declined'; }) ? 'declined'
+                  : changes.some(function (c) { return c.state === 'in_review'; }) ? 'in_review' : 'applied';
+        return '<div class="mt-3 rounded-md border ' + tones[worst].box + ' px-3 py-2 text-xs" role="status" ' +
+                 'data-testid="change-verdicts">' +
                  '<ul class="list-none p-0 m-0 text-muted-foreground">' + rows + '</ul>' +
-                 '<p class="mt-1.5 text-muted-foreground">' +
-                   'You requested ' + (pending.length === 1 ? 'this' : 'these') + ' — a different reviewer in your ' +
-                   'organization must approve it from their own Approvals for review menu before it executes.' +
-                 '</p>' +
                '</div>';
     }
 
@@ -534,6 +558,16 @@
               '</div>';
 
         div.innerHTML = avatar + bubble;
+        if (isAi) {
+            /* A slash command an answer offers (the closest recorded names) is run by a click or Enter. */
+            div.querySelectorAll('.message-content code').forEach(function (code) {
+                if (!/^\/[a-z-]+ \S/.test(code.textContent)) return;
+                code.setAttribute('role', 'button');
+                code.setAttribute('tabindex', '0');
+                code.setAttribute('data-run-command', code.textContent);
+                code.classList.add('cursor-pointer', 'underline');
+            });
+        }
         if (isAi && metadata.genomeHtml) applyGenomeAnswer(div, metadata.genomeHtml);
         if (container) container.appendChild(div);
 
@@ -658,9 +692,50 @@
             '<div class="min-w-0 max-w-3xl flex-1">' + sanitiseAnswerHtml(html) + '</div>';
         var container = messages();
         if (container) container.appendChild(div);
+        bindApplicationChange(div);
         scrollToBottom();
         if (window.lucide) lucide.createIcons();
         return div;
+    }
+
+    /* A change to an application shown for approval: Save sends the signed change
+       the card carries and puts what the server says in the card's place; Cancel
+       says nothing was changed. */
+    function bindApplicationChange(div) {
+        var card = div.querySelector('[data-application-change="preview"]');
+        if (!card) return;
+        var save = card.querySelector('[data-application-change-save]');
+        var cancel = card.querySelector('[data-application-change-cancel]');
+        var problem = card.querySelector('[data-change-error]');
+        var token = card.getAttribute('data-change-token');
+        function setDisabled(flag) {
+            if (save) save.disabled = flag;
+            if (cancel) cancel.disabled = flag;
+        }
+        if (save) save.addEventListener('click', function () {
+            setDisabled(true);
+            if (problem) problem.hidden = true;
+            ArchieChat.transport.confirmApplicationChange(token).then(function (data) {
+                var holder = card.parentNode;
+                holder.innerHTML = sanitiseAnswerHtml(data.html);
+                if (window.lucide) lucide.createIcons();
+            }).catch(function () {
+                setDisabled(false);
+                if (problem) {
+                    problem.textContent = 'The change could not be saved just now. Nothing was changed. Press Save to try again.';
+                    problem.hidden = false;
+                }
+            });
+        });
+        if (cancel) cancel.addEventListener('click', function () {
+            var actions = card.querySelector('[data-application-change-save]');
+            if (actions && actions.parentNode) {
+                actions.parentNode.replaceWith(Object.assign(document.createElement('p'), {
+                    className: 'mt-4 text-sm text-muted-foreground',
+                    textContent: 'Cancelled. Nothing was changed.'
+                }));
+            }
+        });
     }
 
     // ------------------------------------------------------- streamed answer
@@ -700,7 +775,7 @@
     function applyGenomeAnswer(el, html) {
         var body = el.querySelector('.message-content');
         if (!body || !window.DOMPurify) return false;
-        body.innerHTML = DOMPurify.sanitize(html);
+        body.innerHTML = externalLinksInNewTab(DOMPurify.sanitize(html));
         el.setAttribute('data-testid', 'genome-answer');
         return true;
     }

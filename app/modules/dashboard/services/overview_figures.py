@@ -18,7 +18,7 @@ import re
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app import db
 
@@ -238,38 +238,134 @@ def _sourced_share(org_id):
     }
 
 
-def _relationships(org_id, now):
-    from app.models import ArchiMateElement as E
+def _relationship_pairs(org_id, element_id=None, since=None):
+    """The (source, target) of each recorded relationship of the organisation, or only those
+    touching *element_id*, or only those recorded since *since*. The one place relationships are
+    read for these counts."""
     from app.models import ArchiMateRelationship as R
-    from app.models.audit_log import AuditLog
 
-    total = db.session.execute(db.select(func.count(R.id)).where(R.organization_id == org_id)).scalar_one()
-    if not total:
-        return {"total": 0}
-    since = now - timedelta(days=30)
-    added = db.session.execute(
-        db.select(func.count(AuditLog.id)).where(
-            AuditLog.organization_id == org_id,
-            AuditLog.table_name == "archimate_relationships",
-            AuditLog.action == "create",
-            AuditLog.created_at >= since,
-        )
-    ).scalar_one()
+    from app.models import ArchiMateElement as E
+
+    # A relationship with a deleted element at either end is not a connection any more: bulk
+    # delete keeps the row so a restore brings it back, but no count or answer reads it meanwhile.
+    live = db.select(E.id).where(E.organization_id == org_id, E.deleted_at.is_(None))
+    query = db.select(R.source_id, R.target_id).where(
+        R.organization_id == org_id, R.source_id.in_(live), R.target_id.in_(live)
+    )
+    if element_id is not None:
+        query = query.where(or_(R.source_id == element_id, R.target_id == element_id))
+    if since is not None:
+        query = query.where(R.created_at >= since)
+    return db.session.execute(query).all()
+
+
+def relationship_ends(org_id):
+    """How many recorded relationships touch each element of the organisation (an element at
+    both ends of one relationship counts it once). The one count the overview's "most
+    connected" line and the chat's first questions both read."""
     ends = Counter()
-    for source_id, target_id in db.session.execute(
-        db.select(R.source_id, R.target_id).where(R.organization_id == org_id)
-    ):
+    for source_id, target_id in _relationship_pairs(org_id):
         ends[source_id] += 1
         if target_id != source_id:
             ends[target_id] += 1
+    return ends
+
+
+_SEPARATORS = str.maketrans("-_", "  ")
+
+
+def element_each_name_means(org_id, rows, ends=None):
+    """The one element each name means, for *rows* of ``(id, name)`` of this organisation.
+
+    Several elements can share a name. The one the name means is the one with the most recorded
+    relationships; on a tie the application's own element (``ApplicationComponent.archimate_element_id``);
+    then the one recorded first. The overview, the first-question cards, the answer and a typed question
+    all call this, so they name the same element and the same count. Returns ``{folded name: id}``."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.utils.duplicate_guard import normalize_name
+
+    rows = [(element_id, name) for element_id, name in rows if normalize_name(name)]
+    if not rows:
+        return {}
+    if ends is None:
+        ends = relationship_ends(org_id)
+    own = set(
+        db.session.execute(
+            db.select(ApplicationComponent.archimate_element_id).where(
+                ApplicationComponent.organization_id == org_id,
+                ApplicationComponent.archimate_element_id.in_([element_id for element_id, _ in rows]),
+            )
+        ).scalars()
+    )
+    best = {}
+    for element_id, name in rows:
+        rank = (-ends.get(element_id, 0), element_id not in own, element_id)
+        key = normalize_name(name)
+        if key not in best or rank < best[key][0]:
+            best[key] = (rank, element_id)
+    return {key: element_id for key, (_, element_id) in best.items()}
+
+
+def element_named(org_id, name):
+    """The id of the one element *name* means in this organisation, or ``None`` when no element
+    carries it. A name matches ignoring case, spacing, ``-`` and ``_``; among elements sharing it
+    ``element_each_name_means`` picks. Every answer path calls this, never ``.first()``."""
+    from app.models import ArchiMateElement as E
+    from app.utils.duplicate_guard import folded_column, normalize_name
+
+    key = normalize_name(str(name or "").translate(_SEPARATORS))
+    if not key:
+        return None
+    rows = db.session.execute(
+        db.select(E.id).where(
+            E.organization_id == org_id,
+            E.deleted_at.is_(None),
+            folded_column(func.translate(E.name, "-_", "  ")) == key,
+        )
+    ).all()
+    meant = element_each_name_means(org_id, [(row.id, key) for row in rows])
+    return meant.get(key)
+
+
+def relationship_split(org_id, element_id):
+    """What makes up one element's count in ``relationship_ends``: how many relationships lead
+    from it, how many lead to it (one that does both counts once, as leading from it), and how
+    many different other elements they reach. ``total`` is always ``from_it + to_it``."""
+    from_it = to_it = 0
+    reached = set()
+    for source_id, target_id in _relationship_pairs(org_id, element_id):
+        if source_id == element_id:
+            from_it += 1
+            if target_id != element_id:
+                reached.add(target_id)
+        else:
+            to_it += 1
+            reached.add(source_id)
+    return {"total": from_it + to_it, "from_it": from_it, "to_it": to_it, "reached": len(reached)}
+
+
+def _relationships(org_id, now):
+    from app.models import ArchiMateElement as E
+
+    total = len(_relationship_pairs(org_id))
+    if not total:
+        return {"total": 0}
+    since = now - timedelta(days=30)
+    # the same live relationships the total counts, so the figure beside it can never exceed it
+    added = len(_relationship_pairs(org_id, since=since))
+    ends = relationship_ends(org_id)
     top = None
     if ends:
-        element_id, count = max(ends.items(), key=lambda item: (item[1], -item[0]))
-        name = db.session.execute(
-            db.select(E.name).where(E.id == element_id, E.organization_id == org_id)
-        ).scalar_one_or_none()
-        if name:
-            top = {"name": name, "count": count}
+        # The element the leading name means, by the one rule every surface uses.
+        rows = db.session.execute(
+            db.select(E.id, E.name).where(E.organization_id == org_id, E.id.in_(list(ends)))
+        ).all()
+        meant = element_each_name_means(org_id, rows, ends)
+        names = {element_id: name for element_id, name in rows}
+        leading = [element_id for element_id in meant.values()]
+        if leading:
+            element_id = max(leading, key=lambda item: (ends[item], -item))
+            top = {"name": names[element_id], "count": ends[element_id]}
     return {"total": total, "added_30d": added, "top": top}
 
 
@@ -341,16 +437,23 @@ def _run_cost(org_id, now):
 
 
 def _history(org_id, now):
-    """Every model change since the start of last year, from the change history."""
+    """Every model change a person made since the start of last year, from the change history."""
+    return _history_and_sample(org_id, now)[0]
+
+
+def _history_and_sample(org_id, now):
+    """The changes, and the records the sample company wrote (worked out once, for every panel)."""
     from app.modules.intelligence.services.history_service import HistoryService
 
     start = datetime(now.year - 1, 1, 1)
     try:
-        return HistoryService(db.session, org_id).difference(start, now).changes
+        raw = HistoryService(db.session, org_id).difference(start, now).changes
+        sample = _sample_records(raw, org_id)
+        return _in_the_model(raw, _removed_sample_records(raw, org_id, sample)), sample
     except Exception:
         db.session.rollback()
         logger.exception("overview: change history could not be read")
-        return None
+        return None, frozenset()
 
 
 def _application_names(changes):
@@ -478,11 +581,48 @@ def _person_names(org_id, changes):
     return HistoryService(db.session, org_id).person_names(c.changed_by_id for c in changes)
 
 
-def _is_connected(change):
+def _is_connected(change, sample=frozenset()):
+    """Whether the change came from a connected source: never when the record is the sample company's."""
+    if (change.table_name, change.record_id) in sample:
+        return False
     return (change.snapshot or {}).get("source_kind") in CONNECTED_KINDS
 
 
-def _bars(inserts, today, days):
+def _marked_sample(changes):
+    return {(c.table_name, c.record_id) for c in changes if (c.snapshot or {}).get("source_kind") == "sample"}
+
+
+def _sample_records(changes, org_id):
+    """The records the sample company wrote, as (table, id) pairs, loaded now or removed since."""
+    from app.services import sample_company_service
+
+    return set(sample_company_service.written_by_the_sample(org_id)) | _marked_sample(changes)
+
+
+def _removed_sample_records(changes, org_id, sample):
+    """The records written by a sample company that has since been removed.
+
+    With no sample loaded now, that is every record the sample ever wrote; with one loaded, only the
+    records of the loads removed before it.
+    """
+    from app.services import sample_company_service
+
+    if sample_company_service.find_restore_point(org_id) is None:
+        return sample
+    return set(sample_company_service.written_by_the_sample(org_id, removed_only=True))
+
+
+def _in_the_model(changes, removed_sample):
+    """The changes a person made: everything in the change history except what a removed sample wrote.
+
+    The change history is kept for good and never edited, so the panels decide what to show. A record
+    the person added and later deleted still counts as one record added and one deletion. Only the rows
+    of a sample company since removed are left out, deletions included: the person never did that.
+    """
+    return [c for c in changes if (c.table_name, c.record_id) not in removed_sample]
+
+
+def _bars(inserts, today, days, sample=frozenset(), entered=()):
     """Records added, split into connected and by hand: one bar a day, or a week when the range is long."""
     size = 7 if days > 31 else 1
     first = today - timedelta(days=days - 1)
@@ -491,12 +631,13 @@ def _bars(inserts, today, days):
     while end >= first:
         buckets.append([max(end - timedelta(days=size - 1), first), end, 0, 0])
         end -= timedelta(days=size)
-    for change in inserts:
-        day = change.valid_from.date()
+    # ``entered`` are the records that left no history row: (day, from a connected source)
+    days_added = [(c.valid_from.date(), _is_connected(c, sample)) for c in inserts] + list(entered)
+    for day, connected in days_added:
         if first <= day <= today:
             for bucket in buckets:
                 if bucket[0] <= day <= bucket[1]:
-                    bucket[2 if _is_connected(change) else 3] += 1
+                    bucket[2 if connected else 3] += 1
                     break
     return [
         {"day": "%d %s" % (b[0].day, b[0].strftime("%b")), "connected": b[2], "manual": b[3]}
@@ -532,16 +673,111 @@ def _without_applications_counted_as_elements(inserts, org_id):
     ]
 
 
-def _activity(changes, now, org_id):
+def _records_without_history(changes, inserts, org_id, sample, year):
+    """Live elements and relationships the year's history has no insert row for, counted by year entered.
+
+    A record an import, a connector or a bulk loader wrote with a direct insert leaves no history row,
+    and a record entered before the history read here began has its row outside it. Each is counted in
+    the year it entered the model: the earliest of its first history row, its first recorded version and
+    its own timestamps (when its origin was recorded, when it was written). One with none of these is
+    counted as having no recorded entry date. The sample company's records and the starter elements stay out, as the page's
+    totals leave them out; an element written as one with an application already counted is not counted
+    again.
+    """
+    from app.models import ArchiMateElement as E
+    from app.models import ArchiMateRelationship as R
+    from app.models.application_portfolio import ApplicationComponent as A
+    from app.models.audit_log import AuditLog
+    from app.models.entity_history import EntityHistory as H
+
+    seen = {(c.table_name, c.record_id) for c in changes if c.action == "insert"}
+    applications = {c.record_id for c in inserts if c.table_name == "application_component"}
+    if applications:
+        seen |= {
+            ("archimate_elements", element_id)
+            for (element_id,) in db.session.execute(
+                db.select(A.archimate_element_id).where(A.organization_id == org_id, A.id.in_(applications))
+            )
+            if element_id is not None
+        }
+    live = db.select(E.id).where(E.organization_id == org_id, E.deleted_at.is_(None))
+    queries = {
+        # not valid_from: a row seeded with no known date carries a placeholder there, not a date
+        "archimate_elements": db.select(E.id, E.source_kind, func.coalesce(E.source_recorded_at, E.recorded_at))
+        .where(E.organization_id == org_id, E.deleted_at.is_(None), E.source_kind.is_distinct_from("starter")),
+        # a relationship with a deleted element at either end is not counted, as the page's total leaves it out
+        "archimate_relationships": db.select(R.id, R.source_kind, func.coalesce(R.created_at, R.source_recorded_at, R.recorded_at))
+        .where(R.organization_id == org_id, R.source_id.in_(live), R.target_id.in_(live)),
+    }
+    counts = {"this_year": 0, "last_year": 0, "earlier": 0, "undated": 0, "dated": []}
+    kinds = {}
+    for table, query in queries.items():
+        rows = db.session.execute(query).all()
+        unseen = {
+            record_id: stamp
+            for record_id, source_kind, stamp in rows
+            if source_kind != "sample" and (table, record_id) not in seen and (table, record_id) not in sample
+        }
+        kinds.update({(table, record_id): kind for record_id, kind, _ in rows})
+        if not unseen:
+            continue
+        ids = list(unseen)
+        first_rows = [
+            dict(db.session.execute(query).all())
+            for query in (
+                db.select(AuditLog.record_id, func.min(AuditLog.created_at)).where(
+                    AuditLog.organization_id == org_id, AuditLog.table_name == table,
+                    AuditLog.action == "create", AuditLog.record_id.in_(ids),
+                ).group_by(AuditLog.record_id),
+                db.select(H.record_id, func.min(H.recorded_at)).where(
+                    H.organization_id == org_id, H.table_name == table, H.record_id.in_(ids),
+                ).group_by(H.record_id),
+            )
+        ]
+        for record_id, stamp in unseen.items():
+            known = [d for d in (stamp, *(rows.get(record_id) for rows in first_rows)) if d is not None]
+            entered = min(known) if known else None
+            if entered is not None:
+                counts["dated"].append((entered.date(), kinds.get((table, record_id)) in CONNECTED_KINDS))
+            if entered is None:
+                counts["undated"] += 1
+            elif entered.year == year:
+                counts["this_year"] += 1
+            elif entered.year == year - 1:
+                counts["last_year"] += 1
+            else:
+                counts["earlier"] += 1
+    return counts
+
+
+def _year_alone(this_year, unrecorded):
+    """The year card's one figure with its label, and every record it cannot place in a year beside it."""
+    lines = ["{:,} added this year".format(this_year) if this_year else "No records added this year"]
+    if unrecorded["earlier"]:
+        lines.append("{:,} added before last year".format(unrecorded["earlier"]))
+    if unrecorded["undated"]:
+        lines.append("{:,} {} with no recorded entry date".format(
+            unrecorded["undated"], "record" if unrecorded["undated"] == 1 else "records"
+        ))
+    return ". ".join(lines)
+
+
+def _activity(changes, now, org_id, sample=None):
     if changes is None:
         return None
     today = now.date()
+    if sample is None:
+        sample = _sample_records(changes, org_id)
     inserts = _without_applications_counted_as_elements(
         [c for c in changes if c.action == "insert" and c.valid_from], org_id
     )
+    # records an import, a connector or a bulk loader wrote leave no history row: each is counted in the
+    # year its own created timestamp names, so the panel and the page's totals describe the same records
+    unrecorded = _records_without_history(changes, inserts, org_id, sample, now.year)
+    entered = unrecorded["dated"]
     ranges = {}
     for key, label, days in RANGES:
-        rows = _bars(inserts, today, days)
+        rows = _bars(inserts, today, days, sample, entered)
         ranges[key] = {
             "label": label,
             "rows": rows,
@@ -554,11 +790,17 @@ def _activity(changes, now, org_id):
     default_range = next((key for key in ("7d", "30d") if ranges[key]["total"]), "90d")
     this_year = sum(1 for c in inserts if c.valid_from.year == now.year)
     last_year = sum(1 for c in inserts if c.valid_from.year == now.year - 1)
+    this_year += unrecorded["this_year"]
+    last_year += unrecorded["last_year"]
+    untold = unrecorded["earlier"] + unrecorded["undated"]
     week_start = today - timedelta(days=6)
     week = [c for c in changes if c.valid_from and c.valid_from.date() >= week_start and c.action in ("insert", "update", "delete")]
     per_weekday = defaultdict(int)
     for change in week:
         per_weekday[change.valid_from.date()] += 1
+    week_entered = [day for day, _ in entered if week_start <= day <= today]
+    for day in week_entered:
+        per_weekday[day] += 1
     weekly_rows = [
         {"day": (week_start + timedelta(days=i)).strftime("%a"), "changes": per_weekday[week_start + timedelta(days=i)]}
         for i in range(7)
@@ -580,18 +822,21 @@ def _activity(changes, now, org_id):
         "ranges": ranges,
         "default_range": default_range,
         # with nothing to set it against the card shows this one figure alone, so the figure carries its label
-        "this_year": this_year if last_year or not this_year else "{:,} added this year".format(this_year),
+        "this_year": this_year if last_year or not (this_year or untold) else _year_alone(this_year, unrecorded),
+        "this_year_count": this_year,
         "last_year": last_year,
         "year_change": _percent_change(this_year, last_year),
+        "before_last_year": unrecorded["earlier"],
+        "no_entry_date": unrecorded["undated"],
         "year_rows": [
             {"year": "Last year", "last": last_year, "this": 0},
             {"year": "This year", "last": 0, "this": this_year},
         ],
         "week": {
             "rows": weekly_rows,
-            "total": len(week),
+            "total": len(week) + len(week_entered),
             # records added, counted once like "Records added": the chart above counts changes
-            "added": sum(1 for c in inserts if c.valid_from.date() >= week_start),
+            "added": sum(1 for c in inserts if c.valid_from.date() >= week_start) + len(week_entered),
             "updated": sum(1 for c in week if c.action == "update"),
             "removed": sum(1 for c in week if c.action == "delete"),
         },
@@ -746,8 +991,8 @@ def build_overview(org_id, user, now=None, with_cost=True):
     sourced = _sourced_share(org_id)
     relationships = _relationships(org_id, now)
     run_cost = _run_cost(org_id, now) if with_cost else {"total": None, "contracts": 0, "withheld": True}
-    changes = _history(org_id, now)
-    activity = _activity(changes, now, org_id)
+    changes, sample = _history_and_sample(org_id, now)
+    activity = _activity(changes, now, org_id, sample)
     table = _table(org_id, with_cost)
     _name_the_basis(run_cost, table["cost_total"])
     empty = not apps["total"] and not relationships["total"] and sourced is None

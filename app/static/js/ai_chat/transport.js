@@ -76,10 +76,23 @@
         var resp = await apiFetch('/ai-chat/estate-answer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember })
+            body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember, part: (options && options.part) || null, element_id: (options && options.elementId) || undefined })
         });
         var data = await resp.json().catch(function () { return {}; });
         if (!resp.ok || data.success === false) throw new Error(data.error || 'estate answer ' + resp.status);
+        return data;
+    }
+
+    /* Save a change to an application that a preview card described. Resolves to
+       {success, html}: the card for what was saved, or the words for why it was not. */
+    async function confirmApplicationChange(token) {
+        var resp = await apiFetch('/ai-chat/application-change/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token })
+        });
+        var data = await resp.json().catch(function () { return {}; });
+        if (!data.html) throw new Error(data.error || 'application change ' + resp.status);
         return data;
     }
 
@@ -270,6 +283,7 @@
                             answeredBy: ev.answered_by || null,
                             genomeHtml: (ev.genome_answer && ev.genome_answer.html) || null,
                             paused: !!ev.paused,
+                            retryable: !!ev.retryable,
                             error: ev.error || null
                         };
                     } else if (ev.error) {
@@ -309,6 +323,7 @@
             answeredBy: meta.answeredBy || null,
             genomeHtml: meta.genomeHtml || null,
             paused: !!meta.paused,
+            retryable: !!meta.retryable,
             error: meta.error || null
         });
         return true;
@@ -378,6 +393,7 @@
         isProviderConfigurationFault: isProviderConfigurationFault,
         sendMessage: sendMessage,
         askEstate: askEstate,
+        confirmApplicationChange: confirmApplicationChange,
         recomputeConnections: recomputeConnections,
         streamMessage: streamMessage,
         abort: abort,

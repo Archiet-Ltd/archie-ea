@@ -17,7 +17,12 @@ from app.middleware.tenant_context import current_org_id
 from app.models import ArchiMateElement
 from app.modules.ai_chat.services.ai_hallucination_detector import candidate_phrases, phrase_key
 from app.modules.intelligence.services import answer_envelope as envelope
+from app.modules.dashboard.services.overview_figures import element_each_name_means
 from app.utils.duplicate_guard import folded_column
+
+
+# The largest id the database stores: a posted id above it is not an element, and is not asked about.
+MAX_ELEMENT_ID = 2**31 - 1
 
 
 def named_element_ids(message: str, organization_id: int) -> list:
@@ -36,28 +41,58 @@ def named_element_ids(message: str, organization_id: int) -> list:
                 )
             ).all()
         )
-    found.sort(key=lambda row: (-len(phrase_key(row.name)), row.id))
-    seen, ordered = set(), []
-    for element_id, name in found:
-        if element_id not in seen:
-            seen.add(element_id)
-            ordered.append(element_id)
-    return ordered
+    # One element for each name, by the rule the overview and the cards share.
+    meant = set(element_each_name_means(organization_id, [(row.id, row.name) for row in found]).values())
+    chosen = [row for row in found if row.id in meant]
+    chosen.sort(key=lambda row: (-len(phrase_key(row.name)), row.id))
+    return [row.id for row in chosen]
 
 
-def answer_estate_question(message: str, *, user_id: Optional[int] = None):
+def owned_element_id(element_id: Any, organization_id: Optional[int]) -> Optional[int]:
+    """*element_id* when it is an element of this organisation, else ``None``: a posted id
+    from another organisation, or one that is not a whole number, is ignored."""
+    if organization_id is None or isinstance(element_id, bool) or not isinstance(element_id, int):
+        return None
+    if not 0 < element_id <= MAX_ELEMENT_ID:
+        return None
+    return db.session.execute(
+        db.select(ArchiMateElement.id).where(
+            ArchiMateElement.id == element_id, ArchiMateElement.organization_id == organization_id
+        )
+    ).scalar_one_or_none()
+
+
+def answer_estate_question(
+    message: str,
+    *,
+    user_id: Optional[int] = None,
+    direction: Optional[str] = None,
+    element_id: Optional[int] = None,
+):
     """The stored answer to *message*, or ``None`` when it is not a question
-    about an element of the active organisation."""
+    about an element of the active organisation. A card that offered the question
+    passes the id of the element it named: once that is this organisation's element it
+    decides both the element and the kind of answer (what breaks if it fails), whatever
+    its name says or shares. The text is classified only when no id is posted.
+    *direction* ("upstream" for what the element depends on, "downstream" for what
+    breaks) asks the impact walk that way whatever the wording, for a message that
+    asks several things at once."""
     organization_id = current_org_id()
-    kind = envelope.classify_estate_question(message)
-    if kind is None or organization_id is None:
+    if organization_id is None:
         return None
-    element_ids = named_element_ids(message, organization_id)
-    if not element_ids:
-        return None
+    card_element = owned_element_id(element_id, organization_id)
+    if card_element is not None:
+        kind, element_ids = envelope.KIND_IMPACT, [card_element]
+    else:
+        kind = envelope.KIND_IMPACT if direction else envelope.classify_estate_question(message)
+        element_ids = named_element_ids(message, organization_id) if kind is not None else []
+        if not element_ids:
+            return None
     # The dashboard's first answer follows worked-out connections three steps out;
     # the chat asks the same question the same way.
     params = {"include_derived": True, "max_depth": 3}
+    if direction:
+        params["direction"] = direction
     if kind == envelope.KIND_SET_IMPACT and len(element_ids) > 1:
         params["element_ids"] = element_ids[:envelope.SET_IMPACT_MAX_SEEDS]
     else:

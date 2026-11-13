@@ -843,6 +843,24 @@ def jira_config_test():
 # ---------------------------------------------------------------------------
 
 
+def _product_asked_for(org_id: int, raw):
+    """The Product (id, name, page address) a person came from to connect GitHub, only when it is a Product
+    of the active organisation; anything else is ignored and the person stays on the connect page."""
+    from app.models.archimate_core import ArchiMateElement
+
+    if not str(raw or "").isdigit():
+        return None
+    product = ArchiMateElement.query.filter_by(id=int(raw), type="Product", organization_id=org_id).first()
+    if product is None:
+        return None
+    return {
+        "id": product.id,
+        "name": product.name,
+        "url": url_for("archimate_crud.detail_element", layer="business", element_type="Product",
+                       element_id=product.id, ae=1, bring_in=1) + "#bring-in",
+    }
+
+
 def _github_state(org_id: int) -> dict:
     """What the connect page and its status route report: the connection, the latest read and the counts.
     Never the token, only whether one is stored."""
@@ -900,6 +918,7 @@ def github_connect():
     return render_template(
         "admin/connectors/github.html",
         status=_github_state(org_id),
+        for_product=_product_asked_for(org_id, request.args.get("product")),
         review_url=url_for("m365_connector.github_review"),
         status_url=url_for("m365_connector.github_status"),
         github_app_configured=configured,
@@ -933,7 +952,11 @@ def github_connect_save():
         gh.connect_and_start(org_id, request.form.get("organization"), request.form.get("api_token"))
     except gh.ConnectRefused as exc:
         flash(str(exc), "error")
-        return redirect(url_for("m365_connector.github_connect"))
+        return redirect(url_for("m365_connector.github_connect", product=request.form.get("product") or None))
+    product = _product_asked_for(org_id, request.form.get("product"))
+    if product is not None:
+        flash("Connected. Choose the repositories to read for %s." % product["name"], "success")
+        return redirect(product["url"])
     flash("Connected. Reading your repositories now; this page shows when it is done.", "success")
     return redirect(url_for("m365_connector.github_connect"))
 

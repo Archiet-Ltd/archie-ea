@@ -4,6 +4,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table %}
 {% from 'components/figures.html' import state_badge, section %}
+{% from 'components/fact_list.html' import fact_list %}
 {% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}Approvals{% endblock %}
@@ -27,8 +28,80 @@
 
 {% block content %}
 <div class="p-6 space-y-6">
-{{ page_shell(title='Approvals', subtitle='Changes proposed through the AI chat, for you to approve or reject',
+{{ page_shell(title='Approvals', subtitle='Changes the AI chat makes are checked and reviewed automatically; other records wait here for a person',
               breadcrumb=[('Home', url_for('dashboard.overview')), ('AI chat', url_for('unified_ai_chat.index')), ('Approvals', none)]) }}
+
+{#- The record of one reviewed change, read only: what was asked, what was decided, who drafted and who reviewed,
+    and every check and reason. -#}
+{% if record %}
+{% call ui.card(id='record-' ~ record.id, attrs={'data-testid': 'review-record'}) %}
+  {% call ui.card_header() %}
+    {% call ui.card_title(class='flex flex-wrap items-center gap-2') %}
+      {{ state_badge(record.verdict, tone=record.tone, testid='review-record-verdict') }}
+      <span>{{ record.summary }}</span>
+    {% endcall %}
+    {{ ui.card_description(text=('Asked: ' ~ (record.request|truncate(300)) if record.request else 'No request text was kept for this change.')) }}
+  {% endcall %}
+  {% call ui.card_content(class='space-y-5') %}
+    {% call(p) fact_list(items=[
+        {'label': 'Drafted by', 'key': 'drafter'},
+        {'label': 'Reviewed by', 'key': 'reviewer'},
+        {'label': 'Reviews run', 'key': 'rounds'},
+        {'label': 'Rubric version', 'key': 'rubric'}], testid='review-record-facts') %}
+      {%- if p.key == 'drafter' %}{{ record.drafter or 'Not recorded' }}
+      {%- elif p.key == 'reviewer' %}{{ record.reviewer or 'Not reviewed yet' }}
+      {%- elif p.key == 'rounds' %}{{ record.rounds if record.rounds else 'None yet' }}
+      {%- else %}{{ record.rubric_version or 'Not recorded' }}{% endif %}
+    {% endcall %}
+    {% if record.same_provider_note %}<p class="text-sm text-muted-foreground" data-testid="review-record-same-provider">{{ record.same_provider_note }}</p>{% endif %}
+
+    {% if record.verdict == 'In review' and record.waiting_reason %}
+    <p class="text-sm text-muted-foreground" data-testid="review-record-waiting">{{ record.waiting_reason }}</p>
+    {% endif %}
+
+    {% if record.verdict == 'Declined' and record.reasons %}
+    <div data-testid="review-record-reasons">
+      <p class="text-sm font-medium text-foreground">Why it was declined</p>
+      <ul class="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+        {% for reason in record.reasons %}<li>{{ reason }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if record.checks %}
+    <div data-testid="review-record-checks">
+      <p class="text-sm font-medium text-foreground">Checks the server ran first</p>
+      <ul class="mt-1 space-y-1 text-sm text-muted-foreground">
+        {% for check in record.checks %}
+        <li><span class="text-foreground">{{ check.name }}:</span> {{ ('passed' if check.passed else 'failed') if check.get('ran', True) else 'not run' }}. {{ check.reason }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% for round in record.review_rounds %}
+    <div data-testid="review-record-round-{{ round.round }}">
+      <p class="text-sm font-medium text-foreground">Review {{ round.round }}: {{ 'passed' if round.passed else 'did not pass' }}</p>
+      <ul class="mt-1 space-y-1 text-sm text-muted-foreground">
+        {% for c in round.criteria %}
+        <li data-testid="review-criterion-{{ c.id }}"><span class="text-foreground">{{ c.name }}:</span> {{ 'passed' if c.passed else 'failed' }}. {{ c.reason }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+
+    {% if not record.checks and not record.review_rounds %}
+    <p class="text-sm text-muted-foreground" data-testid="review-record-unreviewed">No review has been recorded for this change.</p>
+    {% endif %}
+  {% endcall %}
+{% endcall %}
+{% elif record_missing %}
+{% call ui.alert(variant='destructive', attrs={'data-testid': 'review-record-missing', 'role': 'alert'}) %}
+  {{ lucide('circle-alert') }}
+  {{ ui.alert_title(text='That change was not found') }}
+  {{ ui.alert_description(text='It may belong to another workspace or no longer exist. The changes you can open are listed below.') }}
+{% endcall %}
+{% endif %}
 
 {% if queue_error %}
 {% call ui.alert(variant='destructive', attrs={'data-testid': 'approval-inbox-unavailable', 'role': 'alert'}) %}
@@ -99,13 +172,24 @@
       </details>
       {% endif %}
     {% endcall %}
-    {% call ui.card_footer(class='flex items-start gap-2 border-t') %}
+    {% call ui.card_footer(class='flex flex-wrap items-start gap-2 border-t') %}
+      {% if item.pre_loop %}
+      <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-pre-loop-{{ item.id }}">This was recorded before changes by the assistant were checked and reviewed automatically, so nothing has checked it. A person approves or rejects it; when you approve it, it is checked and reviewed before it is applied.</p>
+      {% elif item.held_by_pause %}
+      <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-held-{{ item.id }}">Changes by the assistant are paused for this workspace, so this change waits. It is checked, reviewed and applied once they resume.{% if item.has_check_record %} <a href="{{ url_for('unified_ai_chat.approval_inbox', approval=item.id) }}#record-{{ item.id }}" class="underline hover:no-underline">See how it was checked</a>{% endif %}</p>
+      {% elif item.settled_by_review %}
+      <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-in-review-{{ item.id }}">This change is checked and reviewed automatically and is applied or declined without waiting for a person. <a href="{{ url_for('unified_ai_chat.approval_inbox', approval=item.id) }}#record-{{ item.id }}" class="underline hover:no-underline">See how it was checked</a></p>
+      {% endif %}
+      {% if item.can_approve %}
       <form method="post" action="{{ url_for('unified_ai_chat.approve_pending_approval', approval_id=item.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="from_inbox" value="1">
         {% call ui.button(type='submit', size='sm') %}{{ lucide('check') }}Approve{% endcall %}
       </form>
-      <details class="flex-1">
+      {% elif item.approve_note %}
+      <p class="w-full basis-full text-sm text-muted-foreground" data-testid="approval-own-request-{{ item.id }}">{{ item.approve_note }}</p>
+      {% endif %}
+      <details class="min-w-0 flex-1">
         <summary role="button" class="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground select-none">{{ lucide('x') }}Reject</summary>
         <form method="post" action="{{ url_for('unified_ai_chat.reject_pending_approval', approval_id=item.id) }}" class="mt-3 space-y-2">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -124,13 +208,13 @@
 {#- Nothing waiting and nothing decided: one empty state for the whole page. -#}
 {% call ui.card() %}
   {{ _empty('inbox', 'No approvals yet',
-            'When someone asks the AI chat to change your architecture, the proposal waits here for a second person to approve or reject it. Decisions are kept here too.',
+            'When someone asks the AI chat to change your architecture, the change is checked and reviewed automatically, and how each one was checked is kept under Recently decided. Records outside that review wait here for a person to approve or reject them.',
             'approval-inbox-empty', _open_chat) }}
 {% endcall %}
 {% else %}
 {% call ui.card() %}
   {{ _empty('inbox', 'No pending approvals waiting for your review',
-            'When someone asks the AI chat to change your architecture, the proposal waits here for a second person to approve or reject it.',
+            'Changes the AI chat makes are checked and reviewed automatically, so they do not wait here. Records outside that review wait here for a person to approve or reject them.',
             'approval-inbox-empty', _open_chat) }}
 {% endcall %}
 {% endif %}
@@ -149,6 +233,7 @@
         <div data-testid="approval-decided-{{ d.id }}" class="space-y-1">
           {{ state_badge('Rejected' if d.status == 'rejected' else 'Approved', tone=('negative' if d.status == 'rejected' else 'positive')) }}
           {% if d.status == 'rejected' %}<p class="text-sm text-muted-foreground">Reason: <span class="text-foreground">{{ d.rejected_reason or 'No reason was given' }}</span></p>{% endif %}
+          <a href="{{ url_for('unified_ai_chat.approval_inbox', approval=d.id) }}#record-{{ d.id }}" class="text-sm underline hover:no-underline" data-testid="approval-record-link-{{ d.id }}">See how it was checked</a>
         </div>
       {% endcall %}
       {% call table_cell(class='whitespace-nowrap tabular-nums text-muted-foreground', attrs={'data-sort': d.proposed.isoformat() if d.proposed else ''}) %}{{ d.proposed|format_date if d.proposed else 'Date not recorded' }}{% endcall %}

@@ -37,6 +37,21 @@ entries:
       template, and do not write a second footer, "Source:" line or confidence label beside it.
       The rule is in the service docstring and in docs/adr/0013-result-footer.md.
 
+  - id: cost-visibility
+    concept: Withholding a figure in pounds from a person who may not see spend (cost, budget, TCO, licence cost, investment estimate, savings, financial risk)
+    status: active
+    canonical:
+      path: app/services/cost_visibility.py
+      symbols: [costs_visible, withhold_costs, COSTS_WITHHELD, COST_KEYS, INVESTMENT_MONEY_KEYS]
+    reuse: >
+      The rule is may_see_spend_pages (app/decorators/requires_role.py), asked through costs_visible. When it
+      says no, pass the result through withhold_costs before the reply is built, with keys= when the money sits
+      under other keys than a simulation's. The masker sets costs_withheld; a template reads that flag and prints
+      COSTS_WITHHELD, "Cost figures are withheld for your role.", and never blanks a cell. Do not call
+      can_see_costs outside requires_role.py and role_access.py, do not write a second masker or walker, do not
+      write another sentence or flag for the same case, and do not mask in the browser: the figure must not
+      leave the server. The static test tests/test_one_cost_rule.py enforces it.
+
   - id: design-tokens
     concept: Colour, radius and type tokens for every page (one token file; the public marketing
       palette is a scoped class in it)
@@ -190,6 +205,23 @@ entries:
       - id: visibility-helper
         regex: 'def\s+_?(get_|find_|load_)?(visible|accessible)_(capabilit\w*|to_org\w*)\s*\('
 
+  - id: title-case-label
+    concept: Title-casing a stored label or key for display (categories, types, enum keys)
+    status: active
+    canonical:
+      path: app/utils/template_utils.py
+      symbols: [title_keep_caps, ENUM_LABEL_OVERRIDES]
+    reuse: >
+      Use the title_keep_caps template filter (also registered as humanize_key). It maps a known key to its
+      hand-written label in ENUM_LABEL_OVERRIDES, reads underscores as spaces, and keeps acronyms as typed
+      (SaaS, IoT, API, AI). Do not write another title-case helper or chain replace and title in a template.
+    must_not_create:
+      - id: title-case-helper
+        regex: 'def\s+_?(titleize|title_case|title_keep_caps|humanize_key)\w*\s*\('
+    known_exceptions:
+      - path: app/utils/template_utils.py
+        reason: the canonical helper's own module
+
   - id: name-matching
     concept: Name and code matching for duplicates (normaliser, SQL folding, duplicate lookup)
     status: active
@@ -255,17 +287,29 @@ entries:
           follow-up: route through ApplicationOwner.display_rows_for_owner_rows
 
   - id: ai-chat-approval
-    concept: Approving or rejecting an AI chat change request (the approval gate)
+    concept: Settling an AI chat change request (checked, reviewed, then applied or declined by the server)
     status: active
     canonical:
       path: app/modules/ai_chat/services/ai_chat_approval_service.py
       symbols:
+        - AIChatApprovalService.settle_after_review
         - AIChatApprovalService.approve_and_execute
         - AIChatApprovalService.reject_approval
     reuse: >
-      Every approval goes through AIChatApprovalService.approve_and_execute / reject_approval so the approver is
-      recorded, the audit log is written, only a PENDING request can be claimed and self-approval is refused.
-      Never call approval.approve(...) or approval.reject(...) on the model from a route or another service.
+      A requested change is settled by AIChatApprovalService.settle_after_review, which runs the checks and the
+      model review in app/modules/ai_chat/services/change_review.py (the only caller of that module) and then
+      applies the change through approve_and_execute as the system, or declines it with reasons. Every apply
+      and every decline goes through approve_and_execute / reject_approval so the audit log is written and only
+      a PENDING request can be claimed. No second queue, no second reviewer, no route or service that writes the
+      status itself. Never call approval.approve(...) or approval.reject(...) on the model from a route or
+      another service. A person's Approve (the route, the inbox button and "approve it" in the chat) is a request
+      to settle: approve_and_execute sends a change the review settles through settle_after_review and applies
+      it only after a passing review; the settled_by_review flag is checked against the record's own passing
+      round. The charter rule is AgentCharter.tool_allowed, called from change_review.run_checks. A prompt that
+      leaves the server for a review or a revision goes through LLMModelRouter.call_model, which applies
+      llm_service_impl._scrub_prompt, and its data blocks are wrapped by architect_persona_charters.fence_untrusted
+      (no second fence). Who may act is the one sign-in rule, User.is_active (disabled_at), read in
+      AIChatApprovalService._acting_user. The address of a record is change_review.record_path.
     must_not_create:
       - id: approval-path
         regex: 'def\s+_?(approve_and_execute|reject_approval|approve_and_run|execute_approval\w*|approve_pending\w*)\s*\('
@@ -347,6 +391,26 @@ entries:
     known_exceptions:
       - path: app/utils/duplicate_guard.py
         reason: find_duplicate_by_name is the canonical duplicate lookup of the name-matching entry
+
+  # Searched before adding: "name", "resolve" and "matcher". name-matching (normaliser and duplicate lookup) and
+  # entity-matching (imports and proposals) both exist; neither says which element a shared name means in an answer.
+  - id: answer-name-resolution
+    concept: Which element a name means in any answer (typed question, catalogue, assistant tools, slash commands)
+    status: active
+    canonical:
+      path: app/modules/dashboard/services/overview_figures.py
+      symbols: [element_each_name_means, element_named]
+    reuse: >
+      element_named(org_id, name) finds the elements a name matches ignoring case, spacing, "-" and "_", and
+      element_each_name_means picks one: the most recorded relationships, then the application's own element, then
+      the one recorded first. Every answer path calls it so card, answer and tools agree. Never pick an element
+      with .first() or an ilike lookup in answer code; MatcherService stays the matcher for imports and proposals.
+    must_not_create:
+      - id: answer-name-picker
+        regex: 'ArchiMateElement\.name\.ilike\([^)]*\)\s*\)\s*\.first\('
+    known_exceptions:
+      - path: app/modules/genome/patch/grounding.py
+        reason: grounds a patch against one element for the genome, not an answer to a person; moves to the rule in a later round
 
   - id: impact-answer
     concept: What breaks if this element changes or fails (impact answer)
@@ -563,6 +627,17 @@ entries:
         regex: '(?i)(?:let|const|var|function|class)\s+\w*archimate\w*(?:renderer|diagramengine)\b'
         scope: [app/static/js, app/templates]
         suffixes: [.js, .html]
+
+  - id: composer-radial-arrangement
+    concept: Arranging the elements of a view round one element, each step away on its own ring (the Composer's neighbourhood view)
+    status: active
+    canonical:
+      path: app/static/js/archimate/composer.js
+      symbols: [applyRadialLayout, applyLayerBanding]
+    reuse: >
+      applyRadialLayout is the one radial arrangement, beside applyLayerBanding, which arranges by layer. It shares
+      LAYER_Y_ORDER with layer banding, and the drawing is then fitted by the one fitCanvas. A view about one element
+      calls it; do not write a second radial, circular or ring layout or a second fit or zoom routine in the Composer.
 
   - id: diagram-editor-shell
     concept: The editor chrome around an ArchiMate diagram (toolbar, element palette, finder, relationship legend, minimap, status line, header, properties sheet)
@@ -818,13 +893,13 @@ entries:
     status: active
     canonical:
       path: scripts/component_inventory.py
-      symbols: [build_inventory, main]
+      symbols: [build_inventory, main, route_entries, handler_place, controls_for_template]
     reuse: >
       The component inventory is generated by scripts/component_inventory.py. It reads every Jinja template,
       walks the Jinja AST for macro calls and url_for references, reconstructs HTML from lex tokens,
       and maps each route to its rendered template with all interactive elements. Do not write a second
       generator or a second route-to-template mapper; reuse the canonical script and its build_inventory()
-      function. The output docs/component-inventory.json is the single source of truth for Phase 1 click audits.
+      function. The output docs/component-inventory.json is the single source of truth for Phase 1 click audits, and the one reader of routes (with each handler file and line) and forms (with line, id, action and button formaction) that scripts/sysml/as_built.py takes them from.
     must_not_create:
       - id: second-inventory-generator
         regex: 'def\s+build_inventory\s*\('
@@ -1069,3 +1144,111 @@ entries:
         reason: the programme view's own inline force graph, to be moved onto impact_graph.js in a later brief
       - path: app/templates/stakeholders/map.html
         reason: the stakeholder map's own inline force graph, to be moved onto impact_graph.js in a later brief
+
+  - id: diagram
+    concept: Drawing a notation of the model (ArchiMate, BPMN 2.0, UML sequence, use case and class, ERD) on a screen
+    status: active
+    canonical:
+      path: app/static/js/archimate/composer_renderer.js
+      symbols: [ComposerRenderer]
+    reuse: >
+      Decided in docs/adr/0016-one-drawing-engine.md. JointJS is the one drawing library and ComposerRenderer is
+      the engine; a notation ArchiMate cannot draw is a sibling module on the same library and the shared chrome
+      in app/templates/components/diagram/ (siblings today: app/static/js/bpmn/bpmn_editor.js for BPMN and
+      app/static/js/data/erd.js for the ERD; class diagrams keep app/static/js/codegen/uml_shapes.js). The model
+      is the store: a BPMN flow lives on BusinessProcess.bpmn_flow, entities on DataEntity (register entry
+      data-model-diagram), and sequence, use case and class views are derived at read time, never stored. Do not
+      add a library, a diagram table, a second flow column or an inline svg drawing. Frozen, with the pattern that
+      stops new use named below: workflow_designer.js (code workflows), workflow_builder.js,
+      archimate_diagram_renderer.js and solution_composer_cytoscape.js (loaded by no template; to be deleted, each
+      in its own change), mermaid_diagram_generator.py (one test only), Mermaid on screen, and UMLModel.
+    must_not_create:
+      - id: frozen-diagram-script-loaded
+        regex: '(?:workflow_builder|archimate_diagram_renderer|solution_composer_cytoscape)\.js'
+        scope: [app/templates]
+        suffixes: [.html]
+      - id: frozen-workflow-designer-loaded
+        regex: 'workflow_(?:designer|shapes)\.js'
+        scope: [app/templates]
+        suffixes: [.html]
+      - id: second-diagram-library
+        regex: '(?i)(?:vendor/|from\s+|import\s+|require\()[\w/.-]*(?:cytoscape|mxgraph|bpmn-js|bpmn-moddle|gojs|konva|plantuml)'
+        scope: [app]
+        suffixes: [.html, .js, .py]
+      - id: mermaid-on-screen
+        regex: 'mermaid\.(?:initialize|render|run|contentLoaded)\s*\(|vendor/mermaid'
+        scope: [app/templates, app/static/js]
+        suffixes: [.html, .js]
+      - id: mermaid-diagram-generator-use
+        regex: '(?:from|import)\s+[\w.]*mermaid_diagram_generator'
+        scope: [app]
+        suffixes: [.py]
+      - id: second-bpmn-flow-store
+        regex: '^\s*\w*(?:bpmn|flow_doc|process_flow|flow_json)\w*\s*=\s*(?:db\.)?(?:Column|mapped_column)\('
+        scope: [app/models, app/modules]
+        suffixes: [.py]
+      - id: chat-visual-or-generator-diagram-on-a-page
+        regex: 'VisualGenerationService|visual_generation_service|structured_deliverable_service|_build_mermaid_diagram|SequenceDiagramDef'
+        scope: [app/modules/architecture, app/modules/business_architecture, app/modules/solutions_product/routes, app/templates, app/static/js]
+        suffixes: [.py, .html, .js]
+      - id: new-d3-chart-layout
+        regex: 'd3\.(?:sankey|tree|cluster)\('
+        scope: [app/static/js, app/templates]
+        suffixes: [.html, .js]
+      - id: uml-model-row-for-product-diagram
+        regex: '\bUMLModel\s*\('
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/models/process_data.py
+        reason: BusinessProcess.bpmn_flow is the one BPMN flow store named in docs/adr/0016-one-drawing-engine.md
+      - path: app/models/archimate_technology.py
+        reason: process_flow is an older text description of automation steps on a technology element; nothing
+          draws it, and it must not be used as a BPMN flow store
+      - path: app/templates/codegen/workflow_designer.html
+        reason: the frozen code workflow designer loads its own scripts; nothing new may load them
+      - path: app/templates/applications/dashboard.html
+        reason: frozen Mermaid use (mermaid_diagrams is passed empty); no new Mermaid on screen
+      - path: app/models/models.py
+        reason: UMLModel is defined here, frozen for codegen only
+      - path: app/static/js/archimate_views/traceability_sankey.js
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+      - path: app/static/js/solutions/traceability_sankey.js
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+      - path: app/templates/solutions/partials/_layer_sankey.html
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+      - path: app/static/js/organization/org_chart.js
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+    note: >
+      Searched before writing: joint, d3, mermaid, plantuml, cytoscape, dagre, bpmn, UMLModel, SavedDiagram across
+      app/. dagre is a layout helper that composer.js and erd.js already use and is not a drawing library.
+
+  - id: application-model-links
+    concept: What the architecture model links to an application (technology, suppliers, every other element), and the
+      type spelling those links are read by
+    status: active
+    canonical:
+      path: app/services/application_model_links.py
+      symbols: [normalised_type, linked_elements, linked_technology, recorded_technology, linked_suppliers, linked_suppliers_by_application]
+    reuse: >
+      Read the elements linked to an application, its linked technology and its linked suppliers only through
+      application_model_links, so the application's tabs, its completeness banner and the Vendors portfolio state one
+      count. Compare element types through normalised_type ("Business Actor", "business_actor" and "BusinessActor"
+      read alike); do not write a second type normaliser or query the application's relationships beside it.
+    must_not_create:
+      - id: second-type-normaliser
+        regex: 'def\s+_?normali[sz]ed_type\s*\('
+        scope: [app]
+        suffixes: [.py]
+
+  - id: capability-strategic-score
+    concept: A capability's strategic score on the investment pages, recorded or worked out from the model
+    status: active
+    canonical:
+      path: app/modules/solutions_strategic/v2/services/investment_prioritization_service.py
+      symbols: [InvestmentPrioritizationService.analyze_investment_priorities, InvestmentPrioritizationService._derive_importance]
+    reuse: >
+      The recorded importance wins. Where none is recorded, _derive_importance works one out from the criticality
+      of the applications that support the capability, then its links to goals, drivers, outcomes or principles,
+      then the value streams it serves, then its open risks, and the footer says it was derived. Read the score
+      from the service result; do not write a second derivation or a stand-in score for an unrated capability.

@@ -25,7 +25,7 @@ stack. Typing them in again during setup is friction nobody needs.
 Reading your own public pages during onboarding to propose connector candidates automatically — each
 one shown with exactly the page and passage it came from, and nothing configured until you say so.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

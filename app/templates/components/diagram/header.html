@@ -10,7 +10,7 @@
     <p class="truncate text-sm font-semibold text-foreground" data-testid="diagram-title"
        x-text="viewTitle"></p>
     <p class="truncate text-xs text-muted-foreground" data-testid="diagram-purpose"
-       x-text="(focusView ? focusView.name + ' and what it connects to' + (focusView.fromAnswer ? ', from your answer' : '') : null) || ({{ purposes|tojson|forceescape }})[activeViewpoint] || 'A free canvas. Add an element from the list on the left, then connect it to another.'"></p>
+       x-text="(focusView ? focusView.name + ' and its neighbours, ' + focusView.stepsText + (focusView.fromAnswer ? ', from your answer' : '') : null) || ({{ purposes|tojson|forceescape }})[activeViewpoint] || 'A free canvas. Add an element from the list on the left, then connect it to another.'"></p>
   </div>
 </header>
 {% endmacro %}
