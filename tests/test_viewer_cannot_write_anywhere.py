@@ -505,7 +505,7 @@ def test_a_persona_on_a_viewer_cannot_delete_or_rename_applications_outside_the_
     assert _table_counts(db_session) == before
 
 
-def test_a_solution_architect_on_a_viewer_still_records_a_process_owner_the_persona_permits(
+def test_a_solution_architect_on_a_viewer_is_refused_process_owner_write(
     client, db_session, login_as, two_orgs
 ):
     from app.models.application_owner import ApplicationOwner
@@ -522,9 +522,9 @@ def test_a_solution_architect_on_a_viewer_still_records_a_process_owner_the_pers
     login_as(client, person)
     recorded = client.post(f"/architecture/business-process/{process_id}/owners", json={"user_id": owner_id})
 
-    assert recorded.status_code == 201, recorded.get_data(as_text=True)[:300]
+    assert recorded.status_code == 403, recorded.get_data(as_text=True)[:300]
     db_session.expire_all()
-    assert ApplicationOwner.query.filter_by(user_id=owner_id).count() >= 1
+    assert ApplicationOwner.query.filter_by(user_id=owner_id).count() == 0
 
 
 def test_the_overview_save_refuses_the_procurement_person_the_chat_refuses_and_admits_an_editor(
@@ -551,3 +551,33 @@ def test_the_overview_save_refuses_the_procurement_person_the_chat_refuses_and_a
     assert saved.status_code in (200, 302), saved.status_code
     db_session.expire_all()
     assert db_session.get(ApplicationComponent, target_id).description == "Pays suppliers weekly"
+
+
+def test_viewer_can_access_mcp_connector_endpoint(
+    client, db_session, login_as, two_orgs, app
+):
+    """Viewer can read the MCP connector endpoint (GET /mcp) when MCP_ENABLED=true."""
+    app.config["MCP_ENABLED"] = True
+    app.config["PUBLIC_BASE_URL"] = "https://test.example.com"
+    org_a, _ = two_orgs
+    viewer = _member(db_session, org_a, "viewer")
+    login_as(client, viewer)
+
+    # GET /mcp should be accessible to viewers (read-only)
+    resp = client.get("/mcp")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+
+
+def test_viewer_can_access_connected_assistants_page(
+    client, db_session, login_as, two_orgs, app
+):
+    """Viewer can access the connected assistants page when MCP_ENABLED=true."""
+    app.config["MCP_ENABLED"] = True
+    app.config["PUBLIC_BASE_URL"] = "https://test.example.com"
+    org_a, _ = two_orgs
+    viewer = _member(db_session, org_a, "viewer")
+    login_as(client, viewer)
+
+    # GET /account/manage/connected-assistants should be accessible to viewers (read-only)
+    resp = client.get("/account/manage/connected-assistants")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]

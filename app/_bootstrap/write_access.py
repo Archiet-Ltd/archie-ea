@@ -41,6 +41,18 @@ READ_ONLY_ALLOWED = {
     "application_mgmt.api_remove_stakeholder": (
         "The owner of an analysis removes a stakeholder from it; the route checks the owner or an administrator."
     ),
+    # Assistant connector (MCP): a viewer may read through the connector; write tools are refused
+    # by the MCP layer with a JSON-RPC error, not by the HTTP guard.
+    "mcp.mcp_endpoint": "Assistant connector JSON-RPC endpoint; read tools answer, write tools refuse with a plain sentence.",
+    "mcp.mcp_get": "Assistant connector metadata discovery; stores nothing.",
+    # Read-only POST actions that compute an answer and store nothing.
+    "enterprise_export.export_archimate_xml": "Exports the model as XML; stores nothing.",
+    "application_mgmt.simulate_impact": "Computes an impact simulation; stores nothing.",
+    "application_mgmt.search_templates_advanced": "Searches templates; stores nothing.",
+    "codegen.search_generated_files": "Searches generated code files; stores nothing.",
+    # The person's own records (not tenant data).
+    "solution_design.mark_solution_notification_read": "Marks one of the person's own notifications as read.",
+    "main.api_toggle_watch": "Toggles the person's own watch on a workflow instance.",
 }
 
 # The same, for pages and forms outside ``/api/``.
@@ -66,6 +78,12 @@ READ_ONLY_ALLOWED_PAGES = {
     "account.decline_invitation": "Declines the person's own invitation.",
     "service_status.update_subscription": "Saves the person's own choice of service status emails.",
     "main.product_inquiry_submit": "Sends the person's own enquiry to the team; it changes nothing in the model.",
+    # The person's own connected assistants (their own records, not tenant data).
+    "connected_assistants.index": "Lists the person's own connected assistants.",
+    "connected_assistants.revoke": "Revokes one of the person's own assistant grants.",
+    "connected_assistants.revoke_all": "Revokes all of the person's own assistant grants.",
+    # OAuth authorization: the person's own consent to connect an assistant.
+    "oauth_provider.authorize": "The person's own consent screen; stores nothing until they allow.",
     # Asking questions: the conversation belongs to the person, and a change the assistant is asked
     # to make is refused by the assistant's own write check.
     "unified_ai_chat.send_message": "Adds the person's own question to their own conversation.",
@@ -133,22 +151,20 @@ def _refusal(reason):
 def refuse_read_only(user=None):
     """The guard's answer, for a route that asks it itself after its own lookup: a refusal, or None.
 
-    A person who may change the model is let through. A person whose only write grant is a
-    governance persona is let through on the same terms as the guard gives: the change is stored
-    only if the route's own check grants it.
+    A person who may change the model is let through. A person whose organisation role is viewer
+    is never admitted, whatever their platform role or persona.
     """
     from flask import g, request
     from flask_login import current_user
 
-    from app.core.auth.permissions import holds_governance_write, may_write
+    from app.core.auth.permissions import is_read_only_member, may_write
 
     person = user or current_user
     if may_write(person):
         return None
-    if holds_governance_write(person):
-        g.write_admitted_for_route_check = True
-        return None
-    return _refusal(_reason_for(request.endpoint))
+    if is_read_only_member(person):
+        return _refusal(_reason_for(request.endpoint))
+    return None
 
 
 def commit_unless_read_only():
@@ -272,9 +288,9 @@ def init_write_access(app):
     from sqlalchemy import event
     from sqlalchemy.orm import Session
 
-    # A person whose only write grant is a governance persona reaches the route, and the route's
-    # own check (through ``can`` or its role check) decides; a change the route did not grant is
-    # never stored, whatever route it came through.
+    # A person whose organisation role is viewer never writes tenant data. The flush and
+    # statement listeners enforce that no ungranted change is stored, whatever route it
+    # came through.
     if not event.contains(Session, "before_flush", _refuse_ungranted_change):
         event.listen(Session, "before_flush", _refuse_ungranted_change)
     from sqlalchemy.engine import Engine

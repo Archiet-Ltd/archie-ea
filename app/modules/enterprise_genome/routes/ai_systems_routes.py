@@ -45,6 +45,7 @@ from app import db
 from app.decorators import admin_required
 from app._decorators_base import permission_required
 from app.models import Permission
+from app.core.auth.permissions import may_write
 from app.modules.enterprise_genome.emit.ai_systems_register import emit_ai_systems_register
 from app.modules.ai_chat.services.ai_chat_approval_service import (
     AIChatApprovalService,
@@ -111,12 +112,6 @@ def _may_release(user, org_id) -> bool:
     return is_platform_admin(user) or rbac_service.is_org_admin(user, org_id)
 
 
-def _may_write(user) -> bool:
-    """The predicate ``@permission_required(Permission.GENERAL)`` enforces on
-    the classify, assess and owner routes."""
-    return getattr(user, "is_authenticated", False) and user.can(Permission.GENERAL)
-
-
 def _approval_payload_element(approval_id: int, org_id: int):
     """The element id a grounding-source approval's payload names, or ``None``
     when no such approval exists in this organisation or its payload is not
@@ -180,7 +175,7 @@ def ai_systems():
         register_html = emit_ai_systems_register(
             slice_data,
             can_release=_may_release(current_user, org_id),
-            can_write=_may_write(current_user),
+            can_write=may_write(current_user),
         )
     return render_template(
         "enterprise_genome/ai_systems.html",

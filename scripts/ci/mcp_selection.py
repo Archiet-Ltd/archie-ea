@@ -44,6 +44,8 @@ MCP_TESTS = (
     "tests/test_mcp_signin_next_through_sso.py::test_an_administrator_keeps_next_through_the_two_factor_step",
     "tests/test_two_factor_requirement_assistant_authorise.py::test_an_administrator_is_sent_to_set_up_and_told_why_but_a_member_gets_the_page",
     "tests/test_two_factor_requirement_assistant_authorise.py::test_an_administrator_of_an_organisation_that_requires_nothing_keeps_the_week",
+    "tests/test_viewer_cannot_write_anywhere.py::test_viewer_can_access_mcp_connector_endpoint",
+    "tests/test_viewer_cannot_write_anywhere.py::test_viewer_can_access_connected_assistants_page",
 )
 MARKER = "mcp"
 

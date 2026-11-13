@@ -3123,12 +3123,14 @@ def view_solution(solution_id: int):
 @login_required
 def get_copilot_insights(solution_id: int):
     """Return unseen, undismissed CopilotInsights for the blueprint page."""
+    from app.core.auth.permissions import is_read_only_member
     Solution.query.get_or_404(solution_id)
     from app.models.copilot_insight import CopilotInsight
     insights = CopilotInsight.get_unseen_for_solution(solution_id)
-    for i in insights:
-        i.seen = True
-    db.session.commit()
+    if not is_read_only_member(current_user):
+        for i in insights:
+            i.seen = True
+        db.session.commit()
     return jsonify({"insights": [i.to_dict() for i in insights]})
 
 
