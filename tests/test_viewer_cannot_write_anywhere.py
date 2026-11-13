@@ -581,3 +581,138 @@ def test_viewer_can_access_connected_assistants_page(
     # GET /account/manage/connected-assistants should be accessible to viewers (read-only)
     resp = client.get("/account/manage/connected-assistants")
     assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+
+
+# -- GET routes that used to store tenant data for a viewer ----------------------------------------
+
+
+def test_a_viewer_reading_the_default_board_stores_no_board_and_an_editor_still_gets_one(
+    client, db_session, login_as, two_orgs
+):
+    from app.models.adm_kanban import KanbanBoard
+
+    org_a, _ = two_orgs
+    viewer = _member(db_session, org_a, "viewer")
+    editor = _member(db_session, org_a, "architect")
+
+    login_as(client, viewer)
+    read = client.get("/api/sprints/default-board")
+    assert read.status_code == 200, read.get_data(as_text=True)[:300]
+    assert read.get_json()["board_id"] is None
+    db_session.expire_all()
+    assert KanbanBoard.query.count() == 0
+
+    login_as(client, editor)
+    created = client.get("/api/sprints/default-board")
+    assert created.status_code == 200, created.get_data(as_text=True)[:300]
+    assert created.get_json()["board_id"] is not None
+    db_session.expire_all()
+    assert KanbanBoard.query.count() == 1
+
+
+def test_a_viewer_reading_the_prioritised_backlog_stores_no_ranked_copy(
+    client, db_session, login_as, two_orgs
+):
+    from app.models.models import Requirement
+    from app.models.solution_architect_models import SolutionRequirement
+
+    org_a, _ = two_orgs
+    viewer = _member(db_session, org_a, "viewer")
+    editor = _member(db_session, org_a, "architect")
+    requirement = SolutionRequirement(
+        name="Viewer reads the board", description="d", organization_id=org_a.id
+    )
+    db_session.add(requirement)
+    db_session.commit()
+    requirement_id = requirement.id
+    # A backlog requirement written before it was ever ranked: no ranked copy, no link. Set at the
+    # column level so the flush listener that ranks requirements when they are written does not fire.
+    from sqlalchemy import delete as sa_delete, update as sa_update
+
+    db_session.execute(
+        sa_update(SolutionRequirement)
+        .where(SolutionRequirement.id == requirement_id)
+        .values(archimate_requirement_id=None)
+    )
+    db_session.execute(sa_delete(Requirement).where(Requirement.organization_id == org_a.id))
+    db_session.commit()
+
+    login_as(client, viewer)
+    read = client.get("/api/backlog/prioritised")
+    assert read.status_code == 200, read.get_data(as_text=True)[:300]
+    db_session.expire_all()
+    assert db_session.get(SolutionRequirement, requirement_id).archimate_requirement_id is None
+    assert Requirement.query.filter_by(organization_id=org_a.id).count() == 0
+
+    login_as(client, editor)
+    ranked = client.get("/api/backlog/prioritised")
+    assert ranked.status_code == 200, ranked.get_data(as_text=True)[:300]
+    db_session.expire_all()
+    assert db_session.get(SolutionRequirement, requirement_id).archimate_requirement_id is not None
+
+
+def test_a_viewer_opening_the_codegen_workbench_stores_no_generation_row(
+    client, db_session, login_as, two_orgs
+):
+    from app.models.solution_models import Solution
+    from app.modules.codegen.models import CodegenGeneration
+
+    org_a, _ = two_orgs
+    viewer = _member(db_session, org_a, "viewer")
+    editor = _member(db_session, org_a, "architect")
+    solution = Solution(
+        name="Workbench read", organization_id=org_a.id,
+        created_by_id=editor.id, solution_owner=viewer.email,
+    )
+    db_session.add(solution)
+    db_session.commit()
+    solution_id = solution.id
+
+    login_as(client, viewer)
+    opened = client.get(f"/solutions/{solution_id}/codegen")
+    assert opened.status_code == 200, opened.get_data(as_text=True)[:300]
+    db_session.expire_all()
+    assert CodegenGeneration.query.filter_by(solution_id=solution_id).count() == 0
+
+    login_as(client, editor)
+    opened = client.get(f"/solutions/{solution_id}/codegen")
+    assert opened.status_code == 200, opened.get_data(as_text=True)[:300]
+    db_session.expire_all()
+    assert CodegenGeneration.query.filter_by(solution_id=solution_id).count() == 1
+
+
+def test_a_viewer_reading_the_phase_h_review_stores_nothing(
+    client, db_session, login_as, two_orgs
+):
+    from app.models.archimate_motivation import MotivationOutcome
+    from app.models.solution_lifecycle_models import SolutionMetric
+    from app.models.solution_models import Solution
+
+    org_a, _ = two_orgs
+    viewer = _member(db_session, org_a, "viewer")
+    editor = _member(db_session, org_a, "architect")
+    solution = Solution(name="Phase H read", organization_id=org_a.id, created_by_id=viewer.id)
+    db_session.add(solution)
+    db_session.commit()
+    metric = SolutionMetric(
+        solution_id=solution.id, name="Cycle time", unit="days",
+        baseline_value="30", target_value="10", actual_value="12",
+        organization_id=org_a.id,
+    )
+    db_session.add(metric)
+    db_session.commit()
+    solution_id = solution.id
+    before = _all_table_counts(db_session)
+
+    login_as(client, viewer)
+    read = client.get(f"/solutions/{solution_id}/phase-h/review")
+    assert read.status_code == 200, read.get_data(as_text=True)[:300]
+    db_session.expire_all()
+    assert _all_table_counts(db_session) == before
+    assert MotivationOutcome.query.count() == 0
+
+    login_as(client, editor)
+    read = client.get(f"/solutions/{solution_id}/phase-h/review")
+    assert read.status_code == 200, read.get_data(as_text=True)[:300]
+    db_session.expire_all()
+    assert MotivationOutcome.query.count() == 1

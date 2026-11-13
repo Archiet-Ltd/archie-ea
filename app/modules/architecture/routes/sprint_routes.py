@@ -70,7 +70,12 @@ def update_sprint_status(sprint_id: int):
 @sprint_bp.route("/default-board", methods=["GET"])
 @login_required
 def get_default_board():
-    """GET /api/sprints/default-board — return or create the current user's default board."""
+    """GET /api/sprints/default-board — return or create the current user's default board.
+
+    Reading this never stores anything for a person whose organisation role is viewer:
+    they get the empty state with its reason and no board is created.
+    """
+    from app.core.auth.permissions import is_read_only_member
     from app.models.adm_kanban import KanbanBoard
 
     board = (
@@ -80,6 +85,11 @@ def get_default_board():
         .first()
     )
     if not board:
+        if is_read_only_member(current_user):
+            return jsonify({
+                "board_id": None,
+                "reason": "Your role can read but not change this organisation's records, so no board is created for your account.",
+            }), 200
         board = KanbanBoard(
             name="Architecture Work Queue",
             description="Auto-created board for governance tasks",

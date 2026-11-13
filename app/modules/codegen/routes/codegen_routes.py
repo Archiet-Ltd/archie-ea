@@ -377,14 +377,20 @@ def workbench_page(solution_id):
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
     if not gen:
-        try:
+        from app.core.auth.permissions import is_read_only_member
+        if is_read_only_member(current_user):
+            # Reading the workbench never stores anything for a person whose organisation role is
+            # viewer: the page renders from an unstored generation row, so nothing is written.
             gen = CodegenGeneration(solution_id=solution_id, version=1)
-            db.session.add(gen)
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error("Failed to create CodegenGeneration for solution %s: %s", solution_id, e)
-            return render_plain_error(500)
+        else:
+            try:
+                gen = CodegenGeneration(solution_id=solution_id, version=1)
+                db.session.add(gen)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error("Failed to create CodegenGeneration for solution %s: %s", solution_id, e)
+                return render_plain_error(500)
 
     has_uml = gen.uml_snapshot is not None
     has_files = gen.generated_files is not None
@@ -645,11 +651,15 @@ def enrich_status(solution_id):
             }
             cfg["_enrich_status"] = enrich_st
             gen.config = cfg
-            try:
-                db.session.commit()
-            except Exception as exc:
-                db.session.rollback()
-                logger.warning("Failed to persist enrich timeout status: %s", exc)
+            # Reading the status never stores anything for a person whose organisation role is
+            # viewer: the dead-thread transition is computed for them without being persisted.
+            from app.core.auth.permissions import is_read_only_member
+            if not is_read_only_member(current_user):
+                try:
+                    db.session.commit()
+                except Exception as exc:
+                    db.session.rollback()
+                    logger.warning("Failed to persist enrich timeout status: %s", exc)
     return jsonify(enrich_st)
 
 
