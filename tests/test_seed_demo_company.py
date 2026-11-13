@@ -1438,7 +1438,6 @@ def test_second_organisation_gaps_untouched_by_reseeding(app, db_session, make_o
     from app.models.archimate_core import ArchiMateElement
 
     _seed_once()
-    org_id = _get_lantern_org_id()
 
     other = make_org("second-org")
     other_id = other.id
