@@ -67,10 +67,12 @@
                 <p class="text-2xs uppercase tracking-wide text-muted-foreground">Exact</p>
                 <p class="text-sm font-semibold text-foreground" x-text="runFeedback.exact_matches || 0"></p>
               </div>
+              {% if not costs_withheld %}
               <div class="rounded-md border border-input/60 bg-overlay/50 px-2.5 py-2">
                 <p class="text-2xs uppercase tracking-wide text-muted-foreground">Savings</p>
                 <p class="text-sm font-semibold text-foreground"><span x-text="Platform.figure.money(runFeedback.estimated_savings)"></span></p>
               </div>
+              {% endif %}
             </div>
             <p x-show="runFeedback.status === 'success' && runFeedback.run_id" x-cloak class="text-xs text-muted-foreground mt-2">
               Run ID: <span class="font-medium text-foreground" x-text="runFeedback.run_id"></span>
@@ -113,11 +115,15 @@
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-sm font-medium text-muted-foreground">Estimated Savings</p>
+            {% if costs_withheld %}
+            <p class="text-sm text-muted-foreground mt-1" data-testid="costs-withheld">{{ costs_withheld_text }}</p>
+            {% else %}
             {# sum the loaded groups so the headline always matches the table
                below; fall back to the server aggregate before groups load #}
             <p class="font-bold tracking-tight mt-1"
                :class="savingsFigure === null ? 'text-sm text-muted-foreground' : 'text-2xl'"><span x-text="Platform.figure.money(savingsFigure, 'Not estimated yet')">Not estimated yet</span></p>
             <p class="text-xs text-muted-foreground mt-1">Annual cost reduction</p>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -355,9 +361,11 @@
                   <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[80px]">
                     Risk
                   </th>
+                  {% if not costs_withheld %}
                   <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[110px] cursor-pointer select-none" @click="sortBy('estimated_savings')">
                     <span class="inline-flex items-center gap-1">Est. Savings <span x-show="sortColumn === 'estimated_savings'" x-cloak x-text="sortDirection === 'asc' ? '\u2191' : '\u2193'"></span></span>
                   </th>
+                  {% endif %}
                   <th class="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[180px]">
                     Actions
                   </th>
@@ -395,9 +403,11 @@
                             :class="riskBadgeClass(group.risk_level)"
                             x-text="(group.risk_level || 'medium').charAt(0).toUpperCase() + (group.risk_level || 'medium').slice(1)"></span>
                     </td>
+                    {% if not costs_withheld %}
                     <td class="px-4 py-3">
                       <span class="text-sm font-medium text-foreground"><span x-text="Platform.figure.money(group.estimated_savings)"></span></span>
                     </td>
+                    {% endif %}
                     <td class="px-4 py-3 text-right">
                       <div class="flex gap-1 justify-end">
                         <a :href="`/duplicate-detection/simple/group/${group.id}`"
@@ -418,7 +428,7 @@
                 </template>
                 <template x-if="getFilteredGroups().length === 0 && allGroups.length > 0">
                   <tr>
-                    <td colspan="9" class="px-4 py-8 text-center text-sm text-muted-foreground">
+                    <td colspan="{{ 8 if costs_withheld else 9 }}" class="px-4 py-8 text-center text-sm text-muted-foreground">
                       No groups match your filter criteria.
                     </td>
                   </tr>
@@ -453,10 +463,12 @@
                     <p class="text-xs text-muted-foreground mb-1">Applications</p>
                     <p class="font-medium text-foreground" x-text="group.application_count || 0"></p>
                   </div>
+                  {% if not costs_withheld %}
                   <div>
                     <p class="text-xs text-muted-foreground mb-1">Est. Savings</p>
                     <p class="font-medium text-foreground"><span x-text="Platform.figure.money(group.estimated_savings)"></span></p>
                   </div>
+                  {% endif %}
                   <div>
                     <p class="text-xs text-muted-foreground mb-1">Similarity</p>
                     <p class="font-medium text-foreground" x-text="formatPercent(group.similarity_threshold || 0.6)"></p>

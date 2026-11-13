@@ -226,7 +226,7 @@
     {% endcall %}
     {% if any_systems %}
     {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': row.annual_cost if row.annual_cost is not none else -1}) %}
-      {% if row.annual_cost is not none %}{{ row.annual_cost|currency }}{% if row.annual_cost_basis %}<span class="block text-xs text-muted-foreground">{{ row.annual_cost_basis }}</span>{% endif %}{% else %}<span class="text-muted-foreground">{{ 'Not shown for your role' if row.cost_visible is sameas false else 'No cost recorded' }}</span>{% endif %}
+      {% if row.annual_cost is not none and not costs_withheld %}{{ row.annual_cost|currency }}{% if row.annual_cost_basis %}<span class="block text-xs text-muted-foreground">{{ row.annual_cost_basis }}</span>{% endif %}{% else %}<span class="text-muted-foreground">{{ costs_withheld_text if costs_withheld else 'No cost recorded' }}</span>{% endif %}
     {% endcall %}
     {% endif %}
     {% if any_contracts %}
@@ -234,7 +234,7 @@
     {% endif %}
     {% if cost_col %}
     {% call table_cell(class='text-right tabular-nums whitespace-normal', attrs={'data-sort': row.contract_annual_cost if row.contract_annual_cost is not none else -1}) %}
-      {% if row.contract_annual_cost is not none %}<span class="whitespace-nowrap">{{ row.contract_annual_cost|currency }}</span>{% else %}<span class="ml-auto block max-w-48 text-muted-foreground {{ '' if row.other_currency_reasons else 'whitespace-nowrap' }}">{{ (row.other_currency_reasons|join('; ')) if row.other_currency_reasons else ('No contract' if not row.contract_count else 'Not stated') }}</span>{% endif %}
+      {% if row.contract_annual_cost is not none and not costs_withheld %}<span class="whitespace-nowrap">{{ row.contract_annual_cost|currency }}</span>{% else %}<span class="ml-auto block max-w-48 text-muted-foreground {{ '' if row.other_currency_reasons else 'whitespace-nowrap' }}">{{ (row.other_currency_reasons|join('; ')) if row.other_currency_reasons else ('No contract' if not row.contract_count else (costs_withheld_text if costs_withheld else 'Not stated')) }}</span>{% endif %}
       {% if row.contract_annual_cost is not none and row.other_currency_reasons %}<span class="ml-auto block max-w-48 text-xs text-muted-foreground">{{ row.other_currency_reasons|join('; ') }}</span>{% endif %}
     {% endcall %}
     {% endif %}
