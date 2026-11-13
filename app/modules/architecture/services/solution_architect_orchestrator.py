@@ -27,6 +27,7 @@ from app.modules.architecture.services.options_analysis_service import (
 )
 from app.services import application_cost_accessor
 from app.services.cost_visibility import (
+    without_amounts,
     COSTS_WITHHELD,
     COST_KEYS,
     INVESTMENT_MONEY_KEYS,
@@ -47,31 +48,13 @@ ANALYZE_MONEY_KEYS = COST_KEYS + INVESTMENT_MONEY_KEYS + (
     "cost_estimate", "estimated_cost_min", "estimated_cost_max",
 )
 
-# A currency amount written into text: a symbol then digits, or digits then a currency word.
-_AMOUNT_IN_TEXT = re.compile(
-    r"(?:[£$€]\s?\d[\d,]*(?:\.\d+)?(?:\s?[kKmM]\b|bn\b)?"
-    r"|\b\d[\d,]*(?:\.\d+)?\s?(?:[kKmM]\s)?(?:GBP|USD|EUR|pounds|dollars|euros)\b)"
-)
-
-
-def _without_amounts(value: Any) -> Any:
-    """A copy of text, lists and dicts with every written currency amount replaced by a plain phrase."""
-    if isinstance(value, str):
-        return _AMOUNT_IN_TEXT.sub("a cost figure", value)
-    if isinstance(value, list):
-        return [_without_amounts(v) for v in value]
-    if isinstance(value, dict):
-        return {k: _without_amounts(v) for k, v in value.items()}
-    return value
-
-
 def withhold_analysis(result: Dict[str, Any]) -> Dict[str, Any]:
     """A copy of an analysis reply for a person the cost rule withholds from: no money key, no amount
     written into the AI's option text, and the withheld sentence stated once."""
     out = withhold_costs(result, keys=ANALYZE_MONEY_KEYS)
     for part in ("buy_build_analysis", "recommendations", "justification", "pros", "cons"):
         if part in out:
-            out[part] = _without_amounts(out[part])
+            out[part] = without_amounts(out[part])
     out["costs_withheld_sentence"] = COSTS_WITHHELD
     return out
 

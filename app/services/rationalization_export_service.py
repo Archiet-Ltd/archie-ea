@@ -9,6 +9,8 @@ import logging
 from datetime import datetime
 from html import escape
 
+from app.services.cost_visibility import COSTS_WITHHELD
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,7 +43,7 @@ class RationalizationExportService:
         return query.all()
 
     @staticmethod
-    def generate_csv(scope=None):
+    def generate_csv(scope=None, *, show_costs=False):
         """Generate CSV export of scored applications."""
         rows = RationalizationExportService.get_scored_apps(scope)
 
@@ -51,8 +53,7 @@ class RationalizationExportService:
             "App ID", "App Name", "Overall Score", "Technical Health",
             "Business Value", "Cost Efficiency", "Vendor Risk",
             "TIME Action", "Disposition", "Confidence",
-            "Estimated Annual Savings", "Review Status",
-        ])
+        ] + (["Estimated Annual Savings"] if show_costs else []) + ["Review Status"])
 
         for score, app in rows:
             writer.writerow([
@@ -66,15 +67,13 @@ class RationalizationExportService:
                 score.rationalization_action,
                 score.disposition_action,
                 score.disposition_confidence,
-                float(score.estimated_annual_savings or 0),
-                score.review_status,
-            ])
+            ] + ([float(score.estimated_annual_savings or 0)] if show_costs else []) + [score.review_status])
 
         output.seek(0)
         return output.getvalue().encode("utf-8")
 
     @staticmethod
-    def generate_excel(scope=None):
+    def generate_excel(scope=None, *, show_costs=False):
         """Generate Excel workbook with multiple sheets."""
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill
@@ -88,8 +87,7 @@ class RationalizationExportService:
             "App ID", "App Name", "Overall Score", "Technical Health",
             "Business Value", "Cost Efficiency", "Vendor Risk",
             "TIME Action", "Disposition", "Confidence",
-            "Est. Annual Savings", "Review Status",
-        ]
+        ] + (["Est. Annual Savings"] if show_costs else []) + ["Review Status"]
         ws.append(headers)
         for cell in ws[1]:
             cell.font = Font(bold=True)
@@ -108,9 +106,7 @@ class RationalizationExportService:
                 score.rationalization_action,
                 score.disposition_action,
                 score.disposition_confidence,
-                float(score.estimated_annual_savings or 0),
-                score.review_status,
-            ])
+            ] + ([float(score.estimated_annual_savings or 0)] if show_costs else []) + [score.review_status])
 
         # RAG conditional formatting
         from openpyxl.styles import Font as XlFont
@@ -146,7 +142,10 @@ class RationalizationExportService:
             total_savings += float(score.estimated_annual_savings or 0)
 
         ws2.append(["Total Scored Applications", total])
-        ws2.append(["Total Projected Savings", total_savings])
+        if show_costs:
+            ws2.append(["Total Projected Savings", total_savings])
+        else:
+            ws2.append(["Cost figures", COSTS_WITHHELD])
         ws2.append([])
         ws2.append(["TIME Distribution", ""])
         for action in ["TOLERATE", "INVEST", "MIGRATE", "ELIMINATE"]:
@@ -161,7 +160,7 @@ class RationalizationExportService:
         return output.getvalue()
 
     @staticmethod
-    def generate_pdf(scope=None):
+    def generate_pdf(scope=None, *, show_costs=False):
         """Generate PDF as styled HTML (ReportLab not available)."""
         rows = RationalizationExportService.get_scored_apps(scope)
 
@@ -174,18 +173,25 @@ class RationalizationExportService:
             total_savings += float(score.estimated_annual_savings or 0)
 
         # Top 10 candidates by savings
-        sorted_rows = sorted(rows, key=lambda r: float(r[0].estimated_annual_savings or 0), reverse=True)[:10]
+        if show_costs:
+            sorted_rows = sorted(rows, key=lambda r: float(r[0].estimated_annual_savings or 0), reverse=True)[:10]
+        else:
+            # Without the savings, the weakest scores come first; no order that would reveal an amount
+            sorted_rows = sorted(rows, key=lambda r: (r[0].overall_health_score is None, r[0].overall_health_score))[:10]
 
         # Built as standalone statements (each markable with a trailing
         # comment), rather than interpolated inside the triple-quoted
         # template below -- all four are ints/formatted numbers, never free
         # text, but a comment can't be attached to a line inside a
         # triple-quoted literal without corrupting it.
+        savings_html = ""
+        if show_costs:
+            savings_html = f'<div class="metric"><div class="metric-value">{total_savings:,.0f}</div><div class="metric-label">Projected Savings</div></div>\n'  # raw-html-ok: formatted from a float total, never free text
         metrics_html = (
             f'<div class="metric"><div class="metric-value">{total}</div><div class="metric-label">Apps Scored</div></div>\n'  # raw-html-ok: total is len(rows), always an int
-            f'<div class="metric"><div class="metric-value">{total_savings:,.0f}</div><div class="metric-label">Projected Savings</div></div>\n'  # raw-html-ok: formatted from a float total, never free text
-            f'<div class="metric"><div class="metric-value">{time_dist.get("ELIMINATE", 0)}</div><div class="metric-label">Eliminate</div></div>\n'  # raw-html-ok: dict value is always an int counter
-            f'<div class="metric"><div class="metric-value">{time_dist.get("MIGRATE", 0)}</div><div class="metric-label">Migrate</div></div>\n'  # raw-html-ok: dict value is always an int counter
+            + savings_html
+            + f'<div class="metric"><div class="metric-value">{time_dist.get("ELIMINATE", 0)}</div><div class="metric-label">Eliminate</div></div>\n'  # raw-html-ok: dict value is always an int counter
+            + f'<div class="metric"><div class="metric-value">{time_dist.get("MIGRATE", 0)}</div><div class="metric-label">Migrate</div></div>\n'  # raw-html-ok: dict value is always an int counter
         )
 
         html = f"""<!DOCTYPE html>
@@ -217,15 +223,19 @@ td {{ padding: 8px 12px; border: 1px solid #e2e8f0; }}
             pct = round(count / total * 100, 1) if total > 0 else 0
             html += f"<tr><td>{action}</td><td>{count}</td><td>{pct}%</td></tr>\n"  # raw-html-ok: action is one of a fixed 4-item vocabulary list from this loop, count/pct are computed numbers
 
-        html += """</table>
+        savings_head = "<th>Est. Savings</th>" if show_costs else ""
+        html += f"""</table>
 <h2>Top 10 Rationalization Candidates</h2>
 <table>
-<tr><th>Application</th><th>Score</th><th>Disposition</th><th>Est. Savings</th></tr>
-"""
+<tr><th>Application</th><th>Score</th><th>Disposition</th>{savings_head}</tr>
+"""  # raw-html-ok: savings_head is one of two fixed strings
         for score, app in sorted_rows:
             # app.name is user-entered freeform text - escape it; other fields are numeric/fixed-vocabulary
-            html += f"<tr><td>{escape(app.name)}</td><td>{score.overall_health_score}</td><td>{score.disposition_action or '—'}</td><td>{float(score.estimated_annual_savings or 0):,.0f}</td></tr>\n"
+            savings_cell = f"<td>{float(score.estimated_annual_savings or 0):,.0f}</td>" if show_costs else ""  # raw-html-ok: formatted from a float
+            html += f"<tr><td>{escape(app.name)}</td><td>{score.overall_health_score}</td><td>{score.disposition_action or '—'}</td>{savings_cell}</tr>\n"  # raw-html-ok: name escaped, rest numeric or fixed vocabulary
 
+        withheld_html = "" if show_costs else f"<p>{escape(COSTS_WITHHELD)}</p>\n"  # raw-html-ok: a fixed sentence, escaped
+        html += withheld_html
         html += f"""</table>
 <div class="footer">Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')} by Entelim Platform</div>
 </body></html>"""

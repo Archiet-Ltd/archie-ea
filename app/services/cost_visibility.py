@@ -5,6 +5,7 @@ and whoever may see cost figures. ``costs_visible`` asks it. ``withhold_costs`` 
 result before a reply is built, and the one sentence a person reads is ``COSTS_WITHHELD``. A template reads
 the ``costs_withheld`` flag the masker sets and prints that sentence; it never blanks a cell itself.
 """
+import re
 from typing import Any, Iterable, Optional
 
 COSTS_WITHHELD = "Cost figures are withheld for your role."
@@ -21,6 +22,24 @@ INVESTMENT_MONEY_KEYS = (
 
 # every key that holds a money amount in a vendor analysis reply, its comparison, export and provenance
 VENDOR_ANALYSIS_MONEY_KEYS = ("tco_total", "license_cost_annual", "support_cost_annual", "cost_delta")
+
+
+# A currency amount written into text: a symbol then digits, or digits then a currency word.
+_AMOUNT_IN_TEXT = re.compile(
+    r"(?:[£$€]\s?\d[\d,]*(?:\.\d+)?(?:\s?[kKmM]\b|bn\b)?"
+    r"|\b\d[\d,]*(?:\.\d+)?\s?(?:[kKmM]\s)?(?:GBP|USD|EUR|pounds|dollars|euros)\b)"
+)
+
+
+def without_amounts(value: Any) -> Any:
+    """A copy of text, lists and dicts with every written currency amount replaced by a plain phrase."""
+    if isinstance(value, str):
+        return _AMOUNT_IN_TEXT.sub("a cost figure", value)
+    if isinstance(value, list):
+        return [without_amounts(v) for v in value]
+    if isinstance(value, dict):
+        return {k: without_amounts(v) for k, v in value.items()}
+    return value
 
 
 def costs_visible(user) -> bool:

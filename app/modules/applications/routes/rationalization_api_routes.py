@@ -14,7 +14,7 @@ from app.middleware.tenant_decorators import platform_admin_required
 from app.models.application_portfolio import ApplicationComponent
 from app.core.auth.decorators import require_permission
 from app.services.application_cost_accessor import set_annual_cost
-from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, without_amounts, withhold_costs
 from ._helpers import _verify_app_in_org
 from app.services.rate_limiter import rate_limit
 
@@ -31,6 +31,26 @@ _GROUP_MONEY_KEYS = ("estimated_savings", "annual_cost", "total_cost_of_ownershi
 _SAVINGS_MONEY_KEYS = ("projected_annual_savings", "actual_annual_savings", "savings_variance_pct",
                        "estimated_annual_savings", "estimated_investment_needed", "total_projected_savings",
                        "total_investment_needed", "total_cost_of_ownership")
+
+
+# the evidence factors whose observed value is an amount of money
+_COST_EVIDENCE_FACTORS = ("Annual Cost (TCO)", "Cost per User")
+
+
+def _withhold_evidence_trail(node):
+    """An evidence trail with each cost factor's observed amount left out, no amount written into any
+    rationale or source, and the withheld sentence said once at the top."""
+    def walk(value):
+        if isinstance(value, list):
+            return [walk(item) for item in value]
+        if isinstance(value, dict):
+            out = {key: walk(item) for key, item in value.items()}
+            if out.get("factor") in _COST_EVIDENCE_FACTORS:
+                out["raw_value"] = None
+            return out
+        return without_amounts(value)
+
+    return {**walk(node), "costs_withheld": True, "costs_withheld_sentence": COSTS_WITHHELD}
 
 
 # ── RAT-114: Audit trail helper ──────────────────────────────────────────
@@ -516,6 +536,8 @@ def rationalization_run_detection():
         result = service.run_detection(
             similarity_threshold=threshold, strategy=strategy
         )
+        if not costs_visible(current_user):
+            result = {**withhold_costs(result, keys=_GROUP_MONEY_KEYS), "costs_withheld_sentence": COSTS_WITHHELD}
 
         return _reply(result)
     except Exception as e:
@@ -1535,7 +1557,10 @@ def rationalization_evidence_trail(app_id):
         if "error" in result:
             return jsonify({"success": False, "error": result["error"]}), 500
 
-        return jsonify({"success": True, **result})
+        reply = {"success": True, **result}
+        if not costs_visible(current_user):
+            reply = _withhold_evidence_trail(reply)
+        return jsonify(reply)
 
     except Exception as e:
         current_app.logger.error(
@@ -4159,7 +4184,7 @@ def rationalization_export():
 
     try:
         if fmt == "csv":
-            data = RationalizationExportService.generate_csv(scope)
+            data = RationalizationExportService.generate_csv(scope, show_costs=costs_visible(current_user))
             return send_file(
                 io.BytesIO(data),
                 mimetype="text/csv",
@@ -4167,7 +4192,7 @@ def rationalization_export():
                 download_name="rationalization_export.csv",
             )
         elif fmt == "excel":
-            data = RationalizationExportService.generate_excel(scope)
+            data = RationalizationExportService.generate_excel(scope, show_costs=costs_visible(current_user))
             return send_file(
                 io.BytesIO(data),
                 mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -4175,7 +4200,7 @@ def rationalization_export():
                 download_name="rationalization_business_case.xlsx",
             )
         elif fmt == "pdf":
-            data = RationalizationExportService.generate_pdf(scope)
+            data = RationalizationExportService.generate_pdf(scope, show_costs=costs_visible(current_user))
             return send_file(
                 io.BytesIO(data),
                 mimetype="text/html",
