@@ -1281,49 +1281,6 @@ entries:
         scope: [app]
         suffixes: [.py]
 
-  - id: mcp-client
-    concept: Entelim as a client of a customer's MCP server (the only sender of resource reads)
-    status: pending
-    pending_branch: ui/mcpsrc01
-    canonical:
-      path: app/services/api_clients/mcp_client.py
-      symbols: [McpClient, ALLOWED_METHODS]
-    reuse: >
-      Requests to a customer's MCP server are sent only by McpClient. Do not write a second sender of
-      resources/read or a second session header handler.
-    must_not_create:
-      - id: second-resource-read-sender
-        regex: '"method":\s*"resources/'
-        scope: [app]
-        suffixes: [.py]
-      - id: second-session-header
-        regex: 'Mcp-Session-Id'
-        scope: [app]
-        suffixes: [.py]
-    known_exceptions:
-      - path: app/modules/mcp/
-        reason: that module is Entelim as a server, the opposite direction
-
-  - id: mcp-source-connector
-    concept: The connector that reads a customer's MCP server resources into the model, and cleans the text it reads
-    status: pending
-    pending_branch: ui/mcpsrc01
-    canonical:
-      path: app/connectors/mcp_source.py
-      symbols: [McpSourceConnector, clean_source_text, LIMITS]
-    reuse: >
-      Text read from an MCP server is cleaned by clean_source_text and records are written by McpSourceConnector.
-      Do not write a second text cleaner for connector text or a second writer of source_system mcp_source.
-    must_not_create:
-      - id: second-connector-text-cleaner
-        regex: 'def\s+clean_source_text\s*\('
-        scope: [app]
-        suffixes: [.py]
-      - id: second-source-system-writer
-        regex: 'source_system\s*=\s*["'']mcp_source["'']'
-        scope: [app]
-        suffixes: [.py]
-
   - id: capability-strategic-score
     concept: A capability's strategic score on the investment pages, recorded or worked out from the model
     status: active
