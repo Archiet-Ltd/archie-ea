@@ -5,6 +5,9 @@ An architect plans three plateaus and six work packages, two of them inside anot
 "Work packages" line under the tiles and the roadmap board's own count are the same
 number, and the timeline names every plateau the board shows. Another organisation's
 plateaus and packages are on neither screen.
+
+Journeys hold each source's answer to prove tiles show the evidence figure or the
+loading mark from first paint, never a stale or fabricated number.
 """
 import os
 import re
@@ -19,6 +22,8 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 PATH = "/capability-roadmap"
 BASE = "/capability-map/api/roadmap"
+
+SOURCES = re.compile(r"/capability-map/api/roadmap/(gaps|plateaus|work-packages)(\?.*)?$")
 
 
 def _page(browser, width, theme):
@@ -81,25 +86,76 @@ def test_tiles_and_timeline_agree_with_the_roadmap_board(browser, live_server):
 
     for width, theme in ((1440, "light"), (390, "dark")):
         context, page = _page(browser, width, theme)
+        asked = {"gaps": 0, "plateaus": 0, "work-packages": 0}
+        state = {"release_wp": False, "release_plateaus": False}
+
+        def on_request(request):
+            found = SOURCES.search(request.url.split("#")[0])
+            if found and request.method == "GET":
+                asked[found.group(1)] += 1
+
+        def slow_packages(route):
+            for _ in range(300):
+                if state["release_wp"]:
+                    break
+                page.wait_for_timeout(100)
+            route.continue_()
+
+        def slow_plateaus(route):
+            for _ in range(300):
+                if state["release_plateaus"]:
+                    break
+                page.wait_for_timeout(100)
+            route.continue_()
+
         try:
             sign_in(page, live_server, org["emails"]["enterprise_architect"])
             board_text, board_packages = _board(page, live_server)
             assert board_packages == 6, board_packages
 
+            page.on("request", on_request)
+            page.route(re.compile(r".*/capability-map/api/roadmap/work-packages(\?.*)?$"), slow_packages)
+            page.route(re.compile(r".*/capability-map/api/roadmap/plateaus(\?.*)?$"), slow_plateaus)
             page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+            # Wait for gaps to load (they arrive first)
+            expect(page.get_by_test_id("rdm-recorded-gaps")).not_to_have_text("—", timeout=15000)
+
+            # While work-packages and plateaus answers are held, tiles must show
+            # the evidence figure or the loading mark, never "0".
+            wp_tile = page.get_by_test_id("rdm-work-packages-tile")
+            tile_text = wp_tile.inner_text()
+            assert tile_text != "0", f"Work Packages tile showed '0' while answer held"
+            assert tile_text in (str(board_packages), "—"), f"Work Packages tile showed '{tile_text}' while answer held"
+
+            plateau_tile = page.get_by_test_id("rdm-plateaus-tile")
+            tile_text = plateau_tile.inner_text()
+            assert tile_text != "0", f"Plateaus tile showed '0' while answer held"
+            assert tile_text in (str(len(names)), "—"), f"Plateaus tile showed '{tile_text}' while answer held"
+
+            _frame(page, "figures-loading", width, theme)
+
+            # Release both answers
+            state["release_wp"] = True
+            state["release_plateaus"] = True
+
+            # Final agreement checks
             for name in names:
                 expect(page.get_by_test_id("rdm-plateau-name").filter(has_text=name)).to_be_visible(timeout=PAGE_TIMEOUT)
             expect(page.get_by_test_id("rdm-plateau")).to_have_count(len(names))
             assert page.locator("[data-testid=rdm-plateau-name]", has_text=other_suffix).count() == 0
 
-            expect(page.get_by_test_id("rdm-work-packages-tile")).to_have_text(str(board_packages))
+            expect(page.get_by_test_id("rdm-work-packages-tile")).to_have_text(str(board_packages), timeout=PAGE_TIMEOUT)
             for name in names:
                 assert name in board_text, board_text
-            expect(page.get_by_test_id("rdm-plateaus-tile")).to_have_text(str(len(names)))
+            expect(page.get_by_test_id("rdm-plateaus-tile")).to_have_text(str(len(names)), timeout=PAGE_TIMEOUT)
             line = page.get_by_test_id("roadmap-summary-footer").inner_text()
             assert "Work packages: %d" % board_packages in line, line
             assert "Plateaus: %d" % len(names) in line, line
             assert other_suffix not in page.content()
+            assert asked == {"gaps": 1, "plateaus": 1, "work-packages": 1}, asked
             _frame(page, "figures", width, theme)
         finally:
+            state["release_wp"] = True
+            state["release_plateaus"] = True
             context.close()
