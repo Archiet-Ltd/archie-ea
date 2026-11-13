@@ -39,25 +39,39 @@ FIELDS = {
     "support team": ("supportLevel", "support team"),
 }
 
+# Field names sorted longest first for the alternation (longest match wins).
+_FIELD_ALT = "|".join(re.escape(name) for name in sorted(FIELDS.keys(), key=len, reverse=True))
 _VERB = r"(?:please\s+)?(?:set|change|update|edit)\s+(?:the\s+)?"
+# Possessive: "set <app>'s <field> to <value>"
+# Field is matched against known names; app and value are greedy tails stripped afterwards.
 _POSSESSIVE = re.compile(
-    r"^\s*" + _VERB + r"(?P<app>.+?)(?:'s|\u2019s)\s+(?P<field>[a-z ]+?)\s+(?:to|as)\s+(?P<value>.+?)\s*$",
+    r"^\s*" + _VERB + r"(?P<app>.+?)(?:'s|\u2019s)\s+(?P<field>" + _FIELD_ALT + r")\s+(?:to|as)\s+(?P<value>.+)\s*$",
     re.I | re.S,
 )
+# Of-form: "set <field> of <app> to <value>"
 _OF = re.compile(
-    r"^\s*" + _VERB + r"(?P<field>[a-z ]+?)\s+(?:of|for|on)\s+(?P<app>.+?)\s+(?:to|as)\s+(?P<value>.+?)\s*$",
+    r"^\s*" + _VERB + r"(?P<field>" + _FIELD_ALT + r")\s+(?:of|for|on)\s+(?P<app>.+?)\s+(?:to|as)\s+(?P<value>.+)\s*$",
     re.I | re.S,
 )
 _QUOTES = "\"'\u201c\u201d\u2018\u2019`"
 
 
+def _collapse_ws(text: str) -> str:
+    """Collapse runs of whitespace to a single space."""
+    return " ".join(text.split())
+
+
 def parse_change_request(message: str) -> Optional[Dict[str, str]]:
     """{application, key, label, value} for "set <app>'s <field> to <value>", else ``None``."""
+    if not message:
+        return None
+    # Collapse whitespace first so the regex never sees runs of spaces that cause backtracking.
+    collapsed = _collapse_ws(message)
     for pattern in (_POSSESSIVE, _OF):
-        found = pattern.match(message or "")
+        found = pattern.match(collapsed)
         if not found:
             continue
-        field = " ".join(found.group("field").lower().split())
+        field = found.group("field").lower()
         if field not in FIELDS:
             continue
         value = found.group("value").strip()
