@@ -132,7 +132,8 @@ def _owner_ids_of(element_type: Optional[str], element_id: Optional[int], organi
         rows = ApplicationOwner.get_display_rows_for_application(element_id, organization_id)
     else:
         rows = ApplicationOwner.get_display_rows_for_element(element_type, element_id, organization_id)
-    return sorted({row["user_id"] for row in rows})
+    # A person recorded with no account has no user id and is never told.
+    return sorted({row["user_id"] for row in rows if row["user_id"] is not None})
 
 
 def owner_user_ids(entity_type: str, target: object, organization_id: int, action: str) -> List[int]:

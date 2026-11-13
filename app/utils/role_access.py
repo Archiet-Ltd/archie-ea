@@ -632,8 +632,8 @@ def _link(label, endpoint, icon, requires=None, query_params=None):
       "admin"          — route is @admin_required (Permission.ADMINISTER)
       "platform_admin" — route is @platform_admin_required (the cross-tenant
                          is_platform_admin super-admin flag)
-      "data_subject_requests" — routes are @requires_role(DATA_SUBJECT_REQUEST_ROLES)
-                         (security_architect, and platform_admin as always)
+      "data_subject_requests" — routes are @requires_data_subject_request_access
+                         (security_architect, the organisation's own administrator, and platform_admin as always)
       "general"        — route requires Permission.GENERAL (require_roles()
                          only grants access when current_user.can(GENERAL)
                          holds), which a read-only Viewer role (permissions=0)

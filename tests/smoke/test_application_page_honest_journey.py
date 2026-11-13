@@ -96,6 +96,14 @@ def test_unset_facts_are_honest_and_the_editor_has_one_trail(page, live_server, 
     page.get_by_role("link", name=re.compile("Edit Technology Details")).click()
     page.wait_for_selector("#authentication_method")
     assert page.locator("nav[aria-label='Breadcrumb']").count() == 1
+    trail = page.locator("nav[aria-label='Breadcrumb']").inner_text()
+    assert [p.strip() for p in re.split(r"[\n>/›]+", trail) if p.strip()] == [
+        "Home", "Systems", "Applications", "Edit Application",
+    ], trail
+    # Systems is the section heading and has no page; Applications lands on the list with this row.
+    crumbs = page.locator("nav[aria-label='Breadcrumb']")
+    assert crumbs.get_by_role("link", name="Systems").count() == 0
+    assert crumbs.get_by_role("link", name="Applications").count() == 1
     assert "Abacus" not in page.locator("main").inner_text()
     _shot(page, "editor-light-1440")
     page.locator("#authentication_method").fill("SAML single sign-on")
@@ -108,6 +116,30 @@ def test_unset_facts_are_honest_and_the_editor_has_one_trail(page, live_server, 
     _shot(page, "technology-light-1440")
     page.goto(url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
     assert "Competitive Advantage Yes" in _body(page)
+
+    page.goto(url + "/edit", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    with page.expect_navigation(wait_until="networkidle", timeout=PAGE_TIMEOUT):
+        page.locator("nav[aria-label='Breadcrumb']").get_by_role("link", name="Applications").click()
+    assert "Honest page" in _body(page)
+
+    # A recorded No reads No, and the category keeps "SaaS" as typed.
+    page.goto(url + "/edit", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.locator("#competitive_advantage").select_option("no")
+    with page.expect_navigation(wait_until="networkidle", timeout=PAGE_TIMEOUT):
+        page.get_by_role("button", name=re.compile("Save|Update")).last.click()
+    page.goto(url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    body = _body(page)
+    assert "Competitive Advantage No " in body + " ", body
+    assert "Competitive Advantage Not recorded" not in body
+    page.get_by_role("link", name=re.compile("^\\s*Edit\\s*$")).first.click()
+    page.wait_for_selector("#edit-application_category")
+    page.locator("#edit-application_category").fill("SaaS billing API")
+    with page.expect_navigation(wait_until="networkidle", timeout=PAGE_TIMEOUT):
+        page.get_by_role("button", name=re.compile("Save")).first.click()
+    body = _body(page)
+    assert "SaaS Billing API" in body, body
+    assert "Saas" not in body
+    _shot(page, "overview-no-saas-1440")
 
 
 def test_the_page_holds_at_phone_width_in_the_dark(page, live_server, org):

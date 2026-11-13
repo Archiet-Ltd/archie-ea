@@ -267,7 +267,8 @@
             isOpen:    false,
             hooks:     Object.create(null),
             resolver:  null,
-            prevFocus: null   // captured on open, restored on close (per-entry for multi-modal safety)
+            prevFocus: null,  // captured on open, restored on close (per-entry for multi-modal safety)
+            asking: false     // the "Discard what you typed?" question is on screen
         };
         log.debug('registered', id);
         return true;
@@ -294,6 +295,8 @@
         global.document.body.classList.add('overflow-hidden');
 
         _stack.push(id);
+        // A dialog opened over another sits above it, whatever layer its own styles name.
+        if (_stack.length > 1) el.style.zIndex = String(1000 + _stack.length);
         entry.isOpen = true;
 
         if (entry.config.focus) _trapFocus(el, id, options && options.returnFocus);
@@ -319,10 +322,61 @@
         return true;
     }
 
+    // ── Typed text ───────────────────────────────────────────────────────────
+    // A person who has typed into a form in a dialog is asked before the dialog is dismissed (Escape, the
+    // close control, a click outside, Cancel). Only text a person typed counts: values the page filled in
+    // are not theirs to lose, and a dialog with nothing typed closes at once.
+    function _textFields(el) {
+        return Array.prototype.slice.call(el.querySelectorAll('form input, form textarea')).filter(function (f) {
+            const type = (f.getAttribute('type') || 'text').toLowerCase();
+            return f.tagName === 'TEXTAREA' || ['text', 'search', 'email', 'url', 'tel', 'number', 'password'].indexOf(type) !== -1;
+        });
+    }
+
+    function hasTypedText(id) {
+        const entry = _registry[id];
+        if (!entry) return false;
+        return _textFields(entry.element).some(function (f) {
+            return f.getAttribute('data-typed') === '1' && String(f.value || '').trim() !== '';
+        });
+    }
+
+    global.document.addEventListener('input', function (e) {
+        if (!e.isTrusted || !e.target || !e.target.closest) return;
+        const field = e.target;
+        if (!field.closest('form') || !field.closest('[data-modal-root], [role="dialog"]')) return;
+        if (_textFields(field.closest('form')).indexOf(field) !== -1) field.setAttribute('data-typed', '1');
+    }, true);
+
+    // Dismiss a dialog the way a person asks to: it closes at once, or asks first when text was typed.
+    function requestClose(id, result) {
+        const entry = _registry[id];
+        if (!entry || !entry.isOpen) return false;
+        if (!hasTypedText(id)) return close(id, result);
+        if (entry.asking) return false;
+        entry.asking = true;
+        confirmDialog('Anything you typed in this form will be lost.', {
+            title: 'Discard what you typed?',
+            confirmLabel: 'Discard',
+            cancelLabel: 'Keep',
+            destructive: true
+        }).then(function (discard) {
+            entry.asking = false;
+            if (discard) close(id, result);
+            else {
+                const field = _textFields(entry.element).filter(function (f) { return f.getAttribute('data-typed') === '1'; })[0];
+                if (field && field.focus) field.focus();
+            }
+        });
+        return false;
+    }
+
     // ── Close ────────────────────────────────────────────────────────────────
     function close(id, result) {
         const entry = _registry[id];
         if (!entry || !entry.isOpen) return false;
+        _textFields(entry.element).forEach(function (f) { f.removeAttribute('data-typed'); });
+        entry.element.style.zIndex = '';
 
         const el = entry.element;
         el.setAttribute('hidden', '');         // native HTML hidden attribute
@@ -406,7 +460,7 @@
     function _bindEscape(id) {
         const handler = function (e) {
             if (e.key === 'Escape' && _stack[_stack.length - 1] === id) {
-                close(id);
+                requestClose(id);
             }
         };
         _escHandlers[id] = handler;
@@ -686,7 +740,11 @@
         const closeTrigger = e.target.closest('[data-modal-close]');
         if (closeTrigger) {
             const closeId = closeTrigger.getAttribute('data-modal-close');
-            if (closeId) { close(closeId); return; }
+            if (closeId) {
+                // A button that saves leaves at once; the close control and Cancel ask first.
+                if (closeTrigger.getAttribute('type') === 'submit') close(closeId); else requestClose(closeId);
+                return;
+            }
         }
 
         // Backdrop click
@@ -695,7 +753,7 @@
             const modalId = backdropTrigger.getAttribute('data-modal-backdrop');
             const entry   = _registry[modalId];
             if (entry && entry.config.backdrop && entry.isOpen) {
-                close(modalId);
+                requestClose(modalId);
             }
         }
     });
@@ -925,6 +983,8 @@
         register:    register,
         open:        open,
         close:       close,
+        requestClose: requestClose,
+        hasTypedText: hasTypedText,
         resolve:     resolve,
         prompt:      awaitResult,
         promptText:  promptText,
