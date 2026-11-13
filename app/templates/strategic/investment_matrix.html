@@ -107,7 +107,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                 <i data-lucide="target" class="absolute top-4 right-4 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
             </div>
             <div class="px-6 pb-4 text-sm text-muted-foreground">
-                {% if scores_error %}The scores could not be loaded.{% elif portfolio_metrics.average_strategic_score is none %}No capability has an importance rating yet.{% else %}average of the importance scores of the {{ portfolio_metrics.scored_count }} rated capabilities, out of {{ portfolio_metrics.total_capabilities }}{% if portfolio_metrics.scored_count < portfolio_metrics.total_capabilities %}; the other {{ portfolio_metrics.total_capabilities - portfolio_metrics.scored_count }} are not rated yet and are left out{% endif %}{% endif %}
+                {% if scores_error %}The scores could not be loaded.{% elif portfolio_metrics.average_strategic_score is none %}No capability has a recorded importance or a fact to work one out from yet.{% else %}average of the strategic scores of {{ portfolio_metrics.scored_count }} of {{ portfolio_metrics.total_capabilities }} capabilities{% if portfolio_metrics.derived_count %}; {{ portfolio_metrics.derived_count }} worked out from the model because no importance is recorded{% endif %}{% if portfolio_metrics.scored_count < portfolio_metrics.total_capabilities %}; the other {{ portfolio_metrics.total_capabilities - portfolio_metrics.scored_count }} have nothing recorded to score them from and are left out{% endif %}{% endif %}
             </div>
         </div>
     </div>
@@ -281,6 +281,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                     data-testid="capability-type"
                                     x-text="cap.capability_type || '—'"></span></div>
                                     <dl class="mt-2 grid gap-1 text-xs font-normal md:hidden" data-testid="phone-summary">
+                                        <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Strategic</dt><dd class="font-medium" data-testid="phone-strategic" x-text="cap.strategic_score === null ? 'Not scored' : cap.strategic_score + '/25' + (cap.strategic_basis === 'derived' ? ' (derived)' : '')"></dd></div>
                                         <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Score</dt><dd class="font-medium" data-testid="phone-score" x-text="cap.investment_priority_score === null ? 'Not scored' : cap.investment_priority_score + '/100'"></dd></div>
                                         <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Priority</dt><dd class="font-medium" data-testid="phone-priority" x-text="cap.priority_level"></dd></div>
                                         <div class="flex justify-between gap-2"><dt class="text-muted-foreground">Investment</dt><dd class="font-medium" data-testid="phone-investment" x-text="cap.investment_need.costs_withheld ? '{{ costs_withheld_text }}' : (cap.investment_need.estimated_cost === null ? 'Not estimated' : '{{ shown_symbol }}' + (cap.investment_need.estimated_cost / 1000).toFixed(1) + 'k ' + (cap.investment_need.source ? 'from ' + cap.investment_need.source : ''))"></dd></div>
@@ -298,7 +299,21 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                 <td class="px-2 py-3 text-muted-foreground text-sm" data-testid="cell-domain" x-text="cap.capability_domain || 'Not assigned'"></td>
                                 <td class="px-2 py-3 text-sm" data-testid="cell-strategic">
                                     <span x-text="cap.strategic_score === null ? 'Not scored' : cap.strategic_score + '/25'"></span>
-                                    <span class="block max-w-28 text-xs text-muted-foreground" x-text="cap.strategic_score === null ? 'No importance rating yet' : (cap.strategic_importance + ' importance · ' + (cap.objective_count ? cap.objective_count + (cap.objective_count === 1 ? ' objective' : ' objectives') : 'no objectives linked'))"></span>
+                                    <template x-if="cap.strategic_basis === 'recorded'">
+                                        <span class="block max-w-28 text-xs text-muted-foreground" x-text="cap.strategic_importance + ' importance · ' + (cap.objective_count ? cap.objective_count + (cap.objective_count === 1 ? ' objective' : ' objectives') : 'no objectives linked')"></span>
+                                    </template>
+                                    <template x-if="cap.strategic_basis === 'derived'">
+                                        <div>
+                                            <span class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground" data-testid="strategic-derived">Derived</span>
+                                            <span class="block max-w-40 text-xs text-muted-foreground" data-testid="strategic-sentence" x-text="cap.strategic_derivation.sentence"></span>
+                                        </div>
+                                    </template>
+                                    <template x-if="cap.strategic_basis === null">
+                                        <div>
+                                            <span class="block max-w-40 text-xs text-muted-foreground">Nothing is recorded to score it from.</span>
+                                            <a x-show="cap.strategic_step && cap.strategic_step.href" :href="cap.strategic_step && cap.strategic_step.href" class="block text-xs text-primary hover:underline" data-testid="strategic-step" x-text="cap.strategic_step && cap.strategic_step.text"></a>
+                                        </div>
+                                    </template>
                                 </td>
                                 <td class="px-2 py-3 text-sm" x-text="cap.coverage_count + (cap.coverage_count === 1 ? ' app' : ' apps')"></td>
                                 <td class="px-2 py-3 text-sm" data-testid="cell-maturity">
@@ -558,7 +573,7 @@ document.addEventListener('alpine:init', () => {
             const rows = selected.map(c => [
                 c.capability_name,
                 c.capability_domain,
-                c.strategic_score === null ? 'Not scored' : c.strategic_score + '/25',
+                c.strategic_score === null ? 'Not scored' : c.strategic_score + '/25' + (c.strategic_basis === 'derived' ? ' (derived)' : ''),
                 c.coverage_count + (c.coverage_count === 1 ? ' app' : ' apps'),
                 (c.current_maturity_level === null || c.target_maturity_level === null) ? 'Not recorded' : c.current_maturity_level + ' of ' + c.target_maturity_level,
                 c.risk_count ? c.risk_score + '/25' : 'No risks linked',
