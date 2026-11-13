@@ -8,8 +8,9 @@ organisation's id.
 
 from __future__ import annotations
 
+import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
@@ -112,12 +113,19 @@ def test_statistics_api_only_shows_own_orgs_runs(
         db_session, make_org
     )
 
+    # Make A's run the newest so the test proves isolation, not insertion order.
+    from app import db
+
+    run_a = db.session.get(UnifiedDetectionRun, run_a_id)
+    run_a.created_at = datetime.utcnow() + timedelta(minutes=5)
+    db.session.commit()
+
     _login(db_session, client, login_as, user_b_id)
     response = client.get("/duplicate-detection/simple/api/statistics")
 
     assert response.status_code == 200
     body = response.get_json()
-    # Org B's own run is present
+    # Org B's own run is present even though A's run is newer
     assert body["latest_run"]["id"] == run_b_id
     # Org A's run is not leaked
     assert body["latest_run"]["id"] != run_a_id
@@ -153,8 +161,10 @@ def test_rationalization_dashboard_only_counts_own_orgs_entries(
     response = client.get("/applications/rationalization")
 
     assert response.status_code == 200
-    # Org B's consolidation entry is counted, org A's is not
-    assert b"consolidation_count" in response.data or response.status_code == 200
+    # Org B's consolidation entry is counted (1), org A's is not (0)
+    match = re.search(rb"(\d+) on the consolidation list", response.data)
+    assert match is not None, "consolidation count not found in rationalization dashboard"
+    assert int(match.group(1)) == 1, f"expected 1 consolidation entry for org B, got {match.group(1)}"
 
 
 def test_new_detection_run_carries_creators_org(
