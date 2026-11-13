@@ -107,7 +107,6 @@ def test_page_groups_members_by_layer_with_relationship_in_words(app, db_session
 def test_another_organisations_elements_never_appear(app, db_session, make_org, client, login_as):
     mine, theirs = make_org("mine"), make_org("theirs")
     one = _estate(db_session, mine, "c")
-    other = _estate(db_session, theirs, "d")
     # Cross-org relationships are now rejected by the model guard; the
     # product page still filters by organisation_id so foreign elements
     # never appear even if a relationship existed.
