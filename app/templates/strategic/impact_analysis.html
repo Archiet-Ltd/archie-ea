@@ -416,7 +416,7 @@
     </div>
 
     {# Below the picker: a person starts a run first and reads the queue of other work after it. #}
-    {% if not model_empty %}
+    {% if not model_empty or priority_actions.rows %}
     {% if simulation %}
     {# The prioritised action list belongs to Impact Analysis; this page links to it rather than repeating it. #}
     <p class="text-sm text-muted-foreground" data-testid="priority-actions-link-line">What should be done first is ranked on
