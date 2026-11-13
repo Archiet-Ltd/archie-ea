@@ -64,6 +64,7 @@ def seed_organisation(base):
             db.session.add(row)
             apps.append(row)
         db.session.flush()
+        entries = []
         for row in apps:
             db.session.add(ApplicationRationalizationScore(
                 application_component_id=row.id, organization_id=org["org_id"], disposition_action="retain",
@@ -71,9 +72,11 @@ def seed_organisation(base):
                 technical_health_score=70, business_value_score=64, cost_efficiency_score=58, vendor_risk_score=66,
                 action_rationale="Keeps the ledger running.", estimated_annual_savings=fig["savings"],
                 estimated_investment_needed=fig["investment"], total_cost_of_ownership=fig["tco"]))
-            db.session.add(ConsolidationListEntry(
+            entry = ConsolidationListEntry(
                 application_id=row.id, estimated_savings=fig["entry_savings"], migration_cost=fig["entry_migration"],
-                status="identified", recommended_action="decommission", source_group_name="Ledger twins " + tag))
+                status="identified", recommended_action="decommission", source_group_name="Ledger twins " + tag)
+            db.session.add(entry)
+            entries.append(entry)
         db.session.flush()
         db.session.add(RationalizationBenefitsTracker(
             application_id=apps[0].id, projected_annual_savings=fig["benefit_projected"],
@@ -91,6 +94,7 @@ def seed_organisation(base):
         for row in apps:
             db.session.execute(unified_group_members.insert().values(group_id=group.id, application_id=row.id))
         db.session.commit()
+        org["entry_ids"] = [entry.id for entry in entries]
         org["app_ids"] = [row.id for row in apps]
         org["app_names"] = [row.name for row in apps]
         org["group_id"] = group.id

@@ -16,11 +16,12 @@ import logging
 from datetime import datetime
 
 from flask import Blueprint, jsonify, render_template, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 from sqlalchemy import or_
 
 from app.decorators import audit_log
 from app.services.application_cost_accessor import set_annual_cost
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
 
 from .. import db
 from ..models.application_portfolio import ApplicationComponent
@@ -33,6 +34,14 @@ from app.utils.pagination import safe_int_arg
 from app.utils.recorded_figures import sum_recorded
 
 logger = logging.getLogger(__name__)
+
+# every key of this page's replies that holds a money amount, handed to the one cost rule's masker
+_MONEY_KEYS = (
+    "estimated_savings", "migration_cost", "total_estimated_savings", "savings_verified_total",
+    "savings_estimated_total", "total_migration_cost", "portfolio_annual_cost", "rationalization_tco_total",
+    "rationalization_savings_estimate", "license_cost", "support_cost", "infrastructure_cost", "maintenance_cost",
+    "total_annual_cost", "net_annual_saving", "payback_months", "savings", "breakdown",
+)
 
 # Create blueprint
 consolidation_list_bp = Blueprint("consolidation_list", __name__, url_prefix="/consolidation-list")
@@ -88,7 +97,8 @@ def dashboard():
             logger.debug("Could not resolve dashboard registry URL: %s", e)
             dashboard_registry_url = "/auto-dashboard/registry"
         return render_template(
-            "consolidation_list/dashboard.html", dashboard_registry_url=dashboard_registry_url
+            "consolidation_list/dashboard.html", dashboard_registry_url=dashboard_registry_url,
+            costs_withheld=not costs_visible(current_user), costs_withheld_text=COSTS_WITHHELD,
         )
     except HTTPException:
         raise
@@ -103,15 +113,15 @@ def _portfolio_annual_cost():
     The figure is the one the Overview and the application list state. It is None, with the reason, when
     the signed-in person may not read cost or when no contract or system states one.
     """
-    from flask_login import current_user
-
     from app.modules.dashboard.services.overview_figures import run_cost_line
     from app.utils.tenant import current_organization_id
 
+    if not costs_visible(current_user):
+        return None, None  # the reply states once that costs are withheld; no second sentence rides on the figure
     org_id = current_organization_id()
     line = run_cost_line(org_id, current_user) if org_id is not None else None
     if line is None:
-        return None, "Cost figures are not shown for your role."
+        return None, "No active contract or system states an annual cost yet."
     if line["total"] is None:
         return None, "No active contract or system states an annual cost yet."
     return line["total"], None
@@ -310,21 +320,22 @@ def get_entries():
         except Exception as e:
             logger.warning("Could not enrich summary with rationalization data: %s", e)
 
-        return jsonify(
-            {
-                "success": True,
-                "entries": entries_data,
-                "summary": summary,
-                "pagination": {
-                    "page": pagination.page,
-                    "per_page": pagination.per_page,
-                    "total": pagination.total,
-                    "pages": pagination.pages,
-                    "has_prev": pagination.has_prev,
-                    "has_next": pagination.has_next,
-                },
-            }
-        )
+        reply = {
+            "success": True,
+            "entries": entries_data,
+            "summary": summary,
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "total": pagination.total,
+                "pages": pagination.pages,
+                "has_prev": pagination.has_prev,
+                "has_next": pagination.has_next,
+            },
+        }
+        if not costs_visible(current_user):
+            reply = {**withhold_costs(reply, keys=_MONEY_KEYS), "costs_withheld_sentence": COSTS_WITHHELD}
+        return jsonify(reply)
     except HTTPException:
         raise
     except Exception as e:
@@ -484,7 +495,7 @@ def get_entry_detail(entry_id):
             "architecture_assistant": "/architecture-assistant/",
         }
 
-        return jsonify({
+        reply = {
             "success": True,
             "financial": {
                 "license_cost": license_cost,
@@ -510,7 +521,10 @@ def get_entry_detail(entry_id):
                 "name": entry.target_application.name if entry.target_application else None,
             } if entry.target_application_id else None,
             "links": links,
-        })
+        }
+        if not costs_visible(current_user):
+            reply = {**withhold_costs(reply, keys=_MONEY_KEYS), "costs_withheld_sentence": COSTS_WITHHELD}
+        return jsonify(reply)
     except HTTPException:
         raise
     except Exception as e:
@@ -547,8 +561,6 @@ def update_entry(entry_id):
             entry.priority = data["priority"]
 
         if "status" in data:
-            from flask_login import current_user
-
             entry.status = data["status"]
             entry.status_changed_at = datetime.utcnow()
             entry.status_changed_by = (
@@ -631,6 +643,8 @@ def update_entry(entry_id):
         if benefits_prompt:
             result["benefits_prompt"] = True
             result["estimated_savings"] = float(entry.estimated_savings or 0)
+        if not costs_visible(current_user):
+            result = {**withhold_costs(result, keys=_MONEY_KEYS), "costs_withheld_sentence": COSTS_WITHHELD}
         return jsonify(result)
 
     except HTTPException:
@@ -960,16 +974,17 @@ def recalculate_savings():
 
         logger.info(f"Recalculated savings for {updated_count} consolidation entries")
 
-        return jsonify(
-            {
-                "success": True,
-                "message": f"Recalculated savings for {updated_count} entries",
-                "updated_count": updated_count,
-                "real_data_count": real_data_count,
-                "baseline_count": baseline_count,
-                "details": entry_details,
-            }
-        )
+        reply = {
+            "success": True,
+            "message": f"Recalculated savings for {updated_count} entries",
+            "updated_count": updated_count,
+            "real_data_count": real_data_count,
+            "baseline_count": baseline_count,
+            "details": entry_details,
+        }
+        if not costs_visible(current_user):
+            reply = {**withhold_costs(reply, keys=_MONEY_KEYS), "costs_withheld_sentence": COSTS_WITHHELD}
+        return jsonify(reply)
 
     except HTTPException:
 

@@ -79,6 +79,7 @@
             </div>
         </div>
 
+        {% if not costs_withheld %}
         <!-- Cost Data -->
         <div class="grid grid-cols-2 gap-4">
             <div>
@@ -92,12 +93,16 @@
             </div>
         </div>
 
+        {% endif %}
+
         <!-- Migration Cost & Savings Verified -->
         <div class="grid grid-cols-2 gap-4">
+            {% if not costs_withheld %}
             <div>
                 <label for="edit-migration-cost" class="block text-sm font-medium mb-2">Migration Cost</label>
                 <input type="number" id="edit-migration-cost" step="0.01" min="0" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="0.00">
             </div>
+            {% endif %}
             <div class="flex items-end pb-2">
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="edit-savings-verified" class="rounded border-input">
@@ -196,10 +201,14 @@ function openEditEntryModal(entryOrId) {
     // Enrichment fields
     document.getElementById('edit-wave').value = entry.wave || '';
     document.getElementById('edit-migration-complexity').value = entry.migration_complexity || '';
-    document.getElementById('edit-migration-cost').value = entry.migration_cost || '';
+    // the cost inputs are left off the form for a role the cost rule withholds from
+    const migrationInput = document.getElementById('edit-migration-cost');
+    if (migrationInput) migrationInput.value = entry.migration_cost || '';
     document.getElementById('edit-savings-verified').checked = !!entry.savings_verified;
-    document.getElementById('edit-annual-cost').value = entry.annual_operating_cost || '';
-    document.getElementById('edit-estimated-savings').value = entry.estimated_savings || '';
+    const annualInput = document.getElementById('edit-annual-cost');
+    if (annualInput) annualInput.value = entry.annual_operating_cost || '';
+    const savingsInput = document.getElementById('edit-estimated-savings');
+    if (savingsInput) savingsInput.value = entry.estimated_savings || '';
     document.getElementById('edit-data-disposition').value = entry.data_disposition || '';
 
     document.getElementById('edit-rationale').value = entry.business_rationale || '';
@@ -233,9 +242,10 @@ function submitEditEntry() {
     }
 
     const waveVal = document.getElementById('edit-wave').value;
-    const migCostVal = document.getElementById('edit-migration-cost').value;
-    const annualCostVal = document.getElementById('edit-annual-cost').value;
-    const estSavingsVal = document.getElementById('edit-estimated-savings').value;
+    const costInput = function (id) { const el = document.getElementById(id); return el ? el.value : null; };
+    const migCostVal = costInput('edit-migration-cost');
+    const annualCostVal = costInput('edit-annual-cost');
+    const estSavingsVal = costInput('edit-estimated-savings');
     const data = {
         recommended_action: action,
         priority: priority.value,
@@ -247,12 +257,13 @@ function submitEditEntry() {
         assigned_to: document.getElementById('edit-assigned-to').value,
         wave: waveVal ? parseInt(waveVal, 10) : null,
         migration_complexity: document.getElementById('edit-migration-complexity').value || null,
-        migration_cost: migCostVal ? parseFloat(migCostVal) : null,
         savings_verified: document.getElementById('edit-savings-verified').checked,
         data_disposition: document.getElementById('edit-data-disposition').value || null,
-        annual_operating_cost: annualCostVal ? parseFloat(annualCostVal) : null,
-        estimated_savings: estSavingsVal ? parseFloat(estSavingsVal) : null,
     };
+    // a role the cost rule withholds from has no cost inputs, so its edit leaves the recorded amounts alone
+    if (migCostVal !== null) data.migration_cost = migCostVal ? parseFloat(migCostVal) : null;
+    if (annualCostVal !== null) data.annual_operating_cost = annualCostVal ? parseFloat(annualCostVal) : null;
+    if (estSavingsVal !== null) data.estimated_savings = estSavingsVal ? parseFloat(estSavingsVal) : null;
 
     Platform.fetch.put('/consolidation-list/api/entry/' + entryId, data)
     .then(function(resp) {
