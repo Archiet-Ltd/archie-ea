@@ -2,6 +2,10 @@
 {# design-block: dashboard #}
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/form_field.html' import form_group %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/button.html' import button %}
 
 {% block title %}{{ risk.title }}{% endblock %}
 
@@ -15,8 +19,42 @@
 {% endblock %}
 
 {% block content %}
-<div class="p-6 space-y-6 mx-auto">
-    {{ page_shell(title=risk.title, subtitle='Risk · ' ~ (risk.status.value | capitalize)) }}
+<div class="p-6 space-y-6 mx-auto" x-data="riskPage({{ risk.id }}, {{ {'title': risk.title, 'description': risk.description or '', 'likelihood': risk.likelihood, 'impact': risk.impact, 'owner': risk.owner or '', 'mitigation_plan': risk.mitigation_plan or ''} | tojson | forceescape }})">
+    {% macro _ps_actions() %}
+        {% if can_change_loss %}{{ button(text='Edit risk', icon='pencil', variant='outline', type='button', on_click='editing = !editing', attrs_dict={':aria-expanded': 'editing'}) }}{% endif %}
+    {% endmacro %}
+    {{ page_shell(title=risk.title, subtitle='Risk · ' ~ (risk.status.value | capitalize), actions_caller=_ps_actions) }}
+
+    {% if can_change_loss %}
+    <form class="rounded-lg border border-border bg-card p-4 space-y-4" x-show="editing" x-cloak @submit.prevent="save()" data-testid="risk-edit-form" aria-label="Edit risk">
+        <h2 class="text-sm font-semibold text-foreground">Edit risk</h2>
+        {% call form_group(id='edit-risk-title', label='Title', required=true) %}
+            {{ input(id='edit-risk-title', type='text', size='sm', attrs_dict={'x-model': 'form.title'}) }}
+        {% endcall %}
+        {% call form_group(id='edit-risk-description', label='Description') %}
+            {{ textarea(id='edit-risk-description', rows=2, attrs_dict={'x-model': 'form.description'}) }}
+        {% endcall %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {% call form_group(id='edit-risk-likelihood', label='Likelihood (1-5)', required=true) %}
+                {% call native_select(id='edit-risk-likelihood', size='sm', options=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5')], attrs_dict={'x-model': 'form.likelihood'}) %}{% endcall %}
+            {% endcall %}
+            {% call form_group(id='edit-risk-impact', label='Impact (1-5)', required=true) %}
+                {% call native_select(id='edit-risk-impact', size='sm', options=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5')], attrs_dict={'x-model': 'form.impact'}) %}{% endcall %}
+            {% endcall %}
+        </div>
+        {% call form_group(id='edit-risk-owner', label='Owner') %}
+            {{ input(id='edit-risk-owner', type='text', size='sm', attrs_dict={'x-model': 'form.owner'}) }}
+        {% endcall %}
+        {% call form_group(id='edit-risk-mitigation', label='Mitigation plan') %}
+            {{ textarea(id='edit-risk-mitigation', rows=2, attrs_dict={'x-model': 'form.mitigation_plan'}) }}
+        {% endcall %}
+        <p x-show="error" x-cloak role="alert" class="text-sm text-destructive-emphasis" x-text="error"></p>
+        <div class="flex justify-end gap-2">
+            {{ button(text='Cancel', type='button', variant='outline', on_click='editing = false') }}
+            {% call button(type='submit', attrs_dict={':disabled': 'saving'}) %}Save changes{% endcall %}
+        </div>
+    </form>
+    {% endif %}
 
     <div class="rounded-lg border border-border bg-card p-4 space-y-3" data-testid="risk-account">
         <div>
@@ -81,7 +119,8 @@
         {% if row and row.touches %}
         <ul class="space-y-1 text-sm">
             {% for t in row.touches %}
-            <li>
+            <li {% if t.kind == 'application' and link_ids.get('application:' ~ t.id) %}data-risk-link class="flex items-center justify-between gap-2"{% endif %}>
+                <span>
                 {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions %}
                 <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a> <span class="text-xs text-muted-foreground">application</span>
                 {% elif t.url %}
@@ -89,13 +128,32 @@
                 {% elif t.element_id and 'archimate.element_impact_graph_page' in flask.current_app.view_functions %}
                 <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>
                 {% else %}{{ t.name }}{% endif %}
+                </span>
+                {% if can_change_loss and t.kind == 'application' and link_ids.get('application:' ~ t.id) %}
+                {{ button(text='Unlink', variant='bare', size='bare', type='button', aria_label='Unlink ' ~ t.name, class='text-xs text-muted-foreground hover:text-destructive-emphasis', on_click='unlink(' ~ link_ids.get('application:' ~ t.id) ~ ')') }}
+                {% endif %}
             </li>
             {% endfor %}
         </ul>
         {% elif row and not row.worked_out %}
         <p class="text-sm text-muted-foreground">What this risk touches could not be worked out.</p>
         {% else %}
-        <p class="text-sm text-muted-foreground">No linked elements recorded.</p>
+        <p class="text-sm text-muted-foreground">No linked elements recorded.{% if can_change_loss %} Link the applications this risk threatens and it appears on their pages and in their impact answer.{% endif %}</p>
+        {% endif %}
+        {% if can_change_loss %}
+        <div class="mt-3 space-y-2">
+            {{ button(text='Link an application', icon='link', variant='outline', size='sm', type='button', on_click='picking = !picking', attrs_dict={':aria-expanded': 'picking'}) }}
+            <div x-show="picking" x-cloak class="space-y-2">
+                {{ input(type='text', size='sm', aria_label='Search applications to link', placeholder='Search applications…', attrs_dict={'x-model': 'query', '@input.debounce.300ms': 'search()', 'autocomplete': 'off'}) }}
+                <p x-show="searched && !results.length" x-cloak class="text-xs text-muted-foreground">No application in your organisation matches that.</p>
+                <ul class="max-h-48 overflow-y-auto rounded-md border border-border divide-y divide-border" x-show="results.length" x-cloak>
+                    <template x-for="app in results" :key="app.id">
+                        <li>{% call button(type='button', variant='ghost', size='bare', class='w-full text-left px-2.5 py-1.5 text-sm', attrs_dict={'@click': 'link(app)', 'x-text': 'app.name'}) %}{% endcall %}</li>
+                    </template>
+                </ul>
+                <p x-show="error" x-cloak role="alert" class="text-sm text-destructive-emphasis" x-text="error"></p>
+            </div>
+        </div>
         {% endif %}
     </div>
 
@@ -112,4 +170,68 @@
         <div><h2 class="text-sm font-semibold text-foreground">Mitigation plan</h2><p class="text-muted-foreground">{{ risk.mitigation_plan or '—' }}</p></div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function riskPage(riskId, initial) {
+    return {
+        editing: false, picking: false, saving: false, searched: false,
+        error: '', query: '', results: [],
+        form: initial,
+        search() {
+            const q = this.query.trim();
+            this.error = '';
+            if (q.length < 2) { this.results = []; this.searched = false; return; }
+            const self = this;
+            Platform.fetch.get('/applications/api/list?search=' + encodeURIComponent(q) + '&limit=10', null, { silent: true })
+                .then(function (data) {
+                    const rows = data.applications || data.items || data || [];
+                    self.results = rows.map(function (r) { return { id: r.id, name: r.name }; });
+                    self.searched = true;
+                })
+                .catch(function () { self.results = []; self.searched = true; });
+        },
+        link(app) {
+            const self = this;
+            Platform.fetch('/api/risks/' + riskId + '/links', {
+                method: 'POST', body: { entity_type: 'application', entity_id: app.id }, silent: true
+            }).then(function (data) {
+                if (data && data.error) { self.error = data.error; return; }
+                window.location.reload();
+            }).catch(function (err) {
+                self.error = 'Could not link this risk.';
+                throw err;
+            });
+        },
+        unlink(linkId) {
+            const self = this;
+            Platform.fetch('/api/risks/' + riskId + '/links/' + linkId, { method: 'DELETE', silent: true })
+                .then(function () { window.location.reload(); })
+                .catch(function (err) { Platform.toast.error('Could not remove that link.'); throw err; });
+        },
+        save() {
+            if (this.saving) return;
+            if (!String(this.form.title || '').trim()) { this.error = 'Title is required.'; return; }
+            this.saving = true;
+            this.error = '';
+            const self = this;
+            Platform.fetch('/api/risks/' + riskId, {
+                method: 'PATCH', silent: true,
+                body: {
+                    title: this.form.title, description: this.form.description,
+                    likelihood: Number(this.form.likelihood), impact: Number(this.form.impact),
+                    owner: this.form.owner, mitigation_plan: this.form.mitigation_plan
+                }
+            }).then(function (data) {
+                if (data && data.error) { self.error = data.error; return; }
+                window.location.reload();
+            }).catch(function (err) {
+                self.error = 'Could not save the risk.';
+                throw err;
+            }).finally(function () { self.saving = false; });
+        }
+    };
+}
+</script>
 {% endblock %}

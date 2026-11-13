@@ -617,8 +617,14 @@ def risk_page(risk_id):
     ranked = risk_service.ranked_risks()
     row = next((r for r in ranked["rows"] if r["risk_id"] == risk.id), None)
     loss = open_fair.losses_for_risks(org_id, [risk.id]).get(risk.id)
+    # The link record behind each "what it touches" entry, so the page can unlink it
+    # through the one endpoint the register uses.
+    link_ids = {
+        "%s:%s" % (link.entity_type, link.entity_id): link.id
+        for link in risk_service.list_risk_links(risk.id)
+    }
     return render_template(
-        "governance/risk_page.html", risk=risk, row=row, rule=ranked["rule"],
+        "governance/risk_page.html", risk=risk, row=row, rule=ranked["rule"], link_ids=link_ids,
         loss=open_fair.describe(loss) if loss else None,
         loss_factors=loss["factors"] if loss else {},
         loss_fields=open_fair.FACTORS,
