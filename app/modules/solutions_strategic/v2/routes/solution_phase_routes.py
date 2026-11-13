@@ -2147,7 +2147,11 @@ def phase_h_review(solution_id: int):
     except Exception as e:
         logger.warning(f"Phase H outcome sync failed: {e}")
 
-    return jsonify({
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(
+        withhold_reply(
+        {
         "success": True,
         "metrics": metric_results,
         "cost_variance": cost_variance,
@@ -2158,7 +2162,10 @@ def phase_h_review(solution_id: int):
                   / max(1, len([m for m in metric_results if m["achievement_pct"] is not None])), 1)
             if any(m["achievement_pct"] is not None for m in metric_results) else None
         ),
-    })
+    },
+        keys=("cost_variance", "estimated", "actual", "variance", "variance_pct", "estimated_cost", "actual_cost", "total_cost", "budget_allocated", "budget_spent", "tco", "cost", "savings", "total_outcomes")
+        )
+    )
 
 
 @solution_design_bp.route("/<int:solution_id>/phase-h/new-cycle", methods=["POST"])

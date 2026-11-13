@@ -529,7 +529,9 @@ def programme_rollup(initiative_id):
     rollup = ProgrammeGovernanceService.rollup(initiative_id)
     if rollup is None:
         return jsonify({"success": False, "error": "Programme not found."}), 404
-    return jsonify({"success": True, **rollup})
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply({"success": True, **rollup}, keys=("cost_variance", "estimated", "actual", "variance", "variance_pct", "estimated_cost", "actual_cost", "total_cost", "budget_allocated", "budget_spent", "tco", "cost", "savings", "total_outcomes")))
 
 
 @solution_design_bp.route("/programmes/<int:initiative_id>/solutions", methods=["POST"])

@@ -11985,7 +11985,9 @@ def api_outcomes(solution_id):
         from app.services.outcome_tracking_service import OutcomeTrackingService
         service = OutcomeTrackingService()
         summary = service.get_solution_realization_summary(solution_id)
-        return jsonify({"success": True, "data": summary})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "data": summary}, keys=("cost_variance", "estimated", "actual", "variance", "variance_pct", "estimated_cost", "actual_cost", "total_cost", "budget_allocated", "budget_spent", "tco", "cost", "savings", "total_outcomes")))
     except HTTPException:
         raise
     except Exception as e:
