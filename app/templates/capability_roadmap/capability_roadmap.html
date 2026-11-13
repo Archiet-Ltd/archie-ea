@@ -297,7 +297,7 @@
 
   {# ── Error Banner ── #}
   <template x-if="gapsError || plateausError || workPackagesError">
-    <div class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis">
+    <div data-testid="rdm-error-banner" class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis">
       <template x-if="gapsError"><div x-text="gapsError"></div></template>
       <template x-if="plateausError"><div x-text="plateausError"></div></template>
       <template x-if="workPackagesError"><div x-text="workPackagesError"></div></template>

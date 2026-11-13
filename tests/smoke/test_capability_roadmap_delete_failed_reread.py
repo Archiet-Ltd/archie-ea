@@ -85,7 +85,7 @@ def test_delete_work_package_failed_reread_shows_error_not_empty(browser, live_s
             assert "Work packages: none recorded" not in line_after, line_after
 
             # The error banner names the failure
-            banner = page.locator(".bg-destructive\\/10")
+            banner = page.get_by_test_id("rdm-error-banner")
             expect(banner).to_be_visible(timeout=PAGE_TIMEOUT)
             assert "work packages service unavailable" in banner.inner_text(), banner.inner_text()
         finally:
