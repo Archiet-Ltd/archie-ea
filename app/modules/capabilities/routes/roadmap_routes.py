@@ -1875,12 +1875,9 @@ def api_roadmap_summary_footer():
     Returns the same markup the page first-paints with, so the evidence line under
     the tiles always agrees with the tile figures after any save or delete.
     """
-    from app import db
-    from app.models.implementation_migration import GAP_KIND_PLATEAU_TRANSITION, Gap, Plateau
-    from app.models.unified_capability import BusinessDomain, UnifiedCapability
-    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.models.implementation_migration import Plateau
+    from app.models.unified_capability import UnifiedCapability
     from app.services import result_footer_service, work_package_service
-    from app.services.gap_register_service import count_gaps
     from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
     from app.utils.tenant import current_organization_id
 
