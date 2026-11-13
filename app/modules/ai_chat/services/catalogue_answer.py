@@ -32,6 +32,13 @@ NEXT_STEPS = {
 }
 
 
+# What a question must name for a model's reading of it as "what came from GitHub" to stand. The
+# entry answers with a list of the records a GitHub connector brought in, so a question that only
+# mentions repositories or files while asking something else ("what does it run on") is not a
+# request for that list and goes on to be answered in words, as it is on any screen width.
+_ASKS_FOR_GITHUB_RECORDS = ("github", "connector", "imported", "discovered", "came from", "came into", "brought in")
+
+
 def _keep(question: str, interpretation: Dict[str, Any]) -> bool:
     """False for a question the interpreter matched only on a broad phrase.
 
@@ -41,6 +48,9 @@ def _keep(question: str, interpretation: Dict[str, Any]) -> bool:
     """
     if interpretation.get("entry_id") not in CATALOGUE:
         return False
+    if interpretation["entry_id"] == "github_sourced_records" and interpretation.get("method") == "model":
+        lowered = question.lower()
+        return any(word in lowered for word in _ASKS_FOR_GITHUB_RECORDS)
     if interpretation["entry_id"] != "what_breaks_if_fails":
         return True
     return (
