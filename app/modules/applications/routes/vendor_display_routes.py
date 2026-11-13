@@ -345,7 +345,11 @@ def vendor_detail(vendor_id):
         # The Vendors list's permission decides every cost figure on this page too.
         cost_visible = may_see_spend_pages(current_user)
         supplied_cost = (vendor_register.annual_cost_with_basis(supplied_systems, vendor_id, counted=counted)[0] if cost_visible else None)
-        next_renewal = vendor_register.next_renewal(counted)
+        renewing = ledger["renewing_by_vendor"].get(vendor_id, [])
+        next_renewal = vendor_register.next_renewal(renewing)
+        overdue = [c for c in renewing if vendor_register.renewal_is_overdue(c)
+                   and vendor_register.renewal_date_of(c) == next_renewal]
+        next_renewal_overdue = vendor_register.renewal_state(overdue[0]).text if overdue else None
 
         from app.middleware.tenant_context import current_org_id
         from app.services import result_footer_service
@@ -375,6 +379,7 @@ def vendor_detail(vendor_id):
             cost_visible=cost_visible,
             systems_footer=systems_footer,
             next_renewal=next_renewal,
+            next_renewal_overdue=next_renewal_overdue,
             all_business_capabilities=all_business_capabilities,
             products_json=products_json,
             capabilities_json=capabilities_json,

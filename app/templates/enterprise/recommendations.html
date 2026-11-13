@@ -41,7 +41,7 @@
 {% call ui.card(attrs={'data-testid': 'recommendations-empty'}) %}
   {% call ui.card_content() %}
     {{ empty_state(icon='lightbulb', title='Nothing to recommend yet',
-                   description='Recommendations are worked out from your open gaps, risks, work packages and applications. None of them needs attention right now, or the model holds no records yet.',
+                   description='Recommendations are worked out from your open gaps, risks, work packages and applications. Nothing among them needs attention right now, or the model holds no records yet.',
                    cta_text='Open the application list', cta_icon='list', cta_href=url_for('unified_applications.application_list')) }}
   {% endcall %}
 {% endcall %}

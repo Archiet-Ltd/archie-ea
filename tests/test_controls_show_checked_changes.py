@@ -143,3 +143,15 @@ def test_one_route_serves_controls_and_the_old_address_goes_there(app, db_sessio
     assert old.headers["Location"].endswith(CONTROLS)
     rules = [r.rule for r in app.url_map.iter_rules() if r.endpoint.endswith("policy_dashboard")]
     assert rules == [CONTROLS]
+
+
+def test_the_passed_card_claims_only_that_no_check_found_a_problem(
+    app, db_session, make_org, tenant_ctx, monkeypatch, client, login_as
+):
+    """A change that passed its checks may still be waiting for a reviewer, so the card must not say a model reviewed it."""
+    org_a, org_b, alpha, bravo = _two_organisations(db_session, make_org, tenant_ctx, monkeypatch)
+    login_as(client, _viewer(db_session, org_a))
+
+    html = client.get(CONTROLS).get_data(as_text=True)
+    assert "No check found a problem with these changes" in html
+    assert "Went on to be reviewed by a second model" not in html

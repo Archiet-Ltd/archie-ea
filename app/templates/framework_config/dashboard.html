@@ -10,6 +10,7 @@
 {% block title %}Framework configuration{% endblock %}
 
 {% macro _actions() %}
+{% if platform_view %}
 <div class="flex flex-wrap items-center gap-2">
   {% call ui.dropdown_menu() %}
     {% call ui.dropdown_menu_trigger(variant='ghost', size='icon', attrs={'aria-label': 'More framework pages'}) %}{{ lucide('ellipsis') }}{% endcall %}
@@ -25,19 +26,21 @@
   {% endcall %}
   {% call ui.button(type='button', attrs={'data-modal-open': 'create-framework-config', 'data-testid': 'framework-config-new'}) %}{{ lucide('plus') }}New configuration{% endcall %}
 </div>
+{% endif %}
 {% endmacro %}
 
-{% macro _all_configs() %}{{ ui.button(text='View all', href=url_for('framework_config_ui.instances'), variant='outline', size='sm') }}{% endmacro %}
-{% macro _all_templates() %}{{ ui.button(text='View all', href=url_for('framework_config_ui.templates'), variant='outline', size='sm') }}{% endmacro %}
-{% macro _all_extensions() %}{{ ui.button(text='View all', href=url_for('framework_config_ui.extensions'), variant='outline', size='sm') }}{% endmacro %}
+{% macro _all_configs() %}{% if platform_view %}{{ ui.button(text='View all', href=url_for('framework_config_ui.instances'), variant='outline', size='sm') }}{% endif %}{% endmacro %}
+{% macro _all_templates() %}{% if platform_view %}{{ ui.button(text='View all', href=url_for('framework_config_ui.templates'), variant='outline', size='sm') }}{% endif %}{% endmacro %}
+{% macro _all_extensions() %}{% if platform_view %}{{ ui.button(text='View all', href=url_for('framework_config_ui.extensions'), variant='outline', size='sm') }}{% endif %}{% endmacro %}
 
 {% block content %}
 {% set templates = templates|default([]) %}
 {% set extensions = extensions|default([]) %}
 {% set recent_configs = recent_configs|default([]) %}
 {% set active_config = active_config|default(none) %}
+{% set platform_view = platform_view|default(false) %}
 <div class="p-6 space-y-6">
-{{ page_shell(title='Framework configuration', subtitle='The capability framework your organisation uses, its industry extensions and the templates it can start from',
+{{ page_shell(title='Framework configuration', subtitle=('The capability framework your organisation uses, its industry extensions and the templates it can start from' if platform_view else 'The capability framework configurations of your organisation, and the shared catalogue they draw on'),
               breadcrumb=[('Home', url_for('main.index')), ('Framework configuration', none)], actions_caller=_actions) }}
 
 {% if active_config %}
@@ -51,20 +54,28 @@
 ]) }}
 {% endif %}
 
+{% if not platform_view %}
+{% call ui.alert(attrs={'data-testid': 'framework-config-platform-note'}) %}
+  {{ lucide('info') }}
+  {{ ui.alert_title(text='The shared catalogue is kept by the platform administrator') }}
+  {{ ui.alert_description(text='Templates and extensions below are shared by every organisation, so only the platform administrator can change them. The configurations listed are your organisation\'s own.') }}
+{% endcall %}
+{% endif %}
+
 {% if not active_config and not templates and not extensions and not recent_configs %}
 {% call ui.card() %}
 {% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'framework-config-empty', 'role': 'status'}) %}
   {% call ui.empty_header() %}
     {% call ui.empty_icon(variant='icon') %}{{ lucide('settings-2') }}{% endcall %}
     {{ ui.empty_title(text='No framework configuration yet') }}
-    {{ ui.empty_description(text='Use New configuration to set which capability domains, levels and industry extensions your organisation uses.') }}
+    {{ ui.empty_description(text=('Use New configuration to set which capability domains, levels and industry extensions your organisation uses.' if platform_view else 'Your organisation has no configuration of its own yet. It uses the shared framework until the platform administrator sets one up.')) }}
   {% endcall %}
 {% endcall %}
 {% endcall %}
 {% else %}
 
 {% if recent_configs %}
-{% call section('Recent configurations', 'The last ten configurations created', action=_all_configs, testid='framework-config-recent') %}
+{% call section('Recent configurations' if platform_view else 'Your organisation\'s configurations', 'The last ten configurations created', action=_all_configs, testid='framework-config-recent') %}
 {% call(config) list_table(rows=recent_configs, columns=[('Configuration', ''), {'label': 'Organisation', 'class': 'hidden md:table-cell'}, ('Industry', ''), ('Status', ''), {'label': 'Created', 'sortable': true}, {'label': '', 'class': 'w-12'}],
                             caption='Recent framework configurations', testid='framework-configs-table', row_testid='framework-config-row', page_size=10) %}
   {% call table_cell(class='max-w-[360px]') %}
@@ -78,7 +89,7 @@
   {% call table_cell(class='w-12 text-right') %}
     {% call row_actions('Actions for ' ~ config.configuration_name) %}
         {{ row_action('View', href=url_for('framework_config_ui.view_configuration', config_id=config.id)) }}
-        {{ row_action('Edit', href=url_for('framework_config_ui.edit_configuration', config_id=config.id)) }}
+        {% if platform_view %}{{ row_action('Edit', href=url_for('framework_config_ui.edit_configuration', config_id=config.id)) }}{% endif %}
     {% endcall %}
   {% endcall %}
 {% endcall %}
@@ -91,7 +102,7 @@
                               caption='Framework templates', testid='framework-templates-table', row_testid='framework-template-row', page_size=10,
                               empty_message='No templates are available yet.') %}
   {% call table_cell(class='max-w-[280px]') %}
-    <a href="{{ url_for('framework_config_ui.template_details', template_id=template.id) }}" class="block truncate font-medium text-foreground hover:underline">{{ template.template_name }}</a>
+    {% if platform_view %}<a href="{{ url_for('framework_config_ui.template_details', template_id=template.id) }}" class="block truncate font-medium text-foreground hover:underline">{{ template.template_name }}</a>{% else %}<span class="block truncate font-medium text-foreground">{{ template.template_name }}</span>{% endif %}
     {% if template.template_description %}<span class="block truncate text-xs text-muted-foreground">{{ template.template_description }}</span>{% endif %}
   {% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}{{ value_or_unset((template.template_type or '')|replace('_', ' ')|capitalize, 'No type') }}{% endcall %}
@@ -104,7 +115,7 @@
                                caption='Framework extensions', testid='framework-extensions-table', row_testid='framework-extension-row', page_size=10,
                                empty_message='No extensions are available yet.') %}
   {% call table_cell(class='max-w-[280px]') %}
-    <a href="{{ url_for('framework_config_ui.extension_details', extension_code=extension.extension_code) }}" class="block truncate font-medium text-foreground hover:underline">{{ extension.extension_name }}</a>
+    {% if platform_view %}<a href="{{ url_for('framework_config_ui.extension_details', extension_code=extension.extension_code) }}" class="block truncate font-medium text-foreground hover:underline">{{ extension.extension_name }}</a>{% else %}<span class="block truncate font-medium text-foreground">{{ extension.extension_name }}</span>{% endif %}
     {% if extension.extension_description %}<span class="block truncate text-xs text-muted-foreground">{{ extension.extension_description }}</span>{% endif %}
   {% endcall %}
   {% call table_cell(class='whitespace-nowrap') %}{{ value_or_unset((extension.extension_type or '')|replace('_', ' ')|capitalize, 'No type') }}{% endcall %}
@@ -115,6 +126,7 @@
 {% endif %}
 </div>
 
+{% if platform_view %}
 <div x-data="frameworkConfigModal">
 {% call modal(id='create-framework-config', title='New framework configuration', description='Name the configuration; you can choose its domains and extensions next.', size='default') %}
 <form @submit.prevent="submit" class="space-y-4" data-testid="framework-config-form">
@@ -139,6 +151,7 @@
 </form>
 {% endcall %}
 </div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}

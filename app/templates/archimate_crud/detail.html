@@ -381,7 +381,9 @@
         <div class="mt-4 grid gap-6 md:grid-cols-2">
             <div>
                 <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Yearly cost</h3>
-                {% if product.cost.total is not none %}
+                {% if product.cost.withheld %}
+                <p class="mt-2 text-sm text-muted-foreground" data-testid="product-cost-total">{{ costs_withheld_text }}</p>
+                {% elif product.cost.total is not none %}
                 <p class="mt-2 text-sm font-medium" data-testid="product-cost-total">{{ product.cost.total | currency(product.cost.currency) }} a year across {{ product.cost.counted }} cost line{{ '' if product.cost.counted == 1 else 's' }}</p>
                 {% elif product.cost.counted == 0 %}
                 <p class="mt-2 text-sm text-muted-foreground" data-testid="product-cost-total">No application or technology in this product has a yearly cost recorded, so no total is shown.</p>
@@ -389,7 +391,7 @@
                 <p class="mt-2 text-sm text-muted-foreground" data-testid="product-cost-total">No total is shown because {{ product.cost.missing | join(', ') }} {{ 'has' if product.cost.missing | length == 1 else 'have' }} no yearly cost recorded.</p>
                 {% endif %}
                 <ul class="mt-2 space-y-1 text-sm" role="list">
-                    {% for c in product.cost.lines %}<li data-testid="product-cost-line">{{ c.name }}: {{ c.amount | currency(product.cost.currency) }}</li>{% endfor %}
+                    {% for c in (product.cost.lines if not product.cost.withheld else []) %}<li data-testid="product-cost-line">{{ c.name }}: {{ c.amount | currency(product.cost.currency) }}</li>{% endfor %}
                 </ul>
             </div>
             <div data-testid="product-problems">

@@ -21,13 +21,13 @@
 
 {% if business_cases %}
 {#- A column every row leaves empty is left out rather than repeating "not costed" on each row. -#}
-{%- set show_cost = business_cases|selectattr('tco_3yr', 'ne', none)|list|length > 0 -%}
+{%- set show_cost = (not costs_withheld) and business_cases|selectattr('tco_3yr', 'ne', none)|list|length > 0 -%}
 {%- set show_roi = business_cases|selectattr('roi_percentage', 'ne', none)|list|length > 0 -%}
 {%- set columns = [{'label': 'Title', 'sortable': true}, ('Status', '')] -%}
 {%- if show_cost %}{% set _ = columns.append({'label': 'Three-year cost', 'align': 'right', 'sortable': true}) %}{% endif -%}
 {%- if show_roi %}{% set _ = columns.append({'label': 'Return', 'align': 'right', 'sortable': true}) %}{% endif -%}
 {%- set _ = columns.append({'label': 'Updated', 'sortable': true}) -%}
-{% macro _figures_notice() %}<span data-testid="bc-figures-note">{{ 'No business case has its cost or return worked out yet' if not show_cost and not show_roi else ('No business case has its three-year cost worked out yet' if not show_cost else 'No business case has its return worked out yet') }}. Open one to add its figures.</span>{% endmacro %}
+{% macro _figures_notice() %}<span data-testid="bc-figures-note">{% if costs_withheld %}{{ costs_withheld_text }}{% else %}{{ 'No business case has its cost or return worked out yet' if not show_cost and not show_roi else ('No business case has its three-year cost worked out yet' if not show_cost else 'No business case has its return worked out yet') }}. Open one to add its figures.{% endif %}</span>{% endmacro %}
 {% call(bc) list_table(rows=business_cases,
                        columns=columns,
                        caption='Business cases', testid='bc-table', row_testid='bc-row', search_placeholder='Filter business cases...',

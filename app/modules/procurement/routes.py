@@ -7,7 +7,7 @@ All queries are scoped by current user's organization_id.
 ADR Reference: docs/adr/0010-procurement-persona.md
 """
 
-from datetime import date, timedelta
+from datetime import date
 
 from flask import render_template, request
 from flask_login import current_user, login_required
@@ -27,11 +27,15 @@ from . import procurement_bp
 
 # As in my_applications, services.py held the summary shapes these templates
 # read and was never imported, so every dashboard raised jinja2.UndefinedError.
+from app.services.vendor_register import (
+    get_days_until_renewal,
+    get_renewal_urgency,
+    renewal_date_of,
+    renewal_state,
+)
 from .services import (
     get_contract_amounts,
-    get_days_until_renewal,
     get_renewal_summary,
-    get_renewal_urgency,
     get_spend_by_category,
     get_spend_summary,
 )
@@ -72,7 +76,7 @@ def contracts_list():
     """List all vendor contracts for current organization."""
     org_id = current_user.organization_id
 
-    from app.services.vendor_register import is_active, register_contracts
+    from app.services.vendor_register import contract_renewal_due, is_active, register_contracts
 
     contracts = register_contracts(org_id)
 
@@ -87,10 +91,7 @@ def contracts_list():
 
     # Summary stats
     active_count = sum(1 for c in contracts if is_active(c))
-    expiring_soon = sum(
-        1 for c in contracts
-        if is_active(c) and c.end_date and c.end_date <= date.today() + timedelta(days=90)
-    )
+    expiring_soon = sum(1 for c in contracts if contract_renewal_due(c))
 
     # contracts_list.html iterates item.contract.* plus item.days_until_renewal
     # and item.urgency - it wants each contract wrapped with its renewal state,
@@ -98,20 +99,11 @@ def contracts_list():
     # item.contract for every line, so the page 500'd the moment a single
     # contract existed. An empty portfolio never enters the loop, which is why it
     # looked healthy until the first record was created.
-    today = date.today()
-
     def _wrap(contract):
-        days = (contract.end_date - today).days if contract.end_date else None
-        if days is None:
-            urgency = "unknown"
-        elif days < 0:
-            urgency = "expired"
-        elif days <= 30:
-            urgency = "critical"
-        elif days <= 90:
-            urgency = "warning"
-        else:
-            urgency = "ok"
+        # The renewal state is the one rule the renewals page and the vendor pages read.
+        renewal = renewal_state(contract)
+        days = renewal.days
+        urgency = get_renewal_urgency(contract)
         # The row's amounts come from the same function the spend totals read,
         # so a contract with no annual cost is a dash here and is left out of
         # the total there, never a zero on either.
@@ -119,6 +111,7 @@ def contracts_list():
             "contract": contract,
             "days_until_renewal": days,
             "urgency": urgency,
+            "renewal": renewal,
             **get_contract_amounts(contract),
         }
 
@@ -128,7 +121,7 @@ def contracts_list():
         status=status,
         search=None,
         # The renewal column shows only when some contract has a date; otherwise the page says so once.
-        any_renewal=any(c.end_date for c in contracts),
+        any_renewal=any(renewal_date_of(c) for c in contracts),
         # The pagination footer reads both. It is guarded by `total > 20`, so on a
         # small portfolio the block never renders and their absence went unnoticed
         # until a real dataset existed.
@@ -144,6 +137,8 @@ def contracts_list():
 @requires_contract_visibility
 def contract_detail(contract_id):
     """View contract details (scoped to org)."""
+    from app.services import vendor_register
+
     org_id = current_user.organization_id
 
     contract = VendorContract.query.filter_by(
@@ -161,6 +156,12 @@ def contract_detail(contract_id):
         "procurement/contract_detail.html",
         contract=contract,
         licenses=licenses,
+        renews_on=renewal_date_of(contract),
+        days_until_renewal=get_days_until_renewal(contract),
+        urgency=get_renewal_urgency(contract),
+        renewal=renewal_state(contract),
+        system_retired=vendor_register.on_retired_system(contract.id, vendor_register.contract_ledger(org_id)),
+        retired_note=vendor_register.RETIRED_SYSTEM_RENEWAL,
         organisation_currency=get_reporting_currency(org_id),
     )
 
@@ -183,17 +184,25 @@ def renewals_dashboard():
     else:
         days_filter = 30
 
-    all_contracts = VendorContract.query.filter_by(organization_id=org_id).all()
+    # The same contracts the tiles count: the active ones. A contract still marked active whose end date
+    # has passed is in neither the tiles nor this list; the page says how many there are.
+    all_contracts = VendorContract.query.filter_by(organization_id=org_id, status="active").all()
+    from app.services import vendor_register
+
+    retired = {c.id for c in vendor_register.contract_ledger(org_id)["retired_system"]}
     items = []
     for c in all_contracts:
-        days = get_days_until_renewal(c)
-        if days is None:
+        renewal = renewal_state(c)
+        if renewal.kind not in ("overdue", "ahead"):
             continue
-        if days <= days_filter:  # includes expired (negative days)
+        if renewal.days <= days_filter:
             items.append({
                 "contract": c,
                 "urgency": get_renewal_urgency(c),
-                "days_until_renewal": days,
+                "renewal": renewal,
+                "days_until_renewal": renewal.days,
+                "renews_on": renewal.on,
+                "system_retired": c.id in retired,
             })
     items.sort(key=lambda i: i["days_until_renewal"])
 
@@ -224,6 +233,7 @@ def renewals_dashboard():
         brief_contract=brief_contract,
         brief_error=brief_error,
         today=today,
+        retired_note=vendor_register.RETIRED_SYSTEM_RENEWAL,
         # Template reads summary.{critical,warning,ok,unknown,upcoming,total} -
         # precisely get_renewal_summary()'s return shape.
         summary=get_renewal_summary(org_id),

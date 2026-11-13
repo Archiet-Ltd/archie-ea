@@ -17,8 +17,8 @@ Stores used (none added here):
 
 from __future__ import annotations
 
-from datetime import date, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import date
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
 from flask import g, has_request_context
 from sqlalchemy import and_, event, func, or_
@@ -164,11 +164,16 @@ def contracts_of(vendor_id: int, org_id: Optional[int] = None) -> List[VendorCon
     ).scalars())
 
 
+def is_marked_active(contract) -> bool:
+    """Whether the contract's status says active, whatever its dates say."""
+    return contract.status == "active"
+
+
 def is_active(contract, today: Optional[date] = None) -> bool:
     """The one definition of an active contract: its status is active, and it has no end date or one not yet
     past. Every screen that counts, lists or prices active contracts asks this, or ``active_condition``."""
     today = today or date.today()
-    return contract.status == "active" and (contract.end_date is None or contract.end_date >= today)
+    return is_marked_active(contract) and (contract.end_date is None or contract.end_date >= today)
 
 
 def active_condition(today: Optional[date] = None):
@@ -178,11 +183,118 @@ def active_condition(today: Optional[date] = None):
                 or_(VendorContract.end_date.is_(None), VendorContract.end_date >= today))
 
 
-def next_renewal(contracts, today: Optional[date] = None) -> Optional[date]:
-    """The earliest end date still ahead among the active contracts, else None."""
+class RenewalState(NamedTuple):
+    """What one contract says about renewal. ``kind`` is ``inactive`` (not active: nothing to renew), ``ended``
+    (active but the end date has passed), ``overdue`` (active, the renewal date has passed), ``ahead`` (a date
+    to come) or ``none`` (active with no date). ``on`` is the date the kind names, ``days`` the whole days to it
+    (negative once past), ``text`` the words every screen shows for it."""
+    kind: str
+    on: Optional[date]
+    days: Optional[int]
+    text: Optional[str]
+
+
+def _plural_days(n: int) -> str:
+    return "%d day%s" % (n, "" if n == 1 else "s")
+
+
+def renewal_state(contract, today: Optional[date] = None) -> RenewalState:
+    """The one renewal rule, applied in this order. A contract that is not active (terminated, expired, draft)
+    has no upcoming renewal and no urgency. An active contract whose end date has passed reads "Ended N days
+    ago" from the end date. An active contract whose renewal date has passed reads "Renewal overdue by N days"
+    from the renewal date. Anything else has its next date, the renewal date else the end date, and the days
+    to it. Every screen, count and brief that says when a contract renews reads this and nothing else."""
     today = today or date.today()
-    ends = [c.end_date for c in contracts if c.end_date and is_active(c, today)]
-    return min(ends) if ends else None
+    if not is_marked_active(contract):
+        return RenewalState("inactive", None, None, None)
+    if contract.end_date is not None and contract.end_date < today:
+        days = days_until(contract.end_date, today)
+        return RenewalState("ended", contract.end_date, days, "Ended %s ago" % _plural_days(-days))
+    if contract.renewal_date is not None and contract.renewal_date < today:
+        days = days_until(contract.renewal_date, today)
+        return RenewalState("overdue", contract.renewal_date, days,
+                            "Renewal overdue by %s" % _plural_days(-days))
+    on = contract.renewal_date or contract.end_date
+    if on is None:
+        return RenewalState("none", None, None, None)
+    days = days_until(on, today)
+    return RenewalState("ahead", on, days, "Renews today" if days == 0 else "In %s" % _plural_days(days))
+
+
+def renewal_date_of(contract, today: Optional[date] = None) -> Optional[date]:
+    """The date the contract's renewal state names, or None (see ``renewal_state``)."""
+    return renewal_state(contract, today).on
+
+
+RENEWAL_BAND_DAYS = (("critical", 30), ("warning", RENEWAL_WINDOW_DAYS), ("upcoming", 180))
+
+
+def renewal_band(days: Optional[int]) -> str:
+    """The one banding of days to a renewal, used by the renewals tiles, their list and the vendor pages. A
+    contract exactly 30, 90 or 180 days away is in the nearer band, as the labels "within 30 days" say."""
+    if days is None:
+        return "unknown"
+    if days < 0:
+        return "expired"
+    for band, limit in RENEWAL_BAND_DAYS:
+        if days <= limit:
+            return band
+    return "ok"
+
+
+def days_until(target: Optional[date], today: Optional[date] = None) -> Optional[int]:
+    """Whole days from today to a date, negative once past, None with no date. The one place a contract
+    date is turned into a day count."""
+    if target is None:
+        return None
+    return (target - (today or date.today())).days
+
+
+def get_days_until_renewal(contract, today: Optional[date] = None) -> Optional[int]:
+    """Whole days from today to the contract's renewal state date, negative once past, None with none."""
+    return renewal_state(contract, today).days
+
+
+def get_renewal_urgency(contract, today: Optional[date] = None) -> Optional[str]:
+    """The band of the contract's days to renewal: critical (up to 30), warning (up to 90), upcoming (up to
+    180), ok (later), expired (past) or unknown (no date). None for a contract that is not active: it carries
+    no urgency. Every screen and brief that says how soon a contract renews reads this, so none of them can
+    band the same contract differently."""
+    state = renewal_state(contract, today)
+    return None if state.kind == "inactive" else renewal_band(state.days)
+
+
+def renewal_is_overdue(contract, today: Optional[date] = None) -> bool:
+    """Whether an active contract's renewal date has passed (and its end date has not)."""
+    return renewal_state(contract, today).kind == "overdue"
+
+
+def renewal_is_due(days: Optional[int]) -> bool:
+    """Whether a renewal still ahead is within the 90 day window the vendors page and the 90 day tile both
+    name. A passed date is not ahead: ask ``contract_renewal_due`` for a contract."""
+    return renewal_band(days) in ("critical", "warning")
+
+
+def contract_renewal_due(contract, today: Optional[date] = None) -> bool:
+    """Whether the contract is within 90 days of renewal: an overdue renewal counts, an ended or inactive
+    contract does not."""
+    if renewal_is_overdue(contract, today):
+        return True
+    state = renewal_state(contract, today)
+    return state.kind == "ahead" and renewal_is_due(state.days)
+
+
+def next_renewal_state(contracts, today: Optional[date] = None) -> Optional[RenewalState]:
+    """The earliest renewal among the contracts that have one ahead or overdue, else None. An overdue date is
+    kept and, being earliest, comes first."""
+    states = [s for s in (renewal_state(c, today) for c in contracts) if s.kind in ("overdue", "ahead")]
+    return min(states, key=lambda s: s.on) if states else None
+
+
+def next_renewal(contracts, today: Optional[date] = None) -> Optional[date]:
+    """The date of ``next_renewal_state``, else None."""
+    state = next_renewal_state(contracts, today)
+    return state.on if state else None
 
 
 NOT_COUNTED_INACTIVE = "Not counted: the contract is not active"
@@ -205,7 +317,8 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
     """The one rule for which contracts a cost figure adds up, applied to every contract at once.
 
     An active contract counts for the vendor of the live system it sits on, else for the vendor it names
-    when it sits on no system. A contract on a decommissioned, removed or copied system counts nowhere.
+    when it sits on no system. A contract on a decommissioned or removed system adds no cost to any vendor, but it
+    is still active, so it is listed in ``retired_system`` and renews.
     Returns ``{"by_vendor": {vendor id: [contracts]}, "unassigned": [contracts that name no vendor],
     "left_out": {contract id: reason}, "counted": every counted contract, "superseded": {contract id: reason}
     for counted contracts whose cost is not added because the system they sit on records its own}``. A
@@ -217,7 +330,7 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
     org_id = _org(org_id)
     today = today or date.today()
     ledger: Dict = {"by_vendor": {}, "unassigned": [], "left_out": {}, "counted": [], "superseded": {},
-                    "other_currency": [], "other_by_vendor": {}}
+                    "other_currency": [], "other_by_vendor": {}, "renewing_by_vendor": {}, "retired_system": []}
     if org_id is None:
         return ledger
     from app.services.application_cost_accessor import get_reporting_currency
@@ -237,7 +350,11 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
             ledger["left_out"][c.id] = (NOT_COUNTED_INACTIVE if c.status != "active" else
                                         "Not counted: the contract ended on %s" % c.end_date.strftime("%d %b %Y"))
         elif c.application_id is not None and c.application_id not in owner_of:
+            # its cost is not added, but an active contract renews whatever the state of the system it covers
             ledger["left_out"][c.id] = NOT_COUNTED_SYSTEM
+            ledger["retired_system"].append(c)
+            if c.vendor_id is not None:
+                ledger["renewing_by_vendor"].setdefault(c.vendor_id, []).append(c)
         elif (c.currency or currency).upper() != currency:
             # an amount in another currency is never added under the organisation's symbol
             ledger["left_out"][c.id] = not_added_reason(c.currency, currency)
@@ -245,6 +362,7 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
             owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
             if owner is not None:
                 ledger["other_by_vendor"].setdefault(owner, []).append(c)
+                ledger["renewing_by_vendor"].setdefault(owner, []).append(c)
         else:
             owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
             ledger["counted"].append(c)
@@ -254,7 +372,37 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
                 ledger["unassigned"].append(c)
             else:
                 ledger["by_vendor"].setdefault(owner, []).append(c)
+                ledger["renewing_by_vendor"].setdefault(owner, []).append(c)
     return ledger
+
+
+def renewing_contracts(ledger: Dict) -> List[VendorContract]:
+    """Every active contract a renewal is counted for, whatever currency it states its cost in and whatever
+    the state of the system it covers.
+
+    Currency and a retired system decide only whether a cost figure adds the contract up, never whether it
+    renews: the obligation is the contract's.
+    """
+    return ledger["counted"] + ledger.get("other_currency", []) + ledger.get("retired_system", [])
+
+
+RETIRED_SYSTEM_RENEWAL = "The system is retired; the contract is still active. Renew or end it."
+
+
+def on_retired_system(contract_id: int, ledger: Dict) -> bool:
+    """Whether the contract is active and sits on a decommissioned or removed system."""
+    return any(c.id == contract_id for c in ledger.get("retired_system", []))
+
+
+def renewals_due_counts(ledger: Dict, today: Optional[date] = None) -> Dict[str, int]:
+    """The contracts within 90 days of renewal, counted as the Renewals page counts them: ``contracts`` is
+    every one, ``without_vendor`` those that name no vendor (so no vendor row carries them) and
+    ``on_retired_system`` those that sit on a decommissioned or removed system."""
+    due = [c for c in renewing_contracts(ledger) if contract_renewal_due(c, today)]
+    named = {c.id for cs in ledger["renewing_by_vendor"].values() for c in cs}
+    retired = {c.id for c in ledger.get("retired_system", [])}
+    return {"contracts": len(due), "without_vendor": len([c for c in due if c.id not in named]),
+            "on_retired_system": len([c for c in due if c.id in retired])}
 
 
 def _stack_by_currency(contracts) -> Dict[str, Dict]:
@@ -325,8 +473,12 @@ def contracts_with_standing(vendor_id: int, org_id: Optional[int] = None, ledger
     counted_ids = {c.id for c in counted}
     no_vendor_ids = {c.id for c in ledger["unassigned"]}
     rows = [(c, ledger.get("superseded", {}).get(c.id)) for c in counted]
+    retired_ids = {c.id for c in ledger.get("retired_system", [])}
     for c in contracts_of(vendor_id, org_id):
         if c.id in counted_ids:
+            continue
+        if c.id in retired_ids:
+            rows.append((c, RETIRED_SYSTEM_RENEWAL + " Its cost is not counted."))
             continue
         rows.append((c, ledger["left_out"].get(c.id)
                      or (NOT_COUNTED_NO_VENDOR if c.id in no_vendor_ids else
@@ -423,7 +575,7 @@ def counted_cost_by_category(ledger: Dict) -> Dict[str, float]:
 
 
 def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List[Dict]:
-    """One row per vendor, renewals due within 90 days first, then by name."""
+    """One row per vendor: renewals due within 90 days first, then vendors with a renewal ahead, then those with none, each by name."""
     org_id = _org(org_id)
     today = today or date.today()
     ids = vendor_ids(org_id)
@@ -439,11 +591,14 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
             .order_by(func.lower(ApplicationComponent.name), ApplicationComponent.id)).all():
         if owner is not None:
             systems_by_vendor.setdefault(owner, []).append(system)
-    counted_by_vendor = contract_ledger(org_id, today)["by_vendor"]
+    ledger = contract_ledger(org_id, today)
+    counted_by_vendor = ledger["by_vendor"]
+    renewing_by_vendor = ledger["renewing_by_vendor"]
     rows = []
     for v in vendors:
         systems = systems_by_vendor.get(v.id, [])
-        renewal = next_renewal(counted_by_vendor.get(v.id, []), today)
+        nxt = next_renewal_state(renewing_by_vendor.get(v.id, []), today)
+        renewal = nxt.on if nxt else None
         cost, basis = annual_cost_with_basis(systems, v.id, org_id, counted_by_vendor.get(v.id, []))
         rows.append({
             "id": v.id,
@@ -458,11 +613,13 @@ def register(org_id: Optional[int] = None, today: Optional[date] = None) -> List
             "annual_cost": cost,
             "annual_cost_basis": basis,
             "next_renewal": renewal.isoformat() if renewal else None,
-            "renewal_due": bool(renewal and renewal <= today + timedelta(days=RENEWAL_WINDOW_DAYS)),
+            "renewal_due": bool(nxt and (nxt.kind == "overdue" or renewal_is_due(nxt.days))),
+            "renewal_text": nxt.text if nxt and nxt.kind == "overdue" else None,
         })
     rows.sort(key=lambda r: (
         not r["renewal_due"],
         r["next_renewal"] if r["renewal_due"] else "",
+        r["next_renewal"] is None,
         r["name"].lower(),
     ))
     return rows
@@ -583,6 +740,7 @@ def page_summary() -> Optional[Dict]:
         "supplied_count": coverage["supplied_count"],
         "total_systems": coverage["total_systems"],
         "renewals_due": sum(1 for r in rows if r["renewal_due"]),
+        "renewing_contracts": renewals_due_counts(ledger),
         "annual_cost": total if show_cost else None,
         "unassigned_count": len(ledger["unassigned"]),
         "unassigned_cost": unassigned_cost(ledger) if show_cost else None,

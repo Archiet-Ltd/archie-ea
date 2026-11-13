@@ -158,23 +158,23 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "The AI assistant answering a question from the organisation's own architecture model.",
      "Screenshot of the AI Chat module answering a question about Lantern Quay Systems' architecture."),
     ("applications", "/applications/", DEMO_PERSONA,
-     "The application portfolio: lifecycle tiles, owner and vendor coverage, and each application's type, lifecycle stage and the capability it supports.",
-     "Screenshot of the Applications module showing Lantern Quay Systems' portfolio tiles, data-quality coverage and application list with type, lifecycle stage and mapped capability."),
+     "The application portfolio: every system with its type, lifecycle stage, owner, record completeness and the capability it supports.",
+     "The Applications list showing the systems with their type, lifecycle stage, owner, how complete each record is and the capability each supports."),
     ("arb", "/arb/", DEMO_PERSONA,
-     "The Architecture Review Board hub: review volume, pending decisions, approval rate and cycle time.",
-     "Screenshot of the Architecture Review Board hub showing total and pending reviews, approval rate, cycle time and the review status chart."),
+     "The Architecture Review Board: the review figures and the queue of reviews waiting for a decision.",
+     "The Architecture Review Board showing its review figures and the reviews waiting for a decision, each with its subject, status and an Open review button."),
     ("architecture-model", "/architecture/", DEMO_PERSONA,
-     "The ArchiMate element browser, spanning the business, application, technology and motivation layers.",
-     "Screenshot of the Architecture Model module's ArchiMate element browser."),
+     "The ArchiMate layered view: strategy, business, application and technology elements in bands, joined by their relationships.",
+     "A layered ArchiMate view of the model's elements drawn in strategy, business, application and technology bands, with the relationships between them drawn as arrows."),
     ("business-case", "/business-case/", DEMO_PERSONA,
-     "Business cases with their status, three-year TCO and return on investment.",
-     "Screenshot of the Business Case module's list of business cases."),
+     "One business case open: its options, the recommendation and the three-year cost and return worked out from its figures.",
+     "The business case to move the event backbone to a managed message broker, with the options considered, the recommendation, and the capital cost, annual running cost, three-year cost, annual benefit, return and payback worked out from them."),
     ("business-model-canvas", "/business-model/", DEMO_PERSONA,
-     "The business model canvas library, with each canvas's operating-model archetype.",
-     "Screenshot of the Business Model Canvas module's canvas library."),
+     "The nine-block business model canvas, filled in for the demonstration company.",
+     "A business model canvas with every block filled in for the demonstration company: key partners, activities and resources, value propositions, customer relationships, channels and segments, cost structure and revenue streams."),
     ("compliance-frameworks", "/dashboard/compliance", DEMO_PERSONA,
-     "The compliance frameworks dashboard, tracking framework coverage across the estate.",
-     "Screenshot of the Compliance Frameworks module's dashboard."),
+     "Regulatory compliance: the framework, its controls and the controls mapped to applications that are not yet in place.",
+     "The compliance dashboard showing the active frameworks, controls and application control mappings by status, above the controls not yet in place with the application and capability each belongs to."),
     ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,
      "The duplicate detection dashboard, flagging applications that may overlap in function.",
      "Screenshot of the Duplicate Detection module's dashboard."),
@@ -182,17 +182,17 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "An application owner's personal dashboard of the applications they're responsible for.",
      "Screenshot of the My Applications module's owner dashboard."),
     ("portfolio", "/portfolio/", DEMO_PERSONA,
-     "The portfolio dashboard, summarising active initiatives and programmes.",
-     "Screenshot of the Portfolio module's dashboard."),
+     "The portfolio: {initiatives} with budget, spend, health and benefits.",
+     "The portfolio dashboard showing the initiatives, their approved budget and spend, a health count of red, amber and green, and a table with each initiative's phase, budget, spend, variance, completion, benefits and sponsor."),
     ("procurement", "/procurement/renewals", PROCUREMENT_PERSONA,
-     "The contract renewals dashboard, showing upcoming vendor renewal dates.",
-     "Screenshot of the Procurement module's contract renewals dashboard."),
+     "Contract renewals: the contracts due soonest with their vendor, annual cost and days to renewal.",
+     "The renewals screen showing how many contracts renew in each window, and the contracts due soonest with their vendor, annual cost and days to renewal."),
     ("projects", "/enterprise/implementation/work-packages", DEMO_PERSONA,
      "The work packages list, tracking delivery programmes in progress.",
      "Screenshot of the Projects module's work packages list."),
     ("risk-register", "/risks/", DEMO_PERSONA,
-     "The risk register, with likelihood, impact and a mitigation plan recorded for each risk.",
-     "Screenshot of the Risk Register module."),
+     "The risk register: the ranked risks beside a probability-by-impact matrix.",
+     "The risk register showing the top risks ranked by the elements each reaches, with their status and what they touch, beside a five-by-five matrix counting the register's risks by probability and impact."),
     ("build-your-model-from-your-tools", "/account/welcome", DEMO_PERSONA,
      "The welcome screen, where you connect GitHub or Jira or import a model.",
      "Screenshot of the welcome screen offering to connect GitHub or Jira, or import an existing model."),
@@ -200,8 +200,8 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "Capability maturity: how many capabilities have a recorded assessment, and the average current and target level.",
      "Screenshot of the capability maturity page showing the assessed count and the average current and target maturity for the demonstration company."),
     ("digital-twin", "/intelligence/twin-map", DEMO_PERSONA,
-     "The twin map: one application and everything it connects to, banded by architecture layer.",
-     "Screenshot of the twin map showing one application and the capabilities, processes, technology and data it connects to, grouped by architecture layer."),
+     "The twin map: an application and everything it connects to, banded by architecture layer.",
+     "Screenshot of the twin map showing an application and the capabilities, processes, technology and data it connects to, grouped by architecture layer."),
     ("industry-apqc", "/industry-apqc/", DEMO_PERSONA,
      "The industry process classification, with its process groups and coverage.",
      "Screenshot of the industry process classification dashboard for the demonstration company."),
@@ -215,9 +215,24 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "The solutions list, tracking each solution's design progress and next action.",
      "Screenshot of the Solutions module's solution list."),
     ("vendors", "/applications/vendors", DEMO_PERSONA,
-     "The vendor catalogue, with each vendor's type, products and contract status.",
-     "Screenshot of the Vendors module's vendor catalogue."),
+     "The vendor register: each vendor with its active contracts and the systems it supplies.",
+     "The vendor register: a line counting vendors, systems and renewals, above the vendors with the number of active contracts and the systems each supplies."),
 ]
+
+# What the phone version of a module image shows, where it is not the same screen as the desktop version: a picture
+# can have one description per version, and the page gives each its own. A slug not listed here uses its alt text above.
+MODULE_PHONE_ALTS: dict[str, str] = {
+    "applications": "The Applications list as cards, each with its status, owner, vendor, capability and a ring showing how complete its record is.",
+    "architecture-model": "The layered ArchiMate view on a narrow screen: the elements stacked one above another in strategy, business, application and technology bands, with the relationships between them drawn as lines.",
+    "arb": "The Architecture Review Board's four figures, a line saying how many pending reviews are not yet in a review cycle, and the reviews waiting for a decision, one card each.",
+    "business-case": "A business case with its options considered, the recommendation, and the capital cost, annual running cost, three-year cost, annual benefit, return and payback.",
+    "business-model-canvas": "One block of the business model canvas, the value propositions, listing what the demonstration company offers.",
+    "compliance-frameworks": "The compliance figures: the active frameworks, controls and application control mappings counted by status.",
+    "portfolio": "The portfolio figures: the initiatives, the approved budget, the spend to date and a health count of red, amber and green.",
+    "procurement": "The renewals screen showing how many contracts renew in each window, and the contracts coming up soonest.",
+    "risk-register": "The risk register on a phone: a five-by-five matrix counting the register's risks by probability and impact, above the top risks ranked by the elements each reaches.",
+    "vendors": "The vendor register: a line counting vendors, systems and renewals, above the vendors and the systems each supplies.",
+}
 
 # ── whole-journey recordings of the module pages ────────────────────────────
 # One recording per /modules/<slug> page, captured by scripts/capture_screenshots.py --modules from the
@@ -427,6 +442,7 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
     "investment-analysis": "domain Unknown and 0 apps coverage on every capability row",
     "gap-analysis": "type None on every row",
     "value-streams": "0 stages and 0 capabilities on every value stream",
+    "scenario-modelling": "the page is live now that the scenarios screen is released; its screen has not been captured yet",
 }
 
 # The one live use-case page: same screen as the capability-maturity module
@@ -890,6 +906,8 @@ def get_role_more_screens(page: "PublicPage") -> list[dict[str, Any]]:
         path = STATIC_ROOT / "img" / rel
         if not path.is_file():
             continue
+        if rel.startswith("modules/"):
+            density = _standard_density(Path(rel).stem) or density
         with Image.open(path) as im:
             width, height = im.size[0] // density, im.size[1] // density
         out.append({"url": f"/static/img/{rel}", "width": width, "height": height,
@@ -897,7 +915,55 @@ def get_role_more_screens(page: "PublicPage") -> list[dict[str, Any]]:
     return out
 
 
+# The module images made to the capture standard (scripts/capture/clip_kit.py, capture_standard_image). Each
+# is recorded with its density in captures.json beside the images; a module not yet recaptured keeps the
+# density it was captured at.
+STANDARD_MODULE_IMAGES = frozenset({
+    "applications", "arb", "architecture-model", "business-case", "business-model-canvas",
+    "compliance-frameworks", "portfolio", "procurement", "risk-register", "vendors",
+})
+MODULE_CAPTURES_MANIFEST = "captures.json"
+
+
+def _standard_density(slug: str) -> int | None:
+    manifest = IMG_MODULES_DIR / MODULE_CAPTURES_MANIFEST
+    if not manifest.is_file():
+        return None
+    entry = json.loads(manifest.read_text(encoding="utf-8")).get(slug)
+    return entry["density"] if entry else None
+
+
+def module_image_alt(slug: str, variant: str = "desktop") -> str | None:
+    """The description written when the picture was captured, from the figures its screen showed, or None when
+    the manifest holds none for it (the registry's figure-free description is then used)."""
+    manifest = IMG_MODULES_DIR / MODULE_CAPTURES_MANIFEST
+    if not manifest.is_file():
+        return None
+    entry = json.loads(manifest.read_text(encoding="utf-8")).get(slug) or {}
+    return (entry.get(variant) or {}).get("alt")
+
+
+def module_caption(slug: str, caption: str) -> str:
+    """A caption whose figures come from the manifest: ``{initiatives}`` becomes "7 initiatives" from the
+    count captured with the picture, and a count the manifest does not hold reads as the plural noun alone,
+    so no number is written by hand."""
+    if "{" not in caption:
+        return caption
+    manifest = IMG_MODULES_DIR / MODULE_CAPTURES_MANIFEST
+    facts = {}
+    if manifest.is_file():
+        facts = ((json.loads(manifest.read_text(encoding="utf-8")).get(slug) or {}).get("desktop") or {}).get("facts") or {}
+    nouns = {"initiatives": "initiative"}
+    words = {}
+    for key, noun in nouns.items():
+        count = facts.get(key)
+        words[key] = ("%d %s%s" % (count, noun, "" if count == 1 else "s")) if isinstance(count, int) else "its " + key
+    return caption.format(**words)
+
+
 def _screenshot_density(slug: str, page_family: str) -> int:
+    if page_family == "module" and _standard_density(slug):
+        return _standard_density(slug)
     if page_family == "module" and slug in TWO_X_MODULE_IMAGES:
         return 2
     if page_family == "role" and slug in TWO_X_ROLE_IMAGES:
@@ -936,6 +1002,9 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
     if entry is None:
         return None
     _, _, _, caption, alt = entry
+    if page.page_family == "module":
+        alt = module_image_alt(page.slug) or alt
+        caption = module_caption(page.slug, caption)
 
     image_path = static_dir / f"{page.slug}.webp"
     if not image_path.is_file():
@@ -955,6 +1024,8 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         with Image.open(mobile_path) as im:
             mobile = {
                 "url": f"{url_prefix}/{page.slug}-mobile.webp",
+                "alt": (module_image_alt(page.slug, "phone") or MODULE_PHONE_ALTS.get(page.slug, alt))
+                if page.page_family == "module" else alt,
                 "width": im.size[0] // density,
                 "height": im.size[1] // density,
             }
@@ -964,6 +1035,7 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         "width": width,
         "height": height,
         "mobile": mobile,
+        "density": density,
         "alt": alt,
         "caption": caption,
         "frame_label": f"{ROLE_FRAME_LABELS.get(page.slug, 'Ask')} \u00b7 Demonstration company"
@@ -1056,6 +1128,8 @@ def get_page_recording(page: "PublicPage") -> dict[str, Any] | None:
     if entry is None:
         return None
     _, _, _, caption, alt = entry
+    if page.page_family == "module":
+        alt = module_image_alt(page.slug) or alt
 
     video_path = VIDEO_USE_CASES_DIR / f"{page.slug}.webm"
     poster_path = VIDEO_USE_CASES_DIR / f"{page.slug}-poster.webp"

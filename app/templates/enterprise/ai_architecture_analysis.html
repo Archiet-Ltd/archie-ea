@@ -96,7 +96,7 @@
                 {% if total_recommendations %}
                 <p class="text-sm text-muted-foreground max-w-sm mx-auto mb-2" data-testid="ai-analysis-recommendations-link">The {{ total_recommendations }} recommendation{{ '' if total_recommendations == 1 else 's' }} worked out from your model {{ 'is' if total_recommendations == 1 else 'are' }} on the <a href="{{ url_for('early_access.recommendations') }}" class="font-medium text-primary hover:underline">Recommendations page</a>.</p>
                 <p class="text-sm text-muted-foreground max-w-sm mx-auto mb-4">
-                    None of them has been worded by the AI yet{% if application_count %}. Your model holds {{ application_count }} {{ 'application' if application_count == 1 else 'applications' }}; run the discovery scan to have the AI word recommendations from them{% endif %}.
+                    The AI has not worded any of them yet{% if application_count %}. Your model holds {{ application_count }} {{ 'application' if application_count == 1 else 'applications' }}; run the discovery scan to have the AI word recommendations from them{% endif %}.
                 </p>
                 {% else %}
                 <p class="text-sm text-muted-foreground max-w-sm mx-auto mb-4" data-testid="ai-analysis-no-recommendations">
