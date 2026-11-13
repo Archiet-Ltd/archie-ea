@@ -933,7 +933,7 @@ def gap_analysis():
         }
         total_gap_count = gap_counts["recorded"]
         closed_gap_count = gap_counts["resolved"]
-        unclosed_gap_count = count_gaps(org_id, has_work_package=False)
+        unclosed_gap_count = count_gaps(org_id, has_work_package=False, closed=False)
         # the open gaps with no work package, whole register: the board's "No work planned" figure and rows
         not_addressed_gaps = sorted(get_gaps_not_addressed(org_id), key=lambda g: ((g.name or "").lower(), g.id))
         work_packages_by_gap = work_package_service.work_packages_for_gaps(
