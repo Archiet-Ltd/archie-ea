@@ -106,6 +106,8 @@ def test_the_old_address_lands_on_the_register_whose_counts_follow_its_ratings(b
         assert tiles == {"critical": "2", "high": "1", "medium": "1", "low": "1"}, tiles
         for level in tiles:
             assert tiles[level] == str(sum(1 for v in register.values() if v == level)), (level, tiles, register)
+        recorded = page.locator('[data-testid="gap-stat-recorded-value"]').inner_text().strip()
+        assert recorded == "5", recorded
         for key, name in names.items():
             link = page.get_by_role("link", name=name, exact=True)
             expect(link).to_have_count(1)

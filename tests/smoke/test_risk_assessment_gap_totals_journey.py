@@ -83,6 +83,14 @@ def test_gap_risk_assessment_totals_are_not_capped(browser, live_server, viewpor
         shown = int(re.search(r"to (\d+) of 501", note.inner_text()).group(1))
         expect(page.locator('[data-testid="gap-row"]')).to_have_count(shown, timeout=PAGE_TIMEOUT)
 
+        # Follow the Next gaps link to page 2 and find the 501st gap.
+        next_link = page.locator('[data-testid="gap-page-next"]')
+        expect(next_link).to_have_count(1, timeout=PAGE_TIMEOUT)
+        next_link.click()
+        page.wait_for_url(re.compile(r".*page=2.*"), timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-testid="gap-row"]')).to_have_count(1, timeout=PAGE_TIMEOUT)
+        expect(page.locator("main")).to_contain_text("501", timeout=PAGE_TIMEOUT)
+
         main = page.locator("main")
         expect(main).to_contain_text(noun, timeout=PAGE_TIMEOUT)
         expect(main).to_contain_text("501", timeout=PAGE_TIMEOUT)
