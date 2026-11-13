@@ -154,7 +154,6 @@ compliance_requirements_model
 compliance_scan_reports
 composite_structures
 confidence_thresholds
-consolidation_list_entries
 consolidation_recommendations
 constraints
 consulting_partners
@@ -410,8 +409,6 @@ unified_capability_application_mappings
 unified_capability_process_mapping
 unified_capability_technology_mapping
 unified_capability_vendor_organization_mappings
-unified_detection_runs
-unified_duplicate_groups
 unified_work_packages
 usage_analytics
 usage_events

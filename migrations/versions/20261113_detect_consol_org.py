@@ -53,6 +53,22 @@ TENANT_TABLES = TABLES
 HYBRID_TABLES = ()
 
 
+def _fk_name(bind, table, column):
+    """The name of whatever foreign key actually sits on `column`, detected by
+    column presence rather than by the name this migration expects -- the same
+    table can carry an auto-named foreign key created by ensure_baseline_schema
+    from today's models instead of this migration's own fk_{table}_{column}."""
+    return bind.execute(
+        text(
+            "SELECT con.conname FROM pg_constraint con "
+            "JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ANY (con.conkey) "
+            "WHERE con.contype = 'f' AND con.conrelid = to_regclass(:t) "
+            "AND att.attname = :c"
+        ),
+        {"t": f"public.{table}", "c": column},
+    ).scalar()
+
+
 def _present(bind, table):
     return bool(bind.execute(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": f"public.{table}"}).scalar())
 
@@ -210,8 +226,8 @@ def upgrade():
         print(f"detection org fence: {cross_org} run(s) link applications of more than one organisation; marked cross_organization, counted by none")
 
     if "consolidation_list_entries" in present and _present(bind, "application_components"):
-        ambiguous = _ambiguous_consolidation_entries(bind) if _has_column(bind, "application_components", "organization_id") else 0
         _backfill_consolidation_entries(bind)
+        ambiguous = _ambiguous_consolidation_entries(bind) if _has_column(bind, "application_components", "organization_id") else 0
         print(f"consolidation org fence: {ambiguous} entry(ies) with no derivable organisation")
 
     # Rows nothing links to an organisation cannot be shown to anyone safely.
@@ -241,16 +257,18 @@ def upgrade():
         # runs have NULL organization_id and must not be forced to NOT NULL.
         if table == "unified_detection_runs":
             op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
-            fk = f"fk_{table}_organization_id"
-            if not bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
-                op.create_foreign_key(fk, table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
+            existing_fk = _fk_name(bind, table, "organization_id")
+            if existing_fk:
+                op.drop_constraint(existing_fk, table, type_="foreignkey")
+            op.create_foreign_key(f"fk_{table}_organization_id", table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
             _fence(bind, table)
         else:
             op.alter_column(table, "organization_id", existing_type=sa.Integer(), nullable=False)
             op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
-            fk = f"fk_{table}_organization_id"
-            if not bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
-                op.create_foreign_key(fk, table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
+            existing_fk = _fk_name(bind, table, "organization_id")
+            if existing_fk:
+                op.drop_constraint(existing_fk, table, type_="foreignkey")
+            op.create_foreign_key(f"fk_{table}_organization_id", table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
             _fence(bind, table)
 
 
@@ -262,9 +280,9 @@ def downgrade():
         bind.execute(text(f"ALTER TABLE public.{table} DISABLE ROW LEVEL SECURITY"))  # nosec B608 - literal table names
         for name in TENANT_POLICIES:
             bind.execute(text(f"DROP POLICY IF EXISTS {name} ON public.{table}"))  # nosec B608 - literal table names
-        fk = f"fk_{table}_organization_id"
-        if bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
-            op.drop_constraint(fk, table, type_="foreignkey")
+        existing_fk = _fk_name(bind, table, "organization_id")
+        if existing_fk:
+            op.drop_constraint(existing_fk, table, type_="foreignkey")
         op.drop_index(f"ix_{table}_organization_id", table_name=table, if_exists=True)
         if table == "unified_detection_runs" and _has_column(bind, table, "cross_organization"):
             op.drop_column(table, "cross_organization")
