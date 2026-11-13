@@ -291,11 +291,18 @@ def list_relationships():
     bare id, which is how BOTH routes produced the same "IDs, no names" bug
     from two different causes. Resolve real names/types here explicitly
     instead of relying on attributes that were never declared.
+
+    A relationship row may cross the organisation boundary (its own organization_id
+    is the caller's org while the far element belongs to another). Only relationships
+    where both source and target elements belong to the current organisation are listed.
     """
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from flask import g
 
     page = safe_int_arg('page', 1, minimum=1)
     per_page = 20
+
+    org_id = getattr(g, "current_org_id", None)
 
     # An address that names one relationship ("Open relationship record" in an
     # answer) shows that relationship, so the row it points at is on the page.
@@ -307,10 +314,23 @@ def list_relationships():
         ArchiMateRelationship.type, ArchiMateRelationship.id
     ).paginate(page=page, per_page=per_page)
 
-    element_ids = {
-        eid for rel in pagination.items
-        for eid in (rel.source_id, rel.target_id) if eid is not None
-    }
+    # Filter out relationships where either end belongs to another organisation
+    filtered_items = []
+    element_ids = set()
+    for rel in pagination.items:
+        source = db.session.get(ArchiMateElement, rel.source_id)
+        target = db.session.get(ArchiMateElement, rel.target_id)
+        if source is None or target is None:
+            continue
+        if org_id is not None:
+            if getattr(source, "organization_id", None) != org_id:
+                continue
+            if getattr(target, "organization_id", None) != org_id:
+                continue
+        filtered_items.append(rel)
+        element_ids.add(rel.source_id)
+        element_ids.add(rel.target_id)
+
     names_by_id = {}
     if element_ids:
         names_by_id = dict(
@@ -327,13 +347,28 @@ def list_relationships():
             "source_name": names_by_id.get(rel.source_id),
             "target_name": names_by_id.get(rel.target_id),
         }
-        for rel in pagination.items
+        for rel in filtered_items
     ]
+
+    # Create a pagination-like object with filtered results
+    class FilteredPagination:
+        def __init__(self, items, total, page, per_page):
+            self.items = items
+            self.total = total
+            self.page = page
+            self.per_page = per_page
+            self.pages = (total + per_page - 1) // per_page if per_page else 0
+            self.has_prev = page > 1
+            self.has_next = page < self.pages
+            self.prev_num = page - 1 if self.has_prev else None
+            self.next_num = page + 1 if self.has_next else None
+
+    filtered_pagination = FilteredPagination(filtered_items, len(filtered_items), page, per_page)
 
     return render_template(
         "architecture/relationships.html",
         relationships=relationships,
-        total=pagination.total,
+        total=filtered_pagination.total,
         focus_id=focus_id,
     )
 
@@ -703,11 +738,31 @@ def api_list_relationships():
 )
 @login_required
 def api_element_relationships(element_id):
-    """API: Get relationships for an element."""
-    ArchitectureElement.query.get_or_404(element_id)
+    """API: Get relationships for an element, scoped to the element's organisation.
 
-    incoming = Relationship.query.filter_by(target_id=element_id).all()
-    outgoing = Relationship.query.filter_by(source_id=element_id).all()
+    A relationship row may cross the organisation boundary (its own organization_id
+    is the caller's org while the far element belongs to another). Only relationships
+    where the far element belongs to the same organisation as the centre element
+    are returned.
+    """
+    center = ArchitectureElement.query.get_or_404(element_id)
+    org_id = getattr(center, "organization_id", None)
+
+    incoming_rels = Relationship.query.filter_by(target_id=element_id).all()
+    outgoing_rels = Relationship.query.filter_by(source_id=element_id).all()
+
+    def _far_end_in_org(rel, want_source: bool) -> bool:
+        """Check if the far end of a relationship is in the centre element's org."""
+        if org_id is None:
+            return True
+        far_id = rel.source_id if want_source else rel.target_id
+        far_el = db.session.get(ArchitectureElement, far_id)
+        if far_el is None:
+            return False
+        return getattr(far_el, "organization_id", None) == org_id
+
+    incoming = [r for r in incoming_rels if _far_end_in_org(r, want_source=True)]
+    outgoing = [r for r in outgoing_rels if _far_end_in_org(r, want_source=False)]
 
     return jsonify(
         {

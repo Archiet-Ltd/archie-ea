@@ -2824,28 +2824,38 @@ def api_element_detail(element_id):
     # is already in the session identity map (Query.get would skip it).
     element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
 
+    org_id = getattr(element, "organization_id", None)
+
     outgoing = []
     for rel in ArchiMateRelationship.query.filter_by(source_id=element_id).limit(50).all():
         target = ArchiMateElement.query.get(rel.target_id)
+        if target is None:
+            continue
+        if org_id is not None and getattr(target, "organization_id", None) != org_id:
+            continue
         outgoing.append({
             "id": rel.id,
             "type": rel.type or "",
             "target_id": rel.target_id,
-            "target_name": target.name if target else f"#{rel.target_id}",
-            "target_type": target.type if target else "",
-            "target_layer": target.layer if target else "",
+            "target_name": target.name,
+            "target_type": target.type,
+            "target_layer": target.layer,
         })
 
     incoming = []
     for rel in ArchiMateRelationship.query.filter_by(target_id=element_id).limit(50).all():
         source = ArchiMateElement.query.get(rel.source_id)
+        if source is None:
+            continue
+        if org_id is not None and getattr(source, "organization_id", None) != org_id:
+            continue
         incoming.append({
             "id": rel.id,
             "type": rel.type or "",
             "source_id": rel.source_id,
-            "source_name": source.name if source else f"#{rel.source_id}",
-            "source_type": source.type if source else "",
-            "source_layer": source.layer if source else "",
+            "source_name": source.name,
+            "source_type": source.type,
+            "source_layer": source.layer,
         })
 
     solutions = []
