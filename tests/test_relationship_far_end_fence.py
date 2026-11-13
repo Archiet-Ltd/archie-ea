@@ -60,8 +60,9 @@ class TestApiElementDetailFarEndFence:
         mine, theirs = make_org("d1-mine"), make_org("d1-theirs")
         service_a = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
         service_b = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
+        local_target = _el(db_session, mine, "Local target", "BusinessService", "Business")
         # Same-org relationship (should appear)
-        _rel(db_session, mine, service_a, _el(db_session, mine, "Local target", "BusinessService", "Business"), "Serving")
+        _rel(db_session, mine, service_a, local_target, "Serving")
         # Cross-org relationship (should NOT appear)
         _cross_rel(db_session, mine, service_a, service_b, "Serving")
 
@@ -70,7 +71,7 @@ class TestApiElementDetailFarEndFence:
         resp = client.get(f"/architecture/api/elements/{service_a.id}/detail")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["success"] is True
+        # Response is the element data directly, not wrapped in success
 
         outgoing_ids = {r["target_id"] for r in data["outgoing"]}
         outgoing_names = {r["target_name"] for r in data["outgoing"]}
@@ -86,8 +87,9 @@ class TestApiElementDetailFarEndFence:
         mine, theirs = make_org("d1-mine2"), make_org("d1-theirs2")
         service_a = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
         service_b = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
+        local_source = _el(db_session, mine, "Local source", "BusinessService", "Business")
         # Same-org relationship (should appear)
-        _rel(db_session, mine, _el(db_session, mine, "Local source", "BusinessService", "Business"), service_a, "Serving")
+        _rel(db_session, mine, local_source, service_a, "Serving")
         # Cross-org relationship (should NOT appear)
         _cross_rel(db_session, mine, service_b, service_a, "Serving")
 
@@ -96,7 +98,7 @@ class TestApiElementDetailFarEndFence:
         resp = client.get(f"/architecture/api/elements/{service_a.id}/detail")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["success"] is True
+        # Response is the element data directly, not wrapped in success
 
         incoming_ids = {r["source_id"] for r in data["incoming"]}
         incoming_names = {r["source_name"] for r in data["incoming"]}
