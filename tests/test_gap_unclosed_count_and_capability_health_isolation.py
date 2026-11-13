@@ -56,6 +56,41 @@ def test_gaps_page_unclosed_figure_is_the_register_count_above_500_gaps(
     assert int(shown.group(1)) == register
 
 
+def test_gaps_page_and_board_agree_on_unplanned_with_a_resolved_gap(
+        app, db_session, make_org, client, login_as):
+    from app.models.implementation_migration import Gap
+    from app.services.gap_register_service import count_gaps
+
+    org = make_org("gap-unplanned")
+    user = _user(db_session, org, "unplanned")
+    db_session.add_all([
+        Gap(name="Open gap, no work package", organization_id=org.id,
+            resolution_status="identified"),
+        Gap(name="Resolved gap, no work package", organization_id=org.id,
+            resolution_status="resolved"),
+    ])
+    db_session.commit()
+    org_id, user_id = org.id, user.id
+    db_session.expunge_all()
+
+    register = count_gaps(org_id, has_work_package=False, closed=False)
+    assert register == 1
+
+    _sign_in(client, login_as, user_id)
+
+    # The Gaps page's unplanned figure counts open gaps only.
+    html = client.get("/enterprise/implementation/gap-analysis").get_data(as_text=True)
+    shown = re.search(r'data-testid="gap-unclosed-count">\s*(\d+)\s*<', html)
+    assert shown, "the unclosed figure is missing from the Gaps page"
+    assert int(shown.group(1)) == 1, shown.group(1)
+
+    # The change board's "No work planned" figure counts open gaps only.
+    board = client.get("/adm-kanban/gap-analysis").get_data(as_text=True)
+    board_shown = re.search(r'data-testid="gap-unclosed">\s*(\d+)\s*<', board)
+    assert board_shown, "the unclosed figure is missing from the change board"
+    assert int(board_shown.group(1)) == 1, board_shown.group(1)
+
+
 def test_capability_health_lists_only_the_signed_in_organisations_capabilities(
         app, db_session, make_org, client, login_as):
     from app.models.business_capabilities import BusinessCapability
