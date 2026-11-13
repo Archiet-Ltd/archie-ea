@@ -224,11 +224,10 @@ td {{ padding: 8px 12px; border: 1px solid #e2e8f0; }}
             html += f"<tr><td>{action}</td><td>{count}</td><td>{pct}%</td></tr>\n"  # raw-html-ok: action is one of a fixed 4-item vocabulary list from this loop, count/pct are computed numbers
 
         savings_head = "<th>Est. Savings</th>" if show_costs else ""
-        html += f"""</table>
-<h2>Top 10 Rationalization Candidates</h2>
-<table>
-<tr><th>Application</th><th>Score</th><th>Disposition</th>{savings_head}</tr>
-"""  # raw-html-ok: savings_head is one of two fixed strings
+        html += (
+            "</table>\n<h2>Top 10 Rationalization Candidates</h2>\n<table>\n"
+            "<tr><th>Application</th><th>Score</th><th>Disposition</th>" + savings_head + "</tr>\n"
+        )
         for score, app in sorted_rows:
             # app.name is user-entered freeform text - escape it; other fields are numeric/fixed-vocabulary
             savings_cell = f"<td>{float(score.estimated_annual_savings or 0):,.0f}</td>" if show_costs else ""  # raw-html-ok: formatted from a float
