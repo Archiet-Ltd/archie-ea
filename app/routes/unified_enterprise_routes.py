@@ -45,7 +45,6 @@ from ..exceptions import (  # dead-code-ok
 from ..utils.api_helpers import api_error
 from ..models import (  # dead-code-ok
     ConceptualDataModel,
-    Contract,
     DesignPattern,
     LogicalDataModel,
     PhysicalDataModel,
@@ -204,27 +203,8 @@ def api_data_models():
 @enterprise_bp.route("/solutions_architecture_dashboard")
 @login_required
 def solutions_architecture_dashboard():
-    """Solutions Architecture Dashboard"""
-    try:
-        solution_count = Solution.query.count()
-        pattern_count = SolutionPattern.query.count()
-        contract_count = Contract.query.count()
-
-        return render_template(
-            "enterprise/solutions_architecture_dashboard.html",
-            solution_count=solution_count,
-            pattern_count=pattern_count,
-            contract_count=contract_count,
-        )
-    except SQLAlchemyError as e:
-        current_app.logger.error(
-            f"Database error loading solutions architecture dashboard: {e}"
-        )
-        raise DatabaseError(
-            message=f"Failed to load solutions dashboard: {str(e)}",
-            user_message="Unable to load the solutions architecture dashboard.",
-            recovery_action="Refresh the page. If the problem persists, contact support.",
-        )
+    """The Enterprise page's link: the one Solutions Architecture dashboard, the page the sidebar opens."""
+    return redirect(url_for("architecture.solutions_architecture_dashboard"))
 
 
 @enterprise_bp.route("/api/solutions")
@@ -234,7 +214,10 @@ def api_solutions():
     try:
         solutions = Solution.query.limit(500).all()
         patterns = SolutionPattern.query.limit(500).all()
-        contracts = Contract.query.limit(500).all()
+        from app.decorators.requires_role import may_see_contract_pages
+        from app.services.vendor_register import register_contracts
+
+        contracts = register_contracts(current_user.organization_id)[:500] if may_see_contract_pages(current_user) else []
 
         return jsonify(
             {
@@ -257,7 +240,7 @@ def api_solutions():
                         "name": p.name,
                         "description": p.description,
                         "pattern_category": p.pattern_category,
-                        "applicability": p.applicability,
+                        "pattern_type": p.pattern_type,
                         "created_at": p.created_at.isoformat()
                         if p.created_at
                         else None,
@@ -267,9 +250,9 @@ def api_solutions():
                 "contracts": [
                     {
                         "id": c.id,
-                        "name": c.name,
+                        "name": c.contract_name,
                         "contract_type": c.contract_type,
-                        "provider": c.provider,
+                        "provider": c.vendor.name if c.vendor else None,
                         "status": c.status,
                         "created_at": c.created_at.isoformat()
                         if c.created_at
@@ -482,11 +465,26 @@ def investment_matrix():
 @enterprise_bp.route("/strategic/risk-assessment")
 @login_required
 def risk_assessment():
-    """Risk Assessment"""
-    try:
-        gaps = Gap.query.filter(Gap.gap_kind != "plateau_transition").limit(500).all()
+    """Gap Risk Assessment: the gap register's gaps counted by severity.
 
-        return render_template("enterprise/risk_assessment.html", gaps=gaps)
+    Every figure is the register's own count (`count_gaps`) for the organisation, so none is capped.
+    The table lists the first rows only and says how many of how many it shows."""
+    try:
+        from app.services.gap_register_service import count_gaps, list_gaps
+
+        org_id = current_organization_id()
+        shown_limit = 50
+        gaps = list_gaps(org_id, limit=shown_limit)
+        counts = {
+            "total": count_gaps(org_id),
+            "high": count_gaps(org_id, severity="critical") + count_gaps(org_id, severity="high"),
+            "medium": count_gaps(org_id, severity="medium"),
+            "low": count_gaps(org_id, severity="low"),
+        }
+
+        return render_template(
+            "enterprise/risk_assessment.html", gaps=gaps, counts=counts, shown=len(gaps)
+        )
     except SQLAlchemyError as e:
         current_app.logger.error(f"Database error loading risk assessment: {e}")
         raise DatabaseError(
@@ -923,6 +921,7 @@ def gap_analysis():
         query = gap_register_query(current_org_id(), severity_filter or None)
         gaps = query.order_by(order, Gap.id).limit(500).all()
         total_gap_count = count_gaps(current_org_id())
+        unclosed_gap_count = count_gaps(current_org_id(), has_work_package=False)
         not_addressed_gaps = get_gaps_not_addressed(current_org_id())
         work_packages_by_gap = work_package_service.work_packages_for_gaps(
             [g.id for g in gaps], current_org_id())
@@ -931,6 +930,7 @@ def gap_analysis():
             "enterprise/gap_analysis.html", gaps=gaps,
             work_packages_by_gap=work_packages_by_gap,
             total_gap_count=total_gap_count,
+            unclosed_gap_count=unclosed_gap_count,
             severity_filter=severity_filter,
             not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",
@@ -1006,10 +1006,12 @@ def ai_architecture_analysis():
         total_gaps = count_gaps(current_org_id())
 
         from app.services.priority_action_service import limit_for, prioritised_actions
+        from app.services.risk_service import footers_by_risk
 
         return render_template(
             "enterprise/ai_architecture_analysis.html",
-            priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+            priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
             ai_recommendations=ai_recommendations,
             gaps_by_severity=gaps_by_severity,
             apps_needing_review=apps_needing_review,

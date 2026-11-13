@@ -112,9 +112,14 @@ def _turnstile_passes(response_token):
         return False
 
 
+def names_itself_a_bot() -> bool:
+    """True when this request's user agent names itself a bot or crawler: the one test every caller uses."""
+    return bool(_BOT_AGENT.search(request.headers.get("User-Agent") or ""))
+
+
 def refusal(form=None):
     """The reason this request is not a person signing up, or None when it may go on."""
-    if _BOT_AGENT.search(request.headers.get("User-Agent") or ""):
+    if names_itself_a_bot():
         return "bot_agent"
     form = form if form is not None else request.form
     if (form.get(HONEYPOT_FIELD) or "").strip():

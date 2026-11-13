@@ -1134,6 +1134,57 @@ def _seed_decisions(org_id, user_id) -> dict:
     return {"architecture_decisions_created": created}
 
 
+# ── saved scenarios ────────────────────────────────────────────────────────
+
+# (name, system it is tried on, kind of change): two ways to deal with the same system, so Compare Scenarios
+# has two saved scenarios to put side by side.
+_SCENARIOS = [
+    ("Retire Calibration Ledger", "Calibration Ledger", "RETIRE"),
+    ("Replace Calibration Ledger with a managed service", "Calibration Ledger", "REPLACE"),
+]
+
+
+def _seed_scenarios(org_id, user_id) -> dict:
+    """Two saved scenarios on one system, worked out by the same analysis a person's save uses.
+    Idempotent: a scenario whose name the organisation already has is left as it is."""
+    from flask import g
+
+    from app.models.saved_scenario import SavedScenario
+    from app.modules.solutions_strategic.v2.routes.strategic_routes import _scenario_figures
+    from app.modules.solutions_strategic.v2.services import simulation_service
+    from app.modules.solutions_strategic.v2.services.impact_analysis_service import ImpactAnalysisService
+
+    elements = _resolve_elements(org_id)
+    existing = {
+        row.name for row in db.session.query(SavedScenario.name).filter(SavedScenario.organization_id == org_id)
+    }
+    created = 0
+    had_org = hasattr(g, "current_org_id")
+    previous = getattr(g, "current_org_id", None)
+    g.current_org_id = org_id  # the analysis reads the organisation the way a request does
+    try:
+        for name, system, change_type in _SCENARIOS:
+            element = elements.get(system)
+            if element is None or name in existing:
+                continue
+            server = ImpactAnalysisService.analyze_change_impact(element.id, change_type, record=False)
+            db.session.add(SavedScenario(
+                organization_id=org_id, name=name, element_id=element.id, element_name=element.name,
+                element_type=element.type, change_type=change_type,
+                change_label=simulation_service.change_label(change_type),
+                analysis_result=_scenario_figures(server), created_by_id=user_id,
+            ))
+            created += 1
+    finally:
+        if had_org:
+            g.current_org_id = previous
+        else:
+            del g.current_org_id
+    if created:
+        db.session.flush()
+    return {"saved_scenarios_created": created}
+
+
 # ── products ───────────────────────────────────────────────────────────────
 
 # (product, what it is, [(relationship, direction, other element name, type, layer)]). "out" is product to element,
@@ -1799,6 +1850,110 @@ _WORK_PACKAGES = [
         -20, 45, 65000, 38000,
         "Inventory Accuracy Drive", "Inventory Control",
     ),
+    # The other capabilities each carry the work that changes them, so every
+    # capability on the investment pages has a recorded figure with its source.
+    (
+        "Install online water quality probes",
+        "in_progress", "high",
+        -40, 150, 185000, 72000,
+        "Predictive Maintenance Pilot", "Water Quality Monitoring",
+    ),
+    (
+        "Streamline order-to-dispatch hand-offs",
+        "in_progress", "medium",
+        -25, 100, 88000, 31000,
+        "Inventory Accuracy Drive", "Order Fulfilment",
+    ),
+    (
+        "Introduce skills-based rostering",
+        "planned", "medium",
+        45, 110, 72000, 0,
+        "Field Tester Rollout", "Workforce Planning",
+    ),
+    (
+        "Stand up a 24-hour incident desk",
+        "in_progress", "high",
+        -35, 90, 120000, 54000,
+        "Event Backbone Migration", "Incident Response",
+    ),
+    (
+        "Build demand forecasting model",
+        "planned", "medium",
+        75, 130, 98000, 0,
+        "Predictive Maintenance Pilot", "Demand Forecasting",
+    ),
+    (
+        "Automate batch quality checks",
+        "in_progress", "medium",
+        -20, 80, 64000, 22000,
+        "Compliance System Upgrade", "Quality Assurance",
+    ),
+    (
+        "Launch the shared analytics workspace",
+        "planned", "high",
+        30, 140, 175000, 0,
+        "Predictive Maintenance Pilot", "Data Analytics",
+    ),
+    (
+        "Replace point-to-point interfaces with the bus",
+        "in_progress", "high",
+        -55, 160, 230000, 96000,
+        "Event Backbone Migration", "Integration Management",
+    ),
+    (
+        "Introduce single sign-on for field tools",
+        "planned", "high",
+        40, 75, 82000, 0,
+        "Compliance System Upgrade", "Identity and Access",
+    ),
+    (
+        "Move controlled documents to one register",
+        "in_progress", "low",
+        -15, 70, 46000, 15000,
+        "Compliance System Upgrade", "Document Control",
+    ),
+    (
+        "Add alert routing and on-call rotas",
+        "planned", "medium",
+        50, 60, 58000, 0,
+        "Event Backbone Migration", "Monitoring and Alerting",
+    ),
+    (
+        "Enrol field devices in central management",
+        "in_progress", "medium",
+        -30, 110, 92000, 35000,
+        "Field Tester Rollout", "Device Management",
+    ),
+    (
+        "Sign and stage firmware releases",
+        "planned", "medium",
+        60, 90, 69000, 0,
+        "Calibration Automation Phase 2", "Firmware Distribution",
+    ),
+    (
+        "Renew the site network links",
+        "in_progress", "medium",
+        -45, 120, 135000, 68000,
+        "Event Backbone Migration", "Network Operations",
+    ),
+    (
+        "Test restore of the calibration ledger",
+        "planned", "high",
+        25, 45, 41000, 0,
+        "Event Backbone Migration", "Backup and Recovery",
+    ),
+    (
+        "Plan capacity for peak calibration season",
+        "planned", "low",
+        90, 60, 36000, 0,
+        "Event Backbone Migration", "Capacity Planning",
+    ),
+    (
+        "Segment the lab and field networks",
+        "in_progress", "high",
+        -10, 100, 115000, 29000,
+        "Compliance System Upgrade", "Security Operations",
+    ),
 ]
 
 # ── plateaus ───────────────────────────────────────────────────────────────
@@ -1852,12 +2007,18 @@ _PLATEAU_DESCRIPTIONS = {
     "Future State": "Platform services with governed data, full integration coverage and complete monitoring.",
 }
 
-# The two work packages that close no gap, and the plateau each one realises.
+# The work packages that close no gap, and the plateau each one realises.
 # Every other package realises the plateau its gap is closed on.
 _WORK_PACKAGE_PLATEAUS = {
     "Procure handheld field testers": "Transition State 1",
     "Consolidate supplier base": "Target Architecture",
 }
+# Packages that close no gap sit on the plateau their status points to: under way is
+# Transition State 1, planned is Target Architecture.
+_WORK_PACKAGE_PLATEAUS.update({
+    spec[0]: ("Target Architecture" if spec[1] == "planned" else "Transition State 1")
+    for spec in _WORK_PACKAGES[12:]
+})
 
 # gap name -> (gap type, impact): what kind of shortfall it is and what it costs.
 _GAP_DETAILS = {
@@ -2514,10 +2675,64 @@ def _seed_boards(org_id, demo_user_id) -> dict:
         ))
         stats["backlog_requirements_created"] += 1
     db.session.flush()
+    stats["backlog_scores_recorded"] = _seed_backlog_scores(org_id)
     stats.update(_seed_solution_blueprints(org_id, solutions))
     stats["solution_risks_created"] = _seed_solution_risks(org_id, solutions)
     stats["risk_records_completed"] = stats.get("risk_records_completed", 0) + _complete_risk_records(org_id)
     return stats
+
+
+# Score inputs the team has recorded for each backlog requirement, by name:
+# (business value, time criticality, risk reduction, job size, reach, impact, confidence %, story points).
+# The scores are worked out from these on the prioritisation page, never typed in.
+_BACKLOG_SCORE_INPUTS = {
+    "Record the as-found reading for every instrument": (8, 5, 8, 3, 400, 4, 80, 3),
+    "Show a customer the status of an open request": (5, 3, 2, 5, 1200, 2, 70, 5),
+    "Suggest the nearest qualified engineer": (8, 5, 3, 8, 90, 4, 60, 8),
+    "Suppliers confirm delivery dates in the portal": (8, 8, 5, 5, 300, 3, 80, 5),
+    "Reject certificates with a missing reference standard": (13, 8, 13, 3, 500, 5, 90, 3),
+    "Retry a failed event delivery three times": (3, 2, 8, 2, 40, 2, 90, 2),
+    "Publish every instrument change as an event": (5, 3, 5, 5, 60, 3, 80, 5),
+    "Export certificates as signed documents": (5, 2, 3, 3, 700, 2, 80, 3),
+}
+
+
+def _seed_backlog_scores(org_id) -> int:
+    """Record score inputs on the ranked copy of each backlog requirement that has none.
+
+    A requirement with any input already recorded is left as a person set it."""
+    from app.models.models import Requirement
+    from app.models.solution_architect_models import SolutionRequirement
+    from app.services.prioritisation_service import project_backlog_requirements
+
+    project_backlog_requirements(org_id)
+    db.session.flush()
+    filled = 0
+    rows = db.session.query(SolutionRequirement).filter(
+        SolutionRequirement.organization_id == org_id, SolutionRequirement.deleted_at.is_(None),
+        SolutionRequirement.archimate_requirement_id.isnot(None),
+    ).all()
+    for source in rows:
+        inputs = _BACKLOG_SCORE_INPUTS.get(source.name)
+        ranked = db.session.get(Requirement, source.archimate_requirement_id)
+        if inputs is None or ranked is None or ranked.organization_id != org_id:
+            continue
+        fields = ("business_value", "time_criticality", "risk_reduction", "job_size",
+                  "reach", "impact", "confidence", "story_points")
+        if any(getattr(ranked, f) is not None for f in fields):
+            continue
+        (business_value, time_criticality, risk_reduction, job_size,
+         reach, impact, confidence, story_points) = inputs
+        ranked.business_value = business_value
+        ranked.time_criticality = time_criticality
+        ranked.risk_reduction = risk_reduction
+        ranked.job_size = job_size
+        ranked.reach = reach
+        ranked.impact = impact
+        ranked.confidence = confidence
+        ranked.story_points = story_points
+        filled += 1
+    return filled
 
 
 # ── the blueprint of each seeded solution ─────────────────────────────────
@@ -4371,6 +4586,7 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_data_flows(org_id))
         stats.update(_seed_raci(org_id))
         stats.update(_seed_decisions(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_scenarios(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_products(org_id))
 
         # The portfolio opens already scored: run the existing scoring

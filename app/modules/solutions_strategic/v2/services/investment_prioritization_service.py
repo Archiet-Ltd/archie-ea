@@ -20,6 +20,32 @@ from .decorators import transactional
 
 _CLOSED_RISK_STATUSES = ("mitigated", "accepted", "closed")
 
+# Strategic score (0 - 25) of each importance level, recorded or worked out.
+_IMPORTANCE_POINTS = {"critical": 25, "high": 20, "medium": 15, "low": 10}
+_LEVEL_ORDER = ("low", "medium", "high", "critical")
+# What an application's recorded criticality says about the capabilities it supports.
+_CRITICALITY_LEVEL = {
+    "critical": "critical", "mission_critical": "critical", "mission critical": "critical",
+    "high": "high", "important": "high",
+    "medium": "medium", "supporting": "medium",
+    "low": "low", "optional": "low",
+}
+# The elements of the motivation layer a capability can be linked to.
+_MOTIVATION_TYPES = ("goal", "driver", "outcome", "principle")
+_MAX_EVIDENCE = 5
+STRATEGIC_STEP_TEXT = "Record its importance"
+STRATEGIC_UNSCORED_REASON = (
+    "Record how important it is, or link an application that has a criticality, a goal or a value "
+    "stream to it, to score it."
+)
+
+
+def _record_page():
+    """The page where a capability's importance is recorded, or None when it cannot be built."""
+    from app.services.result_footer_service import page_link
+
+    return page_link("unified_low_priority.capability_map_capabilities")
+
 
 def currency_symbol() -> str:
     """The tenant's configured currency symbol, the one both investment pages show."""
@@ -65,23 +91,33 @@ class InvestmentPrioritizationService:
         Returns:
             Dict with prioritized investment recommendations
         """
-        # Get all unified capabilities
-        capabilities = UnifiedCapability.query.all()
+        from app.middleware.tenant_context import current_org_id
+        from app.modules.capabilities.services.capability_count_service import capability_totals
+
+        # The organisation's own capabilities and the shared catalogue's, by the one visibility rule
+        org_id = current_org_id()
+        capabilities = UnifiedCapability.query.filter(UnifiedCapability.visibility_predicate(org_id)).all()
 
         capability_ids = [c.id for c in capabilities]
 
         # Batch-load the capability mappings of these capabilities, keeping only
         # those whose application this organisation can see.
         mappings_by_cap = {}
+        app_rows = {}
         try:
             from app.models.application_portfolio import ApplicationComponent
 
-            visible_apps = {
-                row[0]
+            app_rows = {
+                row.id: row
                 for row in db.session.execute(
-                    db.select(ApplicationComponent.id)
+                    db.select(
+                        ApplicationComponent.id, ApplicationComponent.name,
+                        ApplicationComponent.business_criticality, ApplicationComponent.criticality,
+                        ApplicationComponent.updated_at, ApplicationComponent.created_at,
+                    )
                 ).all()
             }
+            visible_apps = set(app_rows)
             if capability_ids:
                 for m in UnifiedApplicationCapabilityMapping.query.filter(
                     UnifiedApplicationCapabilityMapping.unified_capability_id.in_(capability_ids)
@@ -91,9 +127,16 @@ class InvestmentPrioritizationService:
         except Exception:
             logger.debug("Could not batch-load capability mappings", exc_info=True)
 
+        motivation = self._motivation_links(capabilities)
         evidence = {
             "domains": self._domain_names(capabilities),
-            "objectives": self._objective_counts(capabilities),
+            "objectives": {
+                cap_id: sum(1 for link in links if link["type"] == "goal")
+                for cap_id, links in motivation.items()
+            },
+            "motivation": motivation,
+            "applications": app_rows,
+            "streams": self._value_streams_by_capability(capability_ids),
             "risks": self._risks_by_capability(mappings_by_cap),
             "work": self._work_cost_by_capability(capability_ids),
         }
@@ -120,14 +163,20 @@ class InvestmentPrioritizationService:
         medium_investments = [c for c in capability_scores if c["priority_level"] == "MEDIUM"]
         low_investments = [c for c in capability_scores if c["priority_level"] == "LOW"]
 
-        # Calculate portfolio metrics
+        # Calculate portfolio metrics; the total is a count query, never the length of a list
         portfolio_metrics = self._calculate_portfolio_metrics(capability_scores)
+        totals = capability_totals(org_id)
+        portfolio_metrics.update({
+            "total_capabilities": totals["total"],
+            "own_capabilities": totals["own"],
+            "shared_capabilities": totals["shared"],
+        })
 
         # Generate investment recommendations
         recommendations = self._generate_investment_recommendations(capability_scores)
 
         return {
-            "total_capabilities": len(capabilities),
+            "total_capabilities": totals["total"],
             "capability_scores": capability_scores,
             "critical_investments": critical_investments,
             "high_investments": high_investments,
@@ -214,19 +263,27 @@ class InvestmentPrioritizationService:
 
         coverage_count = len(app_mappings)
 
-        # Strategic importance score (0 - 25 points); None when nobody rated it
+        # Strategic importance score (0 - 25 points): the recorded rating, else the
+        # rating the model's own facts imply; None only when it holds nothing to work from
+        linked_risks = (evidence.get("risks") or {}).get(capability.id, [])
         strategic_score = self._calculate_strategic_score(capability)
+        derivation = None
+        if strategic_score is None:
+            derivation = self._derive_importance(capability, app_mappings, linked_risks, evidence)
+            if derivation:
+                strategic_score = _IMPORTANCE_POINTS[derivation["level"]]
+        recorded = (capability.strategic_importance or "").lower()
+        importance = recorded if recorded in _IMPORTANCE_POINTS else (derivation or {}).get("level")
         objective_count = (evidence.get("objectives") or {}).get(capability.id, 0)
 
         # Coverage gap score (0 - 25 points)
-        coverage_score = self._calculate_coverage_score(coverage_count, capability)
+        coverage_score = self._calculate_coverage_score(coverage_count, capability, importance)
 
         # Maturity gap score (0 - 25 points)
         maturity_score = self._calculate_maturity_score(capability)
 
         # Risk score (0 - 25 points): the highest exposure among the open risks
         # linked to the applications that run this capability
-        linked_risks = (evidence.get("risks") or {}).get(capability.id, [])
         risk_score = 0
         if include_risk:
             risk_score = self._calculate_risk_score(capability, app_mappings, linked_risks)
@@ -236,7 +293,7 @@ class InvestmentPrioritizationService:
         if strategic_score is None:
             total_score = None
             priority_level = "NOT SCORED"
-            unscored_reason = "Rate how important this capability is to the strategy to score it."
+            unscored_reason = STRATEGIC_UNSCORED_REASON
         else:
             total_score = strategic_score + coverage_score + maturity_score + risk_score
             unscored_reason = None
@@ -265,6 +322,14 @@ class InvestmentPrioritizationService:
             "archimate_element_id": capability.archimate_element_id,
             "capability_domain": (evidence.get("domains") or {}).get(capability.id),
             "strategic_importance": capability.strategic_importance,
+            "effective_importance": importance,
+            "strategic_basis": (
+                "derived" if derivation else ("recorded" if recorded in _IMPORTANCE_POINTS else None)
+            ),
+            "strategic_derivation": derivation,
+            "strategic_step": (
+                None if strategic_score is not None else {"text": STRATEGIC_STEP_TEXT, "href": _record_page()}
+            ),
             "capability_type": capability.capability_type,
             "coverage_count": coverage_count,
             "strategic_score": strategic_score,
@@ -294,7 +359,7 @@ class InvestmentPrioritizationService:
             "recommendation": (
                 "RATE: Set how important %s is to the strategy so it can be scored" % capability.name
                 if total_score is None
-                else self._get_capability_recommendation(capability, total_score, coverage_count)
+                else self._get_capability_recommendation(capability, total_score, coverage_count, importance)
             ),
         }
 
@@ -321,8 +386,8 @@ class InvestmentPrioritizationService:
                 hops += 1
         return result
 
-    def _objective_counts(self, capabilities) -> Dict[int, int]:
-        """Objectives (goals) each capability is linked to through the model."""
+    def _motivation_links(self, capabilities) -> Dict[int, List[Dict]]:
+        """Goals, drivers, outcomes and principles each capability is linked to through the model."""
         from app.models.models import ArchiMateElement, ArchiMateRelationship
 
         element_to_cap = {
@@ -338,26 +403,127 @@ class InvestmentPrioritizationService:
         ).all()
         other_ends = {}
         for rel in rels:
+            when = rel.updated_at or rel.created_at
             for mine, theirs in ((rel.source_id, rel.target_id), (rel.target_id, rel.source_id)):
                 if mine in element_to_cap and theirs:
-                    other_ends.setdefault(element_to_cap[mine], set()).add(theirs)
+                    ends = other_ends.setdefault(element_to_cap[mine], {})
+                    if theirs not in ends or (when and (ends[theirs] is None or when > ends[theirs])):
+                        ends[theirs] = when
         wanted = {e for ends in other_ends.values() for e in ends}
         if not wanted:
             return {}
-        goal_elements = {
-            row[0]
+        found = {
+            row.id: row
             for row in db.session.execute(
-                db.select(ArchiMateElement.id).where(
+                db.select(ArchiMateElement.id, ArchiMateElement.name, ArchiMateElement.type).where(
                     ArchiMateElement.id.in_(wanted),
-                    db.func.lower(ArchiMateElement.type) == "goal",
+                    db.func.lower(ArchiMateElement.type).in_(_MOTIVATION_TYPES),
                 )
             ).all()
         }
-        return {
-            cap_id: len(ends & goal_elements)
-            for cap_id, ends in other_ends.items()
-            if ends & goal_elements
-        }
+        result = {}
+        for cap_id, ends in other_ends.items():
+            links = [
+                {"id": eid, "name": found[eid].name, "type": found[eid].type.lower(),
+                 "as_of": when.isoformat() if when else None}
+                for eid, when in ends.items() if eid in found
+            ]
+            if links:
+                result[cap_id] = sorted(links, key=lambda link: (link["type"], link["name"] or ""))
+        return result
+
+    def _value_streams_by_capability(self, capability_ids: List[int]) -> Dict[int, List[Dict]]:
+        """The value streams each capability serves, one entry per stream."""
+        from app.models.unified_capability import CapabilityValueStreamMapping, ValueStream
+
+        if not capability_ids:
+            return {}
+        rows = db.session.execute(
+            db.select(
+                CapabilityValueStreamMapping.capability_id, ValueStream.id, ValueStream.name,
+                CapabilityValueStreamMapping.updated_at, CapabilityValueStreamMapping.created_at,
+            )
+            .join(ValueStream, ValueStream.id == CapabilityValueStreamMapping.value_stream_id)
+            .where(CapabilityValueStreamMapping.capability_id.in_(capability_ids))
+        ).all()
+        result = {}
+        for cap_id, stream_id, name, updated, created in rows:
+            when = updated or created
+            by_stream = result.setdefault(cap_id, {})
+            if stream_id not in by_stream:
+                by_stream[stream_id] = {"id": stream_id, "name": name,
+                                        "as_of": when.isoformat() if when else None}
+        return {cap_id: sorted(v.values(), key=lambda s: s["name"] or "") for cap_id, v in result.items()}
+
+    def _derive_importance(self, capability, app_mappings: List, linked_risks: List, evidence: Dict):
+        """The importance level the model's own facts imply for a capability nobody rated, with its evidence.
+
+        The first of these rules that has a fact decides; a rating somebody recorded never reaches here.
+          1. the highest recorded criticality among the applications that support it;
+          2. its links to goals, drivers, outcomes or principles (two or more: high, one: medium);
+          3. the value streams it serves (two or more: high, one: medium);
+          4. the open risks on the applications that support it (an exposure of 15 or more: high, else medium).
+        Returns None when the model holds none of these.
+        """
+        def derived(level, basis, sentence, facts):
+            return {
+                "level": level, "basis": basis, "sentence": sentence,
+                "facts": facts[:_MAX_EVIDENCE], "more": max(0, len(facts) - _MAX_EVIDENCE),
+            }
+
+        def plural(n, one, many=None):
+            return "%d %s" % (n, one if n == 1 else (many or one + "s"))
+
+        rows = evidence.get("applications") or {}
+        facts = []
+        levels = []
+        for mapping in app_mappings:
+            row = rows.get(mapping.application_component_id)
+            raw = ((row.business_criticality or row.criticality) if row is not None else None) or ""
+            level = _CRITICALITY_LEVEL.get(raw.strip().lower())
+            if level:
+                levels.append(level)
+                when = row.updated_at or row.created_at
+                facts.append({"kind": "application", "id": row.id, "label": "%s: %s criticality" % (row.name, raw.strip()),
+                              "as_of": when.isoformat() if when else None})
+        if levels:
+            n = len(levels)
+            return derived(
+                max(levels, key=_LEVEL_ORDER.index), "the criticality of its applications",
+                "Derived from the criticality of the %s that %s it." % (
+                    plural(n, "application"), "supports" if n == 1 else "support"),
+                facts)
+
+        links = (evidence.get("motivation") or {}).get(capability.id) or []
+        if links:
+            counts = {}
+            for link in links:
+                counts[link["type"]] = counts.get(link["type"], 0) + 1
+            parts = [plural(counts[t], t) for t in _MOTIVATION_TYPES if t in counts]
+            phrase = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+            return derived(
+                "high" if len(links) >= 2 else "medium", "its links to goals, drivers, outcomes and principles",
+                "Derived from its links to %s." % phrase,
+                [{"kind": link["type"], "id": link["id"], "label": "%s: %s" % (link["type"].capitalize(), link["name"]),
+                  "as_of": link["as_of"]} for link in links])
+
+        streams = (evidence.get("streams") or {}).get(capability.id) or []
+        if streams:
+            n = len(streams)
+            return derived(
+                "high" if n >= 2 else "medium", "the value streams it serves",
+                "Derived from the %s it serves." % plural(n, "value stream"),
+                [{"kind": "value_stream", "id": st["id"], "label": "Value stream: %s" % st["name"],
+                  "as_of": st["as_of"]} for st in streams])
+
+        if linked_risks:
+            n = len(linked_risks)
+            return derived(
+                "high" if max(r["exposure"] for r in linked_risks) >= 15 else "medium", "its open risks",
+                "Derived from the %s on the applications that support it." % plural(n, "open risk"),
+                [{"kind": "risk", "id": r["id"], "label": "Risk: %s" % r["title"], "as_of": None}
+                 for r in linked_risks])
+        return None
 
     def _risks_by_capability(self, mappings_by_cap: Dict) -> Dict[int, List[Dict]]:
         """Open risks linked to the applications that run each capability."""
@@ -400,40 +566,37 @@ class InvestmentPrioritizationService:
     def _work_cost_by_capability(self, capability_ids: List[int]) -> Dict[int, Dict]:
         """Estimated cost of the work packages linked to each capability.
 
-        A package with no estimate (0 is the column default) adds no figure.
+        A package is linked to its primary capability and to every capability
+        in its list of capabilities. A package that changes several shares its
+        estimate equally between them, so the total over all capabilities is
+        never more than the estimates recorded. A package with no estimate
+        (0 is the column default) adds no figure.
         """
         from app.models.unified_work_package import UnifiedWorkPackage
+        from app.services.work_package_service import _capability_ids_of
 
         if not capability_ids:
             return {}
+        wanted = set(capability_ids)
         result = {}
-        for wp in UnifiedWorkPackage.query.filter(
-            UnifiedWorkPackage.capability_id.in_(capability_ids),
-            UnifiedWorkPackage.estimated_cost > 0,
-        ).all():
-            entry = result.setdefault(wp.capability_id, {"cost": 0.0, "count": 0})
-            entry["cost"] += float(wp.estimated_cost)
-            entry["count"] += 1
+        for wp in UnifiedWorkPackage.query.filter(UnifiedWorkPackage.estimated_cost > 0).all():
+            linked = [i for i in _capability_ids_of(wp) if i in wanted]
+            if not linked:
+                continue
+            share = float(wp.estimated_cost) / len(linked)
+            for cap_id in linked:
+                entry = result.setdefault(cap_id, {"cost": 0.0, "count": 0})
+                entry["cost"] += share
+                entry["count"] += 1
         return result
 
     def _calculate_strategic_score(self, capability) -> int:
-        """Calculate strategic importance score (0 - 25 points); None when unrated."""
-        importance = (capability.strategic_importance or "").lower()
+        """Calculate strategic importance score (0 - 25 points) from the recorded rating; None when unrated."""
+        return _IMPORTANCE_POINTS.get((capability.strategic_importance or "").lower())
 
-        if importance == "critical":
-            return 25
-        elif importance == "high":
-            return 20
-        elif importance == "medium":
-            return 15
-        elif importance == "low":
-            return 10
-        else:
-            return None
-
-    def _calculate_coverage_score(self, coverage_count: int, capability) -> int:
-        """Calculate coverage gap score (0 - 25 points)."""
-        importance = (capability.strategic_importance or "").lower()
+    def _calculate_coverage_score(self, coverage_count: int, capability, importance: str = None) -> int:
+        """Calculate coverage gap score (0 - 25 points), by the recorded importance or the one worked out."""
+        importance = (importance or capability.strategic_importance or "").lower()
 
         # Critical capabilities need more coverage
         if importance == "critical":
@@ -538,18 +701,16 @@ class InvestmentPrioritizationService:
         return base
 
     def _get_capability_recommendation(
-        self, capability, score: int, coverage_count: int
+        self, capability, score: int, coverage_count: int, importance: str = None
     ) -> str:
         """Generate specific recommendation for the capability."""
+        importance = (importance or capability.strategic_importance or "").lower()
 
         if coverage_count == 0:
             return (
                 f"INVEST: Establish {capability.name} capability - no current application support"
             )
-        elif coverage_count == 1 and (capability.strategic_importance or "").lower() in [
-            "critical",
-            "high",
-        ]:
+        elif coverage_count == 1 and importance in ["critical", "high"]:
             return f"INVEST: Add redundancy for {capability.name} - single point of failure risk"
         elif score >= 70:
             return f"INVEST: High priority investment in {capability.name} - strategic importance with gaps"
@@ -604,6 +765,7 @@ class InvestmentPrioritizationService:
             "low_investment": low_investment,
             "investment_costed_count": len(costed),
             "scored_count": len(scored),
+            "derived_count": len([c for c in scored if c["strategic_basis"] == "derived"]),
             "average_strategic_score": avg_strategic_score,
             "average_coverage_score": avg_coverage_score,
             "average_maturity_score": avg_maturity_score,
@@ -625,11 +787,11 @@ class InvestmentPrioritizationService:
                     "type": "IMMEDIATE_INVESTMENT",
                     "priority": "CRITICAL",
                     "capability": cap["capability_name"],
-                    "justification": f"Strategic {cap['strategic_importance']} capability with {cap['coverage_count']} applications",
+                    "justification": f"Strategic {cap['effective_importance']} capability with {cap['coverage_count']} applications",
                     "estimated_cost": cap["investment_need"]["estimated_cost"] if cap["investment_need"]["estimated_cost"] is not None else "Not estimated",
                     "timeframe": cap["investment_need"]["timeframe"] or "Not estimated",
                     "expected_roi": "HIGH"
-                    if cap["strategic_importance"] == "critical"
+                    if cap["effective_importance"] == "critical"
                     else "MEDIUM",
                 }
             )
@@ -653,7 +815,7 @@ class InvestmentPrioritizationService:
         spf_caps = [
             c
             for c in capability_scores
-            if c["coverage_count"] == 1 and c["strategic_importance"] in ["critical", "high"]
+            if c["coverage_count"] == 1 and c["effective_importance"] in ["critical", "high"]
         ]
         if spf_caps:
             recommendations.append(

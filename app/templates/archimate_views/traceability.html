@@ -262,7 +262,7 @@
             {{ lucide('info') }}
             {{ ui.alert_title(text='No cross-layer relationships modelled yet') }}
             {% call ui.alert_description() %}
-                None of these {{ matrix | length }} rows is connected to strategy, business or technology yet. Add the relationships in the model composer and each row fills in.
+                No row of these {{ matrix | length }} is connected to strategy, business or technology yet. Add the relationships in the model composer and each row fills in.
                 <a class="underline underline-offset-4" href="{{ url_for('archimate.composer_page') }}">Open the model composer</a>
             {% endcall %}
         {% endcall %}

@@ -41,7 +41,6 @@
  *   Roadmap:     roadmapApp
  *   Session:     sessionDetail
  *   Solution:    solutionList
- *   Policy:      policyMonitoringDashboard
  *   Connector:   connectorDashboard
  *   Implementation: implementationDashboard, workPackageCreateModal
  *   Framework:   frameworkConfigModal
@@ -641,32 +640,6 @@ if (window.__ALPINE_ARCH_LOADED__) {
                         .then(() => this._loadItems())
                         .catch(err => Platform.toast.error('Delete failed: ' + err.message));
                 }
-            });
-        });
-
-        /* -----------------------------------------------------------------------
-         * POLICY MONITORING DASHBOARD
-         * --------------------------------------------------------------------- */
-
-        Alpine.data('policyMonitoringDashboard', function () {
-            return Object.assign({}, _asyncMixin(), {
-                apiUrl: '/api/policy-monitoring',
-                monitoringData: { health_status: 'LOADING...', violations: [], metrics: {} },
-                _pollTimer: null,
-                init() { this._loadData(); this._startPolling(); },
-                async _loadData() {
-                    this._startLoading();
-                    try {
-                        let data = await _fetch(this.apiUrl + '/status');
-                        this.monitoringData = data; this._stopLoading();
-                    } catch (err) { this._handleError(err); }
-                },
-                _startPolling() {
-                    if (this._pollTimer) return;
-                    let self = this;
-                    this._pollTimer = setInterval(function () { self._loadData(); }, 30000);
-                },
-                destroy() { if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; } }
             });
         });
 
