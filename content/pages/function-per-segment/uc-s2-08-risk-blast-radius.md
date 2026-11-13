@@ -57,8 +57,8 @@ say which risks are real, how far each one reaches and who is holding it.
    **Add Risk** for each risk you track. Give it a likelihood, an impact, an
    owner and a mitigation plan.
 2. Check the register's table for rows where the Owner column is empty. Those are the risks nobody holds.
-3. Make sure the systems the risk affects are connected to it in your model, so there is something for the blast
-   radius to follow.
+3. Make sure the systems the risk affects are connected to it in your model, so there are connections for the blast
+   radius to travel along.
 4. Open the **AI chat** and ask what could hurt the system or risk, and what it touches.
 5. Read the card: level, score, owner, mitigation plan and the number of connections reached.
 

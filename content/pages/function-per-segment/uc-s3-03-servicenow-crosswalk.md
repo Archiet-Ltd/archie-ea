@@ -26,7 +26,7 @@ enough to be confusing and different enough that nothing links them automaticall
 An identifier crosswalk, with low-confidence matches routed to a review queue instead of merged
 blind, so ServiceNow and your model agree on what's the same thing without anyone guessing.
 
-Coming in an upcoming release. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

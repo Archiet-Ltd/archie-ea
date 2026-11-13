@@ -58,7 +58,7 @@
           <p class="pp-for">Evaluation, one-person companies and self-hosters.</p>
           <p class="pp-price">Free</p>
           <p class="pp-note">No trial clock. One organisation, up to three people.</p>
-          <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-community">Start free</a>
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-community">Start free</a>
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li>Ask the AI chat what breaks, what is at risk and who is accountable</li>
@@ -90,13 +90,13 @@
             {% if not _billing %}<span class="block mt-1" data-testid="start-free-note-{{ key }}">Start free puts you on Community. {{ name }} is set up in a conversation with us.</span>{% endif %}
           </p>
           {% if _billing %}
-          <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
              class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="year" data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
-          <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
              class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="month" data-testid="buy-{{ key }}-monthly">Buy {{ name }}, billed monthly</a>
           {% else %}
-          <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-testid="buy-{{ key }}">Start free</a>
-          <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="talk-{{ key }}">Talk to us about {{ name }}</a>
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-testid="buy-{{ key }}">Start free</a>
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="talk-{{ key }}">Talk to us about {{ name }}</a>
           {% endif %}
           <div class="pp-alt"></div>
           <ul class="pp-list">
@@ -112,7 +112,7 @@
           <p class="pp-for">Enterprise architecture teams.</p>
           <p class="pp-price">{{ plan_prices.enterprise[0] }}</p>
           <p class="pp-note">Annual contract from USD 24,000/year.</p>
-          <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-enterprise">Contact sales</a>
+          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-enterprise">Contact sales</a>
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Team, plus</li>

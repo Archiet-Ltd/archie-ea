@@ -48,6 +48,13 @@ def seed_overview_org(label, apps, contracts, with_owner_user=True, spread=True,
         # a first record added last year gives the year card two years to set side by side
         days_ago = ((400,) + HISTORY_DAYS_AGO) if last_year else HISTORY_DAYS_AGO
         with dated_history(days_ago=days_ago) if spread else contextlib.nullcontext():
+            if last_year:
+                # The first record written takes the first date. An application's history row is left out of
+                # the count in favour of its model element's, so the record from last year is an element of
+                # its own, not an application.
+                db.session.add(ArchiMateElement(name="Archive Office %s" % info["suffix"], type="BusinessActor",
+                                                layer="business", organization_id=org_id))
+                db.session.commit()
             made = []
             for spec in apps:
                 row = ApplicationComponent(

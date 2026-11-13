@@ -22,6 +22,7 @@ from __future__ import annotations
 import functools
 import json
 import re
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -495,7 +496,16 @@ FAMILY_URL_PREFIX = {
     "connector": "/connectors",
 }
 
-_md = markdown.Markdown(extensions=["extra"])
+_md_local = threading.local()
+
+
+def _markdown() -> markdown.Markdown:
+    """This thread's Markdown converter. One converter keeps parse state between calls, so two pages rendered at
+    once by two request threads (a page and a closed address answered in place) must not share one."""
+    md = getattr(_md_local, "md", None)
+    if md is None:
+        md = _md_local.md = markdown.Markdown(extensions=["extra"])
+    return md
 
 # Tags and attributes produced by standard Markdown (plus extra extension).
 # Any HTML tag or attribute not in these lists is stripped by bleach.
@@ -1128,7 +1138,7 @@ def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     body_md = _apply_legal_blocks(body_md)
     if family == "function-per-segment":
         slug, url = _use_case_slug_and_url(front_matter, slug)
-    body_html = _sanitize_html(_md.reset().convert(body_md))
+    body_html = _sanitize_html(_markdown().reset().convert(body_md))
     title = _extract_title(body_html, front_matter)
     external_url = _build_external_url(front_matter)
     return PublicPage(
@@ -1231,7 +1241,7 @@ def load_feed_pages() -> list[PublicPage]:
     than one surface at a time.
     """
     return [
-        page for page in load_all_pages()
+        page for page in _pages_by_url().values()
         if not page.is_held and page.url not in MERGED_PAGES
     ]
 
@@ -1248,7 +1258,10 @@ def feed_page_paths() -> list[str]:
     the way they did when each built its own (see
     tests/test_public_content_pages.py::test_indexnow_submission_matches_sitemap_urls).
     """
-    return ["/", "/vs", "/use-cases"] + [page.url for page in load_feed_pages()] + share_page_paths()
+    from app.release_waves.routes import early_access_paths
+
+    paths = ["/", "/vs", "/use-cases"] + early_access_paths() + [page.url for page in load_feed_pages()] + share_page_paths()
+    return list(dict.fromkeys(paths))
 
 
 def load_page(family: str, slug: str | None = None) -> PublicPage | None:

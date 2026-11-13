@@ -203,9 +203,15 @@ def test_run_cost_card_opens_the_spend_page_for_the_portfolio_manager(browser, l
     context, page = _page(browser, FOLD)
     try:
         _open(page, live_server, info["emails"]["portfolio_manager"])
+        card_value = page.locator('[data-testid="card-run-cost-value"]')
+        assert card_value.get_attribute("title") == "\u00a3250,000"
+        short = card_value.inner_text().strip()
         page.locator('[data-testid="card-run-cost"]').click()
         page.wait_for_url("**/procurement/spend**", timeout=PAGE_TIMEOUT)
-        assert "250,000" in _content(page) and "Annual Recurring Cost" in _content(page)
+        # the Spend page states its totals in the one short money format (cost pages rebuilt to the Overview's
+        # standard), so the same 250,000 reads there as the card's own short figure
+        assert page.locator('[data-testid="spend-annual-cost-value"]').inner_text().strip() == short == "\u00a3250k"
+        assert "Annual recurring cost" in _content(page)
     finally:
         context.close()
 
@@ -217,14 +223,17 @@ def test_figures_agree_with_the_pages_they_summarise(browser, live_server, orgs)
         _open(page, live_server, info["emails"]["portfolio_manager"])
         welcome = _int(page.locator('[data-testid="welcome-applications"] span').first.inner_text())
         cost = page.locator('[data-testid="card-run-cost-value"]').get_attribute("title")
+        short = page.locator('[data-testid="card-run-cost-value"]').inner_text().strip()
+        assert _int(cost) == 250000
         no_owner = _int(page.locator('[data-testid="card-no-owner-value"]').inner_text())
+        # each application is one row followed by a row naming where it came from; only the first is an application
         page.goto(live_server + "/applications/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        listed = page.locator("table tbody tr").count()
+        listed = page.locator("table tbody tr[data-app-id]").count()
         assert listed == welcome
         page.goto(live_server + "/applications/?no_owner=1", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        assert page.locator("table tbody tr").count() == no_owner
+        assert page.locator("table tbody tr[data-app-id]").count() == no_owner
         page.goto(live_server + "/procurement/spend", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        assert cost in _content(page), (cost, _content(page)[:400])
+        assert page.locator('[data-testid="spend-annual-cost-value"]').inner_text().strip() == short, (cost, short)
     finally:
         context.close()
 
@@ -469,11 +478,13 @@ def test_the_welcome_card_stays_dark_in_the_dark_theme(browser, live_server, org
         selector = '[data-testid="overview-welcome"]'
         page.evaluate("document.documentElement.classList.add('dark')")
         page.wait_for_timeout(600)
+        page.evaluate("document.getAnimations().forEach(a => a.finish())")  # a loaded machine may still be mid-fade
         dark = _contrast(page, selector)
         assert dark["ratio"] >= 4.5, dark
         assert dark["lightness"] < 0.1, dark
         page.evaluate("document.documentElement.classList.remove('dark')")
         page.wait_for_timeout(600)
+        page.evaluate("document.getAnimations().forEach(a => a.finish())")
         assert _contrast(page, selector)["ratio"] >= 4.5
     finally:
         context.close()

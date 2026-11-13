@@ -359,6 +359,26 @@ def test_owner_picker_scoped_to_org(two_orgs, client, login_as):
     assert len(data["users"]) == 0, "cross-org user should not appear"
 
 
+def test_owner_picker_finds_person_by_full_name(two_orgs, client, login_as):
+    """Typing a first and last name together finds that person, in the caller's organisation only."""
+    db_session = two_orgs["db_session"]
+    from app.models.user import User
+
+    # The same full name exists in both organisations.
+    mine = User.query.get(two_orgs["manager_a"].id)
+    mine.first_name, mine.last_name = "Priya", "Raman"
+    theirs = User.query.get(two_orgs["manager_b"].id)
+    theirs.first_name, theirs.last_name = "Priya", "Raman"
+    db_session.flush()
+    login_as(client, mine)
+
+    for typed in ("Priya Raman", "priya raman", "ya Ram", "Raman"):
+        resp = client.get("/api/users", query_string={"q": typed, "limit": 20})
+        assert resp.status_code == 200
+        ids = [u["id"] for u in resp.get_json()["users"]]
+        assert ids == [mine.id], "typing %r should find only the person in this organisation" % typed
+
+
 # ── 5. Backfill command ─────────────────────────────────────────────────────
 
 

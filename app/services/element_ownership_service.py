@@ -153,6 +153,8 @@ def set_element_owner(
         if current:
             record = current[0]
             record.user_id = user_id
+            # A named person without an account, replaced by a user, leaves no name behind.
+            record.person_name = record.person_email = record.person_role = None
             record.assigned_by = assigned_by
             _delete_other_owners_of_type(key, organization_id, ownership_type, keep=record)
             if commit:
@@ -187,33 +189,41 @@ def _element_key(element_type: str, element_id: int) -> dict:
     return {"element_type": element_type, "element_id": element_id}
 
 
-def resolve_user_by_name(name: str, organization_id: int):  # reuse-ok: the one name-to-user lookup; the owner backfill's copy was removed for it
-    """The one user in *organization_id* whose full name or email is *name*.
-
-    Full name first, then email, both exact and case-insensitive. A first name
-    alone, a last name alone or an ambiguous match resolves to nothing: an owner
-    is never guessed.
-    """
-    return _users_named(name, organization_id)[0]
-
-
-def _users_named(name, organization_id):
-    """(the one user, how many people share the name): (None, 0) none, (None, n) several."""
+def _match_users_by_name(name: str, organization_id: int):  # reuse-ok: the body of the one name-to-user lookup (resolve_user_by_name), which also reports who a name was ambiguous between
+    """(the one user, the people it was ambiguous between): full name first, then email, both
+    exact and case-insensitive. Exactly one of the two is set, or neither when nobody matches."""
     from app.models.user import User
 
     wanted = (name or "").strip().lower()
     if not wanted:
-        return None, 0
-    most = 0
+        return None, []
+    ambiguous = []
     for match in (
         db.func.lower(db.func.concat(User.first_name, " ", User.last_name)),
         db.func.lower(User.email),
     ):
         users = User.query.filter(User.organization_id == organization_id).filter(match == wanted).all()
         if len(users) == 1:
-            return users[0], 1
-        most = max(most, len(users))
-    return None, most
+            return users[0], []
+        if len(users) > 1 and not ambiguous:
+            ambiguous = users
+    return None, ambiguous
+
+
+def resolve_user_by_name(name: str, organization_id: int):  # reuse-ok: the one name-to-user lookup; the owner backfill's copy was removed for it
+    """The one user in *organization_id* whose full name or email is *name*.
+
+    Full name first, then email, both exact and case-insensitive. A first name
+    alone, a last name alone or an ambiguous match resolves to nothing: an owner
+    is never guessed. ``users_named_alike`` tells "nobody" from "more than one".
+    """
+    return _match_users_by_name(name, organization_id)[0]
+
+
+def users_named_alike(name: str, organization_id: int) -> list:
+    """The two or more users of *organization_id* a name matches when it names no single one,
+    else an empty list: how "nobody has that name" is told from "more than one person has it"."""
+    return _match_users_by_name(name, organization_id)[1]
 
 
 def owner_label(first_name: Optional[str], last_name: Optional[str], email: Optional[str] = None) -> str:
@@ -240,18 +250,38 @@ def _owner_labels_for(
     # transaction instead of beginning one on the global session.
     session = (object_session(application) if application is not None else None) or db.session
     rows = session.execute(
-        db.select(ApplicationOwner.application_id, User.first_name, User.last_name, User.email)
-        .join(User, User.id == ApplicationOwner.user_id)
+        db.select(
+            ApplicationOwner.application_id, User.first_name, User.last_name, User.email,
+            ApplicationOwner.person_name,
+        )
+        .outerjoin(
+            User, db.and_(User.id == ApplicationOwner.user_id, User.organization_id == organization_id),
+        )
         .where(ApplicationOwner.application_id.in_(application_ids))
         .where(ApplicationOwner.organization_id == organization_id)
-        .where(User.organization_id == organization_id)
+        .where(_names_someone_here())
         .where(ApplicationOwner.ownership_type == ownership_type)
         .order_by(ApplicationOwner.id)
     ).all()
     labels: dict = {}
-    for application_id, first_name, last_name, email in rows:
-        labels.setdefault(application_id, owner_label(first_name, last_name, email))
+    for application_id, first_name, last_name, email, person_name in rows:
+        labels.setdefault(application_id, person_name or owner_label(first_name, last_name, email))
     return labels
+
+
+def _names_someone_here():
+    """SQL: the owner record names a user of its organisation, or a person by name.
+
+    Used with an outer join to ``User`` limited to the record's organisation, so
+    a record whose user is elsewhere names nobody here, while a named person
+    without an account (no user, a name) is a real owner.
+    """
+    from app.models.user import User
+
+    return db.or_(
+        db.and_(ApplicationOwner.user_id.is_(None), ApplicationOwner.person_name.isnot(None)),
+        db.and_(ApplicationOwner.user_id.isnot(None), User.id.isnot(None)),
+    )
 
 
 def preload_application_owner_text(applications: Iterable) -> None:
@@ -330,8 +360,9 @@ def apply_staged_application_owners(application, organization_id: Optional[int])
     A name that matches exactly one user of the organisation becomes that user's
     ``ApplicationOwner`` row, replacing the application's owner of that type. A
     name that matches nobody stays as text on the application (it cannot be made
-    a user) and never replaces an owner already on record. Returns the fields
-    left as text.
+    a user) and never replaces an owner already on record; a person who is to be
+    recorded without an account is recorded on purpose, with
+    ``set_named_person_owner``. Returns the fields left as text.
     """
     staged = application.__dict__.pop("_pending_owner_text", {})
     application.__dict__.pop("_owner_text_cache", None)
@@ -361,36 +392,112 @@ def apply_staged_application_owners(application, organization_id: Optional[int])
 def application_owner_edit_problem(application, field: str, text: Optional[str], organization_id: int) -> Optional[str]:
     """Why typing *text* into an owner field would change nothing, or ``None``.
 
-    An owner on record is replaced only by a user of the organisation, so a
-    name that matches nobody, or a cleared field, cannot take its place. The
-    caller refuses the value in words instead of reporting a save that did not
-    happen. With no owner on record, a name is kept as text and a blank clears it.
+    A name is always recordable: a user of the organisation, or else a named
+    person without an account. Only clearing the field of an owner already on
+    record changes nothing (an owner is replaced, not removed, here), so the
+    caller refuses that in words instead of reporting a save that did not
+    happen.
     """
     text = (text or "").strip()
     if text == (getattr(application, field) or ""):
         return None
     ownership_type = APPLICATION_OWNER_FIELDS[field]
-    if application.id is None or not _owner_labels_for(
+    if text or application.id is None or not _owner_labels_for(
         [application.id], organization_id, ownership_type, application=application,
     ):
         return None
-    if not text:
-        return (
-            "has an owner on record, so it cannot be cleared here. "
-            "Type another person's full name or email to change it."
+    return (
+        "has an owner on record, so it cannot be cleared here. "
+        "Type another person's full name or email to change it."
+    )
+
+
+PERSON_NAME_LENGTH = 200
+PERSON_EMAIL_LENGTH = 255
+PERSON_ROLE_LENGTH = 100
+
+
+def set_named_person_owner(
+    application,
+    name: str,
+    ownership_type: str,
+    *,
+    organization_id: int,
+    email: Optional[str] = None,
+    role: Optional[str] = None,
+    assigned_by: Optional[int] = None,
+    replace: bool = True,
+) -> ApplicationOwner:
+    """Record a person with no account in this workspace as an owner of an application.
+
+    The same ownership record a user owner is written to, holding a name, an
+    optional email and an optional role in place of a user. With ``replace`` (the
+    default) it replaces the application's existing owner of that type, a person
+    or a user, so a change of owner is one update; without it, it is added beside
+    them. The application must belong to *organization_id*. The same person
+    recorded twice as one type is one row.
+    """
+    if any(v is not None and not isinstance(v, str) for v in (name, email, role)):
+        raise ValueError("The name, email address and role of a named owner must be text.")
+    name = " ".join((name or "").split())
+    if not name:
+        raise ValueError("A named owner needs a name.")
+    if ownership_type not in ApplicationOwner.OWNERSHIP_TYPES:
+        raise InvalidOwnershipType(f"Invalid ownership type '{ownership_type}'.")
+    if application.organization_id not in (None, organization_id):
+        raise CrossOrganisationElementOwner("That application does not belong to this organisation.")
+    email = (email or "").strip()[:PERSON_EMAIL_LENGTH] or None
+    role = (role or "").strip()[:PERSON_ROLE_LENGTH] or None
+
+    values = dict(
+        person_name=name[:PERSON_NAME_LENGTH], person_email=email, person_role=role,
+        user_id=None, assigned_by=assigned_by,
+    )
+    # The owner is on record now: the text the field was given is no longer the answer,
+    # and what the application read for this field before is stale.
+    for field, recorded_type in APPLICATION_OWNER_FIELDS.items():
+        if recorded_type == ownership_type:
+            setattr(application, "legacy_" + field, None)
+    application.__dict__.pop("_owner_text_cache", None)
+    if application.id is not None:
+        current = ApplicationOwner.query.filter_by(
+            application_id=application.id, organization_id=organization_id,
+            ownership_type=ownership_type,
+        ).order_by(ApplicationOwner.id).all()
+        same = next(
+            (r for r in current if r.user_id is None and (r.person_name or "").lower() == values["person_name"].lower()),
+            None,
         )
-    found, sharing = _users_named(text, organization_id)
-    if found is None and sharing > 1:
-        return (
-            f"has an owner on record, and {sharing} people in this organisation are called "
-            f"\u201c{text}\u201d. Type the email of the one you mean."
+        if same is not None:
+            # Already recorded: keep the row, fill in what is new.
+            same.person_email = email or same.person_email
+            same.person_role = role or same.person_role
+            record = same
+        elif replace and current:
+            record = current[0]
+            record.person_name, record.person_email, record.person_role = (
+                values["person_name"], email, role,
+            )
+            record.user_id, record.assigned_by = None, assigned_by
+        else:
+            record = None
+        if replace and record is not None:
+            for other in current:
+                if other.id != record.id:
+                    db.session.delete(other)
+        if record is not None:
+            return record
+        record = ApplicationOwner(
+            application_id=application.id, ownership_type=ownership_type,
+            organization_id=organization_id, **values,
         )
-    if found is None:
-        return (
-            "has an owner on record, and no one in this organisation is called "
-            f"\u201c{text}\u201d. Type a person's full name or email as it appears in Users."
+    else:
+        record = ApplicationOwner(
+            application=application, ownership_type=ownership_type,
+            organization_id=organization_id, **values,
         )
-    return None
+    db.session.add(record)
+    return record
 
 
 def set_application_owner(
@@ -441,16 +548,22 @@ def application_owner_expression(model, field: str):
     owners = ApplicationOwner.__table__.alias("owner_field_ao")
     users = User.__table__.alias("owner_field_user")
     name = db.func.coalesce(
+        owners.c.person_name,
         db.func.nullif(db.func.trim(db.func.concat_ws(" ", users.c.first_name, users.c.last_name)), ""),
         users.c.email,
         NAMELESS_OWNER_LABEL,
     )
     recorded = (
         db.select(name)
-        .select_from(owners.join(users, users.c.id == owners.c.user_id))
+        .select_from(owners.outerjoin(
+            users, db.and_(users.c.id == owners.c.user_id, users.c.organization_id == model.organization_id),
+        ))
         .where(owners.c.application_id == model.id)
         .where(owners.c.organization_id == model.organization_id)
-        .where(users.c.organization_id == model.organization_id)
+        .where(db.or_(
+            db.and_(owners.c.user_id.is_(None), owners.c.person_name.isnot(None)),
+            db.and_(owners.c.user_id.isnot(None), users.c.id.isnot(None)),
+        ))
         .where(owners.c.ownership_type == APPLICATION_OWNER_FIELDS[field])
         .order_by(owners.c.id)
         .limit(1)
@@ -485,15 +598,16 @@ def application_is_owned_expression(model=None):
         for column in ACCOUNTABLE_LEGACY_OWNER_COLUMNS
     ])
     # The named user must belong to the application's organisation: a record
-    # whose user is elsewhere names nobody who can be held accountable here.
+    # whose user is elsewhere names nobody who can be held accountable here. A
+    # named person without an account is a recorded owner too.
     from app.models.user import User
 
     has_record = (
         db.select(ApplicationOwner.id)
-        .join(User, User.id == ApplicationOwner.user_id)
+        .outerjoin(User, db.and_(User.id == ApplicationOwner.user_id, User.organization_id == model.organization_id))
         .where(ApplicationOwner.application_id == model.id)
         .where(ApplicationOwner.organization_id == model.organization_id)
-        .where(User.organization_id == model.organization_id)
+        .where(_names_someone_here())
         .where(ApplicationOwner.ownership_type.in_(ACCOUNTABLE_OWNERSHIP_TYPES))
         .exists()
     )
@@ -509,11 +623,13 @@ def application_is_owned(application) -> bool:
 
     return db.session.query(
         db.session.query(ApplicationOwner.id)
-        .join(User, User.id == ApplicationOwner.user_id)
+        .outerjoin(User, db.and_(
+            User.id == ApplicationOwner.user_id, User.organization_id == application.organization_id,
+        ))
         .filter(
             ApplicationOwner.application_id == application.id,
             ApplicationOwner.organization_id == application.organization_id,
-            User.organization_id == application.organization_id,
+            _names_someone_here(),
             ApplicationOwner.ownership_type.in_(ACCOUNTABLE_OWNERSHIP_TYPES),
         )
         .exists()

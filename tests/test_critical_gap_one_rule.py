@@ -196,7 +196,7 @@ def test_architecture_intelligence_and_prioritised_actions_rate_by_the_rule(db_s
     login_as(client, user)
     with mock.patch("app.routes.unified_enterprise_routes.render_template", return_value="ok") as render:
         client.get("/enterprise/analysis/ai-architecture")
-    assert render.call_args.kwargs["gaps_by_severity"] == {"critical": 1, "high": 1, "medium": 0, "low": 0}
+    assert render.call_args.kwargs["gaps_by_severity"] == {"critical": 1, "high": 1, "medium": 0, "low": 0, "unrated": 0}
     assert count_gaps(org.id, severity="critical") == 1
 
     rows = priority_action_service.prioritised_actions(org.id, limit=50)["rows"]

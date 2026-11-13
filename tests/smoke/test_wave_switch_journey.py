@@ -4,7 +4,8 @@ Written from the goal "the first release shows only what works and says plainly 
 
 * a visitor opens the home page and clicks every link in the navbar and the footer: each lands on a page
   with content, and only the labelled Coming soon group leads to early-access pages;
-* the sitemap lists only addresses that answer with their own content;
+* the sitemap lists only addresses that answer with their own content: a page of a later release is listed
+  (it is there to be found, and says plainly that it is early access), a closed address is not;
 * a visitor opening a later release's module address reads its early-access page and joins the waiting list,
   and the enquiry is stored;
 * a signed-in CTO's sidebar offers only first-release pages, each opening with content, and none of the
@@ -69,8 +70,63 @@ def _lands_with_content(page, base, href):
     response = page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     status = response.status if response else 0
     early = page.locator('[data-testid="early-access-page"]').count() > 0
-    headings = [h.strip() for h in page.locator("h1, h2, [data-slot='card-title']").all_inner_texts() if h.strip()]
+    headings = _content_headings(page)
     return status, early, (headings[0] if headings else "")
+
+
+def _content_headings(page):
+    """Headings of the page's own content: the header and the footer are on every page and prove nothing."""
+    found = page.eval_on_selector_all(
+        "h1, h2, [data-slot='card-title']",
+        "els => els.filter(e => !e.closest('header, footer, nav')).map(e => (e.innerText || '').trim())")
+    return [h for h in found if h]
+
+
+def _sitemap_problem(path, status, early, heading, landed):
+    """Why a sitemap entry is not a page a crawler should be sent to, or None.
+
+    An early-access page is allowed when it is answered at its own address under /early-access/: it answers 200
+    with content and says it is early access. A closed address (404), one answered with the early-access page
+    in place, an empty page or a page that sends the visitor to sign-in is not."""
+    if status != 200:
+        return "sitemap lists %s -> %s" % (path, status)
+    if not heading:
+        return "sitemap lists %s, which opens a page with no content" % path
+    if urlsplit(landed).path.rstrip("/") == "/account/login":
+        return "sitemap lists %s, which needs sign-in" % path
+    if early and not path.startswith("/early-access/"):
+        return "sitemap lists %s, a closed address answered with its early-access page in place" % path
+    return None
+
+
+@pytest.mark.parametrize("answer", [
+    ("/closed", 404, False, "Not found", "/closed"),
+    ("/empty", 200, False, "", "/empty"),
+    ("/private", 200, False, "Sign in", "/account/login"),
+])
+def test_a_closed_empty_or_sign_in_address_in_the_sitemap_still_fails(answer):
+    assert _sitemap_problem(*answer)
+
+
+def test_a_closed_address_answered_with_the_early_access_page_in_place_fails():
+    assert _sitemap_problem("/modules/diagrams", 200, True, "Diagrams", "/modules/diagrams")
+
+
+def test_a_page_with_only_a_header_and_footer_has_no_content(browser):
+    page = browser.new_page()
+    try:
+        page.set_content(
+            "<header><nav><h2>Menu</h2></nav></header><main></main>"
+            "<footer data-site-footer><h2>Product</h2></footer>")
+        assert _content_headings(page) == []
+        page.set_content("<header><h2>Menu</h2></header><main><h1>Pricing</h1></main><footer><h2>Product</h2></footer>")
+        assert _content_headings(page) == ["Pricing"]
+    finally:
+        page.close()
+
+
+def test_an_early_access_page_in_the_sitemap_passes():
+    assert _sitemap_problem("/early-access/x", 200, True, "X", "/early-access/x") is None
 
 
 def test_visitor_navbar_footer_and_sitemap_lead_only_to_pages_with_content(browser, wave_server, org):
@@ -99,8 +155,8 @@ def test_visitor_navbar_footer_and_sitemap_lead_only_to_pages_with_content(brows
         assert paths
         for path in paths:
             status, early, heading = _lands_with_content(page, wave_server, path)
-            assert status == 200 and heading and not early, "sitemap lists %s -> %s %r early=%s" % (
-                path, status, heading, early)
+            problems = _sitemap_problem(path, status, early, heading, page.url)
+            assert problems is None, problems
     finally:
         page.close()
 
@@ -318,7 +374,7 @@ def test_a_visitor_reads_each_kind_of_early_access_page_with_its_own_name_and_ea
             assert heading and heading.strip().lower() != "this capability", (path, heading)
             article = page.inner_text('[data-testid="early-access-page"]')
             sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", re.sub(r"\s+", " ", article)) if s.strip()]
-            assert sentences.count("Join the waiting list and we will tell you the day it opens.") == 1, (path, sentences)
+            assert sentences.count("Join the waiting list and we will email you when you can use it.") == 1, (path, sentences)
             assert len(sentences) == len(set(sentences)), (path, sentences)
             page.click('a:has-text("Everything coming to Entelim")')
             page.wait_for_selector('[data-testid="early-access-hub"]', timeout=PAGE_TIMEOUT)

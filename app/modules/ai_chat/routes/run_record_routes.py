@@ -7,7 +7,7 @@ their organisation. Records from other organisations are never returned.
 import logging
 
 from flask import abort, jsonify, render_template, request
-from flask_login import current_user
+from flask_login import current_user, login_required
 
 from app.models.agent_charter import AgentCharter
 from app.models.agent_run_record import AgentRunRecord
@@ -35,6 +35,7 @@ def register_run_record_routes(bp):
     """Register run-record routes on a Flask Blueprint."""
 
     @bp.route("/run-records")
+    @login_required
     def run_record_list():
         """List agent run records for this organisation."""
         _require_org_admin()
@@ -55,6 +56,7 @@ def register_run_record_routes(bp):
         )
 
     @bp.route("/run-records/<int:record_id>")
+    @login_required
     def run_record_detail(record_id):
         """Show one agent run record with its tools called and records read."""
         _require_org_admin()
@@ -79,6 +81,7 @@ def register_run_record_routes(bp):
         )
 
     @bp.route("/run-records/<int:record_id>/replay", methods=["POST"])
+    @login_required
     def run_record_replay(record_id):
         """Replay the recorded tool calls read-only for this run record.
 

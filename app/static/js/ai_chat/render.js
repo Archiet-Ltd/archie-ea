@@ -692,9 +692,50 @@
             '<div class="min-w-0 max-w-3xl flex-1">' + sanitiseAnswerHtml(html) + '</div>';
         var container = messages();
         if (container) container.appendChild(div);
+        bindApplicationChange(div);
         scrollToBottom();
         if (window.lucide) lucide.createIcons();
         return div;
+    }
+
+    /* A change to an application shown for approval: Save sends the signed change
+       the card carries and puts what the server says in the card's place; Cancel
+       says nothing was changed. */
+    function bindApplicationChange(div) {
+        var card = div.querySelector('[data-application-change="preview"]');
+        if (!card) return;
+        var save = card.querySelector('[data-application-change-save]');
+        var cancel = card.querySelector('[data-application-change-cancel]');
+        var problem = card.querySelector('[data-change-error]');
+        var token = card.getAttribute('data-change-token');
+        function setDisabled(flag) {
+            if (save) save.disabled = flag;
+            if (cancel) cancel.disabled = flag;
+        }
+        if (save) save.addEventListener('click', function () {
+            setDisabled(true);
+            if (problem) problem.hidden = true;
+            ArchieChat.transport.confirmApplicationChange(token).then(function (data) {
+                var holder = card.parentNode;
+                holder.innerHTML = sanitiseAnswerHtml(data.html);
+                if (window.lucide) lucide.createIcons();
+            }).catch(function () {
+                setDisabled(false);
+                if (problem) {
+                    problem.textContent = 'The change could not be saved just now. Nothing was changed. Press Save to try again.';
+                    problem.hidden = false;
+                }
+            });
+        });
+        if (cancel) cancel.addEventListener('click', function () {
+            var actions = card.querySelector('[data-application-change-save]');
+            if (actions && actions.parentNode) {
+                actions.parentNode.replaceWith(Object.assign(document.createElement('p'), {
+                    className: 'mt-4 text-sm text-muted-foreground',
+                    textContent: 'Cancelled. Nothing was changed.'
+                }));
+            }
+        });
     }
 
     // ------------------------------------------------------- streamed answer

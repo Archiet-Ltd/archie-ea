@@ -74,6 +74,26 @@ def test_counts_nodes_and_links_equal_the_model_and_exclude_another_organisation
     assert len(other["edges"]) == 1
 
 
+def test_unconnected_elements_are_counted_from_the_whole_model_and_not_across_organisations(db_session, make_org, tenant_ctx):
+    from app.services.model_map import build_model_map
+
+    a, b, (api, db, goal), _theirs = _seed_two_orgs(db_session, make_org)
+    lonely = _element(db_session, a, "Nobody uses this", "Business", "BusinessActor")
+    # The other organisation's lone element must not be counted in this organisation's ring.
+    _element(db_session, b, "Their lone element", "Business", "BusinessActor")
+    with tenant_ctx(a.id):
+        whole = build_model_map()
+        nodes = {n["id"]: n for n in whole["nodes"]}
+        # One layer drawn alone: the link to another layer's element still makes an element connected.
+        tech = build_model_map("technology")
+    assert whole["unconnected"] == 1
+    assert [i for i, n in nodes.items() if not n["connected"]] == [lonely.id]
+    assert nodes[api.id]["connected"] and nodes[db.id]["connected"] and nodes[goal.id]["connected"]
+    assert tech["unconnected"] == 0 and tech["nodes"][0]["connected"] is True
+    with tenant_ctx(b.id):
+        assert build_model_map()["unconnected"] == 1
+
+
 def test_each_node_names_its_source_and_date(db_session, make_org, tenant_ctx):
     from app.services.model_map import build_model_map
 

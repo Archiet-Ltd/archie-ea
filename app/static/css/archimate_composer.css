@@ -550,3 +550,17 @@ z-index: 45;
     background: hsl(var(--background) / 0.95); border: 1px solid hsl(var(--border));
     border-radius: 12px; padding: 8px 16px;
 }
+
+/* The element a neighbourhood view is about: marked with the primary colour, whatever is selected after. */
+.composer-focus-seed [joint-selector="body"] {
+    stroke: hsl(var(--primary)) !important;
+    stroke-width: 4px !important;
+}
+
+/* On a phone the unsaved-view card spans the canvas instead of shrinking to half its width, so it stays short
+   and leaves room below it for the drawing. */
+@media (max-width: 640px) {
+    #composer-focus-banner {
+        left: 8px; right: 8px; transform: none; max-width: none; padding: 8px 12px;
+    }
+}
