@@ -82,6 +82,17 @@ def test_work_package_page_has_no_serious_axe_failure(
 
         # What a person needs: the figures agree between the text and the bar.
         expect(page.locator("[data-testid='wp-progress']")).to_contain_text("40%")
+        facts = page.locator("[data-component='fact-list'][data-testid='wp-facts']")
+        expect(facts).to_have_count(1)
+        assert facts.locator("dt").all_inner_texts() == [
+            "Changes capability", "Status", "Owner", "Progress", "Dates"]
+        expect(facts.locator("[data-testid='property-status']")).to_have_text("In progress")
+        expect(facts.locator("[data-testid='property-dates']")).to_contain_text(" to ")
+        # the bar stays inside its cell and no value is cut at any width
+        cell = facts.locator("[data-testid='property-progress']").bounding_box()
+        barbox = page.locator("[role=progressbar]").locator("xpath=..").bounding_box()
+        assert barbox["x"] >= cell["x"] - 1 and barbox["x"] + barbox["width"] <= cell["x"] + cell["width"] + 1
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
         bar = page.locator("[role=progressbar]")
         expect(bar).to_have_count(1)
         assert bar.get_attribute("aria-valuenow") == "40"
