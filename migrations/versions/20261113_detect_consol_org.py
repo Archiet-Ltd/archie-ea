@@ -165,7 +165,7 @@ def _fence(bind, table):
         if check is not None:
             clause += f" WITH CHECK ({check})"
         bind.execute(text(f"CREATE POLICY {name} ON public.{table} FOR {command}{clause}"))  # nosec B608 - literal table names
-    bind.execute(text(f"ALTER TABLE public.{table} ENABLE ROW LEVEL SECURITY"))  # nosec B608 - literal table names
+    bind.execute(text(f"ALTER TABLE public.{table} FORCE ROW LEVEL SECURITY"))  # nosec B608 - literal table names
     print(f"row-level security: fenced {table}")
 
 
