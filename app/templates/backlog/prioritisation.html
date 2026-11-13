@@ -70,7 +70,16 @@
             }) %}
         <template x-for="card in columnCards('{{ state }}')" :key="card.id">
           {% call kanban_card(move_states, moscow_labels, can_write=can_write) %}
-            <p class="mt-1 text-xs text-muted-foreground" x-text="card.wsjf_score == null ? 'Not scored yet' : `WSJF ${Number(card.wsjf_score).toFixed(2)}`"></p>
+            <template x-if="card.wsjf_score != null">
+              <p class="mt-1 text-xs font-medium text-foreground" data-testid="card-score" x-text="`WSJF ${Number(card.wsjf_score).toFixed(2)}`"></p>
+            </template>
+            <template x-if="card.wsjf_score == null">
+              <p class="mt-1 text-xs text-muted-foreground" data-testid="card-score">
+                <span x-text="'Not scored: record ' + card.wsjf_missing.join(', ') + '.'"></span>
+                {{ button(text='Add it', size='xs', variant='link', on_click="tab = 'wsjf'", attrs_dict={'x-show': 'canWrite'}) }}
+              </p>
+            </template>
+            <div x-html="card.footer_html"></div>
           {% endcall %}
         </template>
       {% endcall %}

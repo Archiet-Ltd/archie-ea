@@ -14,7 +14,7 @@ source: app/utils/role_access.py (ROLE_BUSINESS_ARCHITECT, SIDEBAR_ZONES, _MY_WO
 
 # Business architect tools that tie capabilities and value streams to the work that changes them
 
-Business architect tools earn their place by answering three questions every strategy conversation raises: which capabilities the organisation needs and how mature each one is, which value streams depend on a capability that is not ready, and what work is planned to close the gap. Entelim answers all three from the same model your enterprise architects work in: a capability map with application coverage, a maturity heat map that shows a dash rather than a guess, value streams with a capability-by-stage grid, and a gap register that turns a gap into a work package. A business architect can start on the free Community plan.
+Business architect tools earn their place by answering three questions every strategy conversation raises: which capabilities the organisation needs and how mature each one is, which value streams depend on a capability that is not ready, and what work is scheduled to close the gap. Entelim answers all three from the same model your enterprise architects work in: a capability map with application coverage, a maturity heat map that shows a dash rather than a guess, value streams with a capability-by-stage grid, and a gap register that turns a gap into a work package. A business architect can start on the free Community plan.
 
 **[Start free](/register)** or **[see pricing](/pricing)**.
 
