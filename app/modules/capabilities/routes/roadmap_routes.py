@@ -28,7 +28,7 @@ Helpers (3):
 """
 
 from app.services.archimate_backbone import sync_archimate_element
-from app.services.gap_register_service import effective_severity
+from app.services.gap_register_service import effective_severity, gap_register_query
 from datetime import datetime
 
 from flask import current_app, jsonify, request
@@ -2157,7 +2157,8 @@ def api_roadmap_ai_generate():
         if bad is not None:
             return jsonify({"success": False, "error": bad}), 400
 
-        gaps = Gap.query.filter(Gap.id.in_(gap_ids)).all()
+        # The register's own selection: this organisation's gaps, a plateau transition never one of them.
+        gaps = gap_register_query(current_org_id()).filter(Gap.id.in_(gap_ids)).all()
         if not gaps:
             return jsonify({"success": False, "error": "No gaps found for the provided IDs"}), 404
 

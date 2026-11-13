@@ -52,6 +52,22 @@ def normalise_severity(value) -> Optional[str]:
     return cleaned
 
 
+_RESOLVED_GAP_STATUSES = ("resolved", "closed", "complete", "completed")
+
+
+def is_closed(gap) -> bool:
+    """A gap is closed when its resolution status says it was resolved, closed or completed.
+
+    The one meaning of "closed": every screen that counts closed or unclosed gaps reads this (or
+    `closed_gap_expr` in a query). Having a work package planned is not closing a gap."""
+    return (getattr(gap, "resolution_status", None) or "").strip().lower() in _RESOLVED_GAP_STATUSES
+
+
+def closed_gap_expr():
+    """`is_closed` as a SQL expression."""
+    return func.lower(func.trim(Gap.resolution_status)).in_(_RESOLVED_GAP_STATUSES)
+
+
 def effective_severity(gap) -> Optional[str]:
     """The one rating of a gap: critical when its severity or its priority says critical, else its severity.
 
@@ -379,23 +395,16 @@ def get_plateau_gaps(plateau_id: int, organization_id: int) -> List[Gap]:
 
 
 def get_gaps_not_addressed(organization_id: int) -> List[Gap]:
-    """Return gaps that have no work package addressing them.
+    """Return the open gaps that have no work package addressing them.
 
     A gap is "addressed" when at least one work package of the organisation in
     the one work package store is linked to it; the link is read through
     work_package_service (the one reader), not from the retired
-    gap_work_packages table.
+    gap_work_packages table. A closed gap needs no work, so it is not listed:
+    the list is `gap_register_query(closed=False, has_work_package=False)`, the
+    rows behind the change board's "No work planned" figure.
     """
-    from app.services import work_package_service
-
-    addressed = work_package_service.addressed_gap_ids(organization_id)
-    query = Gap.query.filter(
-        Gap.organization_id == organization_id,
-        Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-    )
-    if addressed:
-        query = query.filter(~Gap.id.in_(addressed))
-    return query.all()
+    return gap_register_query(organization_id, closed=False, has_work_package=False).all()
 
 
 def get_plateau_gap_rows(plateau_ids, organization_id: int) -> Dict[int, List[Dict[str, Any]]]:
@@ -435,9 +444,6 @@ def get_plateau_gap_rows(plateau_ids, organization_id: int) -> Dict[int, List[Di
     return out
 
 
-_RESOLVED_GAP_STATUSES = ("resolved", "closed", "complete", "completed")
-
-
 def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
     """Every open capability gap of the organisation, each with whether a work
     package addresses it. Two statements: the gaps, then their links read in bulk
@@ -450,10 +456,7 @@ def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
         .filter(
             Gap.organization_id == organization_id,
             Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-            db.or_(
-                Gap.resolution_status.is_(None),
-                Gap.resolution_status.notin_(_RESOLVED_GAP_STATUSES),
-            ),
+            ~db.func.coalesce(closed_gap_expr(), db.false()),
         )
         .all()
     )
@@ -481,25 +484,47 @@ def gap_record_for_element(element) -> Gap:
     )
 
 
-def gap_register_query(organization_id: int, severity: Optional[str] = None):
+def gap_register_query(
+    organization_id: int,
+    severity: Optional[str] = None,
+    closed: Optional[bool] = None,
+    in_progress: bool = False,
+    has_work_package: Optional[bool] = None,
+):
     """The one query behind every count and list of the gap register: the organisation's gaps, plateau
-    transitions left out, optionally only those of one severity ("critical" is the critical-gap rule).
-    It only reads: Gap elements get their record when the element is written."""
+    transitions left out, optionally only those of one severity ("critical" is the critical-gap rule),
+    only the closed (True) or unclosed (False) ones, only those in progress, and only those with (True)
+    or without (False) a work package. It only reads: Gap elements get their record when the element is written."""
     query = Gap.query.filter(
         Gap.organization_id == organization_id,
         Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
     )
     if severity:
         query = query.filter(priority_filter_clause(severity))
+    if closed is not None:
+        is_closed_ = db.func.coalesce(closed_gap_expr(), db.false())
+        query = query.filter(is_closed_ if closed else ~is_closed_)
+    if in_progress:
+        query = query.filter(db.func.lower(db.func.trim(Gap.resolution_status)) == "in_progress")
+    if has_work_package is not None:
+        from app.services import work_package_service
+
+        addressed = work_package_service.addressed_gap_ids(organization_id)
+        if has_work_package:
+            query = query.filter(Gap.id.in_(addressed)) if addressed else query.filter(db.false())
+        elif addressed:
+            query = query.filter(~Gap.id.in_(addressed))
     return query
 
 
 def list_gaps(
-    organization_id: int, severity: Optional[str] = None, limit: Optional[int] = None
+    organization_id: int, severity: Optional[str] = None, limit: Optional[int] = None,
+    closed: Optional[bool] = None,
 ) -> List[Gap]:
-    """Return the register's gaps, newest first, optionally one severity and the first `limit`.
-    The list for the `count_gaps(organization_id, severity=...)` total."""
-    query = gap_register_query(organization_id, severity).order_by(Gap.created_at.desc(), Gap.id.desc())
+    """Return the register's gaps, newest first, optionally one severity, only the closed (True) or
+    unclosed (False) ones, and the first `limit`.
+    The list for the `count_gaps(organization_id, severity=..., closed=...)` total."""
+    query = gap_register_query(organization_id, severity, closed).order_by(Gap.created_at.desc(), Gap.id.desc())
     if limit:
         query = query.limit(limit)
     return query.all()
@@ -510,6 +535,8 @@ def count_gaps(
     gap_type: Optional[str] = None,
     has_work_package: Optional[bool] = None,
     severity: Optional[str] = None,
+    closed: Optional[bool] = None,
+    in_progress: bool = False,
 ) -> int:
     """Return the number of gaps in the one gap register for an organisation.
 
@@ -523,19 +550,15 @@ def count_gaps(
                          (gap_archimate_service.get_gaps_for_roadmap).
       severity:          only count gaps of this severity; "critical" is the
                          critical-gap count every screen shows (list_gaps).
+      closed:            True counts gaps whose resolution status is
+                         resolved, closed or completed (`is_closed`); False
+                         counts the others. None counts all.
+      in_progress:       True counts only gaps whose resolution status is in progress.
       has_work_package:  True counts gaps with at least one work package
                          link in this organisation; False counts gaps with
                          none (get_gaps_not_addressed). None counts all.
     """
-    query = gap_register_query(organization_id, severity)
+    query = gap_register_query(organization_id, severity, closed, in_progress, has_work_package)
     if gap_type:
         query = query.filter(Gap.gap_type == gap_type)
-    if has_work_package is not None:
-        from app.services import work_package_service
-
-        addressed = work_package_service.addressed_gap_ids(organization_id)
-        if has_work_package:
-            query = query.filter(Gap.id.in_(addressed)) if addressed else query.filter(db.false())
-        elif addressed:
-            query = query.filter(~Gap.id.in_(addressed))
     return query.count()
