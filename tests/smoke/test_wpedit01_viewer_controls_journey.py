@@ -18,9 +18,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 def test_viewer_sees_no_work_package_edit_controls(browser, live_server):
     """A Viewer in an organisation sees no control that leads to a work-package form."""
     org = create_fresh_org("procurement", platform_role="Viewer")  # procurement is not an architect role -> viewer
-    suffix = org["suffix"]
     viewer_email = org["emails"]["procurement"]
-    admin_email = "launch.admin.%s@example.com" % suffix
 
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
@@ -76,7 +74,6 @@ def test_viewer_sees_no_work_package_edit_controls(browser, live_server):
 def test_administrator_sees_all_work_package_edit_controls(browser, live_server):
     """An Administrator in the same organisation sees all work-package edit controls."""
     org = create_fresh_org("enterprise_architect", org_admin=True)
-    suffix = org["suffix"]
     admin_email = org["emails"]["enterprise_architect"]
 
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
