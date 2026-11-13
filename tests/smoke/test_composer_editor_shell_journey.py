@@ -346,7 +346,11 @@ def test_architect_finds_adds_connects_edits_undoes_exports_and_deletes(browser,
         # DELETE: the new element leaves the diagram; the finder and the counts follow.
         page.locator("g.joint-element", has_text=renamed).first.click()
         page.get_by_test_id("action-delete").click()
-        page.get_by_role("button", name="Delete", exact=True).last.click()
+        # The confirmation asks about the one chosen element; its Delete button is the one pressed.
+        confirm = page.get_by_role("dialog").filter(has_text="Delete Selected Elements")
+        expect(confirm).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(confirm).to_contain_text("Remove 1 element(s)")
+        confirm.get_by_role("button", name="Delete", exact=True).click()
         page.wait_for_function(
             "([sel, n]) => !Alpine.$data(document.querySelector(sel)).graph.getElements().some(c => c.get('elName') === n)",
             arg=[APP, renamed], timeout=PAGE_TIMEOUT)
