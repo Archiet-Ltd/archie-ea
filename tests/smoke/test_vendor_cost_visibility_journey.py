@@ -3,7 +3,7 @@
 A finance lead and a compliance lead of the same seeded organisation open Vendors. Finance reads
 the annual total, a cost in both cost columns of the costed vendor, a contract cost that agrees with
 the Costs page, and nothing from a second organisation that names one of the same vendors.
-Compliance reads no total, "Cost figures are withheld for your role." in every row, and no cost from the register API.
+Compliance reads no total, "Cost figures are withheld for your role." once on the page, and no cost from the register API.
 """
 import os
 import re
@@ -138,8 +138,11 @@ def test_compliance_reads_no_vendor_cost_on_the_page_or_from_the_api(browser, li
         assert "Annual cost across vendors" not in answer.inner_text()
         rows = page.get_by_test_id("vendor-row")
         expect(rows).to_have_count(3)
+        # said once above the table, not in every row
+        expect(page.get_by_test_id("costs-withheld")).to_have_count(1)
+        assert _text(page).count("Cost figures are withheld for your role.") == 1
         for i in range(3):
-            expect(rows.nth(i)).to_contain_text("Cost figures are withheld for your role.")
+            assert "Cost figures are withheld" not in rows.nth(i).inner_text()
         body = _text(page)
         for figure in ("15,000", "12,000", "3,000", "2,000", "999", "4,444"):
             assert figure not in body, figure
@@ -161,8 +164,9 @@ def test_the_refused_view_fits_a_phone(browser, live_server, cost_world):
     try:
         _login(page, live_server, cost_world["seeded"]["emails"]["compliance"])
         assert page.goto(live_server + "/applications/vendors", timeout=PAGE_TIMEOUT).status == 200
-        expect(page.get_by_test_id("vendor-row").first).to_contain_text(
-            "Cost figures are withheld for your role.", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("vendor-row").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("costs-withheld")).to_have_count(1)
+        assert _text(page).count("Cost figures are withheld for your role.") == 1
         assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
         _shot(page, "compliance-vendors-390-dark")
     finally:
@@ -181,8 +185,9 @@ def test_compliance_opens_a_vendor_from_the_list_and_reads_no_cost_there(browser
                 "vendor-link").click()
             expect(page.locator("#vendor-systems")).to_contain_text(systems, timeout=PAGE_TIMEOUT)
             section = re.sub(r"\s+", " ", page.locator("#vendor-systems").inner_text())
-            assert "Cost figures are withheld for your role." in section, section
+            assert "Cost figures are withheld" not in section, section
             body = _text(page)
+            assert body.count("Cost figures are withheld for your role.") == 1, name
             for figure in ("15,000", "12,000", "3,000", "2,000", "999", "4,444", "from active contracts"):
                 assert figure not in body, (name, figure)
             _shot(page, "compliance-vendor-%s-1440-light" % name.lower())
