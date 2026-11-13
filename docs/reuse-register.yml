@@ -1241,7 +1241,6 @@ entries:
         scope: [app]
         suffixes: [.py]
 
-<<<<<<< HEAD
   - id: connector-framework
     concept: How a connector changes its configuration, keeps its credentials, and makes the inventory row for an element it reads
     status: active
