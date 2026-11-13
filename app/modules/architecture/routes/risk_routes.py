@@ -579,6 +579,7 @@ def risk_register():
         current_sort=sort_key if sort_key in _RISK_SORT_COLUMNS else "id",
         current_dir=direction if direction in ("asc", "desc") else "asc",
         ranked=ranked,
+        matrix=risk_service.register_matrix(),
         counts=risk_service.level_counts(),
         raid_items=raid_items,
         raid_kinds=[k.value for k in RaidKind],

@@ -157,3 +157,30 @@ def test_the_priority_actions_name_the_pair_their_score_comes_from(db_session, m
     assert "Residual 2 of 25" in row["why"]
     assert "likelihood 2 of 5, impact 5 of 5" not in str(row["footer"])
     assert "residual likelihood 1 of 5, impact 2 of 5" in str(row["footer"])
+
+
+def test_the_register_matrix_places_risks_where_the_heat_map_does(db_session, make_org, tenant_ctx, monkeypatch):
+    from app.services import risk_service
+
+    mine, theirs = make_org("matrix-a"), make_org("matrix-b")
+    treated = _risk(db_session, mine.id, "Treated", residual=(1, 2))
+    raw = _risk(db_session, mine.id, "Raw", pair=(2, 2), inherent=(4, 4))
+    twin = _risk(db_session, mine.id, "Twin", pair=(4, 4), inherent=(4, 4))
+    _risk(db_session, theirs.id, "Theirs", pair=(5, 5))
+
+    placed = []
+    original = risk_service.get_heat_map_data
+
+    def spy(*args, **kwargs):
+        placed.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(risk_service, "get_heat_map_data", spy)
+    with tenant_ctx(mine.id):
+        matrix = risk_service.register_matrix()
+    assert placed, "the register matrix must read the heat map's placement"
+    cells = {(c["likelihood"], c["impact"]): c for row in matrix for c in row}
+    assert cells[(1, 2)]["titles"] == ["Treated"]
+    assert cells[(4, 4)]["titles"] == ["Raw", "Twin"] and cells[(4, 4)]["count"] == 2
+    assert cells[(5, 5)]["count"] == 0
+    assert sum(c["count"] for c in cells.values()) == 3 == len((treated, raw, twin))
