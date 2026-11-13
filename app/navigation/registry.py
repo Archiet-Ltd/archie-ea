@@ -413,6 +413,8 @@ _CATALOGUE_HOME = (
     ("business_architecture.", "archimate_model"),
     ("modules_directory.", "help"),
     ("architecture.investment_priorities", "spend"),
+    ("architecture.software_architecture_dashboard", "changes"),
+    ("architecture.solutions_architecture_dashboard", "changes"),
     ("architect_ui.market_intelligence", "spend"),
     ("main.vendor_archimate_analysis", "spend"),
     ("architect_ui.motivation_view", "systems"),
