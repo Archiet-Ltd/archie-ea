@@ -776,6 +776,9 @@
                     showAnsweredBy(meta);
                     finaliseStreamedMessage(wrap, result.text, meta);
                     wrap = null;   // finalised in place; nothing left to drop
+                    /* The reply is saved by now: the history rail counts it. It was refreshed only when the
+                       thread was new, and before the reply existed, so a later turn left the old count. */
+                    if (window.loadSessionList) window.loadSessionList();
                     // Genome panel extraction is an optional side-panel enrichment;
                     // the chat turn above already completed and must not be undone by this failing.
                     if (window._genomePanelInstance) { try { await window._genomePanelInstance.extractAfterMessage(state.chatHistory); } catch (_) { /* swallow-ok: optional side-panel enrichment run after the answer is already on screen; an error toast here would read as the answer having failed when it did not */ } }
@@ -1389,7 +1392,7 @@ Would you like me to provide more details about the extracted elements or help y
         return '<div class="js-thr group relative flex items-center rounded-lg border border-border hover:bg-accent/50 transition-colors' + active + '" data-thread-id="' + esc(x.id) + '">' +
           '<button type="button" class="js-thr-open flex-1 text-left p-3 min-w-0">' +
           '<div class="font-medium text-sm truncate">' + esc(x.title || 'New chat') + '</div>' +
-          '<div class="text-xs text-muted-foreground mt-1">' + esc(d) + (x.message_count ? ' · ' + x.message_count + ' messages' : '') + '</div></button>' +
+          '<div class="text-xs text-muted-foreground mt-1">' + esc(d) + (x.message_count ? ' · ' + x.message_count + (x.message_count === 1 ? ' message' : ' messages') : '') + '</div></button>' +
           '<button type="button" class="js-thr-del opacity-0 group-hover:opacity-100 shrink-0 p-2 text-muted-foreground hover:text-destructive" title="Delete conversation" aria-label="Delete conversation"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button></div>';
       }).join('');
       c.querySelectorAll('.js-thr').forEach(function (row) {
