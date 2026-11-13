@@ -12,6 +12,7 @@ from sqlalchemy import func
 from app import db
 from app.core.auth.permissions import can
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
+from app.utils.recorded_figures import as_figure
 from app.main.views import main
 from app.models.roadmap import RoadmapTask
 from app.models.implementation_migration import Deliverable
