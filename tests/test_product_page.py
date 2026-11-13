@@ -121,15 +121,24 @@ def test_another_organisations_elements_never_appear(app, db_session, make_org, 
 def test_element_page_relationship_list_excludes_another_organisations_element(
         app, db_session, make_org, client, login_as):
     """An element page's 'Also connected to' list must not name an element from another
-    organisation, even when a relationship row crosses the boundary."""
+    organisation, even when a relationship row crosses the boundary.
+    Also verifies that a same-organisation related element IS listed (positive control)."""
     mine, theirs = make_org("el-mine"), make_org("el-theirs")
     service = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
     foreign = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
+    # Same-org related element (should appear in 'Also connected to')
+    local_related = _el(db_session, mine, "Local related", "BusinessService", "Business")
+    _rel(db_session, mine, service, local_related, "Serving")
+    # Cross-org relationship (should NOT appear)
     _rel(db_session, mine, service, foreign, "Serving")
     user = _user(db_session, mine)
     html = _get(client, login_as, user,
                 f"/architecture/business/BusinessService/{service.id}?ae=1").get_data(as_text=True)
+    # Centre element name appears as page title
     assert "Orders mine" in html
+    # Same-org related element must be listed
+    assert "Local related" in html
+    # Cross-org element must NOT be listed
     assert "Orders theirs" not in html
 
 
