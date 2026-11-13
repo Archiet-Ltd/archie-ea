@@ -292,7 +292,9 @@ def get_industry_benchmarks():
                     }
                 )
 
-        return jsonify({"success": True, "data": {"benchmarks": benchmarks}})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "data": {"benchmarks": benchmarks}}, keys=("median_tco_per_user", "tco_categories_loaded", "cost_distribution", "tco", "cost", "total_cost")))
 
     except Exception as e:
         logger.error(f"Get benchmarks error: {e}")
@@ -752,7 +754,9 @@ def health_check():
             "service_version": "1.0.0",
         }
 
-        return jsonify({"success": True, "data": health_status})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "data": health_status}, keys=("median_tco_per_user", "tco_categories_loaded", "cost_distribution", "tco", "cost", "total_cost")))
 
     except Exception as e:
         logger.error(f"Health check error: {e}")
