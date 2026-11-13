@@ -62,7 +62,8 @@
                         <option value="">All Status</option>
                     </select>
                 </div>
-                <div>
+                {% if not costs_withheld %}
+                <div id="app-filter-cost-field">
                     <label for="app-filter-cost" class="block text-xs font-medium text-muted-foreground mb-1">Cost Range</label>
                     <select id="app-filter-cost" class="w-full h-9 px-2 py-1 border rounded-md text-sm bg-background">
                         <option value="">All Costs</option>
@@ -72,7 +73,10 @@
                         <option value="500000-999999999">&pound;500k+</option>
                     </select>
                 </div>
+                {% endif %}
             </div>
+
+            <p id="app-costs-withheld" {% if costs_withheld %}role="status" class="mb-4 text-sm text-muted-foreground">{{ costs_withheld_text }}{% else %}hidden role="status" class="mb-4 text-sm text-muted-foreground"{% endif %}></p>
 
             <!-- Applications List -->
             <div id="app-list-container" class="border rounded-lg max-h-80 overflow-y-auto">
@@ -193,6 +197,13 @@ function loadAvailableApplications() {
         if (!data.applications) {
             showError('No application data returned.');
             return;
+        }
+        if (data.costs_withheld) {
+            // The cost rule withholds figures from this person: no cost filter, no cost line, the reason once.
+            const note = document.getElementById('app-costs-withheld');
+            if (note) { note.textContent = data.costs_withheld; note.hidden = false; }
+            const costField = document.getElementById('app-filter-cost-field');
+            if (costField) costField.hidden = true;
         }
         // Exclude apps already in the consolidation list
         allAvailableApps = data.applications.filter(function (app) {

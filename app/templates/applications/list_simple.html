@@ -197,6 +197,8 @@
     No run cost is shown yet: no active contract states an annual cost. <a href="{{ url_for('procurement.contracts_list') if 'procurement.contracts_list' in flask.current_app.view_functions else '/procurement/contracts' }}" class="text-primary underline underline-offset-4 hover:no-underline">Open the contracts</a> and add one.
     {% endif %}
   </p>
+  {% elif costs_withheld %}
+  <p class="text-sm text-muted-foreground" data-testid="costs-withheld" role="status">{{ costs_withheld_text }}</p>
   {% endif %}
 
   {# BIZBOK: Application Cooperation Viewpoint (collapsible) #}

@@ -617,9 +617,13 @@ def application_list():
             current_app.logger.warning("Run cost could not be read for the applications list", exc_info=True)
             db.session.rollback()
 
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
         return render_template(
             "applications/list_simple.html",
             run_cost=run_cost,
+            costs_withheld=not costs_visible(_viewer),
+            costs_withheld_text=COSTS_WITHHELD,
             applications=pagination.items,
             chip_remove_urls=chip_remove_urls,
             total_count=total_count,
