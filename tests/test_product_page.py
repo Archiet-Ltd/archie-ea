@@ -118,6 +118,21 @@ def test_another_organisations_elements_never_appear(app, db_session, make_org, 
     assert _get(client, login_as, foreign, _product_url(one["product"])).status_code == 404
 
 
+def test_element_page_relationship_list_excludes_another_organisations_element(
+        app, db_session, make_org, client, login_as):
+    """An element page's 'Also connected to' list must not name an element from another
+    organisation, even when a relationship row crosses the boundary."""
+    mine, theirs = make_org("el-mine"), make_org("el-theirs")
+    service = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
+    foreign = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
+    _rel(db_session, mine, service, foreign, "Serving")
+    user = _user(db_session, mine)
+    html = _get(client, login_as, user,
+                f"/architecture/business/BusinessService/{service.id}?ae=1").get_data(as_text=True)
+    assert "Orders mine" in html
+    assert "Orders theirs" not in html
+
+
 def test_linked_material_and_cost_are_read_from_their_stores(app, db_session, make_org, client, login_as):
     from app.models.application_portfolio import ApplicationComponent
     from app.models.architecture_decision import ArchitectureDecision

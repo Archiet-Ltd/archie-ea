@@ -3308,8 +3308,15 @@ def _form_text(value):
 
 
 def _get_element_relationships(element, element_id):
-    """Get all relationships for an element"""
+    """Get all relationships for an element, scoped to the element's own organisation.
+
+    A relationship row may cross the organisation boundary (its own organization_id
+    is the caller's org while the far element belongs to another). The far element
+    is loaded by id and organisation, so an edge into another organisation lists
+    nothing.
+    """
     relationships = []
+    org_id = getattr(element, "organization_id", None)
 
     # Resolve the archimate_element_id to use for relationship lookup
     ae_id = None
@@ -3320,45 +3327,51 @@ def _get_element_relationships(element, element_id):
 
     # Get ArchiMate relationships
     if ae_id:  # model-safety-ok: polymorphic ArchiMate elements
-        # Outgoing relationships
+        # Outgoing relationships — only to elements in this organisation
         outgoing = ArchiMateRelationship.query.filter_by(
             source_id=ae_id
         ).all()
         for rel in outgoing:
             target_element = ArchiMateElement.query.get(rel.target_id)
-            if target_element:
-                relationships.append(
-                    {
-                        "type": rel.type,
-                        "direction": "outgoing",
-                        "target": {
-                            "id": target_element.id,
-                            "name": target_element.name,
-                            "type": target_element.type,
-                            "layer": target_element.layer,
-                        },
-                    }
-                )
+            if target_element is None:
+                continue
+            if org_id is not None and getattr(target_element, "organization_id", None) != org_id:
+                continue
+            relationships.append(
+                {
+                    "type": rel.type,
+                    "direction": "outgoing",
+                    "target": {
+                        "id": target_element.id,
+                        "name": target_element.name,
+                        "type": target_element.type,
+                        "layer": target_element.layer,
+                    },
+                }
+            )
 
-        # Incoming relationships
+        # Incoming relationships — only from elements in this organisation
         incoming = ArchiMateRelationship.query.filter_by(
             target_id=ae_id
         ).all()
         for rel in incoming:
             source_element = ArchiMateElement.query.get(rel.source_id)
-            if source_element:
-                relationships.append(
-                    {
-                        "type": rel.type,
-                        "direction": "incoming",
-                        "source": {
-                            "id": source_element.id,
-                            "name": source_element.name,
-                            "type": source_element.type,
-                            "layer": source_element.layer,
-                        },
-                    }
-                )
+            if source_element is None:
+                continue
+            if org_id is not None and getattr(source_element, "organization_id", None) != org_id:
+                continue
+            relationships.append(
+                {
+                    "type": rel.type,
+                    "direction": "incoming",
+                    "source": {
+                        "id": source_element.id,
+                        "name": source_element.name,
+                        "type": source_element.type,
+                        "layer": source_element.layer,
+                    },
+                }
+            )
 
     return relationships
 
