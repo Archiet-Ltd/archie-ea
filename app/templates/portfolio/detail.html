@@ -226,7 +226,7 @@
                 </span>
               {% else %}<span class="text-muted-foreground" title="Needs a baseline, a target and a measured actual">&mdash;</span>{% endif %}
             </td>
-            <td class="px-4 py-3">{{ b.owner.email if b.owner else '—' }}</td>
+            <td class="px-4 py-3">{{ b.owner or '—' }}</td>
             <td class="px-4 py-3">{{ b.status|replace('_',' ')|title }}</td>
             {# The measurement form for this benefit is on the same page; the row
                is the place a user looks for the way into it. #}

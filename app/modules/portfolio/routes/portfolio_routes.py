@@ -43,6 +43,13 @@ def _variance(initiative):
     return round((float(spent) - float(budget)) / float(budget) * 100, 1)
 
 
+# What a financial benefit is measured by: its three amounts, and the percentage
+# of the sought improvement they work out to. All four are money, so the one cost
+# rule decides who reads them. A non-financial benefit's values count something
+# else and are never masked.
+BENEFIT_MONEY_KEYS = ("baseline_value", "target_value", "actual_value", "realisation_percentage")
+
+
 @portfolio_bp.route("/")
 @login_required
 def index():
@@ -220,8 +227,20 @@ def detail(initiative_id):
         "forecast_cost": _money(initiative.forecast_cost),
     }
     withheld = not costs_visible(current_user)
+    rows = [b.to_dict() for b in benefits]
     if withheld:
         money = withhold_costs(money, keys=tuple(money))
+        # A financial benefit's amounts are money, so the one masker takes them
+        # out here rather than the template choosing not to print them: a
+        # withheld person is never sent a figure the cost rule keeps from them.
+        # A non-financial benefit's values count something else and are left
+        # exactly as they were.
+        benefits = [
+            withhold_costs(row, keys=BENEFIT_MONEY_KEYS) if row["is_financial"] else row
+            for row in rows
+        ]
+    else:
+        benefits = rows
 
     return render_template(
         "portfolio/detail.html",
