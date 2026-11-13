@@ -89,7 +89,7 @@
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Recorded gaps{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-recorded-gaps" x-text="recordedGaps === null ? '—' : recordedGaps"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-recorded-gaps" x-text="gapsLoading ? '—' : gapsError ? '!' : (recordedGaps === null ? '—' : recordedGaps)"></span>{% endcall %}
       {% endcall %}
       {% call card_footer(direction='col') %}
         <p class="text-sm text-muted-foreground" data-testid="rdm-gap-signals">Capability Gaps Detected: <span x-text="signalCount"></span> signals from capability coverage, not yet recorded.</p>
@@ -110,7 +110,7 @@
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}AI Generated{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span x-text="metrics.ai_generated"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-ai-generated" x-text="gapsLoading ? '—' : gapsError ? '!' : metrics.ai_generated"></span>{% endcall %}
       {% endcall %}
     {% endcall %}
     {% call card() %}
@@ -562,6 +562,7 @@
     'gaps': '/capability-map/api/roadmap/gaps',
     'plateaus': '/capability-map/api/roadmap/plateaus',
     'work-packages': '/capability-map/api/roadmap/work-packages',
+    'summary-footer': '/capability-map/api/roadmap/summary-footer',
   };
   const sourceAnswers = {};
   window.rdmSource = function (key, again) {
@@ -605,6 +606,8 @@
       gapsError: '',
       plateausError: '',
       workPackagesError: '',
+      recordedGaps: null,
+      signalCount: 0,
       gapsLoading: true,
       plateausLoading: true,
       workPackagesLoading: true,
@@ -639,8 +642,9 @@
 
       async init() {
         // A gap saved in the dialog changes the recorded-gaps figure, so the tile reads the register again.
-        window.addEventListener('rdm-gap-saved', () => this.loadGaps(true));
-        window.addEventListener('rdm-work-package-saved', () => this.loadWorkPackages(true));
+        window.addEventListener('rdm-gap-saved', () => this.refreshAfterGapSave());
+        window.addEventListener('rdm-work-package-saved', () => this.refreshAfterWorkPackageSave());
+        window.addEventListener('rdm-plateau-saved', () => this.refreshAfterPlateauSave());
         // Alpine runs init() itself; each part fills in when its own answer arrives.
         // Start all three loads independently; do not wait for all to finish.
         this.loadGaps();
@@ -691,6 +695,36 @@
           this.workPackagesError = 'Failed to load work packages (' + e.message + ').';
         } finally {
           this.workPackagesLoading = false;
+        }
+      },
+
+      async refreshAfterGapSave() {
+        await this.loadGaps(true);
+        await this.refreshEvidenceLine();
+        if (typeof window.rdmRedrawTimeline === 'function') window.rdmRedrawTimeline();
+      },
+
+      async refreshAfterWorkPackageSave() {
+        await this.loadWorkPackages(true);
+        await this.refreshEvidenceLine();
+        if (typeof window.rdmRedrawTimeline === 'function') window.rdmRedrawTimeline();
+      },
+
+      async refreshAfterPlateauSave() {
+        await this.loadPlateaus();
+        await this.refreshEvidenceLine();
+        if (typeof window.rdmRedrawTimeline === 'function') window.rdmRedrawTimeline();
+      },
+
+      async refreshEvidenceLine() {
+        try {
+          const d = await window.rdmSource('summary-footer', true);
+          const footer = document.getElementById('roadmap-summary-footer') || document.querySelector('[data-testid="roadmap-summary-footer"]');
+          if (footer && d.footer_html) {
+            footer.outerHTML = '<div data-testid="roadmap-summary-footer">' + d.footer_html + '</div>';
+          }
+        } catch (e) {
+          // Keep the existing evidence line if the refresh fails.
         }
       },
 
@@ -770,26 +804,18 @@
         if (!await Platform.confirm({ title: `Delete work package "${wp.name}"?`,
                 message: 'This cannot be undone.', confirmText: 'Delete',
                 variant: 'destructive' })) return;
+        this.workPackagesError = '';
         try {
           const d = await Platform.fetch.delete(`/capability-map/api/roadmap/work-packages/${wp.id}`, { silent: true });
           if (!d.success) throw new Error(d.error || 'Delete failed');
           // Re-fetch from server so the tile count and evidence line agree (includes parts).
           await this.loadWorkPackages(true);
-          // Update the evidence line with the new work package count.
-          this.updateEvidenceLineWorkPackages();
-          this.workPackagesError = '';
+          // Refresh the evidence line from the server's markup.
+          await this.refreshEvidenceLine();
+          if (typeof window.rdmRedrawTimeline === 'function') window.rdmRedrawTimeline();
         } catch (e) {
           this.workPackagesError = e.message || 'Failed to delete work package.';
         }
-      },
-
-      updateEvidenceLineWorkPackages() {
-        const footer = document.getElementById('roadmap-summary-footer') || document.querySelector('[data-testid="roadmap-summary-footer"]');
-        if (!footer) return;
-        const evidenceEl = footer.querySelector('[data-testid="result-footer-evidence"]');
-        if (!evidenceEl) return;
-        // Replace "Work packages: X" with the new count.
-        evidenceEl.innerHTML = evidenceEl.innerHTML.replace(/Work packages: \d+/, 'Work packages: ' + this.workPackageCount);
       },
 
       formatDate(value) {
@@ -904,6 +930,7 @@
           store.plateaus = [...store.plateaus, d.plateau].sort((a, b) => a.sequence_order - b.sequence_order);
           this.form = { name: '', sequence_order: store.plateaus.length + 1, target_date: '', description: '' };
           Platform.modal.close('rdm-create-plateau-modal');
+          window.dispatchEvent(new CustomEvent('rdm-plateau-saved'));
         } catch (e) {
           Platform.alert(e.message || 'Failed to create plateau.');
         } finally {
@@ -1309,6 +1336,7 @@
   } else {
     loadAndRender();
   }
+  window.rdmRedrawTimeline = loadAndRender;
 }());
 </script>
 {% endblock %}

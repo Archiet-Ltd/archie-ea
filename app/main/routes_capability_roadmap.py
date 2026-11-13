@@ -428,7 +428,7 @@ def capability_roadmap():
     capability_count = UnifiedCapability.query.count()
     domain_count = len(CapabilityHealthService().get_capability_health_metrics()["health_by_domain"]) or None
     plateau_count = Plateau.query.filter(Plateau.organization_id == org_id).count()
-    work_package_count = UnifiedWorkPackage.query.filter(UnifiedWorkPackage.organization_id == org_id).count()
+    work_package_count = work_package_service.query_for(org_id).count()
     domain_basis = None
     if domain_count is None:
         domain_basis = (

@@ -1866,6 +1866,36 @@ def api_roadmap_get_plateaus():
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
+@capability_map.route("/api/roadmap/summary-footer")
+@login_required
+@rate_limit(60, "1m")
+def api_roadmap_summary_footer():
+    """Render the roadmap summary footer as HTML, for browser-side swap after saves/deletes.
+
+    Returns the same markup the page first-paints with, so the evidence line under
+    the tiles always agrees with the tile figures after any save or delete.
+    """
+    from app import db
+    from app.models.implementation_migration import GAP_KIND_PLATEAU_TRANSITION, Gap, Plateau
+    from app.models.unified_capability import BusinessDomain, UnifiedCapability
+    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.services import result_footer_service, work_package_service
+    from app.services.gap_register_service import count_gaps
+    from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
+    from app.utils.tenant import current_organization_id
+
+    org_id = current_organization_id()
+    capability_count = UnifiedCapability.query.count()
+    domain_count = len(CapabilityHealthService().get_capability_health_metrics()["health_by_domain"]) or None
+    plateau_count = Plateau.query.filter(Plateau.organization_id == org_id).count()
+    work_package_count = work_package_service.query_for(org_id).count()
+
+    footer = result_footer_service.roadmap_summary_footer(
+        org_id, capability_count, domain_count,
+        plateau_count=plateau_count, work_package_count=work_package_count)
+    return jsonify({"success": True, "footer_html": result_footer_service.render_footer(footer)})
+
+
 @capability_map.route("/api/roadmap/plateaus", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")

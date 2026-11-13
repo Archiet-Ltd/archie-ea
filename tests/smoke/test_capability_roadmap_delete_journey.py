@@ -95,7 +95,7 @@ def test_delete_parent_updates_tile_evidence_and_board(browser, live_server):
             # Without reload, the tile, evidence line and board must agree on 0
             expect(page.get_by_test_id("rdm-work-packages-tile")).to_have_text("0", timeout=PAGE_TIMEOUT)
             line_after = page.get_by_test_id("roadmap-summary-footer").inner_text()
-            assert "Work packages: 0" in line_after, line_after
+            assert "Work packages: none recorded" in line_after, line_after
 
             board_text_after, board_count_after = _board(page, live_server)
             assert board_count_after == 0, board_count_after

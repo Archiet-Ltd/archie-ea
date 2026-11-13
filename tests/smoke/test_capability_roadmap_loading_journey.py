@@ -34,12 +34,15 @@ def test_each_source_is_asked_once_and_plateaus_show_before_work_packages(browse
                 asked[found.group(1)] += 1
 
         def slow_packages(route):
-            for _ in range(300):
-                if state["release"]:
-                    break
-                page.wait_for_timeout(100)
-            route.continue_()
-            state["packages_arrived"] = True
+            try:
+                for _ in range(300):
+                    if state["release"]:
+                        break
+                    page.wait_for_timeout(100)
+                route.continue_()
+                state["packages_arrived"] = True
+            except Exception:
+                pass
 
         try:
             sign_in(page, live_server, org["emails"]["enterprise_architect"])
@@ -95,12 +98,15 @@ def test_plateaus_tile_shows_evidence_figure_while_plateaus_answer_held(browser,
                 asked[found.group(1)] += 1
 
         def slow_plateaus(route):
-            for _ in range(300):
-                if state["release"]:
-                    break
-                page.wait_for_timeout(100)
-            route.continue_()
-            state["plateaus_arrived"] = True
+            try:
+                for _ in range(300):
+                    if state["release"]:
+                        break
+                    page.wait_for_timeout(100)
+                route.continue_()
+                state["plateaus_arrived"] = True
+            except Exception:
+                pass
 
         try:
             sign_in(page, live_server, org["emails"]["enterprise_architect"])

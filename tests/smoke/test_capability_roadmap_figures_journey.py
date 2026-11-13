@@ -95,18 +95,24 @@ def test_tiles_and_timeline_agree_with_the_roadmap_board(browser, live_server):
                 asked[found.group(1)] += 1
 
         def slow_packages(route):
-            for _ in range(300):
-                if state["release_wp"]:
-                    break
-                page.wait_for_timeout(100)
-            route.continue_()
+            try:
+                for _ in range(300):
+                    if state["release_wp"]:
+                        break
+                    page.wait_for_timeout(100)
+                route.continue_()
+            except Exception:
+                pass
 
         def slow_plateaus(route):
-            for _ in range(300):
-                if state["release_plateaus"]:
-                    break
-                page.wait_for_timeout(100)
-            route.continue_()
+            try:
+                for _ in range(300):
+                    if state["release_plateaus"]:
+                        break
+                    page.wait_for_timeout(100)
+                route.continue_()
+            except Exception:
+                pass
 
         try:
             sign_in(page, live_server, org["emails"]["enterprise_architect"])
