@@ -141,8 +141,49 @@ def _profile_topic(lowered: str) -> str:
     return "overview"
 
 
-def _keyword_match(question: str) -> Optional[Dict[str, Any]]:
+# "Which capabilities does <application> support?" and its everyday variants. The
+# application is the phrase the question names; the entry resolves it.
+_CAPABILITY_OF_PATTERNS = [
+    re.compile(r"\b(?:which|what)\s+(?:business\s+|enterprise\s+)?capabilit(?:y|ies)\s+(?:does|do|did)\s+(?:the\s+|our\s+)?(.+?)\s+(?:support|supports|cover|covers|provide|provides|enable|enables|deliver|delivers)\b", re.I),
+    re.compile(r"\b(?:which|what)\s+(?:business\s+|enterprise\s+)?capabilit(?:y|ies)\s+(?:is|are)\s+(?:the\s+|our\s+)?(.+?)\s+(?:mapped|linked|assigned)\s+to\b", re.I),
+    re.compile(r"\b(?:list|show)\s+(?:me\s+)?(?:the\s+)?capabilit(?:y|ies)\s+(?:that\s+|which\s+)?(?:the\s+|our\s+)?(.+?)\s+(?:supports?|covers?|is mapped to|is linked to)\b", re.I),
+]
+
+
+def _is_application_of(name: str, organization_id: int) -> bool:
+    """Whether *name* is, folded for case and spacing, the whole name of an application of the organisation."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.utils.duplicate_guard import find_duplicate_by_name
+
+    return find_duplicate_by_name(ApplicationComponent, name, organization_id=organization_id) is not None
+
+
+def _extract_application_for_capabilities(question: str, organization_id: Optional[int] = None) -> Optional[str]:
+    """The application a 'which capabilities does X support' question names, or None.
+
+    With an organisation, a phrase is taken as the application only when it is the exact
+    name of one of that organisation's applications; any other phrase ("we", "our
+    applications") is not an application and the question goes on to the model.
+    """
+    text = (question or "").strip().rstrip("?.! ")
+    for pattern in _CAPABILITY_OF_PATTERNS:
+        found = pattern.search(text)
+        if found:
+            name = found.group(1).strip().strip("'\"")
+            if name.lower().endswith("'s"):
+                name = name[:-2]
+            if name and organization_id is not None and not _is_application_of(name, organization_id):
+                return None
+            return name or None
+    return None
+
+
+def _keyword_match(question: str, organization_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
     lowered = question.lower()
+    application = _extract_application_for_capabilities(question, organization_id)
+    if application:
+        return {"entry_id": "capabilities_of_application", "params": {"service": application},
+                "confidence": 0.9, "method": "keyword"}
     for keywords, entry_id, params in _KEYWORD_RULES:
         if any(kw in lowered for kw in keywords):
             resolved = dict(params)
@@ -288,7 +329,7 @@ def _llm_match(question: str, time_limit: Optional[float] = None) -> Optional[Di
     return {"entry_id": entry_id, "params": parsed.get("params") or {}, "confidence": 0.7, "method": "model"}
 
 
-def interpret(question: str, time_limit: Optional[float] = None) -> Dict[str, Any]:
+def interpret(question: str, organization_id: Optional[int] = None, time_limit: Optional[float] = None) -> Dict[str, Any]:
     """Interpret one plain-language question.
 
     Returns ``{"entry_id": str|None, "params": dict, "confidence": float,
@@ -299,7 +340,7 @@ def interpret(question: str, time_limit: Optional[float] = None) -> Dict[str, An
     ``time_limit`` (seconds) bounds the one lookup that asks the model: a single attempt that gives up
     at the limit, after which the question maps to nothing. Without it the lookup is unbounded as before.
     """
-    match = _keyword_match(question)
+    match = _keyword_match(question, organization_id)
     if match is None and _model_configured():
         match = _llm_match(question, time_limit)
     if match is None:

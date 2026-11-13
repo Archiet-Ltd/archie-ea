@@ -211,6 +211,29 @@
             }
         });
 
+        // A person with no account: a name is enough; email and role are optional.
+        var personName = root.querySelector('[data-person-name]');
+        var personEmail = root.querySelector('[data-person-email]');
+        var personRole = root.querySelector('[data-person-role]');
+        var personSave = root.querySelector('[data-person-save]');
+        if (personName && personSave) {
+            personName.addEventListener('input', function () {
+                personSave.disabled = personName.value.trim().length === 0;
+            });
+            personSave.addEventListener('click', function () {
+                var name = personName.value.trim();
+                if (!name) return;
+                personSave.disabled = true;
+                var body = { person_name: name, ownership_type: 'primary' };
+                if (personEmail && personEmail.value.trim()) body.person_email = personEmail.value.trim();
+                if (personRole && personRole.value.trim()) body.person_role = personRole.value.trim();
+                if (replace) body.replace = true;
+                Platform.fetch.post(url, body)
+                    .then(function () { reloadWithConfirmation('Owner saved'); })
+                    .catch(function () { personSave.disabled = false; });
+            });
+        }
+
         saveBtn.addEventListener('click', function () {
             if (!selectedId) return;
             saveBtn.disabled = true;

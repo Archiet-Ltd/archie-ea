@@ -123,8 +123,10 @@ cost and asserts green -- and asks the gaps screens as a signed-in user.
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
+import re
 import sys
 from decimal import Decimal
 
@@ -141,12 +143,17 @@ class Surface:
     """One way the product answers "how many X are there?".
 
     kind    "orm"  -- count rows of a mapped model
+            "call" -- the number a service function returns for the organisation;
+                      target is "package.module:function", called as
+                      function(organization_id, **call_kwargs)
             "http" -- GET a URL as a logged-in user of the tenant and read a
                       number out of the JSON
     target  dotted model path ("app.models.business_capabilities.BusinessCapability")
             or a URL path ("/api/v1/capabilities/?per_page=1")
     extract http only. A dotted path into the JSON ("data.pagination.total"),
-            or "len:<path>" for the length of a list ("len:" for the top level).
+            or "len:<path>" for the length of a list ("len:" for the top level),
+            or "testid:<name>" for the whole number a rendered page shows in
+            the element carrying data-testid="<name>".
     scope   the question this surface actually answers. "all" is the whole
             population; anything else declares a filter, and is compared only
             with surfaces carrying the SAME string.
@@ -156,8 +163,10 @@ class Surface:
     def __init__(self, name, kind, target, extract=None, scope="all", waived=None,
                  filter_eq=None, filter_not_null=None, distinct=None,
                  tenant_via=None, shared=None, filter_null=None,
-                 expect_zero=False):
+                 expect_zero=False, call_kwargs=None):
         self.name = name
+        # "call" surfaces: keyword arguments for the function `target` names
+        self.call_kwargs = call_kwargs or {}
         self.kind = kind
         self.target = target
         self.extract = extract
@@ -515,10 +524,26 @@ CONCEPTS = {
     ],
     # /procurement/contracts renders VendorContract for the organisation as
     # HTML; its query is the orm:VendorContract surface.
+    # VendorContract is the contract store: the register, Spend, Renewals,
+    # Vendors and the assistant read it, and every row is mirrored as one
+    # Contract element in the architecture model, which is the list the
+    # architecture screens show (the Contract list is element-less
+    # typed rows plus those mirrored elements). The typed Contract table holds
+    # only records a person drew by hand with no element behind them, so it is
+    # not a second copy of the register and is not compared with it; it is
+    # declared under its own scope. The comparison that can fail is the
+    # register against the mirrored elements: a contract with no element node
+    # shows in the register and is missing from the architecture list.
     "contracts": [
         Surface("orm:VendorContract", "orm",
                 "app.models.application_portfolio.VendorContract"),
-        Surface("orm:Contract", "orm", "app.models.archimate_business.Contract"),
+        Surface("orm:VendorContract(on the architecture model)", "orm",
+                "app.models.application_portfolio.VendorContract",
+                filter_not_null="archimate_element_id"),
+        Surface("orm:Contract(drawn by hand, no vendor contract)", "orm",
+                "app.models.archimate_business.Contract",
+                filter_null="archimate_element_id",
+                scope="drawn by hand in the architecture model"),
     ],
     "vendors": [
         Surface("orm:VendorOrganization", "orm",
@@ -537,6 +562,52 @@ CONCEPTS = {
                 "app.models.process_data.DataEntity"),
     ],
 }
+
+# One number per layer and per kind of gap, asked of every screen that states it.
+# The layer tab badge reads /count and the list under the tab reads /elements; both
+# must hold the same number (they once differed by the elements of a type the layer
+# does not list). Critical gaps: the register's own count against the implementation
+# gaps screen's list, which once read the priority column while the register read
+# the gap's severity.
+for _layer in ("motivation", "strategy", "business", "application"):
+    CONCEPTS["%s layer elements" % _layer] = [
+        Surface("GET /architecture/api/layer/%s/count" % _layer, "http",
+                "/architecture/api/layer/%s/count" % _layer, extract="total"),
+        Surface("GET /architecture/api/layer/%s/elements" % _layer, "http",
+                "/architecture/api/layer/%s/elements?per_page=1" % _layer,
+                extract="pagination.total"),
+    ]
+CONCEPTS["critical gaps"] = [
+    Surface("gap_register_service.count_gaps(critical)", "call",
+            "app.services.gap_register_service:count_gaps",
+            call_kwargs={"severity": "critical"}, scope="critical"),
+    Surface("GET /implementation/api/gaps?severity=critical (list)", "http",
+            "/implementation/api/gaps?severity=critical", extract="len:gaps",
+            scope="critical"),
+    Surface("GET /implementation/api/gaps?severity=critical (total)", "http",
+            "/implementation/api/gaps?severity=critical", extract="total",
+            scope="critical"),
+    Surface("GET /enterprise/implementation/gap-analysis (Critical)", "http",
+            "/enterprise/implementation/gap-analysis",
+            extract="testid:gap-stat-critical-value", scope="critical"),
+]
+# "Closed" has one meaning, the register's: a gap whose resolution status is
+# resolved, closed or completed. The gap register's Resolved figure and the
+# board's Closed figure once disagreed ("0 Resolved" beside "10 Covered, 0
+# Unclosed") because one counted resolution status and the other counted work
+# packages.
+CONCEPTS["closed gaps"] = [
+    Surface("gap_register_service.count_gaps(closed)", "call",
+            "app.services.gap_register_service:count_gaps",
+            call_kwargs={"closed": True}, scope="closed"),
+    Surface("GET /enterprise/implementation/gap-analysis (Resolved)", "http",
+            "/enterprise/implementation/gap-analysis",
+            extract="testid:gap-stat-resolved-value", scope="closed"),
+    Surface("GET /adm-kanban/gap-analysis (Closed)", "http",
+            "/adm-kanban/gap-analysis",
+            extract="testid:gap-closed", scope="closed"),
+]
+
 
 
 # --------------------------------------------------------------------------
@@ -1069,6 +1140,9 @@ def _observe_concepts(concepts, db, client, org_id, http, notes):
                         "  %s [unattributed] %s: %d rows link to no "
                         "organisation by any declared link, so they count "
                         "for none" % (concept, surface.name, unattributed))
+            elif surface.kind == "call":
+                count, why = _ask(surface, db, client, org_id)
+                unscoped = False
             elif not http:
                 continue
             else:
@@ -1242,11 +1316,27 @@ def _read_values(side, db, org_id):
         return None
 
 
+def _extract_testid(html, name):
+    """(count, reason) from the number inside the element with data-testid=<name> on a rendered page."""
+    match = re.search(r'data-testid="%s"[^>]*>\s*([0-9][0-9,]*)\s*<' % re.escape(name), html)
+    if not match:
+        return None, "the page showed no number in data-testid=%r" % name
+    return int(match.group(1).replace(",", "")), None
+
+
 def _ask(surface, db, client, org_id=None):
     """(count, reason-it-could-not-answer)."""
     if surface.kind == "orm":
         count, why, _unscoped, _unattributed = _count_orm(surface, db, org_id)
         return count, why
+    if surface.kind == "call":
+        try:
+            module_name, _, function_name = surface.target.partition(":")
+            function = getattr(importlib.import_module(module_name), function_name)
+            return int(function(org_id, **surface.call_kwargs)), None
+        except Exception as exc:
+            db.session.rollback()
+            return None, "the call raised: %s" % str(exc)[:160]
 
     try:
         response = client.get(surface.target)
@@ -1254,6 +1344,8 @@ def _ask(surface, db, client, org_id=None):
         return None, "the request raised: %s" % str(exc)[:160]
     if response.status_code != 200:
         return None, "HTTP %d (not an answer, so not compared)" % response.status_code
+    if (surface.extract or "").startswith("testid:"):
+        return _extract_testid(response.get_data(as_text=True), surface.extract[7:])
     try:
         payload = response.get_json()
     except Exception:

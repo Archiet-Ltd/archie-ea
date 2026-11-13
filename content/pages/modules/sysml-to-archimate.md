@@ -4,10 +4,11 @@ page_family: module
 module_label: "SysML models"
 state: on_main
 cta: waiting_list
+description: See what an engineering change reaches across the business.
 capture_status: not_applicable_not_yet_built
 icon: route
 headline: Bring your SysML models
-summary: "Early access: see what an engineering change reaches across the business. Your SysML v2 models join the same model as your applications, owners, costs, risks and compliance, mapped to ArchiMate and traced back to the SysML element each one came from. Join the waiting list or talk to us."
+summary: "Early access: See what an engineering change reaches across the business. Your SysML v2 models join the same model as your applications, owners, costs, risks and compliance, mapped to ArchiMate and traced back to the SysML element each one came from. Join the waiting list or talk to us."
 who_for:
 - A head of systems engineering who wants the engineering model read by the rest of the business.
 - An enterprise architect in a company that builds hardware, vehicles, aircraft, devices or plant.

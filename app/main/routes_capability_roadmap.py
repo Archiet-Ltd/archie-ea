@@ -182,6 +182,12 @@ def list_users_for_assignment():
                 db.or_(
                     User.first_name.ilike(like, escape="\\"),
                     User.last_name.ilike(like, escape="\\"),
+                    # The name as shown in the list, so typing it in full finds the person.
+                    (
+                        func.coalesce(User.first_name, "")
+                        + " "
+                        + func.coalesce(User.last_name, "")
+                    ).ilike(like, escape="\\"),
                     User.email.ilike(like, escape="\\"),
                 )
             )
@@ -423,11 +429,22 @@ def capability_roadmap():
             "No capability has a health score yet, so no domain is listed. Assess a capability to list its domain." if capability_count
             else "No capabilities are recorded yet, so no domain is listed. Add a capability to list its domain."
         )
+    # The signals the "Gap signals" figure counts, listed from the one computation that counts them.
+    from app.modules.capabilities.routes.roadmap_routes import compute_gap_signals
+
+    try:
+        gap_signals = compute_gap_signals()
+        gap_signals_error = False
+    except Exception as exc:
+        current_app.logger.warning("Gap signals unavailable: %s", exc)
+        gap_signals, gap_signals_error = [], True
     return render_template(
         "capability_roadmap/capability_roadmap.html",
         capability_count=capability_count,
         domain_count=domain_count,
         domain_basis=domain_basis,
+        gap_signals=gap_signals,
+        gap_signals_error=gap_signals_error,
         summary_footer=result_footer_service.roadmap_summary_footer(
             current_organization_id(), capability_count, domain_count),
     )

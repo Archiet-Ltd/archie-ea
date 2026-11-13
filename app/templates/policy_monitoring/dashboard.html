@@ -3,75 +3,60 @@
 {% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/list_table.html' import list_table %}
-{% from 'components/figures.html' import stat_cards, state_badge, value_or_unset, section %}
+{% from 'components/figures.html' import stat_cards, state_badge, section %}
 {% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}AI policy controls{% endblock %}
 
-{% macro _settings() %}{% call ui.button(href=url_for('admin.api_settings'), variant='outline') %}{{ lucide('settings') }}Open AI settings{% endcall %}{% endmacro %}
-
 {% block content %}
-{%- set md = monitoring_data if monitoring_data is defined and monitoring_data else {} -%}
-{%- set cr = compliance_report if compliance_report is defined and compliance_report else {} -%}
-{%- set es = cr.get('enforcement_status') or {} -%}
-{%- set health = cr.get('policy_health') or {} -%}
-{%- set breakdown = cr.get('violation_breakdown') or {} -%}
-{%- set recent = breakdown.get('recent_violations') or [] -%}
-{%- set checked = es.get('total_operations_checked') -%}
-{%- set found = es.get('total_violations_detected') -%}
-{%- set rate = es.get('compliance_rate') -%}
-{%- set measured = md or cr -%}
+{%- set days = checks.period_days -%}
 <div class="p-6 space-y-6">
-{{ page_shell(title='AI policy controls', subtitle='The rules every AI operation is checked against, and the latest violations they caught',
+{{ page_shell(title='AI policy controls', subtitle='The checks that ran on what the assistant did in your workspace, and which kinds of AI operation are checked',
               breadcrumb=[('Home', url_for('main.index')), ('AI policy controls', none)] ) }}
 
-{% if not measured %}
-{% call ui.alert(variant='destructive', attrs={'data-testid': 'policy-fetch-error'}) %}{{ lucide('circle-alert') }}{{ ui.alert_title(text='Policy status could not be read') }}{{ ui.alert_description(text='This is not the same as no violations. Refresh the page; if it persists, the policy service is not running.') }}{% endcall %}
-{% else %}
-
-{% if es.get('termination_triggered') or (health.get('critical_violations') or 0) > 0 %}
-{% call ui.alert(variant='destructive', attrs={'data-testid': 'policy-alert'}) %}{{ lucide('triangle-alert') }}{{ ui.alert_title(text='A serious policy breach was caught') }}{{ ui.alert_description(text=('AI operations were stopped after a breach. ' if es.get('termination_triggered') else '') ~ 'Review the violations below.') }}{% endcall %}
+{% if checks.writes_paused %}
+{% call ui.alert(attrs={'data-testid': 'policy-paused'}) %}{{ lucide('triangle-alert') }}{{ ui.alert_title(text='Changes by the assistant are paused for this workspace') }}{{ ui.alert_description(text='A change is checked and reviewed when writes resume, and not before.') }}{% endcall %}
 {% endif %}
 
-{%- set enforcement_sentence = ('Enforcement is on, in strict mode: an AI operation that breaks a rule is blocked.' if md.get('strict_mode') else 'Enforcement is on: an AI operation that breaks a rule is flagged.') if md.get('enforcement_enabled') else 'Enforcement is off: AI operations are not checked against the rules.' -%}
-{%- set critical = health.get('critical_violations') or 0 -%}
-
-{% if checked %}
+{% if checks.total %}
 {{ stat_cards([
-    {'label': 'Operations checked', 'value': '{:,}'.format(checked), 'icon': 'clipboard-check', 'sentence': enforcement_sentence, 'testid': 'policy-checked'},
-    ({'label': 'Violations caught', 'value': '{:,}'.format(found), 'icon': 'triangle-alert', 'sentence': 'Operations that broke a rule', 'testid': 'policy-violations'} if found else
-     {'label': 'No violations', 'value': none, 'icon': 'circle-check', 'sentence': 'Every operation checked kept to the rules', 'testid': 'policy-violations'}),
-    {'label': 'Kept to the rules', 'value': ((rate|round|int)|string ~ '%') if rate is not none else none, 'icon': 'shield-check', 'sentence': 'Share of checked operations with no violation', 'testid': 'policy-rate'},
-    ({'label': 'Critical violations', 'value': '{:,}'.format(critical), 'icon': 'octagon-x', 'sentence': 'Serious breaches that need a look', 'testid': 'policy-critical'} if critical else
-     {'label': 'No critical violations', 'value': none, 'icon': 'activity', 'sentence': 'Nothing serious has been caught', 'testid': 'policy-critical'})
+    {'label': 'Changes checked', 'value': '{:,}'.format(checks.total), 'icon': 'clipboard-check', 'sentence': 'In the last %d days' % days, 'testid': 'policy-checked'},
+    {'label': 'Passed the checks', 'value': '{:,}'.format(checks.checks_passed), 'icon': 'shield-check', 'sentence': 'No check found a problem with these changes', 'testid': 'policy-passed'},
+    {'label': 'Stopped by a check', 'value': '{:,}'.format(checks.checks_failed), 'icon': 'octagon-x', 'sentence': 'Declined before any model was asked', 'testid': 'policy-failed'},
+    {'label': 'Applied', 'value': '{:,}'.format(checks.applied), 'icon': 'circle-check', 'sentence': '%s declined, %s still in review' % ('{:,}'.format(checks.declined), '{:,}'.format(checks.in_review)), 'testid': 'policy-applied'}
 ]) }}
-{% endif %}
 
-{% if recent %}
-{% call section('Recent violations', 'The last five operations that broke a rule, with what to do about each', testid='policy-recent-violations') %}
-  {% call(v) list_table(rows=recent, columns=[{'label': 'Rule', 'sortable': true}, {'label': 'Severity', 'sortable': true}, {'label': 'Detected', 'sortable': true}, {'label': 'What to do', 'class': 'hidden lg:table-cell'}],
-                        caption='Recent policy violations', testid='policy-violations-table', row_testid='policy-violation-row') %}
-    {% call table_cell(class='max-w-[360px]') %}
-      <span class="block truncate font-medium">{{ v.rule.name }}</span>
-      <span class="block truncate text-xs text-muted-foreground">{{ v.file_path or v.context or v.rule.description }}</span>
+{% call section('Recent checks', 'The latest changes that were checked, newest first', testid='policy-recent-checks') %}
+  {% call(r) list_table(rows=checks.recent, columns=[{'label': 'Change', 'sortable': true}, {'label': 'Checks', 'sortable': true}, {'label': 'Result', 'sortable': true}, {'label': 'Checked', 'sortable': true}, {'label': 'Why', 'class': 'hidden lg:table-cell'}],
+                        caption='Changes the assistant made that were checked', testid='policy-checks-table', row_testid='policy-check-row') %}
+    {% call table_cell(class='max-w-[320px]') %}
+      <a class="block truncate font-medium underline-offset-4 hover:underline" href="{{ r.record_url }}" data-testid="policy-check-link">{{ r.subject }}</a>
+      <span class="block truncate text-xs text-muted-foreground">{{ r.summary }}</span>
     {% endcall %}
-    {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': {'termination': 4, 'critical': 3, 'warning': 2, 'info': 1}.get(v.rule.severity.value, 0)}) %}{{ state_badge(v.rule.severity.value, tone={'termination': 'negative', 'critical': 'negative', 'warning': 'caution', 'info': 'neutral'}.get(v.rule.severity.value, 'neutral')) }}{% endcall %}
-    {% call table_cell(class='whitespace-nowrap tabular-nums', attrs={'data-sort': v.detected_at.strftime('%Y%m%d%H%M%S') if v.detected_at else ''}) %}{{ v.detected_at.strftime('%d %b %Y %H:%M') if v.detected_at else '' }}{% endcall %}
-    {% call table_cell(class='hidden lg:table-cell max-w-[360px] truncate text-muted-foreground') %}{{ v.suggested_action or '' }}{% endcall %}
+    {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(r.checks, tone=('positive' if r.checks == 'Passed' else 'negative')) }}{% endcall %}
+    {% call table_cell(class='whitespace-nowrap') %}{{ state_badge(r.result, tone=('positive' if r.result == 'Applied' else 'negative' if r.result == 'Declined' else 'caution')) }}{% endcall %}
+    {% call table_cell(class='whitespace-nowrap tabular-nums', attrs={'data-sort': r.checked_at.strftime('%Y%m%d%H%M%S')}) %}{{ r.checked_at.strftime('%d %b %Y %H:%M') }}{% endcall %}
+    {% call table_cell(class='hidden lg:table-cell max-w-[360px] truncate text-muted-foreground') %}{{ r.reason or 'Every check passed.' }}{% endcall %}
   {% endcall %}
 {% endcall %}
 {% else %}
-{% call ui.card(attrs={'data-testid': 'policy-recent-violations'}) %}
-{% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'policy-violations-empty', 'role': 'status'}) %}
+{% call ui.card(attrs={'data-testid': 'policy-recent-checks'}) %}
+{% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'policy-checks-empty', 'role': 'status'}) %}
   {% call ui.empty_header() %}
     {% call ui.empty_icon(variant='icon') %}{{ lucide('shield-check') }}{% endcall %}
-    {{ ui.empty_title(text=('No AI operations checked yet' if not checked else 'No violations')) }}
-    {{ ui.empty_description(text=enforcement_sentence ~ (' A violation shows here as soon as an operation breaks a rule.' if not checked else ' Every operation checked kept to the rules.')) }}
+    {{ ui.empty_title(text='No changes have been checked in the last %d days' % days) }}
+    {{ ui.empty_description(text='The assistant has made no change in your workspace in this period. A change shows here as soon as it is checked.') }}
   {% endcall %}
-  {% if current_user.is_platform_admin %}{% call ui.empty_content() %}{{ _settings() }}{% endcall %}{% endif %}
 {% endcall %}
 {% endcall %}
 {% endif %}
-{% endif %}
+
+{% call ui.card(attrs={'data-testid': 'policy-coverage'}) %}
+  {% call ui.card_header() %}{{ ui.card_title(text='What is checked') }}{% endcall %}
+  {% call ui.card_content(class='space-y-2 text-sm') %}
+    <p data-testid="policy-covered">{{ covered }}</p>
+    <p class="text-muted-foreground" data-testid="policy-not-covered">{{ not_covered }}</p>
+  {% endcall %}
+{% endcall %}
 </div>
 {% endblock %}

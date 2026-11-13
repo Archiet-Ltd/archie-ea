@@ -178,14 +178,16 @@ class ComplianceTrackingService:
     def _get_all_capabilities(self) -> List[Dict]:
         """Every business capability of the organisation. Errors propagate so the page reports the failure
         instead of an empty portfolio. The query is ORM-level (BusinessCapability.query), which the tenant fence
-        filters by organisation, and it also names the organisation so it holds even if the fence is absent."""
+        filters by organisation, and it also names the organisation so it holds even if the fence is absent. With no
+        organisation it returns an empty list."""
         from app.middleware.tenant_context import current_org_id
         from app.models.business_capability import BusinessCapability
 
-        query = BusinessCapability.query
         org_id = current_org_id()
-        if org_id is not None:
-            query = query.filter(BusinessCapability.organization_id == org_id)
+        if org_id is None:
+            # No organisation known: no records, never every organisation's.
+            return []
+        query = BusinessCapability.query.filter(BusinessCapability.organization_id == org_id)
         return [
             {"id": cap.id, "name": cap.name, "domain": cap.business_domain,
              "element_id": cap.archimate_element_id, "updated_at": cap.updated_at or cap.created_at}

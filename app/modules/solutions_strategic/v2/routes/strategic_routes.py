@@ -40,6 +40,12 @@ from app.modules.solutions_strategic.v2.services.investment_prioritization_servi
     currency_symbol,
     InvestmentPrioritizationService,
 )
+from app.services.cost_visibility import (
+    COSTS_WITHHELD,
+    INVESTMENT_MONEY_KEYS,
+    costs_visible,
+    withhold_costs,
+)
 from app.modules.solutions_strategic.v2.services.process_optimization_service import (
     ProcessOptimizationService,
 )
@@ -177,6 +183,9 @@ def investment_matrix():
         from app.services import result_footer_service
 
         result_footer_service.attach_capability_footers(current_org_id(), analysis["capability_scores"])
+        # After the footers, which read the figures to say where each came from.
+        if not costs_visible(current_user):
+            analysis = withhold_costs(analysis, keys=INVESTMENT_MONEY_KEYS)
 
         return render_template(
             "strategic/investment_matrix.html",
@@ -188,6 +197,7 @@ def investment_matrix():
             portfolio_metrics=analysis["portfolio_metrics"],
             recommendations=analysis["recommendations"],
             currency_symbol=currency_symbol(),
+            costs_withheld_text=COSTS_WITHHELD,
         )
     except Exception:
         current_app.logger.exception("Investment matrix scores could not be loaded")
@@ -205,6 +215,8 @@ def api_investment_analysis():
     try:
         service = InvestmentPrioritizationService()
         analysis = service.analyze_investment_priorities(include_risk_analysis=True)
+        if not costs_visible(current_user):
+            analysis = withhold_costs(analysis, keys=INVESTMENT_MONEY_KEYS)
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
@@ -229,9 +241,12 @@ def risk_assessment():
         from app.services import risk_service
 
         assessment = risk_service.risk_assessment()
+        # The cards count open risks, so the rows are the open risks too: the page lists what it counts.
+        open_rows = [row for row in assessment["rows"] if row["status"] == "open"]
         return render_template(
             "strategic/risk_assessment.html",
-            risk_rows=assessment["rows"],
+            risk_rows=open_rows,
+            closed_count=len(assessment["rows"]) - len(open_rows),
             counts=assessment["counts"],
         )
     except Exception:
@@ -257,6 +272,7 @@ def impact_analysis():
     """Impact analysis dashboard — architecture change ripple-effect visualization."""
     from app.middleware.tenant_context import current_org_id
     from app.services.priority_action_service import limit_for, prioritised_actions
+    from app.services.risk_service import footers_by_risk
 
     return render_template(
         "strategic/impact_analysis.html",
@@ -264,7 +280,8 @@ def impact_analysis():
         scenario_list_limit=SCENARIO_LIST_LIMIT,
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
-        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
         **_model_state(),
     )
 
@@ -313,6 +330,8 @@ def api_impact_analysis():
 
             analysis["footer_html"] = result_footer_service.render_footer(
                 result_footer_service.impact_footer(current_org_id(), analysis))
+            if not costs_visible(current_user):
+                analysis = withhold_costs(analysis)
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
@@ -334,6 +353,7 @@ def simulations_page():
     """The simulations page: the impact analysis screen in its "try it on a copy" form."""
     from app.middleware.tenant_context import current_org_id
     from app.services.priority_action_service import limit_for, prioritised_actions
+    from app.services.risk_service import footers_by_risk
 
     return render_template(
         "strategic/impact_analysis.html",
@@ -342,7 +362,8 @@ def simulations_page():
         scenario_list_limit=SCENARIO_LIST_LIMIT,
         save_scenario_roles=who_holds_role(*SCENARIO_SAVE_ROLES),
         change_labels=simulation_service.CHANGE_LABELS,
-        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                             risk_footers=footers_by_risk(current_org_id())),
         **_model_state(),
     )
 
@@ -366,8 +387,8 @@ def api_simulation():
 
         result["footer_html"] = result_footer_service.render_footer(
             result_footer_service.impact_footer(current_org_id(), result))
-        if not simulation_service.may_see_costs(current_user):
-            result = simulation_service.withhold_costs(result)
+        if not costs_visible(current_user):
+            result = withhold_costs(result)
         return jsonify(result)
     except simulation_service.ElementNotInModel:
         return jsonify({"error": "That element is not in your model."}), 404
@@ -398,8 +419,8 @@ def _scenario_figures(server):
 def _scenario_for_caller(row):
     """A saved scenario as the caller may read it: the running costs are left out for a person the cost rule withholds from."""
     data = row.to_dict()
-    if not simulation_service.may_see_costs(current_user):
-        data["analysis_result"] = simulation_service.withhold_costs(data["analysis_result"])
+    if not costs_visible(current_user):
+        data["analysis_result"] = withhold_costs(data["analysis_result"])
     return data
 
 
@@ -564,6 +585,8 @@ def api_portfolio_impact():
 
         service = ImpactAnalysisService()
         analysis = service.analyze_portfolio_impact(change_scenarios)
+        if not costs_visible(current_user):
+            analysis = withhold_costs(analysis)
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500

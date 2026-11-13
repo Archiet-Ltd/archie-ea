@@ -31,7 +31,7 @@
     {'label': 'Value streams', 'value': streams|length, 'icon': 'waves', 'sentence': 'End-to-end flows defined', 'testid': 'vs-count'},
     ({'label': 'Stages', 'value': stage_total, 'icon': 'layers', 'sentence': 'Across every value stream'} if stage_total else {'label': 'No stages yet', 'value': none, 'icon': 'layers', 'sentence': 'Open a value stream to add its stages'}),
     ({'label': 'Mapped capabilities', 'value': cap_total, 'icon': 'link', 'sentence': 'Capabilities linked to a stage'} if cap_total else {'label': 'No capabilities mapped', 'value': none, 'icon': 'link', 'sentence': 'Link capabilities to stages on each value stream'}),
-    ({'label': 'Critical value streams', 'value': critical, 'icon': 'target', 'sentence': 'Marked critical to the business'} if critical else {'label': 'None marked critical', 'value': none, 'icon': 'target', 'sentence': 'Rate importance on each value stream to see which matter most'})
+    ({'label': 'Critical value streams', 'value': critical, 'icon': 'target', 'sentence': 'Marked critical to the business'} if critical else {'label': 'Critical value streams', 'value': 0, 'icon': 'target', 'sentence': 'No value stream is marked critical. Rate importance on each value stream to see which matter most'})
 ]) }}
 {% endif %}
 

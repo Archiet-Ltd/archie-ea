@@ -80,6 +80,42 @@ def humanize_error(error_msg):
     )
 
 
+# A raw snake_case key (an ARB review's reason, a governance gate's name) never
+# reaches the UI beside its own label: known codes get a hand-written label,
+# anything else is title-cased by title_keep_caps.
+ENUM_LABEL_OVERRIDES = {
+    "arb_review_is_legacy_generic": "Legacy review (predates typed ARB submission)",
+    "arb_queue_empty": "No items in this queue",
+    "arb_submission": "Architecture Review Board submission",
+}
+
+
+def title_keep_caps(value):
+    """The one title-case helper for a stored label (also the humanize_key filter).
+
+    A known key gets its hand-written label. Otherwise underscores read as
+    spaces, a word with a capital after its first letter (SaaS, IoT, eCommerce)
+    or an all-capital word of two to five letters (AI, SAML, API) stays as it
+    was typed, and every other word is title-cased. The stored value is never
+    changed.
+
+    A hyphen is kept: the values people type for an application type or category
+    (off-the-shelf, line-of-business) are hyphenated on purpose. Every key that goes
+    through humanize_key is snake_case, so no caller needs a hyphen read as a space."""
+    if value is None:
+        return value
+    text = str(value)
+    if text in ENUM_LABEL_OVERRIDES:
+        return ENUM_LABEL_OVERRIDES[text]
+
+    def keep(word):
+        if word.isalpha() and not word.isupper() and any(c.isupper() for c in word[1:]):
+            return True
+        return word.isalpha() and word.isupper() and 2 <= len(word) <= 5
+
+    return " ".join(w if keep(w) else w.title() for w in text.replace("_", " ").split())
+
+
 def register_template_utils(app):
     """Register template utilities with Flask app."""
     _register(app)
@@ -170,32 +206,8 @@ def _register(app):
 
     app.jinja_env.globals["safe_ratio"] = safe_ratio
 
-    # H4/L1: a shared enum-to-label mapping so a raw snake_case key (an ARB
-    # review's `reason`, a governance gate's `gate_name`, ...) never reaches
-    # the UI beside its own human label -- one helper instead of the
-    # `|replace('_',' ')|title` one-offs scattered through arb templates.
-    # Known codes get a hand-written label; anything else falls back to the
-    # same title-casing those one-offs already did, so this is a strict
-    # improvement, never a regression.
-    ENUM_LABEL_OVERRIDES = {
-        "arb_review_is_legacy_generic": "Legacy review (predates typed ARB submission)",
-        "arb_queue_empty": "No items in this queue",
-        "arb_submission": "Architecture Review Board submission",
-    }
-
-    @app.template_filter("humanize_key")
-    def humanize_key_filter(value):
-        """Turn a raw snake_case/enum key into a human label.
-
-        Usage: {{ review.reason|humanize_key }}
-               {{ gate_name|humanize_key }}
-        """
-        if value is None:
-            return None
-        text = str(value)
-        if text in ENUM_LABEL_OVERRIDES:
-            return ENUM_LABEL_OVERRIDES[text]
-        return text.replace("_", " ").replace("-", " ").strip().title()
+    app.add_template_filter(title_keep_caps, "title_keep_caps")
+    app.add_template_filter(title_keep_caps, "humanize_key")
 
     app.jinja_env.globals["ENUM_LABEL_OVERRIDES"] = ENUM_LABEL_OVERRIDES
 

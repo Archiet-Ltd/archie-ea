@@ -763,6 +763,32 @@ _APP_PROFILE = {
     "Data Warehouse": ("2.1 strategic", "Data Platform", "Snowflake", "LQ-CAP-ANALYTICS"),
 }
 
+# What each application's record says about how it is built, hosted, classified and what it is for. Some records
+# carry all of it and some carry part, as a real estate does, so the record completeness differs from one
+# application to the next. (name) -> (technology stack, deployment model, data classification, description)
+_APP_RECORDS = {
+    "Event Relay": (["Kafka", "Java"], "cloud", "confidential", "Carries stock and order events between systems."),
+    "Calibration Ledger": (["Python", "PostgreSQL"], "hybrid", "confidential", "Holds every sensor calibration and its certificate."),
+    "Dispatch Planner": (None, "saas", "internal", "Plans the day's deliveries and field visits."),
+    "Inventory Manager": (["SAP HANA"], "hybrid", "confidential", None),
+    "Field Service Scheduler": (["ServiceNow"], "saas", None, "Books engineers onto site visits."),
+    "Compliance Reporter": (None, "saas", "restricted", "Prepares the evidence for each audit."),
+    "Supplier Portal": (["Coupa"], "saas", "internal", None),
+    "Workforce Planner": (None, "saas", None, None),
+    "Quality Monitor": (["Python", "TimescaleDB"], "cloud", "internal", "Watches sensor quality readings against limits."),
+    "Sensor Data Hub": (["Azure IoT Hub", "Azure Data Lake"], "cloud", "confidential", "Receives readings from every deployed sensor."),
+    "Firmware Distribution Service": (["Go", "S3"], "cloud", None, "Signs and delivers firmware to sensors."),
+    "Customer Portal": (None, "saas", "internal", None),
+    "Finance System": (["Oracle Fusion"], "saas", "restricted", "Ledgers, payables and month-end close."),
+    "Document Management": (None, "on_premise", None, None),
+    "Identity Provider": (["Okta"], "saas", "restricted", "Signs every person in to every application."),
+    "Monitoring Dashboard": (None, "saas", None, "Shows the health of every running service."),
+    "Alert Manager": (None, "saas", None, None),
+    "Reporting Engine": (["Power BI"], "hybrid", "internal", None),
+    "Integration Bus": (["MuleSoft"], "cloud", "confidential", "Connects the order, finance and supplier systems."),
+    "Data Warehouse": (["Snowflake", "dbt"], "cloud", "confidential", "One store for reporting across every system."),
+}
+
 # Applications that also support a second capability, beside the primary one in
 # _APP_PROFILE: (application, capability code). Every technology-layer capability
 # is supported by the application that delivers it.
@@ -840,6 +866,10 @@ _DEMO_READER_PERSONA = "business_analyst"
 # The one business architect in the demonstration, so what that persona does and
 # does not see (Connections yes, Billing no) can be walked signed in as them.
 _DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.tanaka@lantern-quay.example.com"
+
+# The one procurement person in the demonstration, so the contract renewals can be walked signed in as the role
+# that reads them. Matches an entry of _OWNER_USERS.
+_DEMO_PROCUREMENT_EMAIL = "taylor.brennan@lantern-quay.example.com"
 
 # Map from display name (as used in BusinessActor elements) to User email.
 _OWNER_NAME_TO_EMAIL = {
@@ -1090,20 +1120,38 @@ def _seed_raci(org_id) -> dict:
 # ── architecture decisions recorded against the systems that matter ─────────
 
 _DECISIONS = [
-    # (number, title, status, system it governs, what was decided, why); the decision id is the number within the
-    # organisation, because decision ids are unique across every organisation
+    # (number, title, status, system it governs, what was decided, why, what follows from it); the decision id is
+    # the number within the organisation, because decision ids are unique across every organisation
     ("001", "Keep Calibration Ledger as the single record of every calibration run", "accepted",
      "Calibration Ledger",
      "Every calibration result is written to Calibration Ledger first; other systems read it and never keep a copy.",
-     "Two systems each held their own calibration figures and the field teams quoted different numbers."),
+     "Two systems each held their own calibration figures and the field teams quoted different numbers.",
+     "Every consumer reads calibration figures from one place, and the ledger must stay available whenever a batch is released."),
     ("002", "Put every Calibration Ledger integration behind the Integration Bus", "accepted",
      "Calibration Ledger",
      "New consumers of calibration data connect through the Integration Bus, not by a direct database link.",
-     "Direct links made every change to the ledger a change to its consumers."),
+     "Direct links made every change to the ledger a change to its consumers.",
+     "The ledger can change its storage without breaking a consumer, and every new consumer waits for a bus connection."),
     ("003", "Retire the legacy field service scheduler once mobile field work is live", "proposed",
      "Field Service Scheduler",
      "The scheduler is retired when mobile field work has run alongside it for one full quarter.",
-     "Two schedulers double the effort to keep technician rosters correct."),
+     "Two schedulers double the effort to keep technician rosters correct.",
+     "One roster to maintain, and field teams move to the mobile app before the scheduler's licence ends."),
+    ("004", "Move the event backbone to a managed message broker", "proposed",
+     "Event Relay",
+     "Event Relay publishes to a managed broker; the self-run queue is switched off after a month of parallel running.",
+     "The self-run queue needs a specialist on call and lost messages twice during upgrades.",
+     "Fewer outages and no on-call specialist, at a monthly service cost that replaces the hardware it runs on."),
+    ("005", "Sign every firmware release before it is distributed", "proposed",
+     "Firmware Distribution Service",
+     "Firmware Distribution Service refuses any image that does not carry a release signature from Quality Assurance.",
+     "A field unit once received an untested build.",
+     "Releases take one more approval step, and no unsigned image reaches a field unit."),
+    ("006", "Use Identity Provider sign-in for every internal application", "proposed",
+     "Identity Provider",
+     "Internal applications drop their own passwords and sign people in through Identity Provider.",
+     "Leavers kept access to systems that held their own accounts.",
+     "Access ends in one place when a person leaves, and each application needs a sign-in integration."),
 ]
 
 
@@ -1118,20 +1166,221 @@ def _seed_decisions(org_id, user_id) -> dict:
         .filter(ArchitectureDecision.organization_id == org_id)
     }
     created = 0
-    for number, title, status, system, decided, why in _DECISIONS:
+    for number, title, status, system, decided, why, consequences in _DECISIONS:
         decision_id = f"AD-{org_id}-{number}"
         element = elements.get(system)
         if element is None or decision_id in existing:
             continue
         db.session.add(ArchitectureDecision(
             organization_id=org_id, decision_id=decision_id, title=title, status=status,
-            decision=decided, context=why, rationale=why, created_by_id=user_id,
+            decision=decided, context=why, rationale=why, consequences=consequences, created_by_id=user_id,
             archimate_element_ids=[element.id], enterprise_level=True,
         ))
         created += 1
     if created:
         db.session.flush()
     return {"architecture_decisions_created": created}
+
+
+def _seed_arb_submissions(org_id, user_id) -> dict:
+    """Put each proposed architecture decision in front of the board, the way a person does: through the typed
+    submission command, which records the review, its evidence snapshot and its place in the board's queue.
+    Idempotent: a decision already under review is left as it is."""
+    import uuid
+
+    from flask import current_app
+
+    from app.models.architecture_decision import ArchitectureDecision
+    from app.modules.transformation_room.arb_submission_adapter import TypedARBSubmissionAdapter
+    from app.modules.transformation_room.arb_typed_subject_ingress import TypedARBSubjectIngress
+
+    if not user_id:
+        return {"arb_typed_reviews_created": 0}
+    proposed = (db.session.query(ArchitectureDecision)
+                .filter(ArchitectureDecision.organization_id == org_id, ArchitectureDecision.status == "proposed")
+                .order_by(ArchitectureDecision.decision_id).all())
+    actor = TypedARBSubmissionAdapter._load_actor(user_id, org_id, str(uuid.uuid4()))
+    created = 0
+    for decision in proposed:
+        key = TypedARBSubjectIngress._command_key(
+            None, actor=actor, subject_type="adr", subject_id=decision.id, human_reviewed=True)
+        result = TypedARBSubjectIngress.submit(
+            actor=actor, command_key=key, subject_type="adr", subject_id=decision.id, human_reviewed=True)
+        if result.success and not result.idempotent:
+            created += 1
+        elif not result.success:
+            current_app.logger.warning(
+                "demo seed: %s was not put before the board: %s %s", decision.decision_id,
+                result.reason_codes, result.missing_evidence)
+    return {"arb_typed_reviews_created": created}
+
+
+# ── business cases (the Business Case screen) ──────────────────────────────
+
+_BUSINESS_CASES = [
+    # (title, status, solution it supports, capex, annual running cost, annual benefit, problem, options,
+    #  recommendation, expected benefits, key risks)
+    ("Move the event backbone to a managed message broker", "submitted", "Event-Driven Operations Backbone",
+     210000, 48000, 190000,
+     "The self-run message queue needs a specialist on call and lost messages twice during upgrades, which held up stock updates for a day each time.",
+     "1. Keep the self-run queue and add a second specialist. 2. Move to a managed broker. 3. Replace the queue with direct calls between systems.",
+     "Move to a managed broker: it removes the on-call specialist and the upgrade risk for a running cost below the hardware and staff it replaces.",
+     "No lost messages during upgrades, stock updates never wait for the queue, and one specialist is freed for calibration tooling.",
+     "Brokers differ in how they order messages; the move is rehearsed against a month of recorded traffic before the switch."),
+    ("Automate calibration batch release", "draft", "Field Calibration Platform",
+     450000, 95000, 380000,
+     "Each calibration batch is released by hand after a person checks every certificate, which caps output at about 120 units a week.",
+     "1. Hire two more checkers. 2. Automate the certificate checks and release by exception. 3. Outsource release to the laboratory.",
+     "Automate the checks and release by exception, keeping a person for every batch that fails a rule.",
+     "Output of 180 units a week, certificates issued the day a batch passes, and no batch waiting on a person.",
+     "A wrong rule could release a bad batch; each rule is signed off by Quality Assurance and the first quarter keeps a sample check."),
+    ("Consolidate the supplier panel", "approved", "Supplier Collaboration Hub",
+     95000, 15000, 105000,
+     "Component orders go to eleven suppliers, so lead times vary and the team negotiates eleven contracts a year.",
+     "1. Leave the panel as it is. 2. Cut to five suppliers on shared terms. 3. Buy from a single distributor.",
+     "Cut to five suppliers on shared terms, keeping two for each critical component.",
+     "Shorter and steadier lead times and six fewer contracts to renew each year.",
+     "A supplier failure hits harder with fewer suppliers; two sources stay qualified for each critical component."),
+]
+
+
+def _seed_business_cases(org_id, user_id) -> dict:
+    """Business cases with their options, recommendation and three-year cost and return worked out from the
+    figures on them, each tied to the solution it supports. Idempotent: a case whose title exists is left alone."""
+    from app.models.business_case import BusinessCase
+    from app.models.solution_models import Solution
+
+    existing = {c.title for c in BusinessCase.query.filter_by(organization_id=org_id).all()}
+    solutions = {s.name: s for s in Solution.query.filter_by(organization_id=org_id).all()}
+    created = 0
+    for title, status, solution, capex, opex, benefit, problem, options, recommendation, benefits, risks in _BUSINESS_CASES:
+        if title in existing:
+            continue
+        tco = capex + 3 * opex
+        net_annual = benefit - opex
+        db.session.add(BusinessCase(
+            organization_id=org_id, title=title, status=status, created_by_id=user_id,
+            description=problem, problem_statement=problem, options_considered=options,
+            recommended_option=recommendation, expected_benefits=benefits, key_risks=risks,
+            solution_id=solutions[solution].id if solution in solutions else None,
+            capex=capex, opex_annual=opex, financial_benefit_annual=benefit, tco_3yr=tco,
+            roi_percentage=round((3 * benefit - tco) / tco * 100, 1),
+            payback_months=-(-capex * 12 // net_annual),
+        ))
+        created += 1
+    if created:
+        db.session.flush()
+    return {"business_cases_created": created}
+
+
+# Days from today to each active contract's renewal, in the order the contracts were made: a spread, so the
+# renewals screen has contracts in every window it counts (30, 60, 90, 180 days and the year after).
+_RENEWAL_OFFSETS = (14, 41, 66, 88, 130, 172, 215, 268, 330)
+
+
+def _seed_application_records(org_id) -> dict:
+    """Fill what each application's record says about how it is built, hosted and classified, where a record has
+    none of it yet. A value already on a record is left alone."""
+    import json
+
+    changed = 0
+    for name, app in _resolve_apps(org_id).items():
+        stack, deployment, classification, description = _APP_RECORDS.get(name, (None, None, None, None))
+        touched = False
+        if stack and not app.technology_stack:
+            app.technology_stack = json.dumps(stack)
+            touched = True
+        if deployment and not app.deployment_model:
+            app.deployment_model = deployment
+            touched = True
+        if classification and not app.data_classification:
+            app.data_classification = classification
+            touched = True
+        if description and not app.description:
+            app.description = description
+            touched = True
+        changed += touched
+    if changed:
+        db.session.flush()
+    return {"application_records_filled": changed}
+
+
+def _seed_contract_terms(org_id) -> dict:
+    """Give each active contract the term it runs to: a renewal date on the spread above, and an end date six
+    months after it. A contract that already has an end date is left alone."""
+    import datetime as _dt
+
+    from app.models.application_portfolio import VendorContract
+
+    changed = 0
+    contracts = (VendorContract.query.filter_by(organization_id=org_id, status="active")
+                 .order_by(VendorContract.id).all())
+    seen_vendors = set()
+    for index, contract in enumerate(contracts):
+        if contract.end_date is not None:
+            continue
+        # A vendor's second and later contracts renew further out than 90 days, so the contracts due within 90
+        # days and the vendors due within 90 days are the same number on the renewals page and the vendor list.
+        later = contract.vendor_id in seen_vendors
+        seen_vendors.add(contract.vendor_id)
+        offset = _RENEWAL_OFFSETS[4 + index % 5] if later else _RENEWAL_OFFSETS[index % len(_RENEWAL_OFFSETS)]
+        contract.renewal_date = _dt.date.today() + _dt.timedelta(days=offset)
+        contract.end_date = contract.renewal_date + _dt.timedelta(days=183)
+        changed += 1
+    if changed:
+        db.session.flush()
+    return {"contract_terms_recorded": changed}
+
+
+# ── saved scenarios ────────────────────────────────────────────────────────
+
+# (name, system it is tried on, kind of change): two ways to deal with the same system, so Compare Scenarios
+# has two saved scenarios to put side by side.
+_SCENARIOS = [
+    ("Retire Calibration Ledger", "Calibration Ledger", "RETIRE"),
+    ("Replace Calibration Ledger with a managed service", "Calibration Ledger", "REPLACE"),
+]
+
+
+def _seed_scenarios(org_id, user_id) -> dict:
+    """Two saved scenarios on one system, worked out by the same analysis a person's save uses.
+    Idempotent: a scenario whose name the organisation already has is left as it is."""
+    from flask import g
+
+    from app.models.saved_scenario import SavedScenario
+    from app.modules.solutions_strategic.v2.routes.strategic_routes import _scenario_figures
+    from app.modules.solutions_strategic.v2.services import simulation_service
+    from app.modules.solutions_strategic.v2.services.impact_analysis_service import ImpactAnalysisService
+
+    elements = _resolve_elements(org_id)
+    existing = {
+        row.name for row in db.session.query(SavedScenario.name).filter(SavedScenario.organization_id == org_id)
+    }
+    created = 0
+    had_org = hasattr(g, "current_org_id")
+    previous = getattr(g, "current_org_id", None)
+    g.current_org_id = org_id  # the analysis reads the organisation the way a request does
+    try:
+        for name, system, change_type in _SCENARIOS:
+            element = elements.get(system)
+            if element is None or name in existing:
+                continue
+            server = ImpactAnalysisService.analyze_change_impact(element.id, change_type, record=False)
+            db.session.add(SavedScenario(
+                organization_id=org_id, name=name, element_id=element.id, element_name=element.name,
+                element_type=element.type, change_type=change_type,
+                change_label=simulation_service.change_label(change_type),
+                analysis_result=_scenario_figures(server), created_by_id=user_id,
+            ))
+            created += 1
+    finally:
+        if had_org:
+            g.current_org_id = previous
+        else:
+            del g.current_org_id
+    if created:
+        db.session.flush()
+    return {"saved_scenarios_created": created}
 
 
 # ── products ───────────────────────────────────────────────────────────────
@@ -1655,6 +1904,21 @@ _INITIATIVE_OUTCOMES = {
                          ("Stock counts match the ledger", "Count accuracy", "%", 97.1, 99.5)),
 }
 
+# Further benefits an initiative claims beside the one above, so the initiatives claim different numbers of benefits:
+# initiative code -> ((name, measure, unit, baseline, target), ...)
+_EXTRA_BENEFITS = {
+    "LQ-INI-CALIBRATION": (
+        ("Fewer re-calibrations", "Units re-run after a failed check", "units", 14, 4),
+        ("Certificates issued the same day", "Certificates issued within a day", "%", 60, 95),
+    ),
+    "LQ-INI-EVENT-BACKBONE": (("Fewer stock updates held up", "Updates delayed beyond an hour per month", "updates", 22, 2),),
+    "LQ-INI-FIELD-SVC": (("More visits finished first time", "Visits finished on the first call", "%", 68, 85),),
+    "LQ-INI-COMPLIANCE": (
+        ("Less time preparing audit evidence", "Days spent per audit", "days", 18, 6),
+        ("Controls with a named owner", "Controls with an owner", "%", 55, 100),
+    ),
+}
+
 # ── the business model canvas (the Business Model Canvas screen) ───────────
 
 _CANVAS_NAME = "Lantern Quay Systems"
@@ -1799,6 +2063,110 @@ _WORK_PACKAGES = [
         -20, 45, 65000, 38000,
         "Inventory Accuracy Drive", "Inventory Control",
     ),
+    # The other capabilities each carry the work that changes them, so every
+    # capability on the investment pages has a recorded figure with its source.
+    (
+        "Install online water quality probes",
+        "in_progress", "high",
+        -40, 150, 185000, 72000,
+        "Predictive Maintenance Pilot", "Water Quality Monitoring",
+    ),
+    (
+        "Streamline order-to-dispatch hand-offs",
+        "in_progress", "medium",
+        -25, 100, 88000, 31000,
+        "Inventory Accuracy Drive", "Order Fulfilment",
+    ),
+    (
+        "Introduce skills-based rostering",
+        "planned", "medium",
+        45, 110, 72000, 0,
+        "Field Tester Rollout", "Workforce Planning",
+    ),
+    (
+        "Stand up a 24-hour incident desk",
+        "in_progress", "high",
+        -35, 90, 120000, 54000,
+        "Event Backbone Migration", "Incident Response",
+    ),
+    (
+        "Build demand forecasting model",
+        "planned", "medium",
+        75, 130, 98000, 0,
+        "Predictive Maintenance Pilot", "Demand Forecasting",
+    ),
+    (
+        "Automate batch quality checks",
+        "in_progress", "medium",
+        -20, 80, 64000, 22000,
+        "Compliance System Upgrade", "Quality Assurance",
+    ),
+    (
+        "Launch the shared analytics workspace",
+        "planned", "high",
+        30, 140, 175000, 0,
+        "Predictive Maintenance Pilot", "Data Analytics",
+    ),
+    (
+        "Replace point-to-point interfaces with the bus",
+        "in_progress", "high",
+        -55, 160, 230000, 96000,
+        "Event Backbone Migration", "Integration Management",
+    ),
+    (
+        "Introduce single sign-on for field tools",
+        "planned", "high",
+        40, 75, 82000, 0,
+        "Compliance System Upgrade", "Identity and Access",
+    ),
+    (
+        "Move controlled documents to one register",
+        "in_progress", "low",
+        -15, 70, 46000, 15000,
+        "Compliance System Upgrade", "Document Control",
+    ),
+    (
+        "Add alert routing and on-call rotas",
+        "planned", "medium",
+        50, 60, 58000, 0,
+        "Event Backbone Migration", "Monitoring and Alerting",
+    ),
+    (
+        "Enrol field devices in central management",
+        "in_progress", "medium",
+        -30, 110, 92000, 35000,
+        "Field Tester Rollout", "Device Management",
+    ),
+    (
+        "Sign and stage firmware releases",
+        "planned", "medium",
+        60, 90, 69000, 0,
+        "Calibration Automation Phase 2", "Firmware Distribution",
+    ),
+    (
+        "Renew the site network links",
+        "in_progress", "medium",
+        -45, 120, 135000, 68000,
+        "Event Backbone Migration", "Network Operations",
+    ),
+    (
+        "Test restore of the calibration ledger",
+        "planned", "high",
+        25, 45, 41000, 0,
+        "Event Backbone Migration", "Backup and Recovery",
+    ),
+    (
+        "Plan capacity for peak calibration season",
+        "planned", "low",
+        90, 60, 36000, 0,
+        "Event Backbone Migration", "Capacity Planning",
+    ),
+    (
+        "Segment the lab and field networks",
+        "in_progress", "high",
+        -10, 100, 115000, 29000,
+        "Compliance System Upgrade", "Security Operations",
+    ),
 ]
 
 # ── plateaus ───────────────────────────────────────────────────────────────
@@ -1852,12 +2220,18 @@ _PLATEAU_DESCRIPTIONS = {
     "Future State": "Platform services with governed data, full integration coverage and complete monitoring.",
 }
 
-# The two work packages that close no gap, and the plateau each one realises.
+# The work packages that close no gap, and the plateau each one realises.
 # Every other package realises the plateau its gap is closed on.
 _WORK_PACKAGE_PLATEAUS = {
     "Procure handheld field testers": "Transition State 1",
     "Consolidate supplier base": "Target Architecture",
 }
+# Packages that close no gap sit on the plateau their status points to: under way is
+# Transition State 1, planned is Target Architecture.
+_WORK_PACKAGE_PLATEAUS.update({
+    spec[0]: ("Target Architecture" if spec[1] == "planned" else "Transition State 1")
+    for spec in _WORK_PACKAGES[12:]
+})
 
 # gap name -> (gap type, impact): what kind of shortfall it is and what it costs.
 _GAP_DETAILS = {
@@ -2514,10 +2888,64 @@ def _seed_boards(org_id, demo_user_id) -> dict:
         ))
         stats["backlog_requirements_created"] += 1
     db.session.flush()
+    stats["backlog_scores_recorded"] = _seed_backlog_scores(org_id)
     stats.update(_seed_solution_blueprints(org_id, solutions))
     stats["solution_risks_created"] = _seed_solution_risks(org_id, solutions)
     stats["risk_records_completed"] = stats.get("risk_records_completed", 0) + _complete_risk_records(org_id)
     return stats
+
+
+# Score inputs the team has recorded for each backlog requirement, by name:
+# (business value, time criticality, risk reduction, job size, reach, impact, confidence %, story points).
+# The scores are worked out from these on the prioritisation page, never typed in.
+_BACKLOG_SCORE_INPUTS = {
+    "Record the as-found reading for every instrument": (8, 5, 8, 3, 400, 4, 80, 3),
+    "Show a customer the status of an open request": (5, 3, 2, 5, 1200, 2, 70, 5),
+    "Suggest the nearest qualified engineer": (8, 5, 3, 8, 90, 4, 60, 8),
+    "Suppliers confirm delivery dates in the portal": (8, 8, 5, 5, 300, 3, 80, 5),
+    "Reject certificates with a missing reference standard": (13, 8, 13, 3, 500, 5, 90, 3),
+    "Retry a failed event delivery three times": (3, 2, 8, 2, 40, 2, 90, 2),
+    "Publish every instrument change as an event": (5, 3, 5, 5, 60, 3, 80, 5),
+    "Export certificates as signed documents": (5, 2, 3, 3, 700, 2, 80, 3),
+}
+
+
+def _seed_backlog_scores(org_id) -> int:
+    """Record score inputs on the ranked copy of each backlog requirement that has none.
+
+    A requirement with any input already recorded is left as a person set it."""
+    from app.models.models import Requirement
+    from app.models.solution_architect_models import SolutionRequirement
+    from app.services.prioritisation_service import project_backlog_requirements
+
+    project_backlog_requirements(org_id)
+    db.session.flush()
+    filled = 0
+    rows = db.session.query(SolutionRequirement).filter(
+        SolutionRequirement.organization_id == org_id, SolutionRequirement.deleted_at.is_(None),
+        SolutionRequirement.archimate_requirement_id.isnot(None),
+    ).all()
+    for source in rows:
+        inputs = _BACKLOG_SCORE_INPUTS.get(source.name)
+        ranked = db.session.get(Requirement, source.archimate_requirement_id)
+        if inputs is None or ranked is None or ranked.organization_id != org_id:
+            continue
+        fields = ("business_value", "time_criticality", "risk_reduction", "job_size",
+                  "reach", "impact", "confidence", "story_points")
+        if any(getattr(ranked, f) is not None for f in fields):
+            continue
+        (business_value, time_criticality, risk_reduction, job_size,
+         reach, impact, confidence, story_points) = inputs
+        ranked.business_value = business_value
+        ranked.time_criticality = time_criticality
+        ranked.risk_reduction = risk_reduction
+        ranked.job_size = job_size
+        ranked.reach = reach
+        ranked.impact = impact
+        ranked.confidence = confidence
+        ranked.story_points = story_points
+        filled += 1
+    return filled
 
 
 # ── the blueprint of each seeded solution ─────────────────────────────────
@@ -3527,6 +3955,11 @@ def _seed_demo_company() -> dict:
             architect.enterprise_role = "business_architect"
             db.session.flush()
 
+        procurement = User.query.filter_by(email=_DEMO_PROCUREMENT_EMAIL, organization_id=org_id).first()
+        if procurement is not None and procurement.enterprise_role != "procurement":
+            procurement.enterprise_role = "procurement"
+            db.session.flush()
+
         apps = _resolve_apps(org_id)
         users = _resolve_users(org_id)
         existing_owners = set()
@@ -4140,12 +4573,14 @@ def _seed_demo_company() -> dict:
                     links_made += 1
                 except InitiativeGoalLinkError:
                     pass
-            if not db.session.query(Benefit).filter_by(
-                    organization_id=org_id, legacy_enterprise_initiative_id=initiative.id, name=b_name).first():
-                db.session.add(Benefit(
-                    organization_id=org_id, legacy_enterprise_initiative_id=initiative.id, name=b_name,
-                    measure=b_measure, unit=b_unit, baseline_value=b_base, target_value=b_target,
-                    benefit_type="cost_saving" if b_unit == "GBP" else "performance", status="identified"))
+            for b_name, b_measure, b_unit, b_base, b_target in (
+                    (b_name, b_measure, b_unit, b_base, b_target), *_EXTRA_BENEFITS.get(code, ())):
+                if not db.session.query(Benefit).filter_by(
+                        organization_id=org_id, legacy_enterprise_initiative_id=initiative.id, name=b_name).first():
+                    db.session.add(Benefit(
+                        organization_id=org_id, legacy_enterprise_initiative_id=initiative.id, name=b_name,
+                        measure=b_measure, unit=b_unit, baseline_value=b_base, target_value=b_target,
+                        benefit_type="cost_saving" if b_unit == "GBP" else "performance", status="identified"))
         db.session.flush()
         stats["initiative_goal_links_created"] = links_made
 
@@ -4277,28 +4712,46 @@ def _seed_demo_company() -> dict:
         stats["plateaus_created"] = plateaus_created
 
         # ── 12. gaps ────────────────────────────────────────────────────
-        existing_gaps = {
-            g.name
-            for g in db.session.query(Gap)
-            .filter(Gap.organization_id == org_id)
-            .all()
-        }
+        # The commit hook (_on_before_commit in archimate_backbone) writes a gap
+        # record for each Gap element when it is flushed, but with no severity.
+        # Step 12 completes those records with the seed's kind and severity,
+        # matched by name within the organisation. Idempotent: a second run
+        # finds the fields already set and changes nothing.
         gaps_created = 0
         for name, kind, severity, el_name in _GAPS:
-            if name in existing_gaps:
-                continue
-            el = elements.get(el_name)
-            gap = Gap(
-                name=name,
-                gap_kind=kind,
-                severity=severity,
-                organization_id=org_id,
-                archimate_element_id=el.id if el else None,
+            gap = (
+                db.session.query(Gap)
+                .filter(Gap.organization_id == org_id, Gap.name == name)
+                .first()
             )
-            db.session.add(gap)
-            gaps_created += 1
-        if gaps_created:
-            db.session.flush()
+            el = elements.get(el_name)
+            if gap is None:
+                gap = Gap(
+                    name=name,
+                    gap_kind=kind,
+                    severity=severity,
+                    organization_id=org_id,
+                    archimate_element_id=el.id if el else None,
+                )
+                db.session.add(gap)
+                gaps_created += 1
+            elif gap.severity is None:
+                # Only complete the hook's unrated record: fill only empty fields,
+                # leave any field a person has since set untouched.
+                changed = False
+                if not gap.gap_kind:
+                    gap.gap_kind = kind
+                    changed = True
+                if gap.severity is None:
+                    gap.severity = severity
+                    changed = True
+                if el is not None and gap.archimate_element_id is None:
+                    gap.archimate_element_id = el.id
+                    changed = True
+                if changed:
+                    db.session.flush()
+                    gaps_created += 1
+            # else: severity is set — a person rated it, leave it alone
         stats["gaps_created"] = gaps_created
 
         # Each gap sits between two plateaus and has the work package that
@@ -4371,6 +4824,10 @@ def _seed_demo_company() -> dict:
         stats.update(_seed_data_flows(org_id))
         stats.update(_seed_raci(org_id))
         stats.update(_seed_decisions(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_business_cases(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_contract_terms(org_id))
+        stats.update(_seed_application_records(org_id))
+        stats.update(_seed_scenarios(org_id, demo_user.id if demo_user else None))
         stats.update(_seed_products(org_id))
 
         # The portfolio opens already scored: run the existing scoring
@@ -4386,6 +4843,10 @@ def _seed_demo_company() -> dict:
         stats["portfolio_scores_processed"] = scoring_result.get("processed", 0)
 
         db.session.commit()
+
+        # Last: a submission is checked against everything above, so the board's queue opens on reviews that
+        # passed the same readiness checks a person's submission does.
+        stats.update(_seed_arb_submissions(org_id, demo_user.id if demo_user else None))
 
     return stats
 

@@ -62,7 +62,7 @@ def test_architect_works_from_the_prioritised_action_list(browser, live_server):
 
         expect(page.get_by_test_id("priority-actions-rule")).to_contain_text("Ranked by severity, critical first")
         expected = [
-            "Convert the %s to a work package" % names["gap"],
+            "Convert the gap \u201c%s\u201d to a work package" % names["gap"],
             "Finish %s: due %s, 58 percent done" % (
                 names["work"], (datetime.utcnow() - timedelta(days=10)).strftime("%-d %b")),
             "Reduce the risk: %s" % names["risk"],
@@ -162,7 +162,7 @@ def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server
         expect(landing).to_contain_text("Critical")
         # The page's own summary agrees with the list: one critical gap.
         summary = page.get_by_test_id("gap-stat-critical")
-        expect(summary).to_contain_text("Rated critical on the gap itself")
+        expect(summary).to_contain_text("Rated critical on severity or priority, all still open")
         expect(summary).to_contain_text(re.compile(r"\b1\s+Critical\b"))
         expect(page.get_by_test_id("gap-stat-critical-value")).to_have_text("1")
 

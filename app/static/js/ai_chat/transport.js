@@ -83,7 +83,7 @@
             resp = await apiFetch('/ai-chat/estate-answer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember, element_id: (options && options.elementId) || undefined }),
+                body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember, part: (options && options.part) || null, element_id: (options && options.elementId) || undefined }),
                 signal: limit.signal
             });
             data = await resp.json().catch(function () { return {}; });
@@ -92,6 +92,19 @@
             clearTimeout(timer);
         }
         if (!resp.ok || data.success === false) throw new Error(data.error || 'estate answer ' + resp.status);
+        return data;
+    }
+
+    /* Save a change to an application that a preview card described. Resolves to
+       {success, html}: the card for what was saved, or the words for why it was not. */
+    async function confirmApplicationChange(token) {
+        var resp = await apiFetch('/ai-chat/application-change/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token })
+        });
+        var data = await resp.json().catch(function () { return {}; });
+        if (!data.html) throw new Error(data.error || 'application change ' + resp.status);
         return data;
     }
 
@@ -396,6 +409,7 @@
         isProviderConfigurationFault: isProviderConfigurationFault,
         sendMessage: sendMessage,
         askEstate: askEstate,
+        confirmApplicationChange: confirmApplicationChange,
         recomputeConnections: recomputeConnections,
         streamMessage: streamMessage,
         abort: abort,

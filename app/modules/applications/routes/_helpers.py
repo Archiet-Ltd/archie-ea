@@ -595,7 +595,7 @@ def _vendors_impl(
             v.apqc_process_count = 0
 
     # Calculate statistics in a single aggregate query (3 counts → 1 query)
-    from sqlalchemy import case, and_
+    from sqlalchemy import case
     stats_row = db.session.query(
         db.func.count(VendorOrganization.id).label("total"),
         db.func.count(case(
@@ -633,51 +633,12 @@ def _vendors_impl(
         .all()
     )
 
-    from datetime import datetime, timedelta
-
-    try:
-        now = datetime.utcnow()
-        ninety_days = now + timedelta(days=90)
-
-        # DEF-050, Capgemini dry-run: this summed
-        # VendorOrganization.contract_value_annual / read
-        # VendorOrganization.contract_status/contract_end_date — fields
-        # nothing writes to. The real "Add Contract" flow
-        # (app/modules/procurement) creates a VendorContract row (vendor_id
-        # FK, annual_cost, status, end_date), a completely different table.
-        # So "Portfolio ACV" stayed "—" no matter how many real, active
-        # contracts existed. Sum from VendorContract instead.
-        from app.models.application_portfolio import VendorContract
-        from app.services import vendor_register
-
-        acv_row = db.session.query(
-            db.func.count(
-                db.case(
-                    (
-                        and_(
-                            VendorContract.end_date >= now,
-                            VendorContract.end_date <= ninety_days,
-                        ),
-                        VendorContract.id,
-                    )
-                )
-            ).label("renewals_due"),
-        ).filter(
-            vendor_register.active_condition(),
-            VendorContract.vendor_id.isnot(None),
-        ).one()
-
-        renewals_due = int(acv_row.renewals_due or 0)
-    except Exception:
-        renewals_due = 0
-
     stats = {
         "total": total_vendors,
         "active": active_vendors,
         "strategic": strategic_vendors,
         "total_products": total_products,
         "domain_distribution": {d[0] or "other": d[1] for d in domain_distribution},
-        "renewals_due": renewals_due,
     }
 
     # Populate the Type filter from the vendor types actually stored, so the
@@ -722,6 +683,7 @@ def _vendors_impl(
         register_rows=register_rows,
         vendor_footers=vendor_footers,
         system_counts=system_counts,
+        linked_suppliers=page["linked_suppliers"],
         stats=stats,
         vendor_type_filter_options=vendor_type_filter_options,
         vendor_type_filter=vendor_type_filter,

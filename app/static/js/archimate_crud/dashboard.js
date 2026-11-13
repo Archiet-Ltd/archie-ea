@@ -8,6 +8,12 @@ document.addEventListener('alpine:init', function() {
             elements: [],
             pagination: { page: 1, pages: 0, per_page: 25, total: null, has_next: false, has_prev: false },
             loading: false,
+            // The first list request has not finished, or the layer on screen is not the layer last loaded:
+            // the figures that come from the list are being fetched, not missing.
+            elementsLoaded: false,
+            loadedLayer: null,
+            // The layer counts sweep has not answered yet: a layer count not known by then is being fetched.
+            countsLoaded: false,
             loadError: null,   // referenced by x-show/x-text in the template; must exist to avoid Alpine ReferenceError
             searchQuery: '',
             typeFilter: '',
@@ -29,6 +35,9 @@ document.addEventListener('alpine:init', function() {
                 return Object.values(this.layerCounts).reduce(function(a, b) { return a + (b || 0); }, 0);
             },
             layerCounts: {},
+            // Per layer, how many of its records the model map does not draw (a gap entered in the gap
+            // register has no model element). Read from the same counts answer as layerCounts.
+            notOnModelMap: {},
             layerConfig: APP_CONFIG.layerConfig || {},
             popstateHandler: null,
             // ARCH-064: fieldConfigs used to be inlined into every dashboard
@@ -39,6 +48,7 @@ document.addEventListener('alpine:init', function() {
             // fetch completes, exactly as it already does for a type with no
             // configured fields.
             fieldConfigs: {},
+            fieldConfigsReady: null,
 
             // Card filter and grouping
             cardFilter: '',
@@ -244,6 +254,7 @@ document.addEventListener('alpine:init', function() {
             },
 
             get relationshipHint() {
+                if (this.elementsPending) return 'Loading';
                 let metrics = this.relationshipMetrics;
                 if (!metrics.known) return 'Relationship data unavailable on this page';
                 return metrics.connected + ' of ' + metrics.known + ' measured on this page';
@@ -258,6 +269,7 @@ document.addEventListener('alpine:init', function() {
             },
 
             get documentationHint() {
+                if (this.elementsPending) return 'Loading';
                 if (!this.pageCount) return 'No page denominator available';
                 let documented = this.elements.filter(function(el) {
                     return !!(el.description && el.description.trim());
@@ -309,8 +321,65 @@ document.addEventListener('alpine:init', function() {
                     : null;
             },
 
+            get elementsPending() {
+                return !this.elementsLoaded || (this.loading && this.loadedLayer !== this.activeTab);
+            },
+
             get layerTotalKnown() {
                 return typeof this.layerTotal === 'number';
+            },
+
+            // The layer's own count: the number on its tab, its header and its Elements card. The list's
+            // total (layerTotal) is narrower whenever a search or filter is applied, so it is never shown as
+            // the layer's count.
+            get layerCount() {
+                let count = this.layerCounts[this.activeTab];
+                return typeof count === 'number' ? count : null;
+            },
+
+            get layerCountKnown() {
+                return typeof this.layerCount === 'number';
+            },
+
+            get layerNotOnModelMap() {
+                let count = this.notOnModelMap[this.activeTab];
+                return typeof count === 'number' ? count : 0;
+            },
+
+            // The layer's count is not known yet and the answers that carry it are still being fetched.
+            get layerCountPending() {
+                return !this.layerCountKnown && (!this.countsLoaded || this.elementsPending);
+            },
+
+            get layerCountLabel() {
+                if (this.layerCountPending) return 'loading layer total';
+                if (!this.layerCountKnown) return 'layer total unavailable';
+                let n = this.layerCount;
+                let text = n + (n === 1 ? ' element' : ' elements') + ' in this layer';
+                if (this.layerNotOnModelMap > 0) {
+                    text += ', ' + this.layerNotOnModelMap + ' of them not on the model map';
+                }
+                return text;
+            },
+
+            get layerCountHint() {
+                if (!this.layerCountKnown) return 'Layer total unavailable';
+                if (this.layerNotOnModelMap > 0) {
+                    return this.layerNotOnModelMap + ' entered in a register and not on the model map';
+                }
+                return 'Every element in this layer';
+            },
+
+            get listNarrowed() {
+                return !!(this.searchQuery || this.typeFilter || this.sourceFilter || this.kindFilter
+                    || this.viewpointTypeFilter.length);
+            },
+
+            get listTotalLabel() {
+                if (this.elementsPending) return 'Loading';
+                if (!this.layerTotalKnown) return '\u2014 total';
+                if (this.listNarrowed && this.layerCountKnown) return this.layerTotal + ' of ' + this.layerCount + ' match';
+                return this.layerTotal + ' total';
             },
 
             // D-03: sourceCounts/healthStats are computed from `this.elements`,
@@ -386,6 +455,16 @@ document.addEventListener('alpine:init', function() {
 
             init() {
                 var self = this;
+                if (APP_CONFIG.embeddedForm) {
+                    // A page that makes one kind of element in place (the Gaps page) uses only the dialog:
+                    // it loads the field settings and leaves the repository list alone.
+                    if (APP_CONFIG.fieldConfigsUrl) {
+                        this.fieldConfigsReady = Platform.fetch.get(APP_CONFIG.fieldConfigsUrl, null, { silent: true })
+                            .then(function(data) { self.fieldConfigs = data || {}; })
+                            .catch(function() { /* the dialog falls back to name and description */ });
+                    }
+                    return;
+                }
                 if (this.editPageDeepLink) {
                     // On the record's own Edit page Escape means Cancel: back to the record.
                     document.addEventListener('keydown', function(event) {
@@ -547,9 +626,13 @@ document.addEventListener('alpine:init', function() {
                     this.elements = data.elements || [];
                     this.pagination = data.pagination || { page: 1, pages: 0, per_page: this.perPage, total: null, has_next: false, has_prev: false };
                     this.currentPage = this.pagination.page || this.currentPage;
-                    this.layerCounts[this.activeTab] = data.pagination && typeof data.pagination.total === 'number'
-                        ? data.pagination.total
-                        : null;
+                    // Only an unnarrowed list is the whole layer; a search or filter total is not its count.
+                    if (!this.listNarrowed) {
+                        this.layerCounts[this.activeTab] = data.pagination && typeof data.pagination.total === 'number'
+                            ? data.pagination.total
+                            : null;
+                    }
+                    this.loadedLayer = this.activeTab;
                 } catch (err) {
                     // The template already renders an error state + Retry button on
                     // `loadError` (dashboard.html); nothing ever set it until now.
@@ -562,6 +645,7 @@ document.addEventListener('alpine:init', function() {
                     if (window.Platform && Platform.toast) Platform.toast.error(this.loadError);
                 } finally {
                     this.loading = false;
+                    this.elementsLoaded = true;
                     this.$nextTick(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });
                 }
             },
@@ -617,6 +701,7 @@ document.addEventListener('alpine:init', function() {
                     );
                     let payload = data.data || data;
                     batched = payload.counts || {};
+                    self.notOnModelMap = payload.not_on_model_map || {};
                 } catch (batchError) {
                     // Batched endpoint unavailable: every layer falls through below.
                     batched = {};
@@ -641,6 +726,8 @@ document.addEventListener('alpine:init', function() {
                         uncounted.push(layerKey);
                     }
                 }
+
+                self.countsLoaded = true;
 
                 // One toast for the whole sweep — six per-layer toasts would be worse
                 // than the failure they report.
@@ -816,6 +903,18 @@ document.addEventListener('alpine:init', function() {
                 Object.assign(base, this.typedFieldDefaults(this.formData.element_type));
                 this.formData = base;
             },
+            // The word the dialog names what it makes with: "Element", or the kind a page makes in place.
+            dialogNoun() {
+                return APP_CONFIG.createNoun || 'Element';
+            },
+            // The page's own button: open the dialog on the kind the page makes.
+            // It waits for the field settings, so each field opens on its own default, not on its first option.
+            async openCreateForType() {
+                if (this.fieldConfigsReady) { await this.fieldConfigsReady; }
+                this.openCreateModal();
+                this.formData.element_type = APP_CONFIG.createElementType || '';
+                this.resetTypedFields();
+            },
             openCreateModal() {
                 this.editingElement = null;
                 this.formData = { element_type: '', name: '', description: '' };
@@ -843,7 +942,8 @@ document.addEventListener('alpine:init', function() {
                     return;
                 }
                 if (window.Platform && window.Platform.modal) {
-                    window.Platform.modal.close('archimate-form-modal');
+                    // Typed text is not thrown away without asking (the dialog system asks in the page).
+                    window.Platform.modal.requestClose('archimate-form-modal');
                 }
             },
             async submitForm() {
@@ -893,6 +993,11 @@ document.addEventListener('alpine:init', function() {
                         }
                         if (this.editPageDeepLink) {
                             window.location.assign(this.editPageDeepLink.detail_url);
+                            return;
+                        }
+                        if (APP_CONFIG.embeddedForm) {
+                            // Made in place: the page reads its list again and stays where it is.
+                            window.location.reload();
                             return;
                         }
                         this.loadElements();

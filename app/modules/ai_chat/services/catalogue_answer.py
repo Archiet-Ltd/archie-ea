@@ -13,6 +13,7 @@ import logging
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from flask import url_for
+from flask_login import current_user
 
 from app.modules.intelligence.services.nl_query_interpreter import asks_for_superlative, interpret
 from app.modules.intelligence.services.query_catalogue import CATALOGUE, run_entry
@@ -28,8 +29,16 @@ NEXT_STEPS = {
     "duplicate_tooling_by_capability": "Map each application to the capabilities it covers.",
     "github_sourced_records": "Connect a GitHub repository so its records come into the model.",
     "risk_cost": "Open a risk in the register and enter the four Open FAIR factors to work out what it could cost each year.",
+    "capabilities_of_application": "Name an application in your model, or map capabilities to it on its Capabilities tab.",
     "what_breaks_if_fails": "Name a service that is in your model, or draw how your systems depend on each other.",
 }
+
+
+# What a question must name for a model's reading of it as "what came from GitHub" to stand. The
+# entry answers with a list of the records a GitHub connector brought in, so a question that only
+# mentions repositories or files while asking something else ("what does it run on") is not a
+# request for that list and goes on to be answered in words, as it is on any screen width.
+_ASKS_FOR_GITHUB_RECORDS = ("github", "connector", "imported", "discovered", "came from", "came into", "brought in")
 
 
 def _keep(question: str, interpretation: Dict[str, Any]) -> bool:
@@ -41,6 +50,9 @@ def _keep(question: str, interpretation: Dict[str, Any]) -> bool:
     """
     if interpretation.get("entry_id") not in CATALOGUE:
         return False
+    if interpretation["entry_id"] == "github_sourced_records" and interpretation.get("method") == "model":
+        lowered = question.lower()
+        return any(word in lowered for word in _ASKS_FOR_GITHUB_RECORDS)
     if interpretation["entry_id"] != "what_breaks_if_fails":
         return True
     return (
@@ -60,6 +72,8 @@ def _page_for(citation: Dict[str, Any]) -> Optional[str]:
         return None
     if citation.get("type") == "application":
         return url_for("unified_applications.application_detail", id=ident)
+    if citation.get("type") == "capability":
+        return url_for("enterprise_crud.capability_fact_sheet", capability_id=ident)
     if citation.get("type") == "risk":
         return url_for("risk.risk_page", risk_id=ident)
     if citation.get("type") == "element":
@@ -67,16 +81,53 @@ def _page_for(citation: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _cost_shown(organization_id: int) -> Tuple[bool, str]:
+    """Whether the signed-in person may read annual cost (the one rule the spend pages and the
+    Overview follow), and the currency the organisation reports it in."""
+    from app.decorators.requires_role import may_see_spend_pages
+
+    if not may_see_spend_pages(current_user):
+        return False, ""
+    from app.services.application_cost_accessor import get_reporting_currency
+
+    return True, get_reporting_currency(organization_id)
+
+
+def _inventory_detail(row: Dict[str, Any], show_cost: bool, currency: str) -> str:
+    """The owner (and, for a person allowed to read cost, the annual cost) beside one application:
+    exactly the columns the sentence above the list names."""
+    detail = "Owner: %s" % (row.get("owner") or "not recorded")
+    if show_cost:
+        cost = row.get("annual_cost")
+        detail += " · Annual cost: %s" % ("%s %s" % (currency, format(float(cost), ",.0f")) if cost is not None else "not recorded")
+    return detail
+
+
+def _inventory_sentence(result: Dict[str, Any], show_cost: bool) -> str:
+    """One sentence for the application list: how many are in use, what it leaves out and what
+    each entry shows. It names a column only when the list below carries it."""
+    total = result.get("total") or 0
+    left_out = result.get("decommissioned_left_out") or 0
+    sentence = "%d application%s in use" % (total, "" if total == 1 else "s")
+    if left_out:
+        sentence += "; %d decommissioned not counted" % left_out
+    sentence += ". Each is listed with its accountable owner%s." % (" and annual cost" if show_cost else "")
+    return sentence
+
+
 def answer_catalogue_question(message: str, organization_id: int, time_limit: Optional[float] = None) -> Optional[Dict[str, Any]]:
     """The catalogue's answer to *message* with each citation as a page link, or
     ``None`` when the question is not one the catalogue answers."""
-    interpretation = interpret(message, time_limit=time_limit)
+    interpretation = interpret(message, organization_id, time_limit=time_limit)
     if not _keep(message, interpretation):
         return None
     entry_id = interpretation["entry_id"]
     result = run_entry(entry_id, organization_id, **interpretation["params"])
     seen: Set[Tuple[Any, Any]] = set()
     records: List[Dict[str, Any]] = []
+    show_cost, currency = False, ""
+    if entry_id == "applications_and_owners":
+        show_cost, currency = _cost_shown(organization_id)
     rows_by_id = {row.get("id"): row for row in result.get("rows") or [] if isinstance(row, dict)}
     for citation in result.get("citations") or []:
         page = _page_for(citation)
@@ -93,6 +144,8 @@ def answer_catalogue_question(message: str, organization_id: int, time_limit: Op
             record["source_line"] = row["source_line"]
         elif citation.get("source_line"):
             record["source_line"] = citation["source_line"]
+        if entry_id == "applications_and_owners" and citation["type"] == "application":
+            record["detail"] = _inventory_detail(row, show_cost, currency)
         if citation["type"] == "page":
             record["external"] = True
         records.append(record)
@@ -110,6 +163,7 @@ def answer_catalogue_question(message: str, organization_id: int, time_limit: Op
         "entry_id": entry_id,
         "title": result.get("title") or CATALOGUE[entry_id].title,
         "summary": result.get("answer"),
+        "sentence": _inventory_sentence(result, show_cost) if entry_id == "applications_and_owners" and records else None,
         "total": result.get("total"),
         "reason": result.get("reason"),
         # A finding of "none" (every application is owned) needs no next step.

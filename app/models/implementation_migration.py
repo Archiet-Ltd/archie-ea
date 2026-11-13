@@ -703,7 +703,17 @@ class Gap(TenantMixin, db.Model):
     """
 
     __tablename__ = "gaps"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        # One gap record per Gap element of an organisation, even when two requests arrive together.
+        db.Index(
+            "uq_gaps_org_element",
+            "organization_id",
+            "archimate_element_id",
+            unique=True,
+            postgresql_where=db.text("archimate_element_id IS NOT NULL"),
+        ),
+        {"extend_existing": True},
+    )
 
     organization_id = db.Column(
         db.Integer,
@@ -876,6 +886,13 @@ class Gap(TenantMixin, db.Model):
         from app.services.gap_register_service import effective_severity
 
         return effective_severity(self)
+
+    @property
+    def is_closed(self):
+        """Whether the gap is closed, by the one meaning every screen counts."""
+        from app.services.gap_register_service import is_closed
+
+        return is_closed(self)
 
     def to_roadmap_dict(self) -> dict:
         """Convert to dictionary for roadmap API responses."""
