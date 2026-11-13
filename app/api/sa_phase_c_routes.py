@@ -12,6 +12,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.models.workflow_models import EAWorkflowInstance
+from app.utils.plain_errors import PLAIN, is_browser_page_request, render_plain_error
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +72,10 @@ def get_application_patterns():
         return jsonify({"patterns": patterns}), 200
     except LLMClassificationTimeoutError as exc:
         logger.error("application-patterns timed out: %s", exc)
-        return jsonify({
-            "error": "The AI provider did not answer in time. Try again in a moment.",
-        }), 504
+        message = "The AI provider did not answer in time. Try again in a moment."
+        if is_browser_page_request():
+            return render_plain_error(504, title=message, message=PLAIN[504][2])
+        return jsonify({"error": message}), 504
     except Exception as exc:
         logger.error("application-patterns error: %s", exc, exc_info=True)
         return jsonify({"error": "Could not classify the portfolio. Try again in a moment."}), 500

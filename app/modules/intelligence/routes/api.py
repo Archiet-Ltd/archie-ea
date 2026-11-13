@@ -1086,7 +1086,7 @@ def ask_nl_question():
             "title": entry.title if entry is not None else None,
         }
     else:
-        interpretation = interpret(question)
+        interpretation = interpret(question, organization_id)
 
     entry_id = interpretation["entry_id"]
     if entry_id is None or entry_id not in CATALOGUE:
