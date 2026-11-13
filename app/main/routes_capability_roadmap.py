@@ -421,7 +421,6 @@ def capability_roadmap():
     never show a figure that disagrees with the evidence line while loading.
     """
     from app.models.implementation_migration import Plateau
-    from app.models.unified_work_package import UnifiedWorkPackage
     from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
 
     org_id = current_organization_id()
