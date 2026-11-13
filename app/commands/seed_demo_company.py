@@ -4515,20 +4515,23 @@ def _seed_demo_company() -> dict:
                 )
                 db.session.add(gap)
                 gaps_created += 1
-            else:
+            elif gap.severity is None:
+                # Only complete the hook's unrated record: fill only empty fields,
+                # leave any field a person has since set untouched.
                 changed = False
-                if gap.gap_kind != kind:
+                if not gap.gap_kind:
                     gap.gap_kind = kind
                     changed = True
-                if gap.severity != severity:
+                if gap.severity is None:
                     gap.severity = severity
                     changed = True
-                if el is not None and gap.archimate_element_id != el.id:
+                if el is not None and gap.archimate_element_id is None:
                     gap.archimate_element_id = el.id
                     changed = True
                 if changed:
                     db.session.flush()
                     gaps_created += 1
+            # else: severity is set — a person rated it, leave it alone
         stats["gaps_created"] = gaps_created
 
         # Each gap sits between two plateaus and has the work package that
