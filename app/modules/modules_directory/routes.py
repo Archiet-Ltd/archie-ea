@@ -122,12 +122,13 @@ def _link_visible(endpoint: str, requires: str | None = None) -> bool:
 #
 # _MORE_TOOLS entries carry no "requires" field of their own (unlike
 # role_access.py's _link()), so every entry defaults to visible to anyone
-# -- wrong for the two platform_admin-only tiles below (role_access.py's own
-# comment: "Framework Management and Framework Configuration (platform_admin
-# -only) are reachable from the admin dashboard page"). Overridden here by
+# -- wrong for the two tiles below: Framework Management is platform_admin-only,
+# Framework Configuration opens to an organisation's own administrator too (its
+# dashboard shows that organisation's configurations; the catalogue pages stay
+# with the platform administrator). Overridden here by
 # endpoint rather than widening every tuple in this list to four elements.
 _MORE_TOOLS_REQUIRES = {
-    "framework_config_ui.framework_config_dashboard": "platform_admin",
+    "framework_config_ui.framework_config_dashboard": "org_admin",
     "main.framework_management.dashboard": "platform_admin",
 }
 
