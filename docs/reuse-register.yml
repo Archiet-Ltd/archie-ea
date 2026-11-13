@@ -1243,3 +1243,15 @@ entries:
         regex: 'def\s+_?normali[sz]ed_type\s*\('
         scope: [app]
         suffixes: [.py]
+
+  - id: capability-strategic-score
+    concept: A capability's strategic score on the investment pages, recorded or worked out from the model
+    status: active
+    canonical:
+      path: app/modules/solutions_strategic/v2/services/investment_prioritization_service.py
+      symbols: [InvestmentPrioritizationService.analyze_investment_priorities, InvestmentPrioritizationService._derive_importance]
+    reuse: >
+      The recorded importance wins. Where none is recorded, _derive_importance works one out from the criticality
+      of the applications that support the capability, then its links to goals, drivers, outcomes or principles,
+      then the value streams it serves, then its open risks, and the footer says it was derived. Read the score
+      from the service result; do not write a second derivation or a stand-in score for an unrated capability.

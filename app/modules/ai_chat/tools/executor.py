@@ -2048,6 +2048,43 @@ class ToolExecutor:
         }
 
     # ------------------------------------------------------------------ #
+    # Tool: get_application_capabilities (read-only)                      #
+    # ------------------------------------------------------------------ #
+
+    def _tool_get_application_capabilities(self, args: dict) -> dict:
+        """The capabilities one application of the signed-in organisation supports, through the
+        catalogue entry the keyword answer runs, so every phrasing gets the recorded answer."""
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        name = args.get("application_name")
+        org_id = self._get_organization_id()
+        if not isinstance(name, str) or not name.strip():
+            return {"success": False, "error": "application_name is required"}
+        if org_id is None:
+            return {"success": False, "error": "No organisation is signed in."}
+        found = run_entry("capabilities_of_application", org_id, service=name.strip())
+        rows = [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "support_level": row.get("support_level"),
+                "coverage_percentage": row.get("coverage_percentage"),
+                "url": citation.get("target"),
+            }
+            for row, citation in zip(found["rows"], found["citations"])
+        ]
+        # The whole mapping is read, so the total is the number of rows.
+        coverage = self._coverage(rows, len(rows), "capabilities mapped to the application")
+        return {
+            "success": True,
+            "result": rows,
+            "application": found.get("service"),
+            "application_id": found.get("application_id"),
+            **coverage,
+            "message": found.get("reason") or "The capabilities mapped to %s, as its page shows them." % found.get("service"),
+        }
+
+    # ------------------------------------------------------------------ #
     # Tool: find_applications_by_capability (read-only)                   #
     # ------------------------------------------------------------------ #
 

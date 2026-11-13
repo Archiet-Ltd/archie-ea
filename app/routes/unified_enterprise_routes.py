@@ -465,11 +465,26 @@ def investment_matrix():
 @enterprise_bp.route("/strategic/risk-assessment")
 @login_required
 def risk_assessment():
-    """Risk Assessment"""
-    try:
-        gaps = Gap.query.filter(Gap.gap_kind != "plateau_transition").limit(500).all()
+    """Gap Risk Assessment: the gap register's gaps counted by severity.
 
-        return render_template("enterprise/risk_assessment.html", gaps=gaps)
+    Every figure is the register's own count (`count_gaps`) for the organisation, so none is capped.
+    The table lists the first rows only and says how many of how many it shows."""
+    try:
+        from app.services.gap_register_service import count_gaps, list_gaps
+
+        org_id = current_organization_id()
+        shown_limit = 50
+        gaps = list_gaps(org_id, limit=shown_limit)
+        counts = {
+            "total": count_gaps(org_id),
+            "high": count_gaps(org_id, severity="critical") + count_gaps(org_id, severity="high"),
+            "medium": count_gaps(org_id, severity="medium"),
+            "low": count_gaps(org_id, severity="low"),
+        }
+
+        return render_template(
+            "enterprise/risk_assessment.html", gaps=gaps, counts=counts, shown=len(gaps)
+        )
     except SQLAlchemyError as e:
         current_app.logger.error(f"Database error loading risk assessment: {e}")
         raise DatabaseError(
