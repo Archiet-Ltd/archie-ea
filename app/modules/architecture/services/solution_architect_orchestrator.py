@@ -24,6 +24,13 @@ from app.models import ApplicationComponent, BusinessCapability, VendorProduct  
 from app.modules.architecture.services.options_analysis_service import (
     OptionsAnalysisService as ArchimateOptionsService,
 )
+from app.services import application_cost_accessor
+from app.services.cost_visibility import (
+    COSTS_WITHHELD,
+    COST_KEYS,
+    INVESTMENT_MONEY_KEYS,
+    withhold_costs,
+)
 from app.services.unified_duplicate_service import UnifiedDuplicateService
 from app.services.vendor_analysis.options_analysis_service import (
     OptionsAnalysisService as VendorOptionsService,
@@ -31,6 +38,13 @@ from app.services.vendor_analysis.options_analysis_service import (
 from app.services.vendor_analysis.vendor_research_service import VendorResearchService
 
 logger = logging.getLogger(__name__)
+
+# Every money key an analyse reply can carry under a name other than the run/scenario money keys.
+ANALYZE_MONEY_KEYS = COST_KEYS + INVESTMENT_MONEY_KEYS + (
+    "estimated_savings", "maintenance_cost_annual", "tco_total",
+    "support_cost_annual", "license_cost_annual", "list_price_annual",
+    "cost_estimate",
+)
 
 
 class SolutionArchitectOrchestrator:
@@ -64,6 +78,7 @@ class SolutionArchitectOrchestrator:
         industry_vertical: Optional[str] = None,
         existing_constraints: Optional[List[str]] = None,
         compliance_requirements: Optional[List[str]] = None,
+        show_costs: bool = True,
     ) -> Dict[str, Any]:
         """
         Perform comprehensive solution options analysis.
@@ -83,6 +98,9 @@ class SolutionArchitectOrchestrator:
             industry_vertical: Industry sector
             existing_constraints: List of constraints (e.g., "must integrate with SAP")
             compliance_requirements: List of compliance needs (e.g., "GDPR", "SOC2")
+            show_costs: The person's cost visibility (``costs_visible``); when the one cost rule
+                withholds from them, the reply carries no money — descriptions and pros without
+                amounts, money keys left out — and states the withheld sentence.
 
         Returns:
             Comprehensive analysis results with ranked options
@@ -109,9 +127,15 @@ class SolutionArchitectOrchestrator:
                 "description": problem_description,
                 "category": "Functional",
             }
-            buy_build_analysis = self.archimate_options.analyze_requirement_options(
-                requirement=requirement, context=context
-            )
+            try:
+                buy_build_analysis = self.archimate_options.analyze_requirement_options(
+                    requirement=requirement, context=context
+                )
+            except Exception as ai_err:
+                # No AI provider (or it failed): the rest of the analysis still runs on the
+                # real data, so the reply is never an empty set because of the AI step alone.
+                logger.warning("Buy/Build/Reuse AI step unavailable: %s", ai_err)
+                buy_build_analysis = {"options": [], "recommendation": None, "error": str(ai_err)}
 
             # Phase 2: Find existing applications that might help
             logger.info("Phase 2: Analyzing existing applications...")
@@ -120,7 +144,7 @@ class SolutionArchitectOrchestrator:
             # Phase 3: Research potential vendors
             logger.info("Phase 3: Researching vendor solutions...")
             vendor_options = self._research_vendor_options(
-                problem_description, capability_id, context
+                problem_description, capability_id, context, show_costs=show_costs
             )
 
             # Phase 4: Assess capability gaps
@@ -135,6 +159,7 @@ class SolutionArchitectOrchestrator:
                 vendor_options=vendor_options,
                 gap_analysis=gap_analysis,
                 context=context,
+                show_costs=show_costs,
             )
 
             result = {
@@ -148,6 +173,12 @@ class SolutionArchitectOrchestrator:
                 "gap_analysis": gap_analysis,
                 "context": context,
             }
+
+            if not show_costs:
+                # The one cost rule, applied in this one place every analyse caller shares:
+                # a person it withholds from reads no money figure in the reply.
+                result = withhold_costs(result, keys=ANALYZE_MONEY_KEYS)
+                result["costs_withheld_sentence"] = COSTS_WITHHELD
 
             logger.info(
                 f"Analysis complete. Top recommendation: {recommendations[0]['option_type']}"
@@ -167,10 +198,16 @@ class SolutionArchitectOrchestrator:
         Returns application matches with coverage estimates.
         """
         try:
-            # Query for potentially relevant applications
+            # Query for potentially relevant applications in the active organisation only
             query = db.session.query(ApplicationComponent).filter(
                 ApplicationComponent.lifecycle_status.in_(["active", "production", "development"])
             )
+            from flask import g, has_request_context
+
+            if has_request_context():
+                org_id = getattr(g, "current_org_id", None)
+                if org_id:
+                    query = query.filter(ApplicationComponent.organization_id == org_id)
 
             # If capability specified, filter by it
             if capability_id:
@@ -193,6 +230,7 @@ class SolutionArchitectOrchestrator:
                 score = min(100, (matches / len(keywords)) * 100) if keywords else 0
 
                 if score > 20:  # Only include if somewhat relevant
+                    annual = application_cost_accessor.get_annual_cost(app)
                     relevant_apps.append(
                         {
                             "id": app.id,
@@ -201,7 +239,7 @@ class SolutionArchitectOrchestrator:
                             "relevance_score": round(score, 1),
                             "status": app.lifecycle_status or app.deployment_status,
                             "vendor": app.vendor_name or "Internal",
-                            "annual_cost": float(app.total_cost_of_ownership or 0),
+                            "annual_cost": float(annual) if annual is not None else 0.0,
                             "users": app.user_count or 0,
                         }
                     )
@@ -234,7 +272,8 @@ class SolutionArchitectOrchestrator:
             }
 
     def _research_vendor_options(
-        self, problem_description: str, capability_id: Optional[int], context: Dict
+        self, problem_description: str, capability_id: Optional[int], context: Dict,
+        show_costs: bool = True,
     ) -> Dict[str, Any]:
         """
         Research and score potential vendor solutions.
@@ -282,7 +321,9 @@ class SolutionArchitectOrchestrator:
                     pricing = db.session.query(VendorProductPricing).filter(
                         VendorProductPricing.vendor_product_id == product.id
                     ).first()
-                    if pricing and pricing.list_price_annual:
+                    if pricing and pricing.list_price_annual and show_costs:
+                        # The fit score is derived from the price, so a person the cost rule
+                        # withholds from gets neither the amount nor a score computed from it.
                         estimated_cost = float(pricing.list_price_annual)
                         score = max(0, min(100, 100 - (estimated_cost / 10000)))  # Rough fit score
                 except Exception as e:
@@ -392,6 +433,7 @@ class SolutionArchitectOrchestrator:
         vendor_options: Dict,
         gap_analysis: Dict,
         context: Dict,
+        show_costs: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         Synthesize all analyses into ranked recommendations.
@@ -449,7 +491,9 @@ class SolutionArchitectOrchestrator:
             reuse_pros = [
                 "Fastest time to value",
                 "Leverages existing investment",
-                f'Potential £{existing_apps.get("estimated_savings", 0):.0f}/year savings',
+                f'Potential £{existing_apps.get("estimated_savings", 0):.0f}/year savings'
+                if show_costs else
+                "Potential savings from consolidating existing applications",
                 "Low integration risk",
             ] + _compliance_pros("REUSE")
 
@@ -601,7 +645,12 @@ class SolutionArchitectOrchestrator:
                 "estimated_cost": build_cost_estimate,
                 "timeline_months": build_timeline,
                 "risk_level": "HIGH",
-                "description": f"Custom development — {build_timeline} months, est. £{build_cost_estimate:,.0f}" if build_cost_estimate else "Custom development solution",
+                    "description": (
+                        f"Custom development — {build_timeline} months, est. £{build_cost_estimate:,.0f}"
+                        if show_costs and build_cost_estimate else
+                        f"Custom development — {build_timeline} months" if build_cost_estimate else
+                        "Custom development solution"
+                    ),
                 "pros": build_pros,
                 "cons": build_cons,
                 "details": {

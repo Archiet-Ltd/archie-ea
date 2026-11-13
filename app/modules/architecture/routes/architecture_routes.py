@@ -486,6 +486,8 @@ def api_solutions_architecture_analyze():
     """Run AI-powered Buy/Build/Reuse analysis via SolutionArchitectOrchestrator."""
     from decimal import Decimal
 
+    from app.services.cost_visibility import costs_visible
+
     try:
         data = request.get_json(force=True) or {}
         problem = (data.get("problem_description") or "").strip()
@@ -497,6 +499,7 @@ def api_solutions_architecture_analyze():
         )
 
         orchestrator = SolutionArchitectOrchestrator()
+        # The one cost rule decides inside the orchestrator, the one place both analyse callers share.
         result = orchestrator.analyze_problem(
             problem_description=problem,
             budget_min=Decimal(str(data["budget_min"])) if data.get("budget_min") else None,
@@ -508,20 +511,13 @@ def api_solutions_architecture_analyze():
             industry_vertical=data.get("industry_vertical", "general"),
             existing_constraints=data.get("existing_constraints") or [],
             compliance_requirements=data.get("compliance_requirements") or [],
+            show_costs=costs_visible(current_user),
         )
-        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
 
         # Serialize Decimal fields for JSON
         for rec in result.get("recommendations", []):
             if rec.get("estimated_cost") is not None:
                 rec["estimated_cost"] = float(rec["estimated_cost"])
-        # The one cost rule: a person it withholds from reads no money figure in the reply either.
-        if not costs_visible(current_user):
-            for rec in result.get("recommendations", []):
-                rec["estimated_cost"] = None
-            for app in result.get("existing_applications", {}).get("applications", []) or []:
-                app["annual_cost"] = None
-            result["costs_withheld_sentence"] = COSTS_WITHHELD
         return jsonify(result)
     except Exception as exc:
         current_app.logger.error("solutions-architecture/analyze error: %s", exc, exc_info=True)

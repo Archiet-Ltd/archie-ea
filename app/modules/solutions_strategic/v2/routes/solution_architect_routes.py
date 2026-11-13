@@ -185,6 +185,7 @@ def analyze():
         from app.modules.solutions_strategic.v2.services.solution_architect_orchestrator import (
             SolutionArchitectOrchestrator,
         )
+        from app.services.cost_visibility import costs_visible
 
         data = request.get_json()
 
@@ -193,6 +194,7 @@ def analyze():
 
         orchestrator = SolutionArchitectOrchestrator()
 
+        # The one cost rule decides inside the orchestrator, the one place both analyse callers share.
         result = orchestrator.analyze_problem(
             problem_description=data.get("problem_description"),
             capability_id=data.get("capability_id"),
@@ -205,6 +207,7 @@ def analyze():
             industry_vertical=data.get("industry_vertical"),
             existing_constraints=data.get("constraints", []),
             compliance_requirements=data.get("compliance_requirements", []),
+            show_costs=costs_visible(current_user),
         )
 
         return jsonify({"success": True, "analysis": result})
@@ -360,6 +363,7 @@ def run_session_analysis(session_id):
         from app.modules.solutions_strategic.v2.services.solution_architect_orchestrator import (
             SolutionArchitectOrchestrator,
         )
+        from app.services.cost_visibility import costs_visible
 
         session = SolutionAnalysisSession.query.get_or_404(session_id)
 
@@ -394,6 +398,7 @@ def run_session_analysis(session_id):
             if problem.constraints
             else [],
             compliance_requirements=problem.compliance_requirements or [],
+            show_costs=costs_visible(current_user),
         )
 
         if not result.get("success"):

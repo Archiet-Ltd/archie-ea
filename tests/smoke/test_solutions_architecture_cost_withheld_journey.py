@@ -40,7 +40,8 @@ def organisations(live_server):
         with create_app("testing").app_context():
             app_row = ApplicationComponent(
                 name="App %s" % tag, organization_id=org["org_id"],
-                lifecycle_status="operational", total_cost_of_ownership=fig["app_cost"],
+                description="Replace the legacy ledger", lifecycle_status="active",
+                total_cost_of_ownership=fig["app_cost"],
             )
             db.session.add(app_row)
             db.session.commit()
@@ -62,11 +63,11 @@ def _amounts(org):
     return [org["figures"][key] for key in ("rec_cost", "app_cost")]
 
 
-def _analyse(page, live_server, problem="Replace the legacy ledger"):
+def _analyse(page, live_server, path):
     return page.evaluate(
         """async (path) => {
             const meta = document.querySelector('meta[name="csrf-token"]');
-            const headers = {'Accept': 'application/json'};
+            const headers = {'Accept': 'application/json', 'Content-Type': 'application/json'};
             if (meta) headers['X-CSRFToken'] = meta.content;
             const r = await fetch(path, {
                 method: 'POST',
@@ -79,8 +80,14 @@ def _analyse(page, live_server, problem="Replace the legacy ledger"):
             try { body = JSON.parse(text); } catch (e) { /* not JSON */ }
             return [r.status, body];
         }""",
-        live_server + "/architecture/solutions-architecture/analyze",
+        live_server + path,
     )
+
+
+ANALYZE_PATHS = (
+    "/architecture/solutions-architecture/analyze",
+    "/solutions/architect/api/analyze",
+)
 
 
 @pytest.mark.parametrize("width,scheme", SIZES)
@@ -100,15 +107,31 @@ def test_a_solution_architect_reads_one_sentence_and_no_amount_on_solutions_arch
         assert holds_none_of(page.content(), everything) == []
         shot(page, "architect-solarch-dashboard", width, scheme)
 
-        # The analyse reply: estimated costs are null.
-        status, body = _analyse(page, live_server)
-        assert status == 200, (status, body)
-        for rec in body.get("recommendations", []):
-            assert rec.get("estimated_cost") is None, rec
-        for app in (body.get("existing_applications") or {}).get("applications", []):
-            assert app.get("annual_cost") is None, app
+        # The analyse replies on both routes: the analyse set is not empty, every amount is null,
+        # and one sentence says the figures are withheld.
+        for path in ANALYZE_PATHS:
+            status, body = _analyse(page, live_server, path)
+            assert status == 200, (path, status, body)
+            analysis = body.get("analysis") if "analysis" in body else body
+            existing = analysis.get("existing_applications") or {}
+            assert existing.get("found_count", 0) >= 1, (path, existing)
+            assert len(analysis.get("recommendations", [])) >= 1, path
+            assert existing.get("estimated_savings") is None, (path, existing)
+            for rec in analysis.get("recommendations", []):
+                assert rec.get("estimated_cost") is None, (path, rec)
+                assert "£" not in (rec.get("description") or ""), (path, rec)
+                for bullet in (rec.get("pros") or []) + (rec.get("cons") or []):
+                    assert "£" not in bullet, (path, bullet)
+                details = rec.get("details") or {}
+                assert details.get("maintenance_cost_annual") is None, (path, details)
+                for app in details.get("applications", []) or []:
+                    assert app.get("annual_cost") is None, (path, app)
+            for app in existing.get("applications", []):
+                assert app.get("annual_cost") is None, (path, app)
+            assert HELD_BACK in str(body), path
+            assert holds_none_of(str(body), everything) == [], path
+        status, body = _analyse(page, live_server, ANALYZE_PATHS[0])
         assert body.get("costs_withheld_sentence") == HELD_BACK
-        assert holds_none_of(str(body), everything) == []
     finally:
         context.close()
 
@@ -123,11 +146,21 @@ def test_a_finance_person_reads_the_solutions_architecture_figures(browser, live
         assert holds_none_of(page.content(), _amounts(theirs)) == []
         shot(page, "finance-solarch-dashboard", 1440, "light")
 
-        # The analyse reply carries costs for this organisation only.
-        status, body = _analyse(page, live_server)
-        assert status == 200, (status, body)
-        assert holds_none_of(str(body), _amounts(theirs)) == []
-        assert "costs_withheld_sentence" not in body
+        # The analyse replies on both routes: the set is not empty, this organisation's costs are
+        # in the reply, the other organisation's are not, and no withheld sentence appears.
+        for path in ANALYZE_PATHS:
+            status, body = _analyse(page, live_server, path)
+            assert status == 200, (path, status, body)
+            analysis = body.get("analysis") if "analysis" in body else body
+            existing = analysis.get("existing_applications") or {}
+            assert existing.get("found_count", 0) >= 1, (path, existing)
+            assert len(analysis.get("recommendations", [])) >= 1, path
+            assert "costs_withheld_sentence" not in str(body), path
+            text = str(body)
+            assert holds_none_of(text, _amounts(theirs)) == [], path
+            assert holds_none_of(text, []) == [] and any(
+                form in text for form in ("{:,.0f}".format(mine["figures"]["app_cost"]),
+                                          str(int(mine["figures"]["app_cost"])))), path
     finally:
         context.close()
 
