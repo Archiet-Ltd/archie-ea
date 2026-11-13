@@ -93,7 +93,7 @@
                         <label class="text-sm font-medium">Search Element</label>
                         <div class="relative">
                             <input type="text" x-model="searchQuery" @input.debounce="searchElements"
-                                x-ref="pickerInput" role="combobox" aria-autocomplete="list" aria-controls="impact-picker-list"
+                                id="impact-picker-input" role="combobox" aria-autocomplete="list" aria-controls="impact-picker-list"
                                 :aria-expanded="searchResults.length > 0 ? 'true' : 'false'"
                                 :aria-activedescendant="activeIndex >= 0 ? 'impact-picker-option-' + activeIndex : null"
                                 @keydown="pickerKey($event)"
@@ -141,7 +141,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <button type="button" x-ref="analyzeButton" @click="performAnalysis()" :disabled="!selectedElement || loading"
+                    <button type="button" id="impact-analyze-button" @click="performAnalysis()" :disabled="!selectedElement || loading"
                         class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
                         {# x-show sits on a wrapper, not on the <i>: Lucide swaps each <i> for an <svg> and the binding is lost. #}
                         <span x-show="!loading" x-cloak class="mr-2 inline-flex"><i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i></span>
@@ -845,8 +845,10 @@
                 this.activeIndex = -1;
                 this.clearFeedback();
                 /* The next thing a person does is run the analysis, so focus goes there. */
-                const self = this;
-                this.$nextTick(function () { self.$refs.analyzeButton.focus(); });
+                this.$nextTick(function () {
+                    const button = document.getElementById('impact-analyze-button');
+                    if (button) button.focus();
+                });
             },
 
             /* The WAI-ARIA combobox keys: arrows move through the list, Enter chooses, Escape closes. */
@@ -886,7 +888,8 @@
                 this.searchResults = [];
                 this.activeIndex = -1;
                 this.clearFeedback();
-                this.$refs.pickerInput.focus();
+                const box = document.getElementById('impact-picker-input');
+                if (box) box.focus();
             },
 
             async performAnalysis(cursor, pageSize) {
