@@ -7,18 +7,32 @@ one sentence saying cost figures are withheld for my role, and no amount in the 
 Two organisations each carry their own solutions; the finance person and the solution architect of the first
 read the pages, and nothing of the second shows anywhere.
 """
+import os
+import pathlib
 import re
 
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT
+from .conftest import PAGE_TIMEOUT, boot_live_server
 from .cost_withheld_support import HELD_BACK, holds_none_of, open_page, shot, shown_text
 from .fresh_org import api, create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 SIZES = [(1440, "light"), (390, "dark")]
+STAND_IN = pathlib.Path(__file__).parent / "ai_stand_in"
+
+
+@pytest.fixture(scope="module")
+def live_server(request, ai_protocol_stub, app):
+    """A server whose one AI call, the options analysis, is answered by a fixed test reply.
+
+    The analyser no longer hides an AI failure, so a live server with no AI provider answers an error; this
+    server answers with options whose text carries amounts, and the journey reads what a person is shown.
+    """
+    path = os.pathsep.join(filter(None, [str(STAND_IN), os.environ.get("PYTHONPATH", "")]))
+    yield boot_live_server(request, ai_protocol_stub, app, extra_env={"PYTHONPATH": path})
 
 
 @pytest.fixture(scope="module")
@@ -130,6 +144,10 @@ def test_a_solution_architect_reads_one_sentence_and_no_amount_on_solutions_arch
                 assert app.get("annual_cost") is None, (path, app)
             assert HELD_BACK in str(body), path
             assert holds_none_of(str(body), everything) == [], path
+            # the amounts the AI wrote into its options never reach this person
+            options = analysis["buy_build_analysis"]["options"]
+            assert options and options[0]["pros"], (path, analysis["buy_build_analysis"])
+            assert "40,000" not in str(body) and "250,000" not in str(body), path
         status, body = _analyse(page, live_server, ANALYZE_PATHS[0])
         assert body.get("costs_withheld_sentence") == HELD_BACK
     finally:
