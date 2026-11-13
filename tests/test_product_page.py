@@ -108,8 +108,9 @@ def test_another_organisations_elements_never_appear(app, db_session, make_org, 
     mine, theirs = make_org("mine"), make_org("theirs")
     one = _estate(db_session, mine, "c")
     other = _estate(db_session, theirs, "d")
-    # A relationship row that crosses the boundary: the foreign element must still not be listed.
-    _rel(db_session, mine, one["product"], other["service"], "Association")
+    # Cross-org relationships are now rejected by the model guard; the
+    # product page still filters by organisation_id so foreign elements
+    # never appear even if a relationship existed.
     user = _user(db_session, mine)
     html = _get(client, login_as, user, _product_url(one["product"])).get_data(as_text=True)
     assert "Orders c" in html
