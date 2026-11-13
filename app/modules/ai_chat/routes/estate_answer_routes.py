@@ -1,12 +1,15 @@
 """Answering a question about the organisation's own estate inside the chat."""
 
 import logging
+from datetime import datetime
 
 from flask import jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
+from app.decorators import audit_log
 from app.middleware.tenant_context import current_org_id
+from app.modules.ai_chat.services import application_change
 from app.modules.ai_chat.services.catalogue_answer import answer_catalogue_question
 from app.modules.ai_chat.services.estate_answer import (
     answer_estate_question,
@@ -14,16 +17,23 @@ from app.modules.ai_chat.services.estate_answer import (
     owned_element_id,
     recorded_text,
 )
-from app.modules.ai_chat.services.lens_answer import answer_for_lens, answer_lens_question
+from app.modules.ai_chat.services.lens_answer import (
+    answer_for_lens,
+    answer_lens_question,
+    asks_for_capacity,
+    owner_of_element,
+)
 from app.modules.intelligence.services import answer_envelope as envelope
 
 from app.services.conversation_history import persist_turn
+from app.services.result_footer_service import ownership_footer
 
 from . import unified_ai_chat_bp
 
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION_CHARS = 2000
+MAX_CHANGE_CHARS = 8000
 ANSWERED_FROM_RECORDS = "records"  # kept with the saved answer; the chat page reads the same word
 SHOWN_LIMIT = 25  # connections drawn as cards; the template and its explanations agree on it
 
@@ -86,7 +96,7 @@ def _empty_steps(answer, organization_id):
     the one thing the question asked about when that is what is missing, or the
     general next steps (connect a source, or see them working with a sample) when
     the records hold nothing at all yet. ``None`` once there is anything to show
-    instead, or a finding that needs no next step (CLAUDE.md "never invent data" —
+    instead, or a finding that needs no next step (the rule is never to invent data:
     no button is shown unless the person it opens for could actually use it)."""
     if answer["records"] or answer.get("complete"):
         return None
@@ -135,6 +145,43 @@ def _catalogue_response(message, thread_id, keep):
     )
 
 
+def _application_change_response(change, message, thread_id, keep):
+    """The preview card for "set <application>'s <field> to <value>", or the words for why not."""
+    organization_id = current_org_id()
+    result = application_change.propose(change, current_user, int(organization_id)) if organization_id else {
+        "state": "unknown", "label": change["label"], "typed_application": change["application"], "others": []}
+    line = {
+        "preview": "Change preview: the %s of %s. Nothing is saved until you press Save." % (
+            result.get("label"), result.get("application")),
+        "refused": "Not changed: your role cannot edit applications.",
+    }.get(result["state"], "Not changed: %s." % result["state"])
+    return jsonify({
+        "success": True,
+        "found": True,
+        "thread_id": _remember(thread_id, message, line, keep=keep),
+        "change_state": result["state"],
+        "html": render_template("ai_chat/_application_change.html", result=result),
+    })
+
+
+@unified_ai_chat_bp.route("/application-change/confirm", methods=["POST"])
+@login_required
+@audit_log("ai_chat_application_change")
+def confirm_application_change():
+    """Save the change a preview card described, once the person has pressed Save."""
+    body = request.get_json(silent=True)
+    token = body.get("token") if isinstance(body, dict) else None
+    organization_id = current_org_id()
+    if not isinstance(token, str) or not organization_id:
+        return jsonify({"success": False, "error": "Ask for the change again."}), 400
+    result = application_change.confirm(token, current_user, int(organization_id))
+    return jsonify({
+        "success": result["state"] == "saved",
+        "change_state": result["state"],
+        "html": render_template("ai_chat/_application_change.html", result=result),
+    })
+
+
 def _what_it_depends_on(answer):
     """The connections an element has the other way round, when nothing depends on it.
 
@@ -171,13 +218,22 @@ def _recorded_links(answer):
     return relationship_split(int(current_org_id()), int(element_id))
 
 
-def _lens_card(lens):
+def _lens_card(lens, message=""):
+    owned = owner_of_element(lens["element"]) if lens["lens"] == "accountability" and lens["data"] is not None else None
     component_id = ((lens["data"] or {}).get("application_component_id")) if lens["lens"] == "portfolio" else None
+    owners = ((lens["data"] or {}).get("owners")) if lens["lens"] == "accountability" else None
+    for owner in owners or []:
+        # The day the ownership record was made, as people read a date ("12 Nov 2026").
+        day = datetime.strptime(owner["since"], "%Y-%m-%d") if owner.get("since") else None
+        owner["since_text"] = "%d %s" % (day.day, day.strftime("%b %Y")) if day else None
     return render_template(
         "ai_chat/_lens_answer.html",
         lens=lens["lens"],
         element=lens["element"],
         data=lens["data"],
+        owned=owned,
+        asked_capacity=asks_for_capacity(message),
+        footer=ownership_footer(current_org_id(), owners) if owners else None,
         planning_url=(
             url_for("unified_applications.rationalization_planning", app_id=component_id) if component_id else None
         ),
@@ -259,7 +315,7 @@ def _parts_response(message, thread_id, keep, cards):
             lens = answer_for_lens("accountability", message[:MAX_QUESTION_CHARS])
             if lens is None:
                 return None
-            drawn.append(_lens_card(lens))
+            drawn.append(_lens_card(lens, message))
             lines.append(_lens_line(lens))
             continue
         direction = "upstream" if card == "upstream" else "downstream"
@@ -302,8 +358,19 @@ def estate_answer():
     keep = body.get("remember") is not False
     posted_element = body.get("element_id") if isinstance(body.get("element_id"), int) else None
     card_element = owned_element_id(posted_element, current_org_id())
-    # A card names its element: the question is about that element, not about the parts or the
-    # lens its wording sounds like.
+    # A card names its element: the question is about that element, not about a change request,
+    # the parts or the lens its wording sounds like, so all three are skipped for it.
+    change = None
+    if not card_element:
+        # Read whole: cutting a long value short would save text the person did not write. The
+        # description limit refuses anything this cap leaves too long.
+        change = application_change.parse_change_request(message[:MAX_CHANGE_CHARS])
+        # Only a request whose subject is an application of this organisation is a change to
+        # one; a solution, a risk or a work package goes on to the model as it always did.
+        if change is not None and not application_change.names_an_application(change, current_org_id()):
+            change = None
+    if change is not None:
+        return _application_change_response(change, message, thread_id, keep)
     parts = [] if card_element else envelope.classify_estate_parts(message[:MAX_QUESTION_CHARS])
     if set(parts) & {envelope.PART_OWNER, envelope.PART_RUNS_ON, envelope.PART_DEPENDS_ON}:
         cards = _cards_asked(parts)
@@ -322,7 +389,7 @@ def estate_answer():
                 "found": True,
                 "thread_id": kept,
                 "lens": lens["lens"],
-                "html": _lens_card(lens),
+                "html": _lens_card(lens, message),
             }
         )
     try:

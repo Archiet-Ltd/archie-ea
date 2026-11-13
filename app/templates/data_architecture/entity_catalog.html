@@ -103,10 +103,10 @@
                         {% endfor %}
                     </ul>
                     {% else %}
-                    <span class="text-muted-foreground">None recorded</span>
+                    <span class="text-muted-foreground">Not recorded</span>
                     {% endif %}
                 {% endcall %}
-                {% call table_cell(class='text-muted-foreground') %}{{ (flow_row.steward if flow_row else none) or 'None recorded' }}{% endcall %}
+                {% call table_cell(class='text-muted-foreground') %}{{ (flow_row.steward if flow_row else none) or 'Not recorded' }}{% endcall %}
                 {% call table_cell() %}{% if flow_row and flow_row.applications and flow_row.element_id %}<a class="text-primary underline underline-offset-2 whitespace-nowrap" data-testid="data-entity-flow-link" href="{{ url_for('data_architecture.data_architecture_dashboard', entity=entity.id) }}#data-flow">See where it flows</a>{% else %}<span class="text-muted-foreground">Nothing recorded yet</span>{% endif %}{% endcall %}
                 {% call table_cell(class='text-right') %}{{ button(text='Edit', variant='outline', size='sm', href=url_for('data_architecture.edit_data_entity', entity_id=entity.id)) }}{% endcall %}
             {% endcall %}

@@ -205,6 +205,23 @@ entries:
       - id: visibility-helper
         regex: 'def\s+_?(get_|find_|load_)?(visible|accessible)_(capabilit\w*|to_org\w*)\s*\('
 
+  - id: title-case-label
+    concept: Title-casing a stored label or key for display (categories, types, enum keys)
+    status: active
+    canonical:
+      path: app/utils/template_utils.py
+      symbols: [title_keep_caps, ENUM_LABEL_OVERRIDES]
+    reuse: >
+      Use the title_keep_caps template filter (also registered as humanize_key). It maps a known key to its
+      hand-written label in ENUM_LABEL_OVERRIDES, reads underscores as spaces, and keeps acronyms as typed
+      (SaaS, IoT, API, AI). Do not write another title-case helper or chain replace and title in a template.
+    must_not_create:
+      - id: title-case-helper
+        regex: 'def\s+_?(titleize|title_case|title_keep_caps|humanize_key)\w*\s*\('
+    known_exceptions:
+      - path: app/utils/template_utils.py
+        reason: the canonical helper's own module
+
   - id: name-matching
     concept: Name and code matching for duplicates (normaliser, SQL folding, duplicate lookup)
     status: active
@@ -610,6 +627,17 @@ entries:
         regex: '(?i)(?:let|const|var|function|class)\s+\w*archimate\w*(?:renderer|diagramengine)\b'
         scope: [app/static/js, app/templates]
         suffixes: [.js, .html]
+
+  - id: composer-radial-arrangement
+    concept: Arranging the elements of a view round one element, each step away on its own ring (the Composer's neighbourhood view)
+    status: active
+    canonical:
+      path: app/static/js/archimate/composer.js
+      symbols: [applyRadialLayout, applyLayerBanding]
+    reuse: >
+      applyRadialLayout is the one radial arrangement, beside applyLayerBanding, which arranges by layer. It shares
+      LAYER_Y_ORDER with layer banding, and the drawing is then fitted by the one fitCanvas. A view about one element
+      calls it; do not write a second radial, circular or ring layout or a second fit or zoom routine in the Composer.
 
   - id: diagram-editor-shell
     concept: The editor chrome around an ArchiMate diagram (toolbar, element palette, finder, relationship legend, minimap, status line, header, properties sheet)
@@ -1212,3 +1240,55 @@ entries:
         regex: 'def\s+_?normali[sz]ed_type\s*\('
         scope: [app]
         suffixes: [.py]
+
+  - id: connector-framework
+    concept: How a connector changes its configuration, keeps its credentials, and makes the inventory row for an element it reads
+    status: active
+    canonical:
+      path: app/services/connector_framework.py
+      symbols: [propose_connector_change, apply_connector_change, BaseConnector.persist_records, propose_connector_sync, MULTI_CONNECTION_CREDENTIAL_TYPES, OWN_PAGE_CONNECTOR_TYPES, ensure_application_row]
+    reuse: >
+      A connector changes its configuration only through the change path (propose_connector_change,
+      apply_connector_change). A connector type that keeps one credential for each connection is named in
+      MULTI_CONNECTION_CREDENTIAL_TYPES; do not write a second per-connection credential scheme. The inventory row
+      of a connector element is made by ensure_application_row; do not write a second one.
+    must_not_create:
+      - id: second-multi-connection-list
+        regex: 'MULTI_CONNECTION_CREDENTIAL_TYPES\s*='
+        scope: [app]
+        suffixes: [.py]
+      - id: second-application-row-helper
+        regex: 'def\s+ensure_application_row\s*\('
+        scope: [app]
+        suffixes: [.py]
+
+  - id: outbound-address-guard
+    concept: The check that an address a customer or a customer's server supplied is one the server may call
+    status: active
+    canonical:
+      path: app/utils/ssrf_guard.py
+      symbols: [validate_user_supplied_url, validate_outbound_url, clamp_timeout]
+    reuse: >
+      Every address a connector requests that a customer or a customer's server supplied passes
+      validate_connector_url, which calls the guard. Do not write a second address check.
+    must_not_create:
+      - id: second-address-check-function
+        regex: 'def\s+_?(is_private_ip|is_internal_ip|is_internal_url|is_internal_host|is_blocked_ip|is_blocked_url|is_safe_url|validate_url_safe|is_public_ip)\s*\('
+        scope: [app]
+        suffixes: [.py]
+      - id: hand-rolled-private-range-test
+        regex: '\.(is_private|is_loopback|is_link_local)\b'
+        scope: [app]
+        suffixes: [.py]
+
+  - id: capability-strategic-score
+    concept: A capability's strategic score on the investment pages, recorded or worked out from the model
+    status: active
+    canonical:
+      path: app/modules/solutions_strategic/v2/services/investment_prioritization_service.py
+      symbols: [InvestmentPrioritizationService.analyze_investment_priorities, InvestmentPrioritizationService._derive_importance]
+    reuse: >
+      The recorded importance wins. Where none is recorded, _derive_importance works one out from the criticality
+      of the applications that support the capability, then its links to goals, drivers, outcomes or principles,
+      then the value streams it serves, then its open risks, and the footer says it was derived. Read the score
+      from the service result; do not write a second derivation or a stand-in score for an unrated capability.

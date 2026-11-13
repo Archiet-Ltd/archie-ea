@@ -705,6 +705,7 @@ def investment_scores_unavailable_response(currency_symbol):
             "total_estimated_investment": None,
             "investment_costed_count": None,
             "scored_count": None,
+            "derived_count": None,
             "critical_investment": None,
             "high_investment": None,
             "medium_investment": None,

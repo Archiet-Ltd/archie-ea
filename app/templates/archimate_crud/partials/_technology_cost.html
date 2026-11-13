@@ -14,6 +14,18 @@
     <p class="text-sm text-muted-foreground" data-testid="technology-cost-rule">{{ technology_cost.rule }}</p>
   </div>
 
+  {% if technology_cost.withheld %}
+    <p class="text-sm text-muted-foreground" data-testid="technology-cost-withheld">{{ costs_withheld_text }}</p>
+    <div class="space-y-3">
+      <h3 class="text-sm font-semibold text-foreground">Applications this technology runs</h3>
+      {% call(row) list_table(rows=apps, columns=[('Application', '')],
+                              caption='Applications this technology runs', testid='technology-cost-shares', row_testid='technology-cost-share-row',
+                              toolbar=false,
+                              empty_message='No application is mapped to this technology yet.') %}
+        {% call ui.table_cell(class='font-medium') %}<a class="text-primary underline hover:underline" data-testid="technology-cost-share-link" href="{{ url_for('unified_applications.application_detail', id=row.id) }}">{{ row.name }}</a>{% endcall %}
+      {% endcall %}
+    </div>
+  {% else %}
   {% if alloc.total is not none %}
     {% set total_item = {'label': 'Cost a year, in ' ~ cur, 'value': '{:,.2f}'.format(alloc.total) ~ ' ' ~ cur, 'sentence': 'Every cost recorded below, in the reporting currency.', 'icon': 'banknote', 'testid': 'technology-cost-total'} %}
   {% elif alloc.missing %}
@@ -97,5 +109,6 @@
   <p class="text-xs text-muted-foreground">Adding a cost in a category you already recorded changes that cost.</p>
   {% else %}
   <p class="text-sm text-muted-foreground" data-testid="technology-cost-readonly">Only an architect can add a cost to this technology.</p>
+  {% endif %}
   {% endif %}
 </section>

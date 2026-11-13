@@ -911,7 +911,7 @@ def init_context_processors(app):
     # template renders an em dash, never a fabricated 0.
     def _filter_format_currency(value, show_code=False, currency=None):
         # A missing amount renders as an em dash, never a blank cell and
-        # never a fabricated 0 (CLAUDE.md).
+        # never a fabricated 0.
         if value is None:
             return EM_DASH
         from flask import has_request_context
