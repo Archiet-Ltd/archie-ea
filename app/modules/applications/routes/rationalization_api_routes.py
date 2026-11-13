@@ -2912,6 +2912,12 @@ def rationalization_decision_dossier(app_id):
                 float(score.total_cost_of_ownership) if score.total_cost_of_ownership else None
             ),
         }
+        # The one cost rule decides here; the panel only prints what it is given.
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        if not costs_visible(current_user):
+            dossier["financial"] = withhold_costs(dossier["financial"], keys=tuple(dossier["financial"]))
+            dossier["costs_withheld_sentence"] = COSTS_WITHHELD
 
         return jsonify({"success": True, **dossier})
     except Exception as exc:

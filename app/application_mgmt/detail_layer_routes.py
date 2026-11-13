@@ -844,7 +844,7 @@ def update_strategy_layer(id):
                         cap_obj.name = cap_name
                         cap_obj.level = cap_level or 1
                         cap_obj.maturity_level = cap_maturity or "initial"
-                        cap_obj.coverage_percentage = cap_coverage or 0
+                        cap_obj.coverage_percentage = cap_coverage if cap_coverage not in (None, "") else None
 
                         if old_name != cap_name:
                             changed_fields.append(f"capability_{cap_id}")
