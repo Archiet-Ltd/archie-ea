@@ -92,16 +92,21 @@ def get_rationalization_opportunities():
     """
     try:
         service = AIGapDetectionService()
+        from app.services.cost_visibility import withhold_reply
+
         results = service.find_rationalization_opportunities()
         return jsonify(
-            {
-                "success": True,
-                "count": len(results),
-                "data": results,
-                "total_estimated_savings": sum(
-                    r.get("estimated_annual_savings", 0) for r in results
-                ),
-            }
+            withhold_reply(
+                {
+                    "success": True,
+                    "count": len(results),
+                    "data": results,
+                    "total_estimated_savings": sum(
+                        r.get("estimated_annual_savings", 0) for r in results
+                    ),
+                },
+                keys=("total_estimated_savings", "estimated_annual_savings", "estimated_savings", "savings", "cost"),
+            )
         )
     except Exception:
         return jsonify({"success": False, "error": "An internal error occurred"}), 500

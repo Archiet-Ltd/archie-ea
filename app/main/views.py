@@ -1290,13 +1290,15 @@ def get_widget_metrics():
     """
     try:
         # Sample metrics data - in production, this would come from database
+        from app.services.cost_visibility import withhold_reply
+
         metrics = {
             "total_users": 1234,
             "active_sessions": 89,
             "revenue": 45678.90,
             "conversion_rate": 3.45,
         }
-        return jsonify(metrics)
+        return jsonify(withhold_reply(metrics, keys=("revenue",)))
 
     except Exception as e:
         current_app.logger.error(f"Widget metrics fetch failed: {e}")

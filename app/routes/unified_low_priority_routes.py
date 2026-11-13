@@ -402,8 +402,11 @@ def strategic_initiatives():
 def consolidation_dashboard():
     """Application consolidation dashboard - renders existing consolidation list dashboard"""
     try:
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
         dashboard_data = consolidation_service.get_consolidation_dashboard_data()
         statistics = consolidation_service.get_consolidation_statistics()
+        withheld = not costs_visible(current_user)
 
         if dashboard_data.get("success"):
             data = dashboard_data["data"]
@@ -416,6 +419,7 @@ def consolidation_dashboard():
                 if statistics.get("success")
                 else {},
                 savings_forecast=data.get("savings_forecast", {}),
+                costs_withheld=withheld, costs_withheld_text=COSTS_WITHHELD,
             )
         else:
             return render_template(
@@ -423,6 +427,7 @@ def consolidation_dashboard():
                 total_applications=ApplicationComponent.query.count(),
                 duplicate_candidates=[],
                 consolidation_opportunities=[],
+                costs_withheld=withheld, costs_withheld_text=COSTS_WITHHELD,
             )
     except Exception as e:
         current_app.logger.error(f"Consolidation dashboard error: {str(e)}")
@@ -769,8 +774,13 @@ def api_detect_duplicates():
 def api_consolidation_statistics():
     """API endpoint for consolidation statistics"""
     try:
+        from app.services.cost_visibility import withhold_reply
+
         result = consolidation_service.get_consolidation_statistics()
-        return jsonify(result)
+        return jsonify(withhold_reply(result, keys=(
+            "estimated_pipeline", "realized_ytd", "completed_total",
+            "estimated_annual_savings", "estimated_savings", "realized_savings",
+        )))
     except Exception as e:
         current_app.logger.error(f"API consolidation statistics error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500

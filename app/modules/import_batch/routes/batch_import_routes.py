@@ -364,15 +364,20 @@ def list_jobs():
             "totalCost": float(stats_query.total_cost or 0),
         }
 
+        from app.services.cost_visibility import withhold_reply
+
         return jsonify(
-            {
-                "success": True,
-                "jobs": [job.to_dict() for job in jobs],
-                "stats": stats,
-                "total": total,
-                "limit": limit,
-                "offset": offset,
-            }
+            withhold_reply(
+                {
+                    "success": True,
+                    "jobs": [job.to_dict() for job in jobs],
+                    "stats": stats,
+                    "total": total,
+                    "limit": limit,
+                    "offset": offset,
+                },
+                keys=("totalCost", "total_cost", "cost", "actual_cost_usd"),
+            )
         )
 
     except HTTPException:

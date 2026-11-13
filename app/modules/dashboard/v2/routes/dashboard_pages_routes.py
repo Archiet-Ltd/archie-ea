@@ -271,12 +271,21 @@ def rationalization_dashboard():
         except Exception:
             stats["roadmap_count"] = 0
 
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
+        withheld = not costs_visible(current_user)
+        if withheld:
+            currency_symbol = ""
+            stats = dict(stats, estimated_savings=None)
+
         return render_template(
             "applications/rationalization.html",
             stats=stats,
             groups=groups,
             runs=runs[:10] if runs else [],
             currency_symbol=currency_symbol,
+            costs_withheld=withheld,
+            costs_withheld_text=COSTS_WITHHELD,
         )
     except Exception as e:
         from app import db
@@ -286,13 +295,17 @@ def rationalization_dashboard():
         flash("Error loading rationalization data. Please try again.", "error")
         # stats=None rather than a zeroed dict. "0 duplicate groups, 0 estimated
         # savings" is a conclusion about the portfolio; nothing was counted here.
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
         return render_template(
             "applications/rationalization.html",
             stats=None,
             groups=[],
             runs=[],
-            currency_symbol=currency_symbol,
+            currency_symbol="" if not costs_visible(current_user) else currency_symbol,
             load_error="Rationalization statistics could not be read.",
+            costs_withheld=not costs_visible(current_user),
+            costs_withheld_text=COSTS_WITHHELD,
         )
 
 
@@ -680,7 +693,9 @@ def get_blast_radius(app_id):
         if "error" in blast_radius:
             return jsonify({"success": False, "error": blast_radius["error"]}), 404
 
-        return jsonify({"success": True, "data": blast_radius})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "data": blast_radius}, keys=("estimated_cost", "actual_cost", "total_cost", "estimated_savings", "total_cost_of_ownership", "estimated_total_decoupling_cost", "cost_efficiency")))
     except Exception as e:
         logger.error(
             f"Error calculating blast radius for app {app_id}: {e}", exc_info=True
@@ -998,17 +1013,24 @@ def get_tco_cost_tiers():
             for r in results:
                 r["percentage"] = round((r["application_count"] / apps_in_tiers) * 100, 1)
 
-        return jsonify({
-            "success": True,
-            "data": results,
-            "summary": {
-                "total_portfolio": total_portfolio,
-                "apps_with_tco": apps_with_tco,
-                "apps_without_tco": total_portfolio - apps_with_tco,
-                "coverage_percent": round((apps_with_tco / total_portfolio) * 100, 1) if total_portfolio > 0 else None,  # M1: no portfolio yet is unmeasured, not 0%
-                "total_tco": round(float(portfolio_tco), 2),
-            },
-        })
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(
+            withhold_reply(
+                {
+                    "success": True,
+                    "data": results,
+                    "summary": {
+                        "total_portfolio": total_portfolio,
+                        "apps_with_tco": apps_with_tco,
+                        "apps_without_tco": total_portfolio - apps_with_tco,
+                        "coverage_percent": round((apps_with_tco / total_portfolio) * 100, 1) if total_portfolio > 0 else None,  # M1: no portfolio yet is unmeasured, not 0%
+                        "total_tco": round(float(portfolio_tco), 2),
+                    },
+                },
+                keys=("total_tco", "total_cost_of_ownership", "cost", "min", "max"),
+            )
+        )
     except Exception as e:
         logger.error(f"Error getting TCO cost tiers: {e}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500

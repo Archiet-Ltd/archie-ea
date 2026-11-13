@@ -885,8 +885,10 @@ def get_solution_backtest_results(solution_id):
 def get_solution_model_drift(solution_id):
     """Get model drift analysis (ENT-019)."""
     try:
+        from app.services.cost_visibility import withhold_reply
+
         drift = learning_service.detect_model_drift()
-        return jsonify(drift), 200
+        return jsonify(withhold_reply(drift, keys=("recent_cost_accuracy", "older_cost_accuracy", "cost", "tco", "estimated_cost", "savings"))), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -907,8 +909,10 @@ def get_model_accuracy():
 def detect_drift():
     """Detect model drift (performance degradation)."""
     try:
+        from app.services.cost_visibility import withhold_reply
+
         drift = learning_service.detect_model_drift()
-        return jsonify(drift), 200
+        return jsonify(withhold_reply(drift, keys=("recent_cost_accuracy", "older_cost_accuracy", "cost", "tco", "estimated_cost", "savings"))), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
