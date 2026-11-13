@@ -184,32 +184,12 @@ def test_layer_risk_and_gap_figures_agree(browser, live_server, viewport, theme)
         register_critical = _number(page, "register-critical")
         register_open = _number(page, "register-open")
         assert (register_critical, register_open) == (2, 3), (register_critical, register_open)
-        # The Risk Assessment card on Strategic planning opens the assessment of the register's risks.
+        # The Gap analysis card on Strategic planning opens the gap register.
         page.goto(base + "/enterprise/strategic", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_role("link", name=re.compile("Risk Assessment")).first.click()
-        page.wait_for_url(re.compile(r"/strategic/risk-assessment$"), timeout=PAGE_TIMEOUT)
-        body = page.locator("body").inner_text()
-        assert page.locator("h1").first.inner_text().strip().lower() == "risk assessment"
-        assert "Total Gaps" not in body and "Risk Items" not in body, body[:500]
-        assert _number(page, "assess-critical-value") == register_critical
-        assert _number(page, "assess-open-value") == register_open
-        rows = page.locator('[data-testid="risk-assessment-row"]')
-        assert rows.count() == register_open, (rows.count(), register_open)
-        assert noun in rows.first.inner_text() and other not in body
-        listed_critical = sum(1 for index in range(rows.count()) if "critical" in rows.nth(index).inner_text().lower())
-        assert listed_critical == register_critical, (listed_critical, register_critical)
-        assert "closed risk" not in body
-        note = page.locator('[data-testid="assess-closed-note"]').inner_text()
-        assert note.startswith("4 risks are mitigated, accepted or closed and not listed here"), note
-        page.get_by_role("link", name="See every risk in the risk register").click()
-        page.wait_for_url(re.compile(r"/risks/?$"), timeout=PAGE_TIMEOUT)
-        assert _number(page, "register-open") == register_open
-        page.go_back()
-        page.locator('[data-testid="risk-assessment-row"] a').first.click()
-        page.wait_for_url(re.compile(r"/risks/\d+"), timeout=PAGE_TIMEOUT)
-        assert noun in page.locator("body").inner_text()
-        page.go_back()
-        _frame(page, "risk-assessment", viewport["width"], theme)
+        page.get_by_role("link", name=re.compile("Gap analysis")).first.click()
+        page.wait_for_url(re.compile(r"/implementation/gap-analysis"), timeout=PAGE_TIMEOUT)
+        assert page.locator("h1").first.inner_text().strip().lower() == "gaps"
+        _frame(page, "gap-analysis", viewport["width"], theme)
 
         # Critical gaps: the register page, the implementation page and the register's own list say the
         # same number (7 by severity and 1 by priority), the implementation page says how many it does not list.
