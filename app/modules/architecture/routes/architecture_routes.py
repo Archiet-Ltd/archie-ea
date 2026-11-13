@@ -358,6 +358,7 @@ def solutions_architecture_dashboard():
         from app import db
         from app.decorators.requires_role import may_see_contract_pages
         from app.models.truly_missing_models import Solution, SolutionPattern
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
         from app.services.vendor_register import register_contracts
 
         # Get counts for metrics cards
@@ -446,6 +447,7 @@ def solutions_architecture_dashboard():
                 "Failed to query ArchiMate application layer counts", exc_info=True
             )
 
+        costs_withheld = not costs_visible(current_user)
         return render_template(
             "enterprise/solutions_architecture_dashboard.html",
             solutions=solutions_list,
@@ -454,6 +456,8 @@ def solutions_architecture_dashboard():
             contract_count=contract_count,
             archimate_app_count=archimate_app_count,
             relationship_count=relationship_count,
+            costs_withheld=costs_withheld,
+            costs_withheld_text=COSTS_WITHHELD,
         )
     except Exception as e:
         from app import db
@@ -505,10 +509,19 @@ def api_solutions_architecture_analyze():
             existing_constraints=data.get("existing_constraints") or [],
             compliance_requirements=data.get("compliance_requirements") or [],
         )
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
         # Serialize Decimal fields for JSON
         for rec in result.get("recommendations", []):
             if rec.get("estimated_cost") is not None:
                 rec["estimated_cost"] = float(rec["estimated_cost"])
+        # The one cost rule: a person it withholds from reads no money figure in the reply either.
+        if not costs_visible(current_user):
+            for rec in result.get("recommendations", []):
+                rec["estimated_cost"] = None
+            for app in result.get("existing_applications", {}).get("applications", []) or []:
+                app["annual_cost"] = None
+            result["costs_withheld_sentence"] = COSTS_WITHHELD
         return jsonify(result)
     except Exception as exc:
         current_app.logger.error("solutions-architecture/analyze error: %s", exc, exc_info=True)

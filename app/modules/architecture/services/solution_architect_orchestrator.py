@@ -201,7 +201,7 @@ class SolutionArchitectOrchestrator:
                             "relevance_score": round(score, 1),
                             "status": app.lifecycle_status or app.deployment_status,
                             "vendor": app.vendor_name or "Internal",
-                            "annual_cost": float(app.annual_cost or 0),
+                            "annual_cost": float(app.total_cost_of_ownership or 0),
                             "users": app.user_count or 0,
                         }
                     )

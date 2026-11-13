@@ -4,6 +4,7 @@ import logging
 from collections import defaultdict
 
 from flask import render_template
+from flask_login import current_user
 from werkzeug.exceptions import NotFound
 
 from app import db
@@ -517,6 +518,7 @@ def _vendors_impl(
 ):
     """Shared vendor list implementation with filtering, pagination, and stats."""
     from app.models.vendor import application_vendor_products
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
     from sqlalchemy import func
 
     # Limit per_page to reasonable values
@@ -716,6 +718,7 @@ def _vendors_impl(
         db.session.rollback()
         logging.getLogger(__name__).exception("Vendor result footers could not be read")
 
+    costs_withheld = not costs_visible(current_user)
     return render_template(
         "vendors/list.html",
         vendors=vendors,
@@ -735,6 +738,8 @@ def _vendors_impl(
         get_domain_label=get_domain_label,
         get_domain_color_classes=get_domain_color_classes,
         VENDOR_DOMAINS=VENDOR_DOMAINS,
+        costs_withheld=costs_withheld,
+        costs_withheld_text=COSTS_WITHHELD,
     )
 
 
