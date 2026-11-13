@@ -99,6 +99,8 @@ def test_a_change_the_assistant_made_is_counted_on_controls_and_another_workspac
         _open_controls(page, base)
         expect(page.get_by_test_id("policy-checked-value")).to_have_text("1")
         expect(page.get_by_test_id("policy-passed-value")).to_have_text("1")
+        expect(page.get_by_test_id("policy-passed")).to_contain_text("No check found a problem with these changes")
+        assert "reviewed by a second model" not in page.get_by_test_id("policy-passed").inner_text()
         expect(page.get_by_test_id("policy-failed-value")).to_have_text("0")
         expect(page.get_by_test_id("policy-applied-value")).to_have_text("1")
         assert page.get_by_text("No AI operations checked yet").count() == 0
@@ -129,5 +131,10 @@ def test_a_change_the_assistant_made_is_counted_on_controls_and_another_workspac
         expect(page.get_by_test_id("policy-checks-empty")).to_contain_text("No changes have been checked")
         assert atlas_name not in page.locator("main").inner_text()
         _shot(page, shots, "controls-other-workspace-%s" % scheme)
+        # The old read addresses hold nothing of the first workspace: they are gone, not answered.
+        for address in ("status", "compliance", "violations", "alert"):
+            response = page.goto(base + "/policy-monitoring/" + address, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            assert response.status == 404, address
+            assert atlas_name not in page.content()
     finally:
         context.close()

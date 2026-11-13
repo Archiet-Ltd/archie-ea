@@ -462,8 +462,15 @@ def vendor_templates_redirect(subpath=None):
 
 @main.route("/robots.txt")
 def robots_txt():
-    """Serve robots.txt for SEO"""
-    return send_from_directory("static", "robots.txt")
+    """robots.txt for crawlers: everything is allowed except what is not a public page.
+
+    Generated from the routes and the public-site registry (app/services/crawl_rules.py), so a public page
+    added later is crawlable without a line being written for it."""
+    from flask import Response
+
+    from app.services.crawl_rules import robots_text
+
+    return Response(robots_text(), mimetype="text/plain")
 
 
 @main.route("/sitemap.xml")
@@ -478,19 +485,11 @@ def sitemap_xml():
     (front matter ``state: not_planned``) -- see
     app/services/public_pages.py::load_feed_pages / feed_page_paths.
     """
-    from html import escape
-
-    from app.services.public_pages import feed_page_paths
-
-    base_url = "https://entelim.org"
-    urls = []
-    for path in feed_page_paths():
-        # Homepage is not a content page but is the most important URL.
-        priority = "<priority>1.0</priority>" if path == "/" else ""
-        urls.append(f"  <url><loc>{base_url}{escape(path)}</loc>{priority}</url>")
-    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
     from flask import Response
-    return Response(xml, mimetype="application/xml")
+
+    from app.services.crawl_rules import sitemap_text
+
+    return Response(sitemap_text(), mimetype="application/xml")
 
 
 @main.route("/<key>.txt")
@@ -1135,9 +1134,13 @@ def public_site_page(slug):
         )
         import dataclasses
 
-        from app.services.site_registry import open_signed_in_links, signed_in_target
+        from app.services.site_registry import (
+            available_capabilities, coming_capabilities, hold_back_unreleased_capabilities, open_signed_in_links, signed_in_target,
+        )
 
-        page = dataclasses.replace(page, body_html=open_signed_in_links(page.body_html))
+        coming_soon = coming_capabilities()
+        body_html, _described = hold_back_unreleased_capabilities(page.body_html)
+        page = dataclasses.replace(page, body_html=open_signed_in_links(body_html))
         modules = [dataclasses.replace(m, url=signed_in_target(m.url)) for m in modules]
         hub_groups = [
             group for group in (
@@ -1147,6 +1150,7 @@ def public_site_page(slug):
         ]
         return render_template(
             "public/page.html", page=page, hub_groups=hub_groups,
+            coming_soon=coming_soon, available=available_capabilities(),
             share_paths=set(share_page_paths()),
             jsonld=build_hub_jsonld(
                 page.title, page.url, page.description, modules + connectors,

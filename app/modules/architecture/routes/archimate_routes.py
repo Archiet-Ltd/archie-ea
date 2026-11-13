@@ -6978,7 +6978,8 @@ def api_create_diagram_from_elements():
     diagram = SavedDiagram(
         name=diagram_name,
         description=f"Auto-generated from {len(elements)} imported elements",
-        created_by=current_user.id if current_user.is_authenticated else None,
+        created_by=str(current_user.id) if current_user.is_authenticated else None,
+        created_by_id=current_user.id if current_user.is_authenticated else None,
     )
     db.session.add(diagram)
     db.session.flush()
