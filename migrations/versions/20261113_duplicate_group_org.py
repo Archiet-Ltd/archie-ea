@@ -1,7 +1,7 @@
 """Give duplicate groups an organisation.
 
 unified_duplicate_groups was global: every organisation saw every other's
-duplicate groups. It now carries ``organization_id`` (TenantMixin), NOT NULL,
+duplicate groups. It now carries ``organization_id`` NOT NULL,
 with a foreign key to organizations, an index, and row-level security.
 
 Backfill: a group takes the organisation of its detection run
@@ -39,6 +39,22 @@ _TENANT_DEFINITIONS = (
     ("UPDATE", _TENANT_RULE, _TENANT_RULE),
     ("DELETE", _TENANT_RULE, None),
 )
+
+
+def _fk_name(bind, table, column):
+    """The name of whatever foreign key actually sits on `column`, detected by
+    column presence rather than by the name this migration expects -- the same
+    table can carry an auto-named foreign key created by ensure_baseline_schema
+    from today's models instead of this migration's own fk_{table}_{column}."""
+    return bind.execute(
+        text(
+            "SELECT con.conname FROM pg_constraint con "
+            "JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ANY (con.conkey) "
+            "WHERE con.contype = 'f' AND con.conrelid = to_regclass(:t) "
+            "AND att.attname = :c"
+        ),
+        {"t": f"public.{table}", "c": column},
+    ).scalar()
 
 
 def _present(bind, table):
@@ -102,9 +118,10 @@ def upgrade():
 
     op.alter_column(TABLE, "organization_id", existing_type=sa.Integer(), nullable=False)
     op.create_index(f"ix_{TABLE}_organization_id", TABLE, ["organization_id"], if_not_exists=True)
-    fk = f"fk_{TABLE}_organization_id"
-    if not bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
-        op.create_foreign_key(fk, TABLE, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
+    existing_fk = _fk_name(bind, TABLE, "organization_id")
+    if existing_fk:
+        op.drop_constraint(existing_fk, TABLE, type_="foreignkey")
+    op.create_foreign_key(f"fk_{TABLE}_organization_id", TABLE, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
 
     # Row-level security
     owned = bind.execute(
@@ -133,8 +150,8 @@ def downgrade():
     bind.execute(text(f"ALTER TABLE public.{TABLE} DISABLE ROW LEVEL SECURITY"))  # nosec B608 - literal table names
     for name in TENANT_POLICIES:
         bind.execute(text(f"DROP POLICY IF EXISTS {name} ON public.{TABLE}"))  # nosec B608 - literal table names
-    fk = f"fk_{TABLE}_organization_id"
-    if bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
-        op.drop_constraint(fk, TABLE, type_="foreignkey")
+    existing_fk = _fk_name(bind, TABLE, "organization_id")
+    if existing_fk:
+        op.drop_constraint(existing_fk, TABLE, type_="foreignkey")
     op.drop_index(f"ix_{TABLE}_organization_id", table_name=TABLE, if_exists=True)
     op.drop_column(TABLE, "organization_id")
