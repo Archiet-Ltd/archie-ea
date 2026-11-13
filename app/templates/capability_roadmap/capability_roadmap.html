@@ -398,7 +398,7 @@
             </div>
             <div class="flex items-center justify-end gap-2 border-t pt-4">
               {% call button(text='Cancel', variant='ghost', on_click="Platform.modal.close('rdm-create-plateau-modal')") %}{% endcall %}
-              {% call button(text='Create Plateau', variant='default', attrs_dict={':disabled': 'isSubmitting'}) %}{% endcall %}
+              {% call button(text='Create Plateau', variant='default', type='submit', attrs_dict={':disabled': 'isSubmitting'}) %}{% endcall %}
             </div>
           </form>
         </div>
@@ -668,9 +668,9 @@
         }
       },
 
-      async loadPlateaus() {
+      async loadPlateaus(again) {
         try {
-          const d = await window.rdmSource('plateaus');
+          const d = await window.rdmSource('plateaus', again);
           this.plateaus = d.plateaus || [];
           this.plateauCount = this.plateaus.length;
           Alpine.store('rdm').plateaus = this.plateaus;
@@ -711,7 +711,7 @@
       },
 
       async refreshAfterPlateauSave() {
-        await this.loadPlateaus();
+        await this.loadPlateaus(true);
         await this.refreshEvidenceLine();
         if (typeof window.rdmRedrawTimeline === 'function') window.rdmRedrawTimeline();
       },
