@@ -28,20 +28,20 @@
      app/services/public_pages.py:get_page_screenshot(). Only ever set for a
      capture_status: live page whose captured file exists on disk. #}
   <figure class="public-figure mt-10" data-testid="page-screenshot">
-    {# Captured at 2x and shown at its own CSS width (1:1), so the UI text in
-       it stays 12px or larger. Below 1100px the desktop crop would have to
-       shrink, so the phone-width crop of the same screen is shown instead, at
-       its natural size (public_site.css .public-figure img: never stretched). #}
-    <picture>
-      {% if screenshot.mobile %}
-      <source media="(max-width: 1099px)" srcset="{{ screenshot.mobile.url }}"
-              width="{{ screenshot.mobile.width }}" height="{{ screenshot.mobile.height }}">
-      {% endif %}
-      <img src="{{ screenshot.url }}" alt="{{ screenshot.alt }}"
-           width="{{ screenshot.width }}" height="{{ screenshot.height }}"
-           loading="lazy" decoding="async"
-           class="rounded-lg border border-border">
-    </picture>
+    {# Captured at 2x and shown at half its pixel width (the width attribute, which the stylesheet leaves alone), so the UI text in it stays 12px or
+       larger and is never stretched. Below 1100px the desktop crop would have to shrink, so the phone-width
+       crop of the same screen is shown instead, with its own description of what it shows: two images, one of
+       them hidden by public_site.css at each width, and the hidden one never fetched (lazy). #}
+    <img src="{{ screenshot.url }}" alt="{{ screenshot.alt }}"
+         width="{{ screenshot.width }}" height="{{ screenshot.height }}"
+         loading="lazy" decoding="async"
+         class="public-capture{% if screenshot.mobile %} public-capture-wide{% endif %}">
+    {% if screenshot.mobile %}
+    <img src="{{ screenshot.mobile.url }}" alt="{{ screenshot.mobile.alt }}"
+         width="{{ screenshot.mobile.width }}" height="{{ screenshot.mobile.height }}"
+         loading="lazy" decoding="async"
+         class="public-capture public-capture-phone">
+    {% endif %}
     <figcaption class="mt-2 text-sm text-muted-foreground">{{ screenshot.caption }}</figcaption>
   </figure>
   {% endif %}

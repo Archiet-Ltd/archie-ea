@@ -42,21 +42,18 @@ FIELDS = {
 # Field names sorted longest first for the alternation (longest match wins).
 _FIELD_ALT = "|".join(re.escape(name) for name in sorted(FIELDS.keys(), key=len, reverse=True))
 _VERB = r"(?:please\s+)?(?:set|change|update|edit)\s+(?:the\s+)?"
-# "to Y", "as Y" or "to: Y": the colon is how a person naturally writes the plain request.
-_TO = r"(?:(?:to|as)\s*:\s*|(?:to|as)\s+)"
-_QUOTES = "\"'\u201c\u201d\u2018\u2019`"
-
 # Possessive: "set <app>'s <field> to <value>"
 # Field is matched against known names; app and value are greedy tails stripped afterwards.
 _POSSESSIVE = re.compile(
-    r"^\s*" + _VERB + r"(?P<app>.+?)(?:'s|\u2019s)\s+(?P<field>" + _FIELD_ALT + r")\s+" + _TO + r"(?P<value>.+)\s*$",
+    r"^\s*" + _VERB + r"(?P<app>.+?)(?:'s|\u2019s)\s+(?P<field>" + _FIELD_ALT + r")\s+(?:to|as)\s+(?P<value>.+)\s*$",
     re.I | re.S,
 )
 # Of-form: "set <field> of <app> to <value>"
 _OF = re.compile(
-    r"^\s*" + _VERB + r"(?P<field>" + _FIELD_ALT + r")\s+(?:of|for|on)\s+(?P<app>.+?)\s+" + _TO + r"(?P<value>.+)\s*$",
+    r"^\s*" + _VERB + r"(?P<field>" + _FIELD_ALT + r")\s+(?:of|for|on)\s+(?P<app>.+?)\s+(?:to|as)\s+(?P<value>.+)\s*$",
     re.I | re.S,
 )
+_QUOTES = "\"'\u201c\u201d\u2018\u2019`"
 
 
 def _collapse_ws(text: str) -> str:
@@ -64,12 +61,26 @@ def _collapse_ws(text: str) -> str:
     return " ".join(text.split())
 
 
+def _original_value(message: str, tokens: list, collapsed: str, value_start: int) -> str:
+    """The value as typed: the original message from the token the value starts at, stripped at both ends.
+
+    Matching runs on the collapsed text, which keeps the parse linear; the value is then taken from
+    the original so line breaks and runs of spaces the person typed are saved as typed. The value
+    always starts at a token boundary, so its token index is the count of spaces before it."""
+    index = collapsed.count(" ", 0, value_start)
+    for position, token in enumerate(re.finditer(r"\S+", message)):
+        if position == index:
+            return message[token.start():].strip()
+    return " ".join(tokens[index:])
+
+
 def parse_change_request(message: str) -> Optional[Dict[str, str]]:
     """{application, key, label, value} for "set <app>'s <field> to <value>", else ``None``."""
     if not message:
         return None
     # Collapse whitespace first so the regex never sees runs of spaces that cause backtracking.
-    collapsed = _collapse_ws(message)
+    tokens = message.split()
+    collapsed = " ".join(tokens)
     for pattern in (_POSSESSIVE, _OF):
         found = pattern.match(collapsed)
         if not found:
@@ -77,7 +88,7 @@ def parse_change_request(message: str) -> Optional[Dict[str, str]]:
         field = found.group("field").lower()
         if field not in FIELDS:
             continue
-        value = found.group("value").strip()
+        value = _original_value(message, tokens, collapsed, found.start("value"))
         if len(value) >= 2 and value[0] in _QUOTES and value[-1] in _QUOTES:
             value = value[1:-1].strip()
         application = found.group("app").strip().strip(_QUOTES)

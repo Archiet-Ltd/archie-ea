@@ -57,8 +57,12 @@
   {% call table_cell() %}{{ state_badge(item.contract.status) }}{% endcall %}
   {% if any_renewal %}
   {% call table_cell(attrs={'data-sort': item.days_until_renewal if item.days_until_renewal is not none else 99999}) %}
-    {% if item.urgency == 'expired' %}
-      {{ state_badge('Expired', tone='negative') }}
+    {% if item.renewal.kind in ('ended', 'overdue') %}
+      {{ state_badge(item.renewal.text, tone='negative') }}
+    {% elif item.renewal.kind == 'inactive' %}
+      {{ value_or_unset(none, 'Not active, no renewal') }}
+    {% elif item.days_until_renewal == 0 %}
+      {{ state_badge('Today', tone='negative') }}
     {% elif item.days_until_renewal is not none %}
       {{ state_badge('In ' ~ item.days_until_renewal ~ (' day' if item.days_until_renewal == 1 else ' days'),
                      tone={'critical': 'negative', 'warning': 'caution', 'upcoming': 'neutral'}.get(item.urgency, 'positive')) }}
