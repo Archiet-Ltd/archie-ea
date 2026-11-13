@@ -38,7 +38,7 @@ package AsBuilt_application_overview {
     part vocabulary_deployment_status_1 : VocabularySource {
         :>> columnName = "deployment_status";
         :>> sourceKind = "form-select";
-        :>> sourceFile = "app/application_mgmt/forms.py:94";
+        :>> sourceFile = "app/application_mgmt/forms.py:107";
         :>> origin = "app/services/application_status.py";
         :>> valueList = "";
     }
@@ -66,14 +66,14 @@ package AsBuilt_application_overview {
     part vocabulary_deployment_status_5 : VocabularySource {
         :>> columnName = "deployment_status";
         :>> sourceKind = "template-field";
-        :>> sourceFile = "app/templates/applications/dashboard.html:333";
+        :>> sourceFile = "app/templates/applications/dashboard.html:340";
         :>> origin = "app/services/application_status.py";
         :>> valueList = "";
     }
     part vocabulary_deployment_status_6 : VocabularySource {
         :>> columnName = "deployment_status";
         :>> sourceKind = "template-field";
-        :>> sourceFile = "app/templates/applications/edit.html:130";
+        :>> sourceFile = "app/templates/applications/edit.html:145";
         :>> origin = "app/templates/applications/edit.html (written out in place)";
         :>> valueList = "";
     }

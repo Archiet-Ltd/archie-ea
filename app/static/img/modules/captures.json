@@ -1,0 +1,283 @@
+{
+  "applications": {
+    "density": 2,
+    "desktop": {
+      "alt": "The Applications list showing fourteen systems with their type, lifecycle stage, owner, how complete each record is and the capability each supports, under a line saying every system has an owner, a capability and a vendor.",
+      "bytes": 190988,
+      "css_height": 1116,
+      "css_width": 1104,
+      "facts": {
+        "systems": 14
+      },
+      "min_text_px": 12
+    },
+    "phone": {
+      "alt": "The Applications list as cards, eight systems each with its status, owner, vendor, capability and a ring showing how complete its record is.",
+      "bytes": 191208,
+      "css_height": 2045,
+      "css_width": 340,
+      "facts": {
+        "systems": 8
+      },
+      "min_text_px": 12
+    }
+  },
+  "arb": {
+    "density": 2,
+    "desktop": {
+      "alt": "The Architecture Review Board showing fifteen reviews, ten of them pending, an approval rate of 80 per cent and the average cycle time, a line saying six of the ten pending reviews are not yet in a review cycle, and four reviews waiting for a decision, each with its subject, status and an Open review button.",
+      "bytes": 107320,
+      "css_height": 581,
+      "css_width": 1104,
+      "facts": {
+        "approval_rate": 80.0,
+        "in_queue": 4,
+        "outside_queue": 6,
+        "pending": 10,
+        "total": 15
+      },
+      "min_text_px": 12
+    },
+    "phone": {
+      "alt": "The Architecture Review Board's four figures, a line saying six of the ten pending reviews are not yet in a review cycle, and the four reviews waiting for a decision, one card each.",
+      "bytes": 136536,
+      "css_height": 1690,
+      "css_width": 342,
+      "facts": {
+        "approval_rate": 80.0,
+        "in_queue": 4,
+        "outside_queue": 6,
+        "pending": 10,
+        "total": 15
+      },
+      "min_text_px": 12
+    }
+  },
+  "architecture-model": {
+    "density": 2,
+    "desktop": {
+      "alt": "A layered ArchiMate view of twenty elements drawn in strategy, business, application and technology bands, with the twenty relationships between them drawn as arrows.",
+      "bytes": 103332,
+      "css_height": 611,
+      "css_width": 1040,
+      "facts": {
+        "elements": 20,
+        "relationships": 20
+      },
+      "min_text_px": 12
+    },
+    "phone": {
+      "alt": "The layered ArchiMate view on a narrow screen: twenty elements stacked one above another in strategy, business, application and technology bands, with the twenty relationships between them drawn as lines.",
+      "bytes": 99944,
+      "css_height": 1776,
+      "css_width": 310,
+      "facts": {
+        "elements": 20,
+        "relationships": 20
+      },
+      "min_text_px": 12
+    }
+  },
+  "business-case": {
+    "density": 2,
+    "desktop": {
+      "alt": "The business case to move the event backbone to a managed message broker, with its options considered, the recommendation, and the capital cost, annual running cost, three-year cost, annual benefit, return and payback.",
+      "bytes": 152874,
+      "css_height": 994,
+      "css_width": 1104,
+      "facts": {
+        "title": "Move the event backbone to a managed message broker"
+      },
+      "min_text_px": 12
+    },
+    "phone": {
+      "alt": "The business case to move the event backbone to a managed message broker, with its options considered, the recommendation, and the capital cost, annual running cost, three-year cost, annual benefit, return and payback.",
+      "bytes": 140286,
+      "css_height": 1410,
+      "css_width": 342,
+      "facts": {
+        "title": "Move the event backbone to a managed message broker"
+      },
+      "min_text_px": 12
+    }
+  },
+  "business-model-canvas": {
+    "density": 2,
+    "desktop": {
+      "alt": "A business model canvas with nine blocks filled in for the demonstration company: key partners, activities and resources, value propositions, customer relationships, channels and segments, cost structure and revenue streams.",
+      "bytes": 194478,
+      "css_height": 1373,
+      "css_width": 1104,
+      "facts": {
+        "blocks": 9
+      },
+      "min_text_px": 12
+    },
+    "phone": {
+      "alt": "One block of the business model canvas, the value propositions, listing the four propositions the demonstration company offers.",
+      "bytes": 38610,
+      "css_height": 1018,
+      "css_width": 182,
+      "facts": {
+        "propositions": 4
+      },
+      "min_text_px": 12
+    }
+  },
+  "compliance-frameworks": {
+    "density": 2,
+    "desktop": {
+      "alt": "The compliance dashboard showing one active framework, ninety-three controls and 930 application control mappings by status, above the first ten controls not yet in place with the application and capability each belongs to.",
+      "bytes": 171060,
+      "css_height": 749,
+      "css_width": 1104,
+      "facts": {
+        "controls": 93,
+        "findings_shown": 10,
+        "frameworks": 1,
+        "mappings": 930
+      },
+      "min_text_px": 12
+    },
+    "phone": {
+      "alt": "The compliance figures: one active framework, ninety-three controls and 930 application control mappings counted by status.",
+      "bytes": 18672,
+      "css_height": 384,
+      "css_width": 342,
+      "facts": {
+        "controls": 93,
+        "frameworks": 1,
+        "mappings": 930
+      },
+      "min_text_px": 12
+    }
+  },
+  "portfolio": {
+    "density": 2,
+    "desktop": {
+      "alt": "The portfolio dashboard showing seven initiatives, their approved budget and spend, a health count of red, amber and green, and a table with each initiative's phase, budget, spend, variance, completion, benefits and sponsor.",
+      "bytes": 183842,
+      "css_height": 690,
+      "css_width": 1104,
+      "facts": {
+        "amber": 2,
+        "green": 4,
+        "initiatives": 7,
+        "red": 1
+      },
+      "min_text_px": 12
+    },
+    "phone": {
+      "alt": "The portfolio figures: seven initiatives, the approved budget, the spend to date and a health count of red, amber and green, with the line saying every initiative serves an objective.",
+      "bytes": 26444,
+      "css_height": 608,
+      "css_width": 342,
+      "facts": {
+        "amber": 2,
+        "green": 4,
+        "initiatives": 7,
+        "red": 1
+      },
+      "min_text_px": 14
+    }
+  },
+  "procurement": {
+    "density": 2,
+    "desktop": {
+      "alt": "The renewals screen showing how many contracts renew in each window (one within thirty, seven within ninety and ten within one hundred and eighty days), and the one contract due within thirty days with its vendor, annual cost and days to renewal.",
+      "bytes": 89062,
+      "css_height": 555,
+      "css_width": 1104,
+      "facts": {
+        "contracts_in_windows": [
+          1,
+          7,
+          10
+        ],
+        "listed": 1,
+        "windows": [
+          30,
+          90,
+          180
+        ]
+      },
+      "min_text_px": 12
+    },
+    "phone": {
+      "alt": "The renewals screen showing how many contracts renew in each window (one within thirty, seven within ninety and ten within one hundred and eighty days), and the one contract coming up within thirty days.",
+      "bytes": 72012,
+      "css_height": 1291,
+      "css_width": 342,
+      "facts": {
+        "contracts_in_windows": [
+          1,
+          7,
+          10
+        ],
+        "listed": 1,
+        "windows": [
+          30,
+          90,
+          180
+        ]
+      },
+      "min_text_px": 14
+    }
+  },
+  "risk-register": {
+    "density": 2,
+    "desktop": {
+      "alt": "The risk register showing the top risks ranked by the elements each reaches, with their status and what they touch, beside a five-by-five matrix counting the register's twenty-two risks by probability and impact.",
+      "bytes": 180858,
+      "css_height": 594,
+      "css_width": 1056,
+      "facts": {
+        "risks": 22
+      },
+      "min_text_px": 12
+    },
+    "phone": {
+      "alt": "The risk register on a phone: a five-by-five matrix counting the register's twenty-two risks by probability and impact, above the top risks ranked by the elements each reaches.",
+      "bytes": 168164,
+      "css_height": 1618,
+      "css_width": 294,
+      "facts": {
+        "risks": 22
+      },
+      "min_text_px": 12
+    }
+  },
+  "vendors": {
+    "density": 2,
+    "desktop": {
+      "alt": "The vendor register: a line saying sixteen vendors supply all nineteen systems and seven renew within ninety days, above ten vendors and the systems each supplies.",
+      "bytes": 84168,
+      "css_height": 807,
+      "css_width": 1104,
+      "facts": {
+        "listed": 10,
+        "renewing": 7,
+        "systems": 19,
+        "systems_supplied": 19,
+        "vendors": 16,
+        "window_days": 90
+      },
+      "min_text_px": 14
+    },
+    "phone": {
+      "alt": "The vendor register: a line saying sixteen vendors supply all nineteen systems and seven renew within ninety days, above ten vendors and the systems each supplies.",
+      "bytes": 71484,
+      "css_height": 975,
+      "css_width": 342,
+      "facts": {
+        "listed": 10,
+        "renewing": 7,
+        "systems": 19,
+        "systems_supplied": 19,
+        "vendors": 16,
+        "window_days": 90
+      },
+      "min_text_px": 14
+    }
+  }
+}

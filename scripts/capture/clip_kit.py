@@ -5,6 +5,20 @@ Playwright's video shows no mouse pointer, so recordings add a drawn one that fo
 overlay lives only in recordings and in the clips made here, which is why it carries inline styles rather than
 the product's tokens. The scripts that capture product clips and the browser test harness all import this
 module; nothing else in the repository defines the overlay.
+
+The capture standard for every public product image
+---------------------------------------------------
+``capture_standard_image`` is the one way a product image for a public page is made. An image that does not
+meet it is refused, never shipped:
+
+* content only: the page's content element, with no sidebar, top bar, breadcrumb, banner, person's name, build
+  id or date in frame; the frame around it is drawn by the page (``.public-capture``), never by the picture;
+* two versions of one screen: desktop (content 1104 CSS px wide at most) and phone (390 wide, content 358),
+  each taken at 2x, so each is shown at half its pixel width, one image pixel to one screen pixel;
+* every piece of text in frame is 12 CSS px or larger, at 1440 and at 390;
+* no empty state, unset value, bare dash or zero in frame (``FORBIDDEN_IN_FRAME``);
+* each file under 300 KB, written at its full size (quality falls, size never does);
+* what was measured is written to ``captures.json`` beside the images, which the test reads.
 """
 from __future__ import annotations
 
@@ -18,9 +32,16 @@ import time
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
+from app.commands.seed_demo_company import _DEMO_USER_FIRST, _DEMO_USER_LAST
 from app.services.public_pages import DEMO_PERSONA
 
 MAX_IMAGE_BYTES = 200 * 1024
+STANDARD_IMAGE_BYTES = 300 * 1024
+STANDARD_DENSITY = 2
+STANDARD_MIN_TEXT_PX = 12
+STANDARD_DESKTOP = {"viewport": (1408, 2600), "content_max": 1104}
+STANDARD_PHONE = {"viewport": (390, 3200), "content_max": 358}
+STANDARD_MANIFEST = "captures.json"
 MAX_VIDEO_BYTES = 3 * 1024 * 1024
 CLIP_MAX_BYTES = 8 * 1024 * 1024
 
@@ -30,6 +51,15 @@ DEMO_PASSWORD_VARIABLE = "DEMO_USER_PASSWORD"
 DEMO_TOTP_VARIABLE = "DEMO_MFA_SECRET"
 
 SIGN_IN_WAIT_MS = 10000
+
+# Text that puts an empty, unavailable, unset or placeholder state in frame, or a bare zero standing in for a
+# measurement. A clip showing any of it is refused; there is no per-clip exception.
+FORBIDDEN_IN_FRAME = re.compile(
+    r"Not recorded|Not shown for your role|unavailable|No [\w ]+ yet|Something went wrong|don't have access|"
+    r"Nothing here|No data|\bN/A\b|\bTBC\b|\bundefined\b|\bNaN\b|"
+    r"\bNot set\b|\bNot assessed\b|\bNot reviewed\b|\bNo [\w ]+ recorded\b|(?i:\bno (?:owner|capability|vendor|licence|DR)\b)|"
+    r"Appears here|Missing to reach|\bUnassigned\b|^None$|\tNone\t|\tNone$|^None\t|\bNone (?:renew|due|recorded|set)\b|"
+    r"(?<![\w.,\u00a3$%/-])0(?![\w.,%/-])|^\u2014$|\t\u2014\t|\t\u2014$|^\u2014\t", re.M)
 
 _POINTER_JS = r"""
   const pointer = () => {
@@ -378,6 +408,123 @@ def record_clip(browser, base_url, name, steps, *, size=(1440, 900), dark=False,
                    target_width=width)
     shutil.rmtree(raw_dir, ignore_errors=True)
     return Clip(clip, subject_seen_at, poster_at)
+
+
+# What a standard image never shows besides the empty and unset states: a date, the signed-in person, a build id.
+NOT_IN_STANDARD_FRAME = re.compile(
+    r"\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{4}\b|\b\d{4}-\d{2}-\d{2}\b|"
+    r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2}, \d{4}\b|"
+    r"\b" + re.escape(f"{_DEMO_USER_FIRST} {_DEMO_USER_LAST}") + r"\b|\bdemo@|\bBuild [0-9a-f]{7,}\b")
+
+# Page furniture the standard leaves out of a content crop (never data).
+STANDARD_HIDE = ["[data-testid='two-factor-banner']", "nav[aria-label='Breadcrumb']", "[aria-label='Breadcrumb']",
+                 "[data-testid='service-status']"]
+
+_SMALL_TEXT_JS = """(el) => {
+  const small = [];
+  let smallest = null;
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const n = walker.currentNode;
+    if (!n.nodeValue.trim()) continue;
+    const e = n.parentElement;
+    const css = getComputedStyle(e);
+    if (css.visibility === 'hidden' || css.display === 'none' || !e.getClientRects().length) continue;
+    const px = parseFloat(css.fontSize);
+    if (smallest === null || px < smallest) smallest = px;
+    if (px < %d) small.push(px + 'px: ' + n.nodeValue.trim().slice(0, 40));
+  }
+  return {small: small, smallest: smallest};
+}""" % STANDARD_MIN_TEXT_PX
+
+
+def write_webp_at_size(png_bytes: bytes, dest: pathlib.Path, max_bytes: int = STANDARD_IMAGE_BYTES) -> tuple[int, int]:
+    """Write a PNG as WebP at its full pixel size, lowering quality (never size) until under ``max_bytes``."""
+    import io
+
+    from PIL import Image
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    im = Image.open(io.BytesIO(png_bytes)).convert("RGB")
+    for quality in (88, 80, 72, 64, 56, 48):
+        im.save(dest, format="WEBP", quality=quality, method=6)
+        if dest.stat().st_size <= max_bytes:
+            return im.size
+    raise ClipRefused(f"{dest.name} is over {max_bytes} bytes at full size even at the lowest quality; crop less")
+
+
+def _capture_variant(browser, base_url, state, path, dest, spec, *, selector, prepare, hide, variant, describe=None):
+    ctx = browser.new_context(viewport={"width": spec["viewport"][0], "height": spec["viewport"][1]},
+                              device_scale_factor=STANDARD_DENSITY, storage_state=state, color_scheme="light")
+    try:
+        ctx.add_init_script(HIDE_JS % json.dumps(", ".join([*STANDARD_HIDE, *hide])))
+        page = ctx.new_page()
+        page.set_default_timeout(30000)
+        response = page.goto(base_url + path, wait_until="networkidle")
+        if response is None or response.status >= 400:
+            raise ClipRefused(f"{path} answered {response.status if response else 'nothing'}")
+        page.wait_for_timeout(1000)
+        if prepare:
+            prepare(page, variant)
+        target = page.locator(selector).first
+        target.wait_for(state="visible")
+        text = target.inner_text()
+        for pattern, what in ((FORBIDDEN_IN_FRAME, "an empty, unset or placeholder state"),
+                              (NOT_IN_STANDARD_FRAME, "a date, a person's name or a build id")):
+            found = pattern.search(text)
+            if found:
+                raise ClipRefused(f"{path} ({variant}) shows {what} in frame: {found.group(0).strip()!r}")
+        measured = target.evaluate(_SMALL_TEXT_JS)
+        if measured["small"]:
+            raise ClipRefused(f"{path} ({variant}) has text under {STANDARD_MIN_TEXT_PX}px: {measured['small'][:3]}")
+        if measured["smallest"] is None:
+            raise ClipRefused(f"{path} ({variant}) shows no text to measure")
+        described = describe(variant, target, text) if describe else None
+        box = target.bounding_box()
+        width = min(box["width"], spec["content_max"])
+        png = page.screenshot(full_page=True, clip={"x": box["x"], "y": box["y"], "width": width,
+                                                     "height": box["height"]})
+        px_w, px_h = write_webp_at_size(png, dest)
+        made = {"css_width": px_w // STANDARD_DENSITY, "css_height": px_h // STANDARD_DENSITY,
+                "bytes": dest.stat().st_size, "min_text_px": measured["smallest"]}
+        if described:
+            made["alt"], made["facts"] = described
+        return made
+    finally:
+        ctx.close()
+
+
+def capture_standard_image(browser, base_url, slug, path, out_dir, *, selector="main", prepare=None, hide=(),
+                           state=None, describe=None):
+    """Make the desktop and phone images of one screen to the standard above; return what was measured.
+
+    Writes ``<slug>.webp`` and ``<slug>-mobile.webp`` in ``out_dir`` and records them in ``captures.json``.
+    Signed in as the demonstration person only. ``prepare(page, variant)`` opens the state to show (variant is
+    ``desktop`` or ``phone``); ``hide`` adds selectors for furniture to leave out. Raises ``ClipRefused`` and
+    leaves no file behind when the screen breaks any line of the standard. ``describe(variant, target, text)``
+    returns the description of the picture and the figures it was built from, both kept in ``captures.json``.
+    """
+    out = pathlib.Path(out_dir)
+    base_url = base_url.rstrip("/")
+    state = state or sign_in_state(browser, base_url)
+    scratch = out / f".{slug}.standard"
+    shutil.rmtree(scratch, ignore_errors=True)
+    written = {}
+    try:
+        for variant, spec, name in (("desktop", STANDARD_DESKTOP, f"{slug}.webp"),
+                                    ("phone", STANDARD_PHONE, f"{slug}-mobile.webp")):
+            written[variant] = _capture_variant(browser, base_url, state, path, scratch / name, spec,
+                                                selector=selector, prepare=prepare, hide=hide, variant=variant,
+                                                describe=describe)
+        for name in (f"{slug}.webp", f"{slug}-mobile.webp"):
+            (scratch / name).replace(out / name)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    manifest = out / STANDARD_MANIFEST
+    data = json.loads(manifest.read_text(encoding="utf-8")) if manifest.is_file() else {}
+    data[slug] = {"density": STANDARD_DENSITY, **written}
+    manifest.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return data[slug]
 
 
 # ── shapes for sharing ──────────────────────────────────────────────────────

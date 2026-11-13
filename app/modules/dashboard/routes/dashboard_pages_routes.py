@@ -57,13 +57,14 @@ import logging
 
 from werkzeug.exceptions import HTTPException
 from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from app.decorators import audit_log
 from app.middleware.tenant_decorators import platform_admin_required
 from app.services.application_cost_accessor import set_annual_cost
+from app.services.cost_visibility import costs_visible
 
 from app.services.application_consolidation_service import (
     ApplicationConsolidationService,
@@ -1075,7 +1076,8 @@ def api_rationalization_onboard():
             application_type=data.get("type"),
             lifecycle_status=data.get("lifecycle_status", "planning"),
         )
-        set_annual_cost(app, data.get("annual_cost"))
+        if costs_visible(current_user):
+            set_annual_cost(app, data.get("annual_cost"))
         db.session.add(app)
         db.session.flush()
 

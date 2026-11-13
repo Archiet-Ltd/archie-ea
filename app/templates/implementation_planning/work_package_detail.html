@@ -5,6 +5,7 @@
 {% from 'components/input.html' import input, label %}
 {% from 'components/button.html' import button %}
 {% from 'components/progress.html' import progress %}
+{% from 'components/fact_list.html' import fact_list %}
 {% from 'components/provenance.html' import result_footer %}
 
 {% block title %}{{ work_package.name|default('Work package', true) }}{% endblock %}
@@ -22,54 +23,52 @@
 
     {% call card() %}
         {% call card_content() %}
-        <dl class="grid grid-cols-1 gap-4 sm:grid-cols-4 text-sm">
-            <div>
-                <dt class="text-muted-foreground">Changes capability</dt>
-                <dd class="font-medium" data-testid="wp-capability">
-                    {% if capability %}
-                        <a href="{{ capability_url }}" class="text-primary hover:underline">{{ capability.name }}</a>
-                    {% else %}
-                        <span class="text-muted-foreground">No capability linked</span>
-                    {% endif %}
-                </dd>
+        {% set facts = [
+            {'label': 'Changes capability', 'key': 'capability'},
+            {'label': 'Status', 'key': 'status'},
+            {'label': 'Owner', 'key': 'owner'},
+            {'label': 'Progress', 'key': 'progress'},
+            {'label': 'Dates', 'key': 'dates'}
+        ] %}
+        {% call(p) fact_list(items=facts, testid='wp-facts') %}
+            {% if p.key == 'capability' %}
+            <div class="font-medium" data-testid="wp-capability">
+                {% if capability %}
+                    <a href="{{ capability_url }}" class="text-primary hover:underline">{{ capability.name }}</a>
+                {% else %}
+                    <span class="text-muted-foreground">No capability linked</span>
+                {% endif %}
             </div>
-            <div>
-                <dt class="text-muted-foreground">Status</dt>
-                <dd class="font-medium" data-testid="wp-status">{{ (work_package.status or '—')|replace('_', ' ')|capitalize if work_package.status else '—' }}</dd>
+            {% elif p.key == 'status' %}
+            <div class="font-medium" data-testid="wp-status">{{ (work_package.status or '—')|replace('_', ' ')|capitalize if work_package.status else '—' }}</div>
+            {% elif p.key == 'owner' %}
+            <div class="font-medium" data-testid="wp-owner">
+                {% if owner_name or work_package.assigned_to %}
+                    {{ owner_name or work_package.assigned_to }}
+                {% else %}
+                    <span class="text-muted-foreground">No owner yet</span>
+                    <a href="{{ url_for('implementation_planning.edit_work_package', work_package_id=work_package.id) }}" class="text-primary hover:underline text-xs ml-1" data-testid="wp-assign-owner">Assign owner</a>
+                {% endif %}
             </div>
-            <div>
-                <dt class="text-muted-foreground">Owner</dt>
-                <dd class="font-medium" data-testid="wp-owner">
-                    {% if owner_name or work_package.assigned_to %}
-                        {{ owner_name or work_package.assigned_to }}
-                    {% else %}
-                        <span class="text-muted-foreground">No owner yet</span>
-                        <a href="{{ url_for('implementation_planning.edit_work_package', work_package_id=work_package.id) }}" class="text-primary hover:underline text-xs ml-1" data-testid="wp-assign-owner">Assign owner</a>
-                    {% endif %}
-                </dd>
+            {% elif p.key == 'progress' %}
+            <div class="font-medium" data-testid="wp-progress">
+                {% if progress_value is none %}—{% else %}{{ progress_value }}%{% endif %}
+                {% if progress_value is not none %}
+                <div class="mt-1 w-40 max-w-full ml-auto">
+                    {{ progress(value=progress_value, max=100, label='Progress of ' ~ (work_package.name or 'this work package')) }}
+                </div>
+                {% endif %}
             </div>
-            <div>
-                <dt class="text-muted-foreground">Progress</dt>
-                <dd class="font-medium" data-testid="wp-progress">
-                    {% if progress_value is none %}—{% else %}{{ progress_value }}%{% endif %}
-                    {% if progress_value is not none %}
-                    <div class="mt-1">
-                        {{ progress(value=progress_value, max=100, label='Progress of ' ~ (work_package.name or 'this work package')) }}
-                    </div>
-                    {% endif %}
-                </dd>
+            {% elif p.key == 'dates' %}
+            <div class="font-medium" data-testid="wp-dates">
+                {% if work_package.start_date and work_package.end_date %}
+                    {{ work_package.start_date|format_date }} to {{ work_package.end_date|format_date }}
+                {% else %}
+                    <span class="text-muted-foreground">No dates set</span>
+                {% endif %}
             </div>
-            <div>
-                <dt class="text-muted-foreground">Dates</dt>
-                <dd class="font-medium" data-testid="wp-dates">
-                    {% if work_package.start_date and work_package.end_date %}
-                        {{ work_package.start_date|format_date }} to {{ work_package.end_date|format_date }}
-                    {% else %}
-                        <span class="text-muted-foreground">No dates set</span>
-                    {% endif %}
-                </dd>
-            </div>
-        </dl>
+            {% endif %}
+        {% endcall %}
         {{ result_footer(footer) }}
         {% endcall %}
     {% endcall %}

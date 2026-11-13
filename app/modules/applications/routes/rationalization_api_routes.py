@@ -12,7 +12,10 @@ from app import db
 from app.decorators import audit_log, require_roles
 from app.middleware.tenant_decorators import platform_admin_required
 from app.models.application_portfolio import ApplicationComponent
+from app.core.auth.decorators import require_permission
 from app.services.application_cost_accessor import set_annual_cost
+from app.services.cost_visibility import costs_visible
+from ._helpers import _verify_app_in_org
 from app.services.rate_limiter import rate_limit
 
 from . import unified_applications_bp
@@ -2928,6 +2931,12 @@ def rationalization_decision_dossier(app_id):
                 float(score.total_cost_of_ownership) if score.total_cost_of_ownership else None
             ),
         }
+        # The one cost rule decides here; the panel only prints what it is given.
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        if not costs_visible(current_user):
+            dossier["financial"] = withhold_costs(dossier["financial"], keys=tuple(dossier["financial"]))
+            dossier["costs_withheld_sentence"] = COSTS_WITHHELD
 
         return jsonify({"success": True, **dossier})
     except Exception as exc:
@@ -4439,17 +4448,22 @@ def rationalization_enrich_candidates():
     "/rationalization/api/enrich/<int:app_id>", methods=["POST"]
 )
 @login_required
+@require_permission("edit", "application")
 def rationalization_enrich_app(app_id):
-    """RAT-001: Update enrichment fields for a single application."""
+    """Update enrichment fields for a single application of the signed-in organisation."""
     try:
-        app_obj = ApplicationComponent.query.get(app_id)
+        app_obj = _verify_app_in_org(app_id, g.current_org_id)
         if not app_obj:
             return jsonify({"success": False, "error": "Application not found"}), 404
 
         payload = request.get_json(silent=True) or {}
         changed = []
 
-        if "total_cost_of_ownership" in payload:
+        cost_not_saved = None
+        if "total_cost_of_ownership" in payload and not costs_visible(current_user):
+            cost_not_saved = (
+                "The cost was not saved. Only a person who may set costs can record one.")
+        elif "total_cost_of_ownership" in payload:
             val = payload["total_cost_of_ownership"]
             if val is not None:
                 try:
@@ -4473,6 +4487,8 @@ def rationalization_enrich_app(app_id):
                 changed.append("business_criticality")
 
         if not changed:
+            if cost_not_saved:
+                return jsonify({"success": False, "error": cost_not_saved}), 403
             return jsonify({"success": False, "error": "No valid fields provided"}), 400
 
         db.session.commit()
@@ -4485,11 +4501,14 @@ def rationalization_enrich_app(app_id):
             current_user.email if hasattr(current_user, "email") else "unknown",
         )
 
-        return jsonify({
+        body = {
             "success": True,
             "updated_fields": changed,
             "app_id": app_id,
-        })
+        }
+        if cost_not_saved:
+            body["cost_not_saved"] = cost_not_saved
+        return jsonify(body)
     except Exception as exc:
         db.session.rollback()
         current_app.logger.error("Enrich app %s failed: %s", app_id, exc, exc_info=True)

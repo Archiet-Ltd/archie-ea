@@ -81,6 +81,19 @@ class ApplicationComponentForm(FlaskForm):
         validators=[Optional()],
     )
 
+    application_code = StringField(
+        "Application Code",
+        validators=[Optional(), Length(max=50)],
+        filters=[lambda value: (value or "").strip() or None],
+        render_kw={"placeholder": "e.g., APP-001"},
+    )
+
+    business_purpose = TextAreaField(
+        "Business Purpose",
+        validators=[Optional(), Length(max=5000)],
+        render_kw={"rows": 3, "placeholder": "Describe the business purpose and value of this application"},
+    )
+
     technology_stack = StringField(
         "Technology Stack",
         validators=[Optional(), Length(max=500)],
@@ -270,11 +283,6 @@ class ApplicationComponentForm(FlaskForm):
     average_daily_users = IntegerField(
         "Average Daily Users", validators=[Optional()], render_kw={"placeholder": "500"}
     )
-    geographic_distribution = StringField(
-        "Geographic Distribution",
-        validators=[Optional(), Length(max=500)],
-        render_kw={"placeholder": "UK, EU, US"},
-    )
 
     # Performance & Scalability
     response_time_target_ms = IntegerField(
@@ -375,11 +383,6 @@ class ApplicationComponentForm(FlaskForm):
         validators=[Optional()],
     )
     exposes_api = BooleanField("Exposes API", validators=[Optional()])
-    api_documentation_url = StringField(
-        "API Documentation URL",
-        validators=[Optional(), Length(max=500)],
-        render_kw={"placeholder": "https://api-docs.example.com"},
-    )
 
     # Data Management
     primary_data_store = StringField(
@@ -392,11 +395,6 @@ class ApplicationComponentForm(FlaskForm):
         validators=[Optional(), NumberRange(min=0)],
         render_kw={"placeholder": "50.5"},
     )
-    data_retention_policy = TextAreaField(
-        "Data Retention Policy",
-        validators=[Optional(), Length(max=1000)],
-        render_kw={"rows": 2, "placeholder": "Retain data for 7 years"},
-    )
     data_classification = SelectField(
         "Data Classification",
         choices=[
@@ -408,7 +406,6 @@ class ApplicationComponentForm(FlaskForm):
         ],
         validators=[Optional()],
     )
-    master_data_source = BooleanField("Master Data Source", validators=[Optional()])
 
     # Cost & Licensing
     license_type = SelectField(
@@ -437,143 +434,23 @@ class ApplicationComponentForm(FlaskForm):
         validators=[Optional(), NumberRange(min=0)],
         render_kw={"placeholder": "200000.00"},
     )
-    maintenance_cost_annual = DecimalField(
-        "Maintenance Cost (Annual)",
-        validators=[Optional(), NumberRange(min=0)],
-        render_kw={"placeholder": "50000.00"},
-    )
     total_cost_of_ownership = DecimalField(
         "Total Cost of Ownership",
         validators=[Optional(), NumberRange(min=0)],
         render_kw={"placeholder": "500000.00"},
     )
-    cost_center = StringField(
-        "Cost Center",
-        validators=[Optional(), Length(max=100)],
-        render_kw={"placeholder": "IT - 001"},
-    )
 
     # Lifecycle
     go_live_date = DateField("Go Live Date", validators=[Optional()], format="%Y-%m-%d")
-    last_major_release_date = DateField(
-        "Last Major Release", validators=[Optional()], format="%Y-%m-%d"
-    )
-    next_planned_release_date = DateField(
-        "Next Planned Release", validators=[Optional()], format="%Y-%m-%d"
-    )
     end_of_life_date = DateField("End of Life Date", validators=[Optional()], format="%Y-%m-%d")
-    retirement_date = DateField("Retirement Date", validators=[Optional()], format="%Y-%m-%d")
-    replacement_application = StringField(
-        "Replacement Application",
-        validators=[Optional(), Length(max=500)],
-        render_kw={"placeholder": "Name of replacement app"},
-    )
 
     # DevOps & CI/CD
-    ci_cd_pipeline_url = StringField(
-        "CI/CD Pipeline URL",
-        validators=[Optional(), Length(max=500)],
-        render_kw={"placeholder": "https://jenkins.example.com/job/myapp"},
-    )
-    build_tool = StringField(
-        "Build Tool",
-        validators=[Optional(), Length(max=200)],
-        render_kw={"placeholder": "Jenkins, GitLab CI, GitHub Actions"},
-    )
-    automated_testing_coverage = DecimalField(
-        "Test Coverage %",
-        validators=[Optional(), NumberRange(min=0, max=100)],
-        render_kw={"placeholder": "85.5"},
-    )
-    deployment_frequency = SelectField(
-        "Deployment Frequency",
-        choices=[
-            ("", "-- Select Frequency --"),
-            ("Daily", "Daily"),
-            ("Weekly", "Weekly"),
-            ("Monthly", "Monthly"),
-            ("Quarterly", "Quarterly"),
-        ],
-        validators=[Optional()],
-    )
-    mean_time_to_recovery_hours = IntegerField(
-        "MTTR (Hours)", validators=[Optional()], render_kw={"placeholder": "2"}
-    )
-    change_failure_rate_percent = DecimalField(
-        "Change Failure Rate %",
-        validators=[Optional(), NumberRange(min=0, max=100)],
-        render_kw={"placeholder": "5.0"},
-    )
 
     # Monitoring & Observability
-    monitoring_enabled = BooleanField("Monitoring Enabled", validators=[Optional()])
-    monitoring_tool = StringField(
-        "Monitoring Tool",
-        validators=[Optional(), Length(max=200)],
-        render_kw={"placeholder": "Datadog, New Relic, Prometheus"},
-    )
-    logging_enabled = BooleanField("Logging Enabled", validators=[Optional()])
-    logging_tool = StringField(
-        "Logging Tool",
-        validators=[Optional(), Length(max=200)],
-        render_kw={"placeholder": "Splunk, ELK, CloudWatch"},
-    )
-    tracing_enabled = BooleanField("Tracing Enabled", validators=[Optional()])
-    tracing_tool = StringField(
-        "Tracing Tool",
-        validators=[Optional(), Length(max=200)],
-        render_kw={"placeholder": "Jaeger, Zipkin, X-Ray"},
-    )
-    apm_enabled = BooleanField("APM Enabled", validators=[Optional()])
-    health_check_url = StringField(
-        "Health Check URL",
-        validators=[Optional(), Length(max=500)],
-        render_kw={"placeholder": "https://api.example.com/health"},
-    )
 
     # Quality Metrics
-    code_quality_score = DecimalField(
-        "Code Quality Score",
-        validators=[Optional(), NumberRange(min=0, max=100)],
-        render_kw={"placeholder": "85.0"},
-    )
-    technical_debt_hours = IntegerField(
-        "Technical Debt (Hours)", validators=[Optional()], render_kw={"placeholder": "120"}
-    )
-    bugs_count = IntegerField("Bugs Count", validators=[Optional()], render_kw={"placeholder": "5"})
-    vulnerabilities_count = IntegerField(
-        "Vulnerabilities Count", validators=[Optional()], render_kw={"placeholder": "2"}
-    )
-    code_coverage_percent = DecimalField(
-        "Code Coverage %",
-        validators=[Optional(), NumberRange(min=0, max=100)],
-        render_kw={"placeholder": "80.5"},
-    )
-    last_code_quality_scan = DateField(
-        "Last Code Quality Scan", validators=[Optional()], format="%Y-%m-%d"
-    )
 
     # Documentation
-    documentation_url = StringField(
-        "Documentation URL",
-        validators=[Optional(), Length(max=500)],
-        render_kw={"placeholder": "https://docs.example.com"},
-    )
-    architecture_diagram_url = StringField(
-        "Architecture Diagram URL",
-        validators=[Optional(), Length(max=500)],
-        render_kw={"placeholder": "https://diagrams.example.com/app-arch"},
-    )
-    runbook_url = StringField(
-        "Runbook URL",
-        validators=[Optional(), Length(max=500)],
-        render_kw={"placeholder": "https://runbooks.example.com/myapp"},
-    )
-    user_manual_url = StringField(
-        "User Manual URL",
-        validators=[Optional(), Length(max=500)],
-        render_kw={"placeholder": "https://help.example.com/user-guide"},
-    )
 
     # Metadata
     tags = StringField(

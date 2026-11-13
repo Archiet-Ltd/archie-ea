@@ -62,6 +62,10 @@
       "application",
       "capability"
     ],
+    "get_application_capabilities": [
+      "application",
+      "capability"
+    ],
     "find_technical_capabilities": [
       "capability"
     ],

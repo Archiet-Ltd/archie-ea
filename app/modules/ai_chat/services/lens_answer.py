@@ -90,3 +90,47 @@ def answer_for_lens(lens: Optional[str], message: str) -> Optional[Dict[str, Any
     if data is None:
         return {"lens": lens, "element": element, "data": None}
     return {"lens": lens, "element": element, "data": data}
+
+
+_ASKS_CAPACITY = re.compile(r"capacity|availab|take on more|bandwidth|workload", re.I)
+
+
+def asks_for_capacity(message: Any) -> bool:
+    """True when the question asked whether the owner can take on more, which is the only
+    time the answer says capacity data is not connected."""
+    return isinstance(message, str) and bool(_ASKS_CAPACITY.search(message))
+
+
+def owner_of_element(element: ArchiMateElement) -> Optional[Dict[str, Any]]:
+    """``{names, page_url, page_label}`` for an element that is an application of the active
+    organisation with its own recorded owner, or None. The owner is read from the one owner store
+    (the person records, else the owner text the application carries) and the page is the
+    application's own page, where it is recorded."""
+    from flask import url_for
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.intelligence.services.query_service import _resolve_application_owners_batch
+
+    organization_id = current_org_id()
+    component = ApplicationComponent.query.filter_by(
+        archimate_element_id=element.id, organization_id=organization_id
+    ).first()
+    if component is None or element.organization_id != organization_id:
+        return None
+    owners = _resolve_application_owners_batch(
+        [element.id], organization_id, {str(element.id): {"type": element.type}}
+    ).get(element.id, [])
+    names = []
+    for owner in owners:
+        if owner.get("name") and owner["name"] not in names:
+            names.append(owner["name"])
+    if not names:
+        text = component.application_owner or component.business_owner
+        names = [text] if text else []
+    if not names:
+        return None
+    return {
+        "names": names,
+        "page_url": url_for("unified_applications.application_detail", id=component.id),
+        "page_label": "the %s application page" % component.name,
+    }

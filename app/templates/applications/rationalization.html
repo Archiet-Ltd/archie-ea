@@ -2327,7 +2327,10 @@
               <span class="font-medium tabular-nums"
                     x-text="_formatCurrency(dossierData && dossierData.financial && dossierData.financial.total_cost_of_ownership)"></span>
             </div>
-            <p x-show="dossierData && dossierData.financial &&
+            <p x-show="dossierData && dossierData.financial && dossierData.financial.costs_withheld" x-cloak
+               class="text-xs text-muted-foreground" data-testid="costs-withheld"
+               x-text="dossierData && dossierData.costs_withheld_sentence"></p>
+            <p x-show="dossierData && dossierData.financial && !dossierData.financial.costs_withheld &&
                         dossierData.financial.estimated_annual_savings == null &&
                         dossierData.financial.estimated_investment_needed == null &&
                         dossierData.financial.total_cost_of_ownership == null" x-cloak

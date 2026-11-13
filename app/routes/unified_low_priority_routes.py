@@ -812,22 +812,6 @@ def api_scan_compliance():
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
-@unified_low_priority_bp.route("/api/policy-monitoring/violations", methods=["GET"])
-@login_required
-def api_get_violations():
-    """API endpoint for policy violations"""
-    try:
-        status_filter = request.args.get("status")
-        severity_filter = request.args.get("severity")
-        result = policy_monitoring_service.get_violations(
-            status_filter=status_filter, severity_filter=severity_filter
-        )
-        return jsonify(result)
-    except Exception as e:
-        current_app.logger.error(f"API get violations error: {str(e)}")
-        return jsonify({"success": False, "error": "An internal error occurred"}), 500
-
-
 # REMOVED: Legacy route mappings — they duplicated routes already defined above
 # in this same file (/architecture, /capability-map, /strategic, /consolidation,
 # /policy-monitoring), causing Flask endpoint name conflicts.

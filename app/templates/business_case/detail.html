@@ -57,6 +57,7 @@
     savedDiagramId: {{ canvas_saved_diagram_id | tojson }}
   })' x-cloak>
 
+  {%- set currency = '' | currency_symbol -%}
   {{ page_header(
       title=business_case.title or 'Untitled Business Case',
       description=business_case.description,
@@ -188,7 +189,7 @@
         {% call card.card_action() %}{{ draft_with_ai('problem_statement', 'Reasons') }}{% endcall %}
       {% endcall %}
       {% call card.card_content() %}
-        {{ canvas_box_entries(canvas_zones['problem_statement']) }}
+        {{ canvas_box_entries(canvas_zones['problem_statement'], filled=business_case.problem_statement) }}
         <textarea x-model="fields.problem_statement" @blur="saveField('problem_statement')"
           data-testid="bc-textarea-problem_statement" rows="5" placeholder="What business problem or opportunity is driving this case?"
           class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What business problem or opportunity is driving this case?"></textarea>
@@ -210,7 +211,7 @@
         {% call card.card_action() %}{{ draft_with_ai('options_considered', 'Business options') }}{% endcall %}
       {% endcall %}
       {% call card.card_content() %}
-        {{ canvas_box_entries(canvas_zones['options_considered']) }}
+        {{ canvas_box_entries(canvas_zones['options_considered'], filled=business_case.options_considered) }}
         <textarea x-model="fields.options_considered" @blur="saveField('options_considered')"
           data-testid="bc-textarea-options_considered" rows="5" placeholder="What alternatives were evaluated (including do-nothing)?"
           class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What alternatives were evaluated (including do-nothing)?"></textarea>
@@ -250,7 +251,7 @@
         {% call card.card_action() %}{{ draft_with_ai('expected_benefits', 'Expected benefits') }}{% endcall %}
       {% endcall %}
       {% call card.card_content() %}
-        {{ canvas_box_entries(canvas_zones['expected_benefits']) }}
+        {{ canvas_box_entries(canvas_zones['expected_benefits'], filled=business_case.expected_benefits) }}
         <textarea x-model="fields.expected_benefits" @blur="saveField('expected_benefits')"
           data-testid="bc-textarea-expected_benefits" rows="5" placeholder="Quantified and qualitative benefits expected"
           class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Quantified and qualitative benefits expected"></textarea>
@@ -298,7 +299,7 @@
         {% endcall %}
       {% endcall %}
       {% call card.card_content() %}
-        {{ canvas_box_entries(canvas_zones['costs']) }}
+        {{ canvas_box_entries(canvas_zones['costs'], filled=(business_case.capex is not none or business_case.opex_annual is not none or business_case.tco_3yr is not none)) }}
       {% endcall %}
     {% endcall %}
 
@@ -335,22 +336,22 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label for="bc-capex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Capex</label>
+            <label for="bc-capex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Capex ({{ currency }})</label>
             <input id="bc-capex" type="number" step="0.01" x-model="fields.capex" @blur="saveField('capex')" data-testid="bc-input-capex"
               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
-            <label for="bc-opex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Opex (annual)</label>
+            <label for="bc-opex" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Opex, annual ({{ currency }})</label>
             <input id="bc-opex" type="number" step="0.01" x-model="fields.opex_annual" @blur="saveField('opex_annual')" data-testid="bc-input-opex_annual"
               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
-            <label for="bc-tco" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">3yr TCO</label>
+            <label for="bc-tco" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">3-year total cost ({{ currency }})</label>
             <input id="bc-tco" type="number" step="0.01" x-model="fields.tco_3yr" @blur="saveField('tco_3yr')" data-testid="bc-input-tco_3yr"
               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           <div>
-            <label for="bc-benefit" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Annual Financial Benefit</label>
+            <label for="bc-benefit" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Annual financial benefit ({{ currency }})</label>
             <input id="bc-benefit" type="number" step="0.01" x-model="fields.financial_benefit_annual" @blur="saveField('financial_benefit_annual')" data-testid="bc-input-financial_benefit_annual"
               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
@@ -371,7 +372,7 @@
                (business_case.npv) renders on load; the Alpine getter keeps it live
                as those three fields are edited, before the next save/reload. #}
             <label for="bc-npv" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-              NPV <span class="normal-case font-normal">(3yr, 10% discount)</span>
+              NPV ({{ currency }}) <span class="normal-case font-normal">(3 years, 10% discount)</span>
             </label>
             <div id="bc-npv" data-testid="bc-display-npv"
                  class="flex h-9 w-full items-center rounded-md border border-input bg-muted/30 px-3 text-sm">
@@ -407,7 +408,7 @@
         {% call card.card_action() %}{{ draft_with_ai('key_risks', 'Major risks') }}{% endcall %}
       {% endcall %}
       {% call card.card_content() %}
-        {{ canvas_box_entries(canvas_zones['key_risks']) }}
+        {{ canvas_box_entries(canvas_zones['key_risks'], filled=business_case.key_risks) }}
         <textarea x-model="fields.key_risks" @blur="saveField('key_risks')"
           data-testid="bc-textarea-key_risks" rows="5" placeholder="Delivery, adoption, financial and technical risks"
           class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Delivery, adoption, financial and technical risks"></textarea>

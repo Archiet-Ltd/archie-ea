@@ -421,6 +421,7 @@
             </td>
             <td class="px-2 align-middle">
               <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="block max-w-[220px] truncate text-sm font-medium text-foreground hover:underline" title="{{ app.name | e }}{% if app.description %} — {{ app.description[:120] | e }}{% endif %}">{{ app.name }}</a>
+              {% if imported_gaps.get(app.id) %}{% set gaps = imported_gaps.get(app.id) %}{% set compact = true %}{% set sfx = '' %}{% set cap_onclick = "openMappingForApp(" ~ app.id ~ ", " ~ (app.name | tojson | forceescape) ~ ", 'capability')" %}{% include 'applications/_imported_needs.html' with context %}{% endif %}
             </td>
             <td class="px-2 align-middle">
               {% if app.id in repository_ids %}<span class="text-sm text-muted-foreground" data-testid="app-type-{{ app.id }}">Repository</span>
@@ -479,6 +480,7 @@
                           attrs_dict={'aria-label': 'Select ' ~ app.name, ':checked': 'selectedIds.has(' ~ app.id ~ ')', '@change': 'toggleRow(' ~ app.id ~ ', $event.target.checked)'}) }}
               <div class="min-w-0">
                 <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="block truncate text-base font-semibold text-foreground hover:underline">{{ app.name }}</a>
+                {% if imported_gaps.get(app.id) %}{% set gaps = imported_gaps.get(app.id) %}{% set compact = true %}{% set sfx = '-mobile' %}{% set cap_onclick = "openMappingForApp(" ~ app.id ~ ", " ~ (app.name | tojson | forceescape) ~ ", 'capability')" %}{% include 'applications/_imported_needs.html' with context %}{% endif %}
                 {% if app.id in repository_ids %}<p class="mt-1 text-xs text-muted-foreground" data-testid="app-type-mobile-{{ app.id }}">Repository</p>{% endif %}
                 {% if app.description %}<p class="mt-1 text-xs text-muted-foreground">{{ app.description[:100] }}{% if app.description | length > 100 %}…{% endif %}</p>{% endif %}
               </div>
