@@ -2315,6 +2315,15 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     technology_cost_shares = technology_cost.shares_for_application(
         app_obj.organization_id, app_obj.id)
 
+    # What an application read from a connector still needs; a repository nobody has promoted is not one.
+    from app.connectors.github import unpromoted_import_ids
+    from app.connectors.github_gaps import application_gaps
+
+    imported_gaps = application_gaps(
+        app_obj.organization_id, [app_obj],
+        skip_ids=unpromoted_import_ids(app_obj.organization_id, [app_obj.id]),
+    ).get(app_obj.id)
+
     # The one cost rule decides here; the page only prints what it is given.
     from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
 
@@ -2326,6 +2335,9 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
 
     technology_linked_count = 0
     completeness_notes = {}
+    from app.services.application_fact_sheet import completeness_steps, detail_tab
+
+    completeness_step_rows = completeness_steps(app_obj, app_obj.completeness_gaps, tab=detail_tab(request.args.get("tab")))
     try:
         from app.services.application_fact_sheet import linked_notes
         from app.services.application_model_links import linked_technology
@@ -2339,6 +2351,7 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
+        imported_gaps=imported_gaps,
         form_values=form_values or {},
         form_errors=form_errors or {},
         status_options=status_options,
@@ -2377,6 +2390,7 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         vendors_tab_count=vendors_tab_count,
         technology_linked_count=technology_linked_count,
         completeness_notes=completeness_notes,
+        completeness_steps=completeness_step_rows,
         vendor_form_config=vendor_form_config,
         metric_cards=metric_cards,
         dashboard_config=dashboard_config,

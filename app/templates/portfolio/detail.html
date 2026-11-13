@@ -130,6 +130,12 @@
   </div>
 
   {# ── Money ─────────────────────────────────────────────────────────────── #}
+  {% if costs_withheld %}
+  <div class="rounded-lg border border-border bg-card p-6" data-testid="portfolio-costs-withheld">
+    <p class="text-sm font-medium text-muted-foreground">Budget, spend, forecast and variance</p>
+    <p class="text-sm mt-3 text-muted-foreground">{{ costs_withheld_text }}</p>
+  </div>
+  {% else %}
   <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
     <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Approved budget</p>
@@ -163,12 +169,14 @@
       </p>
     </div>
   </div>
+  {% endif %}
 
   {# ── Benefits ──────────────────────────────────────────────────────────── #}
   <div class="rounded-lg border border-border bg-card">
     <div class="flex items-center justify-between border-b px-6 py-4">
       <h2 class="text-xl font-semibold">Benefits</h2>
       <div class="text-sm text-muted-foreground">
+        {% if not costs_withheld %}
         Financial target
         <span class="font-semibold text-foreground">
           {% if benefit_target is not none %}{{ '{:,.0f}'.format(benefit_target) }}{% else %}&mdash;{% endif %}
@@ -177,6 +185,7 @@
         <span class="font-semibold text-foreground">
           {% if benefit_actual is not none %}{{ '{:,.0f}'.format(benefit_actual) }}{% else %}&mdash;{% endif %}
         </span>
+        {% endif %}
         {% if non_financial_count %}
         <span class="ml-2">+ {{ non_financial_count }} non-financial</span>
         {% endif %}
@@ -217,7 +226,7 @@
                 </span>
               {% else %}<span class="text-muted-foreground" title="Needs a baseline, a target and a measured actual">&mdash;</span>{% endif %}
             </td>
-            <td class="px-4 py-3">{{ b.owner.email if b.owner else '—' }}</td>
+            <td class="px-4 py-3">{{ b.owner or '—' }}</td>
             <td class="px-4 py-3">{{ b.status|replace('_',' ')|title }}</td>
             {# The measurement form for this benefit is on the same page; the row
                is the place a user looks for the way into it. #}

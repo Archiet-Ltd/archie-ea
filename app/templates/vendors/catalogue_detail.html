@@ -160,7 +160,7 @@
             {{ button(text='Link to ' ~ product.product_name, type='submit', variant='default', class='w-full', testid='catalogue-link-submit') }}
           </form>
           {% else %}
-            <p class="text-sm text-muted-foreground">None of your applications or contracts names a vendor product yet, so there is nothing to link. Vendor products appear here once one does.</p>
+            <p class="text-sm text-muted-foreground">No application or contract of yours names a vendor product yet, so there is nothing to link. Vendor products appear here once one does.</p>
             {{ button(text='Go to your vendors', href=url_for('unified_applications.vendors'), variant='outline', class='w-full') }}
           {% endif %}
         {% endcall %}

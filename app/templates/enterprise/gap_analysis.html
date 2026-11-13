@@ -130,10 +130,13 @@
 {% if gaps %}
 {{ stat_cards([
     {'label': 'Recorded gaps', 'value': recorded, 'icon': 'target', 'sentence': 'Gaps recorded between the current and target architecture', 'testid': 'gap-stat-recorded'},
-    {'label': 'Critical', 'value': critical, 'icon': 'triangle-alert', 'sentence': ('Rated critical on the gap itself' if critical else ('None of the gaps shown is rated critical' if severity_filter else 'No gap is rated critical')), 'testid': 'gap-stat-critical'},
+    {'label': 'Critical', 'value': critical, 'icon': 'triangle-alert', 'sentence': ('Rated critical on the gap itself' if critical else ('No gap shown is rated critical' if severity_filter else 'No gap is rated critical')), 'testid': 'gap-stat-critical'},
     {'label': 'In progress', 'value': in_progress, 'icon': 'loader', 'sentence': ('Being closed by work under way' if in_progress else 'No gap is being worked on yet'), 'testid': 'gap-stat-in-progress'},
     {'label': 'Resolved', 'value': resolved, 'icon': 'circle-check', 'sentence': ('Closed by delivered work' if resolved else 'No gap has been closed yet'), 'testid': 'gap-stat-resolved'},
 ]) }}
+{%- if not severity_filter %}
+<p class="text-sm text-muted-foreground" data-testid="gap-unclosed-count-line"><span class="font-semibold tabular-nums text-foreground" data-testid="gap-unclosed-count">{{ unclosed_gap_count }}</span> unclosed: {% if unclosed_gap_count %}{{ 'this gap has' if unclosed_gap_count == 1 else 'these gaps have' }} no work package yet{% else %}every gap has a work package{% endif %}. The change board counts the same gaps.</p>
+{%- endif %}
 
 {%- set columns = [{'label': 'Gap', 'sortable': true}] -%}
 {%- if show.type %}{% set _ = columns.append({'label': 'Type', 'sortable': true, 'class': 'hidden lg:table-cell'}) %}{% endif -%}
