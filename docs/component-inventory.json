@@ -20005,8 +20005,27 @@
   {
    "id": "app/templates/applications/_linked_requirements.html::button::0",
    "kind": "button",
+   "label": "Save changes",
+   "line": 42,
+   "mutating": true,
+   "rendered_on": [
+    "/dashboard/admin/custom-fields",
+    "/dashboard/applications/<int:application_id>/gap-analysis",
+    "/dashboard/applications/<int:id>/roadmap",
+    "/dashboard/dashboard"
+   ],
+   "rendered_on_count": 4,
+   "target": {},
+   "template": "app/templates/applications/_linked_requirements.html",
+   "testid": null,
+   "type": "noop",
+   "via_macro": "basecoat/index.html:button"
+  },
+  {
+   "id": "app/templates/applications/_linked_requirements.html::button::1",
+   "kind": "button",
    "label": "Link framework requirement",
-   "line": 39,
+   "line": 45,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -20103,6 +20122,25 @@
   },
   {
    "id": "app/templates/applications/_linked_requirements.html::testid::3",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/dashboard/admin/custom-fields",
+    "/dashboard/applications/<int:application_id>/gap-analysis",
+    "/dashboard/applications/<int:id>/roadmap",
+    "/dashboard/dashboard"
+   ],
+   "rendered_on_count": 4,
+   "target": {},
+   "template": "app/templates/applications/_linked_requirements.html",
+   "testid": "link-requirement-blocked",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/_linked_requirements.html::testid::4",
    "kind": "testid",
    "label": "p",
    "line": null,
@@ -20404,6 +20442,27 @@
   {
    "id": "app/templates/applications/dashboard.html::link::2",
    "kind": "link",
+   "label": "card_data.value",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/dashboard/admin/custom-fields",
+    "/dashboard/applications/<int:application_id>/gap-analysis",
+    "/dashboard/applications/<int:id>/roadmap",
+    "/dashboard/dashboard"
+   ],
+   "rendered_on_count": 4,
+   "target": {
+    "href": "card_data.href"
+   },
+   "template": "app/templates/applications/dashboard.html",
+   "testid": "metric-link",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/dashboard.html::link::3",
+   "kind": "link",
    "label": "View active portfolio only \u2192",
    "line": null,
    "mutating": false,
@@ -20424,7 +20483,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::3",
+   "id": "app/templates/applications/dashboard.html::link::4",
    "kind": "link",
    "label": "Traceability",
    "line": null,
@@ -20446,7 +20505,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::4",
+   "id": "app/templates/applications/dashboard.html::link::5",
    "kind": "link",
    "label": "{{ sol.adm_phase or 'A' }} {{ sol.name }} {{ sol.governance_status or 'Draft' }} \u00b7 {{ sol.solution_t",
    "line": null,
@@ -20468,7 +20527,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::5",
+   "id": "app/templates/applications/dashboard.html::link::6",
    "kind": "link",
    "label": "Generate ArchiMate with AI",
    "line": null,
@@ -20490,7 +20549,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::6",
+   "id": "app/templates/applications/dashboard.html::link::7",
    "kind": "link",
    "label": "{{ r.name }} {{ r.type }} \u00b7 {{ r.rel_type | replace('Relationship', '') }}",
    "line": null,
@@ -20512,7 +20571,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::7",
+   "id": "app/templates/applications/dashboard.html::link::8",
    "kind": "link",
    "label": "Generate ArchiMate with AI",
    "line": null,
@@ -20534,7 +20593,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::8",
+   "id": "app/templates/applications/dashboard.html::link::9",
    "kind": "link",
    "label": "row.name",
    "line": null,
@@ -20555,7 +20614,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::9",
+   "id": "app/templates/applications/dashboard.html::link::10",
    "kind": "link",
    "label": "Open vendor",
    "line": null,
@@ -20577,7 +20636,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::10",
+   "id": "app/templates/applications/dashboard.html::link::11",
    "kind": "link",
    "label": "What it connects to",
    "line": null,
@@ -20599,7 +20658,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::11",
+   "id": "app/templates/applications/dashboard.html::link::12",
    "kind": "link",
    "label": "Edit Technology Details",
    "line": null,
@@ -20621,7 +20680,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::12",
+   "id": "app/templates/applications/dashboard.html::link::13",
    "kind": "link",
    "label": "app.version_control_url",
    "line": null,
@@ -20642,7 +20701,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::13",
+   "id": "app/templates/applications/dashboard.html::link::14",
    "kind": "link",
    "label": "Manage in Roadmap Workspace",
    "line": null,
@@ -20664,7 +20723,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::14",
+   "id": "app/templates/applications/dashboard.html::link::15",
    "kind": "link",
    "label": "Open Full Roadmap Workspace",
    "line": null,
@@ -20686,7 +20745,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::15",
+   "id": "app/templates/applications/dashboard.html::link::16",
    "kind": "link",
    "label": "Open Roadmap Workspace",
    "line": null,
@@ -20708,7 +20767,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::16",
+   "id": "app/templates/applications/dashboard.html::link::17",
    "kind": "link",
    "label": "{{ r.name }} {{ r.type }} \u00b7 {{ r.rel_type | replace('Relationship', '') }}",
    "line": null,
@@ -20730,7 +20789,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::17",
+   "id": "app/templates/applications/dashboard.html::link::18",
    "kind": "link",
    "label": "Edit Compliance Settings",
    "line": null,
@@ -20752,7 +20811,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::18",
+   "id": "app/templates/applications/dashboard.html::link::19",
    "kind": "link",
    "label": "Edit Health & Quality Metrics",
    "line": null,
@@ -20774,7 +20833,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::19",
+   "id": "app/templates/applications/dashboard.html::link::20",
    "kind": "link",
    "label": "health_metrics.health_check_url",
    "line": null,
@@ -20795,7 +20854,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::20",
+   "id": "app/templates/applications/dashboard.html::link::21",
    "kind": "link",
    "label": "Edit Cost Details",
    "line": null,
@@ -20817,7 +20876,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::21",
+   "id": "app/templates/applications/dashboard.html::link::22",
    "kind": "link",
    "label": "Download",
    "line": null,
@@ -20831,28 +20890,6 @@
    "rendered_on_count": 4,
    "target": {
     "href": "doc.file_url or doc.download_url"
-   },
-   "template": "app/templates/applications/dashboard.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/applications/dashboard.html::link::22",
-   "kind": "link",
-   "label": "{{ r.name }} {{ r.type }} \u00b7 {{ r.rel_type | replace('Relationship', '') }}",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/dashboard/admin/custom-fields",
-    "/dashboard/applications/<int:application_id>/gap-analysis",
-    "/dashboard/applications/<int:id>/roadmap",
-    "/dashboard/dashboard"
-   ],
-   "rendered_on_count": 4,
-   "target": {
-    "endpoint": "architect_ui.element_traceability",
-    "href": "url_for('architect_ui.element_traceability', element_id=r.id)"
    },
    "template": "app/templates/applications/dashboard.html",
    "testid": null,
@@ -20884,6 +20921,28 @@
   {
    "id": "app/templates/applications/dashboard.html::link::24",
    "kind": "link",
+   "label": "{{ r.name }} {{ r.type }} \u00b7 {{ r.rel_type | replace('Relationship', '') }}",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/dashboard/admin/custom-fields",
+    "/dashboard/applications/<int:application_id>/gap-analysis",
+    "/dashboard/applications/<int:id>/roadmap",
+    "/dashboard/dashboard"
+   ],
+   "rendered_on_count": 4,
+   "target": {
+    "endpoint": "architect_ui.element_traceability",
+    "href": "url_for('architect_ui.element_traceability', element_id=r.id)"
+   },
+   "template": "app/templates/applications/dashboard.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/dashboard.html::link::25",
+   "kind": "link",
    "label": "Run Workflow",
    "line": null,
    "mutating": false,
@@ -20903,7 +20962,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::25",
+   "id": "app/templates/applications/dashboard.html::link::26",
    "kind": "link",
    "label": "Go to EA Workflows \u2192",
    "line": null,
@@ -24466,6 +24525,22 @@
    "target": {},
    "template": "app/templates/applications/rationalization.html",
    "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/rationalization.html::testid::0",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/dashboard/rationalization"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/applications/rationalization.html",
+   "testid": "costs-withheld",
    "type": null,
    "via_macro": null
   },
@@ -28416,7 +28491,7 @@
    "id": "app/templates/archimate/composer.html::button::51",
    "kind": "button",
    "label": "",
-   "line": 872,
+   "line": 873,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28432,7 +28507,7 @@
    "id": "app/templates/archimate/composer.html::button::52",
    "kind": "button",
    "label": "",
-   "line": 880,
+   "line": 878,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28448,7 +28523,7 @@
    "id": "app/templates/archimate/composer.html::button::53",
    "kind": "button",
    "label": "",
-   "line": 889,
+   "line": 886,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28464,7 +28539,7 @@
    "id": "app/templates/archimate/composer.html::button::54",
    "kind": "button",
    "label": "",
-   "line": 890,
+   "line": 895,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28480,7 +28555,7 @@
    "id": "app/templates/archimate/composer.html::button::55",
    "kind": "button",
    "label": "",
-   "line": 902,
+   "line": 896,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28496,7 +28571,7 @@
    "id": "app/templates/archimate/composer.html::button::56",
    "kind": "button",
    "label": "",
-   "line": 1172,
+   "line": 908,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28512,7 +28587,7 @@
    "id": "app/templates/archimate/composer.html::button::57",
    "kind": "button",
    "label": "",
-   "line": 1183,
+   "line": 1178,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28528,7 +28603,7 @@
    "id": "app/templates/archimate/composer.html::button::58",
    "kind": "button",
    "label": "",
-   "line": 1191,
+   "line": 1189,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28544,7 +28619,7 @@
    "id": "app/templates/archimate/composer.html::button::59",
    "kind": "button",
    "label": "",
-   "line": 1204,
+   "line": 1197,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28560,7 +28635,7 @@
    "id": "app/templates/archimate/composer.html::button::60",
    "kind": "button",
    "label": "",
-   "line": 1212,
+   "line": 1210,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28576,7 +28651,7 @@
    "id": "app/templates/archimate/composer.html::button::61",
    "kind": "button",
    "label": "",
-   "line": 1215,
+   "line": 1218,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28592,7 +28667,7 @@
    "id": "app/templates/archimate/composer.html::button::62",
    "kind": "button",
    "label": "",
-   "line": 1339,
+   "line": 1221,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28608,7 +28683,7 @@
    "id": "app/templates/archimate/composer.html::button::63",
    "kind": "button",
    "label": "",
-   "line": 1340,
+   "line": 1345,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28624,7 +28699,7 @@
    "id": "app/templates/archimate/composer.html::button::64",
    "kind": "button",
    "label": "",
-   "line": 1341,
+   "line": 1346,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28640,7 +28715,7 @@
    "id": "app/templates/archimate/composer.html::button::65",
    "kind": "button",
    "label": "",
-   "line": 1348,
+   "line": 1347,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28656,7 +28731,7 @@
    "id": "app/templates/archimate/composer.html::button::66",
    "kind": "button",
    "label": "",
-   "line": 1349,
+   "line": 1354,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28688,7 +28763,7 @@
    "id": "app/templates/archimate/composer.html::button::68",
    "kind": "button",
    "label": "",
-   "line": 1358,
+   "line": 1361,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28704,7 +28779,7 @@
    "id": "app/templates/archimate/composer.html::button::69",
    "kind": "button",
    "label": "",
-   "line": 1361,
+   "line": 1364,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28720,7 +28795,7 @@
    "id": "app/templates/archimate/composer.html::button::70",
    "kind": "button",
    "label": "",
-   "line": 1382,
+   "line": 1367,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28736,7 +28811,7 @@
    "id": "app/templates/archimate/composer.html::button::71",
    "kind": "button",
    "label": "",
-   "line": 1383,
+   "line": 1388,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28752,7 +28827,7 @@
    "id": "app/templates/archimate/composer.html::button::72",
    "kind": "button",
    "label": "",
-   "line": 1436,
+   "line": 1389,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28768,7 +28843,7 @@
    "id": "app/templates/archimate/composer.html::button::73",
    "kind": "button",
    "label": "",
-   "line": 1444,
+   "line": 1442,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28784,7 +28859,7 @@
    "id": "app/templates/archimate/composer.html::button::74",
    "kind": "button",
    "label": "",
-   "line": 1452,
+   "line": 1450,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28800,7 +28875,7 @@
    "id": "app/templates/archimate/composer.html::button::75",
    "kind": "button",
    "label": "",
-   "line": 1453,
+   "line": 1458,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28816,7 +28891,7 @@
    "id": "app/templates/archimate/composer.html::button::76",
    "kind": "button",
    "label": "",
-   "line": 1474,
+   "line": 1459,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28832,7 +28907,23 @@
    "id": "app/templates/archimate/composer.html::button::77",
    "kind": "button",
    "label": "",
-   "line": 1477,
+   "line": 1480,
+   "mutating": false,
+   "rendered_on": [
+    "/archimate/composer"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/archimate/composer.html",
+   "testid": null,
+   "type": "noop",
+   "via_macro": "components/button.html:button"
+  },
+  {
+   "id": "app/templates/archimate/composer.html::button::78",
+   "kind": "button",
+   "label": "",
+   "line": 1483,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28864,7 +28955,7 @@
    "id": "app/templates/archimate/composer.html::modal::1",
    "kind": "modal",
    "label": "Edit Annotation",
-   "line": 1379,
+   "line": 1385,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28882,7 +28973,7 @@
    "id": "app/templates/archimate/composer.html::modal::2",
    "kind": "modal",
    "label": "Keyboard Shortcuts",
-   "line": 1387,
+   "line": 1393,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28900,7 +28991,7 @@
    "id": "app/templates/archimate/composer.html::modal::3",
    "kind": "modal",
    "label": "Link to Sub-Diagram",
-   "line": 1428,
+   "line": 1434,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28918,7 +29009,7 @@
    "id": "app/templates/archimate/composer.html::modal::4",
    "kind": "modal",
    "label": "Save Style Template",
-   "line": 1448,
+   "line": 1454,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28936,7 +29027,7 @@
    "id": "app/templates/archimate/composer.html::modal::5",
    "kind": "modal",
    "label": "Find and Replace",
-   "line": 1457,
+   "line": 1463,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -28970,7 +29061,7 @@
    "id": "app/templates/archimate/composer.html::table::1",
    "kind": "table",
    "label": "",
-   "line": 874,
+   "line": 880,
    "mutating": false,
    "rendered_on": [
     "/archimate/composer"
@@ -29027,6 +29118,22 @@
    "target": {},
    "template": "app/templates/archimate/composer.html",
    "testid": "composer-empty-workspace",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/archimate/composer.html::testid::3",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/archimate/composer"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/archimate/composer.html",
+   "testid": "composer-focus-counts",
    "type": null,
    "via_macro": null
   },
@@ -39482,7 +39589,7 @@
    "id": "app/templates/architecture/impact_graph.html::button::3",
    "kind": "button",
    "label": "Connect GitHub",
-   "line": 30,
+   "line": 31,
    "mutating": false,
    "rendered_on": [
     "/archimate/elements/<int:element_id>/impact",
@@ -39502,7 +39609,7 @@
    "id": "app/templates/architecture/impact_graph.html::button::4",
    "kind": "button",
    "label": "Connect Jira",
-   "line": 33,
+   "line": 34,
    "mutating": false,
    "rendered_on": [
     "/archimate/elements/<int:element_id>/impact",
@@ -39522,7 +39629,7 @@
    "id": "app/templates/architecture/impact_graph.html::button::5",
    "kind": "button",
    "label": "Add an element in the Composer",
-   "line": 35,
+   "line": 36,
    "mutating": false,
    "rendered_on": [
     "/archimate/elements/<int:element_id>/impact",
@@ -39541,7 +39648,7 @@
    "id": "app/templates/architecture/impact_graph.html::button::6",
    "kind": "button",
    "label": "All layers",
-   "line": 44,
+   "line": 46,
    "mutating": false,
    "rendered_on": [
     "/archimate/elements/<int:element_id>/impact",
@@ -39561,7 +39668,7 @@
    "id": "app/templates/architecture/impact_graph.html::button::7",
    "kind": "button",
    "label": "<expr:Concat>",
-   "line": 46,
+   "line": 48,
    "mutating": false,
    "rendered_on": [
     "/archimate/elements/<int:element_id>/impact",
@@ -39581,7 +39688,7 @@
    "id": "app/templates/architecture/impact_graph.html::button::8",
    "kind": "button",
    "label": "View as list",
-   "line": 63,
+   "line": 65,
    "mutating": false,
    "rendered_on": [
     "/archimate/elements/<int:element_id>/impact",
@@ -39599,8 +39706,59 @@
   {
    "id": "app/templates/architecture/impact_graph.html::button::9",
    "kind": "button",
+   "label": "+",
+   "line": 94,
+   "mutating": false,
+   "rendered_on": [
+    "/archimate/elements/<int:element_id>/impact",
+    "/archimate/model-map"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/architecture/impact_graph.html",
+   "testid": null,
+   "type": "noop",
+   "via_macro": "components/button.html:button"
+  },
+  {
+   "id": "app/templates/architecture/impact_graph.html::button::10",
+   "kind": "button",
+   "label": "\u2212",
+   "line": 95,
+   "mutating": false,
+   "rendered_on": [
+    "/archimate/elements/<int:element_id>/impact",
+    "/archimate/model-map"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/architecture/impact_graph.html",
+   "testid": null,
+   "type": "noop",
+   "via_macro": "components/button.html:button"
+  },
+  {
+   "id": "app/templates/architecture/impact_graph.html::button::11",
+   "kind": "button",
+   "label": "Fit",
+   "line": 96,
+   "mutating": false,
+   "rendered_on": [
+    "/archimate/elements/<int:element_id>/impact",
+    "/archimate/model-map"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/architecture/impact_graph.html",
+   "testid": null,
+   "type": "noop",
+   "via_macro": "components/button.html:button"
+  },
+  {
+   "id": "app/templates/architecture/impact_graph.html::button::12",
+   "kind": "button",
    "label": "Show legend",
-   "line": 98,
+   "line": 112,
    "mutating": false,
    "rendered_on": [
     "/archimate/elements/<int:element_id>/impact",
@@ -39650,6 +39808,40 @@
   {
    "id": "app/templates/architecture/impact_graph.html::testid::2",
    "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/archimate/elements/<int:element_id>/impact",
+    "/archimate/model-map"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/architecture/impact_graph.html",
+   "testid": "model-map-find",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/architecture/impact_graph.html::testid::3",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/archimate/elements/<int:element_id>/impact",
+    "/archimate/model-map"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/architecture/impact_graph.html",
+   "testid": "model-map-zoom",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/architecture/impact_graph.html::testid::4",
+   "kind": "testid",
    "label": "ul",
    "line": null,
    "mutating": false,
@@ -39665,7 +39857,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/architecture/impact_graph.html::testid::3",
+   "id": "app/templates/architecture/impact_graph.html::testid::5",
    "kind": "testid",
    "label": "li",
    "line": null,
@@ -39682,7 +39874,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/architecture/impact_graph.html::testid::4",
+   "id": "app/templates/architecture/impact_graph.html::testid::6",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -39699,7 +39891,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/architecture/impact_graph.html::testid::5",
+   "id": "app/templates/architecture/impact_graph.html::testid::7",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -39716,7 +39908,24 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/architecture/impact_graph.html::testid::6",
+   "id": "app/templates/architecture/impact_graph.html::testid::8",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/archimate/elements/<int:element_id>/impact",
+    "/archimate/model-map"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/architecture/impact_graph.html",
+   "testid": "model-map-unconnected",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/architecture/impact_graph.html::testid::9",
    "kind": "testid",
    "label": "section",
    "line": null,
@@ -65059,7 +65268,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "target": {
     "href": "entry.href"
    },
@@ -65075,7 +65284,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "target": {
     "href": "lens.href"
    },
@@ -65091,7 +65300,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "target": {
     "href": "lens.href"
    },
@@ -65107,7 +65316,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "target": {
     "href": "item.href"
    },
@@ -65123,7 +65332,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "target": {
     "href": "action_href"
    },
@@ -65139,7 +65348,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "target": {
     "button_type": "button"
    },
@@ -65155,7 +65364,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "target": {},
    "template": "app/templates/components/provenance.html",
    "testid": "result-footer",
@@ -65169,7 +65378,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "target": {},
    "template": "app/templates/components/provenance.html",
    "testid": "result-footer-evidence",
@@ -65183,7 +65392,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "target": {},
    "template": "app/templates/components/provenance.html",
    "testid": "result-footer-source",
@@ -65197,7 +65406,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "target": {},
    "template": "app/templates/components/provenance.html",
    "testid": "result-footer-confidence",
@@ -65211,7 +65420,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "target": {},
    "template": "app/templates/components/provenance.html",
    "testid": "result-footer-date",
@@ -109224,16 +109433,16 @@
   }
  ],
  "counts": {
-  "controls": 6155,
+  "controls": 6167,
   "controls_by_kind": {
-   "button": 3114,
+   "button": 3119,
    "form": 300,
-   "link": 1004,
+   "link": 1005,
    "modal": 204,
    "table": 362,
-   "testid": 1171
+   "testid": 1177
   },
-  "controls_mutating": 694,
+  "controls_mutating": 695,
   "pages": 448,
   "pages_without_parameters": 320,
   "routes": 3918,
@@ -137243,7 +137452,7 @@
    ],
    "handler": "api_composer_element_metrics",
    "handler_file": "app/modules/architecture/routes/archimate_routes.py",
-   "handler_line": 7052,
+   "handler_line": 7053,
    "has_parameters": false,
    "id": "archimate.api_composer_element_metrics /archimate/api/composer/element-metrics",
    "login_required": true,
@@ -137795,7 +138004,7 @@
    ],
    "handler": "api_element_dependent_solutions",
    "handler_file": "app/modules/architecture/routes/archimate_routes.py",
-   "handler_line": 7297,
+   "handler_line": 7298,
    "has_parameters": true,
    "id": "archimate.api_element_dependent_solutions /archimate/api/element/<int:element_id>/dependent-solutions",
    "login_required": true,
@@ -137839,7 +138048,7 @@
    ],
    "handler": "api_element_impact_graph",
    "handler_file": "app/modules/architecture/routes/archimate_routes.py",
-   "handler_line": 7457,
+   "handler_line": 7458,
    "has_parameters": true,
    "id": "archimate.api_element_impact_graph /archimate/api/element/<int:element_id>/impact-graph",
    "login_required": true,
@@ -138126,7 +138335,7 @@
    ],
    "handler": "api_import_oef",
    "handler_file": "app/modules/architecture/routes/archimate_routes.py",
-   "handler_line": 7190,
+   "handler_line": 7191,
    "has_parameters": false,
    "id": "archimate.api_import_oef /archimate/api/import/oef",
    "login_required": true,
@@ -138566,7 +138775,7 @@
    ],
    "handler": "api_model_map",
    "handler_file": "app/modules/architecture/routes/archimate_routes.py",
-   "handler_line": 7423,
+   "handler_line": 7424,
    "has_parameters": false,
    "id": "archimate.api_model_map /archimate/api/model-map",
    "login_required": true,
@@ -138654,7 +138863,7 @@
    ],
    "handler": "api_shared_elements",
    "handler_file": "app/modules/architecture/routes/archimate_routes.py",
-   "handler_line": 7344,
+   "handler_line": 7345,
    "has_parameters": false,
    "id": "archimate.api_shared_elements /archimate/api/shared-elements",
    "login_required": true,
@@ -139048,6 +139257,7 @@
   {
    "blueprint": "archimate",
    "closure": [
+    "app/modules/intelligence/templates/intelligence/_entity_picker.html",
     "app/templates/architecture/impact_graph.html",
     "app/templates/basecoat/accordion.html",
     "app/templates/basecoat/alert-dialog.html",
@@ -139129,6 +139339,7 @@
     "app/templates/components/page_guide_drawer.html",
     "app/templates/components/page_header.html",
     "app/templates/components/popover.html",
+    "app/templates/components/provenance.html",
     "app/templates/components/see_how.html",
     "app/templates/components/switch.html",
     "app/templates/components/toast-container.html",
@@ -139144,7 +139355,7 @@
    ],
    "handler": "element_impact_graph_page",
    "handler_file": "app/modules/architecture/routes/archimate_routes.py",
-   "handler_line": 7433,
+   "handler_line": 7434,
    "has_parameters": true,
    "id": "archimate.element_impact_graph_page /archimate/elements/<int:element_id>/impact",
    "login_required": true,
@@ -139256,7 +139467,7 @@
    ],
    "handler": "get_impact_analysis",
    "handler_file": "app/modules/architecture/routes/archimate_routes.py",
-   "handler_line": 7470,
+   "handler_line": 7471,
    "has_parameters": true,
    "id": "archimate.get_impact_analysis /archimate/api/impact-analysis/<int:element_id>",
    "login_required": true,
@@ -139727,6 +139938,7 @@
   {
    "blueprint": "archimate",
    "closure": [
+    "app/modules/intelligence/templates/intelligence/_entity_picker.html",
     "app/templates/architecture/impact_graph.html",
     "app/templates/basecoat/accordion.html",
     "app/templates/basecoat/alert-dialog.html",
@@ -139808,6 +140020,7 @@
     "app/templates/components/page_guide_drawer.html",
     "app/templates/components/page_header.html",
     "app/templates/components/popover.html",
+    "app/templates/components/provenance.html",
     "app/templates/components/see_how.html",
     "app/templates/components/switch.html",
     "app/templates/components/toast-container.html",
@@ -139823,7 +140036,7 @@
    ],
    "handler": "model_map_page",
    "handler_file": "app/modules/architecture/routes/archimate_routes.py",
-   "handler_line": 7404,
+   "handler_line": 7405,
    "has_parameters": false,
    "id": "archimate.model_map_page /archimate/model-map",
    "login_required": true,
@@ -223755,7 +223968,7 @@
    ],
    "handler": "api_check_duplicate_element",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 4283,
+   "handler_line": 4289,
    "has_parameters": true,
    "id": "unified_applications.api_check_duplicate_element /applications/api/<int:app_id>/elements/check-duplicate",
    "login_required": true,
@@ -225916,7 +226129,7 @@
    ],
    "handler": "rationalization_bulk_review",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 2952,
+   "handler_line": 2958,
    "has_parameters": false,
    "id": "unified_applications.rationalization_bulk_review /applications/rationalization/api/bulk-review",
    "login_required": true,
@@ -225938,7 +226151,7 @@
    ],
    "handler": "rationalization_bulk_score",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3777,
+   "handler_line": 3783,
    "has_parameters": false,
    "id": "unified_applications.rationalization_bulk_score /applications/rationalization/api/bulk-score",
    "login_required": true,
@@ -225960,7 +226173,7 @@
    ],
    "handler": "rationalization_calibration_report",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3571,
+   "handler_line": 3577,
    "has_parameters": false,
    "id": "unified_applications.rationalization_calibration_report /applications/rationalization/api/calibration-report",
    "login_required": true,
@@ -225982,7 +226195,7 @@
    ],
    "handler": "rationalization_create_roadmap_item",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3092,
+   "handler_line": 3098,
    "has_parameters": true,
    "id": "unified_applications.rationalization_create_roadmap_item /applications/rationalization/api/create-roadmap-item/<int:app_id>",
    "login_required": true,
@@ -226258,7 +226471,7 @@
    ],
    "handler": "rationalization_enrich",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 4369,
+   "handler_line": 4375,
    "has_parameters": false,
    "id": "unified_applications.rationalization_enrich /applications/rationalization/enrich",
    "login_required": true,
@@ -226283,7 +226496,7 @@
    ],
    "handler": "rationalization_enrich_app",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 4426,
+   "handler_line": 4432,
    "has_parameters": true,
    "id": "unified_applications.rationalization_enrich_app /applications/rationalization/api/enrich/<int:app_id>",
    "login_required": true,
@@ -226305,7 +226518,7 @@
    ],
    "handler": "rationalization_enrich_candidates",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 4379,
+   "handler_line": 4385,
    "has_parameters": false,
    "id": "unified_applications.rationalization_enrich_candidates /applications/rationalization/api/enrich-candidates",
    "login_required": true,
@@ -226349,7 +226562,7 @@
    ],
    "handler": "rationalization_executive_summary",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3585,
+   "handler_line": 3591,
    "has_parameters": false,
    "id": "unified_applications.rationalization_executive_summary /applications/rationalization/api/executive-summary",
    "login_required": true,
@@ -226371,7 +226584,7 @@
    ],
    "handler": "rationalization_export",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 4112,
+   "handler_line": 4118,
    "has_parameters": false,
    "id": "unified_applications.rationalization_export /applications/rationalization/api/export",
    "login_required": true,
@@ -226488,7 +226701,7 @@
    ],
    "handler": "rationalization_gaps",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 4345,
+   "handler_line": 4351,
    "has_parameters": false,
    "id": "unified_applications.rationalization_gaps /applications/rationalization/gaps",
    "login_required": true,
@@ -226512,7 +226725,7 @@
    ],
    "handler": "rationalization_get_benefits",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3405,
+   "handler_line": 3411,
    "has_parameters": true,
    "id": "unified_applications.rationalization_get_benefits /applications/rationalization/api/benefits/<int:app_id>",
    "login_required": true,
@@ -226534,7 +226747,7 @@
    ],
    "handler": "rationalization_get_decommission_plan",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3196,
+   "handler_line": 3202,
    "has_parameters": true,
    "id": "unified_applications.rationalization_get_decommission_plan /applications/rationalization/api/decommission-plan/<int:app_id>",
    "login_required": true,
@@ -226645,7 +226858,7 @@
    ],
    "handler": "rationalization_import_dependencies",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 4167,
+   "handler_line": 4173,
    "has_parameters": false,
    "id": "unified_applications.rationalization_import_dependencies /applications/rationalization/api/dependencies/import",
    "login_required": true,
@@ -226689,7 +226902,7 @@
    ],
    "handler": "rationalization_model_metadata",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3557,
+   "handler_line": 3563,
    "has_parameters": false,
    "id": "unified_applications.rationalization_model_metadata /applications/rationalization/api/model-metadata",
    "login_required": true,
@@ -226872,7 +227085,7 @@
    ],
    "handler": "rationalization_portfolio_scores",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 4017,
+   "handler_line": 4023,
    "has_parameters": false,
    "id": "unified_applications.rationalization_portfolio_scores /applications/rationalization/api/portfolio-scores",
    "login_required": true,
@@ -226916,7 +227129,7 @@
    ],
    "handler": "rationalization_rescore_all",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3890,
+   "handler_line": 3896,
    "has_parameters": false,
    "id": "unified_applications.rationalization_rescore_all /applications/rationalization/api/rescore-all",
    "login_required": true,
@@ -227026,7 +227239,7 @@
    ],
    "handler": "rationalization_roadmap_status",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3165,
+   "handler_line": 3171,
    "has_parameters": true,
    "id": "unified_applications.rationalization_roadmap_status /applications/rationalization/api/roadmap-status/<int:app_id>",
    "login_required": true,
@@ -227070,7 +227283,7 @@
    ],
    "handler": "rationalization_save_benefits",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3461,
+   "handler_line": 3467,
    "has_parameters": true,
    "id": "unified_applications.rationalization_save_benefits /applications/rationalization/api/benefits/<int:app_id>",
    "login_required": true,
@@ -227092,7 +227305,7 @@
    ],
    "handler": "rationalization_save_decommission_plan",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3256,
+   "handler_line": 3262,
    "has_parameters": true,
    "id": "unified_applications.rationalization_save_decommission_plan /applications/rationalization/api/decommission-plan/<int:app_id>",
    "login_required": true,
@@ -227136,7 +227349,7 @@
    ],
    "handler": "rationalization_score_app",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3707,
+   "handler_line": 3713,
    "has_parameters": true,
    "id": "unified_applications.rationalization_score_app /applications/rationalization/api/score/<int:app_id>",
    "login_required": true,
@@ -227391,7 +227604,7 @@
    ],
    "handler": "rationalization_workflow_status",
    "handler_file": "app/modules/applications/routes/rationalization_api_routes.py",
-   "handler_line": 3343,
+   "handler_line": 3349,
    "has_parameters": true,
    "id": "unified_applications.rationalization_workflow_status /applications/rationalization/api/workflow-status/<int:app_id>",
    "login_required": true,
@@ -237143,7 +237356,7 @@
    "includes": [],
    "name": "intelligence/_entity_picker.html",
    "parse_errors": [],
-   "rendered_on_count": 7,
+   "rendered_on_count": 9,
    "unresolved_refs": []
   },
   "app/modules/intelligence/templates/intelligence/_external_ids.html": {
@@ -240406,6 +240619,7 @@
     "app/templates/layouts/admin_base.html"
    ],
    "imports": [
+    "app/modules/intelligence/templates/intelligence/_entity_picker.html",
     "app/templates/components/button.html",
     "app/templates/components/page_header.html"
    ],
@@ -243646,7 +243860,7 @@
    "includes": [],
    "name": "components/provenance.html",
    "parse_errors": [],
-   "rendered_on_count": 35,
+   "rendered_on_count": 37,
    "unresolved_refs": []
   },
   "app/templates/components/public_faq.html": {
@@ -248165,5 +248379,5 @@
   "app/templates/solutions_strategic/partials/_gantt_chart.html",
   "app/templates/tools/gantt_demo.html"
  ],
- "templates_sha256": "eadda447231d6b25dd2fe41f4375b919844dfdc40d6e172bc8e42a18bbc15c62"
+ "templates_sha256": "52dce7bd6a16283fef78954925fe6c125f235cc2e4604b5ffc433b9d3da8ebcb"
 }
