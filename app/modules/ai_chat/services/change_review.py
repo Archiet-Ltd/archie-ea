@@ -1714,7 +1714,7 @@ def undo(service, approval: AIChatCRUDApproval, actor) -> Dict[str, Any]:
             row = _scoped_row(model, item["id"], org_id) if model is not None else None
             if row is None:
                 continue
-            for key, value in item["fields"].items():
+            for key, value in item["fields"].items():  # request-field-writes-ok: the values come from this server's own before_snapshot, not from a request body
                 if hasattr(row, key):
                     setattr(row, key, value)
                     names.add(key)
