@@ -1725,7 +1725,7 @@ def detail_element(layer, element_type, element_id):
         element_type = element.type or element_type
 
     # Get relationships
-    relationships = _get_element_relationships(element, element_id, org_id=getattr(g, "current_org_id", None))
+    relationships = _get_element_relationships(element, element_id)
 
     # The real archimate_elements.id to source a new relationship from (F-05(a)
     # "Add relationship" control) — a dedicated-table element reaches it via
@@ -3307,8 +3307,8 @@ def _form_text(value):
     return value
 
 
-def _get_element_relationships(element, element_id, org_id=None):
-    """Get all relationships for an element, scoped to one organisation."""
+def _get_element_relationships(element, element_id):
+    """Get all relationships for an element"""
     relationships = []
 
     # Resolve the archimate_element_id to use for relationship lookup
@@ -3322,14 +3322,10 @@ def _get_element_relationships(element, element_id, org_id=None):
     if ae_id:  # model-safety-ok: polymorphic ArchiMate elements
         # Outgoing relationships
         outgoing = ArchiMateRelationship.query.filter_by(
-            source_id=ae_id, organization_id=org_id
-        ).all() if org_id is not None else ArchiMateRelationship.query.filter_by(
             source_id=ae_id
         ).all()
         for rel in outgoing:
-            target_element = ArchiMateElement.query.filter_by(
-                id=rel.target_id, organization_id=org_id
-            ).first() if org_id is not None else ArchiMateElement.query.get(rel.target_id)
+            target_element = ArchiMateElement.query.get(rel.target_id)
             if target_element:
                 relationships.append(
                     {
@@ -3346,14 +3342,10 @@ def _get_element_relationships(element, element_id, org_id=None):
 
         # Incoming relationships
         incoming = ArchiMateRelationship.query.filter_by(
-            target_id=ae_id, organization_id=org_id
-        ).all() if org_id is not None else ArchiMateRelationship.query.filter_by(
             target_id=ae_id
         ).all()
         for rel in incoming:
-            source_element = ArchiMateElement.query.filter_by(
-                id=rel.source_id, organization_id=org_id
-            ).first() if org_id is not None else ArchiMateElement.query.get(rel.source_id)
+            source_element = ArchiMateElement.query.get(rel.source_id)
             if source_element:
                 relationships.append(
                     {

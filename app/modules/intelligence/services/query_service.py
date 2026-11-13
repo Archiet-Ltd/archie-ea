@@ -877,9 +877,9 @@ def _stewards_by_element(element_ids: List[int], org_id: int) -> Dict[int, Optio
     return {eid: (steward or "").strip() or None for eid, steward in pairs}
 
 
-def _walk_explicit(root_id: int, max_depth: int, direction: str, org_id: Optional[int] = None) -> List[Dict[str, Any]]:
-    """BFS over ``ArchiMateRelationship`` up to ``max_depth`` hops, in the requested direction,
-    scoped to one organisation so no edge can cross into another tenant's model.
+def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[str, Any]]:
+    """BFS over ``ArchiMateRelationship`` (TenantMixin-fenced, no hand-written
+    predicate needed) up to ``max_depth`` hops, in the requested direction.
 
     Cycle-safe: a node already visited is never re-queued, so this
     terminates even on a cyclic graph within ``max_depth`` iterations.
@@ -902,8 +902,6 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str, org_id: Optiona
             conditions.append(ArchiMateRelationship.source_id.in_(frontier_ids))
         if direction in ("upstream", "both"):
             conditions.append(ArchiMateRelationship.target_id.in_(frontier_ids))
-        if org_id is not None:
-            conditions.append(ArchiMateRelationship.organization_id == org_id)
         if not conditions:
             break
 
@@ -1298,7 +1296,7 @@ class IntelligenceQueryService:
                     reasons = [ELEMENT_NOT_FOUND_REASON]
                     maturity_flags = _maturity_flags(ELEMENT_NOT_FOUND_REASON)
                 else:
-                    explicit_rows = _walk_explicit(element_id, max_depth, direction, org_id)
+                    explicit_rows = _walk_explicit(element_id, max_depth, direction)
                     if layer is not None:
                         explicit_rows = _filter_explicit_by_layer(explicit_rows, layer)
 

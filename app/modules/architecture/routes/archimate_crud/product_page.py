@@ -65,7 +65,7 @@ def members(product_id: int, org_id: int) -> Dict[str, Any]:
     """
     from app.models.archimate_core import ArchiMateElement
 
-    graph = build_impact_graph(product_id, depth=1 + OUTWARD_STEPS, org_id=org_id)
+    graph = build_impact_graph(product_id, depth=1 + OUTWARD_STEPS)
     if graph is None:
         return {"rows": [], "graph": None, "truncated": False}
     edges = sorted(graph["edges"], key=lambda e: (e["type"] or "", e["source"], e["target"]))
