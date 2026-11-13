@@ -240,11 +240,11 @@
                 el.classList.add('ring-2', 'ring-primary', 'bg-muted/50');
                 setTimeout(function () {
                     el.classList.remove('ring-2', 'ring-primary', 'bg-muted/50');
-                }, 2500);
+                }, 10000);
                 return;
             }
             attempts++;
-            if (attempts < 50) {
+            if (attempts < 300) {
                 setTimeout(tryScroll, 100);
             }
         };

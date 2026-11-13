@@ -11,7 +11,7 @@
     <ul class="space-y-2">
       {% for row in linked_requirements %}
       <li class="flex flex-col gap-0.5" data-testid="application-requirement">
-        <a class="font-medium text-foreground hover:underline" href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', framework=row.framework_id) }}#requirement-{{ row.id }}">{{ row.framework }} &middot; {{ row.reference.split(', ')[-1] if row.reference else row.code }} &middot; {{ row.title }}</a>
+        <a class="font-medium text-foreground hover:underline" href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', framework=row.framework_id) }}#requirement-{{ row.control_id }}">{{ row.framework }} &middot; {{ row.reference.split(', ')[-1] if row.reference else row.code }} &middot; {{ row.title }}</a>
         <span class="text-muted-foreground">{{ row.category or 'No group recorded' }} &middot; status: {{ (row.status or 'planned').replace('_', ' ') }}</span>
       </li>
       {% endfor %}

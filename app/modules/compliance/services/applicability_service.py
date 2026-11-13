@@ -259,7 +259,7 @@ class ApplicabilityService:
         return [
             {
                 "code": c.control_code, "title": c.title, "category": c.category, "framework": f.code,
-                "framework_id": f.id, "reference": c.official_reference, "status": link.implementation_status,
+                "framework_id": f.id, "control_id": c.id, "reference": c.official_reference, "status": link.implementation_status,
             }
             for link, c, f in rows
         ]
