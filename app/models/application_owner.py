@@ -31,6 +31,10 @@ class ApplicationOwner(db.Model):
             "application_id", "user_id", "ownership_type",
             name="uq_application_owner_type"
         ),
+        db.CheckConstraint(
+            "user_id IS NOT NULL OR person_name IS NOT NULL",
+            name="ck_application_owner_names_someone",
+        ),
         {"extend_existing": True},
     )
 
@@ -46,12 +50,18 @@ class ApplicationOwner(db.Model):
         nullable=True,
         index=True,
     )
+    # Empty for a named person without an account (person_name below); a row
+    # always names someone, either a user or a name.
     user_id = db.Column(
         db.Integer,
         db.ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
+    # A person who owns it but has no account in this workspace.
+    person_name = db.Column(db.String(200), nullable=True)
+    person_email = db.Column(db.String(255), nullable=True)
+    person_role = db.Column(db.String(100), nullable=True)
     assigned_by = db.Column(
         db.Integer,
         db.ForeignKey("users.id", ondelete="SET NULL"),
@@ -147,6 +157,9 @@ class ApplicationOwner(db.Model):
             "element_type": self.element_type,
             "element_id": self.element_id,
             "user_id": self.user_id,
+            "person_name": self.person_name,
+            "person_email": self.person_email,
+            "person_role": self.person_role,
             "ownership_type": self.ownership_type,
             "assigned_at": self.assigned_at.isoformat() if self.assigned_at else None,
             "assigned_by": self.assigned_by,
@@ -208,11 +221,16 @@ class ApplicationOwner(db.Model):
                 part for part in (getattr(user, "first_name", None), getattr(user, "last_name", None))
                 if part
             ).strip()
+            named_person = row.user_id is None and bool(row.person_name)
             display_rows.append({
                 "id": row.id,
                 "user_id": row.user_id,
-                "user_name": full_name or "—",
-                "user_email": user.email if user else None,
+                # A named person has no account: they are shown by the name they
+                # were recorded with, and by the role when one was given.
+                "user_name": row.person_name if named_person else (full_name or "—"),
+                "user_email": row.person_email if named_person else (user.email if user else None),
+                "has_account": not named_person,
+                "person_role": row.person_role if named_person else None,
                 "ownership_type": row.ownership_type,
                 "ownership_type_label": cls.OWNERSHIP_LABELS.get(
                     row.ownership_type,

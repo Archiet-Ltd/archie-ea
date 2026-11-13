@@ -49,7 +49,7 @@
     </div>
 
     {% if model_empty %}
-    {# An empty model has nothing to try a change on, nor any action to prioritise: say so and offer the way to fill it. #}
+    {# An empty model has nothing to try a change on: say so and offer the way to fill it. #}
     <div class="style-vega rounded-lg border bg-card p-6" data-testid="model-empty">
         {% call ui.empty() %}
             {% call ui.empty_header() %}
@@ -415,7 +415,10 @@
         </div>
     </div>
 
-    {# Below the picker: a person starts a run first and reads the queue of other work after it. #}
+    {# Below the picker: a person starts a run first and reads the queue of other work after it.
+       The queue is built from gaps, work packages and risks, not from model elements, so a model with no
+       elements still shows the actions it has. Only an empty model with no action says nothing here: the
+       "no elements yet" message above is then the whole answer. #}
     {% if not model_empty or priority_actions.rows %}
     {% if simulation %}
     {# The prioritised action list belongs to Impact Analysis; this page links to it rather than repeating it. #}

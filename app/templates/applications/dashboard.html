@@ -450,7 +450,7 @@
           {% set named = (owner_rows | map(attribute='user_name') | map('lower') | list) + ([text_owner | lower] if text_owner else []) %}
           {% set has_any_owner = owner_rows or app.application_owner or app.business_owner or app.technical_owner or app.technical_lead or app.product_manager or app.development_team or app.support_team %}
           <div {% if owner_rows %}data-testid="application-owner"{% elif not has_any_owner %}data-testid="application-owner-empty"{% endif %}>
-            {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = text_owner %}{% set assign_link = none %}
+            {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = text_owner %}{% set assign_link = none %}{% set person_url = owner_assign_url %}
             {% include 'partials/owner_step.html' with context %}
           </div>
           {% for label, value in [('Application Owner', app.application_owner), ('Business Owner', app.business_owner), ('Technical Owner', app.technical_owner), ('Technical Lead', app.technical_lead), ('Product Manager', app.product_manager), ('Development Team', app.development_team), ('Support Team', app.support_team)] %}

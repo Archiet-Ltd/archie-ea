@@ -6,6 +6,7 @@
    can_edit    whether the signed-in person may assign or clear
    assign_link where a capability not yet in the capability store is owned instead
    legacy_text an owner recorded only as text, shown until a person is assigned
+   person_url  set where a person with no account may be recorded as an owner (the application page)
    Pages keep their own data-testid on the wrapper they put this inside. #}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
@@ -18,6 +19,11 @@
       <p class="break-words font-medium text-foreground">{{ row.user_name }}
         {% call badge('neutral', class='ml-1') %}{{ row.ownership_type_label }}{% endcall %}
       </p>
+      {% if row.has_account is defined and not row.has_account %}
+      <p class="text-xs font-normal text-muted-foreground" data-owner-person>
+        {% if row.person_role %}{{ row.person_role }} &middot; {% endif %}No account in this workspace{% if row.user_email %} &middot; {{ row.user_email }}{% endif %}
+      </p>
+      {% endif %}
       {% if row.assigned_label %}
       <p class="text-xs font-normal text-muted-foreground" data-owner-assigned>Assigned {{ row.assigned_label }}</p>
       {% endif %}
@@ -46,5 +52,15 @@
   </div>
   <p class="sr-only" role="status" aria-live="polite" data-owner-status></p>
   {{ button(text='Save owner', variant='outline', disabled=true, attrs_dict={'data-owner-save': ''}) }}
+  {% if person_url is defined and person_url %}
+  <div class="mt-4 space-y-2 border-t border-border pt-3" data-owner-person-form>
+    <p class="text-sm font-medium text-foreground">Owner without an account</p>
+    <p class="text-xs text-muted-foreground">For someone outside this workspace, such as an engineering lead or a supplier contact.</p>
+    {{ input(placeholder='Full name', aria_label='Full name of the owner', size='sm', maxlength='200', autocomplete='off', attrs_dict={'data-person-name': ''}) }}
+    {{ input(type='email', placeholder='Email (optional)', aria_label='Email of the owner, optional', size='sm', maxlength='255', autocomplete='off', attrs_dict={'data-person-email': ''}) }}
+    {{ input(placeholder='Role (optional)', aria_label='Role of the owner, optional', size='sm', maxlength='100', autocomplete='off', attrs_dict={'data-person-role': ''}) }}
+    {{ button(text='Save owner without an account', variant='outline', disabled=true, attrs_dict={'data-person-save': ''}) }}
+  </div>
+  {% endif %}
 </div>
 {% endif %}
