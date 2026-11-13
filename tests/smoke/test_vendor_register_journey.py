@@ -83,7 +83,7 @@ def test_procurement_lead_reads_vendors_then_sets_a_missing_vendor(browser, live
         total = vendor_world["existing"] + 7
         answer = page.get_by_test_id("vendors-answer")
         expect(answer).to_contain_text("4 vendors supply 5 of your %d systems." % total, timeout=PAGE_TIMEOUT)
-        expect(answer).to_contain_text("1 renews within 90 days.")
+        expect(answer).to_contain_text("1 contract with 1 vendor renews within 90 days.")
         unmapped = total - 5
         expect(answer).to_contain_text("%d of your systems have no vendor recorded." % unmapped)
 
