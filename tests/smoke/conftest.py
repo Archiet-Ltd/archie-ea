@@ -263,6 +263,10 @@ class SmokeServer(str):
     def tail(self, lines=40):
         return _tail(self.log_path, lines)
 
+    def url(self):
+        """The base URL, for journeys written against the pytest-flask live_server API."""
+        return str(self)
+
 
 def _has_gunicorn():
     """gunicorn imports on Windows but cannot run there - it needs fcntl."""
