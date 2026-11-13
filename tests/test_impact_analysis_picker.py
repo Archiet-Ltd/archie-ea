@@ -84,7 +84,13 @@ def _global_element_ids(client, login_as, user, text):
     login_as(client, user)
     response = client.get(GLOBAL_SEARCH, query_string={"q": text})
     assert response.status_code == 200
-    return {r["id"] for r in response.get_json()["results"] if r["type"] == "archimate_element"}
+    # A model element is listed under its own type in plain words, and its address is the element page
+    # (/architecture/<layer>/element/<id>); a register row or a page has another address.
+    return {
+        r["id"]
+        for r in response.get_json()["results"]
+        if re.fullmatch(r"/architecture/[a-z]+/element/%s" % r["id"], r.get("url", ""))
+    }
 
 
 def test_picker_uses_the_canonical_element_search_not_a_layer_listing(

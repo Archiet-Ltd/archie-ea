@@ -814,7 +814,7 @@ def test_pricing_contact_sales_button_points_at_the_contact_page(app, client):
     resp = client.get("/pricing")
     html = resp.get_data(as_text=True)
     assert re.search(
-        r'<a href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
+        r'<a (?:rel="nofollow" )?href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
 
 
 def test_signing_in_returns_the_visitor_to_the_plan_they_chose(app, db_session, client, login_as, no_billing):

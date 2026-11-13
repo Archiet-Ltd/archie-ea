@@ -866,6 +866,12 @@
                     <h3 class="text-sm font-semibold text-foreground mb-1" id="composer-focus-title"
                         x-text="focusView ? ('Unsaved view: ' + focusView.name + ', ' + _focusHopsText(focusView.depth)) : ''"></h3>
                     {% if focus and focus.most_connected %}<p class="text-xs text-muted-foreground mb-1" id="composer-focus-most-connected">Showing the most connected element in your model. Search for another element to look at it instead.</p>{% endif %}
+                    <p class="text-xs text-foreground mb-1" id="composer-focus-counts" data-testid="composer-focus-counts"
+                       x-text="focusView ? (focusView.shownElements + ' of ' + focusView.total + ' elements and ' + focusView.shownRelationships + (focusView.shownRelationships === 1 ? ' relationship' : ' relationships') + ' shown' + (focusView.modelRelationships !== null ? '. ' + focusView.modelRelationships + (focusView.modelRelationships === 1 ? ' relationship' : ' relationships') + ' in the model between these elements.' : '.')) : ''"></p>
+                    <p class="text-xs text-muted-foreground mb-1" id="composer-focus-reading-note" x-show="focusView && focusView.total > 24" x-cloak>Opens at reading size on the element. Choose Fit to see everything drawn.</p>
+                    <div class="mb-2" x-show="focusView && focusView.moreCount > 0" x-cloak>
+                        {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-next-ring", "@click": "showNextFocusRing()", "x-text": "focusView ? ('Show next ring (' + focusView.moreCount + ' more)') : ''"}) %}{% endcall %}
+                    </div>
                     <p class="text-xs text-muted-foreground mb-1" id="composer-focus-empty-note" x-show="focusView && focusView.empty">No connections at this depth</p>
                     <p class="text-xs text-muted-foreground mb-2" id="composer-focus-derived-note" x-show="focusView && focusView.hasDerived">Worked-out connections are shown dashed and are not stored with a saved diagram.</p>
                     <div class="mb-2" x-show="focusView && !focusView.empty">

@@ -622,7 +622,7 @@ def _in_the_model(changes, removed_sample):
     return [c for c in changes if (c.table_name, c.record_id) not in removed_sample]
 
 
-def _bars(inserts, today, days, sample=frozenset()):
+def _bars(inserts, today, days, sample=frozenset(), entered=()):
     """Records added, split into connected and by hand: one bar a day, or a week when the range is long."""
     size = 7 if days > 31 else 1
     first = today - timedelta(days=days - 1)
@@ -631,12 +631,13 @@ def _bars(inserts, today, days, sample=frozenset()):
     while end >= first:
         buckets.append([max(end - timedelta(days=size - 1), first), end, 0, 0])
         end -= timedelta(days=size)
-    for change in inserts:
-        day = change.valid_from.date()
+    # ``entered`` are the records that left no history row: (day, from a connected source)
+    days_added = [(c.valid_from.date(), _is_connected(c, sample)) for c in inserts] + list(entered)
+    for day, connected in days_added:
         if first <= day <= today:
             for bucket in buckets:
                 if bucket[0] <= day <= bucket[1]:
-                    bucket[2 if _is_connected(change, sample) else 3] += 1
+                    bucket[2 if connected else 3] += 1
                     break
     return [
         {"day": "%d %s" % (b[0].day, b[0].strftime("%b")), "connected": b[2], "manual": b[3]}
@@ -672,6 +673,95 @@ def _without_applications_counted_as_elements(inserts, org_id):
     ]
 
 
+def _records_without_history(changes, inserts, org_id, sample, year):
+    """Live elements and relationships the year's history has no insert row for, counted by year entered.
+
+    A record an import, a connector or a bulk loader wrote with a direct insert leaves no history row,
+    and a record entered before the history read here began has its row outside it. Each is counted in
+    the year it entered the model: the earliest of its first history row, its first recorded version and
+    its own timestamps (when its origin was recorded, when it was written). One with none of these is
+    counted as having no recorded entry date. The sample company's records and the starter elements stay out, as the page's
+    totals leave them out; an element written as one with an application already counted is not counted
+    again.
+    """
+    from app.models import ArchiMateElement as E
+    from app.models import ArchiMateRelationship as R
+    from app.models.application_portfolio import ApplicationComponent as A
+    from app.models.audit_log import AuditLog
+    from app.models.entity_history import EntityHistory as H
+
+    seen = {(c.table_name, c.record_id) for c in changes if c.action == "insert"}
+    applications = {c.record_id for c in inserts if c.table_name == "application_component"}
+    if applications:
+        seen |= {
+            ("archimate_elements", element_id)
+            for (element_id,) in db.session.execute(
+                db.select(A.archimate_element_id).where(A.organization_id == org_id, A.id.in_(applications))
+            )
+            if element_id is not None
+        }
+    live = db.select(E.id).where(E.organization_id == org_id, E.deleted_at.is_(None))
+    queries = {
+        # not valid_from: a row seeded with no known date carries a placeholder there, not a date
+        "archimate_elements": db.select(E.id, E.source_kind, func.coalesce(E.source_recorded_at, E.recorded_at))
+        .where(E.organization_id == org_id, E.deleted_at.is_(None), E.source_kind.is_distinct_from("starter")),
+        # a relationship with a deleted element at either end is not counted, as the page's total leaves it out
+        "archimate_relationships": db.select(R.id, R.source_kind, func.coalesce(R.created_at, R.source_recorded_at, R.recorded_at))
+        .where(R.organization_id == org_id, R.source_id.in_(live), R.target_id.in_(live)),
+    }
+    counts = {"this_year": 0, "last_year": 0, "earlier": 0, "undated": 0, "dated": []}
+    kinds = {}
+    for table, query in queries.items():
+        rows = db.session.execute(query).all()
+        unseen = {
+            record_id: stamp
+            for record_id, source_kind, stamp in rows
+            if source_kind != "sample" and (table, record_id) not in seen and (table, record_id) not in sample
+        }
+        kinds.update({(table, record_id): kind for record_id, kind, _ in rows})
+        if not unseen:
+            continue
+        ids = list(unseen)
+        first_rows = [
+            dict(db.session.execute(query).all())
+            for query in (
+                db.select(AuditLog.record_id, func.min(AuditLog.created_at)).where(
+                    AuditLog.organization_id == org_id, AuditLog.table_name == table,
+                    AuditLog.action == "create", AuditLog.record_id.in_(ids),
+                ).group_by(AuditLog.record_id),
+                db.select(H.record_id, func.min(H.recorded_at)).where(
+                    H.organization_id == org_id, H.table_name == table, H.record_id.in_(ids),
+                ).group_by(H.record_id),
+            )
+        ]
+        for record_id, stamp in unseen.items():
+            known = [d for d in (stamp, *(rows.get(record_id) for rows in first_rows)) if d is not None]
+            entered = min(known) if known else None
+            if entered is not None:
+                counts["dated"].append((entered.date(), kinds.get((table, record_id)) in CONNECTED_KINDS))
+            if entered is None:
+                counts["undated"] += 1
+            elif entered.year == year:
+                counts["this_year"] += 1
+            elif entered.year == year - 1:
+                counts["last_year"] += 1
+            else:
+                counts["earlier"] += 1
+    return counts
+
+
+def _year_alone(this_year, unrecorded):
+    """The year card's one figure with its label, and every record it cannot place in a year beside it."""
+    lines = ["{:,} added this year".format(this_year) if this_year else "No records added this year"]
+    if unrecorded["earlier"]:
+        lines.append("{:,} added before last year".format(unrecorded["earlier"]))
+    if unrecorded["undated"]:
+        lines.append("{:,} {} with no recorded entry date".format(
+            unrecorded["undated"], "record" if unrecorded["undated"] == 1 else "records"
+        ))
+    return ". ".join(lines)
+
+
 def _activity(changes, now, org_id, sample=None):
     if changes is None:
         return None
@@ -681,9 +771,13 @@ def _activity(changes, now, org_id, sample=None):
     inserts = _without_applications_counted_as_elements(
         [c for c in changes if c.action == "insert" and c.valid_from], org_id
     )
+    # records an import, a connector or a bulk loader wrote leave no history row: each is counted in the
+    # year its own created timestamp names, so the panel and the page's totals describe the same records
+    unrecorded = _records_without_history(changes, inserts, org_id, sample, now.year)
+    entered = unrecorded["dated"]
     ranges = {}
     for key, label, days in RANGES:
-        rows = _bars(inserts, today, days, sample)
+        rows = _bars(inserts, today, days, sample, entered)
         ranges[key] = {
             "label": label,
             "rows": rows,
@@ -696,11 +790,17 @@ def _activity(changes, now, org_id, sample=None):
     default_range = next((key for key in ("7d", "30d") if ranges[key]["total"]), "90d")
     this_year = sum(1 for c in inserts if c.valid_from.year == now.year)
     last_year = sum(1 for c in inserts if c.valid_from.year == now.year - 1)
+    this_year += unrecorded["this_year"]
+    last_year += unrecorded["last_year"]
+    untold = unrecorded["earlier"] + unrecorded["undated"]
     week_start = today - timedelta(days=6)
     week = [c for c in changes if c.valid_from and c.valid_from.date() >= week_start and c.action in ("insert", "update", "delete")]
     per_weekday = defaultdict(int)
     for change in week:
         per_weekday[change.valid_from.date()] += 1
+    week_entered = [day for day, _ in entered if week_start <= day <= today]
+    for day in week_entered:
+        per_weekday[day] += 1
     weekly_rows = [
         {"day": (week_start + timedelta(days=i)).strftime("%a"), "changes": per_weekday[week_start + timedelta(days=i)]}
         for i in range(7)
@@ -722,18 +822,21 @@ def _activity(changes, now, org_id, sample=None):
         "ranges": ranges,
         "default_range": default_range,
         # with nothing to set it against the card shows this one figure alone, so the figure carries its label
-        "this_year": this_year if last_year or not this_year else "{:,} added this year".format(this_year),
+        "this_year": this_year if last_year or not (this_year or untold) else _year_alone(this_year, unrecorded),
+        "this_year_count": this_year,
         "last_year": last_year,
         "year_change": _percent_change(this_year, last_year),
+        "before_last_year": unrecorded["earlier"],
+        "no_entry_date": unrecorded["undated"],
         "year_rows": [
             {"year": "Last year", "last": last_year, "this": 0},
             {"year": "This year", "last": 0, "this": this_year},
         ],
         "week": {
             "rows": weekly_rows,
-            "total": len(week),
+            "total": len(week) + len(week_entered),
             # records added, counted once like "Records added": the chart above counts changes
-            "added": sum(1 for c in inserts if c.valid_from.date() >= week_start),
+            "added": sum(1 for c in inserts if c.valid_from.date() >= week_start) + len(week_entered),
             "updated": sum(1 for c in week if c.action == "update"),
             "removed": sum(1 for c in week if c.action == "delete"),
         },

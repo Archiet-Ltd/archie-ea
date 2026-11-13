@@ -117,7 +117,16 @@ def build_model_map(layer: Optional[str] = None) -> Dict[str, Any]:
         })
     ids = {n["id"] for n in nodes}
     edges = []
+    unconnected = 0
     if ids:
         rels = db.session.execute(db.select(R.source_id, R.target_id, R.type)).all()
         edges = [{"source": s, "target": t, "type": ty} for s, t, ty in rels if s in ids and t in ids]
-    return {**base, "mode": "elements", "nodes": nodes, "edges": edges, "truncated": truncated, "shown": len(nodes)}
+        # An element is connected when any relationship in the model touches it, whether or not the other end
+        # is drawn (a single layer, or the first MAX_NODES), so the ring of unconnected elements is never
+        # an artefact of what was left out of the picture.
+        touched = {end for s, t, _ty in rels for end in (s, t)}
+        for n in nodes:
+            n["connected"] = n["id"] in touched
+        unconnected = sum(1 for n in nodes if not n["connected"])
+    return {**base, "mode": "elements", "nodes": nodes, "edges": edges, "truncated": truncated,
+            "shown": len(nodes), "unconnected": unconnected}
