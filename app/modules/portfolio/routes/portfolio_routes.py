@@ -11,10 +11,11 @@ all carry TenantMixin, so do_orm_execute injects the organisation predicate.
 import logging
 
 from flask import Blueprint, abort, render_template, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app import db
 from app.middleware.tenant_context import current_org_id
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +32,23 @@ def _money(value):
 
 
 def _variance(initiative):
-    """Spend against approved budget, as a percentage.
+    """Forecast against approved budget, as a percentage.
 
     Returns None when either side is missing rather than implying 0% variance
-    against a budget nobody set.
+    against a budget nobody set. A positive figure means the forecast overruns
+    the budget; a negative figure means it comes in under.
     """
-    budget, spent = initiative.approved_budget, initiative.spent_to_date
-    if budget is None or spent is None or float(budget) == 0:
+    budget, forecast = initiative.approved_budget, initiative.forecast_cost
+    if budget is None or forecast is None or float(budget) == 0:
         return None
-    return round((float(spent) - float(budget)) / float(budget) * 100, 1)
+    return round((float(forecast) - float(budget)) / float(budget) * 100, 1)
+
+
+# What a financial benefit is measured by: its three amounts, and the percentage
+# of the sought improvement they work out to. All four are money, so the one cost
+# rule decides who reads them. A non-financial benefit's values count something
+# else and are never masked.
+BENEFIT_MONEY_KEYS = ("baseline_value", "target_value", "actual_value", "realisation_percentage")
 
 
 @portfolio_bp.route("/")
@@ -108,8 +117,15 @@ def index():
 
     summary["no_objective"] = len(unlinked_ids)
 
+    withheld = not costs_visible(current_user)
+    if withheld:
+        rows = withhold_costs(rows, keys=("approved_budget", "spent_to_date", "forecast_cost", "variance_pct"))
+        summary = withhold_costs(summary, keys=("total_budget", "total_spent"))
+
     return render_template(
         "portfolio/index.html",
+        costs_withheld=withheld,
+        costs_withheld_text=COSTS_WITHHELD,
         initiatives=rows,
         summary=summary,
         only_unlinked=only_unlinked,
@@ -205,16 +221,40 @@ def detail(initiative_id):
         float(b.actual_delta) for b in financial if b.actual_delta is not None
     ) or None
 
+    money = {
+        "variance_pct": _variance(initiative),
+        "approved_budget": _money(initiative.approved_budget),
+        "spent_to_date": _money(initiative.spent_to_date),
+        "forecast_cost": _money(initiative.forecast_cost),
+    }
+    withheld = not costs_visible(current_user)
+    rows = [b.to_dict() for b in benefits]
+    if withheld:
+        money = withhold_costs(money, keys=tuple(money))
+        # A financial benefit's amounts are money, so the one masker takes them
+        # out here rather than the template choosing not to print them: a
+        # withheld person is never sent a figure the cost rule keeps from them.
+        # A non-financial benefit's values count something else and are left
+        # exactly as they were.
+        benefits = [
+            withhold_costs(row, keys=BENEFIT_MONEY_KEYS) if row["is_financial"] else row
+            for row in rows
+        ]
+    else:
+        benefits = rows
+
     return render_template(
         "portfolio/detail.html",
+        costs_withheld=withheld,
+        costs_withheld_text=COSTS_WITHHELD,
         initiative=initiative,
-        variance_pct=_variance(initiative),
-        approved_budget=_money(initiative.approved_budget),
-        spent_to_date=_money(initiative.spent_to_date),
-        forecast_cost=_money(initiative.forecast_cost),
+        variance_pct=money["variance_pct"],
+        approved_budget=money["approved_budget"],
+        spent_to_date=money["spent_to_date"],
+        forecast_cost=money["forecast_cost"],
         benefits=benefits,
-        benefit_target=benefit_target,
-        benefit_actual=benefit_actual,
+        benefit_target=None if withheld else benefit_target,
+        benefit_actual=None if withheld else benefit_actual,
         non_financial_count=len(benefits) - len(financial),
         assumptions=assumptions,
         demands=demands,
