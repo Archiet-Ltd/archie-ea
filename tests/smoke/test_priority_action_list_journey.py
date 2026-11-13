@@ -19,6 +19,7 @@ from .fresh_org import create_fresh_org, sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 LIST_PAGES = ("/strategic/impact-analysis", "/enterprise/analysis/ai-architecture")
+ENTERPRISE_IMPACT_PAGE = "/enterprise/analysis/impact-analysis"
 
 
 def _seed(org_id, suffix):
@@ -305,5 +306,131 @@ def test_in_dark_mode_the_critical_badge_is_readable(browser, live_server):
         expect(badge).to_be_visible()
         ratio = badge.evaluate(_CONTRAST_JS)
         assert ratio >= 4.5, "Critical badge contrast in dark mode is %.2f:1" % ratio
+    finally:
+        context.close()
+
+
+def test_enterprise_impact_analysis_empty_org_shows_no_priority_actions(browser, live_server):
+    """A fresh organisation with no elements sees no prioritised-actions section on the enterprise Impact Analysis page."""
+    org = create_fresh_org("enterprise_architect")
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + ENTERPRISE_IMPACT_PAGE, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        # The empty model state is shown
+        expect(page.get_by_test_id("impact-first-steps")).to_be_visible()
+        expect(page.get_by_text("Nothing is modelled yet")).to_be_visible()
+
+        # The prioritised actions section is not rendered at all
+        expect(page.get_by_test_id("priority-actions")).to_have_count(0)
+        expect(page.get_by_test_id("priority-actions-empty")).to_have_count(0)
+    finally:
+        context.close()
+
+
+def test_enterprise_impact_analysis_populated_org_shows_priority_actions(browser, live_server):
+    """An organisation with gaps, work packages and risks sees the ranked list on the enterprise Impact Analysis page."""
+    org = create_fresh_org("enterprise_architect")
+    names = _seed(org["org_id"], org["suffix"])
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + ENTERPRISE_IMPACT_PAGE, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        # The prioritised actions section is rendered with the ranked list
+        expect(page.get_by_test_id("priority-actions")).to_be_visible()
+        expect(page.get_by_test_id("priority-actions-rule")).to_contain_text("Ranked by severity, critical first")
+        expected = [
+            "Convert the gap \u201c%s\u201d to a work package" % names["gap"],
+            "Finish %s: due %s, 58 percent done" % (
+                names["work"], (datetime.utcnow() - timedelta(days=10)).strftime("%-d %b")),
+            "Reduce the risk: %s" % names["risk"],
+        ]
+        assert _order(page) == expected
+    finally:
+        context.close()
+
+
+def test_phone_landing_from_scenarios_shows_priority_actions_in_view(browser, live_server):
+    """At 390 wide, following the 'ranked on Impact Analysis' link from Scenarios opens with the section in view."""
+    org = create_fresh_org("enterprise_architect")
+    names = _seed(org["org_id"], org["suffix"])
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 390, "height": 844},
+                                  color_scheme="dark")
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    context.add_init_script("localStorage.setItem('theme', 'dark');document.documentElement.classList.add('dark');")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        # Start from the Scenarios page which has the link
+        page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        link = page.get_by_test_id("priority-actions-link")
+        expect(link).to_be_visible()
+        link.click()
+        page.wait_for_url(lambda url: ENTERPRISE_IMPACT_PAGE in url and "#priority-actions" in url, timeout=PAGE_TIMEOUT)
+
+        # The priority-actions section should be in the viewport
+        section = page.get_by_test_id("priority-actions")
+        expect(section).to_be_visible()
+        box = section.bounding_box()
+        assert box is not None, "priority-actions section has no bounding box"
+        viewport_height = page.evaluate("() => window.innerHeight")
+        assert box["y"] < viewport_height, "priority-actions section top (%d) is below viewport height (%d)" % (box["y"], viewport_height)
+        assert box["y"] + box["height"] > 0, "priority-actions section is entirely above viewport"
+
+        # The list should have the expected rows
+        expect(page.get_by_test_id("priority-actions-rule")).to_contain_text("Ranked by severity, critical first")
+        expected = [
+            "Convert the gap \u201c%s\u201d to a work package" % names["gap"],
+            "Finish %s: due %s, 58 percent done" % (
+                names["work"], (datetime.utcnow() - timedelta(days=10)).strftime("%-d %b")),
+            "Reduce the risk: %s" % names["risk"],
+        ]
+        assert _order(page) == expected
+    finally:
+        context.close()
+
+
+def test_show_all_preserves_element_parameter(browser, live_server):
+    """Clicking 'Show all N actions' keeps the chosen ?element= parameter in the URL."""
+    org = create_fresh_org("enterprise_architect")
+    suffix = org["suffix"]
+    from app import create_app, db
+    from app.models.implementation_migration import Gap
+
+    app = create_app("testing")
+    with app.app_context():
+        for n in range(13):
+            db.session.add(Gap(name="Show-all gap %02d %s" % (n, suffix), severity="high",
+                               organization_id=org["org_id"]))
+        db.session.commit()
+        db.session.remove()
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        # Visit the enterprise impact analysis page with an element parameter
+        page.goto(live_server + ENTERPRISE_IMPACT_PAGE + "?element=42", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        # The page should show the prioritised actions (since org has gaps)
+        expect(page.get_by_test_id("priority-actions")).to_be_visible()
+        assert len(_order(page)) == 10
+
+        # Click "Show all 13 actions"
+        page.get_by_role("link", name="Show all 13 actions").click()
+        page.wait_for_url(lambda url: "all_actions=1" in url and "element=42" in url, timeout=PAGE_TIMEOUT)
+
+        # The URL should still have element=42
+        assert "element=42" in page.url, "element parameter was dropped: %s" % page.url
+        assert "all_actions=1" in page.url, "all_actions parameter missing: %s" % page.url
+
+        # All 13 actions should be shown
+        assert len(_order(page)) == 13
     finally:
         context.close()

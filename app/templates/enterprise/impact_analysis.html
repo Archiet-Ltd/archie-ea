@@ -44,7 +44,8 @@
             {% call card_description() %}Type the name of an application, capability or other element of your model.{% endcall %}
         {% endcall %}
         {% call card_content() %}
-            <div class="max-w-xl"{% if not answer %} x-data="impactPageSurface()" x-init="$nextTick(() => $refs.pickerInput.focus())"{% else %} x-data="impactPageSurface()"{% endif %}>
+            <div class="max-w-xl" x-data="impactPageSurface()"
+                 {% if not answer %}x-init="$nextTick(() => { if (!window.location.hash) $refs.pickerInput.focus(); })"{% endif %}>
                 {{ entity_picker('impact-page', prompt='Type a team, service or system name') }}
             </div>
         {% endcall %}
@@ -173,6 +174,8 @@
     {% endcall %}
     {% endif %}
 
+    {% if not model_empty or priority_actions.rows %}
     {% include 'components/priority_actions.html' %}
+    {% endif %}
 </div>
 {% endblock %}

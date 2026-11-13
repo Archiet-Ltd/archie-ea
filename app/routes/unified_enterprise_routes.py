@@ -1037,6 +1037,7 @@ def impact_analysis():
 
         element_id = request.args.get("element", type=int)
         has_elements = ArchiMateElement.query.count() > 0
+        model_empty = not has_elements
 
         answer = None
         element_not_found = False
@@ -1117,6 +1118,7 @@ def impact_analysis():
             answer=answer,
             element_not_found=element_not_found,
             has_elements=has_elements,
+            model_empty=model_empty,
             may_connect_github=may_connect_github(current_user, current_org_id()),
             may_load_sample_company=may_load_sample_company(current_user),
             priority_actions=priority_actions,
