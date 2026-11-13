@@ -1337,22 +1337,17 @@ def api_roadmap_work_packages():
         root_only = request.args.get("root_only", "true").lower() == "true"
         include_children = request.args.get("include_children", "true").lower() == "true"
 
-        try:
-            query = work_package_service.query_for(org_id)
-            if gap_id:
-                # The one reader of a work package's gap links (the relationships).
-                query = query.filter(UWP.id.in_(
-                    work_package_service.work_package_ids_for_gap(gap_id, org_id)))
-            # Every package of the organisation (parts included): the figure the roadmap
-            # board and the headline count give, whatever rows this answer lists.
-            all_count = query.count()
-            if root_only:
-                query = query.filter(UWP.parent_id.is_(None))
-            work_packages = query.order_by(UWP.start_date, UWP.id).all()
-        except Exception as qe:
-            current_app.logger.warning(f"Work packages query failed: {qe}", exc_info=True)
-            work_packages = []
-            all_count = 0
+        query = work_package_service.query_for(org_id)
+        if gap_id:
+            # The one reader of a work package's gap links (the relationships).
+            query = query.filter(UWP.id.in_(
+                work_package_service.work_package_ids_for_gap(gap_id, org_id)))
+        # Every package of the organisation (parts included): the figure the roadmap
+        # board and the headline count give, whatever rows this answer lists.
+        all_count = query.count()
+        if root_only:
+            query = query.filter(UWP.parent_id.is_(None))
+        work_packages = query.order_by(UWP.start_date, UWP.id).all()
 
         serialized = []
         for wp in work_packages:

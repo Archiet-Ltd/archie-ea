@@ -53,6 +53,14 @@ def test_each_source_is_asked_once_and_plateaus_show_before_work_packages(browse
                 expect(page.get_by_test_id("rdm-plateau-name").filter(has_text=name)).to_be_visible(timeout=15000)
             assert state["packages_arrived"] is False, "plateaus showed only after the work packages arrived"
             assert other["suffix"] not in page.content()
+
+            # While work-packages answer is held, the Work Packages tile must show the
+            # evidence line's figure (6) or the loading mark (—), never "0".
+            wp_tile = page.get_by_test_id("rdm-work-packages-tile")
+            expect(wp_tile).not_to_have_text("0", timeout=2000)
+            tile_text = wp_tile.inner_text()
+            assert tile_text in ("6", "—"), f"Work Packages tile showed '{tile_text}' while answer held"
+
             _frame(page, "loading-early", width, theme)
 
             state["release"] = True
@@ -63,6 +71,65 @@ def test_each_source_is_asked_once_and_plateaus_show_before_work_packages(browse
             assert "Work packages: 6" in line, line
             assert asked == {"gaps": 1, "plateaus": 1, "work-packages": 1}, asked
             _frame(page, "loading-done", width, theme)
+        finally:
+            state["release"] = True
+            context.close()
+
+
+def test_plateaus_tile_shows_evidence_figure_while_plateaus_answer_held(browser, live_server):
+    """While the plateaus answer is held, the Plateaus tile must show the evidence
+    line's figure or the loading mark, never "0"."""
+    org = create_fresh_org("enterprise_architect")
+    other = create_fresh_org("enterprise_architect")
+    names = _plan(browser, live_server, org["emails"]["enterprise_architect"], org["suffix"])
+    _plan(browser, live_server, other["emails"]["enterprise_architect"], other["suffix"])
+
+    for width, theme in ((1440, "light"), (390, "dark")):
+        context, page = _page(browser, width, theme)
+        asked = {"gaps": 0, "plateaus": 0, "work-packages": 0}
+        state = {"release": False, "plateaus_arrived": False}
+
+        def on_request(request):
+            found = SOURCES.search(request.url.split("#")[0])
+            if found and request.method == "GET":
+                asked[found.group(1)] += 1
+
+        def slow_plateaus(route):
+            for _ in range(300):
+                if state["release"]:
+                    break
+                page.wait_for_timeout(100)
+            route.continue_()
+            state["plateaus_arrived"] = True
+
+        try:
+            sign_in(page, live_server, org["emails"]["enterprise_architect"])
+            page.on("request", on_request)
+            page.route(re.compile(r".*/capability-map/api/roadmap/plateaus(\?.*)?$"), slow_plateaus)
+            page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+            # Wait for gaps to load (they arrive first)
+            expect(page.get_by_test_id("rdm-recorded-gaps")).not_to_have_text("—", timeout=15000)
+            assert state["plateaus_arrived"] is False, "plateaus answer arrived too early"
+            assert other["suffix"] not in page.content()
+
+            # While plateaus answer is held, the Plateaus tile must show the
+            # evidence line's figure (3) or the loading mark (—), never "0".
+            plateau_tile = page.get_by_test_id("rdm-plateaus-tile")
+            expect(plateau_tile).not_to_have_text("0", timeout=2000)
+            tile_text = plateau_tile.inner_text()
+            assert tile_text in ("3", "—"), f"Plateaus tile showed '{tile_text}' while answer held"
+
+            _frame(page, "loading-plateaus-held", width, theme)
+
+            state["release"] = True
+            expect(page.get_by_test_id("rdm-plateaus-tile")).to_have_text("3", timeout=PAGE_TIMEOUT)
+            page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+            expect(page.get_by_test_id("rdm-plateau")).to_have_count(len(names))
+            line = page.get_by_test_id("roadmap-summary-footer").inner_text()
+            assert "Plateaus: 3" in line, line
+            assert asked == {"gaps": 1, "plateaus": 1, "work-packages": 1}, asked
+            _frame(page, "loading-plateaus-done", width, theme)
         finally:
             state["release"] = True
             context.close()

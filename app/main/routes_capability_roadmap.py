@@ -411,12 +411,18 @@ def capability_roadmap():
 
     Most data is loaded client-side via the API endpoints below.
     Server-side: capability_count, domain_count for stat cards (FAR-011 fix).
+    Server-side: plateau_count, work_package_count for initial tile values so tiles
+    never show a figure that disagrees with the evidence line while loading.
     """
-    capability_count = UnifiedCapability.query.count()
-    # the domains Capability Health groups the capabilities by, so the two screens count the same ones
+    from app.models.implementation_migration import Plateau
+    from app.models.unified_work_package import UnifiedWorkPackage
     from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
 
+    org_id = current_organization_id()
+    capability_count = UnifiedCapability.query.count()
     domain_count = len(CapabilityHealthService().get_capability_health_metrics()["health_by_domain"]) or None
+    plateau_count = Plateau.query.filter(Plateau.organization_id == org_id).count()
+    work_package_count = UnifiedWorkPackage.query.filter(UnifiedWorkPackage.organization_id == org_id).count()
     domain_basis = None
     if domain_count is None:
         domain_basis = (
@@ -428,8 +434,10 @@ def capability_roadmap():
         capability_count=capability_count,
         domain_count=domain_count,
         domain_basis=domain_basis,
+        plateau_count=plateau_count,
+        work_package_count=work_package_count,
         summary_footer=result_footer_service.roadmap_summary_footer(
-            current_organization_id(), capability_count, domain_count),
+            org_id, capability_count, domain_count),
     )
 
 

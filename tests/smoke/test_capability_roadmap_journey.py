@@ -73,7 +73,7 @@ def test_business_architect_creates_gap_plateau_and_work_package(browser, live_s
         expect(page.locator("#capability-roadmap-app p", has_text=plateau_name).first).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # The work package name is visible in the table
-        expect(page.locator("text=" + wp_name)).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("roadmap-wp-link").filter(has_text=wp_name)).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # The work package link lands on a page with content
         wp_link = page.get_by_test_id("roadmap-wp-link").filter(has_text=wp_name)

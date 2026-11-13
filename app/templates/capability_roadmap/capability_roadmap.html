@@ -144,7 +144,7 @@
       <template x-if="plateausLoading">
         <div>{{ skeleton_list(rows=3) }}</div>
       </template>
-      <template x-if="!plateausLoading && errorMessage">
+      <template x-if="!plateausLoading && plateausError">
         {{ empty_state(
           icon='alert-triangle',
           title='Error loading plateaus',
@@ -152,7 +152,7 @@
           class='py-10'
         ) }}
       </template>
-      <template x-if="!plateausLoading && !errorMessage && plateaus.length === 0">
+      <template x-if="!plateausLoading && !plateausError && plateaus.length === 0">
         {{ empty_state(
           icon='layers',
           title='No plateaus defined',
@@ -230,14 +230,14 @@
               <td colspan="7" class="p-4 text-center">{{ skeleton_table(rows=3, columns=7) }}</td>
             </tr>
           </template>
-          <template x-if="!workPackagesLoading && errorMessage">
+          <template x-if="!workPackagesLoading && workPackagesError">
             <tr>
               <td colspan="7" class="p-4 text-center text-sm text-destructive-emphasis">
                 Work packages could not be read — this is not "none yet".
               </td>
             </tr>
           </template>
-          <template x-if="!workPackagesLoading && !errorMessage && workPackages.length === 0">
+          <template x-if="!workPackagesLoading && !workPackagesError && workPackages.length === 0">
             <tr>
               <td colspan="7" class="p-4 text-center text-sm text-muted-foreground">
                 No work packages yet. Add a gap first, then create work packages to resolve it.
@@ -296,9 +296,12 @@
   {% endcall %}
 
   {# ── Error Banner ── #}
-  <template x-if="errorMessage">
-    <div class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis"
-      x-text="errorMessage"></div>
+  <template x-if="gapsError || plateausError || workPackagesError">
+    <div class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis">
+      <template x-if="gapsError"><div x-text="gapsError"></div></template>
+      <template x-if="plateausError"><div x-text="plateausError"></div></template>
+      <template x-if="workPackagesError"><div x-text="workPackagesError"></div></template>
+    </div>
   </template>
 
 </div>
@@ -594,11 +597,14 @@
       gaps: [],
       plateaus: [],
       workPackages: [],
-      workPackageCount: 0,
+      workPackageCount: {{ work_package_count | tojson }},
+      plateauCount: {{ plateau_count | tojson }},
       gapFilter: { priority: '', type: '' },
       selectedGapIds: [],
       isDetecting: false,
-      errorMessage: '',
+      gapsError: '',
+      plateausError: '',
+      workPackagesError: '',
       gapsLoading: true,
       plateausLoading: true,
       workPackagesLoading: true,
@@ -624,7 +630,7 @@
       get metrics() {
         return {
           total_gaps: this.gaps.length,
-          total_plateaus: this.plateaus.length,
+          total_plateaus: this.plateauCount,
           total_wps: this.workPackageCount,
           ai_generated: this.gaps.filter(g => g.auto_generated).length,
         };
@@ -652,7 +658,7 @@
         } catch (e) {
           this.gaps = [];
           Alpine.store('rdm').gaps = [];
-          this.errorMessage = 'Failed to load gaps (' + e.message + ').';
+          this.gapsError = 'Failed to load gaps (' + e.message + ').';
         } finally {
           this.gapsLoading = false;
         }
@@ -662,11 +668,12 @@
         try {
           const d = await window.rdmSource('plateaus');
           this.plateaus = d.plateaus || [];
+          this.plateauCount = this.plateaus.length;
           Alpine.store('rdm').plateaus = this.plateaus;
         } catch (e) {
           this.plateaus = [];
           Alpine.store('rdm').plateaus = [];
-          this.errorMessage = 'Failed to load plateaus (' + e.message + ').';
+          this.plateausError = 'Failed to load plateaus (' + e.message + ').';
         } finally {
           this.plateausLoading = false;
         }
@@ -682,7 +689,7 @@
           this.workPackages = [];
           this.workPackageCount = 0;
           Alpine.store('rdm').workPackages = [];
-          this.errorMessage = 'Failed to load work packages (' + e.message + ').';
+          this.workPackagesError = 'Failed to load work packages (' + e.message + ').';
         } finally {
           this.workPackagesLoading = false;
         }
@@ -754,8 +761,9 @@
           if (!d.success) throw new Error(d.error || 'Delete failed');
           this.gaps = this.gaps.filter(g => g.id !== gap.id);
           Alpine.store('rdm').gaps = this.gaps;
+          this.gapsError = '';
         } catch (e) {
-          this.errorMessage = e.message || 'Failed to delete gap.';
+          this.gapsError = e.message || 'Failed to delete gap.';
         }
       },
 
@@ -766,11 +774,23 @@
         try {
           const d = await Platform.fetch.delete(`/capability-map/api/roadmap/work-packages/${wp.id}`, { silent: true });
           if (!d.success) throw new Error(d.error || 'Delete failed');
-          this.workPackages = this.workPackages.filter(w => w.id !== wp.id);
-          Alpine.store('rdm').workPackages = this.workPackages;
+          // Re-fetch from server so the tile count and evidence line agree (includes parts).
+          await this.loadWorkPackages(true);
+          // Update the evidence line with the new work package count.
+          this.updateEvidenceLineWorkPackages();
+          this.workPackagesError = '';
         } catch (e) {
-          this.errorMessage = e.message || 'Failed to delete work package.';
+          this.workPackagesError = e.message || 'Failed to delete work package.';
         }
+      },
+
+      updateEvidenceLineWorkPackages() {
+        const footer = document.getElementById('roadmap-summary-footer') || document.querySelector('[data-testid="roadmap-summary-footer"]');
+        if (!footer) return;
+        const evidenceEl = footer.querySelector('[data-testid="result-footer-evidence"]');
+        if (!evidenceEl) return;
+        // Replace "Work packages: X" with the new count.
+        evidenceEl.innerHTML = evidenceEl.innerHTML.replace(/Work packages: \d+/, 'Work packages: ' + this.workPackageCount);
       },
 
       formatDate(value) {
