@@ -673,7 +673,13 @@ def api_work_packages_gantt():
                 "milestones": _milestones_for(wp),
             })
 
-        return jsonify({"work_packages": items, "total": len(items)})
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        reply = {"work_packages": items, "total": len(items)}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply, keys=("estimated_cost",))
+            reply["costs_withheld"] = COSTS_WITHHELD
+        return jsonify(reply)
     except Exception:
         logger.exception("Failed to build Gantt work-package feed")
         return jsonify({"error": "Failed to load work packages"}), 500

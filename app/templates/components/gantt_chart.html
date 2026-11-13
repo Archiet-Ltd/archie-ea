@@ -75,6 +75,9 @@ ArchiMate 3.2 Compatible with 5-year timeline support
         <p class="text-sm text-destructive-emphasis" x-text="loadError"></p>
     </div>
 
+    <p x-show="costsWithheld" x-cloak x-text="costsWithheld" role="status" data-testid="timeline-costs-withheld"
+       class="mb-6 text-sm text-muted-foreground"></p>
+
     <div class="mb-6 p-4 bg-card border border-border rounded-lg">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <!-- Search -->
@@ -383,7 +386,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
                                class="h-9 w-full px-3 border border-input bg-background rounded-md" aria-label="Number field">
                     </div>
                     
-                    <div>
+                    <div x-show="!costsWithheld">
                         <label class="block text-sm font-medium text-muted-foreground mb-1">Estimated Cost</label>
                         <input type="number" x-model="formData.estimated_cost" step="0.01"
                                class="h-9 w-full px-3 border border-input bg-background rounded-md" aria-label="Number field">
@@ -419,6 +422,7 @@ function ganttChartManager() {
         workPackages: [],
         filteredWorkPackages: [],
         loadError: null,
+        costsWithheld: null,
         timelineMonths: [],
         formData: {
             name: '',
@@ -458,6 +462,7 @@ function ganttChartManager() {
                 // Platform.fetch throws on non-ok responses, returns parsed JSON directly
                 const data = await Platform.fetch('/enterprise/api/work-packages/gantt', { silent: true });
                 this.workPackages = data.work_packages || [];
+                this.costsWithheld = data.costs_withheld || null;
                 this.filteredWorkPackages = [...this.workPackages];
                 this.loadError = null;
             } catch (error) {
@@ -644,7 +649,7 @@ function ganttChartManager() {
         
         exportToCSV() {
             // Generate CSV content
-            const headers = ['Name', 'Description', 'Status', 'Business Capability', 'Assigned To', 'Start Date', 'End Date', 'Progress', 'Cost'];
+            const headers = ['Name', 'Description', 'Status', 'Business Capability', 'Assigned To', 'Start Date', 'End Date', 'Progress'].concat(this.costsWithheld ? [] : ['Cost']);
             const rows = this.filteredWorkPackages.map(wp => [
                 wp.name,
                 wp.description,
@@ -654,7 +659,7 @@ function ganttChartManager() {
                 wp.start_date,
                 wp.end_date,
                 wp.progress_percentage + '%',
-                wp.estimated_cost
+                ...(this.costsWithheld ? [] : [wp.estimated_cost])
             ]);
             
             const csvContent = [headers, ...rows]
