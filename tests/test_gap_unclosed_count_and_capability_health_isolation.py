@@ -91,6 +91,24 @@ def test_gaps_page_and_board_agree_on_unplanned_with_a_resolved_gap(
     assert int(board_shown.group(1)) == 1, board_shown.group(1)
 
 
+def test_gap_register_shows_risks_register_link(
+        app, db_session, make_org, client, login_as):
+    from app.models.implementation_migration import Gap
+
+    org = make_org("gap-risks-link")
+    user = _user(db_session, org, "risks-link")
+    db_session.add(Gap(name="A gap", organization_id=org.id))
+    db_session.commit()
+    org_id, user_id = org.id, user.id
+    db_session.expunge_all()
+
+    _sign_in(client, login_as, user_id)
+    html = client.get("/enterprise/implementation/gap-analysis").get_data(as_text=True)
+
+    assert 'data-testid="gap-risks-register-link"' in html, "the Risks register link is missing"
+    assert "These figures count gaps, not risks" in html, "the gaps-not-risks sentence is missing"
+
+
 def test_capability_health_lists_only_the_signed_in_organisations_capabilities(
         app, db_session, make_org, client, login_as):
     from app.models.business_capabilities import BusinessCapability
