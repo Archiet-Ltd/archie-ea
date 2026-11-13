@@ -182,6 +182,12 @@ def list_users_for_assignment():
                 db.or_(
                     User.first_name.ilike(like, escape="\\"),
                     User.last_name.ilike(like, escape="\\"),
+                    # The name as shown in the list, so typing it in full finds the person.
+                    (
+                        func.coalesce(User.first_name, "")
+                        + " "
+                        + func.coalesce(User.last_name, "")
+                    ).ilike(like, escape="\\"),
                     User.email.ilike(like, escape="\\"),
                 )
             )

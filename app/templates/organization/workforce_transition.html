@@ -103,7 +103,7 @@
             <section class="rounded-lg border border-border bg-card p-6">
               <h2 class="text-sm font-semibold text-foreground mb-3">Retiring roles</h2>
               <template x-if="data.retiring_roles.length === 0">
-                <p class="text-sm text-muted-foreground">None marked for retirement.</p>
+                <p class="text-sm text-muted-foreground">No role is marked for retirement.</p>
               </template>
               <ul class="space-y-2">
                 <template x-for="r in data.retiring_roles" :key="r.id">

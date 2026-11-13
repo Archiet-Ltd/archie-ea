@@ -767,9 +767,9 @@ def test_a_reply_the_reviewer_leaves_unreadable_applies_nothing(db_session, make
 def test_the_run_stops_asking_models_after_the_call_cap(db_session, make_org, tenant_ctx, monkeypatch):
     from app.modules.ai_chat.services.change_review import CALLS_PER_RUN, ReviewBudget, sweep_organisation
 
-    assert CALLS_PER_RUN == 50 and ReviewBudget().limit == 50
+    assert CALLS_PER_RUN == 10 and ReviewBudget().limit == 10
     budget = ReviewBudget()
-    assert [budget.take() for _ in range(51)].count(True) == 50 and budget.take() is False
+    assert [budget.take() for _ in range(11)].count(True) == 10 and budget.take() is False
 
     org = make_org("gap-cap")
     user = _user(db_session, org.id)

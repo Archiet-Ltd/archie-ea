@@ -40,7 +40,37 @@ def may_handle_data_subject_requests(user):
 
     if is_platform_admin(user):
         return True
+    if _administers_own_organisation(user):
+        return True
     return get_user_role(user) in DATA_SUBJECT_REQUEST_ROLES
+
+
+def _administers_own_organisation(user):
+    """True when ``user`` administers their own organisation, by the one check
+    every caller uses. Requests are the organisation's records, so its
+    administrator handles them whatever their working persona is."""
+    try:
+        return bool(getattr(user, "is_authenticated", False) and user.is_org_admin)
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        return False
+
+
+def requires_data_subject_request_access(f):
+    """Admit what ``may_handle_data_subject_requests`` admits; everyone else gets 403."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            abort(401)
+        if not may_handle_data_subject_requests(current_user):
+            current_app.logger.warning(
+                f"Access denied: user {current_user.id} attempted to access {request.path}"
+            )
+            abort(403, description="Access denied. Data subject requests are handled by "
+                                   "your organisation's administrator or Data Protection Officer.")
+        return f(*args, **kwargs)
+
+    return decorated_function
 
 
 def requires_role(allowed_roles: Union[str, List[str]]):
