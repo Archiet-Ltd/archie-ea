@@ -443,7 +443,8 @@ def capability_roadmap():
         plateau_count=plateau_count,
         work_package_count=work_package_count,
         summary_footer=result_footer_service.roadmap_summary_footer(
-            org_id, capability_count, domain_count),
+            org_id, capability_count, domain_count,
+            plateau_count=plateau_count, work_package_count=work_package_count),
     )
 
 

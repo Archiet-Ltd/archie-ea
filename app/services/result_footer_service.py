@@ -728,10 +728,12 @@ def plateau_footer(plateau, now: Optional[datetime] = None) -> Dict[str, Any]:
 
 
 def roadmap_summary_footer(organization_id: int, capability_count: int, domain_count: int,
+                           plateau_count: Optional[int] = None, work_package_count: Optional[int] = None,
                            now: Optional[datetime] = None) -> Dict[str, Any]:
     """Footer for the roadmap's headline counts. The capability and domain counts are the ones the cards show
     (passed in, so footer and card cannot disagree); gaps, plateaus and work packages are counted for this
-    organisation. Each is dated by the newest record behind it."""
+    organisation. Each is dated by the newest record behind it. When plateau_count or work_package_count are
+    passed in, they are used directly so the footer and the tiles cannot disagree (one count per figure)."""
     from app import db
     from app.models.implementation_migration import GAP_KIND_PLATEAU_TRANSITION, Gap, Plateau
     from app.services.gap_register_service import count_gaps
@@ -743,10 +745,14 @@ def roadmap_summary_footer(organization_id: int, capability_count: int, domain_c
                     href=page_link(endpoint) if count else None, source_kind="derived", subject=subject,
                     as_of=newest, missing=not count)
 
-    def counted(model, label, subject, endpoint):
-        count, newest = db.session.execute(
-            db.select(db.func.count(model.id), db.func.max(model.updated_at)).where(
-                model.organization_id == organization_id)).one()
+    def counted(model, label, subject, endpoint, count=None):
+        if count is None:
+            count, newest = db.session.execute(
+                db.select(db.func.count(model.id), db.func.max(model.updated_at)).where(
+                    model.organization_id == organization_id)).one()
+        else:
+            newest = db.session.execute(db.select(db.func.max(model.updated_at)).where(
+                model.organization_id == organization_id)).scalar()
         return named(label, count, subject, endpoint, newest)
 
     # Gaps are the register's count (plateau transitions left out), the figure the Recorded gaps card shows.
@@ -759,8 +765,9 @@ def roadmap_summary_footer(organization_id: int, capability_count: int, domain_c
         named("Capabilities", capability_count, "Capabilities", "capability_map.index", capabilities_newest),
         named("Domains", domain_count, "Domains", "capability_map.index", domains_newest),
         gap_count_fact,
-        counted(Plateau, "Plateaus", "Plateaus", "implementation_planning.plateaus_list"),
-        counted(UnifiedWorkPackage, "Work packages", "Work packages", "implementation_planning.work_packages_list"),
+        counted(Plateau, "Plateaus", "Plateaus", "implementation_planning.plateaus_list", count=plateau_count),
+        counted(UnifiedWorkPackage, "Work packages", "Work packages", "implementation_planning.work_packages_list",
+                count=work_package_count),
     ], now)
 
 
