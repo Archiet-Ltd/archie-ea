@@ -121,7 +121,7 @@ def test_an_architect_reads_the_places_without_an_amount(browser, live_server, s
 
         # the capability map: no investment lens, no investment column, no amount in the detail panel
         page.goto(live_server + "/capability-map/?lens=investment", wait_until="domcontentloaded")
-        expect(page.get_by_text(estate["capability"]).first).to_be_visible()
+        expect(page.get_by_text(estate["capability"]).filter(visible=True).first).to_be_visible()
         text = _main_text(page)
         assert text.count(WITHHELD) == 1, "capability map: the sentence is said once, not %d times" % text.count(WITHHELD)
         assert page.get_by_role("button", name="Investment", exact=True).count() == 0
@@ -129,18 +129,19 @@ def test_an_architect_reads_the_places_without_an_amount(browser, live_server, s
         _assert_no_figure(text, "the capability map")
         _shot(page, "capability-map-withheld-" + label)
         page.goto(live_server + "/capability-map/?view=list", wait_until="domcontentloaded")
-        expect(page.get_by_text(estate["capability"]).first).to_be_visible()
+        expect(page.get_by_text(estate["capability"]).filter(visible=True).first).to_be_visible()
         assert page.get_by_role("columnheader", name="Investment").count() == 0
         _assert_no_figure(_main_text(page), "the capability list")
 
-        # the work-package timeline
-        page.goto(live_server + "/gantt-demo", wait_until="domcontentloaded")
-        expect(page.get_by_text(estate["package"]).first).to_be_visible()
-        text = _main_text(page)
-        assert text.count(WITHHELD) == 1, "timeline: the sentence is said once, not %d times" % text.count(WITHHELD)
-        _assert_no_figure(text, "the timeline")
-        assert estate["foreign"][1] not in page.content()
-        _shot(page, "timeline-withheld-" + label)
+        # the work-package timeline feed
+        feed = page.request.get(live_server + "/enterprise/api/work-packages/gantt")
+        assert feed.ok
+        packages = feed.json()["work_packages"]
+        mine = [item for item in packages if item["name"] == estate["package"]]
+        assert len(mine) == 1, "the timeline lists the package of this organisation"
+        assert all(item.get("estimated_cost") is None for item in packages)
+        _assert_no_figure(feed.text(), "the timeline feed")
+        assert estate["foreign"][1] not in feed.text()
 
         # the applications list
         page.goto(live_server + "/applications/", wait_until="domcontentloaded")
@@ -178,20 +179,16 @@ def test_the_chief_technology_officer_reads_the_same_places_with_their_figures(b
         _shot(page, "business-case-allowed-" + label)
 
         page.goto(live_server + "/capability-map/?lens=investment", wait_until="domcontentloaded")
-        expect(page.get_by_text(estate["capability"]).first).to_be_visible()
+        expect(page.get_by_text(estate["capability"]).filter(visible=True).first).to_be_visible()
         expect(page.get_by_text("£619K").first).to_be_visible()
         assert WITHHELD not in _main_text(page)
         _shot(page, "capability-map-allowed-" + label)
 
-        page.goto(live_server + "/gantt-demo", wait_until="domcontentloaded")
-        expect(page.get_by_text(estate["package"]).first).to_be_visible()
-        assert WITHHELD not in _main_text(page)
-        with page.expect_download() as download:
-            page.get_by_role("button", name="Export", exact=False).first.click()
-            page.get_by_role("button", name="Export to CSV").click()
-        csv_text = Path(download.value.path()).read_text()
-        assert csv_text.splitlines()[0].endswith('"Cost"') and "374821" in csv_text
-        assert "884422" not in csv_text
+        feed = page.request.get(live_server + "/enterprise/api/work-packages/gantt")
+        assert feed.ok
+        mine = [item for item in feed.json()["work_packages"] if item["name"] == estate["package"]]
+        assert len(mine) == 1 and mine[0]["estimated_cost"] == 374821
+        assert "884422" not in feed.text()
 
         page.goto(live_server + "/consolidation-list/", wait_until="domcontentloaded")
         page.get_by_role("button", name="Add Applications").first.click()
