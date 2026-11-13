@@ -2724,6 +2724,11 @@ def export_elements(layer, element_type):
             elem_dict = _element_to_dict(elem)
             data.append(elem_dict)
 
+        if not costs_visible(current_user):
+            # A person the one cost rule withholds from receives no amount in any column of the export.
+            data = withhold_costs(data, keys=tuple(
+                column.key for column in model_class.__table__.columns if _is_money_column(column.key)))
+
         response = jsonify(data)
         response.headers["Content-Disposition"] = (
             f"attachment; filename={element_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
