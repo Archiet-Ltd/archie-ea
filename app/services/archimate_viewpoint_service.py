@@ -502,7 +502,12 @@ def _stored_layer_key(raw) -> str:
 
 def element_layer(stored_layer, element_type) -> str:
     """The layer one element is counted in, whatever its type: the layer it is stored in. An element that
-    names no layer is placed by its type, and one whose type no layer holds is the composite row."""
+    names no layer is placed by its type, and one whose type no layer holds is the composite row.
+
+    The rule itself reads no organisation: it places one element by its own stored layer and type, so it
+    cannot answer for one organisation's rows and not another's. Every reader names its organisation in the
+    query (count_layers, layer_model_query) and applies this rule to the rows that query returns.
+    """
     return _stored_layer_key(stored_layer) or LAYER_TYPE_TO_LAYER.get(_type_key(element_type), COMPOSITE_LAYER)
 
 
@@ -515,17 +520,19 @@ def _stored_layer_column():
     return _db.func.replace(_db.func.replace(spelled, " ", ""), "_", "")
 
 
-def layer_model_query(layer: str, org_id=None):
+def layer_model_query(layer: str, org_id):
     """The model elements of one layer, the rows count_layers counts for it: every element stored in the layer,
     whatever its type (element_layer is the rule). Physical, which is no layer of its own, answers with the
-    Physical types alone. With ``org_id`` the query names that organisation itself, as count_layers does,
-    instead of relying on the tenant filter alone."""
+    Physical types alone. The query names that organisation itself, as count_layers does, instead of relying
+    on the tenant filter alone: ``org_id`` is required, with no default, because the tenant filter alone is
+    not enough — the same element id can exist in more than one organisation."""
+    if org_id is None:
+        raise ValueError("layer_model_query requires an org_id; the tenant filter alone is not enough")
     from app import db as _db
     from app.models.archimate_core import ArchiMateElement
 
     base = ArchiMateElement.query
-    if org_id is not None:
-        base = base.filter(ArchiMateElement.organization_id == org_id)
+    base = base.filter(ArchiMateElement.organization_id == org_id)
     if layer == "physical":
         return base.filter(_type_key_column().in_(list(PHYSICAL_TYPES)))
     stored = _stored_layer_column()
@@ -544,7 +551,12 @@ def count_layers(org_id, allowed_types=None) -> list:
     layer, whatever their type (one that names no layer is placed by its type; types the map does not know are
     the composite row), ``register_only`` the records the layer lists that the model does not hold, and ``count`` their sum. ``count`` is None, never
     a partial figure, when the records could not be counted. Physical is not a row: its types are Technology's.
+
+    ``org_id`` is required, as layer_model_query's is: a count that names no organisation is refused rather
+    than answered from the rows that happen to carry no organisation of their own.
     """
+    if org_id is None:
+        raise ValueError("count_layers requires an org_id; a count of no organisation is not a count")
     from app import db as _db
     from app.models.archimate_core import ArchiMateElement
 

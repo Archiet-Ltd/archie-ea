@@ -76,19 +76,36 @@ def layer_counts() -> List[Dict[str, Any]]:
 
     org_id = current_org_id()
     rows = {row["layer"]: row for row in counting.count_layers(org_id)}
+
+    # One grouped read for every layer's element kinds: stored layer and type together,
+    # then the canonical element_layer rule places each element in its true layer,
+    # instead of one query per layer.
     type_column = db.func.coalesce(ArchiMateElement.type, "Unspecified")
+    stored = counting._stored_layer_column()
+    query = (
+        db.select(stored, type_column, db.func.count(ArchiMateElement.id))
+        .group_by(stored, type_column)
+        .where(ArchiMateElement.organization_id == org_id)
+    )
+    kinds_by_layer = {key: {} for key in LAYERS}
+    for stored_layer, type_name, n in db.session.execute(query).all():
+        layer = counting.element_layer(stored_layer, type_name)
+        key = "other" if layer == counting.COMPOSITE_LAYER else layer
+        if key in kinds_by_layer:
+            label = type_name or "Unspecified"
+            kinds_by_layer[key][label] = kinds_by_layer[key].get(label, 0) + n
+
     out = []
     for key in LAYERS:
-        kinds = counting.layer_model_query(_counting_layer(key), org_id).with_entities(
-            type_column, db.func.count(ArchiMateElement.id)).group_by(type_column).all()
-        row = rows.get(_counting_layer(key), {})
+        kinds = sorted(kinds_by_layer[key].items(), key=lambda kv: (-kv[1], kv[0]))
+        row = rows.get(key, {})
         drawn = row.get("model", 0)
         # The dashboard's figure for the layer. A layer whose records could not be counted has no such figure:
         # it is shown as drawn, with nothing said about records.
         total = row["count"] if row.get("count") is not None else drawn
         out.append({
             "layer": key, "label": LAYER_LABELS[key], "count": drawn, "total": total, "not_drawn": total - drawn,
-            "kinds": [{"type": t, "count": c} for t, c in sorted(kinds, key=lambda kv: (-kv[1], kv[0]))],
+            "kinds": [{"type": t, "count": c} for t, c in kinds],
         })
     return out
 
