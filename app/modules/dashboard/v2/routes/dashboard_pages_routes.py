@@ -19,7 +19,7 @@ import logging
 
 from werkzeug.exceptions import HTTPException
 from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
@@ -32,6 +32,7 @@ from app.modules.dashboard.v2.services import (
 )
 from app.services import scoring_configuration_service
 from app.services.application_cost_accessor import set_annual_cost
+from app.services.cost_visibility import costs_visible
 from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
@@ -1046,7 +1047,8 @@ def api_rationalization_onboard():
             application_type=data.get("type"),
             lifecycle_status=data.get("lifecycle_status", "planning"),
         )
-        set_annual_cost(app, data.get("annual_cost"))
+        if costs_visible(current_user):
+            set_annual_cost(app, data.get("annual_cost"))
         db.session.add(app)
         db.session.flush()
 
