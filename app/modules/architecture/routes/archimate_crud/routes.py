@@ -29,6 +29,7 @@ from sqlalchemy import or_
 from app import db
 from app.core.auth.decorators import admit_model_changers
 from app.decorators import require_roles
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
 from app.utils.tenant_users import escape_like_literal
 from . import archimate_crud, element_page, product_page
 from .services.ai_generation_service import AIGenerationService
@@ -753,6 +754,15 @@ def _mirror_process_owner(process_id, org_id):
     db.session.commit()
 
 
+_MONEY_COLUMN = re.compile(r"cost|price|budget|spend|saving|tco|revenue")
+_NOT_MONEY_COLUMN = re.compile(r"cost_cent(er|re)|cost_code")
+
+
+def _is_money_column(name):
+    """True for a column that holds an amount of money (not a cost centre code)."""
+    return bool(_MONEY_COLUMN.search(name)) and not _NOT_MONEY_COLUMN.search(name)
+
+
 def _get_display_fields(element, model_class, element_type=None):
     """Introspect a model instance and return a list of (label, value) tuples
     for all non-empty, non-private, non-FK columns worth displaying. A column the record's form
@@ -824,7 +834,8 @@ def _get_display_fields(element, model_class, element_type=None):
         else:
             value = _plain_value(value)
 
-        fields.append({"label": label, "value": str(value), "technical": col_name in _TECHNICAL_FIELDS})
+        fields.append({"label": label, "value": str(value), "technical": col_name in _TECHNICAL_FIELDS,
+                       "money": _is_money_column(col_name)})
 
     return fields
 
@@ -1727,6 +1738,10 @@ def detail_element(layer, element_type, element_id):
 
     # Auto-discover displayable fields from the model
     all_fields = _get_display_fields(element, model_class, element_type)
+    costs_shown = costs_visible(current_user)
+    if not costs_shown:
+        # A person the one cost rule withholds from reads no amount on any element page.
+        all_fields = [f for f in all_fields if not f.get("money")]
     display_fields = [f for f in all_fields if not f["technical"]]
     display_fields[:0] = _capability_fact(element, element_type)
     # These two are the element's own dates; the owner's assignment date is
@@ -1806,6 +1821,8 @@ def detail_element(layer, element_type, element_id):
         )
 
     product = _product_page(element, element_type, ae_id)
+    if product is not None and not costs_shown:
+        product["cost"] = {"withheld": True}
 
     return render_template(
         "archimate_crud/detail.html",
@@ -1835,7 +1852,8 @@ def detail_element(layer, element_type, element_id):
         source_facts=source_facts,
         live_connectors=live_connectors,
         connectors_url=connectors_url,
-        technology_cost=_technology_cost_panel(ae_id),
+        technology_cost=_technology_cost_panel(ae_id, costs_shown),
+        costs_withheld_text=COSTS_WITHHELD,
         layer_config=LAYER_CONFIG,
         registered_types=list(MODEL_REGISTRY),
     )
@@ -1978,7 +1996,10 @@ def export_product(product_id):
         product_ae, org_id=org_id, href_for=_element_href, owner_for=_owner_names_for, plain_name=_plain_name,
         user=current_user, add_url=None, export_url=None,
         status_words=_plain_label)
-    response = jsonify(product_page.export_payload(product_ae, page))
+    payload = product_page.export_payload(product_ae, page)
+    if not costs_visible(current_user):
+        payload["cost"] = {"withheld": COSTS_WITHHELD}
+    response = jsonify(payload)
     response.headers["Content-Disposition"] = "attachment; filename=product_%d.json" % product_id
     return response
 
@@ -2015,7 +2036,7 @@ def _utc_stamp(value) -> str:
     return f"{moment:%d %b %Y %H:%M} UTC"
 
 
-def _technology_cost_panel(ae_id):
+def _technology_cost_panel(ae_id, costs_shown=True):
     """The cost panel for a node or system software, or None for any other element."""
     from app.modules.architecture.services.application_technology_links import is_technology_element
     from app.services import technology_cost
@@ -2024,9 +2045,18 @@ def _technology_cost_panel(ae_id):
     element = ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
     if element is None or org_id is None or not is_technology_element(element):
         return None
+    allocation = technology_cost.allocation(org_id, element.id)
+    if not costs_shown:
+        # The applications this technology runs stay; every amount and share is left out.
+        allocation = withhold_costs(
+            dict(allocation, facts=[], total=None, missing=[], share_range=None,
+                 applications=[dict(a, share=None) for a in allocation["applications"]]),
+            keys=("total", "share", "share_range"),
+        )
     return {
+        "withheld": not costs_shown,
         "element_id": element.id,
-        "allocation": technology_cost.allocation(org_id, element.id),
+        "allocation": allocation,
         "categories": technology_cost.CATEGORIES,
         "category_labels": dict(technology_cost.CATEGORIES),
         "rule": technology_cost.RULE,

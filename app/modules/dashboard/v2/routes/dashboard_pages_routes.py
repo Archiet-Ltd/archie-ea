@@ -56,10 +56,17 @@ def api_capability_heatmap():
                     measured zero.
     """
     try:
+        from flask_login import current_user
+
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
         heatmap_service = CapabilityHeatmapService()
         heatmap_data = heatmap_service.get_maturity_heatmap()
+        if not costs_visible(current_user):
+            # No investment is worked out for a person the one cost rule withholds from.
+            heatmap_data["costs_withheld"] = COSTS_WITHHELD
 
-        if request.args.get("group_by", "") == "domain":
+        if request.args.get("group_by", "") == "domain" and costs_visible(current_user):
             investment_by_domain = _aggregate_investment_by_domain()
             inv_lookup = {d["domain_code"]: d for d in investment_by_domain}
             for domain_row in heatmap_data.get("domains", []):
@@ -176,9 +183,15 @@ def capability_heatmap_page():
     except Exception:
         currency_symbol = "£"
 
+    from flask_login import current_user
+
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
     return render_template(
         "dashboard/capability_heatmap.html",
         currency_symbol=currency_symbol,
+        costs_withheld=not costs_visible(current_user),
+        costs_withheld_text=COSTS_WITHHELD,
     )
 
 
