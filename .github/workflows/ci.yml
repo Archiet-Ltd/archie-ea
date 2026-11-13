@@ -341,6 +341,12 @@ jobs:
           chmod +x scripts/bin/tailwindcss
       - name: Install Chromium for JavaScript syntax validation
         run: python -m playwright install --with-deps chromium
+      - name: Install the SysML parser
+        # The system-model gate needs the parser; the script checks each
+        # download against its pinned SHA-256 and unpacks into one folder.
+        run: |
+          echo "SYSML_HOME=${RUNNER_TEMP}/sysml" >> "$GITHUB_ENV"
+          SYSML_HOME="${RUNNER_TEMP}/sysml" bash scripts/sysml/install_parser.sh
       - name: Compile + lint ratchets + design tokens + air-gap
         run: python scripts/verify.py --tag static
       - name: Dependency CVE gate
