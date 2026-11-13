@@ -37,18 +37,20 @@ entries:
       template, and do not write a second footer, "Source:" line or confidence label beside it.
       The rule is in the service docstring and in docs/adr/0013-result-footer.md.
 
-  - id: cost-masker
-    concept: Withholding a figure in pounds from a person who may not see spend (investment figures, budgets, costs)
+  - id: cost-visibility
+    concept: Withholding a figure in pounds from a person who may not see spend (cost, budget, TCO, licence cost, investment estimate, savings, financial risk)
     status: active
     canonical:
-      path: app/modules/solutions_strategic/v2/services/investment_prioritization_service.py
-      symbols: [hide_costs, limit_costs_to_viewer]
+      path: app/services/cost_visibility.py
+      symbols: [costs_visible, withhold_costs, COSTS_WITHHELD, COST_KEYS, INVESTMENT_MONEY_KEYS]
     reuse: >
-      Pass an analysis through limit_costs_to_viewer before a page or feed sends it; it asks the one role helper
-      (can_see_costs) and, for a person who may not see spend, hide_costs replaces every money figure with None
-      and sets costs_hidden so the page says the figure is restricted instead of showing a zero. Do not write a
-      second masker, do not test roles by hand in a route or template to decide whether a cost shows, and do not
-      blank a figure in the browser: the figure must not leave the server.
+      The rule is may_see_spend_pages (app/decorators/requires_role.py), asked through costs_visible. When it
+      says no, pass the result through withhold_costs before the reply is built, with keys= when the money sits
+      under other keys than a simulation's. The masker sets costs_withheld; a template reads that flag and prints
+      COSTS_WITHHELD, "Cost figures are withheld for your role.", and never blanks a cell. Do not call
+      can_see_costs outside requires_role.py and role_access.py, do not write a second masker or walker, do not
+      write another sentence or flag for the same case, and do not mask in the browser: the figure must not
+      leave the server. The static test tests/test_one_cost_rule.py enforces it.
 
   - id: design-tokens
     concept: Colour, radius and type tokens for every page (one token file; the public marketing
@@ -608,6 +610,17 @@ entries:
         regex: '(?i)(?:let|const|var|function|class)\s+\w*archimate\w*(?:renderer|diagramengine)\b'
         scope: [app/static/js, app/templates]
         suffixes: [.js, .html]
+
+  - id: composer-radial-arrangement
+    concept: Arranging the elements of a view round one element, each step away on its own ring (the Composer's neighbourhood view)
+    status: active
+    canonical:
+      path: app/static/js/archimate/composer.js
+      symbols: [applyRadialLayout, applyLayerBanding]
+    reuse: >
+      applyRadialLayout is the one radial arrangement, beside applyLayerBanding, which arranges by layer. It shares
+      LAYER_Y_ORDER with layer banding, and the drawing is then fitted by the one fitCanvas. A view about one element
+      calls it; do not write a second radial, circular or ring layout or a second fit or zoom routine in the Composer.
 
   - id: diagram-editor-shell
     concept: The editor chrome around an ArchiMate diagram (toolbar, element palette, finder, relationship legend, minimap, status line, header, properties sheet)
@@ -1210,3 +1223,15 @@ entries:
         regex: 'def\s+_?normali[sz]ed_type\s*\('
         scope: [app]
         suffixes: [.py]
+
+  - id: capability-strategic-score
+    concept: A capability's strategic score on the investment pages, recorded or worked out from the model
+    status: active
+    canonical:
+      path: app/modules/solutions_strategic/v2/services/investment_prioritization_service.py
+      symbols: [InvestmentPrioritizationService.analyze_investment_priorities, InvestmentPrioritizationService._derive_importance]
+    reuse: >
+      The recorded importance wins. Where none is recorded, _derive_importance works one out from the criticality
+      of the applications that support the capability, then its links to goals, drivers, outcomes or principles,
+      then the value streams it serves, then its open risks, and the footer says it was derived. Read the score
+      from the service result; do not write a second derivation or a stand-in score for an unrated capability.

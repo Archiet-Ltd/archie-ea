@@ -1,6 +1,6 @@
 {# design-block: public #}
 {# smoke-coverage-ok: covered by tests/test_release_waves.py and tests/smoke/test_wave_switch_journey.py.
-   Template: public/early_access.html -- what a page of a later release answers while the wave switch is on:
+   Template: public/early_access.html -- what a page not yet open to everyone answers while the switch is on:
    the capability's name, a plain sentence that it is coming, and the waiting-list form. No screenshot,
    no figure, no claim that it works today. Receives group (title, blurb), group_slug, form_action,
    thanks and error. #}
@@ -9,7 +9,8 @@
 {% block body_theme %}theme-marketing{% endblock %}
 {% block title %}{{ group.title }}: early access{% endblock %}
 {% block meta_description %}
-<meta name="robots" content="noindex">
+{% from 'partials/_seo_meta.html' import seo_meta %}
+{{ seo_meta('https://entelim.org/early-access/' ~ group_slug, (group.blurb or 'Entelim is building this.') ~ ' Join the waiting list and we will email you when you can use it.', not indexable) }}
 {% endblock %}
 {% block header %}
 {% include 'components/public_navbar.html' %}
@@ -20,7 +21,7 @@
     <p class="text-sm font-medium text-muted-foreground">Early access</p>
     <h1>{{ group.title }}</h1>
     <p>{{ group.blurb or 'Entelim is building this.' }}</p>
-    <p>Join the waiting list and we will tell you the day it opens.</p>
+    <p>Join the waiting list and we will email you when you can use it.</p>
   </article>
   <section id="early-access-interest" aria-labelledby="early-access-heading" class="style-vega mt-12 p-6 border border-border rounded-lg bg-card" data-testid="early-access-interest">
     <h2 id="early-access-heading" class="text-lg font-semibold mb-2">Join the waiting list</h2>
