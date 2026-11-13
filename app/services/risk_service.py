@@ -17,14 +17,14 @@ def get_heat_map_data(solution_id=None):
     q = Risk.query
     if solution_id is not None:
         q = q.filter_by(solution_id=solution_id)
-    all_risks = q.all()
+    all_risks = q.order_by(Risk.id).all()
 
     # Build 5×5 grid indexed [likelihood 1-5][impact 1-5]
     grid = {item: {i: [] for i in range(1, 6)} for item in range(1, 6)}
     for risk in all_risks:
         _kind, likelihood, impact = risk._score_basis  # the cell is the pair the score and band come from
-        item = max(1, min(5, likelihood))
-        i = max(1, min(5, impact))
+        item = max(1, min(5, int(likelihood or 1)))
+        i = max(1, min(5, int(impact or 1)))
         grid[item][i].append(risk.to_dict())
 
     # Convert to list-of-lists (row 0 = likelihood 5 at top)
@@ -224,6 +224,30 @@ def risk_band(score):
         if score >= floor:
             return key
     return "low"
+
+
+def probability_impact_grid(placements):
+    """The cells of the five by five risk matrix, the shape ``components/risk_matrix.html`` draws.
+
+    ``placements`` is (probability, impact, title) for each risk. Five rows, impact 5 down to 1, each of five
+    cells, probability 1 to 5, each a dict of likelihood, impact, count, band and titles.
+    """
+    cells = {}
+    for likelihood, impact, title in placements:
+        cells.setdefault((likelihood, impact), []).append(title)
+    return [[{"likelihood": lk, "impact": im, "count": len(cells.get((lk, im), [])),
+              "band": risk_band(lk * im), "titles": cells.get((lk, im), [])}
+             for lk in range(1, 6)] for im in range(5, 0, -1)]
+
+
+def register_matrix():
+    """The risk matrix for every risk in the register, in the shape ``probability_impact_grid`` gives. The risks are
+    placed by ``get_heat_map_data``, the one place a risk's cell is worked out."""
+    placements = []
+    for row_number, row in enumerate(get_heat_map_data()["grid"]):  # row 0 is likelihood 5
+        for column_number, cell in enumerate(row):  # column 0 is impact 1
+            placements.extend((5 - row_number, column_number + 1, risk["title"]) for risk in cell)
+    return probability_impact_grid(placements)
 
 
 def links_for_entity(entity_type, entity_id):
