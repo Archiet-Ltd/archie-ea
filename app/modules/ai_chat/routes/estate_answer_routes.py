@@ -1,6 +1,7 @@
 """Answering a question about the organisation's own estate inside the chat."""
 
 import logging
+from datetime import datetime
 
 from flask import jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -20,6 +21,7 @@ from app.modules.ai_chat.services.lens_answer import answer_for_lens, answer_len
 from app.modules.intelligence.services import answer_envelope as envelope
 
 from app.services.conversation_history import persist_turn
+from app.services.result_footer_service import ownership_footer
 
 from . import unified_ai_chat_bp
 
@@ -213,11 +215,17 @@ def _recorded_links(answer):
 
 def _lens_card(lens):
     component_id = ((lens["data"] or {}).get("application_component_id")) if lens["lens"] == "portfolio" else None
+    owners = ((lens["data"] or {}).get("owners")) if lens["lens"] == "accountability" else None
+    for owner in owners or []:
+        # The day the ownership record was made, as people read a date ("12 Nov 2026").
+        day = datetime.strptime(owner["since"], "%Y-%m-%d") if owner.get("since") else None
+        owner["since_text"] = "%d %s" % (day.day, day.strftime("%b %Y")) if day else None
     return render_template(
         "ai_chat/_lens_answer.html",
         lens=lens["lens"],
         element=lens["element"],
         data=lens["data"],
+        footer=ownership_footer(current_org_id(), owners) if owners else None,
         planning_url=(
             url_for("unified_applications.rationalization_planning", app_id=component_id) if component_id else None
         ),

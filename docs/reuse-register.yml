@@ -205,6 +205,23 @@ entries:
       - id: visibility-helper
         regex: 'def\s+_?(get_|find_|load_)?(visible|accessible)_(capabilit\w*|to_org\w*)\s*\('
 
+  - id: title-case-label
+    concept: Title-casing a stored label or key for display (categories, types, enum keys)
+    status: active
+    canonical:
+      path: app/utils/template_utils.py
+      symbols: [title_keep_caps, ENUM_LABEL_OVERRIDES]
+    reuse: >
+      Use the title_keep_caps template filter (also registered as humanize_key). It maps a known key to its
+      hand-written label in ENUM_LABEL_OVERRIDES, reads underscores as spaces, and keeps acronyms as typed
+      (SaaS, IoT, API, AI). Do not write another title-case helper or chain replace and title in a template.
+    must_not_create:
+      - id: title-case-helper
+        regex: 'def\s+_?(titleize|title_case|title_keep_caps|humanize_key)\w*\s*\('
+    known_exceptions:
+      - path: app/utils/template_utils.py
+        reason: the canonical helper's own module
+
   - id: name-matching
     concept: Name and code matching for duplicates (normaliser, SQL folding, duplicate lookup)
     status: active
@@ -1247,3 +1264,15 @@ entries:
         regex: 'def\s+_?normali[sz]ed_type\s*\('
         scope: [app]
         suffixes: [.py]
+
+  - id: capability-strategic-score
+    concept: A capability's strategic score on the investment pages, recorded or worked out from the model
+    status: active
+    canonical:
+      path: app/modules/solutions_strategic/v2/services/investment_prioritization_service.py
+      symbols: [InvestmentPrioritizationService.analyze_investment_priorities, InvestmentPrioritizationService._derive_importance]
+    reuse: >
+      The recorded importance wins. Where none is recorded, _derive_importance works one out from the criticality
+      of the applications that support the capability, then its links to goals, drivers, outcomes or principles,
+      then the value streams it serves, then its open risks, and the footer says it was derived. Read the score
+      from the service result; do not write a second derivation or a stand-in score for an unrated capability.
