@@ -99,7 +99,7 @@ def test_gap_register_shows_risks_register_link(
     user = _user(db_session, org, "risks-link")
     db_session.add(Gap(name="A gap", organization_id=org.id))
     db_session.commit()
-    org_id, user_id = org.id, user.id
+    user_id = user.id
     db_session.expunge_all()
 
     _sign_in(client, login_as, user_id)

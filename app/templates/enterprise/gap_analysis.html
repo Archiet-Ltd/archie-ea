@@ -144,10 +144,8 @@
 {%- set sev_cards = [] -%}
 {%- for level in ['critical', 'high', 'medium', 'low'] %}{% set n = by_sev.get(level, 0) %}{% set _ = sev_cards.append({'label': 'Open ' ~ level, 'value': n, 'icon': {'critical': 'triangle-alert', 'high': 'circle-alert', 'medium': 'circle-dashed', 'low': 'circle'}[level], 'sentence': (('Open gaps rated ' ~ level ~ ', not resolved, closed or completed') if n else ('No open gap is rated ' ~ level)), 'href': (url_for('enterprise.gap_analysis', severity=level, status='open') if n else none), 'testid': 'gap-open-' ~ level}) %}{% endfor -%}
 {{ stat_cards(sev_cards) }}
-{%- if not severity_filter %}
 <p class="text-sm text-muted-foreground" data-testid="gap-unclosed-count-line"><span class="font-semibold tabular-nums text-foreground" data-testid="gap-unclosed-count">{{ unclosed_gap_count }}</span> unclosed: {% if unclosed_gap_count %}{{ 'this gap has' if unclosed_gap_count == 1 else 'these gaps have' }} no work package yet{% else %}every gap has a work package{% endif %}. The change board counts the same gaps.</p>
 <p class="text-sm text-muted-foreground" data-testid="gap-figures-count-gaps-not-risks">These figures count gaps, not risks. <a href="{{ url_for('risk.risk_register') }}" class="text-primary hover:underline" data-testid="gap-risks-register-link">Open the Risks register</a>.</p>
-{%- endif %}
 {% if listed_count > gaps|length %}
 {%- set first_shown = (page_number - 1) * page_size + 1 -%}
 <p class="flex flex-wrap items-center gap-3 text-sm text-muted-foreground" data-testid="gap-page-note">
