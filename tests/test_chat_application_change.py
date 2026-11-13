@@ -234,3 +234,38 @@ def test_crafted_message_parses_in_linear_time():
         assert elapsed < 0.1, (
             f"parsed {len(message)} characters in {elapsed:.3f}s, expected under 0.1 s"
         )
+
+
+def test_a_value_is_returned_exactly_as_typed_over_several_lines():
+    from app.modules.ai_chat.services.application_change import parse_change_request
+
+    typed = "Runs billing.\n\nOwned by finance:\n- invoices\n- refunds"
+    found = parse_change_request(f"  set Payments's description to \n  {typed}\n\n ")
+    assert found is not None and found["application"] == "Payments"
+    assert found["value"] == typed, "inner line breaks and blank lines are kept; only the ends are stripped"
+    of_form = parse_change_request(f"set description of Payments to {typed}")
+    assert of_form is not None and of_form["value"] == typed
+
+
+def test_a_value_with_runs_of_spaces_keeps_them_and_its_typed_length():
+    from app.modules.ai_chat.services.application_change import parse_change_request
+
+    typed = "two  spaces,\tone tab,   three   spaces"
+    found = parse_change_request(f"set Payments's description to {typed}")
+    assert found["value"] == typed and len(found["value"]) == len(typed)
+    # A description the form refuses as too long is still too long once parsed: spaces are not dropped.
+    long_value = ("ab  " * 1350).strip()
+    assert len(long_value) > 5000
+    parsed = parse_change_request(f"set Payments's description to {long_value}")
+    assert parsed["value"] == long_value and len(parsed["value"]) > 5000
+
+
+def test_asking_for_the_stored_multi_line_description_again_is_unchanged(world, client, login_as, db_session):
+    application = world["apps"]["a"]
+    typed = "Runs billing.\n\nOwned by finance:\n- invoices\n- refunds"
+    application.description = typed
+    db_session.flush()
+    login_as(client, world["editor"])
+    same = _ask(client, f"set {world['name']}'s description to {typed}")
+    assert same["change_state"] == "unchanged" and "already has that description" in same["html"]
+    assert _stored(db_session, application) == typed
