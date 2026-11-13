@@ -65,7 +65,6 @@
 {% block content %}
 <div id="capability-roadmap-app"
      x-data="enterpriseCapabilityRoadmap()"
-     x-init="init()"
      class="space-y-6">
 
   <input type="hidden" id="rdm-csrf-token" value="{{ csrf_token() }}">
@@ -142,10 +141,10 @@
       </div>
     {% endcall %}
     {% call card_content() %}
-      <template x-if="loading">
+      <template x-if="plateausLoading">
         <div>{{ skeleton_list(rows=3) }}</div>
       </template>
-      <template x-if="!loading && errorMessage">
+      <template x-if="!plateausLoading && errorMessage">
         {{ empty_state(
           icon='alert-triangle',
           title='Error loading plateaus',
@@ -153,7 +152,7 @@
           class='py-10'
         ) }}
       </template>
-      <template x-if="!loading && !errorMessage && plateaus.length === 0">
+      <template x-if="!plateausLoading && !errorMessage && plateaus.length === 0">
         {{ empty_state(
           icon='layers',
           title='No plateaus defined',
@@ -164,7 +163,7 @@
           class='py-10'
         ) }}
       </template>
-      <template x-if="!loading && plateaus.length > 0">
+      <template x-if="!plateausLoading && plateaus.length > 0">
         <div data-testid="figure-cards" class="grid gap-4" :class="plateaus.length === 1 ? 'grid-cols-1' : plateaus.length === 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'">
           <template x-for="plateau in plateaus" :key="plateau.id">
             <div data-testid="rdm-plateau">
@@ -226,26 +225,26 @@
           </tr>
         {% endcall %}
         {% call table_body() %}
-          <template x-if="loading">
+          <template x-if="workPackagesLoading">
             <tr>
               <td colspan="7" class="p-4 text-center">{{ skeleton_table(rows=3, columns=7) }}</td>
             </tr>
           </template>
-          <template x-if="!loading && errorMessage">
+          <template x-if="!workPackagesLoading && errorMessage">
             <tr>
               <td colspan="7" class="p-4 text-center text-sm text-destructive-emphasis">
                 Work packages could not be read — this is not "none yet".
               </td>
             </tr>
           </template>
-          <template x-if="!loading && !errorMessage && workPackages.length === 0">
+          <template x-if="!workPackagesLoading && !errorMessage && workPackages.length === 0">
             <tr>
               <td colspan="7" class="p-4 text-center text-sm text-muted-foreground">
                 No work packages yet. Add a gap first, then create work packages to resolve it.
               </td>
             </tr>
           </template>
-          <template x-for="wp in (loading ? [] : workPackages)" :key="wp.id">
+          <template x-for="wp in (workPackagesLoading ? [] : workPackages)" :key="wp.id">
             {% call table_row(attrs_dict={'class': 'hover:bg-muted/30'}) %}
               {% call table_cell() %}
                 <input type="checkbox" class="rounded border-input"
@@ -554,6 +553,23 @@
 (function () {
   'use strict';
 
+  // One request per data source per page load; the page's parts share the answer.
+  // `again` asks the server afresh after something was saved or removed.
+  const sourceUrls = {
+    'gaps': '/capability-map/api/roadmap/gaps',
+    'plateaus': '/capability-map/api/roadmap/plateaus',
+    'work-packages': '/capability-map/api/roadmap/work-packages',
+  };
+  const sourceAnswers = {};
+  window.rdmSource = function (key, again) {
+    if (again || !sourceAnswers[key]) {
+      const asked = Platform.fetch(sourceUrls[key], { silent: true });
+      sourceAnswers[key] = asked;
+      asked.catch(() => { if (sourceAnswers[key] === asked) delete sourceAnswers[key]; });
+    }
+    return sourceAnswers[key];
+  };
+
   const CSRF = () => document.getElementById('rdm-csrf-token')?.value || '';
 
   // ── Alpine Store: shared state between page and modal sub-components ──
@@ -583,7 +599,9 @@
       selectedGapIds: [],
       isDetecting: false,
       errorMessage: '',
-      loading: true,
+      gapsLoading: true,
+      plateausLoading: true,
+      workPackagesLoading: true,
 
       get gapModalTitle() {
         const editing = Alpine.store('rdm').editingGap;
@@ -615,19 +633,18 @@
 
       async init() {
         // A gap saved in the dialog changes the recorded-gaps figure, so the tile reads the register again.
-        window.addEventListener('rdm-gap-saved', () => this.loadGaps());
-        window.addEventListener('rdm-work-package-saved', () => this.loadWorkPackages());
-        this.loading = true;
-        try {
-          await Promise.all([this.loadGaps(), this.loadPlateaus(), this.loadWorkPackages()]);
-        } finally {
-          this.loading = false;
-        }
+        window.addEventListener('rdm-gap-saved', () => this.loadGaps(true));
+        window.addEventListener('rdm-work-package-saved', () => this.loadWorkPackages(true));
+        // Alpine runs init() itself; each part fills in when its own answer arrives.
+        // Start all three loads independently; do not wait for all to finish.
+        this.loadGaps();
+        this.loadPlateaus();
+        this.loadWorkPackages();
       },
 
-      async loadGaps() {
+      async loadGaps(again) {
         try {
-          const d = await Platform.fetch('/capability-map/api/roadmap/gaps', { silent: true });
+          const d = await window.rdmSource('gaps', again);
           this.gaps = d.gaps || [];
           this.recordedGaps = d.recorded_gaps === undefined ? null : d.recorded_gaps;
           this.signalCount = d.signal_count === undefined ? this.gaps.length : d.signal_count;
@@ -636,24 +653,28 @@
           this.gaps = [];
           Alpine.store('rdm').gaps = [];
           this.errorMessage = 'Failed to load gaps (' + e.message + ').';
+        } finally {
+          this.gapsLoading = false;
         }
       },
 
       async loadPlateaus() {
         try {
-          const d = await Platform.fetch('/capability-map/api/roadmap/plateaus?footer=1', { silent: true });
+          const d = await window.rdmSource('plateaus');
           this.plateaus = d.plateaus || [];
           Alpine.store('rdm').plateaus = this.plateaus;
         } catch (e) {
           this.plateaus = [];
           Alpine.store('rdm').plateaus = [];
           this.errorMessage = 'Failed to load plateaus (' + e.message + ').';
+        } finally {
+          this.plateausLoading = false;
         }
       },
 
-      async loadWorkPackages() {
+      async loadWorkPackages(again) {
         try {
-          const d = await Platform.fetch('/capability-map/api/roadmap/work-packages?footer=1', { silent: true });
+          const d = await window.rdmSource('work-packages', again);
           this.workPackages = d.work_packages || [];
           this.workPackageCount = d.all_count === undefined ? this.workPackages.length : d.all_count;
           Alpine.store('rdm').workPackages = this.workPackages;
@@ -662,6 +683,8 @@
           this.workPackageCount = 0;
           Alpine.store('rdm').workPackages = [];
           this.errorMessage = 'Failed to load work packages (' + e.message + ').';
+        } finally {
+          this.workPackagesLoading = false;
         }
       },
 
@@ -674,7 +697,7 @@
         try {
           const d = await Platform.fetch.post('/capability-map/api/roadmap/gaps/detect', undefined, { silent: true });
           if (!d.success) throw new Error(d.error || 'Detection failed');
-          await this.loadGaps();
+          await this.loadGaps(true);
           Platform.alert(`Detection complete: ${d.created} gap(s) created, ${d.updated} updated.`);
         } catch (e) {
           this.errorMessage = e.message || 'Gap detection failed.';
@@ -1187,9 +1210,9 @@
   async function loadAndRender() {
     try {
       const [wpData, gapData, plateauData] = await Promise.all([
-        Platform.fetch('/capability-map/api/roadmap/work-packages', { silent: true }),
-        Platform.fetch('/capability-map/api/roadmap/gaps', { silent: true }),
-        Platform.fetch('/capability-map/api/roadmap/plateaus', { silent: true }),
+        window.rdmSource('work-packages'),
+        window.rdmSource('gaps'),
+        window.rdmSource('plateaus'),
       ]);
       const workPackages = (wpData.work_packages || [])
         .filter(wp => wp.start_date && (wp.end_date || wp.target_date));

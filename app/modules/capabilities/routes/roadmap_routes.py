@@ -1366,13 +1366,12 @@ def api_roadmap_work_packages():
                 current_app.logger.warning(f"WorkPackage {wp.id} serialization failed: {se}")
                 serialized.append({"id": wp.id, "name": wp.name, "status": wp.status})
 
-        if request.args.get("footer"):
-            # The roadmap draws each row in the browser, so the one footer travels with it as markup.
-            from app.services import result_footer_service
+        # Always include footer data for the evidence line
+        from app.services import result_footer_service
 
-            for wp, item in zip(work_packages, serialized):
-                item["footer_html"] = result_footer_service.render_footer(
-                    result_footer_service.work_package_footer(wp, name_shown=True))
+        for wp, item in zip(work_packages, serialized):
+            item["footer_html"] = result_footer_service.render_footer(
+                result_footer_service.work_package_footer(wp, name_shown=True))
 
         return jsonify(
             {
@@ -1851,6 +1850,8 @@ def api_roadmap_get_plateaus():
         # by its packages, and the packages that realise it.
         gaps_by_plateau = get_plateau_gap_rows(ids, org_id)
         wps_by_plateau = work_package_service.plateau_work_package_ids(ids, org_id)
+        from app.services import result_footer_service
+
         shown = [
             {
                 "id": p.id,
@@ -1860,14 +1861,10 @@ def api_roadmap_get_plateaus():
                 "target_date": p.target_date.isoformat() if p.target_date else None,
                 "gaps": gaps_by_plateau.get(p.id, []),
                 "work_package_ids": sorted(wps_by_plateau.get(p.id, ())),
+                "footer_html": result_footer_service.render_footer(result_footer_service.plateau_footer(p)),
             }
             for p in plateaus
         ]
-        if request.args.get("footer"):
-            from app.services import result_footer_service
-
-            for p, item in zip(plateaus, shown):
-                item["footer_html"] = result_footer_service.render_footer(result_footer_service.plateau_footer(p))
         return jsonify({"success": True, "plateaus": shown})
     except Exception as e:
         current_app.logger.error(f"Error fetching plateaus: {e}", exc_info=True)
