@@ -1523,6 +1523,8 @@ def describe(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "checks": saved["checks"],
         "review_rounds": saved["rounds"],
         "rubric_version": approval.rubric_version,
+        "undo_problem": undo_problem(approval) if approval.status == ApprovalStatus.APPROVED else None,
+        "undone": saved["undone"],
     }
 
 
@@ -1690,7 +1692,7 @@ def record_row(approval: AIChatCRUDApproval, people: Optional[Dict[int, str]] = 
         "source_key": approval.source_table or "chat",
         "when": approval.executed_at or approval.approved_at or approval.created_at,
         "can_undo": problem is None,
-        "undo_note": None if problem is None else problem,
+        "undo_note": None if problem is None else "Cannot be undone",
         "record_url": record_path(approval.id),
         "requested_by": (people or {}).get(approval.user_id) or "The system",
     }
@@ -1921,6 +1923,7 @@ def sweep_organisation(organization_id: int, budget: Optional[ReviewBudget] = No
 
 
 SETTLE_TASK = "settle_proposals"
+SETTLE_LOCK_WAIT_SECONDS = 180
 
 
 def queue_settling(organization_id: int) -> None:
@@ -1946,6 +1949,28 @@ def settle_proposals(
     starts, and the one-off job for what was waiting before. Never runs inside a web request. Runs with the
     organisation already active (``tenant_scope``). Returns how many were applied, linked, declined, retired
     and left in review."""
+    import time
+
+    from app.jobs.tenant_safe_job import job_lock
+
+    # One pass for an organisation at a time: two reads (or a read and a connection change) that finish together
+    # would otherwise settle the same proposals side by side. The second waits for the first, then settles what
+    # the first did not reach.
+    give_up_at = time.monotonic() + SETTLE_LOCK_WAIT_SECONDS
+    while True:
+        with job_lock("settle_proposals:%d" % organization_id, required=False) as acquired:
+            if acquired:
+                return _settle_proposals_locked(organization_id, sources, budget, only_ids)
+        if time.monotonic() >= give_up_at:
+            logger.warning("Settling the proposals of organisation %s waited too long for another pass", organization_id)
+            return {"applied": 0, "linked": 0, "declined": 0, "retired": 0, "in_review": 0}
+        time.sleep(1)
+
+
+def _settle_proposals_locked(
+    organization_id: int, sources: Optional[Tuple[str, ...]], budget: Optional[ReviewBudget],
+    only_ids: Optional[List[int]],
+) -> Dict[str, int]:
     counts = {"applied": 0, "linked": 0, "declined": 0, "retired": 0, "in_review": 0}
     budget = budget or ReviewBudget(CALLS_PER_BATCH)
     from app.connectors.github import proposal_rank

@@ -90,6 +90,12 @@
     </div>
     {% endfor %}
 
+    {% if record.undone %}
+    <p class="text-sm text-muted-foreground" data-testid="review-record-undone">Undone on {{ record.undone.at[:10] }}. {{ record.undone.what }}</p>
+    {% elif record.undo_problem %}
+    <p class="text-sm text-muted-foreground" data-testid="review-record-undo">Undo: {{ record.undo_problem }}</p>
+    {% endif %}
+
     {% if not record.checks and not record.review_rounds %}
     <p class="text-sm text-muted-foreground" data-testid="review-record-unreviewed">No review has been recorded for this change.</p>
     {% endif %}

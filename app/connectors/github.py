@@ -1904,6 +1904,19 @@ def pending_for_product(org_id, product_id) -> int:
     )
 
 
+def findings_counts(org_id) -> Dict[str, int]:
+    """What became of the findings GitHub reads have made for this organisation: how many were applied, linked,
+    declined or retired, and how many are still being checked. The Approvals record filtered to GitHub lists the
+    same rows."""
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    counts = {"applied": 0, "linked": 0, "declined": 0, "retired": 0, "in_review": 0}
+    for row in AIChatCRUDApproval.query.filter_by(organization_id=org_id, source_table=PROPOSAL_SOURCE).all():
+        outcome = (row.review_reasons or {}).get("outcome") if row.status != ApprovalStatus.PENDING else None
+        counts[outcome if outcome in counts else "in_review"] += 1
+    return counts
+
+
 PRODUCT_SCAN_MAX = 25  # repositories read in one scan from a Product's page
 
 

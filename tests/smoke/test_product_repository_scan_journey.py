@@ -3,8 +3,9 @@
 The goal: "this product's code is in GitHub; show me what it is made of, and where each piece was read from".
 A solution architect of a new organisation (with a product already linked to a business service and an
 application) opens the product, sees GitHub is not connected, connects it from there and comes back to the
-product, chooses two repositories, waits for the read, reviews and approves what was found, and returns to the
-product to see the applications and the technology in their layers, each citing the file it was read from. A
+product, chooses two repositories, waits for the read, sees what became of each finding and why (nobody approves
+anything: the server checks and settles them), and returns to the product to see the applications and the
+technology in their layers, each citing the file it was read from. A
 second organisation sees none of it and is offered Connect GitHub of its own.
 
 GitHub is never called: the recorded organisation of the connector tests is served to the server under test.
@@ -157,22 +158,47 @@ def test_2_the_person_chooses_two_repositories_and_the_read_proposes_what_they_s
         architect.get_by_label(name, exact=True).check()
     architect.get_by_test_id("product-repositories-submit").click()
     architect.wait_for_selector("[data-testid='product-scan-state']")
-    waiting = architect.get_by_test_id("product-scan-waiting")
+    settled = architect.get_by_test_id("product-scan-settled")
     for _ in range(60):  # the read runs in the background; the page shows its result when it has finished
-        if waiting.count():
+        if settled.count():
             break
         architect.wait_for_timeout(3000)
         architect.reload(wait_until="domcontentloaded")
-    expect(waiting).to_be_visible()
+    expect(settled).to_be_visible()
     expect(architect.get_by_test_id("product-scan-state")).to_contain_text(", ".join(sorted(CHOSEN)))
-    shoot(architect, "product-waiting-1440.png", "#bring-in")
+    # Nothing waits for anyone: the read has been checked and every finding has an outcome.
+    expect(settled).to_contain_text("findings were checked")  # every GitHub finding of the workspace
+    expect(settled).not_to_contain_text("still being checked")
+    expect(architect.get_by_test_id("product-scan-waiting")).to_have_count(0)
+    shoot(architect, "product-settled-1440.png", "#bring-in")
 
 
-def test_3_the_review_lands_the_proposals_and_the_product_page_shows_them_by_layer_with_their_files(architect, world, app):
+def test_3_the_record_shows_what_became_of_each_finding_and_the_product_page_shows_them_by_layer_with_their_files(architect, world, app):
+    summary = architect.get_by_test_id("product-scan-settled").inner_text()
+    checked = int(re.search(r"(\d+) findings? (?:was|were) checked", summary).group(1))
     architect.get_by_test_id("product-review-link").click()
-    architect.wait_for_url("**/admin/connectors/github/review")
-    architect.get_by_role("button", name=re.compile(r"^Approve all \(\d+\)$")).click()
-    expect(architect.locator("#main-content").get_by_text("Nothing is waiting for review.", exact=False)).to_be_visible()
+    architect.wait_for_url("**/ai-chat/approvals/inbox?source=github_connector")
+    # There is nothing to approve or reject: the page is the record of what was settled.
+    expect(architect.get_by_role("button", name=re.compile(r"Approve|Reject"))).to_have_count(0)
+    expect(architect.get_by_role("link", name=re.compile(r"Approve|Reject"))).to_have_count(0)
+    expect(architect.get_by_test_id("approval-waiting")).to_have_count(0)
+    rows = architect.get_by_test_id("approval-record-row")
+    expect(rows).to_have_count(checked)  # the figures agree: the product page said how many were checked
+    for index in range(checked):
+        row = rows.nth(index)
+        outcome = row.locator("[data-testid^='approval-outcome-']").inner_text().strip()
+        assert outcome in ("Applied", "Linked"), outcome
+        assert len(row.locator("[data-testid^='approval-reason-']").inner_text().strip()) > 20
+        assert row.locator("[data-testid^='approval-verdict-']").inner_text().strip()
+        href = row.locator("[data-testid^='approval-source-link-']").get_attribute("href")
+        assert re.match(r"https://github\.com/acme/[A-Za-z0-9._-]+(/blob/[0-9a-f]{40}/.+)?$", href), href
+    payments = rows.filter(has_text="Payments Service").first
+    expect(payments).to_contain_text("acme/payments-service")
+    shoot(architect, "product-record-1440.png")
+    # The record of one finding opens and says how it was checked.
+    payments.get_by_role("link", name=re.compile("Payments Service")).first.click()
+    architect.wait_for_selector("[data-testid='review-record']")
+    expect(architect.get_by_test_id("review-record-checks")).to_contain_text("What it depends on is in the model")
     open_product(architect, world)
 
     for name, (layer, repository) in EXPECTED.items():
@@ -186,6 +212,7 @@ def test_3_the_review_lands_the_proposals_and_the_product_page_shows_them_by_lay
         assert re.fullmatch(r"https://github\.com/%s/blob/[0-9a-f]{40}/.+" % repository, href), href
         assert href.endswith("/" + file), (href, file)
     expect(architect.get_by_test_id("product-scan-waiting")).to_have_count(0)
+    expect(architect.get_by_test_id("product-scan-settled")).to_be_visible()
     # What nobody chose and nothing joins to it is in the model but not on this product; what a chosen
     # application depends on is, one step out, with the relationship in words and its own file.
     expect(architect.get_by_test_id("product-layers")).not_to_contain_text("Inventory Service")
@@ -252,6 +279,7 @@ def test_6_another_organisation_sees_none_of_it(browser, world):
         expect(page.get_by_test_id("product-layers")).not_to_contain_text("Redis")
         expect(page.get_by_test_id("product-connect-github")).to_be_visible()
         expect(page.get_by_test_id("product-scan-waiting")).to_have_count(0)
+        expect(page.get_by_test_id("product-scan-settled")).to_have_count(0)
         # A product of the first organisation is not found, and its repositories cannot be read for it.
         gone = page.goto(product_url(world, "one"), wait_until="domcontentloaded")
         assert gone.status == 404
