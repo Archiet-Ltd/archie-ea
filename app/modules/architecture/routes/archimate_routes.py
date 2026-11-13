@@ -7460,7 +7460,7 @@ def api_element_impact_graph(element_id):
     from app.services.impact_graph import build_impact_graph  # noqa: PLC0415
 
     depth = request.args.get("depth", default=2, type=int)
-    graph = build_impact_graph(element_id, depth=depth)
+    graph = build_impact_graph(element_id, depth=depth, org_id=getattr(g, "current_org_id", None))
     if graph is None:
         return jsonify({"error": "Element not found"}), 404
     return jsonify(graph)

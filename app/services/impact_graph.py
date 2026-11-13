@@ -18,6 +18,7 @@ from collections import deque
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from app import db
+from app.middleware.tenant_context import current_org_id
 
 # Guardrail: a hub element can reach thousands of others. Past this the picture
 # stops being legible and starts being a hairball, so we cap and say so.
@@ -71,7 +72,7 @@ def dependency_ends(rel_type: Optional[str], source_id: int, target_id: int) -> 
     return None
 
 
-def _dependency_chain(element_id: int, depth: int, want: str) -> Dict[int, int]:
+def _dependency_chain(element_id: int, depth: int, want: str, org_id: Optional[int] = None) -> Dict[int, int]:
     """Elements that depend on ``element_id`` (want='consumers') or that it
     depends on (want='providers'), following only consistent dependency
     edges, with the fewest hops to each. A sibling that merely shares a
@@ -88,7 +89,10 @@ def _dependency_chain(element_id: int, depth: int, want: str) -> Dict[int, int]:
         rels = ArchiMateRelationship.query.filter(
             db.or_(ArchiMateRelationship.source_id == cur_id,
                    ArchiMateRelationship.target_id == cur_id)
-        ).all()
+        )
+        if org_id is not None:
+            rels = rels.filter(ArchiMateRelationship.organization_id == org_id)
+        rels = rels.all()
         for r in rels:
             ends = dependency_ends(r.type, r.source_id, r.target_id)
             if ends is None:
@@ -111,7 +115,7 @@ def _layer_of(el) -> str:
     return (getattr(el, "layer", None) or "other").lower()
 
 
-def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, Any]]:
+def build_impact_graph(element_id: int, depth: int = 2, org_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
     """Breadth-first blast radius around ``element_id`` to ``depth`` hops.
 
     Returns ``{center, nodes, edges, truncated, counts}`` or None if the element
@@ -132,8 +136,16 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
         ArchiMateElement, ArchiMateRelationship,
     )
 
+    if org_id is None:
+        org_id = current_org_id()
+
     depth = max(1, min(int(depth or 2), 4))
-    center = db.session.get(ArchiMateElement, element_id)
+    center = db.session.execute(
+        db.select(ArchiMateElement).where(
+            ArchiMateElement.id == element_id,
+            ArchiMateElement.organization_id == org_id,
+        )
+    ).scalar_one_or_none()
     if center is None:
         return None
 
@@ -170,8 +182,12 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
             continue
 
         # Outgoing (cur depends on target) and incoming (source depends on cur).
-        out_rels = ArchiMateRelationship.query.filter_by(source_id=cur_id).all()
-        in_rels = ArchiMateRelationship.query.filter_by(target_id=cur_id).all()
+        out_rels = ArchiMateRelationship.query.filter_by(
+            source_id=cur_id, organization_id=org_id
+        ).all()
+        in_rels = ArchiMateRelationship.query.filter_by(
+            target_id=cur_id, organization_id=org_id
+        ).all()
 
         for r in out_rels:
             other = db.session.get(ArchiMateElement, r.target_id)
@@ -203,8 +219,8 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
                 seen.add(other.id)
                 frontier.append((other.id, dist + 1))
 
-    consumer_hops = _dependency_chain(element_id, depth, "consumers")
-    provider_hops = _dependency_chain(element_id, depth, "providers")
+    consumer_hops = _dependency_chain(element_id, depth, "consumers", org_id)
+    provider_hops = _dependency_chain(element_id, depth, "providers", org_id)
     for node_id, node in nodes.items():
         if node["is_center"]:
             continue

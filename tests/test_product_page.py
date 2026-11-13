@@ -107,9 +107,17 @@ def test_page_groups_members_by_layer_with_relationship_in_words(app, db_session
 def test_another_organisations_elements_never_appear(app, db_session, make_org, client, login_as):
     mine, theirs = make_org("mine"), make_org("theirs")
     one = _estate(db_session, mine, "c")
-    # Cross-org relationships are now rejected by the model guard; the
-    # product page still filters by organisation_id so foreign elements
-    # never appear even if a relationship existed.
+    other = _estate(db_session, theirs, "d")
+    # A relationship row that crosses the boundary, seeded with plain SQL
+    # (the model guard now rejects cross-org relationships through the ORM,
+    # but rows written before the guard may still exist). The product page
+    # filters by organisation_id so foreign elements never appear.
+    from sqlalchemy import text
+    db_session.execute(text(
+        "INSERT INTO archimate_relationships (organization_id, source_id, target_id, type, source_kind, created_at, updated_at) "
+        "VALUES (:org_id, :source_id, :target_id, 'Association', 'manual', now(), now())"
+    ), {"org_id": mine.id, "source_id": one["product"].id, "target_id": other["service"].id})
+    db_session.flush()
     user = _user(db_session, mine)
     html = _get(client, login_as, user, _product_url(one["product"])).get_data(as_text=True)
     assert "Orders c" in html
