@@ -107,14 +107,23 @@ def test_the_active_orgs_own_admin_is_admitted(app, db_session, make_org, client
 
     org = make_org("gga-own-admin")
     admin = _make_user(db_session, org, role=admin_role)
+    other = make_org("gga-other-org")
+    stranger = _make_user(db_session, other, role=admin_role)
     db_session.commit()
 
     login_as(client, admin)
+
     response = client.get("/admin/audit-log")
     assert response.status_code == 200, (
         f"an ordinary administrator was refused their own organisation's "
         f"audit log ({response.status_code})"
     )
+    html = response.get_data(as_text=True)
+    assert "Audit Log" in html
+    # Their own organisation's trail is on the page (their own account's creation)...
+    assert admin.email in html
+    # ...and another organisation's is not.
+    assert stranger.email not in html
 
 
 def test_a_platform_admin_is_admitted_to_any_orgs_audit_log(

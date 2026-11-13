@@ -167,6 +167,12 @@ def test_executive_briefing_advisory_only_health_scorecard_still_works(
     _clear_auth_caches()
     resp = client.get("/dashboard/health")
     assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "Architecture Health Scorecard" in html
+    # The scorecard's own figures still render beside the advisory briefing...
+    assert 'data-testid="health-total-solutions"' in html
+    # ...and with nothing to measure it says so instead of inventing a score.
+    assert 'data-testid="health-score-not-measured"' in html
 
 
 # ---------------------------------------------------------------------------
