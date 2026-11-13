@@ -94,7 +94,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
             </div>
             <div class="px-6 pb-4 text-sm text-muted-foreground">
                 {% if scores_error %}The investment figures could not be loaded.
-                {% elif costs_withheld %}Money figures are left out of this page.
+                {% elif costs_withheld %}
                 {% elif total_inv is none %}No capability has linked work or a funded initiative yet; link a work package to a capability to estimate its investment.
                 {% else %}from {{ portfolio_metrics.investment_costed_count }} of {{ portfolio_metrics.total_capabilities }} capabilities with a recorded figure{% if portfolio_metrics.investment_costed_count < portfolio_metrics.total_capabilities %}; the other {{ portfolio_metrics.total_capabilities - portfolio_metrics.investment_costed_count }} have none yet and add nothing to it{% else %}; every capability has one{% endif %}{% endif %}
             </div>
@@ -307,6 +307,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                         <div>
                                             <span class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground" data-testid="strategic-derived">Derived</span>
                                             <span class="block max-w-40 text-xs text-muted-foreground" data-testid="strategic-sentence" x-text="cap.strategic_derivation.sentence"></span>
+                                            <a x-show="cap.strategic_step && cap.strategic_step.href" :href="cap.strategic_step && cap.strategic_step.href" class="block text-xs text-primary hover:underline" data-testid="strategic-step" x-text="cap.strategic_step && cap.strategic_step.text"></a>
                                         </div>
                                     </template>
                                     <template x-if="cap.strategic_basis === null">
@@ -456,7 +457,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                 {% if not costs_withheld %}<canvas id="investmentChart"></canvas>{% endif %}
                 <p class="mt-3 text-sm text-muted-foreground" data-testid="allocation-note">
                     {%- if scores_error -%}Unavailable
-                    {%- elif costs_withheld -%}Nothing is plotted because costs are not shown.
+                    {%- elif costs_withheld -%}
                     {%- elif portfolio_metrics.investment_costed_count == 0 -%}No capability has an investment estimate, so nothing is plotted.
                     {%- elif portfolio_metrics.investment_costed_count < portfolio_metrics.total_capabilities -%}Plots {{ portfolio_metrics.investment_costed_count }} of {{ portfolio_metrics.total_capabilities }} capabilities. {{ portfolio_metrics.total_capabilities - portfolio_metrics.investment_costed_count }} not estimated and not plotted.
                     {%- else -%}Plots all {{ portfolio_metrics.total_capabilities }} capabilities.

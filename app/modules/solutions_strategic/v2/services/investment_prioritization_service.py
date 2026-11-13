@@ -40,18 +40,56 @@ STRATEGIC_UNSCORED_REASON = (
 )
 
 
-def _record_page(capability=None):
-    """The page where a capability's importance is recorded, or None when it cannot be built.
+def _record_page(edit_id=None):
+    """The capabilities page opened on one capability's edit form, or None when there is none to open.
 
-    With a capability the link opens that capability's own edit form. The score reads the unified
-    record; the form edits the capability it was projected from, so the link names that one."""
+    ``edit_id`` is the id of the record that page edits, never an id from another table; with no
+    such record there is no form to open, so there is no link."""
     from app.services.result_footer_service import page_link
 
     href = page_link("unified_low_priority.capability_map_capabilities")
-    if href and capability is not None:
-        edit_id = capability.source_id if capability.source_table == "business_capability" else capability.id
-        href = f"{href}{'&' if '?' in href else '?'}edit={edit_id}"
-    return href
+    if not href or edit_id is None:
+        return None
+    return f"{href}{'&' if '?' in href else '?'}edit={edit_id}"
+
+
+def _editable_records(capabilities):
+    """Capability id -> id of the record the capabilities page edits, for the signed-in person.
+
+    Two links already tie that record to the capability: the capability's own provenance (it was
+    projected from that record) and the record's ``retired_into_id`` (it was merged into the
+    capability). A capability with neither is not on that page, so it is absent. Empty for a
+    person who may not save a capability: they are offered no step."""
+    from flask_login import current_user
+
+    from app.models.business_capabilities import BusinessCapability
+    from app.utils.role_access import can_edit_capabilities, can_retire_applications
+
+    # The page draws its form for can_edit_capabilities, and the save is refused to anyone
+    # outside the rule can_retire_applications mirrors (administrator or Architect role).
+    if not capabilities or not (can_edit_capabilities(current_user) and can_retire_applications(current_user)):
+        return {}
+    unified_ids = [c.id for c in capabilities]
+    rows = BusinessCapability.query.filter(
+        db.or_(
+            BusinessCapability.id.in_(
+                [int(c.source_id) for c in capabilities
+                 if c.source_table == "business_capability" and str(c.source_id or "").isdigit()]
+            ),
+            BusinessCapability.retired_into_id.in_(unified_ids),
+        )
+    ).all()
+    by_id = {r.id: r for r in rows}
+    found = {}
+    for c in capabilities:
+        if c.source_table == "business_capability" and str(c.source_id or "").isdigit():
+            row = by_id.get(int(c.source_id))
+            if row is not None and row.organization_id == c.organization_id:
+                found[c.id] = row.id
+    for r in rows:
+        if r.retired_into_id is not None:
+            found.setdefault(r.retired_into_id, r.id)
+    return found
 
 
 def currency_symbol() -> str:
@@ -146,6 +184,7 @@ class InvestmentPrioritizationService:
             "streams": self._value_streams_by_capability(capability_ids),
             "risks": self._risks_by_capability(mappings_by_cap),
             "work": self._work_cost_by_capability(capability_ids),
+            "edit_ids": _editable_records(capabilities),
         }
 
         # Build capability → initiative map via RoadmapItem.linked_capabilities JSON
@@ -335,7 +374,10 @@ class InvestmentPrioritizationService:
             ),
             "strategic_derivation": derivation,
             "strategic_step": (
-                None if strategic_score is not None else {"text": STRATEGIC_STEP_TEXT, "href": _record_page(capability)}
+                None if recorded in _IMPORTANCE_POINTS else {
+                    "text": STRATEGIC_STEP_TEXT,
+                    "href": _record_page((evidence.get("edit_ids") or {}).get(capability.id)),
+                }
             ),
             "capability_type": capability.capability_type,
             "coverage_count": coverage_count,
