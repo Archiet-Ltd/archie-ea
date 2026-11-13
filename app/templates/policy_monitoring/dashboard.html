@@ -21,7 +21,7 @@
 {% if checks.total %}
 {{ stat_cards([
     {'label': 'Changes checked', 'value': '{:,}'.format(checks.total), 'icon': 'clipboard-check', 'sentence': 'In the last %d days' % days, 'testid': 'policy-checked'},
-    {'label': 'Passed the checks', 'value': '{:,}'.format(checks.checks_passed), 'icon': 'shield-check', 'sentence': 'Went on to be reviewed by a second model', 'testid': 'policy-passed'},
+    {'label': 'Passed the checks', 'value': '{:,}'.format(checks.checks_passed), 'icon': 'shield-check', 'sentence': 'No check found a problem with these changes', 'testid': 'policy-passed'},
     {'label': 'Stopped by a check', 'value': '{:,}'.format(checks.checks_failed), 'icon': 'octagon-x', 'sentence': 'Declined before any model was asked', 'testid': 'policy-failed'},
     {'label': 'Applied', 'value': '{:,}'.format(checks.applied), 'icon': 'circle-check', 'sentence': '%s declined, %s still in review' % ('{:,}'.format(checks.declined), '{:,}'.format(checks.in_review)), 'testid': 'policy-applied'}
 ]) }}

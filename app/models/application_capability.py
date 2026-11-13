@@ -59,7 +59,7 @@ class ApplicationCapabilityMapping(db.Model):
 
     # Mapping characteristics
     support_level = db.Column(db.String(50), default="partial")  # full, partial, minimal, none, gap
-    coverage_percentage = db.Column(db.Integer, default=0)  # 0 - 100% capability coverage
+    coverage_percentage = db.Column(db.Integer)  # 0 - 100% capability coverage; empty when nobody entered one
     support_quality_score = db.Column(db.Integer)  # 1 - 10 quality rating
 
     # Relationship details
@@ -194,11 +194,12 @@ class ApplicationCapabilityMapping(db.Model):
         """
         Calculate gap severity based on coverage, business criticality, and support level
         """
-        if self.coverage_percentage >= 90 and self.support_level == "full":
+        coverage = self.coverage_percentage or 0
+        if coverage >= 90 and self.support_level == "full":
             return "none"
-        elif self.coverage_percentage >= 70:
+        elif coverage >= 70:
             return "low"
-        elif self.coverage_percentage >= 40:
+        elif coverage >= 40:
             return "medium"
         elif self.business_criticality in ["mission_critical", "high"]:
             return "critical"
@@ -532,7 +533,7 @@ def _mirror_mapping_into_unified(mapper, connection, target):
                     "app_id": target.application_component_id,
                     "bc_id": target.business_capability_id,
                     "support_level": target.support_level or "partial",
-                    "coverage": target.coverage_percentage or 0,
+                    "coverage": target.coverage_percentage,
                     "relationship_type": relationship,
                     "gap_status": target.gap_status,
                     "is_active": target.is_active,
