@@ -11,7 +11,12 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 from app import db
-from app.models.models import ArchiMateElement, ArchiMateRelationship  # dead-code-ok (pre-existing)
+from app.models.models import (  # dead-code-ok (pre-existing)
+    ArchiMateElement,
+    ArchiMateRelationship,
+    CrossOrganisationRelationship,
+    assert_relationship_same_organisation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -174,27 +179,6 @@ class ArchiMateRelationshipService:
         return True, ""
 
     @classmethod
-    def _assert_same_organisation(
-        cls,
-        source_element: ArchiMateElement,
-        target_element: ArchiMateElement,
-        organization_id: int,
-    ) -> None:
-        """Refuse a relationship whose source or target belongs to another
-        organisation.
-
-        Raises ValueError with a plain message the caller can show.
-        """
-        if source_element.organization_id != organization_id:
-            raise ValueError(
-                f"source element {source_element.id} is not in organisation {organization_id}"
-            )
-        if target_element.organization_id != organization_id:
-            raise ValueError(
-                f"target element {target_element.id} is not in organisation {organization_id}"
-            )
-
-    @classmethod
     def create_relationship(
         cls,
         source_element: ArchiMateElement,
@@ -234,13 +218,17 @@ class ArchiMateRelationshipService:
             return None
 
         # Same-organisation guard: source and target must both belong to the
-        # relationship's owning organisation.
+        # relationship's owning organisation. The one function in the model
+        # module, so the service and the model guard cannot disagree.
         if organization_id is not None:
             try:
-                cls._assert_same_organisation(
-                    source_element, target_element, organization_id
+                assert_relationship_same_organisation(
+                    db.session.connection(),
+                    organization_id,
+                    source_element.id,
+                    target_element.id,
                 )
-            except ValueError as exc:
+            except CrossOrganisationRelationship as exc:
                 logger.error(f"Same-organisation check failed: {exc}")
                 if not rollback:
                     raise
@@ -439,7 +427,12 @@ class ArchiMateRelationshipService:
             raise ValueError(
                 f"Suggestion {suggestion_id} references a missing element"
             )
-        cls._assert_same_organisation(source_el, target_el, source_el.organization_id)
+        assert_relationship_same_organisation(
+            db.session.connection(),
+            source_el.organization_id,
+            suggestion.source_element_id,
+            suggestion.target_element_id,
+        )
 
         # Create the actual relationship
         relationship = ArchiMateRelationship(

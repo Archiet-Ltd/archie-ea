@@ -634,6 +634,63 @@ else:
             return out
 
 
+class CrossOrganisationRelationship(ValueError):
+    """A relationship whose source or target belongs to an organisation other
+    than the row's own organization_id. Raised by the one same-organisation
+    function below; a ValueError so existing callers that catch ValueError
+    keep turning it into a plain message."""
+
+
+# Each value the archimate_relationships.source_kind column can hold (the
+# column comment above: 'manual', 'import', 'connector', 'derived', 'sample';
+# nullable, and NULL reads as 'manual') mapped to the table that holds the
+# far ends of rows of that kind. A kind with no entry here cannot be
+# resolved and is refused, never allowed.
+_RELATIONSHIP_END_TABLES = {
+    None: "archimate_elements",
+    "manual": "archimate_elements",
+    "import": "archimate_elements",
+    "connector": "archimate_elements",
+    "derived": "archimate_elements",
+    "sample": "archimate_elements",
+}
+
+
+def assert_relationship_same_organisation(
+    connection, organization_id, source_id, target_id, source_kind=None
+):
+    """Refuse a relationship row whose source or target belongs to another
+    organisation. The one function behind the service check, accept_suggestion
+    and the model guard.
+
+    Reads each end's organization_id with plain SQL through the given
+    (flush) connection, so the tenant filter on ORM queries cannot hide a
+    foreign end: a missing end, or a source_kind with no table in
+    _RELATIONSHIP_END_TABLES, is refused. Raises CrossOrganisationRelationship.
+    """
+    from sqlalchemy import text
+
+    table = _RELATIONSHIP_END_TABLES.get(source_kind or None)
+    if table is None:
+        raise CrossOrganisationRelationship(
+            f"cannot resolve relationship ends of kind {source_kind!r}: no table for that kind"
+        )
+    for end, end_id in (("source", source_id), ("target", target_id)):
+        row = connection.execute(
+            # nosec B608 - table name comes from the literal map above, never from input
+            text(f"SELECT organization_id FROM {table} WHERE id = :end_id"),
+            {"end_id": end_id},
+        ).first()
+        if row is None:
+            raise CrossOrganisationRelationship(
+                f"relationship {end} {end_id} does not exist in {table}"
+            )
+        if row[0] != organization_id:
+            raise CrossOrganisationRelationship(
+                f"relationship {end} {end_id} is not in organisation {organization_id}"
+            )
+
+
 @event.listens_for(ArchiMateRelationship, "before_insert")
 @event.listens_for(ArchiMateRelationship, "before_update")
 def _guard_relationship_same_organisation(mapper, connection, target):
@@ -642,25 +699,22 @@ def _guard_relationship_same_organisation(mapper, connection, target):
 
     Applies to every writer that persists the model directly (connectors,
     imports, sync, backfills, seeds) as well as the service path, so no
-    code path can save a crossing row.
+    code path can save a crossing row. Reads the far ends through the flush
+    connection with plain SQL, so a tenant-filtered session cannot hide a
+    foreign end from this guard.
     """
     org_id = target.organization_id
     if org_id is None:
+        org_id = _default_org_id()
+    if org_id is None:
         return
-    from app.models.archimate_core import ArchiMateElement
-
-    source = db.session.get(ArchiMateElement, target.source_id)
-    target_el = db.session.get(ArchiMateElement, target.target_id)
-    if source is None or target_el is None:
-        return
-    if source.organization_id != org_id:
-        raise ValueError(
-            f"relationship source element {target.source_id} is not in organisation {org_id}"
-        )
-    if target_el.organization_id != org_id:
-        raise ValueError(
-            f"relationship target element {target.target_id} is not in organisation {org_id}"
-        )
+    assert_relationship_same_organisation(
+        connection,
+        org_id,
+        target.source_id,
+        target.target_id,
+        source_kind=target.source_kind or None,
+    )
 
 
 class WorkflowInstanceArchiMateElement(db.Model):

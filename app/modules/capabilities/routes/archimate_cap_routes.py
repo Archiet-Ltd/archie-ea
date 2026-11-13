@@ -926,6 +926,7 @@ def api_accept_suggestion(suggestion_id):
     try:
         from flask_login import current_user
 
+        from app.models.models import CrossOrganisationRelationship
         from app.modules.architecture.services.archimate_relationship_service import (
             ArchiMateRelationshipService,
         )
@@ -943,6 +944,10 @@ def api_accept_suggestion(suggestion_id):
             },
         })
 
+    except CrossOrganisationRelationship as e:
+        # Plain refusal, not a 500: the same-organisation guard refused the row.
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
     except ValueError as e:
         return jsonify({"error": str(e)}), 409
     except SQLAlchemyError as e:
