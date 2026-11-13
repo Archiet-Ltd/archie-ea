@@ -98,7 +98,7 @@ def layer_counts() -> List[Dict[str, Any]]:
     out = []
     for key in LAYERS:
         kinds = sorted(kinds_by_layer[key].items(), key=lambda kv: (-kv[1], kv[0]))
-        row = rows.get(key, {})
+        row = rows.get(_counting_layer(key), {})
         drawn = row.get("model", 0)
         # The dashboard's figure for the layer. A layer whose records could not be counted has no such figure:
         # it is shown as drawn, with nothing said about records.

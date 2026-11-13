@@ -80,6 +80,26 @@ def test_each_organisation_is_read_by_its_own_id_and_no_call_reads_both(db_sessi
                 count_layers(None)
 
 
+def test_the_other_layer_reads_the_composite_row_not_itself(db_session, make_org, tenant_ctx):
+    """The model map's "other" layer is count_layers' "composite" row: elements stored in no layer
+    and of a type no layer holds. Looking the map's "other" key up under itself finds nothing, so it
+    must be read under "composite" (_counting_layer). With a plain lookup under "other" the layer
+    reads zero although it holds elements."""
+    from app.services.archimate_backbone import create_backbone_element
+    from app.services.model_map import layer_counts
+
+    mine = make_org("namedother")
+    with tenant_ctx(mine.id):
+        create_backbone_element(element_type="Location", layer=None, name="A place", organization_id=mine.id)
+        create_backbone_element(element_type="Grouping", layer=None, name="A group", organization_id=mine.id)
+        create_backbone_element(element_type="Goal", layer="motivation", name="A goal", organization_id=mine.id)
+        db_session.flush()
+
+    counts = {c["layer"]: c for c in layer_counts()}
+    assert counts["other"]["count"] == 2
+    assert counts["motivation"]["count"] == 1
+
+
 def test_the_model_map_reads_every_layers_kinds_in_one_grouped_query(db_session, two_orgs, tenant_ctx):
     """One grouped read carries every layer's kinds, so the map's per-layer figures cost the same
     whatever the number of layers, instead of one read per layer."""
