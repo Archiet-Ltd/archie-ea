@@ -18,7 +18,7 @@
       </select>
     </div>
   {% endmacro %}
-  {{ page_shell(title='Capability Heatmap', breadcrumb=[('Home', '/'), ('Capability Heatmap', none)], subtitle='Maturity levels by domain with investment overlay', actions_caller=_ps_actions) }}
+  {{ page_shell(title='Capability Heatmap', breadcrumb=[('Home', '/'), ('Capability Heatmap', none)], subtitle=('Maturity levels by domain' if costs_withheld else 'Maturity levels by domain, with an investment view'), actions_caller=_ps_actions) }}
 
   {% if costs_withheld %}<p class="text-sm text-muted-foreground" data-testid="heatmap-costs-withheld">{{ costs_withheld_text }}</p>{% endif %}
 
@@ -49,6 +49,8 @@
       <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Investment</p>
       <p class="text-2xl font-bold text-foreground mt-1"
          x-text="'{{ currency_symbol }}' + formatNumber(data.investment_summary?.grand_total || 0)"></p>
+      <p class="text-xs text-muted-foreground mt-1" x-show="!(data.investment_summary?.grand_total)" x-cloak
+         data-testid="heatmap-zero-investment">{{ currency_symbol }}0 means no solution cost is recorded against these capabilities yet. Map a solution to a capability and add its cost items to see it here.</p>
     </div>
     <div x-show="viewMode === 'investment'" x-cloak class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Domains w/ Investment</p>
