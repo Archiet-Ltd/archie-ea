@@ -664,6 +664,8 @@ def _execute_relationship(approval, payload) -> Dict[str, Any]:
         return {"success": False, "error": blocker}
     source = _element_for_repository(org_id, payload.get("source"))
     target = _element_for_repository(org_id, payload.get("target"))
+    if source is None or target is None:
+        return {"success": False, "error": "Source or target element not found in this organisation"}
     kind = payload.get("relationship_type")
     if kind not in ("Serving", "Association", "Flow"):
         return {"success": False, "error": "Unsupported relationship type"}
@@ -722,6 +724,8 @@ def _execute_technology(approval, payload) -> Dict[str, Any]:
     if blocker:
         return {"success": False, "error": blocker}
     application = _element_for_repository(org_id, payload.get("target"))
+    if application is None:
+        return {"success": False, "error": "Application element not found in this organisation"}
     name = payload.get("technology")
     if not name or not payload.get("file") or not payload.get("line") or not payload.get("image"):
         return {"success": False, "error": "A technology link needs its technology, file, line and image."}
