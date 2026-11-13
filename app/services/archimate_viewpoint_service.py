@@ -466,23 +466,35 @@ def _register_only_count(dashboard_layer: str, org_id=None) -> int:
     """Records of the layer's own tables that have no model element (a gap entered in the gap register).
 
     The layer lists them and counts them, the model map does not draw them. A type held in a table that
-    mirrors into the model is counted once, as its model element. Raises when a table cannot be read."""
+    mirrors into the model is counted once, as its model element. Raises when a table cannot be read.
+
+    One UNION ALL query per layer across all of the layer's model tables, instead of one count query
+    per type."""
     from app.modules.architecture.routes.archimate_crud.routes import LAYER_CONFIG, MODEL_REGISTRY
+    from app import db as _db
+    from sqlalchemy import union_all, select, literal, func
 
     keys = [dashboard_layer] + (["physical"] if dashboard_layer == "technology" else [])
-    records = 0
+
+    parts = []
     for key in keys:
         for type_name in LAYER_CONFIG.get(key, {}).get("elements", []):
             model_class = MODEL_REGISTRY.get(type_name)
             if not model_class:
                 continue
-            query = model_class.query
+            q = select(literal(1)).select_from(model_class)
             if org_id is not None and hasattr(model_class, "organization_id"):
-                query = query.filter(model_class.organization_id == org_id)
+                q = q.where(model_class.organization_id == org_id)
             if hasattr(model_class, "archimate_element_id"):
-                query = query.filter(model_class.archimate_element_id.is_(None))
-            records += query.count()
-    return records
+                q = q.where(model_class.archimate_element_id.is_(None))
+            parts.append(q)
+
+    if not parts:
+        return 0
+
+    combined = union_all(*parts).subquery("register_only")
+    count = _db.session.execute(select(func.count()).select_from(combined)).scalar()
+    return count or 0
 
 
 # A layer as an element's layer column may spell it (lower case, no spaces or underscores, "&" as "and").
