@@ -38,12 +38,12 @@
         'recommended_option': business_case.recommended_option or '',
         'expected_benefits': business_case.expected_benefits or '',
         'key_risks': business_case.key_risks or '',
-        'financial_benefit_annual': business_case.financial_benefit_annual if business_case.financial_benefit_annual is not none else '',
-        'capex': business_case.capex if business_case.capex is not none else '',
-        'opex_annual': business_case.opex_annual if business_case.opex_annual is not none else '',
-        'tco_3yr': business_case.tco_3yr if business_case.tco_3yr is not none else '',
-        'roi_percentage': business_case.roi_percentage if business_case.roi_percentage is not none else '',
-        'payback_months': business_case.payback_months if business_case.payback_months is not none else ''
+        'financial_benefit_annual': '' if costs_withheld else (business_case.financial_benefit_annual if business_case.financial_benefit_annual is not none else ''),
+        'capex': '' if costs_withheld else (business_case.capex if business_case.capex is not none else ''),
+        'opex_annual': '' if costs_withheld else (business_case.opex_annual if business_case.opex_annual is not none else ''),
+        'tco_3yr': '' if costs_withheld else (business_case.tco_3yr if business_case.tco_3yr is not none else ''),
+        'roi_percentage': '' if costs_withheld else (business_case.roi_percentage if business_case.roi_percentage is not none else ''),
+        'payback_months': '' if costs_withheld else (business_case.payback_months if business_case.payback_months is not none else '')
     } | tojson }},
     status: {{ (business_case.status or 'draft') | tojson }},
     capabilityId: {{ business_case.capability_id | tojson }},
@@ -302,6 +302,18 @@
       {% endcall %}
     {% endcall %}
 
+    {% if costs_withheld %}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base flex items-center gap-2') %}
+          <i data-lucide="calculator" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Costs, Benefits &amp; ROI
+        {% endcall %}
+      {% endcall %}
+      {% call card.card_content() %}
+        <p class="text-sm text-muted-foreground" data-testid="bc-costs-withheld" role="status">{{ costs_withheld_text }}</p>
+      {% endcall %}
+    {% endcall %}
+    {% else %}
     {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
@@ -369,6 +381,7 @@
         </div>
       {% endcall %}
     {% endcall %}
+    {% endif %}
 
     {# 8. Investment appraisal — composed from Costs and Expected benefits;
        the record's own capex/opex/TCO/ROI/NPV figures stay exactly as they
