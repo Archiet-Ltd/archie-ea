@@ -57,8 +57,14 @@
             .force('labels', labels)
             .on('tick', o.tick);
         if (o.gravity) {
-            // gravity keeps unconnected elements in view instead of drifting off the canvas
-            sim.force('x', d3.forceX(o.width / 2).strength(o.gravity)).force('y', d3.forceY(o.height / 2).strength(o.gravity));
+            // gravity keeps elements in view instead of drifting off the canvas; the ones nothing connects to
+            // are drawn on their own outer ring, so the pull to the centre does not apply to them
+            var pull = function (d) { return o.outerRing && d.connected === false ? 0 : o.gravity; };
+            sim.force('x', d3.forceX(o.width / 2).strength(pull)).force('y', d3.forceY(o.height / 2).strength(pull));
+        }
+        if (o.outerRing) {
+            sim.force('ring', d3.forceRadial(o.outerRing, o.width / 2, o.height / 2)
+                .strength(function (d) { return d.connected === false ? 0.9 : 0; }));
         }
         if (o.alphaDecay) sim.alphaDecay(o.alphaDecay);
         if (o.end) sim.on('end', o.end);
@@ -77,8 +83,16 @@
         var root = svg.append('g');
         var linkG = root.append('g');
         var nodeG = root.append('g');
-        var zoomer = d3.zoom().scaleExtent([0.1, 6]).on('zoom', function (ev) { root.attr('transform', ev.transform); });
+        // The wheel zooms the map only once the map has been clicked (or a pinch, which arrives with ctrl held),
+        // so the page scrolls normally while the cursor passes over it.
+        var zoomer = d3.zoom().scaleExtent([0.1, 6])
+            .filter(function (ev) {
+                if (ev.type === 'wheel') return ev.ctrlKey || svgEl === document.activeElement || svgEl.contains(document.activeElement);
+                return !ev.ctrlKey && !ev.button;
+            })
+            .on('zoom', function (ev) { root.attr('transform', ev.transform); });
         svg.call(zoomer);
+        svg.on('pointerdown.focus', function () { svgEl.focus({ preventScroll: true }); });
 
         function text(id, t) { var e = document.getElementById(id); if (e) e.textContent = t; }
         function hide(id) { var e = document.getElementById(id); if (e) e.classList.add('hidden'); }
@@ -123,12 +137,31 @@
             if (!nodes.length) { show('impact-empty'); text('impact-counts', 'No elements in this layer.'); return; }
             var clusters = data.mode === 'clusters';
             var edges = data.edges || [];
+            var ringLabel = null;
+            var isolated = clusters ? [] : nodes.filter(function (d) { return d.connected === false; });
+            var cx = width / 2, cy = height / 2;
+            var ringRadius = Math.min(width, height) * 0.44;
 
             if (clusters) {
                 text('impact-counts', data.total + ' elements, drawn one circle per layer. Click a layer to open it.');
             } else {
                 text('impact-counts', nodes.length + ' elements · ' + edges.length + ' relationships'
                     + (data.truncated ? ' · first ' + data.max_nodes + ' shown, pick a layer to narrow it' : ''));
+            }
+
+            // The elements nothing connects to sit on an outer ring, and the ring says so.
+            if (isolated.length) {
+                var ring = root.insert('g', ':first-child').attr('data-testid', 'model-map-unconnected-ring');
+                ring.append('circle').attr('cx', cx).attr('cy', cy).attr('r', ringRadius + 22).attr('fill', 'none')
+                    .attr('stroke', 'currentColor').attr('class', 'text-border').attr('stroke-width', 1)
+                    .attr('stroke-dasharray', '4 4');
+                ringLabel = ring.append('text').attr('x', cx).attr('y', cy - ringRadius - 32).attr('text-anchor', 'middle')
+                    .attr('font-size', 13).attr('fill', 'currentColor').attr('class', 'text-muted-foreground')
+                    .attr('data-testid', 'model-map-unconnected-label')
+                    .text('Not connected to anything (' + isolated.length + ')');
+                text('model-map-unconnected', 'Not connected to anything (' + isolated.length
+                    + '): the elements on the outer ring have no relationship to any other element.');
+                show('model-map-unconnected');
             }
 
             var link = linkG.selectAll('line').data(edges).enter().append('line')
@@ -173,10 +206,15 @@
 
             // Place the nodes on a ring before the first paint so the map is readable at once; the
             // simulation then settles them while the person is already hovering and clicking.
-            nodes.forEach(function (d, i) {
-                var a = (i / nodes.length) * 2 * Math.PI, r = Math.min(width, height) * 0.4;
-                d.x = width / 2 + r * Math.cos(a); d.y = height / 2 + r * Math.sin(a);
-            });
+            var inner = nodes.filter(function (d) { return !(isolated.length && d.connected === false); });
+            function onRing(list, r) {
+                list.forEach(function (d, i) {
+                    var a = (i / list.length) * 2 * Math.PI;
+                    d.x = cx + r * Math.cos(a); d.y = cy + r * Math.sin(a);
+                });
+            }
+            onRing(inner, isolated.length ? ringRadius * 0.45 : Math.min(width, height) * 0.4);
+            onRing(isolated, ringRadius);
             function paint() {
                 link.attr('x1', function (d) { return d.source.x; }).attr('y1', function (d) { return d.source.y; })
                     .attr('x2', function (d) { return d.target.x; }).attr('y2', function (d) { return d.target.y; });
@@ -188,10 +226,18 @@
                 charge: clusters ? -400 : (many ? -30 : -120),
                 collide: function (d) { return radius(d) + 2; },
                 gravity: 0.06, alphaDecay: many ? 0.06 : 0.04,
+                outerRing: isolated.length ? ringRadius : 0,
                 label: (clusters || !many) ? function (d) { return labelBox(d, radius(d) + 4, labelText); } : null,
-                end: function () { fit(nodes); svgEl.setAttribute('data-settled', '1'); }
+                end: function () { placeRingLabel(); if (!touched) fit(nodes); svgEl.setAttribute('data-settled', '1'); }
             });
             paint();
+            // The ring's label sits above the highest dot of the settled map, so no dot or dot name can lie on it.
+            function placeRingLabel() {
+                if (!ringLabel) return;
+                var top = cy - ringRadius - 32;
+                nodes.forEach(function (d) { top = Math.min(top, d.y - radius(d) - 14); });
+                ringLabel.attr('y', top);
+            }
             // When the layout settles, zoom to show every element with a margin.
             function fit(list) {
                 var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -200,12 +246,49 @@
                     x0 = Math.min(x0, d.x - r); y0 = Math.min(y0, d.y - r);
                     x1 = Math.max(x1, d.x + r + (many ? 0 : 150)); y1 = Math.max(y1, d.y + r);
                 });
+                if (ringLabel) { y0 = Math.min(y0, parseFloat(ringLabel.attr('y')) - 18); }
                 var w = x1 - x0, h = y1 - y0;
                 if (!(w > 0 && h > 0)) return;
                 var k = Math.max(0.1, Math.min(1, 0.92 * Math.min(width / w, height / h)));
                 var t = d3.zoomIdentity.translate(width / 2 - k * (x0 + x1) / 2, height / 2 - k * (y0 + y1) / 2).scale(k);
                 svg.transition().duration(250).call(zoomer.transform, t);
             }
+
+            // What the search box and the zoom buttons drive: the page's own controls call these.
+            var located = null;
+            function zoomBy(factor) { touched = true; svg.transition().duration(200).call(zoomer.scaleBy, factor); }
+            function locate(id) {
+                var d = nodes.filter(function (n) { return String(n.id) === String(id); })[0];
+                if (!d) return false;
+                touched = true;
+                if (located) {
+                    located.select('[data-located-ring]').remove();
+                    located.attr('data-located', null);
+                    if (many) located.select('[data-located-label]').remove();
+                }
+                located = node.filter(function (n) { return n === d; });
+                located.attr('data-located', 'true').raise();
+                located.append('circle').attr('data-located-ring', '1').attr('r', radius(d) + 7).attr('fill', 'none')
+                    .attr('stroke', 'currentColor').attr('class', 'text-primary').attr('stroke-width', 3);
+                if (many) {
+                    located.append('text').attr('data-located-label', '1').text(labelText(d))
+                        .attr('x', radius(d) + 10).attr('y', 4).attr('font-size', 13).attr('fill', 'currentColor')
+                        .attr('class', 'text-foreground').style('paint-order', 'stroke')
+                        .attr('stroke', 'var(--card)').attr('stroke-width', 3);
+                }
+                var k = Math.max(1.6, d3.zoomTransform(svgEl).k);
+                var t = d3.zoomIdentity.translate(width / 2 - k * d.x, height / 2 - k * d.y).scale(k);
+                svg.transition().duration(250).call(zoomer.transform, t);
+                selected(d);
+                return true;
+            }
+            window.modelMapView = {
+                nodes: nodes,
+                locate: locate,
+                zoomIn: function () { zoomBy(1.4); },
+                zoomOut: function () { zoomBy(1 / 1.4); },
+                fit: function () { touched = true; fit(nodes); }
+            };
             var done = function () {
                 var ms = ((window.performance && performance.now) ? performance.now() : Date.now()) - started;
                 svgEl.setAttribute('data-rendered-ms', String(Math.round(ms)));
@@ -215,6 +298,7 @@
         }
 
         var sim = null;
+        var touched = false;
         var layer = svgEl.getAttribute('data-layer');
         Platform.fetch(ENDPOINT + (layer ? '?layer=' + encodeURIComponent(layer) : ''))
             .then(render)
