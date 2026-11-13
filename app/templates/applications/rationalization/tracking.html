@@ -21,7 +21,7 @@
                 </div>
                 <div>
                     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Projected Savings</p>
-                    <p class="text-2xl font-bold text-foreground">{{ currency_symbol }}{{ '{:,.0f}'.format(financial_summary.projected|default(0)) }}</p>
+                    <p class="text-2xl font-bold text-foreground">{% if costs_withheld %}{{ costs_withheld_text }}{% else %}{{ currency_symbol }}{{ '{:,.0f}'.format(financial_summary.projected|default(0)) }}{% endif %}</p>
                 </div>
             </div>
             <p class="text-xs text-muted-foreground">Aggregate projected annual savings from all tracked applications</p>
@@ -33,7 +33,7 @@
                 </div>
                 <div>
                     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Actual Savings</p>
-                    <p class="text-2xl font-bold text-foreground">{{ currency_symbol }}{{ '{:,.0f}'.format(financial_summary.actual|default(0)) }}</p>
+                    <p class="text-2xl font-bold text-foreground">{% if costs_withheld %}{{ costs_withheld_text }}{% else %}{{ currency_symbol }}{{ '{:,.0f}'.format(financial_summary.actual|default(0)) }}{% endif %}</p>
                 </div>
             </div>
             <p class="text-xs text-muted-foreground">Realized annual savings from completed rationalization actions</p>

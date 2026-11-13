@@ -923,7 +923,7 @@
               </div>
               <div class="flex justify-between items-center py-3 px-4 rounded-md bg-background/60 border border-success/20">
                 <span class="text-sm font-medium text-muted-foreground">Est. Savings:</span>
-                <span id="result-savings" class="text-2xl font-bold text-success tabular-nums">{{ currency_symbol|default("£") }}0</span>
+                <span id="result-savings" class="text-2xl font-bold text-success tabular-nums">{% if costs_withheld %}{{ costs_withheld_text }}{% else %}{{ currency_symbol|default("£") }}0{% endif %}</span>
               </div>
             </div>
             <div class="flex gap-3">
@@ -2666,7 +2666,7 @@
 <script>
   window.__APP_CONFIG__ = window.__APP_CONFIG__ || {};
   Object.assign(window.__APP_CONFIG__, {
-    currencySymbol: '{{ currency_symbol|default("£") }}',
+    currencySymbol: {% if costs_withheld %}''{% else %}'{{ currency_symbol|default("£") }}'{% endif %},
     runDetectionUrl: '{{ url_for("unified_duplicate.run_simple_detection_api") }}',
     simpleDashboardUrl: '{{ url_for("unified_duplicate.simple_dashboard") }}',
     autoResolveUrl: '{{ url_for("unified_applications.rationalization_auto_resolve") }}',
@@ -2945,7 +2945,7 @@
       saveError: '',
 
       // Currency symbol from server config
-      currencySymbol: (window.__APP_CONFIG__ || {}).currencySymbol || '£', // frontend-quality-ok
+      currencySymbol: (window.__APP_CONFIG__ || {}).currencySymbol || '', // frontend-quality-ok
 
       // Form values — mirrors ReplacementPlan fields
       form: {
@@ -3732,7 +3732,7 @@
       _formatCurrency(amount) {
         if (amount == null) return '—';
         if (typeof formatCurrency === 'function') return formatCurrency(amount);
-        let sym = (window.__APP_CONFIG__ || {}).currencySymbol || '£'; // frontend-quality-ok
+        let sym = (window.__APP_CONFIG__ || {}).currencySymbol || ''; // frontend-quality-ok
         return sym + Number(amount).toLocaleString();
       },
     };

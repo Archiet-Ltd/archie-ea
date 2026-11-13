@@ -415,11 +415,20 @@ def rationalization_tracking():
         current_app.logger.error(f"Error loading tracking financials: {e}")
         financial = {"projected": 0, "actual": 0}
 
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
+    withheld = not costs_visible(current_user)
+    if withheld:
+        currency_symbol = ""
+        financial = {"projected": None, "actual": None}
+
     return render_template(
         "applications/rationalization/tracking.html",
         currency_symbol=currency_symbol,
         active_tab="tracking",
         financial_summary=financial,
+        costs_withheld=withheld,
+        costs_withheld_text=COSTS_WITHHELD,
     )
 
 
@@ -1185,15 +1194,20 @@ def rationalization_dependency_impact(app_id):
             and blast_radius.get("risk_level", "low") not in ("critical", "high")
         )
 
+        from app.services.cost_visibility import withhold_reply
+
         return jsonify(
-            {
-                "success": True,
-                "app_id": app_id,
-                "app_name": app_obj.name,
-                "blockers": blockers,
-                "blast_radius": blast_radius,
-                "retirement_safe": retirement_safe,
-            }
+            withhold_reply(
+                {
+                    "success": True,
+                    "app_id": app_id,
+                    "app_name": app_obj.name,
+                    "blockers": blockers,
+                    "blast_radius": blast_radius,
+                    "retirement_safe": retirement_safe,
+                },
+                keys=("estimated_cost", "actual_cost", "total_cost", "estimated_savings", "total_cost_of_ownership", "estimated_total_decoupling_cost", "cost_efficiency", "invest_bv", "invest_tech")
+            )
         )
     except Exception as e:
         current_app.logger.error(
@@ -1509,7 +1523,9 @@ def rationalization_evidence_trail(app_id):
         if "error" in result:
             return jsonify({"success": False, "error": result["error"]}), 500
 
-        return jsonify({"success": True, **result})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, **result}, keys=("estimated_cost", "actual_cost", "total_cost", "estimated_savings", "total_cost_of_ownership", "estimated_total_decoupling_cost", "cost_efficiency", "invest_bv", "invest_tech")))
 
     except Exception as e:
         current_app.logger.error(
@@ -3557,7 +3573,9 @@ def rationalization_model_metadata():
 
     try:
         metadata = RationalizationScoringService.get_model_metadata()
-        return jsonify({"success": True, **metadata})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, **metadata}, keys=("estimated_cost", "actual_cost", "total_cost", "estimated_savings", "total_cost_of_ownership", "estimated_total_decoupling_cost", "cost_efficiency", "invest_bv", "invest_tech")))
     except Exception as exc:
         current_app.logger.error(f"Error fetching model metadata: {exc}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -4409,7 +4427,9 @@ def rationalization_enrich_candidates():
                 "business_criticality": app_obj.business_criticality or "",
             })
 
-        return jsonify({"success": True, "applications": results})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "applications": results}, keys=("estimated_cost", "actual_cost", "total_cost", "estimated_savings", "total_cost_of_ownership", "estimated_total_decoupling_cost", "cost_efficiency", "invest_bv", "invest_tech")))
     except Exception as exc:
         current_app.logger.error("Enrich candidates failed: %s", exc, exc_info=True)
         return jsonify({"success": False, "error": str(exc)}), 500
