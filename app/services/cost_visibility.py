@@ -19,6 +19,11 @@ INVESTMENT_MONEY_KEYS = (
     "total_estimated_investment", "critical_investment", "high_investment", "medium_investment", "low_investment",
 )
 
+# every key that holds a money amount or a figure worked out from one in a business case
+BUSINESS_CASE_MONEY_KEYS = (
+    "financial_benefit_annual", "capex", "opex_annual", "tco_3yr", "roi_percentage", "payback_months", "npv",
+)
+
 
 def costs_visible(user) -> bool:
     """The one rule the Overview applies to cost: whoever may read the spend pages."""
@@ -38,6 +43,58 @@ def withhold_costs(result: Any, keys: Optional[Iterable[str]] = None) -> Any:
     out = _withhold(result, money, keys is not None)
     if keys is not None and isinstance(out, dict):
         out["costs_withheld"] = True
+    return out
+
+
+def withhold_reply(reply: Any, keys: Iterable[str]) -> Any:
+    """A JSON reply with its money keys left out for the signed-in person the rule withholds from.
+
+    A route calls this on the reply it is about to jsonify. For a person the rule allows the reply
+    passes through unchanged; for anyone else the named money keys are removed at any depth and the
+    reply carries ``costs_withheld`` with the one sentence, so a template or a fetch can say it once.
+    """
+    from flask import current_user, has_request_context
+
+    if not has_request_context() or current_user is None or not current_user.is_authenticated:
+        return reply
+    if costs_visible(current_user):
+        return reply
+    out = withhold_costs(reply, keys=keys)
+    if isinstance(out, dict):
+        out["costs_withheld"] = COSTS_WITHHELD
+    return out
+
+
+import re as _re
+
+# a field whose name says money, in a change-history row
+MONEY_FIELD_RE = _re.compile(
+    r"cost|tco|budget|spend|saving|invest|estimate|price|licen[cs]e|capex|opex|revenue", _re.I
+)
+
+
+def withhold_change_rows(rows: Any) -> Any:
+    """History-style rows (``{"fields": [{"field", "before", "after"}]}``) with money-named
+    fields' figures replaced by the one sentence, for the signed-in person the rule withholds from."""
+    from flask import current_user, has_request_context
+
+    if not has_request_context() or current_user is None or not current_user.is_authenticated:
+        return rows
+    if costs_visible(current_user):
+        return rows
+    out = []
+    for row in rows or []:
+        row = dict(row)
+        fields = []
+        for f in row.get("fields") or []:
+            f = dict(f)
+            if MONEY_FIELD_RE.search(str(f.get("field", ""))):
+                f["before"] = COSTS_WITHHELD
+                f["after"] = COSTS_WITHHELD
+            fields.append(f)
+        row["fields"] = fields
+        row["costs_withheld"] = True
+        out.append(row)
     return out
 
 
