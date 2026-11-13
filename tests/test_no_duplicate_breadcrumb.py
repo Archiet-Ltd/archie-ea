@@ -69,6 +69,6 @@ def _offenders() -> list[str]:
 def test_no_page_renders_two_breadcrumb_trails():
     offenders = _offenders()
     assert offenders == [], (
-        "pages render both a {% block breadcrumb %} and a shell-rendered "
-        "breadcrumb (page_trail via page_shell/page_header): %s" % offenders
+        f"pages render both a {{% block breadcrumb %}} and a shell-rendered "
+        f"breadcrumb (page_trail via page_shell/page_header): {offenders}"
     )
