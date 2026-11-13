@@ -42,6 +42,15 @@ def _seed_org(org_id, tag):
         name=funded_name, organization_id=org_id, strategic_importance="high", level=1)
     db.session.add(funded)
     db.session.flush()
+    # The priorities page opens only once some application is mapped to a capability.
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+
+    app_row = ApplicationComponent(name="Claims system %s" % tag, organization_id=org_id)
+    db.session.add(app_row)
+    db.session.flush()
+    db.session.add(UnifiedApplicationCapabilityMapping(
+        unified_capability_id=funded.id, application_component_id=app_row.id))
     db.session.add(UnifiedWorkPackage(
         name="Work for %s" % funded_name, organization_id=org_id,
         capability_id=funded.id, capability_ids=[funded.id], estimated_cost=12345.0))

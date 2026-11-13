@@ -52,7 +52,7 @@
              data-level="{{ cap.level|default(1) }}"
              data-cap-id="{{ cap.id }}"
              data-cap-name="{{ cap.name|e }}"
-             data-cap-category="{{ cap.category|default('operational')|e }}"
+             data-cap-category="{{ cap.category|default('operational', true)|e }}"
              data-cap-level="{{ cap.level|default(1) }}"
              data-cap-desc="{{ cap.description|default('', true)|e }}"
              data-cap-parent="{{ cap.parent_capability_id or '' }}"
@@ -378,6 +378,14 @@ async function deleteCap(id, name) {
 if (new URLSearchParams(window.location.search).get('new') === '1' && document.getElementById('cap-dialog')) {
     openCapCreate();
 }
+
+/* A score's "Record its importance" step links here with ?edit=<capability id>: open that capability's form. */
+(function () {
+    var editId = new URLSearchParams(window.location.search).get('edit');
+    if (!editId || !document.getElementById('cap-dialog')) return;
+    var card = document.querySelector('.cap-card[data-cap-id="' + String(editId).replace(/"/g, '') + '"]');
+    if (card) openCapEdit(card);
+})();
 
 /* CSP-safe: delegate the page actions instead of inline onclick= (DESIGN.md). */
 document.addEventListener('click', function (e) {

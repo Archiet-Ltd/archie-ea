@@ -40,11 +40,18 @@ STRATEGIC_UNSCORED_REASON = (
 )
 
 
-def _record_page():
-    """The page where a capability's importance is recorded, or None when it cannot be built."""
+def _record_page(capability=None):
+    """The page where a capability's importance is recorded, or None when it cannot be built.
+
+    With a capability the link opens that capability's own edit form. The score reads the unified
+    record; the form edits the capability it was projected from, so the link names that one."""
     from app.services.result_footer_service import page_link
 
-    return page_link("unified_low_priority.capability_map_capabilities")
+    href = page_link("unified_low_priority.capability_map_capabilities")
+    if href and capability is not None:
+        edit_id = capability.source_id if capability.source_table == "business_capability" else capability.id
+        href = f"{href}{'&' if '?' in href else '?'}edit={edit_id}"
+    return href
 
 
 def currency_symbol() -> str:
@@ -328,7 +335,7 @@ class InvestmentPrioritizationService:
             ),
             "strategic_derivation": derivation,
             "strategic_step": (
-                None if strategic_score is not None else {"text": STRATEGIC_STEP_TEXT, "href": _record_page()}
+                None if strategic_score is not None else {"text": STRATEGIC_STEP_TEXT, "href": _record_page(capability)}
             ),
             "capability_type": capability.capability_type,
             "coverage_count": coverage_count,
