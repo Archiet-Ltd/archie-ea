@@ -110,6 +110,9 @@
                 {% if value_stream.stages %}
                 <div class="overflow-x-auto" data-stage-chevrons>
                     <div class="flex items-stretch gap-1 min-w-max pb-2">
+                        {% if value_stream.stages|length > 0 %}
+                        <span class="text-xs font-medium text-muted-foreground shrink-0">Trigger</span>
+                        {% endif %}
                         {% for stage in value_stream.stages %}
                         {% set edit_attrs = {'data-stage': stage|tojson|forceescape} %}
                         <div class="w-72 shrink-0" data-stage-card data-stage-id="{{ stage.id }}">
@@ -201,6 +204,9 @@
                             </div>
                         </div>
                         {% endfor %}
+                        {% if value_stream.stages|length > 0 %}
+                        <span class="text-xs font-medium text-muted-foreground shrink-0">Outcome</span>
+                        {% endif %}
                     </div>
                 </div>
                 {% else %}
@@ -494,7 +500,7 @@
     {% call modal(id='stage-create-modal', title='Add Stage', size='default') %}
     <form method="POST" action="{{ url_for('value_stream.create_stage', value_stream_id=value_stream.id) }}" class="space-y-4">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
-        {% call form_group(id='stage-name', label='Name') %}{{ input(id='stage-name', name='name', required=true, class='h-9') }}{% endcall %}
+        {% call form_group(id='stage-name', label='Name') %}{{ input(id='stage-name', name='name', required=true, class='h-9', autofocus=true) }}{% endcall %}
         {% call form_group(id='stage-description', label='Description') %}{{ textarea(id='stage-description', name='description', rows=2) }}{% endcall %}
         {% call form_group(id='stage-entry-criteria', label='Entry criteria') %}{{ textarea(id='stage-entry-criteria', name='entry_criteria', rows=2) }}{% endcall %}
         {% call form_group(id='stage-exit-criteria', label='Exit criteria') %}{{ textarea(id='stage-exit-criteria', name='exit_criteria', rows=2) }}{% endcall %}
@@ -553,7 +559,7 @@
     <form method="POST" x-bind:action="stageEditForm.id ? '{{ url_for('value_stream.edit_stage', stage_id=0) }}'.replace('/0/', '/' + stageEditForm.id + '/') : '#'" class="space-y-4">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         {{ input(type='hidden', name='value_stream_id', value=value_stream.id) }}
-        {% call form_group(id='stage-edit-name', label='Name') %}{{ input(id='stage-edit-name', name='name', required=true, class='h-9', attrs_dict={'x-model': 'stageEditForm.name'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-name', label='Name') %}{{ input(id='stage-edit-name', name='name', required=true, class='h-9', autofocus=true, attrs_dict={'x-model': 'stageEditForm.name'}) }}{% endcall %}
         {% call form_group(id='stage-edit-description', label='Description') %}{{ textarea(id='stage-edit-description', name='description', rows=2, attrs_dict={'x-model': 'stageEditForm.description'}) }}{% endcall %}
         {% call form_group(id='stage-edit-entry-criteria', label='Entry criteria') %}{{ textarea(id='stage-edit-entry-criteria', name='entry_criteria', rows=2, attrs_dict={'x-model': 'stageEditForm.entry_criteria'}) }}{% endcall %}
         {% call form_group(id='stage-edit-exit-criteria', label='Exit criteria') %}{{ textarea(id='stage-edit-exit-criteria', name='exit_criteria', rows=2, attrs_dict={'x-model': 'stageEditForm.exit_criteria'}) }}{% endcall %}
@@ -589,7 +595,7 @@
     {% call modal(id='vs-edit-modal', title='Edit Value Stream', size='default') %}
     <form method="POST" action="{{ url_for('value_stream.edit', value_stream_id=value_stream.id) }}" class="space-y-4">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
-        {% call form_group(id='vs-edit-name', label='Name') %}{{ input(id='vs-edit-name', name='name', value=value_stream.name, required=true, class='h-9') }}{% endcall %}
+        {% call form_group(id='vs-edit-name', label='Name') %}{{ input(id='vs-edit-name', name='name', value=value_stream.name, required=true, class='h-9', autofocus=true) }}{% endcall %}
         {% call form_group(id='vs-edit-description', label='Description') %}
             {% call textarea(id='vs-edit-description', name='description', rows=3) %}{{ value_stream.description or '' }}{% endcall %}
         {% endcall %}
