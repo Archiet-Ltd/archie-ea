@@ -88,7 +88,7 @@
           <th class="px-4 py-3 font-medium">Phase</th>
           <th class="px-4 py-3 font-medium">Health</th>
           {% if not costs_withheld %}<th class="px-4 py-3 font-medium text-right">Budget</th>{% endif %}
-          {% if not costs_withheld %}<th class="px-4 py-3 font-medium text-right">Spent</th>{% endif %}
+          {% if not costs_withheld %}<th class="px-4 py-3 font-medium text-right">Spent so far</th>{% endif %}
           {% if not costs_withheld %}<th class="px-4 py-3 font-medium text-right">Variance</th>{% endif %}
           <th class="px-4 py-3 font-medium text-right">Complete</th>
           <th class="px-4 py-3 font-medium text-right">Benefits</th>
@@ -120,7 +120,7 @@
           </td>
           <td class="px-4 py-3 text-right tabular-nums">
             {% if i.variance_pct is not none %}
-              <span class="{% if i.variance_pct > 10 %}text-destructive{% elif i.variance_pct > 0 %}text-warning{% else %}text-success{% endif %} font-medium">
+              <span class="{% if i.variance_pct > 0 %}text-destructive{% elif i.variance_pct < 0 %}text-success{% else %}text-foreground{% endif %} font-medium">
                 {{ '%+.1f' | format(i.variance_pct) }}%
               </span>
             {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}

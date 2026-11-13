@@ -333,13 +333,21 @@ def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
     """
     from app.models.application_portfolio import ApplicationComponent
 
+    from app.modules.dashboard.services.overview_figures import _active_applications, left_out_applications
+
+    # The applications in use: the Systems list's own definition (not a copy, not
+    # decommissioned, not an unpromoted import), so the count here is that list's count.
     apps = (
-        ApplicationComponent.query.filter(
-            ApplicationComponent.organization_id == organization_id,
+        db.session.execute(
+            _active_applications()
+            .where(ApplicationComponent.organization_id == organization_id, ApplicationComponent.deleted_at.is_(None))
+            .order_by(ApplicationComponent.name)
         )
-        .order_by(ApplicationComponent.name)
+        .scalars()
         .all()
     )
+    # The Overview's own left-out figure: an unpromoted repository import is not a decommissioned application.
+    decommissioned = left_out_applications(organization_id)["decommissioned"]
 
     owners_by_app = _owner_names_by_application(
         organization_id, [a.id for a in apps], ownership_types=("primary", "business"))
@@ -367,9 +375,10 @@ def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
         citations.append(application_citation(app.id, app.name))
 
     return {
-        "answer": "the applications we run, with each one's accountable owner and annual cost",
+        "answer": "the applications in use, with each one's accountable owner and annual cost",
         "rows": rows,
         "total": len(rows),
+        "decommissioned_left_out": decommissioned,
         "citations": citations,
         "reason": None if rows else "no applications are recorded in this organisation",
     }
