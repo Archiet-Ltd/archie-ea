@@ -876,6 +876,9 @@ function composerApp() {
         /* Selected cell reference for inline editing */
         _currentSelectedCell: null,
 
+        /* Last selected element id for keyboard re-entry */
+        _lastSelectedElementId: null,
+
         /* Tab cycle index for cycling through connected elements */
         _tabCycleIndex: -1,
         _tabCycleNeighbors: [],
@@ -1202,6 +1205,39 @@ function composerApp() {
 
                 defaultConnectionPoint: { name: 'boundary', args: { offset: 2 } },
             });
+
+            /* ── Canvas focus: when Tab enters the drawing, select the element nearest
+               the top-left (or the last selected one when returning) and announce it. */
+            let canvasEl = document.getElementById('composer-canvas');
+            if (canvasEl) {
+                canvasEl.addEventListener('focus', function() {
+                    if (self.mode === 'view') return;
+                    let elements = self.graph.getElements().filter(function(c) {
+                        return !c.get('isLayerZone') && !c.get('isAnnotation');
+                    });
+                    if (elements.length === 0) return;
+                    let chosen = null;
+                    if (self._lastSelectedElementId) {
+                        chosen = self.graph.getCell(self._lastSelectedElementId);
+                        if (!chosen || !elements.includes(chosen)) chosen = null;
+                    }
+                    if (!chosen) {
+                        chosen = elements.reduce(function(best, el) {
+                            let bPos = best.position();
+                            let ePos = el.position();
+                            if (ePos.y < bPos.y || (ePos.y === bPos.y && ePos.x < bPos.x)) return el;
+                            return best;
+                        });
+                    }
+                    self._clearSelection();
+                    self._selectedCells = [chosen];
+                    self._currentSelectedCell = chosen;
+                    self._lastSelectedElementId = chosen.id;
+                    let view = self.paper.findViewByModel(chosen);
+                    if (view) self._highlightCell(view);
+                    self._announceSelection(chosen);
+                });
+            }
 
             /* ── Pan / rubber-band select: drag on blank canvas ── */
             this.shellInit();
@@ -3382,7 +3418,8 @@ function composerApp() {
             return !!(this.focusView || this.mode !== 'edit' || e.altKey);
         },
 
-        /* Step to the next (1) or previous (-1) element connected to the one the walk started from. */
+        /* Step to the next (1) or previous (-1) element connected to the one the walk started from.
+           If no connected element lies in that direction, move to the nearest element in that direction. */
         _walkConnected: function(step) {
             let self = this;
             let chosen = (self._selectedCells.length === 1) ? self._selectedCells[0] : self._currentSelectedCell;
@@ -3394,16 +3431,23 @@ function composerApp() {
                 self._tabCycleIndex = -1;
             }
             let neighbors = self._tabCycleNeighbors;
-            if (neighbors.length === 0) {
-                self.statusText = 'No connected elements';
+            let nextCell = null;
+            if (neighbors.length > 0) {
+                self._tabCycleIndex = inWalk ? neighbors.indexOf(chosen) : (step > 0 ? -1 : 0);
+                self._tabCycleIndex = (self._tabCycleIndex + step + neighbors.length) % neighbors.length;
+                nextCell = neighbors[self._tabCycleIndex];
+            } else {
+                /* No connected elements: find the nearest element in the arrow direction. */
+                nextCell = self._findNearestInDirection(chosen, step > 0 ? 'forward' : 'backward');
+            }
+            if (!nextCell) {
+                self.statusText = 'No elements to walk to';
                 return;
             }
-            self._tabCycleIndex = inWalk ? neighbors.indexOf(chosen) : (step > 0 ? -1 : 0);
-            self._tabCycleIndex = (self._tabCycleIndex + step + neighbors.length) % neighbors.length;
-            let nextCell = neighbors[self._tabCycleIndex];
             self._clearSelection();
             self._selectedCells = [nextCell];
             self._currentSelectedCell = nextCell;
+            self._lastSelectedElementId = nextCell.id;
             let view = self.paper.findViewByModel(nextCell);
             if (view) self._highlightCell(view);
             let pos = nextCell.position();
@@ -3417,7 +3461,46 @@ function composerApp() {
                 self.paper.translate(Math.round(canvasEl.clientWidth / 2 - (pos.x + size.width / 2) * scale.sx),
                                      Math.round(canvasEl.clientHeight / 2 - (pos.y + size.height / 2) * scale.sy));
             }
-            self.statusText = (nextCell.get('elName') || 'Element') + ', ' + (self._tabCycleIndex + 1) + ' of ' + neighbors.length + ' connected';
+            let neighborCount = neighbors.length > 0 ? neighbors.length : self.graph.getElements().filter(function(c) { return c.isElement && c.isElement() && !c.get('isLayerZone') && !c.get('isAnnotation'); }).length;
+            self.statusText = (nextCell.get('elName') || 'Element') + ', ' + (neighbors.length > 0 ? (self._tabCycleIndex + 1) + ' of ' + neighbors.length + ' connected' : 'no connections');
+            self._announceSelection(nextCell);
+        },
+
+        /* Find the nearest element in the given direction (forward/backward) from the reference cell.
+           Forward = right/down, Backward = left/up. Uses visual position on canvas. */
+        _findNearestInDirection: function(refCell, direction) {
+            let self = this;
+            let elements = self.graph.getElements().filter(function(c) {
+                return c.isElement && c.isElement() && !c.get('isLayerZone') && !c.get('isAnnotation') && c.id !== refCell.id;
+            });
+            if (elements.length === 0) return null;
+            let refPos = refCell.position();
+            let refCenter = { x: refPos.x + refCell.size().width / 2, y: refPos.y + refCell.size().height / 2 };
+            let best = null;
+            let bestScore = Infinity;
+            elements.forEach(function(el) {
+                let pos = el.position();
+                let center = { x: pos.x + el.size().width / 2, y: pos.y + el.size().height / 2 };
+                let dx = center.x - refCenter.x;
+                let dy = center.y - refCenter.y;
+                let score = 0;
+                if (direction === 'forward') {
+                    /* Prefer right then down: positive x, then positive y */
+                    if (dx >= 0) score = dx * dx + dy * dy;
+                    else if (dy > 0) score = 10000 + dy * dy; /* down but left */
+                    else score = 20000 + dx * dx + dy * dy; /* up */
+                } else {
+                    /* Prefer left then up: negative x, then negative y */
+                    if (dx <= 0) score = dx * dx + dy * dy;
+                    else if (dy < 0) score = 10000 + dy * dy; /* up but right */
+                    else score = 20000 + dx * dx + dy * dy; /* down */
+                }
+                if (score < bestScore) {
+                    bestScore = score;
+                    best = el;
+                }
+            });
+            return best;
         },
 
         /* Where the focus view opens, for every size: the larger of fitting the whole and reading size (names at
@@ -4528,6 +4611,24 @@ function composerApp() {
                 if (view) self._unhighlightCell(view);
             });
             this._selectedCells = [];
+        },
+
+        /* Announce the selected element to screen readers via aria-live. */
+        _announceSelection: function(cell) {
+            let name = cell.get('elName') || '(unnamed)';
+            let type = cell.get('elType') || '';
+            let connections = this.graph.getConnectedLinks(cell).length;
+            let msg = name + ', ' + type + ', ' + connections + ' connection' + (connections === 1 ? '' : 's');
+            let live = document.getElementById('composer-a11y-live');
+            if (!live) {
+                live = document.createElement('div');
+                live.id = 'composer-a11y-live';
+                live.setAttribute('aria-live', 'polite');
+                live.setAttribute('aria-atomic', 'true');
+                live.className = 'sr-only';
+                document.body.appendChild(live);
+            }
+            live.textContent = msg;
         },
 
         /* ── Open relationship picker for two cells (used by R shortcut and connect mode) ── */
