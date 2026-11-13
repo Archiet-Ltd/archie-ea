@@ -5,6 +5,7 @@ from flask import jsonify, request  # dead-code-ok
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.permissions import can
 from app.utils.recorded_figures import as_figure
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.main.views import main
@@ -91,6 +92,9 @@ def get_strategic_work_packages():
 @login_required
 def create_strategic_work_package():
     """Create new strategic work package"""
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         data = request.get_json()
 
@@ -158,6 +162,9 @@ def create_strategic_work_package():
 @login_required
 def update_strategic_work_package(wp_id):
     """Update strategic work package"""
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         data = request.get_json()
 
@@ -219,6 +226,9 @@ def update_strategic_work_package(wp_id):
 @login_required
 def delete_strategic_work_package(wp_id):
     """Delete strategic work package"""
+    if not can(current_user, "delete", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         work_package_service.delete_work_package(
             wp_id, organization_id=current_organization_id()

@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import Optional
 
 ACTIONS = ("create", "read", "edit", "delete", "bulk_delete")
-OBJECT_TYPES = ("application", "relationship", "motivation_element")
+OBJECT_TYPES = ("application", "relationship", "motivation_element", "work_package")
 
 _ALL = frozenset(ACTIONS)
 # Architects create, read, edit and delete one application at a time; deleting
@@ -60,6 +60,15 @@ DEFAULTS = {
     # Goals, drivers, requirements and other motivation elements: administrators and
     # architects create, edit and delete them, everyone else reads.
     "motivation_element": {
+        "org_admin": _ALL,
+        "administrator": _ALL,
+        "admin": _ALL,
+        "architect": _ARCHITECT,
+        "viewer": _READ,
+    },
+    # Work packages: administrators and architects create, read, edit and delete;
+    # viewers read; every unlisted role reads only. Same defaults as application.
+    "work_package": {
         "org_admin": _ALL,
         "administrator": _ALL,
         "admin": _ALL,

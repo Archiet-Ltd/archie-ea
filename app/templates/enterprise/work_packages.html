@@ -11,11 +11,15 @@
 {% block title %}Work packages{% endblock %}
 
 {% macro _actions() %}
+{% if can("create", "work_package") %}
 {% call ui.button(href=url_for('implementation_planning.create_work_package'), attrs={'data-testid': 'btn-new-work-package'}) %}{{ lucide('plus') }}New work package{% endcall %}
+{% endif %}
 {% endmacro %}
 
 {% macro _bulk_delete() %}
+{% if can("delete", "work_package") %}
 {% call ui.button(type='submit', variant='outline', size='sm', class='h-8', attrs={'form': 'wp-bulk-form', 'data-testid': 'wp-bulk-delete', 'data-bulk-delete': '', 'hidden': true}) %}{{ lucide('trash-2') }}Delete selected{% endcall %}
+{% endif %}
 {% endmacro %}
 
 {#- The row's ellipsis menu, built from the same dropdown parts as row_actions in components/list_table.html
@@ -25,9 +29,9 @@
   {%- call ui.dropdown_menu_trigger(variant='ghost', size='icon', class='size-8 data-[state=open]:bg-muted') -%}{{ lucide('ellipsis') }}<span class="sr-only">Actions for {{ wp.name or 'this work package' }}</span>{%- endcall -%}
   {%- call ui.dropdown_menu_content(align='end', class='w-[160px]') -%}
     {{ row_action('Open', href=url_for('implementation_planning.work_package_detail', work_package_id=wp.id)) }}
-    {{ row_action('Edit', href=url_for('implementation_planning.edit_work_package', work_package_id=wp.id), testid='work-package-edit') }}
-    {{ row_action('Delete', action=url_for('enterprise.work_packages', delete=wp.id), destructive=true, separator_before=true,
-                  confirm='Delete "' ~ (wp.name or 'this work package') ~ '"? This cannot be undone.', testid='work-package-delete') }}
+    {% if can("edit", "work_package") %}{{ row_action('Edit', href=url_for('implementation_planning.edit_work_package', work_package_id=wp.id), testid='work-package-edit') }}{% endif %}
+    {% if can("delete", "work_package") %}{{ row_action('Delete', action=url_for('enterprise.work_packages', delete=wp.id), destructive=true, separator_before=true,
+                  confirm='Delete "' ~ (wp.name or 'this work package') ~ '"? This cannot be undone.', testid='work-package-delete') }}{% endif %}
   {%- endcall -%}
 {%- endcall -%}
 {%- endmacro %}
@@ -138,7 +142,7 @@
   {% call ui.card_content() %}
     {{ empty_state(icon='package', title='No work packages yet',
                    description='A work package is a piece of work that closes one or more gaps. Add one here, or convert a gap on the gap analysis page.',
-                   cta_text='New work package', cta_icon='plus', cta_href=url_for('implementation_planning.create_work_package')) }}
+                   cta_text='New work package', cta_icon='plus', cta_href=url_for('implementation_planning.create_work_package')) if can("create", "work_package") else none }}
   {% endcall %}
 {% endcall %}
 {% endif %}

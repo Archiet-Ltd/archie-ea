@@ -18,7 +18,7 @@
         description=work_package.description|default('', true)|truncate(200),
         actions=[
             {'text': 'Edit', 'icon': 'pencil', 'href': url_for('implementation_planning.edit_work_package', work_package_id=work_package.id), 'variant': 'outline'}
-        ]
+        ] if can("edit", "work_package") else []
     ) }}
 
     {% call card() %}
@@ -47,7 +47,7 @@
                     {{ owner_name or work_package.assigned_to }}
                 {% else %}
                     <span class="text-muted-foreground">No owner yet</span>
-                    <a href="{{ url_for('implementation_planning.edit_work_package', work_package_id=work_package.id) }}" class="text-primary hover:underline text-xs ml-1" data-testid="wp-assign-owner">Assign owner</a>
+                    {% if can("edit", "work_package") %}<a href="{{ url_for('implementation_planning.edit_work_package', work_package_id=work_package.id) }}" class="text-primary hover:underline text-xs ml-1" data-testid="wp-assign-owner">Assign owner</a>{% endif %}
                 {% endif %}
             </div>
             {% elif p.key == 'progress' %}

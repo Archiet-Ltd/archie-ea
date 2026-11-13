@@ -10,7 +10,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from app import db
-from app.utils.recorded_figures import as_figure
+from app.core.auth.permissions import can
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.main.views import main
 from app.models.roadmap import RoadmapTask
@@ -621,6 +621,9 @@ def get_capability_work_packages():
 @login_required
 def create_capability_work_package():
     """Create new capability work package with multi-capability support"""
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         data = request.get_json()
 
@@ -708,6 +711,9 @@ def create_capability_work_package():
 @login_required
 def update_capability_work_package(wp_id):
     """Update capability work package"""
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         data = request.get_json()
 
@@ -779,6 +785,9 @@ def update_capability_work_package(wp_id):
 @login_required
 def delete_capability_work_package(wp_id):
     """Delete capability work package"""
+    if not can(current_user, "delete", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         work_package_service.delete_work_package(
             wp_id, organization_id=current_organization_id()
@@ -846,6 +855,9 @@ def get_work_package_tasks(wp_id):
 @login_required
 def create_work_package_task(wp_id):
     """Create a new task for a work package"""
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         # Verify work package exists
         _require_wp(wp_id)
@@ -1009,6 +1021,9 @@ def get_work_package_deliverables(wp_id):
 @login_required
 def create_work_package_deliverable(wp_id):
     """Create a new deliverable for a work package"""
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         # Verify work package exists
         _require_wp(wp_id)
@@ -1054,6 +1069,9 @@ def create_work_package_deliverable(wp_id):
 @login_required
 def update_work_package_deliverable(wp_id, deliverable_id):
     """Update a deliverable"""
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         # Verify work package and deliverable exist
         _require_wp(wp_id)
@@ -1091,6 +1109,9 @@ def update_work_package_deliverable(wp_id, deliverable_id):
 @login_required
 def delete_work_package_deliverable(wp_id, deliverable_id):
     """Delete a deliverable"""
+    if not can(current_user, "delete", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         # Verify work package and deliverable exist
         _require_wp(wp_id)

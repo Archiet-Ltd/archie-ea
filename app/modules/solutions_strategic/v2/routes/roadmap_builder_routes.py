@@ -35,6 +35,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
+from app.core.auth.permissions import can
 from app.decorators import audit_log
 
 from ..services.roadmap_builder_service import RoadmapBuilderService
@@ -105,6 +106,9 @@ def create_work_package():
     Returns:
         JSON with created work package
     """
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "Request body is required"}), 400
@@ -183,6 +187,9 @@ def update_work_package(work_package_id: int):
     Returns:
         JSON with updated work package
     """
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "Request body is required"}), 400
@@ -218,6 +225,9 @@ def delete_work_package(work_package_id: int):
     Returns:
         JSON with deletion result
     """
+    if not can(current_user, "delete", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     service = _get_service()
     result = service.delete_work_package(work_package_id)
 
@@ -245,6 +255,9 @@ def add_dependency(work_package_id: int):
     Returns:
         JSON with result
     """
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     data = request.get_json()
     if not data or "depends_on_id" not in data:
         return jsonify({"success": False, "error": "depends_on_id is required"}), 400
@@ -273,6 +286,9 @@ def remove_dependency(work_package_id: int, dep_id: int):
     Returns:
         JSON with result
     """
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     service = _get_service()
     result = service.remove_dependency(work_package_id, dep_id)
 

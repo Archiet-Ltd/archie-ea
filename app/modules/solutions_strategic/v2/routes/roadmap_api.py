@@ -17,7 +17,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func, text
 
 from app import db
-from app.core.auth.permissions import can_change_model
+from app.core.auth.permissions import can, can_change_model
 from app.decorators import audit_log
 from app.utils.api_helpers import api_error
 from app.models.implementation_migration import (
@@ -294,12 +294,14 @@ def create_work_package():
       401:
         description: Unauthorized
     """
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         # Validate required fields
         validation_error = validate_json_data(["name", "business_capability"])
         if validation_error:
             return validation_error
-
         data = request.get_json()
 
         # Validate business rules
@@ -520,6 +522,9 @@ def update_work_package(work_package_id: int):
       404:
         description: Not found
     """
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         work_package = _require(work_package_id)
 
@@ -616,6 +621,9 @@ def delete_work_package(work_package_id: int):
       404:
         description: Not found
     """
+    if not can(current_user, "delete", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         work_package = _require(work_package_id)
 
@@ -788,6 +796,9 @@ def create_deliverable():
       401:
         description: Unauthorized
     """
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         validation_error = validate_json_data(["name", "work_package_id"])
         if validation_error:
