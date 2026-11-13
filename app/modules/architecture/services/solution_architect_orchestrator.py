@@ -239,7 +239,7 @@ class SolutionArchitectOrchestrator:
                             "relevance_score": round(score, 1),
                             "status": app.lifecycle_status or app.deployment_status,
                             "vendor": app.vendor_name or "Internal",
-                            "annual_cost": float(annual) if annual is not None else 0.0,
+                            "annual_cost": float(annual) if annual is not None else None,
                             "users": app.user_count or 0,
                         }
                     )
@@ -249,15 +249,16 @@ class SolutionArchitectOrchestrator:
 
             # Calculate potential consolidation savings
             if len(relevant_apps) > 1:
-                total_cost = sum(app["annual_cost"] for app in relevant_apps)
-                estimated_savings = total_cost * 0.3  # Assume 30% consolidation savings
+                costs = [app["annual_cost"] for app in relevant_apps]
+                # A saving summed while an app's cost is not recorded would read as measured
+                estimated_savings = sum(costs) * 0.3 if all(c is not None for c in costs) else None  # Assume 30% consolidation savings
             else:
                 estimated_savings = 0
 
             return {
                 "found_count": len(relevant_apps),
                 "applications": relevant_apps[:5],  # Top 5
-                "estimated_savings": round(estimated_savings, 2),
+                "estimated_savings": round(estimated_savings, 2) if estimated_savings is not None else None,
                 "recommendation": "reuse" if relevant_apps else "new_solution",
             }
 
@@ -491,7 +492,9 @@ class SolutionArchitectOrchestrator:
             reuse_pros = [
                 "Fastest time to value",
                 "Leverages existing investment",
-                f'Potential £{existing_apps.get("estimated_savings", 0):.0f}/year savings'
+                (f'Potential £{existing_apps["estimated_savings"]:.0f}/year savings'
+                 if existing_apps.get("estimated_savings") is not None else
+                 "Potential savings from consolidating existing applications (not recorded yet)")
                 if show_costs else
                 "Potential savings from consolidating existing applications",
                 "Low integration risk",

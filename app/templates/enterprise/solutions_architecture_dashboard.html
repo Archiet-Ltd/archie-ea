@@ -308,7 +308,7 @@
                                         </div>
                                     </td>
                                     <td class="px-5 py-3 font-mono text-xs"
-                                        x-text="app.annual_cost && !costsWithheld ? '£' + formatCost(app.annual_cost) : (costsWithheld ? costsWithheldText : '')"></td>
+                                        x-text="costsWithheld ? costsWithheldText : Platform.figure.money(app.annual_cost)"></td>
                                 </tr>
                             </template>
                         </tbody>
