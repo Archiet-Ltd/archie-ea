@@ -216,6 +216,36 @@ def test_a_plainly_worded_request_with_a_colon_is_a_change_request():
     assert possessive["value"] == "Runs monthly billing" and possessive["application"] == "Acme Ledger"
 
 
+def test_crafted_message_parses_in_linear_time():
+    """The reviewer's crafted message of several thousand characters parses in linear time.
+
+    The old field pattern ([a-z ]+?) and lazy value tail backtracked polynomially on
+    "set a" followed by repeats of twenty spaces and "on": 225 characters took 0.24 s,
+    885 characters 4.43 s, 1765 characters 19.56 s. The route reads up to
+    MAX_CHANGE_CHARS of every chat message before any role check, and Python's regex
+    engine holds the interpreter lock while it matches, so the gunicorn worker's other
+    threads stopped. The field is now matched against the known names in FIELDS
+    (longest first) after whitespace is collapsed, and the value is a greedy tail
+    stripped afterwards, so the parse is linear for every input.
+    """
+    import time
+
+    from app.modules.ai_chat.services.application_change import parse_change_request
+
+    # "set a" followed by repeats of twenty spaces and "on": 225, 885, 1765 and about
+    # 8000 characters, the reviewer's measured sizes.
+    for size in (225, 885, 1765, 8013):
+        repeat = (size - 5) // 22
+        message = "set a" + (" " * 20 + "on") * repeat
+        start = time.perf_counter()
+        result = parse_change_request(message)
+        elapsed = time.perf_counter() - start
+        assert result is None, f"{len(message)}-character message should not parse as a change"
+        assert elapsed < 0.1, (
+            f"parsed {len(message)} characters in {elapsed:.3f}s, expected under 0.1 s"
+        )
+
+
 def test_a_replaced_owner_is_assigned_when_it_was_recorded(world, db_session):
     from datetime import datetime, timedelta
 
