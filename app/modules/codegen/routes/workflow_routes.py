@@ -263,7 +263,8 @@ def export_migration_zip():
 def get_acceptance_criteria(solution_id):
     """Generate acceptance criteria from motivation elements + business rules."""
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution):
+        return jsonify({"error": "Forbidden"}), 403
 
     from app.modules.codegen.services.acceptance_criteria_generator import AcceptanceCriteriaGenerator
     gen = AcceptanceCriteriaGenerator()
@@ -372,7 +373,8 @@ def apply_genome_template(slug):
     solution = Solution.query.get(int(solution_id))
     if not solution:
         return jsonify({"error": "Solution not found"}), 404
-    _check_access(solution)
+    if not _check_access(solution, write=True):
+        return jsonify({"error": "Forbidden"}), 403
 
     genome, err = _load_genome_template(slug)
     if err:

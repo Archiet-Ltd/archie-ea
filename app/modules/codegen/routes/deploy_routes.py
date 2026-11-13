@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 def deploy_to_github(solution_id):
     """Push generated code to GitHub via pull request (GAP-05)."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -216,7 +216,7 @@ def generate_iac(solution_id):
     the solution's CodegenGeneration.generated_files JSON blob.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -311,7 +311,7 @@ def deploy_iac_to_github(solution_id):
     Uses the terraform/* subset of CodegenGeneration.generated_files.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
@@ -381,7 +381,8 @@ def deploy_iac_to_github(solution_id):
 def deploy_to_coolify(solution_id):
     """Deploy generated code to Coolify-managed infrastructure."""
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution, write=True):
+        return jsonify({"error": "Forbidden"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
     if not gen or not gen.generated_files:
@@ -424,7 +425,8 @@ def deploy_to_coolify(solution_id):
 def deploy_status(solution_id):
     """Check deployment status for a solution."""
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution):
+        return jsonify({"error": "Forbidden"}), 403
 
     from app.modules.codegen.services.instance_tracker import InstanceTracker
 
@@ -458,7 +460,8 @@ def deploy_status(solution_id):
 def deploy_destroy(solution_id):
     """Stop and remove a deployed solution."""
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution, write=True):
+        return jsonify({"error": "Forbidden"}), 403
 
     from app.modules.codegen.services.instance_tracker import InstanceTracker
     from app.modules.codegen.services.deployment_orchestrator import DeploymentOrchestrator
@@ -484,7 +487,8 @@ def deploy_destroy(solution_id):
 def recommend_language_route(solution_id):
     """Recommend the best programming language for this solution."""
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution):
+        return jsonify({"error": "Forbidden"}), 403
 
     from app.modules.codegen.services.deployment_orchestrator import recommend_language
 

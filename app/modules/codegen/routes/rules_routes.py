@@ -27,7 +27,8 @@ logger = logging.getLogger(__name__)
 def list_rule_templates(solution_id):
     """List available rule templates with context-aware suggestions."""
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution):
+        return jsonify({"error": "Forbidden"}), 403
 
     from app.modules.codegen.services.rule_template_engine import RuleTemplateEngine
     engine = RuleTemplateEngine()
@@ -48,7 +49,8 @@ def list_rule_templates(solution_id):
 def create_rule(solution_id):
     """Create a business rule from template or natural language."""
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution, write=True):
+        return jsonify({"error": "Forbidden"}), 403
 
     body = request.get_json(silent=True) or {}
     source = body.get("source", "template")  # template or natural_language
@@ -102,7 +104,8 @@ def create_rule(solution_id):
 def list_rules(solution_id):
     """List all business rules for a solution."""
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution):
+        return jsonify({"error": "Forbidden"}), 403
 
     from app.modules.codegen.models import SolutionRule
     rules = SolutionRule.query.filter_by(solution_id=solution_id, is_active=True).all()
@@ -117,7 +120,8 @@ def list_rules(solution_id):
 def compile_rule(solution_id, rule_id):
     """Compile a rule into implementation code."""
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution, write=True):
+        return jsonify({"error": "Forbidden"}), 403
 
     from app.modules.codegen.models import SolutionRule
     rule = SolutionRule.query.get_or_404(rule_id)

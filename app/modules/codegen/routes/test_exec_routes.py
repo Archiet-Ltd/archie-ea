@@ -29,7 +29,7 @@ def generate_test_scenarios_v2(solution_id):
     from app.modules.codegen.models import SolutionRule
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     # Extract model entities from solution data
@@ -75,7 +75,7 @@ def record_test_result(solution_id):
     from app.modules.codegen.services.scenario_tracker import ScenarioTracker
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}
@@ -126,7 +126,7 @@ def run_acceptance_tests_v2(solution_id):
     from app.modules.codegen.services.acceptance_test_runner import AcceptanceTestRunner
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}
@@ -145,7 +145,7 @@ def compare_process_v2(solution_id):
     from app.modules.codegen.services.process_comparison_engine import ProcessComparisonEngine
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     engine = ProcessComparisonEngine()
@@ -161,7 +161,7 @@ def auto_fix_issue(solution_id):
     from app.modules.codegen.services.auto_fixer import AutoFixer
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}
@@ -188,7 +188,7 @@ def run_fix_loop(solution_id):
     from app.modules.codegen.services.auto_fixer import AutoFixer
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}
@@ -276,7 +276,7 @@ def schedule_test_run(solution_id):
     from app.modules.codegen.services.test_scheduler import TestScheduler
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}
@@ -299,7 +299,7 @@ def generate_edge_case_scenarios(solution_id):
     from app.modules.codegen.models import SolutionRule
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}

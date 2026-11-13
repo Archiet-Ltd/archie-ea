@@ -38,7 +38,7 @@ def create_share_link(solution_id):
     Returns the full shareable URL.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()

@@ -63,7 +63,7 @@ def list_connectors(solution_id):
 def test_connector_connection(solution_id):
     """Test connectivity to an external system before creating a connector."""
     solution = require_entity_in_active_org(Solution, solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         abort(403)
 
     from app.modules.codegen.services.connector_orchestrator import ConnectorOrchestrator
@@ -85,7 +85,7 @@ def test_connector_connection(solution_id):
 def create_connector(solution_id):
     """Create a connector and start an n8n sync workflow."""
     solution = require_entity_in_active_org(Solution, solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         abort(403)
 
     from app.modules.codegen.services.connector_orchestrator import ConnectorOrchestrator
@@ -175,7 +175,7 @@ def list_active_connectors(solution_id):
 def delete_connector(solution_id, connector_id):
     """Delete a connector and its n8n workflow."""
     solution = require_entity_in_active_org(Solution, solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         abort(403)
 
     from app.modules.codegen.models import SolutionConnector
@@ -220,7 +220,7 @@ def discover_connector_objects(solution_id, connector_id):
 def update_connector_mappings(solution_id, connector_id):
     """Update object mappings for a connector."""
     solution = require_entity_in_active_org(Solution, solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         abort(403)
 
     from app.modules.codegen.models import SolutionConnector
@@ -245,7 +245,7 @@ def update_connector_mappings(solution_id, connector_id):
 def update_connector_schedule(solution_id, connector_id):
     """Update the sync frequency for a connector."""
     solution = require_entity_in_active_org(Solution, solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         abort(403)
 
     from app.modules.codegen.models import SolutionConnector
@@ -270,7 +270,7 @@ def update_connector_schedule(solution_id, connector_id):
 def pause_connector(solution_id, connector_id):
     """Pause sync for a connector by deactivating its n8n workflow."""
     solution = require_entity_in_active_org(Solution, solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         abort(403)
 
     from app.modules.codegen.models import SolutionConnector
@@ -293,7 +293,7 @@ def pause_connector(solution_id, connector_id):
 def resume_connector(solution_id, connector_id):
     """Resume sync for a connector by reactivating its n8n workflow."""
     solution = require_entity_in_active_org(Solution, solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         abort(403)
 
     from app.modules.codegen.models import SolutionConnector

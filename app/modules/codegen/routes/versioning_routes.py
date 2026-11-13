@@ -32,7 +32,7 @@ def submit_change_request(solution_id):
     from app.modules.codegen.models import SolutionRule
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}
@@ -101,7 +101,7 @@ def rollback_version(solution_id):
     from app.modules.codegen.services.version_manager import VersionManager
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}
@@ -132,7 +132,7 @@ def workflow_compile(solution_id):
     from app.modules.codegen.services.workflow_n8n_compiler import WorkflowToN8nCompiler
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}
@@ -157,7 +157,7 @@ def export_solution(solution_id):
     from app.modules.codegen.services.migration_packager import MigrationPackager
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}
@@ -187,7 +187,7 @@ def apply_change(solution_id):
     from app.modules.codegen.models import SolutionRule
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}
@@ -246,7 +246,7 @@ def promote_version(solution_id):
     from app.modules.codegen.services.version_manager import VersionManager
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}
@@ -302,7 +302,7 @@ def export_package(solution_id):
     from app.modules.codegen.services.migration_packager import MigrationPackager
 
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     data = request.get_json(silent=True) or {}

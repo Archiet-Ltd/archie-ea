@@ -242,7 +242,7 @@ def _build_preview_openapi(solution_name, uml):
 def preview_start(solution_id):
     """Start live API preview — derive OpenAPI spec from UML and store it."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
@@ -404,7 +404,7 @@ def preview_status(solution_id):
 def preview_stop(solution_id):
     """Stop live API preview."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
@@ -516,7 +516,7 @@ def expo_snack(solution_id):
     can be opened in a browser and scanned with the Expo Go app on a device.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
@@ -894,7 +894,7 @@ def docker_preview_start(solution_id):
     from sqlalchemy.orm.attributes import flag_modified
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     if not _docker_available():
@@ -1093,7 +1093,7 @@ def docker_preview_stop(solution_id):
     import subprocess
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()

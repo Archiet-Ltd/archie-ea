@@ -146,7 +146,7 @@ def upsert_template_file(set_id, template_name):
 def save_generation_as_template(solution_id):
     """Snapshot the current generated files into a new CodegenTemplateSet."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()

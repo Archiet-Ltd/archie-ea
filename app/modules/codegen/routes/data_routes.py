@@ -28,7 +28,8 @@ logger = logging.getLogger(__name__)
 def data_upload(solution_id):
     """Upload Excel/CSV file, return parsed sheets with column types."""
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution, write=True):
+        return jsonify({"error": "Forbidden"}), 403
 
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -57,7 +58,8 @@ def data_auto_map(solution_id):
     Uses LLM semantic matching when deterministic methods fail.
     """
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution, write=True):
+        return jsonify({"error": "Forbidden"}), 403
 
     body = request.get_json(silent=True) or {}
     sheet_columns = body.get("columns", [])
@@ -103,7 +105,8 @@ def data_add_field(solution_id):
     for review before execution.
     """
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution, write=True):
+        return jsonify({"error": "Forbidden"}), 403
 
     body = request.get_json(silent=True) or {}
     entity = body.get("entity")
@@ -186,7 +189,8 @@ def data_import_execute(solution_id):
     5. Updates the DataImport with results
     """
     solution = Solution.query.get_or_404(solution_id)
-    _check_access(solution)
+    if not _check_access(solution, write=True):
+        return jsonify({"error": "Forbidden"}), 403
 
     body = request.get_json(silent=True) or {}
     mappings = body.get("mappings")

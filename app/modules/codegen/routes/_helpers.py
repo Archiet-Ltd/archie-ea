@@ -7,7 +7,6 @@ import os
 import re
 from datetime import datetime
 
-from flask import has_request_context, request
 from flask_login import current_user
 
 from app.extensions import db
@@ -49,8 +48,11 @@ def _snake(name):
     return re.sub(r"_+", "_", s).strip("_").lower()
 
 
-def _check_access(solution, user=None):
+def _check_access(solution, user=None, write=False):
     """Verify current user can access this solution's workbench.
+
+    ``write=True`` is for routes that change the solution, generate, deploy or delete: a persona
+    admitted only to read (Viewer, Reader) is not let in. Routes that only read leave it off.
 
     D-4 (admin-rbac-active-org continuation): the admin branch used to be
     the bare ``user.is_admin()`` callable -- a global Permission.ADMINISTER
@@ -111,8 +113,7 @@ def _check_access(solution, user=None):
     if (
         org_id is not None
         and getattr(user, "organization_id", None) == org_id
-        and has_request_context()
-        and request.method in ("GET", "HEAD")
+        and not write
     ):
         try:
             from app.core.auth.permissions import can

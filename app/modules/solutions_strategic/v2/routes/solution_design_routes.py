@@ -176,6 +176,32 @@ def _may_edit_solution(solution) -> bool:
         return False
 
 
+def refuse_writes_by_people_who_may_only_read():
+    """Before any request that changes a solution (POST, PUT, PATCH, DELETE) on a route that names one.
+
+    One write check for the whole blueprint, so a route added later is covered without remembering to add it:
+    a person who cannot open the solution is told it does not exist, and a person who can open it but may not
+    change it (a Viewer, a Reader) is refused. The author, editors and administrators pass on to the route.
+    Reads are never touched here; they keep ``_check_solution_access``.
+    """
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    solution_id = (request.view_args or {}).get("solution_id")
+    if solution_id is None or not current_user.is_authenticated:
+        return None
+    solution = db.session.get(Solution, solution_id)
+    if solution is None:
+        return None
+    if not _check_solution_access(solution):
+        abort(404)
+    if not _may_edit_solution(solution):
+        abort(403)
+    return None
+
+
+solution_design_bp.before_request(refuse_writes_by_people_who_may_only_read)
+
+
 def _capability_gap_severity(capability) -> str | None:
     """Derive a simple maturity gap severity for detail rendering."""
     current = getattr(capability, "current_maturity_level", None)
@@ -3548,7 +3574,7 @@ def list_decisions(solution_id: int):
 def create_decision(solution_id: int):
     """Create a new architecture decision record."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     try:
@@ -3604,7 +3630,7 @@ def create_decision(solution_id: int):
 def update_decision(solution_id: int, decision_id: int):
     """Update an architecture decision record (only while proposed)."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     from app.models.architecture_decision import ArchitectureDecision
@@ -3647,7 +3673,7 @@ def update_decision(solution_id: int, decision_id: int):
 def approve_decision(solution_id: int, decision_id: int):
     """Approve an architecture decision (ARB workflow)."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     from app.models.architecture_decision import ArchitectureDecision
@@ -3673,7 +3699,7 @@ def approve_decision(solution_id: int, decision_id: int):
 def reject_decision(solution_id: int, decision_id: int):
     """Reject an architecture decision with a reason."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     from app.models.architecture_decision import ArchitectureDecision
@@ -4501,7 +4527,7 @@ def create_solution_note(solution_id: int):
     """A typed note on the solution record: meeting, email, decision, escalation or
     status update (the solutions rethink, slice 5b; the old communication log)."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         abort(403)
     from app.modules.solutions_strategic.v2.services.solution_record_service import NOTE_KINDS
     from app.services import communication_log_service
@@ -4535,7 +4561,7 @@ def create_solution_note(solution_id: int):
 def create_solution_comment(solution_id: int):
     """PLT-011: Create a new section-level comment on a solution."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         abort(403)
     data = request.get_json(silent=True) or {}
     section = (data.get("section") or "").strip()
@@ -10009,7 +10035,7 @@ def api_put_section_narrative(solution_id, section_id):
         }), 400
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden", "error_code": "FORBIDDEN"}), 403
     body = request.get_json(silent=True) or {}
     narrative_text = body.get("narrative", "")
@@ -10503,7 +10529,7 @@ def api_blueprint_codegen(solution_id, section_id):
         return jsonify({"success": False, "error": f"Target '{target}' not valid for section '{section_id}'. Valid: {allowed}", "error_code": "INVALID_TARGET"}), 400
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden", "error_code": "FORBIDDEN"}), 403
 
     svc = BlueprintCompletenessService()
@@ -10647,7 +10673,7 @@ def api_generate_draft(solution_id):
     )
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden", "error_code": "FORBIDDEN"}), 403
 
     try:
@@ -10757,7 +10783,7 @@ def api_recalculate_blueprint_scores(solution_id):
     )
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden", "error_code": "FORBIDDEN"}), 403
     svc = BlueprintCompletenessService()
     section_scores = svc.score_all(solution_id)
@@ -11228,7 +11254,7 @@ def api_get_component_spec(solution_id, element_id):
 def api_put_component_spec(solution_id, element_id):
     """Save fields, api_contract, or business_rules for a component."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     junction = _find_junction(solution_id, element_id)
@@ -11280,7 +11306,7 @@ def api_put_component_spec(solution_id, element_id):
 def api_confirm_component_spec(solution_id, element_id):
     """Confirm proposed fields, api_contract, or a business rule."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     junction = _find_junction(solution_id, element_id)
@@ -11375,7 +11401,7 @@ def api_diff_component_spec(solution_id, element_id):
 def api_infer_component_spec(solution_id, element_id):
     """Run LLM inference to propose fields for a component."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     junction = _find_junction(solution_id, element_id)
@@ -11440,7 +11466,7 @@ def api_infer_component_spec(solution_id, element_id):
 def api_infer_all_component_specs(solution_id):
     """Run LLM inference for all ApplicationComponent elements in the solution."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     from app.models.solution_archimate_element import SolutionArchiMateElement
@@ -11507,7 +11533,7 @@ def api_infer_all_component_specs(solution_id):
 def api_validate_component_spec(solution_id, element_id):
     """Validate fields against schema rules."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     body = request.get_json(silent=True) or {}
@@ -11545,7 +11571,7 @@ def api_get_business_rules(solution_id, element_id):
 def api_put_business_rules(solution_id, element_id):
     """Save business rules for a component."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     junction = _find_junction(solution_id, element_id)
@@ -11576,7 +11602,7 @@ def api_put_business_rules(solution_id, element_id):
 def api_suggest_business_rules(solution_id, element_id):
     """LLM-suggest business rules from component requirements and capabilities."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     # Business rule suggestion returns empty when no LLM is configured
@@ -11588,7 +11614,7 @@ def api_suggest_business_rules(solution_id, element_id):
 def api_validate_business_rules(solution_id, element_id):
     """Validate business rules against metamodel."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     body = request.get_json(silent=True) or {}
@@ -11626,7 +11652,7 @@ def api_get_integration_contracts(solution_id, element_id):
 def api_put_integration_contract(solution_id, element_id):
     """Save an integration contract for a target element."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     junction = _find_junction(solution_id, element_id)
@@ -11662,7 +11688,7 @@ def api_put_integration_contract(solution_id, element_id):
 def api_suggest_integration_contract(solution_id, element_id):
     """Suggest an integration contract from ArchiMate relationships."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     body = request.get_json(silent=True) or {}
@@ -11696,7 +11722,7 @@ def api_suggest_integration_contract(solution_id, element_id):
 def api_validate_integration_contract(solution_id, element_id):
     """Validate an integration contract."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     body = request.get_json(silent=True) or {}
@@ -11734,7 +11760,7 @@ def api_get_deployment_spec(solution_id, element_id):
 def api_put_deployment_spec(solution_id, element_id):
     """Save a deployment spec for a Node element."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     junction = _find_junction(solution_id, element_id)
@@ -11765,7 +11791,7 @@ def api_put_deployment_spec(solution_id, element_id):
 def api_suggest_deployment_spec(solution_id, element_id):
     """Suggest a deployment spec from a Node/TechnologyService element."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     from app.models.archimate_core import ArchiMateElement
@@ -11783,7 +11809,7 @@ def api_suggest_deployment_spec(solution_id, element_id):
 def api_validate_deployment_spec(solution_id, element_id):
     """Validate a deployment spec for runtime compatibility."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     body = request.get_json(silent=True) or {}
@@ -11810,7 +11836,7 @@ def update_identity_provider(solution_id):
     spec_data["identity_provider"], making it available to the code generator.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_solution_access(solution):
+    if not _may_edit_solution(solution):
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
     body = request.get_json(silent=True) or {}

@@ -24,6 +24,17 @@ logger = logging.getLogger(__name__)
 solution_sad_bp = Blueprint("solution_sad", __name__, url_prefix="/solutions")
 
 
+def _refuse_writes_by_readers():
+    from app.modules.solutions_strategic.v2.routes.solution_design_routes import (
+        refuse_writes_by_people_who_may_only_read,
+    )
+
+    return refuse_writes_by_people_who_may_only_read()
+
+
+solution_sad_bp.before_request(_refuse_writes_by_readers)
+
+
 def _get_solution_or_404(solution_id):
     solution = db.session.get(Solution, solution_id)
     if not solution:

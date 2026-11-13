@@ -121,6 +121,27 @@ logger = logging.getLogger(__name__)
 codegen_bp = Blueprint("codegen", __name__)
 
 
+@codegen_bp.before_request
+def _refuse_workbench_writes_by_readers():
+    """Any request that changes a solution's workbench needs the write check; reads keep the read check."""
+    from flask import abort
+    from flask_login import current_user
+
+    if request.method in ("GET", "HEAD", "OPTIONS") or not current_user.is_authenticated:
+        return None
+    solution_id = (request.view_args or {}).get("solution_id")
+    if solution_id is None:
+        return None
+    solution = db.session.get(Solution, solution_id)
+    if solution is None:
+        return None
+    if not _check_access(solution):
+        abort(404)
+    if not _check_access(solution, write=True):
+        abort(403)
+    return None
+
+
 # Valid ArchiMate element types accepted by the generation pipeline
 _NL_VALID_TYPES = {
     # Business layer
@@ -202,7 +223,7 @@ def generate_architecture(solution_id):
     - append=true: adds to existing elements (iterative refinement)
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -586,7 +607,7 @@ def get_genome(solution_id):
 def enrich_uml(solution_id):
     """Phase 1: Start async UML generation from ArchiMate elements."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     import threading
@@ -659,7 +680,7 @@ def apply_confirmed_specs(solution_id):
     Classes are marked with `_spec_locked: true` to indicate they carry authoritative specs.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
@@ -848,7 +869,7 @@ def generate_code(solution_id):
         field names. Kept for backwards compatibility.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -2234,7 +2255,7 @@ def generate_stream(solution_id):
     from app.modules.solutions_product.services.deterministic_code_generator import DeterministicCodeGenerator
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -3126,7 +3147,7 @@ def patch_violation(solution_id):
     Remediations that patch generated code take effect immediately in the stored bundle.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -3379,7 +3400,7 @@ def fix_dimension(solution_id):
     via POST /codegen/chat-edit/apply-patch.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     _VALID_DIMENSIONS = {
@@ -3452,7 +3473,7 @@ def fix_recommendation(solution_id):
     Each `patch` event carries {file, diff} that the client auto-applies via apply-patch.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -3563,7 +3584,7 @@ def verify_code(solution_id):
     from flask import Response, stream_with_context
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
@@ -3913,7 +3934,7 @@ def verify_code(solution_id):
 def regenerate_file(solution_id):
     """Regenerate files for a prompt group (e.g., 'models' regenerates all model files)."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -3975,7 +3996,7 @@ def regenerate_file(solution_id):
 def save_uml(solution_id):
     """Phase 2: Save UML edits."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -4007,7 +4028,7 @@ def confirm_fields(solution_id):
     Each field: { "name": str, "type": str, "nullable": bool, "description": str }
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -4112,7 +4133,7 @@ def chat_regenerate(solution_id):
     Sends instruction + current generated files context to LLM, replaces affected files.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -4354,7 +4375,7 @@ full file content here
 def reset_uml(solution_id):
     """Re-enrich from ArchiMate, clearing Phases 1-4."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
@@ -4399,7 +4420,7 @@ def get_config(solution_id):
 def save_config(solution_id):
     """Phase 3: Save stack + repo configuration."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -4466,7 +4487,7 @@ def patch_generated_file(solution_id):
     does NOT commit to DB until the client calls PATCH /codegen/files.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -4534,7 +4555,7 @@ Return the complete updated file content now:"""
 def plan_change_intent(solution_id):
     """Build a scoped AI implementation plan from a natural-language intent."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -5109,7 +5130,7 @@ def push_to_git(solution_id):
         {"success": false, "error": "DevOps connector not configured for this organisation."}
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
@@ -5247,7 +5268,7 @@ def get_quality(solution_id):
 def post_codegen_intelligence(solution_id):
     """Advisory AI intelligences for the Code Workbench (requirements→tests, gap coach, triage, etc.)."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     data = request.get_json(silent=True) or {}
@@ -5274,7 +5295,7 @@ def scan_drift(solution_id):
     from datetime import datetime
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
@@ -5392,7 +5413,7 @@ def import_drift(solution_id):
     from datetime import datetime
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
@@ -5479,7 +5500,7 @@ def start_debug_session(solution_id):
     }
     """
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     from app.models.user import Permission
@@ -5537,7 +5558,7 @@ def debug_analyze_with_llm(solution_id):
     }
     """
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     from app.models.user import Permission
@@ -5596,7 +5617,7 @@ def debug_apply_fix(solution_id):
     }
     """
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     from app.models.user import Permission
@@ -5667,7 +5688,7 @@ def debug_continue(solution_id):
     }
     """
     solution = db.session.get(Solution, solution_id)
-    if not solution or not _check_access(solution):
+    if not solution or not _check_access(solution, write=True):
         abort(404)
 
     from app.models.user import Permission
@@ -5869,7 +5890,7 @@ def monaco_chat_edit(solution_id):
     Response: text/event-stream — events: thinking, patch, complete, error
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -5944,7 +5965,7 @@ def monaco_apply_patch(solution_id):
     )
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -6008,7 +6029,7 @@ def nl_selection_action(solution_id):
     Payload: {action, file, selection_start, selection_end, selection_content, full_file_content}
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -6047,7 +6068,7 @@ def nl_complete(solution_id):
     Response: {completion: str}
     """
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}

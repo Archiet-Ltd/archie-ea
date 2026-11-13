@@ -86,7 +86,7 @@ def save_generated_file(solution_id):
     from sqlalchemy.orm.attributes import flag_modified
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -131,7 +131,7 @@ def delete_generated_file(solution_id):
     from sqlalchemy.orm.attributes import flag_modified
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -165,7 +165,7 @@ def create_generated_file(solution_id):
     from sqlalchemy.orm.attributes import flag_modified
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -204,7 +204,7 @@ def rename_generated_file(solution_id):
     from sqlalchemy.orm.attributes import flag_modified
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -254,7 +254,7 @@ def duplicate_generated_file(solution_id):
     from sqlalchemy.orm.attributes import flag_modified
 
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
@@ -290,7 +290,7 @@ def duplicate_generated_file(solution_id):
 def search_generated_files(solution_id):
     """Search across all generated files for a string or regex."""
     solution = Solution.query.get_or_404(solution_id)
-    if not _check_access(solution):
+    if not _check_access(solution, write=True):
         return jsonify({"error": "Access denied"}), 403
 
     payload = request.get_json(silent=True) or {}
