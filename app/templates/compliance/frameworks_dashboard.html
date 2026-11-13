@@ -204,7 +204,7 @@
                                     </thead>
                                     <tbody>
                                         <template x-for="c in (controlsByFramework[{{ f.id }}] || [])" :key="c.id">
-                                            <tr class="border-t border-border/60">
+                                            <tr class="border-t border-border/60" :id="'requirement-' + c.id">
                                                 <td class="py-1.5 pr-4 font-medium text-foreground" x-text="c.control_code || '—'"></td>
                                                 <td class="py-1.5 pr-4 text-foreground" x-text="c.title || '—'"></td>
                                                 <td class="py-1.5 pr-4 text-muted-foreground" x-text="c.category || '—'"></td>
@@ -225,6 +225,32 @@
     </div>
 </div>
 <script>
+    // Handle anchor fragment on page load: if a requirement anchor (e.g.
+    // #requirement-123) is present, scroll to that requirement's row once the
+    // framework's controls have been loaded and rendered by Alpine.
+    document.addEventListener('DOMContentLoaded', function () {
+        var hash = window.location.hash || '';
+        if (!hash.startsWith('#requirement-')) return;
+        var requirementId = hash.substring('#requirement-'.length);
+        var attempts = 0;
+        var tryScroll = function () {
+            var el = document.getElementById('requirement-' + requirementId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                el.classList.add('ring-2', 'ring-primary', 'bg-muted/50');
+                setTimeout(function () {
+                    el.classList.remove('ring-2', 'ring-primary', 'bg-muted/50');
+                }, 2500);
+                return;
+            }
+            attempts++;
+            if (attempts < 50) {
+                setTimeout(tryScroll, 100);
+            }
+        };
+        tryScroll();
+    });
+
     function frameworksTable(initialId) {
         return {
             start() {
