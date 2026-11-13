@@ -1404,6 +1404,8 @@ def list_solutions():
         # user-supplied keys ever reach `url_for`, and every filter is gone.
         clear_filters_url = url_for("solution_design.list_solutions")
 
+        from app.modules.solutions_strategic.v2.services.solution_record_service import review_label
+
         return render_template(
             "solutions/list.html",
             can_create_programme=can_create_programme,
@@ -1442,6 +1444,7 @@ def list_solutions():
             completeness_scores=completeness_scores,
             selected_workspace=ws_filter,
             all_filtered_ids=all_filtered_ids,
+            review_label=review_label,
         )
     except Exception as e:
         import traceback as _tb

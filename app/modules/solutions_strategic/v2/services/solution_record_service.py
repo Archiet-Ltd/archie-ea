@@ -312,6 +312,23 @@ def next_step(score_data: dict, solution, latest_review) -> dict:
 
 # ── header, properties, review ──────────────────────────────────────────────
 
+_REVIEW_LABELS = {
+    "draft": "Draft",
+    "arb_review": "In review",
+    "under_review": "In review",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "in_progress": "In progress",
+    "proposed": "Submitted",
+}
+
+
+def review_label(governance_status: str) -> str:
+    """The review-state word for a governance status, the same word the Solutions list shows."""
+    status = (governance_status or "draft").lower()
+    return _REVIEW_LABELS.get(status, status.replace("_", " ").capitalize())
+
+
 def stage_label(solution) -> str:
     status = (solution.governance_status or "draft").lower()
     return _STAGES.get(status, status.replace("_", " ").capitalize())
@@ -1008,6 +1025,7 @@ def build(solution, tab: str = "overview", user=None) -> dict:
         "tabs": [(label, record_url(solution.id, key), key == tab) for key, label in TABS],
         "score": score_data,
         "stage": stage_label(solution),
+        "review_label": review_label(solution.governance_status),
         "owner": (solution.solution_owner or "").strip(),
         "programme": programme_of(solution),
         "gap": gap,

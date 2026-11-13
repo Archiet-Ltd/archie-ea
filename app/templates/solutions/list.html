@@ -32,8 +32,6 @@
 
 {% macro _subtitle() %}<span data-testid="programme-solution-relationship">Every solution in design, what is blocking it and the next step</span>{% endmacro %}
 
-{%- set GOV_LABELS = {'draft': 'Draft', 'arb_review': 'In review', 'under_review': 'In review', 'approved': 'Approved', 'rejected': 'Rejected', 'in_progress': 'In progress', 'proposed': 'Submitted'} -%}
-
 {#- Created: a period, not a date picker. "Today" is worked out from a stored date and days_until(), the one helper
     templates have for comparing a date with today. -#}
 {%- set _periods = [] -%}
@@ -229,7 +227,7 @@
   {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap text-muted-foreground') %}{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}{% endcall %}
   {%- set bucket = ws.work_bucket or 'in_design' -%}
   {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': solution.status or 'planned'}) %}{{ state_badge(solution.status or 'planned') }}{% endcall %}
-  {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap') %}{{ state_badge(GOV_LABELS.get(gov, gov|replace('_', ' ')|capitalize), tone={'approved': 'positive', 'rejected': 'negative', 'arb_review': 'caution', 'under_review': 'caution', 'in_progress': 'caution', 'proposed': 'caution'}.get(gov, 'neutral')) }}{% endcall %}
+  {% call table_cell(class='hidden 2xl:table-cell whitespace-nowrap') %}{{ state_badge(review_label(gov), tone={'approved': 'positive', 'rejected': 'negative', 'arb_review': 'caution', 'under_review': 'caution', 'in_progress': 'caution', 'proposed': 'caution'}.get(gov, 'neutral')) }}{% endcall %}
   {% call table_cell(class='text-right tabular-nums whitespace-nowrap', attrs={'data-sort': readiness if readiness is not none else -1}) %}
     <span class="inline-flex items-center justify-end gap-2" title="{{ ws.readiness_passed or 0 }} of {{ ws.readiness_total or 0 }} maturity checks pass">
       <span class="text-right">{{ readiness|dash('%', 'Not scored') }}</span>

@@ -44,7 +44,8 @@
 
 {% macro _meta() %}
   <span data-testid="record-kind">{% call badge(variant='outline', class='font-normal') %}Solution{% endcall %}</span>
-  <span data-testid="record-stage">{{ state_badge(stage, tone={'Approved': 'positive', 'Approved with conditions': 'positive', 'In review': 'caution', 'Rejected': 'negative'}.get(stage, 'neutral')) }}</span>
+  <span data-testid="record-status"><span class="text-xs text-muted-foreground uppercase tracking-wider">Status</span> {{ state_badge(solution.status or 'planned') }}</span>
+  <span data-testid="record-review"><span class="text-xs text-muted-foreground uppercase tracking-wider">Review</span> {{ state_badge(review_label) }}</span>
   <span class="text-muted-foreground/60" aria-hidden="true">·</span>
   {% if owner %}
   <span class="text-sm text-muted-foreground" data-testid="record-owner">Owner <span class="font-medium text-foreground">{{ owner }}</span></span>
