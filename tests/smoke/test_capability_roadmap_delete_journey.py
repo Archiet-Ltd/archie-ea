@@ -44,10 +44,10 @@ def _plan_parent_with_parts(browser, live_server, email, suffix):
 
 
 def test_delete_parent_updates_tile_evidence_and_board(browser, live_server):
-    org = create_fresh_org("enterprise_architect")
-    suffix = org["suffix"]
-
     for width, theme in ((1440, "light"), (390, "dark")):
+        # Each viewport gets its own organisation, so the second pass starts from nothing too.
+        org = create_fresh_org("enterprise_architect")
+        suffix = org["suffix"]
         context, page = _page(browser, width, theme)
         try:
             sign_in(page, live_server, org["emails"]["enterprise_architect"])
@@ -94,6 +94,9 @@ def test_delete_parent_updates_tile_evidence_and_board(browser, live_server):
 
             # Without reload, the tile, evidence line and board must agree on 0
             expect(page.get_by_test_id("rdm-work-packages-tile")).to_have_text("0", timeout=PAGE_TIMEOUT)
+            # The evidence line is swapped in from the server just after the tile, so wait for it.
+            expect(page.get_by_test_id("roadmap-summary-footer")).to_contain_text(
+                "Work packages: none recorded", timeout=PAGE_TIMEOUT)
             line_after = page.get_by_test_id("roadmap-summary-footer").inner_text()
             assert "Work packages: none recorded" in line_after, line_after
 
