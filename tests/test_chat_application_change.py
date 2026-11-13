@@ -269,3 +269,16 @@ def test_asking_for_the_stored_multi_line_description_again_is_unchanged(world, 
     same = _ask(client, f"set {world['name']}'s description to {typed}")
     assert same["change_state"] == "unchanged" and "already has that description" in same["html"]
     assert _stored(db_session, application) == typed
+
+
+def test_a_multi_line_description_from_the_chat_is_saved_as_typed(world, client, login_as, db_session):
+    application = world["apps"]["a"]
+    login_as(client, world["editor"])
+    typed = "Runs billing.\n\nOwned by finance:\n- invoices\n-  refunds (two  spaces)"
+    shown = _ask(client, f"set {world['name']}'s description to {typed}")
+    assert shown["change_state"] == "preview"
+    assert _stored(db_session, application) == "Old description a"
+    saved = client.post("/ai-chat/application-change/confirm", json={"token": _token(shown["html"])}).get_json()
+    assert saved["success"] is True
+    assert _stored(db_session, application) == typed
+
