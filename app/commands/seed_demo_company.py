@@ -4492,28 +4492,43 @@ def _seed_demo_company() -> dict:
         stats["plateaus_created"] = plateaus_created
 
         # ── 12. gaps ────────────────────────────────────────────────────
-        existing_gaps = {
-            g.name
-            for g in db.session.query(Gap)
-            .filter(Gap.organization_id == org_id)
-            .all()
-        }
+        # The commit hook (_on_before_commit in archimate_backbone) writes a gap
+        # record for each Gap element when it is flushed, but with no severity.
+        # Step 12 completes those records with the seed's kind and severity,
+        # matched by name within the organisation. Idempotent: a second run
+        # finds the fields already set and changes nothing.
         gaps_created = 0
         for name, kind, severity, el_name in _GAPS:
-            if name in existing_gaps:
-                continue
-            el = elements.get(el_name)
-            gap = Gap(
-                name=name,
-                gap_kind=kind,
-                severity=severity,
-                organization_id=org_id,
-                archimate_element_id=el.id if el else None,
+            gap = (
+                db.session.query(Gap)
+                .filter(Gap.organization_id == org_id, Gap.name == name)
+                .first()
             )
-            db.session.add(gap)
-            gaps_created += 1
-        if gaps_created:
-            db.session.flush()
+            el = elements.get(el_name)
+            if gap is None:
+                gap = Gap(
+                    name=name,
+                    gap_kind=kind,
+                    severity=severity,
+                    organization_id=org_id,
+                    archimate_element_id=el.id if el else None,
+                )
+                db.session.add(gap)
+                gaps_created += 1
+            else:
+                changed = False
+                if gap.gap_kind != kind:
+                    gap.gap_kind = kind
+                    changed = True
+                if gap.severity != severity:
+                    gap.severity = severity
+                    changed = True
+                if el is not None and gap.archimate_element_id != el.id:
+                    gap.archimate_element_id = el.id
+                    changed = True
+                if changed:
+                    db.session.flush()
+                    gaps_created += 1
         stats["gaps_created"] = gaps_created
 
         # Each gap sits between two plateaus and has the work package that
