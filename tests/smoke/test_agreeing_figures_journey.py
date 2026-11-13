@@ -184,9 +184,8 @@ def test_layer_risk_and_gap_figures_agree(browser, live_server, viewport, theme)
         register_critical = _number(page, "register-critical")
         register_open = _number(page, "register-open")
         assert (register_critical, register_open) == (2, 3), (register_critical, register_open)
-        # The Risk Assessment card on Strategic planning opens the assessment of the register's risks.
-        page.goto(base + "/enterprise/strategic", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_role("link", name=re.compile("Risk Assessment")).first.click()
+        # The Risk Assessment page shows the register's open risks (closed ones, critical included, are in neither figure).
+        page.goto(base + "/strategic/risk-assessment", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_url(re.compile(r"/strategic/risk-assessment$"), timeout=PAGE_TIMEOUT)
         body = page.locator("body").inner_text()
         assert page.locator("h1").first.inner_text().strip().lower() == "risk assessment"
