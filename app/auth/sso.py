@@ -511,3 +511,20 @@ def unconfirmed_email_message(provider):
     others = [PLATFORM_LABELS[key] for key in _PLATFORM_SETTINGS if key != provider and status[key]["configured"]]
     advice = "Use Continue with {}, or sign up with email and password.".format(others[0]) if others else "Sign up with email and password."
     return "{} did not confirm this email address. {}".format(PLATFORM_LABELS[provider], advice)
+
+
+def platform_form_action_origins(host):
+    """The web origins the sign-in buttons' forms are answered with a redirect to.
+
+    A browser checks the redirect that answers a form post against the page's
+    ``form-action`` rule, so the sign-in and register pages name these.
+    """
+    from urllib.parse import urlsplit
+
+    origins = []
+    for button in platform_sign_in_buttons(host):
+        parts = urlsplit(platform_provider(button["key"]).idp_metadata_url)
+        origin = "%s://%s" % (parts.scheme, parts.netloc)
+        if origin not in origins:
+            origins.append(origin)
+    return origins

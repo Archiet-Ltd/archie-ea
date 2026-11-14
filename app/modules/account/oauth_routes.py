@@ -16,7 +16,7 @@ import hmac
 import logging
 import time
 
-from flask import Blueprint, abort, current_app, flash, redirect, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, g, redirect, request, session, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -42,7 +42,12 @@ SESSION_PENDING = "oauth_pending_link"
 @oauth_bp.app_context_processor
 def _inject_buttons():
     def social_sign_in_buttons():
-        return platform.platform_sign_in_buttons(request.host)
+        buttons = platform.platform_sign_in_buttons(request.host)
+        if buttons:
+            # The start form is answered with a redirect to the provider; the page's form-action rule must allow it.
+            extra = " ".join(filter(None, [getattr(g, "csp_form_action_extra", None), *platform.platform_form_action_origins(request.host)]))
+            g.csp_form_action_extra = extra
+        return buttons
 
     return {"social_sign_in_buttons": social_sign_in_buttons}
 

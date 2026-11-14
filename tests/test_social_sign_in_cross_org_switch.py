@@ -152,3 +152,12 @@ def test_m50_stand_in_address_ignored_outside_testing(app, social_config, monkey
         assert platform_provider("microsoft").idp_metadata_url == (
             "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration"
         )
+
+
+def test_m1_pages_with_buttons_let_their_forms_be_answered_by_the_provider(browser):
+    """The sign-in and register pages name the providers' origins in their form-action rule, and no other page does."""
+    for path in ("/account/login", "/account/register"):
+        rule = [part for part in browser.get(path).headers["Content-Security-Policy"].split(";") if "form-action" in part][0]
+        assert browser.providers["google"].base in rule and browser.providers["microsoft"].base in rule, rule
+    rule = [part for part in browser.get("/account/reset-password").headers["Content-Security-Policy"].split(";") if "form-action" in part][0]
+    assert rule.strip() == "form-action 'self'"
