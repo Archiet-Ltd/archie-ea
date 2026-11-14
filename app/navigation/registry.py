@@ -413,6 +413,8 @@ _CATALOGUE_HOME = (
     ("business_architecture.", "archimate_model"),
     ("modules_directory.", "help"),
     ("architecture.investment_priorities", "spend"),
+    ("architecture.software_architecture_dashboard", "changes"),
+    ("architecture.solutions_architecture_dashboard", "changes"),
     ("architect_ui.market_intelligence", "spend"),
     ("main.vendor_archimate_analysis", "spend"),
     ("architect_ui.motivation_view", "systems"),
@@ -505,9 +507,12 @@ def entry_for_endpoint(endpoint: str | None) -> NavLink | None:
             continue
         if endpoint == link.endpoint or (link.fallback is not None and endpoint == link.fallback.endpoint):
             return link
-    # ... then an exact owner, a sub-item, or a platform admin tool ...
+    # ... then an exact owner, a sub-item, or a platform admin tool. A sub-item whose page is its
+    # own endpoint (a canonical type page such as Capability map) answers for the page wherever it
+    # sits, including under a Model layer; a sub-item that is only a filtered view of a shared page
+    # (url_values) does not — those stay with the prefix owner below. ...
     for link in ALL_ENTRIES:
-        if endpoint in link.owns or (link.group != "model" and any(endpoint == c.endpoint for c in link.children)):
+        if endpoint in link.owns or any(endpoint == c.endpoint and not c.url_values for c in link.children):
             return link
     if any(endpoint == tool.endpoint for tool in PLATFORM_ADMIN_TOOLS):
         return _by_key("platform_admin")
@@ -856,6 +861,21 @@ def filter_keys() -> set:
 
     walk(ALL_ENTRIES)
     return keys
+
+
+def close_trail(trail: list, title: str) -> list:
+    """The crumbs after Home for a page titled `title`, sitting at the end of `trail`.
+
+    One name per page: when the trail already ends in the title's name (or the title carries it),
+    the title stands in for that last crumb; otherwise the title follows the trail. Both page
+    headers call this, so the rule lives here once.
+    """
+    if not title:
+        return list(trail)
+    last = trail[-1][0].lower() if trail else ""
+    if trail and (title.lower() == last or last in title.lower()):
+        return list(trail[:-1]) + [(title, None)]
+    return list(trail) + [(title, None)]
 
 
 def page_trail(user, endpoint: str | None, args=None) -> list:

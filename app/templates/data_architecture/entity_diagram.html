@@ -16,19 +16,7 @@
 {% from 'components/diagram/legend.html' import diagram_legend with context %}
 {% from 'components/diagram/status_line.html' import diagram_status_line with context %}
 
-{% block title %}Data objects: diagram — {{ config.APP_NAME }}{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Data objects', 'href': url_for('data_architecture.data_entity_catalog')},
-    {'text': 'Diagram', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Data objects: diagram — {{ config.APP_NAME }}{% endblock %}{% block content %}
 {% set page_tabs = [('List', url_for('data_architecture.data_entity_catalog'), false), ('Diagram', url_for('data_architecture.data_entity_diagram'), true)] %}
 
 {% macro _actions() %}
@@ -43,6 +31,7 @@
 {% endmacro %}
 
 {% if not domain %}
+{# duplicate-breadcrumb-ok: two page_shell() calls in mutually exclusive if/else branches; only one renders #}
   {{ page_shell(title='Data objects', subtitle='The entities of your data model, and how they relate.', tabs=page_tabs) }}
   {{ empty_state(icon='database', title='No data domains yet', description='A data domain groups the entities of one subject area, such as Customer or Finance. Add your first data entity and its domain is created with it.', cta_text='Add a data entity', cta_href=url_for('data_architecture.create_data_entity'), cta_icon='plus') }}
 {% else %}
