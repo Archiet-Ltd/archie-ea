@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import lru_cache
+from html import escape
 from typing import Dict, List, Optional
 from urllib.parse import urlsplit
 
@@ -305,7 +306,8 @@ def remind_one_organisation(app, organization_id: int, now: Optional[datetime] =
     from app._bootstrap._digest_emails import _safe_send_email
 
     recipients = [p.email for p in admins if p.email]
-    body = f"<p>{message}</p><p><a href=\"{app.config.get('PUBLIC_BASE_URL', '').rstrip('/')}{link}\">Open billing</a></p>"
+    address = escape(app.config.get("PUBLIC_BASE_URL", "").rstrip("/") + link)
+    body = f"<p>{escape(message)}</p><p><a href=\"{address}\">Open billing</a></p>"
     _safe_send_email(app, "Your 90 days of Startup are ending", recipients, body)
     return {"organization_id": organization_id, "sent": len(admins), "days": days}
 
