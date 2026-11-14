@@ -900,6 +900,7 @@ class CapabilityGapAnalysisService:
                     source_id=capability_element.id,
                     target_id=gap_element.id,
                     architecture_id=gap_element.architecture_id,
+                    organization_id=gap_element.organization_id,
                 )
             )
 
@@ -932,12 +933,14 @@ class CapabilityGapAnalysisService:
         self, source_id: int, target_id: int, architecture_id: int, rel_type: str
     ) -> None:
         if not self._relationship_exists(source_id, target_id, architecture_id, rel_type):
+            source = db.session.get(ArchiMateElement, source_id)
             db.session.add(
                 ArchiMateRelationship(
                     type=rel_type,
                     source_id=source_id,
                     target_id=target_id,
                     architecture_id=architecture_id,
+                    organization_id=source.organization_id if source is not None else None,
                 )
             )
 

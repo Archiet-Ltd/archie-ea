@@ -58,7 +58,7 @@ def test_association_joins_the_capability_element_to_the_gap_element(app, db_ses
               gap_type="compliance", source_capability_id=capability.id)
     db_session.add(gap)
     gap_element = ArchiMateElement(name="Gap element", type="Gap", layer="implementation_migration",
-                                   architecture_id=None)
+                                   architecture_id=None, organization_id=org.id)
     db_session.add(gap_element)
     db_session.flush()
 
