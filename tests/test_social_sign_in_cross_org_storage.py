@@ -160,7 +160,7 @@ def test_sign_in_methods_card_empty_state(browser, db_session):
     user = _account(db_session)
     browser.password_sign_in(user.email, PASSWORD)
     page = browser.get("/account/manage").get_data(as_text=True)
-    assert "No Google or Microsoft sign-in is connected." in page
+    assert "No Google or Microsoft sign-in is connected" in page
     assert "we connect it after you confirm your password" in page
 
 

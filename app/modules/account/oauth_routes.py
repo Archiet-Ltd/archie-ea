@@ -48,6 +48,31 @@ def _inject_buttons():
     return {"social_sign_in_buttons": social_sign_in_buttons}
 
 
+@oauth_bp.app_context_processor
+def _inject_sign_in_methods():
+    def sign_in_methods():
+        """What the Sign-in methods card shows for the signed-in person; ``None`` when no provider is on."""
+        from app.models.sign_in_identity import SignInIdentity
+
+        status = platform.platform_sign_in_status()
+        on = [key for key in platform.PLATFORM_LABELS if status[key]["configured"]]
+        if not on or not current_user.is_authenticated:
+            return None
+        rows = SignInIdentity.query.filter(
+            SignInIdentity.user_id == current_user.id, SignInIdentity.provider.in_(on)
+        ).all()
+        by_provider = {row.provider: row for row in rows}
+        return {
+            "connected": [
+                {"key": key, "label": platform.PLATFORM_LABELS[key], "email": by_provider[key].email_at_link,
+                 "connected_at": by_provider[key].created_at}
+                for key in on if key in by_provider
+            ]
+        }
+
+    return {"sign_in_methods": sign_in_methods}
+
+
 def pending_email():
     """The address a Google or Microsoft connection is waiting on, for the sign-in form, or None."""
     pending = session.get(SESSION_PENDING)

@@ -273,6 +273,36 @@
         ('alert_email',         'Daily alert email',   'One email a day listing the alerts about what you own: support dates, owners, costs and overdue review conditions. The bell shows them either way.'),
         ('mention_notifications','Mentions',           'Receive notifications when you are mentioned in a comment or review.')
     ] %}
+    {% set sign_in_card = sign_in_methods() if sign_in_methods is defined else none %}
+    {% if sign_in_card is not none %}
+    <div class="mt-6" data-testid="sign-in-methods-card">
+    {% call card() %}
+    {% call card_content() %}
+            <h3 class="text-sm font-semibold mb-1">Sign-in methods</h3>
+            <p class="text-xs text-muted-foreground mb-5">Google and Microsoft accounts you can use to sign in to Entelim.</p>
+            {% if sign_in_card.connected %}
+            <ul class="divide-y divide-border">
+                {% for method in sign_in_card.connected %}
+                <li class="flex items-center justify-between gap-4 py-3" data-testid="sign-in-method-{{ method.key }}">
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium">{{ method.label }}</p>
+                        <p class="text-xs text-muted-foreground">{{ method.email }} &middot; connected {{ method.connected_at.strftime('%d %b %Y') }}</p>
+                    </div>
+                    <form method="POST" action="{{ url_for('account_oauth.disconnect', provider=method.key) }}">
+                        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                        {{ button(type='submit', variant='outline', size='sm', text='Disconnect', aria_label='Disconnect ' ~ method.label) }}
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+                {{ empty_state(icon='key-round', title='No Google or Microsoft sign-in is connected', description='Choose Continue with Google or Continue with Microsoft next time you sign in; we connect it after you confirm your password.', compact=True, class='py-6') }}
+            {% endif %}
+    {% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
+
     <div class="mt-6">
     {% call card() %}
     {% call card_content() %}
