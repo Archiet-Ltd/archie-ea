@@ -44,6 +44,10 @@ MCP_TESTS = (
     "tests/test_mcp_signin_next_through_sso.py::test_an_administrator_keeps_next_through_the_two_factor_step",
     "tests/test_two_factor_requirement_assistant_authorise.py::test_an_administrator_is_sent_to_set_up_and_told_why_but_a_member_gets_the_page",
     "tests/test_two_factor_requirement_assistant_authorise.py::test_an_administrator_of_an_organisation_that_requires_nothing_keeps_the_week",
+    "tests/test_origin_request.py::test_metadata_on_entelim_tech_names_entelim_tech",
+    "tests/test_origin_request.py::test_metadata_on_entelim_org_names_entelim_org",
+    "tests/test_origin_request.py::test_metadata_on_forged_host_names_canonical",
+    "tests/test_origin_request.py::test_metadata_on_server_ip_names_canonical",
 )
 MARKER = "mcp"
 
