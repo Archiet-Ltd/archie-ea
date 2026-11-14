@@ -47,7 +47,7 @@ WORK_CHILDREN = {
     "Systems": ["Applications", "Portfolio", "Data register", "Interfaces", "Technology radar"],
     "Impact": ["Impact analysis", "Traceability"],
     "Changes": ["Gaps", "Solutions", "Options analysis", "Scenarios", "Business cases", "Work packages", "Roadmap", "Programmes"],
-    "Spend": ["Costs", "Vendors", "Vendor catalogue", "Contracts and licences", "Renewals", "Investments"],
+    "Spend": ["Costs", "Money", "Vendors", "Vendor catalogue", "Contracts and licences", "Renewals", "Investments"],
     "Compliance": ["Controls", "Risks", "Decisions", "Review board", "Evidence"],
 }
 LAYER_TYPES = {
@@ -182,7 +182,7 @@ def test_work_pages_follow_who_may_open_them(ctx, role):
     held = {item.label: _labels(item.children) for item in nav["work"]}
     spend = list(WORK_CHILDREN["Spend"])
     if role == ROLE_FINANCE:
-        spend = ["Costs", "Vendors", "Vendor catalogue", "Licences", "Investments"]
+        spend = ["Costs", "Money", "Vendors", "Vendor catalogue", "Licences", "Investments"]
     elif role not in COST_VIEWERS:
         spend = ["Investments"]
     assert held["Spend"] == spend
