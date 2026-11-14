@@ -96,7 +96,9 @@ def ensure_view(canvas):
     """The canvas's Architecture View, created on first use."""
     diagram = None
     if canvas.saved_diagram_id:
-        diagram = SavedDiagram.query.filter(SavedDiagram.id == canvas.saved_diagram_id).first()
+        diagram = SavedDiagram.query.filter(
+            SavedDiagram.id == canvas.saved_diagram_id, SavedDiagram.organization_id == canvas.organization_id
+        ).first()
     if diagram is None:
         diagram = SavedDiagram(
             name=canvas.name or CANVAS_TEMPLATES[template_key(canvas)]["name"],
@@ -113,7 +115,12 @@ def _view_rows(canvas):
     """``(view row, element)`` for every element on the canvas's view, oldest first."""
     if not canvas.saved_diagram_id:
         return []
-    rows = SavedDiagramElement.query.filter(SavedDiagramElement.diagram_id == canvas.saved_diagram_id).all()
+    diagram = SavedDiagram.query.filter(
+        SavedDiagram.id == canvas.saved_diagram_id, SavedDiagram.organization_id == canvas.organization_id
+    ).first()
+    if diagram is None:
+        return []
+    rows = SavedDiagramElement.query.filter(SavedDiagramElement.diagram_id == diagram.id).all()
     by_id = {
         el.id: el for el in ArchiMateElement.query.filter(
             ArchiMateElement.id.in_({r.element_id for r in rows} or {0}),
@@ -386,3 +393,156 @@ def create_value_proposition_canvas(canvas):
             add_entry(vpc, box, element_id=el.id)
     db.session.commit()
     return vpc
+
+
+# --- One reader: what a canvas shows, for the page, the JSON route, the chat and MCP -------------------------
+
+COST_LINES_SHOWN = 8
+
+
+def _readable_type(element_type):
+    from app.modules.business_model_canvas.box_meta import _readable
+
+    return _readable(element_type)
+
+
+def _price_lines(canvas, box_key):
+    """The price plans on the box's priced entries, each with the one line every surface prints."""
+    priceable = priceable_box(canvas)
+    if box_key != PRICE_BOX or not priceable:
+        return []
+    priced = {el.id: el for el in entries(canvas, priceable)}
+    return [
+        {
+            "plan_id": plan.id, "element_id": plan.element_id, "entry": priced[plan.element_id].name,
+            "plan_name": plan.name, "price": f"{plan.price:,.2f}", "currency": plan.currency,
+            "period": plan.billing_period, "url": element_href(priced[plan.element_id]),
+            "text": f"{priced[plan.element_id].name}: {plan.name}, {plan.price:,.2f} {plan.currency} per {plan.billing_period}",
+        }
+        for plan in price_plans(canvas) if plan.element_id in priced
+    ]
+
+
+def _cost_summary(canvas):
+    """The cost lines the page shows (the first eight, then the technology shares), how many there are
+    and the total line."""
+    from flask import url_for
+
+    from app.services import technology_cost
+
+    lines = cost_lines(canvas)
+    technology = technology_cost.canvas_figures(canvas.organization_id)
+    shown = [
+        {
+            "id": line["id"], "text": f"{line['name']}: {line['amount']:,.0f} {line['currency']} a year",
+            "url": url_for("unified_applications.application_detail", id=line["id"]),
+        }
+        for line in lines[:COST_LINES_SHOWN]
+    ] + [
+        {
+            "text": f"{share['name']}, technology share: {share['share']:,.2f} {technology['currency']} a year",
+            "url": url_for("unified_applications.application_detail", id=share["id"], tab="technology")
+            + "#technology-cost-shares",
+        }
+        for share in technology["shares"][:COST_LINES_SHOWN]
+    ]
+    count = len(lines) + len(technology["shares"])
+    total = None
+    if lines or technology["shares"]:
+        total = (
+            f"Total a year: {technology['total']:,.2f} {technology['currency']}"
+            if technology["total"] is not None
+            else f"Total a year: not shown, there is no exchange rate on file to {technology['currency']}"
+        )
+    return {"lines": shown, "count": count, "not_listed": max(0, count - len(shown)), "text": total}
+
+
+def _box_empty_reason(zone, box_key):
+    if zone["membership"] == "attribute":
+        return (
+            "No application has a recorded annual cost yet" if box_key == COST_BOX
+            else "No price has been added to an entry yet"
+        )
+    return f"Nothing is in {zone['label']} yet"
+
+
+def canvas_contents(organization_id, canvas_id):
+    """Everything one canvas shows, box by box in layout order, or ``None`` when the canvas is not the
+    organisation's. The canvas page, ``GET /business-model/api/<id>``, the chat's ``get_canvas`` and the
+    chat's canvas answer all read this one result, so they list the same entries in the same order."""
+    from flask import url_for
+
+    from app.models.business_model import BusinessModelCanvas
+    from app.modules.business_model_canvas.box_meta import canvas_box_meta
+
+    canvas = BusinessModelCanvas.query.filter(
+        BusinessModelCanvas.id == canvas_id, BusinessModelCanvas.organization_id == organization_id
+    ).first()
+    if canvas is None:
+        return None
+    key = template_key(canvas)
+    template = CANVAS_TEMPLATES[key]
+    boxes = []
+    for zone in sorted(template["zones"], key=lambda z: z["order"]):
+        box_key = zone["box_key"]
+        meta = canvas_box_meta(key.replace("_", "-"), box_key)
+        box = {
+            "key": box_key, "title": zone["label"], "guidance": meta["guidance"], "takes": list(zone["element_types"]),
+            "entries": [], "prices": [], "costs": None, "empty_reason": None,
+        }
+        if zone["membership"] == "attribute":
+            if box_key == PRICE_BOX:
+                box["prices"] = _price_lines(canvas, box_key)
+                has_content = bool(box["prices"])
+            else:
+                box["costs"] = _cost_summary(canvas)
+                has_content = bool(box["costs"]["count"])
+        else:
+            box["entries"] = [
+                {
+                    "id": el.id, "name": el.name, "type": el.type, "type_name": _readable_type(el.type),
+                    "url": element_href(el), "detail": None,
+                }
+                for el in entries(canvas, box_key)
+            ]
+            has_content = bool(box["entries"])
+        if not has_content:
+            box["empty_reason"] = _box_empty_reason(zone, box_key)
+        boxes.append(box)
+    return {
+        "id": canvas.id, "name": canvas.name or "Untitled Canvas", "description": canvas.description or "",
+        "canvas_type": key, "type_name": template["name"], "operating_model_type": canvas.operating_model_type,
+        "updated_at": canvas.updated_at.isoformat() if canvas.updated_at else None,
+        "url": url_for("business_model.detail", canvas_id=canvas.id), "boxes": boxes,
+    }
+
+
+def organisation_canvas(organization_id, key=TEMPLATE_KEY):
+    """The organisation's most recently updated canvas of one type, or ``None``."""
+    from app.models.business_model import BusinessModelCanvas
+
+    query = BusinessModelCanvas.query.filter(BusinessModelCanvas.organization_id == organization_id)
+    if key == TEMPLATE_KEY:
+        query = query.filter(db.or_(BusinessModelCanvas.canvas_type.is_(None), BusinessModelCanvas.canvas_type == key))
+    else:
+        query = query.filter(BusinessModelCanvas.canvas_type == key)
+    return query.order_by(BusinessModelCanvas.updated_at.desc(), BusinessModelCanvas.id.desc()).first()
+
+
+def box_across_canvases(organization_id, box_keys):
+    """Every canvas of the organisation that has one of these boxes, most recently updated first, each with
+    that box's slice of ``canvas_contents``: ``[{"canvas": <contents without boxes>, "box": <box>}]``."""
+    from app.models.business_model import BusinessModelCanvas
+
+    wanted = set(box_keys)
+    found = []
+    for canvas in BusinessModelCanvas.query.filter(
+        BusinessModelCanvas.organization_id == organization_id
+    ).order_by(BusinessModelCanvas.updated_at.desc(), BusinessModelCanvas.id.desc()).all():
+        if not wanted & set(zones(canvas)):
+            continue
+        contents = canvas_contents(organization_id, canvas.id)
+        for box in contents["boxes"]:
+            if box["key"] in wanted:
+                found.append({"canvas": {k: v for k, v in contents.items() if k != "boxes"}, "box": box})
+    return found

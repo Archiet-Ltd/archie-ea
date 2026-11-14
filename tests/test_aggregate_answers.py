@@ -874,8 +874,10 @@ class TestEvaluationSetCoversAllThirtyStartupQuestions:
         from app.modules.intelligence.services.nl_query_interpreter import evaluation_set
 
         cases = evaluation_set()
-        answerable = [c for c in cases if c["expected_entry_id"] is not None]
+        answerable = [c for c in cases if c["expected_entry_id"] not in (None, "canvas_box_entries")]
         assert len(answerable) == 30, "the thirty startup questions must each map to an entry"
+        canvas = [c for c in cases if c["expected_entry_id"] == "canvas_box_entries"]
+        assert len(canvas) == 6, "the six canvas questions must each map to the canvas entry"
 
     def test_every_answerable_question_maps_to_a_real_entry(self):
         from app.modules.intelligence.services.nl_query_interpreter import evaluation_set, interpret

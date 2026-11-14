@@ -17,9 +17,8 @@ from app.decorators import require_roles
 
 from app import db
 from app.config.archimate_viewpoints import CANVAS_TEMPLATES
-from app.models.business_model import OPERATING_MODEL_TYPES
+from app.models.business_model import CANVAS_BLOCKS, OPERATING_MODEL_TYPES
 from app.models.price_plan import BILLING_PERIODS
-from app.services import technology_cost
 from app.utils.api_response import error_response, not_found_response, success_response
 
 from werkzeug.exceptions import HTTPException
@@ -83,63 +82,42 @@ def _can_edit():
     return True
 
 
-def _note_entry(canvas, box_key, el, editable):
+def _note_entry(canvas, box_key, entry, editable):
     note = {
-        "id": el.id, "text": el.name, "type": el.type, "box": box_key,
-        "href": model_service.element_href(el),
+        "id": entry["id"], "text": entry["name"], "type": entry["type"], "box": box_key,
+        "href": entry["url"],
     }
     if editable:
-        note["remove_url"] = url_for("business_model.remove_entry", canvas_id=canvas.id, element_id=el.id)
-        note["rename_url"] = url_for("business_model.rename_entry", canvas_id=canvas.id, element_id=el.id)
+        note["remove_url"] = url_for("business_model.remove_entry", canvas_id=canvas.id, element_id=entry["id"])
+        note["rename_url"] = url_for("business_model.rename_entry", canvas_id=canvas.id, element_id=entry["id"])
     return note
 
 
 def _canvas_boxes(canvas):
-    """The notes of every box, read from the model: elements for the element boxes, and, on the canvases
-    with a Revenue Streams box, price plans there and cost facts in Cost Structure."""
+    """The notes of every box, formatted from the one canvas reader the JSON route and the chat also read."""
     editable = _can_edit()
-    zones = model_service.zones(canvas)
-    boxes = {key.replace("_", "-"): [_note_entry(canvas, key, el, editable) for el in model_service.entries(canvas, key)]
-             for key in model_service.element_boxes(canvas)}
+    contents = model_service.canvas_contents(canvas.organization_id, canvas.id)
+    boxes = {}
     cost_line_count = 0
-    priceable = model_service.priceable_box(canvas)
-    if model_service.PRICE_BOX in zones and priceable:
-        elements = {el.id: el for el in model_service.entries(canvas, priceable)}
-        plan_href = {eid: model_service.element_href(el) for eid, el in elements.items()}
-        boxes["revenue-streams"] = [
-            {
-                "id": plan.id, "box": "revenue_streams",
-                "text": f"{elements[plan.element_id].name}: {plan.name}, {plan.price:,.2f} {plan.currency} per {plan.billing_period}",
-                "href": plan_href[plan.element_id],
-                **({"remove_url": url_for("business_model.remove_price", canvas_id=canvas.id, plan_id=plan.id)} if editable else {}),
-            }
-            for plan in model_service.price_plans(canvas) if plan.element_id in elements
-        ]
-    if model_service.COST_BOX in zones:
-        lines = model_service.cost_lines(canvas)
-        technology = technology_cost.canvas_figures(canvas.organization_id)
-        cost_line_count = len(lines) + len(technology["shares"])
-        total_text = (
-            f"Total a year: {technology['total']:,.2f} {technology['currency']}"
-            if technology["total"] is not None
-            else f"Total a year: not shown, there is no exchange rate on file to {technology['currency']}"
-        )
-        boxes["cost-structure"] = [
-            {
-                "text": f"{line['name']}: {line['amount']:,.0f} {line['currency']} a year",
-                "href": url_for("unified_applications.application_detail", id=line["id"]),
-            }
-            for line in lines[:8]
-        ]
-        boxes["cost-structure"] += [
-            {
-                "text": f"{share['name']}, technology share: {share['share']:,.2f} {technology['currency']} a year",
-                "href": url_for("unified_applications.application_detail", id=share["id"], tab="technology") + "#technology-cost-shares",
-            }
-            for share in technology["shares"][:8]
-        ]
-        if lines or technology["shares"]:
-            boxes["cost-structure:total"] = total_text
+    for box in contents["boxes"]:
+        key = box["key"].replace("_", "-")
+        if box["key"] == model_service.PRICE_BOX:
+            boxes[key] = [
+                {
+                    "id": plan["plan_id"], "box": box["key"], "text": plan["text"], "href": plan["url"],
+                    **({"remove_url": url_for("business_model.remove_price", canvas_id=canvas.id, plan_id=plan["plan_id"])} if editable else {}),
+                }
+                for plan in box["prices"]
+            ]
+        elif box["costs"] is not None:
+            cost_line_count = box["costs"]["count"]
+            boxes[key] = [{"text": line["text"], "href": line["url"]} for line in box["costs"]["lines"]]
+            if box["costs"]["text"]:
+                boxes[key + ":total"] = box["costs"]["text"]
+        else:
+            boxes[key] = [
+                _note_entry(canvas, box["key"], entry, editable) for entry in box["entries"]
+            ]
     return boxes, cost_line_count
 
 
@@ -375,7 +353,11 @@ def update_canvas(canvas_id):
 
     if not request.is_json:
         return _back(canvas_id)
-    return success_response(canvas.to_dict())
+    contents = model_service.canvas_contents(canvas.organization_id, canvas.id)
+    # Text kept from before a canvas listed elements. It is shown apart, never as a box's entries.
+    flat = canvas.to_dict()
+    contents["earlier_text"] = {key: flat[key] for key in CANVAS_BLOCKS if flat.get(key)}
+    return success_response(contents)
 
 
 @business_model_bp.route("/<int:canvas_id>/delete", methods=["POST"])
@@ -408,6 +390,9 @@ def api_list():
             "name": c.name or "",
             "description": c.description or "",
             "operating_model_type": c.operating_model_type,
+            "canvas_type": model_service.template_key(c),
+            "type_name": CANVAS_TEMPLATES[model_service.template_key(c)]["name"],
+            "url": url_for("business_model.detail", canvas_id=c.id),
             "updated_at": c.updated_at.isoformat() if c.updated_at else None,
         }
         for c in canvases
@@ -421,7 +406,11 @@ def api_detail(canvas_id):
     canvas = service.get_canvas_or_none(canvas_id)
     if canvas is None:
         return not_found_response("Business Model Canvas")
-    return success_response(canvas.to_dict())
+    contents = model_service.canvas_contents(canvas.organization_id, canvas.id)
+    # Text kept from before a canvas listed elements. It is shown apart, never as a box's entries.
+    flat = canvas.to_dict()
+    contents["earlier_text"] = {key: flat[key] for key in CANVAS_BLOCKS if flat.get(key)}
+    return success_response(contents)
 
 
 # Import AI block-draft route — adds POST /api/<id>/ai-draft-block to this

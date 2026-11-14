@@ -26,7 +26,7 @@ TRUTH_CLASS_SYNCHRONISED = "synchronised"
 # that recompute a value from other rows are "derived". Nothing in this
 # catalogue reads from a sync-mirror table today, so "synchronised" is
 # available for a future entry but unused here — never guessed per row.
-_DRAWN_SOURCE_TABLES = {"application_owners", "application_components", "company_profile"}
+_DRAWN_SOURCE_TABLES = {"application_owners", "application_components", "company_profile", "saved_diagram_elements"}
 
 
 def truth_class_for(source_table: Optional[str]) -> str:
@@ -1058,6 +1058,80 @@ def _company_profile(organization_id: int, topic: Optional[str] = None, **_: Any
     }
 
 
+# What each plain question about a canvas box asks: the box, in the words a person asks it.
+CANVAS_BOX_QUESTIONS = {
+    "customer_segments": ("Who are our customer segments?", "Customer Segments"),
+    "early_adopters": ("Who are our early adopters?", "Early adopters"),
+    "value_propositions": ("What are our value propositions?", "Value Propositions"),
+    "revenue_streams": ("What are our revenue streams?", "Revenue Streams"),
+    "key_partners": ("Who are our key partners?", "Key Partners"),
+    "key_activities": ("What are our key activities?", "Key Activities"),
+    "key_resources": ("What are our key resources?", "Key Resources"),
+    "cost_structure": ("What is in our cost structure?", "Cost Structure"),
+    "customer_relationships": ("What are our customer relationships?", "Customer Relationships"),
+    "channels": ("What are our channels?", "Channels"),
+}
+
+
+def _canvas_box_entries(organization_id: int, box: Optional[str] = None, **_: Any) -> Dict[str, Any]:
+    """"Who are our customer segments? Who are our key partners?" Answered from the canvases themselves: the
+    entries each canvas of the organisation shows in that box, in the order the canvas page shows them, each
+    cited to its element and to the canvas it sits on. Read through the one canvas reader the page and the
+    chat's get_canvas use, so the three never disagree."""
+    from app.modules.business_model_canvas import model_service
+
+    box = box if box in CANVAS_BOX_QUESTIONS else None
+    title, box_title = CANVAS_BOX_QUESTIONS[box] if box else ("What is on our canvas?", "any box")
+    found = model_service.box_across_canvases(organization_id, [box] if box else list(CANVAS_BOX_QUESTIONS))
+
+    rows: List[Dict[str, Any]] = []
+    citations: List[Dict[str, Any]] = []
+    canvases: Dict[int, Dict[str, Any]] = {}
+    for item in found:
+        canvas, slice_ = item["canvas"], item["box"]
+        line_start = "%s on %s" % (slice_["title"], canvas["name"])
+        listed = [
+            (entry["id"], entry["name"], "element", "%s · %s" % (line_start, entry["type_name"]))
+            for entry in slice_["entries"]
+        ] + [
+            (price["element_id"], price["text"], "element", "%s · price" % line_start) for price in slice_["prices"]
+        ] + [
+            (line["id"], line["text"], "application", "%s · cost" % line_start)
+            for line in ((slice_["costs"] or {}).get("lines") or [])
+        ]
+        if not listed:
+            continue
+        canvases.setdefault(canvas["id"], {"canvas": canvas, "count": 0})["count"] += len(listed)
+        for ident, name, kind, line in listed:
+            rows.append({"id": ident, "name": name, "source_line": line, "source_table": "saved_diagram_elements",
+                         "truth_class": truth_class_for("saved_diagram_elements")})
+            citations.append({"type": kind, "id": ident, "name": name,
+                              "target": "/api/v1/elements/%d" % ident if kind == "element" else None, "source_line": line})
+    for entry in canvases.values():
+        canvas = entry["canvas"]
+        citations.append({"type": "canvas", "id": canvas["id"], "name": canvas["name"], "target": canvas["url"],
+                          "source_line": "%s · %d listed" % (canvas["type_name"], entry["count"])})
+
+    result: Dict[str, Any] = {
+        "answer": "what the canvases list under %s" % box_title if box else "what the canvases list",
+        "title": title, "box": box, "rows": rows, "total": len(rows), "citations": citations,
+        "reason": None if rows else "no canvas has an entry in %s yet" % box_title,
+    }
+    if not rows:
+        from flask import url_for
+
+        own = model_service.organisation_canvas(organization_id)
+        result["next_step"] = ("Open your canvas and add the first entry." if own is not None
+                               else "Make a canvas, then add the first entry.")
+        result["next_label"] = "Open your canvas" if own is not None else "Open the canvases"
+        try:
+            result["next_url"] = (url_for("business_model.detail", canvas_id=own.id) if own is not None
+                                  else url_for("business_model.index"))
+        except RuntimeError:  # outside a request there is no page to point to
+            result["next_url"] = None
+    return result
+
+
 CATALOGUE: Dict[str, CatalogueEntry] = {
     "applications_without_owner": CatalogueEntry(
         id="applications_without_owner",
@@ -1121,6 +1195,13 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         description="The business capabilities mapped to a named application, read from the same mapping the application page shows, each cited to its fact sheet.",
         params=["service"],
         run=_capabilities_of_application,
+    ),
+    "canvas_box_entries": CatalogueEntry(
+        id="canvas_box_entries",
+        title="What is in a box of our canvas?",
+        description="The entries each canvas shows in one box (customer segments, key partners, value propositions and the rest), in the order the canvas page shows them, each cited to its element and its canvas.",
+        params=["box"],
+        run=_canvas_box_entries,
     ),
     "what_breaks_if_fails": CatalogueEntry(
         id="what_breaks_if_fails",

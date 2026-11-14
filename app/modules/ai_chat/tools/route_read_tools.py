@@ -263,26 +263,59 @@ _CASE_TEXT_KEYS = ("title", "description", "problem_statement", "options_conside
                    "recommended_option", "expected_benefits", "key_risks")
 
 
+def _fence_canvas(canvas_data: dict) -> None:
+    """Neutralise every string a canvas carries that a person typed: its name, each box's title, guidance,
+    entries, prices and costs, and the text kept from before the canvas listed elements."""
+    _fence_keys(canvas_data, ("name", "description", "type_name"))
+    for box in canvas_data.get("boxes") or []:
+        _fence_keys(box, ("title", "guidance", "empty_reason"))
+        for entry in box.get("entries") or []:
+            _fence_keys(entry, ("name", "detail"))
+        for price in box.get("prices") or []:
+            _fence_keys(price, ("entry", "plan_name", "text"))
+        costs = box.get("costs")
+        if isinstance(costs, dict):
+            _fence_keys(costs, ("text",))
+            for line in costs.get("lines") or []:
+                _fence_keys(line, ("text",))
+    earlier = canvas_data.get("earlier_text")
+    if isinstance(earlier, dict):
+        _fence_keys(earlier, tuple(earlier))
+
+
+def _organisation_canvas_id(canvas_type: str) -> int | None:
+    """The id of the organisation's most recently updated Business Model Canvas, from the same list route."""
+    _status, listing = call_internal_api("GET", "/business-model/api/list", pass_session=True)
+    for canvas in (listing.get("data") or []) if isinstance(listing, dict) else []:
+        if canvas.get("canvas_type") == "business_model_canvas":
+            return canvas["id"]
+    return None
+
+
 def _get_canvas(args: dict) -> dict:
     canvas_type = str(args["canvas_type"])
-    canvas_id = int(args["canvas_id"])
+    canvas_id = args.get("canvas_id")
 
     if canvas_type == "business_model":
+        if canvas_id in (None, ""):
+            canvas_id = _organisation_canvas_id(canvas_type)
+        if canvas_id is None:
+            return {"success": False, "error": {"code": "NOT_FOUND", "message": "Business Model Canvas not found"}}
         status, data = call_internal_api(
-            "GET", f"/business-model/api/{canvas_id}", pass_session=True
+            "GET", f"/business-model/api/{int(canvas_id)}", pass_session=True
         )
         if status != 200 or not (isinstance(data, dict) and data.get("success")):
             return {"success": False, "error": {"code": "NOT_FOUND", "message": "Business Model Canvas not found"}}
         canvas_data = data["data"]
-        _fence_keys(canvas_data, ("name", "description"))
-        for block_key, block_content in (canvas_data.get("blocks") or {}).items():
-            if isinstance(block_content, str):
-                canvas_data["blocks"][block_key] = neutralize_fence_lookalikes(block_content)
+        _fence_canvas(canvas_data)
         return {"success": True, "data": canvas_data}
 
     if canvas_type == "business_case":
+        if canvas_id in (None, ""):
+            return {"success": False, "error": {"code": "INVALID_PARAMETER",
+                    "message": "canvas_id is required for a business_case"}}
         status, data = call_internal_api(
-            "GET", f"/business-case/api/{canvas_id}", pass_session=True
+            "GET", f"/business-case/api/{int(canvas_id)}", pass_session=True
         )
         if status != 200 or not (isinstance(data, dict) and data.get("success")):
             return {"success": False, "error": {"code": "NOT_FOUND", "message": "Business Case not found"}}

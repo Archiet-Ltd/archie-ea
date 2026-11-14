@@ -30,6 +30,7 @@ NEXT_STEPS = {
     "github_sourced_records": "Connect a GitHub repository so its records come into the model.",
     "risk_cost": "Open a risk in the register and enter the four Open FAIR factors to work out what it could cost each year.",
     "capabilities_of_application": "Name an application in your model, or map capabilities to it on its Capabilities tab.",
+    "canvas_box_entries": "Open your canvas and add the first entry to that box.",
     "what_breaks_if_fails": "Name a service that is in your model, or draw how your systems depend on each other.",
 }
 
@@ -76,6 +77,8 @@ def _page_for(citation: Dict[str, Any]) -> Optional[str]:
         return url_for("enterprise_crud.capability_fact_sheet", capability_id=ident)
     if citation.get("type") == "risk":
         return url_for("risk.risk_page", risk_id=ident)
+    if citation.get("type") == "canvas":
+        return url_for("business_model.detail", canvas_id=ident)
     if citation.get("type") == "element":
         return url_for("archimate.element_impact_graph_page", element_id=ident)
     return None
@@ -136,7 +139,7 @@ def answer_catalogue_question(message: str, organization_id: int, time_limit: Op
             continue
         seen.add(key)
         record = {"name": citation.get("name") or "Unnamed record", "kind": citation["type"], "url": page}
-        row = rows_by_id.get(citation.get("id")) or {}
+        row = {} if citation["type"] == "canvas" else rows_by_id.get(citation.get("id")) or {}
         count = row.get("depends_on_count")
         if count:
             record["dependents"] = "%d %s" % (count, "thing depends on it" if count == 1 else "things depend on it")

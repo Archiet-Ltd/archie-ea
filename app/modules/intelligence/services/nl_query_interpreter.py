@@ -28,6 +28,17 @@ logger = logging.getLogger(__name__)
 # more specific rules come first: "what came from GitHub" and "what we run"
 # are both checked before the broad "no owner" and "what breaks" rules so a
 # question that mentions both lands on the one it is really asking.
+# The canvas box a phrase asks about (None: the canvas as a whole), in the order they are tried.
+_CANVAS_PHRASES = (
+    ("customer segment", "customer_segments"), ("our segments", "customer_segments"),
+    ("early adopter", "early_adopters"), ("value proposition", "value_propositions"),
+    ("revenue stream", "revenue_streams"), ("key partner", "key_partners"), ("our partners", "key_partners"),
+    ("key activit", "key_activities"), ("key resource", "key_resources"), ("cost structure", "cost_structure"),
+    ("customer relationship", "customer_relationships"), ("our channels", "channels"),
+    ("on our canvas", None), ("business model canvas", None), ("lean canvas", None),
+)
+
+
 _KEYWORD_RULES = [
     # UC-S2-04: what came from the GitHub connector.
     (
@@ -121,6 +132,13 @@ _KEYWORD_RULES = [
         "business_continuity_criticality",
         {"criticality": "Critical"},
     ),
+    # What a canvas lists in one box (customer segments, key partners, value propositions...). Last, so the
+    # impact and inventory questions keep their own entries; the box is the first phrase below that matches.
+    (
+        tuple(phrase for phrase, _box in _CANVAS_PHRASES),
+        "canvas_box_entries",
+        {},
+    ),
 ]
 
 
@@ -189,6 +207,10 @@ def _keyword_match(question: str, organization_id: Optional[int] = None) -> Opti
             resolved = dict(params)
             if entry_id == "company_profile":
                 resolved["topic"] = _profile_topic(lowered)
+            if entry_id == "canvas_box_entries":
+                box = next((box for phrase, box in _CANVAS_PHRASES if phrase in lowered), None)
+                if box:
+                    resolved["box"] = box
             if entry_id == "risk_cost":
                 risk = _extract_risk(question)
                 if risk:
@@ -395,6 +417,13 @@ def evaluation_set() -> List[Dict[str, Any]]:
         {"question": "Which records cite a GitHub commit as their origin?", "expected_entry_id": "github_sourced_records"},
         {"question": "What came into the catalogue from the GitHub integration?", "expected_entry_id": "github_sourced_records"},
         {"question": "List the GitHub-sourced applications and their repositories.", "expected_entry_id": "github_sourced_records"},
+        # What a canvas lists in a box.
+        {"question": "Who are our customer segments?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "Who are our key partners?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "What are our value propositions?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "What are our revenue streams?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "Who are our early adopters?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "What is on our business model canvas?", "expected_entry_id": "canvas_box_entries"},
         # Outside the catalogue — must map to nothing, never a guessed answer.
         {"question": "what's the weather today", "expected_entry_id": None},
         {"question": "how many users do we have", "expected_entry_id": None},
