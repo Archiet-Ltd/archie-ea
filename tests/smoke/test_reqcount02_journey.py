@@ -18,6 +18,7 @@ from tests.smoke.test_signup_brings_the_company_in_journey import (  # noqa: F40
     server,
     sign_up,
 )
+from tests.smoke.test_connect_github_to_cited_answer_journey import SKIP_WELCOME
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -28,6 +29,7 @@ def new_page(browser, width=1440, scheme="light"):
     context = browser.new_context(
         viewport={"width": width, "height": 900}, color_scheme=scheme
     )
+    context.add_init_script(SKIP_WELCOME)
     context.set_default_timeout(90000)
     context.set_default_navigation_timeout(90000)
     return context, context.new_page()
@@ -67,22 +69,14 @@ def _wait_for_framework(page, base, label):
 
 @pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
 def test_requirement_figure_lands_with_title_in_view(browser, server, people, app, width, scheme):
-    """Following a requirement figure on an application page lands with the card's title visible below the top bar."""
+    """Following the Framework requirements tile link on an application page lands with the card's title visible below the top bar."""
     base = str(server)
     context, page = new_page(browser, width, scheme)
     try:
         email, _started = sign_up(page, base, people)
         app_name = "Payments core"
         app_id = _application_for(app, email, app_name)
-        page.get_by_test_id("signup-continue").click()
-        page.wait_for_url("**/account/welcome?step=3")
-        page.get_by_test_id("signup-goal").locator("select").select_option("audit")
-        if not page.get_by_label("DORA", exact=True).is_visible():
-            page.get_by_role("button", name="Show all frameworks").click()
-        page.get_by_label("DORA", exact=True).check()
-        page.get_by_test_id("signup-continue").click()
-        page.wait_for_url("**/account/welcome?step=4")
-        page.get_by_role("button", name="Finish").click()
+        # SKIP_WELCOME skips the welcome steps; we land on the dashboard.
         page.wait_for_url("**/dashboard/**")
 
         _wait_for_framework(page, base, "DORA")
@@ -97,13 +91,29 @@ def test_requirement_figure_lands_with_title_in_view(browser, server, people, ap
         card.get_by_role("button", name="Link framework requirement").click()
         page.wait_for_url(re.compile(r"/applications/%d$" % app_id))
 
-        # The figure link points at the requirement's own anchor, not the whole framework page.
+        # The Framework requirements tile links to #application-requirements on the overview tab.
+        # Click that tile's link and measure that the card title sits below the top bar.
+        tile = page.locator("[data-slot=card]", has_text="Framework requirements").filter(
+            has=page.get_by_test_id("metric-link")
+        ).first
+        tile_link = tile.get_by_test_id("metric-link")
+        tile_link.click()
+        page.wait_for_selector("[data-testid=application-requirements]")
+
+        # Measure: card title's bounding box top >= top bar's bottom.
+        top_bar = page.locator("#admin-header")
+        card_title = page.get_by_test_id("application-requirements").locator("h3").first
+        top_bar_bottom = top_bar.bounding_box()["y"] + top_bar.bounding_box()["height"]
+        card_title_top = card_title.bounding_box()["y"]
+        assert card_title_top >= top_bar_bottom, (
+            "card title top %s is above top bar bottom %s" % (card_title_top, top_bar_bottom)
+        )
+
+        # Now follow a requirement row link to the framework page and verify the marked row matches.
         linked = page.get_by_test_id("application-requirement").first
         href = linked.get_by_role("link").get_attribute("href")
         assert "#requirement-" in href, "figure link must name the requirement: %r" % href
-
-        # The card carries scroll margin so its title clears the top bar when scrolled into view.
-        expect(card).to_have_class(re.compile(r"\bscroll-mt-12\b"))
+        expected_id = href.split("#requirement-")[-1]
 
         # Follow the figure: land on the framework page at the requirement anchor.
         linked.get_by_role("link").click()
@@ -111,12 +121,17 @@ def test_requirement_figure_lands_with_title_in_view(browser, server, people, ap
 
         # The requirement row gets its id via Alpine's :id binding after the
         # framework is expanded and controls are loaded. Wait for it to render,
-        # then check the anchor highlight before the 2.5s auto-remove expires.
+        # then check the anchor highlight before the 10s auto-remove expires.
         page.locator("tr[id^='requirement-']").first.wait_for(state="visible", timeout=30000)
         page.wait_for_timeout(500)
 
         marked = page.locator("tr[id^='requirement-'].ring-2")
         expect(marked).to_have_count(1)
+        # The marked row's id must equal the href's fragment.
+        marked_id = marked.first.get_attribute("id")
+        assert marked_id == "requirement-%s" % expected_id, (
+            "marked row id %s does not match href fragment requirement-%s" % (marked_id, expected_id)
+        )
         expect(marked.first).to_have_class(re.compile(r"ring-primary"))
         expect(marked.first).to_have_class(re.compile(r"bg-muted/50"))
 
