@@ -201,3 +201,46 @@ def test_every_lens_question_is_answered_with_cards_or_a_plain_empty_state(clien
         assert body["found"] is True and body["lens"] == lens, lens
         assert "data-lens-cards" in body["html"] and "Payments service" in body["html"]
         assert "We could not look that up" not in body["html"], lens
+
+
+def _move_last_run_back_an_hour(org_id):
+    db.session.execute(
+        db.text(
+            "UPDATE intelligence_derivation_runs SET started_at = started_at - interval '1 hour', "
+            "finished_at = finished_at - interval '1 hour' WHERE organization_id = :o"
+        ),
+        {"o": org_id},
+    )
+    db.session.commit()
+
+
+def _panel_count(html):
+    return int(re.search(r"data-derivation-stale>(\d+)<", html).group(1))
+
+
+def test_the_answer_and_its_panel_agree_about_the_last_run_and_what_changed_since(client, login_as, make_org):
+    org = make_org()
+    user = _architect(org, "chat-ask-fresh@example.com")
+    _load(client, login_as, user)
+    org_id = org.id
+    # Loading the sample works the connections out: the panel names the run and counts nothing changed since.
+    html = _ask(client, QUESTION).get_json()["html"]
+    assert "Not worked out yet." not in html
+    assert _panel_count(html) == 0
+    assert "been added or changed since" not in html
+
+    # The model changes after that run: the answer names the run and counts what changed, as the panel does.
+    _move_last_run_back_an_hour(org_id)
+    html = _ask(client, QUESTION).get_json()["html"]
+    panel = _panel_count(html)
+    assert panel > 0
+    assert re.search(r"last updated [^<;]*\d{4}[^<;]*; %d relationships? ha(?:s|ve) been added or changed since" % panel, html)
+    assert "We haven't worked out the indirect connections for your model yet" not in html
+
+    # The element has no connections worked out but a run is recorded: the answer never claims it was not worked out.
+    db.session.execute(db.text("DELETE FROM archimate_derived_relationships WHERE organization_id = :o"), {"o": org_id})
+    db.session.commit()
+    html = _ask(client, QUESTION).get_json()["html"]
+    assert "We haven't worked out the indirect connections for your model yet" not in html
+    assert "Not worked out yet." not in html
+    assert re.search(r"when your model was last worked out \([^)]*\d{4}[^)]*\); %d relationships? ha(?:s|ve) been added or changed since" % _panel_count(html), html)

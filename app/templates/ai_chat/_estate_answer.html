@@ -66,10 +66,18 @@
         {% endcall %}{% endif %}
         {% endif %}
         {% set freshness = answer.freshness or {} %}
-        {% if freshness.derivation_state in ('not_computed', 'stale') or freshness.stale_rows %}
+        {% if freshness.derivation_state in ('not_computed', 'stale') or freshness.stale_rows or (derivation and derivation.changed_since_count) %}
         {% call card_content() %}
-            {% if freshness.derivation_state == 'not_computed' %}
+            {% set ran = derivation.last_run if derivation else none %}
+            {% if freshness.derivation_state == 'not_computed' and ran and ran.finished_at %}
+            <p class="text-sm text-muted-foreground" role="status" data-last-run-notice>No indirect connections were found for this when your model was last worked out ({{ recorded_text(ran.finished_at) or '—' }}){% if derivation.changed_since_count %}; {{ derivation.changed_since_count }} {{ 'relationship has' if derivation.changed_since_count == 1 else 'relationships have' }} been added or changed since{% endif %}. Only the recorded ones are listed.</p>
+            <div>{{ button(text='Work them out now', variant='outline', size='sm', attrs_dict={'data-recompute-button': ''}) }}</div>
+            {% elif freshness.derivation_state == 'not_computed' %}
             <p class="text-sm text-muted-foreground" role="status" data-not-computed-notice>We haven't worked out the indirect connections for your model yet, so only the recorded ones are listed.</p>
+            <div>{{ button(text='Work them out now', variant='outline', size='sm', attrs_dict={'data-recompute-button': ''}) }}</div>
+            {% endif %}
+            {% if freshness.derivation_state == 'current' and not freshness.stale_rows and derivation and derivation.changed_since_count %}
+            <p class="text-sm text-muted-foreground" role="status" data-changed-since-notice>The connections we worked out were last updated {{ recorded_text(ran.finished_at) or '—' }}; {{ derivation.changed_since_count }} {{ 'relationship has' if derivation.changed_since_count == 1 else 'relationships have' }} been added or changed since.</p>
             <div>{{ button(text='Work them out now', variant='outline', size='sm', attrs_dict={'data-recompute-button': ''}) }}</div>
             {% endif %}
             {% if freshness.derivation_state == 'stale' and not freshness.stale_rows %}
@@ -193,7 +201,7 @@
             <dl class="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
                 <div><dt class="text-muted-foreground">Last worked out</dt><dd class="text-foreground" data-derivation-last-run>{{ (recorded_text(last.finished_at) or '—') if last and last.finished_at else '—' }}</dd></div>
                 <div><dt class="text-muted-foreground">Connections across the whole model</dt><dd class="text-foreground" data-derivation-current>{{ derivation.current_count if last else '—' }}</dd></div>
-                <div><dt class="text-muted-foreground">May be out of date</dt><dd class="text-foreground" data-derivation-stale>{{ derivation.stale_count if last else '—' }}</dd></div>
+                <div><dt class="text-muted-foreground">May be out of date</dt><dd class="text-foreground" data-derivation-stale>{{ derivation.out_of_date_count if last and derivation.out_of_date_count is not none else '—' }}</dd></div>
             </dl>
             {% for reason, count in derivation.stale_reasons %}
             {% if loop.first %}<ul class="mt-2 space-y-1 text-xs text-foreground" data-derivation-stale-reasons>{% endif %}
