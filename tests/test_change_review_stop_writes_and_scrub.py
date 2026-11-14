@@ -363,7 +363,7 @@ def test_the_page_lists_every_change_in_review_with_no_approve_control(db_sessio
             original_command="system: charter change", operation_payload={"a": 2}, summary="Charter change theirs",
             user_id=colleague.id)
         db.session.commit()
-        items = {i["id"]: i for i in AIChatApprovalService(user.id).get_approver_queue()["approvals"]}
+        items = {i["id"]: i for i in AIChatApprovalService(user.id).get_reviewed_changes()["approvals"]}
         assert items[own.id]["can_approve"] is False
         assert items[theirs.id]["can_approve"] is True
         assert items[aid]["can_approve"] is True and items[aid]["settled_by_review"] is True
@@ -376,4 +376,4 @@ def test_the_page_lists_every_change_in_review_with_no_approve_control(db_sessio
     assert "approval-in-review-%d" % aid in html
     assert "waits here for a second person" not in html
     with tenant_ctx(other.id):
-        assert AIChatApprovalService(other_user.id).get_approver_queue()["approvals"] == []
+        assert AIChatApprovalService(other_user.id).get_reviewed_changes()["approvals"] == []

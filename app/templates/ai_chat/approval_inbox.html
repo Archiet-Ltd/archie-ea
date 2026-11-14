@@ -125,13 +125,28 @@
     {% endcall %}
     {% call ui.card_content(class='space-y-4') %}
       <div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
-        <span>Requested by <span class="text-foreground">{{ item.requester.display_name if item.requester and item.requester.display_name else 'The system' }}</span></span>
+        <span>Requested by <span class="text-foreground">{{ item.requester.display_name if item.requester and item.requester.display_name else 'Source not recorded' }}</span></span>
+        <span class="inline-flex items-center gap-2 whitespace-nowrap" data-testid="approval-verdict-{{ item.id }}">
+          {{ state_badge('In review', tone='caution') }}
+          <span>In review for <span class="text-foreground">{{ item.in_review_for or 'a time that was not recorded' }}</span></span>
+        </span>
         <span class="inline-flex items-center gap-2 whitespace-nowrap">
           {% if item.overdue %}{{ state_badge('Overdue', tone='negative') }}{% endif %}
           <span>Expires: <span class="text-foreground">{{ item.expires|format_date if item.expires else 'No expiry date' }}</span></span>
         </span>
         {% if item.source_label %}<span data-testid="approval-source">{{ item.source_label }}</span>{% elif item.source_table %}<span data-testid="approval-source">From {{ item.source_table|replace('_', ' ') }}{% if item.source_id %} number {{ item.source_id }}{% endif %}</span>{% endif %}
       </div>
+
+      {%- set r = item.review -%}
+      {% if r %}
+      <div class="space-y-1 text-sm text-muted-foreground" data-testid="approval-review-facts-{{ item.id }}">
+        <p>Drafted by <span class="text-foreground">{{ r.drafter or 'not drafted yet' }}</span>, reviewed by <span class="text-foreground">{{ r.reviewer or 'not reviewed yet' }}</span>, <span class="text-foreground">{{ r.rounds if r.rounds else 'no' }}</span> review{{ '' if r.rounds == 1 else 's' }} run so far.</p>
+        {% if r.waiting_reason %}<p>{{ r.waiting_reason }}</p>{% endif %}
+        {% for round in r.review_rounds[-1:] %}{% for c in round.criteria %}
+        <p data-testid="approval-criterion-{{ item.id }}-{{ c.id }}"><span class="text-foreground">{{ c.name }}:</span> {{ 'passed' if c.passed else 'failed' }}. {{ c.reason }}</p>
+        {% endfor %}{% endfor %}
+      </div>
+      {% endif %}
 
       {# What approving this would affect, worked out for the one proposal the person opens #}
       <div class="space-y-3">
@@ -213,6 +228,10 @@
         <div data-testid="approval-decided-{{ d.id }}" class="space-y-1">
           {{ state_badge('Declined' if d.status == 'rejected' else 'Applied', tone=('negative' if d.status == 'rejected' else 'positive')) }}
           {% if d.status == 'rejected' %}<p class="text-sm text-muted-foreground">Reason: <span class="text-foreground">{{ d.rejected_reason or 'No reason was given' }}</span></p>{% endif %}
+          {%- set r = d.review -%}
+          {% if r %}<p class="text-sm text-muted-foreground" data-testid="approval-decided-facts-{{ d.id }}">Drafted by <span class="text-foreground">{{ r.drafter or 'not drafted' }}</span>, reviewed by <span class="text-foreground">{{ r.reviewer or 'not reviewed' }}</span>, <span class="text-foreground">{{ r.rounds if r.rounds else 'no' }}</span> review{{ '' if r.rounds == 1 else 's' }}.</p>
+          {% for round in r.review_rounds[-1:] %}{% for c in round.criteria %}<p class="text-sm text-muted-foreground"><span class="text-foreground">{{ c.name }}:</span> {{ 'passed' if c.passed else 'failed' }}. {{ c.reason }}</p>{% endfor %}{% endfor %}{% endif %}
+          {% if d.expired %}{% call ui.button(href=url_for('unified_ai_chat.index'), variant='outline', size='sm', attrs={'data-testid': 'approval-propose-again-' ~ d.id}) %}{{ lucide('message-square') }}Propose again{% endcall %}{% endif %}
           <a href="{{ url_for('unified_ai_chat.approval_inbox', approval=d.id) }}#record-{{ d.id }}" class="text-sm underline hover:no-underline" data-testid="approval-record-link-{{ d.id }}">See how it was checked</a>
         </div>
       {% endcall %}

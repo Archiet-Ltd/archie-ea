@@ -86,6 +86,7 @@ BUDGET_USED_UP_REASON = (
 )
 ACCOUNT_OFF_REASON = "The account that asked for this change has been switched off, so the change was not made."
 MOVED_REASON = "The person who asked for this change is no longer in the workspace."
+EXPIRED_REASON = "Expired before review."
 WRITES_PAUSED_REASON = (
     "Changes by the assistant are paused for this workspace. This one is made, after it is checked and "
     "reviewed, when they resume."
@@ -1411,10 +1412,43 @@ def waiting_ids(organization_id: int) -> List[int]:
     return [row.id for row in rows if in_scope(row)]
 
 
+def decline_expired(organization_id: int) -> int:
+    """Decline this organisation's changes that waited past their expiry without the review taking them up.
+
+    A change the loop is working on (a rubric version or a review event on its record) is left to the loop,
+    which declines it itself when no reviewer can be reached. Everything else that is past its expiry, a
+    proposal from an import or a connector, or one recorded before automatic review, is declined with
+    ``EXPIRED_REASON`` and costs no AI call. Returns how many were declined."""
+    from datetime import datetime
+
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    rows = (
+        AIChatCRUDApproval.query.filter(
+            AIChatCRUDApproval.organization_id == organization_id,
+            AIChatCRUDApproval.status == ApprovalStatus.PENDING,
+            AIChatCRUDApproval.expires_at < datetime.utcnow(),
+        )
+        .order_by(AIChatCRUDApproval.id)
+        .all()
+    )
+    service = AIChatApprovalService(None)
+    declined = 0
+    for row in rows:
+        if in_scope(row) and not is_before_the_loop(row):
+            continue
+        if service._reject_pending_approval(row.id, organization_id, reason=EXPIRED_REASON):
+            _event(service, row, "declined", EXPIRED_REASON, to_status=ApprovalStatus.REJECTED.value)
+            declined += 1
+    db.session.commit()
+    return declined
+
+
 def sweep_organisation(organization_id: int, budget: Optional[ReviewBudget] = None) -> Dict[str, int]:
     """Settle this organisation's quiet changes in review. Runs with the organisation already active."""
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
 
+    decline_expired(organization_id)
     counts = {"applied": 0, "declined": 0, "in_review": 0}
     budget = budget or ReviewBudget()
     if budget.out_of_money:

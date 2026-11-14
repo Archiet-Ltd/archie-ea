@@ -68,7 +68,7 @@ def test_approver_queue_never_shows_another_organisations_item(db_session, make_
     assert result["success"] is True
 
     with tenant_ctx(org_b.id):
-        queue = AIChatApprovalService(user_id=approver_b.id).get_approver_queue()
+        queue = AIChatApprovalService(user_id=approver_b.id).get_reviewed_changes()
 
     assert queue["success"] is True
     assert all(a["summary"] != "Create capability 'Org A Thing'" for a in queue["approvals"])
@@ -176,7 +176,7 @@ def test_backfilled_approval_never_shows_another_organisations_item(db_session, 
     run_backfill(dry_run=False, organization_id=None)
 
     with tenant_ctx(org_b_id):
-        queue = AIChatApprovalService(user_id=approver_b_id).get_approver_queue()
+        queue = AIChatApprovalService(user_id=approver_b_id).get_reviewed_changes()
 
     assert queue["success"] is True
     assert all(a["summary"] != "Confidence review: Org A backfilled item" for a in queue["approvals"])
@@ -260,7 +260,10 @@ def test_overdue_item_still_approvable_and_marked_overdue(db_session, make_org, 
     assert result.get("code") != "CONFLICT" or "expired" not in str(result.get("error", "")).lower()
 
 
-def test_overdue_item_still_appears_in_approver_queue(db_session, make_org, tenant_ctx):
+def test_expired_item_is_declined_not_left_in_the_queue(db_session, make_org, tenant_ctx):
+    """An item past its expiry is not in review any more: the review declines it with its reason."""
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+    from app.modules.ai_chat.services import change_review
     from app.modules.ai_chat.services.ai_chat_approval_service import (
         AIChatApprovalService,
         create_approval_record,
@@ -284,9 +287,12 @@ def test_overdue_item_still_appears_in_approver_queue(db_session, make_org, tena
     db_session.commit()
 
     with tenant_ctx(org.id):
-        queue = AIChatApprovalService(user_id=approver.id).get_approver_queue()
-
-    assert any(a["id"] == approval.id for a in queue["approvals"])
+        queue = AIChatApprovalService(user_id=approver.id).get_reviewed_changes()
+        assert not any(a["id"] == approval.id for a in queue["approvals"])
+        assert change_review.decline_expired(org.id) == 1
+        row = AIChatCRUDApproval.query.filter_by(id=approval.id, organization_id=org.id).one()
+        assert row.status == ApprovalStatus.REJECTED
+        assert row.rejected_reason == change_review.EXPIRED_REASON
 
 
 def test_escalation_notifies_only_the_overdue_items_organisation(db_session, make_org, monkeypatch):

@@ -89,7 +89,7 @@ def test_same_org_reviewer_executes_once_and_receives_allowlisted_queue(
         approval = db_session.get(AIChatCRUDApproval, approval_id)
         assert approval.organization_id == org.id
 
-        queue = AIChatApprovalService(reviewer.id).get_approver_queue()
+        queue = AIChatApprovalService(reviewer.id).get_reviewed_changes()
         assert queue["success"] is True
         assert queue["approvals"] == [
             {
@@ -382,7 +382,7 @@ def test_foreign_org_cannot_see_or_decide_known_approval_id(
     calls = _fake_execution(monkeypatch)
     with tenant_ctx(org_b.id):
         service = AIChatApprovalService(foreign_reviewer.id)
-        assert service.get_approver_queue() == {"success": True, "approvals": []}
+        assert service.get_reviewed_changes() == {"success": True, "approvals": []}
         assert service.approve_and_execute(approval_id, foreign_reviewer.id)["code"] == "NOT_FOUND"
         assert service.reject_approval(approval_id)["code"] == "NOT_FOUND"
     assert calls == []
@@ -424,7 +424,7 @@ def test_viewer_is_denied_reviewer_queue_and_rejection(db_session, make_org, ten
     with tenant_ctx(org.id):
         approval_id = _queue(AIChatApprovalService(requester.id))
         service = AIChatApprovalService(viewer.id)
-        assert service.get_approver_queue()["code"] == "FORBIDDEN"
+        assert service.get_reviewed_changes()["code"] == "FORBIDDEN"
         assert service.reject_approval(approval_id)["code"] == "FORBIDDEN"
 
 

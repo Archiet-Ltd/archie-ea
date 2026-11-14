@@ -2,6 +2,7 @@
 
 from flask import jsonify, render_template, request
 from flask_login import current_user, login_required
+from app import db
 
 from app.models.ai_chat_crud_approval import AIChatCRUDApproval
 from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
@@ -47,7 +48,7 @@ def _decision_status(result):
 @login_required
 def approver_queue():
     """Approvals from other requesters the current same-org reviewer may decide."""
-    result = _approval_service().get_approver_queue()
+    result = _approval_service().get_reviewed_changes()
     return jsonify(result), _decision_status(result)
 
 
@@ -99,7 +100,14 @@ def approval_inbox():
     from datetime import datetime
 
     service = _approval_service()
-    queue = service.get_approver_queue()
+    try:
+        # A change that waited past its expiry without the review taking it up is decided before the page is drawn.
+        from app.modules.ai_chat.services.change_review import decline_expired
+
+        decline_expired(current_user.organization_id)
+    except Exception:
+        db.session.rollback()
+    queue = service.get_reviewed_changes()
     approvals = queue.get("approvals", []) if queue.get("success") else []
     now = datetime.utcnow()
     for item in approvals:

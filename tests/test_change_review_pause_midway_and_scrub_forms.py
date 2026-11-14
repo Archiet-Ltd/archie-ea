@@ -404,7 +404,7 @@ def test_a_persons_approve_of_a_record_outside_the_loop_waits_for_resume_and_sta
         assert done["success"] is True, done
         assert _row(record_id).status == ApprovalStatus.APPROVED and len(written) == 1
     with tenant_ctx(other.id):
-        assert AIChatApprovalService(other_requester.id).get_approver_queue()["approvals"] == []
+        assert AIChatApprovalService(other_requester.id).get_reviewed_changes()["approvals"] == []
 
 
 # --------------------------------------------------------------------------- #
@@ -438,17 +438,17 @@ def test_the_approvals_page_claims_a_settlement_only_for_a_change_with_a_recorde
             original_command="connector", operation_payload={"id": 2}, summary="Connector change two",
             user_id=colleague.id)
         db.session.commit()
-        items = {i["id"]: i for i in AIChatApprovalService(user.id).get_approver_queue()["approvals"]}
+        items = {i["id"]: i for i in AIChatApprovalService(user.id).get_reviewed_changes()["approvals"]}
         assert items[waiting_id]["settled_by_review"] is True, "it has recorded checks and a review is coming"
         assert items[older.id]["settled_by_review"] is False, "a row from before the loop has no recorded review"
         assert items[connector_by_colleague.id]["can_approve"] is False
         assert "administrator" in items[connector_by_colleague.id]["approve_note"]
-        admin_items = {i["id"]: i for i in AIChatApprovalService(admin.id).get_approver_queue()["approvals"]}
+        admin_items = {i["id"]: i for i in AIChatApprovalService(admin.id).get_reviewed_changes()["approvals"]}
         assert admin_items[connector_by_colleague.id]["can_approve"] is True
 
         _pause(org, user)
         db.session.commit()
-        paused = {i["id"]: i for i in AIChatApprovalService(user.id).get_approver_queue()["approvals"]}
+        paused = {i["id"]: i for i in AIChatApprovalService(user.id).get_reviewed_changes()["approvals"]}
         assert paused[waiting_id]["held_by_pause"] is True and paused[waiting_id]["settled_by_review"] is False
         assert paused[connector_by_colleague.id]["can_approve"] is False
         assert "paused" in paused[connector_by_colleague.id]["approve_note"]
@@ -462,4 +462,4 @@ def test_the_approvals_page_claims_a_settlement_only_for_a_change_with_a_recorde
     assert "/approve" not in html and "/reject" not in html
     assert "approval-card-%d" % connector.id in html
     with tenant_ctx(other.id):
-        assert AIChatApprovalService(other_user.id).get_approver_queue()["approvals"] == []
+        assert AIChatApprovalService(other_user.id).get_reviewed_changes()["approvals"] == []

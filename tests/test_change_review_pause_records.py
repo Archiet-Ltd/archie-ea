@@ -189,7 +189,7 @@ def test_a_row_from_before_automatic_review_does_not_promise_a_check(db_session,
         held_id = _waiting_change(db_session, tenant_ctx, monkeypatch, org, colleague, ledger)
         _pause(org, user)
         db.session.commit()
-        items = {i["id"]: i for i in AIChatApprovalService(user.id).get_approver_queue()["approvals"]}
+        items = {i["id"]: i for i in AIChatApprovalService(user.id).get_reviewed_changes()["approvals"]}
         assert items[old.id].get("pre_loop") is True and "has_check_record" not in items[old.id]
         assert items[old.id]["settled_by_review"] is False and items[old.id]["can_approve"] is False
         assert change_review.describe(_row(old.id))["waiting_reason"] is None, "its record promises nothing either"
@@ -204,7 +204,7 @@ def test_a_row_from_before_automatic_review_does_not_promise_a_check(db_session,
     pre_loop_card = html.split("approval-pre-loop-%d" % old.id)[1].split("approval-in-review")[0][:1500]
     assert "See how it was checked" not in pre_loop_card
     with tenant_ctx(other.id):
-        assert AIChatApprovalService(other_user.id).get_approver_queue()["approvals"] == []
+        assert AIChatApprovalService(other_user.id).get_reviewed_changes()["approvals"] == []
 
 
 def test_a_password_key_and_url_token_in_an_ordinary_field_never_reach_the_reviewer(

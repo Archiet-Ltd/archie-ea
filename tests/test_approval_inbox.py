@@ -235,8 +235,8 @@ def test_approval_inbox_backfilled_row_keeps_org(app, db_session, make_org, tena
     assert all(a["summary"] != "Confidence review: Backfilled Item" for a in data["approvals"])
 
 
-def test_approval_inbox_overdue_item_still_visible(app, db_session, make_org, tenant_ctx, login_as):
-    """Overdue (past expires_at) items still appear in the queue API."""
+def test_approval_inbox_expired_item_is_declined_not_queued(app, db_session, make_org, tenant_ctx, login_as):
+    """An item past its expiry is not in the queue; the page shows it declined with the reason."""
     from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval
 
@@ -266,7 +266,10 @@ def test_approval_inbox_overdue_item_still_visible(app, db_session, make_org, te
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["success"] is True
-    assert any(a["summary"] == "Overdue capability" for a in data["approvals"])
+    assert not any(a["summary"] == "Overdue capability" for a in data["approvals"])
+    html = client.get("/ai-chat/approvals/inbox").get_data(as_text=True)
+    assert 'data-testid="approval-decided-%s"' % approval.id in html
+    assert "Expired before review." in html
 
 
 def test_approval_inbox_escalation_notifies_only_own_org(app, db_session, make_org, monkeypatch):

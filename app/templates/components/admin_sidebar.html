@@ -179,7 +179,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
     {% call sidebar_menu_button(href=item.href, active=item.active, tooltip=item.label, wrap=true, attrs={'data-nav-key': item.key}) %}
         {% if item.icon %}<i data-lucide="{{ item.icon }}" aria-hidden="true"></i>{% endif %}<span>{{ item.label }}</span>
     {% endcall %}
-    {% if item.badge %}{% call sidebar_menu_badge(attrs={'data-testid': 'nav-count-' ~ item.key, 'aria-label': item.badge ~ ' waiting'}) %}{{ item.badge }}{% endcall %}{% endif %}
+    {% if item.badge %}{% call sidebar_menu_badge(attrs={'data-testid': 'nav-count-' ~ item.key, 'aria-label': item.badge ~ ' in review'}) %}{{ item.badge }}{% endcall %}{% endif %}
 {% endcall %}
 {%- endmacro %}
 

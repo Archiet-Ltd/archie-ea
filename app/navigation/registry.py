@@ -551,7 +551,7 @@ def _waiting_approvals(user) -> int | None:
     try:
         from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
 
-        return AIChatApprovalService(getattr(user, "id", None)).count_approver_queue()
+        return AIChatApprovalService(getattr(user, "id", None)).count_in_review()
     except Exception:  # noqa: BLE001 - a count must not 500 a page
         return None
 

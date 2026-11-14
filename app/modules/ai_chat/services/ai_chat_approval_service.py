@@ -161,6 +161,22 @@ def _plain(code: Optional[str]) -> str:
     return text[:1].upper() + text[1:]
 
 
+def span_words(delta: timedelta) -> str:
+    """A length of time in the largest whole unit: "5 minutes", "1 hour", "3 days"."""
+    seconds = max(int(delta.total_seconds()), 0)
+    for unit, size in (("day", 86400), ("hour", 3600), ("minute", 60)):
+        if seconds >= size:
+            count = seconds // size
+            return "%d %s%s" % (count, unit, "" if count == 1 else "s")
+    return "under a minute"
+
+
+def proposer_words(source: Optional[str]) -> str:
+    """What proposed a change nobody typed: the import, connector or assistant feature named in the
+    record's own source column. A record with no source says so."""
+    return _plain(source) if source else "Source not recorded"
+
+
 def card_words(approval, payload: Dict[str, Any], people: Dict[int, str]) -> Dict[str, Any]:
     """The words an inbox card shows for one approval: the one mapping from its source and kind to words.
 
@@ -175,7 +191,7 @@ def card_words(approval, payload: Dict[str, Any], people: Dict[int, str]) -> Dic
         "operation": _plain(approval.operation_type),
         "entity": _plain(approval.entity_type),
         "source": "From " + _plain(source).lower() if source else None,
-        "requester": people.get(approval.user_id) or "The system",
+        "requester": people.get(approval.user_id) or proposer_words(source),
     }
 
 
@@ -1553,6 +1569,7 @@ class AIChatApprovalService:
         A rejected proposal keeps its reason here, so the decision is still
         visible after a reload. One read, bounded by RECENT_DECISIONS_LIMIT.
         """
+        from app.modules.ai_chat.services import change_review
         from app.modules.ai_chat.services.change_review import record_path
 
         _, org_id, error = self._active_org_actor()
@@ -1580,6 +1597,9 @@ class AIChatApprovalService:
                     "rejected_reason": row.rejected_reason if row.status == ApprovalStatus.REJECTED else None,
                     "created_at": row.created_at.isoformat() if row.created_at else None,
                     "approved_at": row.approved_at.isoformat() if row.approved_at else None,
+                    "expired": row.status == ApprovalStatus.REJECTED
+                    and row.rejected_reason == change_review.EXPIRED_REASON,
+                    "review": change_review.describe(row),
                 }
                 for row in rows
             ],
@@ -1606,23 +1626,24 @@ class AIChatApprovalService:
         return [approval.to_dict() for approval in approvals]
 
     @staticmethod
-    def _approver_queue_query(actor):
+    def _in_review_query(actor):
         """The same-organisation changes still in review, whoever asked for them (the queue's one filter).
 
         A change is no longer hidden from the person who asked for it: nobody else has to approve it."""
-        return AIChatCRUDApproval.query.filter_by(
-            organization_id=actor.organization_id,
-            status=ApprovalStatus.PENDING,
+        return AIChatCRUDApproval.query.filter(
+            AIChatCRUDApproval.organization_id == actor.organization_id,
+            AIChatCRUDApproval.status == ApprovalStatus.PENDING,
+            AIChatCRUDApproval.expires_at >= datetime.utcnow(),
         )
 
-    def count_approver_queue(self) -> int:
+    def count_in_review(self) -> int:
         """How many items the approvals inbox lists for this person (0 when they may not open it)."""
         actor, actor_error = self._acting_user(require_general=True)
         if actor_error:
             return 0
-        return self._approver_queue_query(actor).count()
+        return self._in_review_query(actor).count()
 
-    def get_approver_queue(self) -> Dict[str, Any]:
+    def get_reviewed_changes(self) -> Dict[str, Any]:
         """Same-org changes still in review, including the ones the viewer asked for.
 
         Overdue-not-expired: includes overdue rows (no expires_at filter — being
@@ -1634,7 +1655,7 @@ class AIChatApprovalService:
         if actor_error:
             return actor_error
         approvals = (
-            self._approver_queue_query(actor)
+            self._in_review_query(actor)
             .order_by(AIChatCRUDApproval.created_at.desc())
             .all()
         )
@@ -1721,6 +1742,9 @@ class AIChatApprovalService:
                         "id": approval.user_id,
                         "display_name": words[approval.id]["requester"],
                     },
+                    "verdict": "In review",
+                    "in_review_for": span_words(datetime.utcnow() - approval.created_at) if approval.created_at else None,
+                    "review": change_review.describe(approval),
                 }
                 for approval in approvals
         ]
