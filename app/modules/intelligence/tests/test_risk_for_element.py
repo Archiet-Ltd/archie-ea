@@ -210,7 +210,6 @@ def _application(db_session, org_id, name, element):
 def test_a_risk_linked_to_an_application_is_found_through_the_applications_element(app, db_session, make_org):
     from flask import g
 
-    from app.models.risk import Risk
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
     from app.services import risk_service
 

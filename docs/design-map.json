@@ -36824,6 +36824,9 @@
     "macros/page_shell.html"
    ],
    "basis": "rule",
+   "extra_macros": [
+     "components/risk_link_picker.html"
+   ],
    "block": "data-table",
    "charts": [],
    "components": [

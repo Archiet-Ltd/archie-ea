@@ -24,7 +24,7 @@ def test_create_risk_writes_the_risk_and_its_links_together(app, db_session, mak
         risk = risk_service.create_risk(None, "Lock-in", None, 4, 4, "Ops", None,
                                         links=[("application", billing.id)], organization_id=org.id)
         links = RiskEntityLink.query.filter_by(risk_id=risk.id).all()
-    assert [(l.entity_type, l.entity_id, l.organization_id) for l in links] == [("application", billing.id, org.id)]
+    assert [(link.entity_type, link.entity_id, link.organization_id) for link in links] == [("application", billing.id, org.id)]
     assert risk.organization_id == org.id
 
 
