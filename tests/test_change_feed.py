@@ -424,3 +424,65 @@ def test_the_consumer_is_scheduled_as_a_declared_tenant_job():
     from app.jobs.tenant_safe_job import TENANT_JOBS
 
     assert "change_feed_consumer" in TENANT_JOBS
+
+
+def _named_owner(db_session, org, application, name, role, email):
+    from app.models.application_owner import ApplicationOwner
+
+    row = ApplicationOwner(
+        application_id=application.id,
+        organization_id=org.id,
+        ownership_type="primary",
+        person_name=name,
+        person_email=email,
+        person_role=role,
+    )
+    db_session.add(row)
+    db_session.commit()
+    return row
+
+
+def test_replacing_one_named_owner_with_another_is_one_recorded_change(db_session, two_orgs):
+    org_a, org_b = two_orgs["A"], two_orgs["B"]
+    app_a = _application(db_session, org_a)
+    app_b = _application(db_session, org_b)
+    row_a = _named_owner(db_session, org_a, app_a, "Ada Byron", "Head of Billing", "ada@example.test")
+    row_b = _named_owner(db_session, org_b, app_b, "Bea Other", "Lead", "bea@example.test")
+    _relay()
+    before_a = len(_events(org_a, "application_owner.updated"))
+    before_b = len(_events(org_b, "application_owner.updated"))
+
+    row_a.person_name = "Grace Hopper"
+    row_a.person_role = "Billing Director"
+    row_a.person_email = "grace@example.test"
+    db_session.commit()
+    _relay()
+
+    events = _events(org_a, "application_owner.updated")[before_a:]
+    assert len(events) == 1
+    changes = {c["field"]: c for c in events[0]["payload"]["changes"]}
+    assert changes["person_name"]["before"] == "Ada Byron"
+    assert changes["person_name"]["after"] == "Grace Hopper"
+    assert changes["person_role"]["before"] == "Head of Billing"
+    assert changes["person_role"]["after"] == "Billing Director"
+    assert "person_email" not in changes, "a named person's email is not sent in the feed"
+    assert "example.test" not in str(events[0]["payload"])
+    assert len(_events(org_b, "application_owner.updated")) == before_b
+    assert row_b.person_name == "Bea Other"
+
+
+def test_replacing_a_named_owner_with_a_user_is_still_one_recorded_change(db_session, two_orgs):
+    org_a = two_orgs["A"]
+    app_a = _application(db_session, org_a)
+    row = _named_owner(db_session, org_a, app_a, "Ada Byron", "Head of Billing", None)
+    user = _user(db_session, org_a, "acct")
+    _relay()
+    before = len(_events(org_a, "application_owner.updated"))
+
+    row.user_id = user.id
+    row.person_name = None
+    row.person_role = None
+    db_session.commit()
+    _relay()
+
+    assert len(_events(org_a, "application_owner.updated")) - before == 1

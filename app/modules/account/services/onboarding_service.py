@@ -331,10 +331,15 @@ def is_finished(org) -> bool:
 
 
 def on_paying_plan(org) -> bool:
-    """True when the organisation is on a plan other than Community."""
+    """True when the organisation pays: a live provider subscription, or a contract plan
+    that is not a free offer. An organisation on the startup credit does not pay yet."""
     from app.services.billing_plans import current_subscription, effective_plan
+    from app.services.billing_service import BillingService
 
-    return effective_plan(current_subscription(org)).key != "free"
+    sub = current_subscription(org)
+    if BillingService.has_live_subscription(sub):
+        return True
+    return effective_plan(sub).key != "free" and not sub.offer
 
 
 # --------------------------------------------------------------------------------------------- #
@@ -489,6 +494,11 @@ def website_instead() -> List[Dict[str, str]]:
         {"label": "Connect Jira", "url": url_for("account.welcome") + "#signup-jira"},
         {"label": "See the sample company", "url": url_for("unified_ai_chat.index")},
     ]
+
+
+def website_url(org) -> Optional[str]:
+    """The company website given at sign-up, or None when none was given."""
+    return (_onboarding(org).get("website") or {}).get("url") or None
 
 
 def website_state(org) -> Dict[str, Any]:

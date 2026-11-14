@@ -11,7 +11,7 @@ question asks and which element it names.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from app.extensions import db
 from app.middleware.tenant_context import current_org_id
@@ -101,10 +101,34 @@ def asks_for_capacity(message: Any) -> bool:
     return isinstance(message, str) and bool(_ASKS_CAPACITY.search(message))
 
 
+def human_join(owners: List[Dict[str, Optional[str]]]) -> str:
+    """Join owner dicts ``{"name": str, "role": str|None}`` into a sentence fragment.
+
+    One owner shows just the name (with its role in parentheses when one is recorded).
+    Two owners are joined by " and ". Three or more use commas with a final " and ".
+    An owner with no recorded role shows the name alone.
+    """
+    parts = []
+    for owner in owners:
+        name = (owner.get("name") or "").strip()
+        if not name:
+            continue
+        role = (owner.get("role") or "").strip()
+        parts.append("%s (%s)" % (name, role) if role else name)
+    if not parts:
+        return ""
+    if len(parts) == 1:
+        return parts[0]
+    if len(parts) == 2:
+        return " and ".join(parts)
+    return ", ".join(parts[:-1]) + " and " + parts[-1]
+
+
 def owner_of_element(element: ArchiMateElement) -> Optional[Dict[str, Any]]:
-    """``{names, page_url, page_label}`` for an element that is an application of the active
-    organisation with its own recorded owner, or None. The owner is read from the one owner store
-    (the person records, else the owner text the application carries) and the page is the
+    """``{owners, owner_sentence, page_url, page_label}`` for an element that is an application of
+    the active organisation with its own recorded owner, or None. Each owner carries its name and
+    role (lowercased ownership type, or None). The sentence is pre-joined by ``human_join`` so the
+    chat reads "Nneka Okafor (primary) and Cameron Doyle (technical)". The page is the
     application's own page, where it is recorded."""
     from flask import url_for
 
@@ -120,17 +144,24 @@ def owner_of_element(element: ArchiMateElement) -> Optional[Dict[str, Any]]:
     owners = _resolve_application_owners_batch(
         [element.id], organization_id, {str(element.id): {"type": element.type}}
     ).get(element.id, [])
-    names = []
+    seen = set()
+    owner_list = []
     for owner in owners:
-        if owner.get("name") and owner["name"] not in names:
-            names.append(owner["name"])
-    if not names:
+        name = owner.get("name")
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        role = owner.get("role")
+        owner_list.append({"name": name, "role": role.lower() if role else None})
+    if not owner_list:
         text = component.application_owner or component.business_owner
-        names = [text] if text else []
-    if not names:
+        if text:
+            owner_list = [{"name": text, "role": None}]
+    if not owner_list:
         return None
     return {
-        "names": names,
+        "owners": owner_list,
+        "owner_sentence": human_join(owner_list),
         "page_url": url_for("unified_applications.application_detail", id=component.id),
         "page_label": "the %s application page" % component.name,
     }

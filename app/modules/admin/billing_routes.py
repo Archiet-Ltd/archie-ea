@@ -6,6 +6,7 @@ URL prefix: /admin/billing  (registered in app/modules/admin/__init__.py)
 
 Routes:
   GET  /admin/billing                   — plan, limits, plans to buy, invoices, billing details
+  POST /admin/billing/startup-credit    — claim 90 days of Startup, free
   POST /admin/billing/upgrade           — start hosted checkout for a plan
   GET  /admin/billing/checkout/complete — return from checkout; apply the plan at once
   POST /admin/billing/change-plan       — switch the live subscription's plan / seats
@@ -18,10 +19,11 @@ Routes:
 
 import logging
 
-from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 from app.modules.account.mfa_flow import enrol_first
 
+from app import db
 from app.extensions import csrf
 from app.decorators import admin_required
 
@@ -107,11 +109,18 @@ def billing_index():
         except BillingError as exc:
             details_error = str(exc)
 
+    from app.services import billing_offers
+
     current = billing_plans.effective_plan(sub)
     live = BillingService.has_live_subscription(sub)
+    credit = billing_offers.startup_credit_state(org)
     return render_template(
         "admin/billing.html",
         subscription=sub,
+        credit=credit,
+        credit_declared=billing_offers.declared_answers(sub),
+        credit_website=billing_offers.website_on_file(org),
+        credit_raised_answers=billing_offers.RAISED_ANSWERS,
         org=org,
         plan=current,
         renewal=billing_plans.renewal_summary(sub, current, live),
@@ -131,6 +140,36 @@ def billing_index():
         details_error=details_error,
         contact_sales_url=billing_plans.CONTACT_SALES_URL,
     )
+
+
+@billing_bp.route("/startup-credit", methods=["POST"])
+@login_required
+@admin_required
+def billing_startup_credit():
+    """Claim 90 days of Startup, free, for the active organisation."""
+    from flask_login import current_user
+
+    from app.middleware.tenant_decorators import is_active_org_admin
+    from app.services import billing_offers
+
+    if not is_active_org_admin():
+        abort(403)
+    org = _org()
+    if org is None:
+        return redirect(url_for("billing.billing_index"))
+    declaration = {
+        "website": request.form.get("website", ""),
+        "founded": request.form.get("founded", ""),
+        "raised": request.form.get("raised", ""),
+    }
+    result = billing_offers.grant_startup_credit(org, current_user, declaration)
+    if not result.granted:
+        db.session.rollback()
+        flash(result.reason, "error")
+        return redirect(url_for("billing.billing_index") + "#startup-credit")
+    db.session.commit()
+    flash("Your 90 days of Startup have started.", "success")
+    return redirect(url_for("billing.billing_index"))
 
 
 @billing_bp.route("/upgrade", methods=["POST"])

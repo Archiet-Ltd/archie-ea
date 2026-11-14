@@ -577,19 +577,22 @@ entries:
       symbols:
         - set_element_owner
         - set_application_owner
+        - set_named_person_owner
         - application_owner_text
         - application_owner_expression
         - application_is_owned_expression
         - application_is_owned
         - resolve_user_by_name
     reuse: >
-      An owner is a person recorded as an ApplicationOwner row, written only through set_element_owner (an
-      application is element_type "application"). The business_owner, technical_owner and application_owner
-      fields on an application are attributes that read and assign through that service, so assigning them
-      is allowed and records the owner; in SQL use the same attributes, which carry the matching expression.
-      The legacy_* columns behind them hold only a name that matched no user and are written by the service and
-      the backfill alone. Do not write a second owner row, a second name-to-user lookup, or read an owner text
-      column directly. The retirement of those columns is a named follow-up, not part of this entry.
+      An owner is a person recorded as an ApplicationOwner row. A user owner is written through
+      set_element_owner (an application is element_type "application") or set_application_owner. A named
+      person without an account is written through set_named_person_owner (aichatapp01). The business_owner,
+      technical_owner and application_owner fields on an application are attributes that read and assign
+      through that service, so assigning them is allowed and records the owner; in SQL use the same
+      attributes, which carry the matching expression. The legacy_* columns behind them hold only a name
+      that matched no user and are written by the service and the backfill alone. Do not write a second
+      owner row, a second name-to-user lookup, or read an owner text column directly. The retirement of
+      those columns is a named follow-up, not part of this entry.
       "Owned" (an application has an accountable owner: a primary or business owner record, or a legacy
       application or business owner text) is defined once, by application_is_owned_expression and
       application_is_owned; the dashboard owner coverage and the Ask question on applications with no owner
@@ -1097,6 +1100,27 @@ entries:
     known_exceptions:
       - path: app/modules/solutions_strategic/v2/services/compliance_tracking_service.py
         reason: the page service that reads the one scorer for the tracking screen
+
+  - id: coverage-formatter
+    concept: Formatting a percentage figure for display (capability coverage or compliance score)
+    status: active
+    canonical:
+      path: app/utils/recorded_figures.py
+      symbols: [coverage_text]
+    reuse: >
+      Capability coverage uses coverage_text (recorded_figures.py): "40%", "0%", or "Not recorded" for None.
+      Compliance score uses ComplianceInheritanceService.format_score (compliance_inheritance_service.py):
+      "62.5%", "50%", or "Not assessed" for None. They differ because coverage is a recorded figure
+      (a person may have entered 0%) while compliance is computed (None means no controls mapped).
+      Do not write a second percentage formatter; call the one for your domain.
+    must_not_create:
+      - id: second-coverage-formatter
+        regex: 'def\s+_?(format|print|render)_(coverage|score|percentage)\s*\('
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/services/compliance/compliance_inheritance_service.py
+        reason: format_score is the canonical compliance formatter; coverage_text is the canonical capability coverage formatter
 
   - id: application-control-link-writer
     concept: Writing the link between an application and a control of an adopted framework

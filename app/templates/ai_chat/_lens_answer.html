@@ -108,7 +108,7 @@
 
     {% elif lens == 'accountability' and owned %}
         {% call card(class='p-4') %}
-            <p class="text-sm text-foreground" data-testid="owner-sentence" data-lens-row>{{ name }} is owned by {{ owned.names | join(', ') }}, recorded on <a class="font-medium text-primary underline underline-offset-4" href="{{ owned.page_url }}" data-testid="owner-source">{{ owned.page_label }}</a>.</p>
+            <p class="text-sm text-foreground" data-testid="owner-sentence" data-lens-row>{{ name }} is owned by {{ owned.owner_sentence }}, recorded on <a class="font-medium text-primary underline underline-offset-4" href="{{ owned.page_url }}" data-testid="owner-source">{{ owned.page_label }}</a>.</p>
         {% endcall %}
         {% if asked_capacity %}<p class="text-sm text-muted-foreground">Capacity and availability data is not yet connected.</p>{% endif %}
 

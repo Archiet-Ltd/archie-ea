@@ -9148,7 +9148,7 @@
    "id": "app/templates/admin/billing.html::button::0",
    "kind": "button",
    "label": "Manage billing",
-   "line": 98,
+   "line": 100,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9167,7 +9167,7 @@
    "id": "app/templates/admin/billing.html::button::1",
    "kind": "button",
    "label": "Keep my subscription",
-   "line": 104,
+   "line": 106,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9183,7 +9183,7 @@
    "id": "app/templates/admin/billing.html::button::2",
    "kind": "button",
    "label": "Cancel at the end of the period",
-   "line": 110,
+   "line": 112,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9198,26 +9198,24 @@
   {
    "id": "app/templates/admin/billing.html::button::3",
    "kind": "button",
-   "label": "<expr:Concat>",
-   "line": 147,
+   "label": "Start 90 days free",
+   "line": 148,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
    ],
    "rendered_on_count": 1,
-   "target": {
-    "href": "<expr:Concat>"
-   },
+   "target": {},
    "template": "app/templates/admin/billing.html",
    "testid": null,
-   "type": "navigate",
+   "type": "noop",
    "via_macro": "components/button.html:button"
   },
   {
    "id": "app/templates/admin/billing.html::button::4",
    "kind": "button",
-   "label": "Change seats",
-   "line": 149,
+   "label": "<expr:Concat>",
+   "line": 183,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9234,15 +9232,15 @@
   {
    "id": "app/templates/admin/billing.html::button::5",
    "kind": "button",
-   "label": "Contact sales",
-   "line": 151,
+   "label": "<expr:Concat>",
+   "line": 186,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
    ],
    "rendered_on_count": 1,
    "target": {
-    "href": "contact_sales_url"
+    "href": "<expr:Concat>"
    },
    "template": "app/templates/admin/billing.html",
    "testid": null,
@@ -9252,8 +9250,8 @@
   {
    "id": "app/templates/admin/billing.html::button::6",
    "kind": "button",
-   "label": "label",
-   "line": 176,
+   "label": "Change seats",
+   "line": 188,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9270,8 +9268,44 @@
   {
    "id": "app/templates/admin/billing.html::button::7",
    "kind": "button",
+   "label": "Contact sales",
+   "line": 190,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/billing/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "contact_sales_url"
+   },
+   "template": "app/templates/admin/billing.html",
+   "testid": null,
+   "type": "navigate",
+   "via_macro": "components/button.html:button"
+  },
+  {
+   "id": "app/templates/admin/billing.html::button::8",
+   "kind": "button",
+   "label": "label",
+   "line": 215,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/billing/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "<expr:Concat>"
+   },
+   "template": "app/templates/admin/billing.html",
+   "testid": null,
+   "type": "navigate",
+   "via_macro": "components/button.html:button"
+  },
+  {
+   "id": "app/templates/admin/billing.html::button::9",
+   "kind": "button",
    "label": "<expr:CondExpr>",
-   "line": 210,
+   "line": 249,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9284,10 +9318,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/admin/billing.html::button::8",
+   "id": "app/templates/admin/billing.html::button::10",
    "kind": "button",
    "label": "Save billing details",
-   "line": 245,
+   "line": 284,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9303,7 +9337,7 @@
    "id": "app/templates/admin/billing.html::form::0",
    "kind": "form",
    "label": "",
-   "line": 93,
+   "line": 94,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9323,7 +9357,7 @@
    "id": "app/templates/admin/billing.html::form::1",
    "kind": "form",
    "label": "",
-   "line": 99,
+   "line": 100,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9343,7 +9377,27 @@
    "id": "app/templates/admin/billing.html::form::2",
    "kind": "form",
    "label": "",
-   "line": 190,
+   "line": 125,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/billing/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "action": "url_for('billing.billing_startup_credit')",
+    "endpoint": "billing.billing_startup_credit",
+    "method": "POST"
+   },
+   "template": "app/templates/admin/billing.html",
+   "testid": "startup-credit-form",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/billing.html::form::3",
+   "kind": "form",
+   "label": "",
+   "line": 228,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9360,10 +9414,10 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/admin/billing.html::form::3",
+   "id": "app/templates/admin/billing.html::form::4",
    "kind": "form",
    "label": "",
-   "line": 226,
+   "line": 264,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9383,7 +9437,7 @@
    "id": "app/templates/admin/billing.html::modal::0",
    "kind": "modal",
    "label": "Cancel your subscription?",
-   "line": 107,
+   "line": 109,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9399,7 +9453,7 @@
    "id": "app/templates/admin/billing.html::table::0",
    "kind": "table",
    "label": "",
-   "line": 266,
+   "line": 305,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9494,6 +9548,22 @@
   {
    "id": "app/templates/admin/billing.html::testid::5",
    "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/billing/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/billing.html",
+   "testid": "startup-credit-ended",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/billing.html::testid::6",
+   "kind": "testid",
    "label": "p",
    "line": null,
    "mutating": false,
@@ -9504,22 +9574,6 @@
    "target": {},
    "template": "app/templates/admin/billing.html",
    "testid": "plans-currency-note",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/admin/billing.html::testid::6",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/admin/billing/"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/admin/billing.html",
-   "testid": "plan-card-{{ p.key }}",
    "type": null,
    "via_macro": null
   },
@@ -9535,12 +9589,28 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/admin/billing.html",
-   "testid": "plan-price-{{ p.key }}",
+   "testid": "plan-card-{{ p.key }}",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/admin/billing.html::testid::8",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/billing/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/billing.html",
+   "testid": "plan-price-{{ p.key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/billing.html::testid::9",
    "kind": "testid",
    "label": "p",
    "line": null,
@@ -9556,7 +9626,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/admin/billing.html::testid::9",
+   "id": "app/templates/admin/billing.html::testid::10",
    "kind": "testid",
    "label": "dd",
    "line": null,
@@ -20716,6 +20786,28 @@
   {
    "id": "app/templates/applications/dashboard.html::link::5",
    "kind": "link",
+   "label": "Add one",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/dashboard/admin/custom-fields",
+    "/dashboard/applications/<int:application_id>/gap-analysis",
+    "/dashboard/applications/<int:id>/roadmap",
+    "/dashboard/dashboard"
+   ],
+   "rendered_on_count": 4,
+   "target": {
+    "endpoint": "unified_applications.application_detail",
+    "href": "url_for('unified_applications.application_detail', id=app.id, edit=1)"
+   },
+   "template": "app/templates/applications/dashboard.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/dashboard.html::link::6",
+   "kind": "link",
    "label": "{{ sol.adm_phase or 'A' }} {{ sol.name }} {{ sol.governance_status or 'Draft' }} \u00b7 {{ sol.solution_t",
    "line": null,
    "mutating": false,
@@ -20736,7 +20828,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::6",
+   "id": "app/templates/applications/dashboard.html::link::7",
    "kind": "link",
    "label": "Generate ArchiMate with AI",
    "line": null,
@@ -20758,7 +20850,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::7",
+   "id": "app/templates/applications/dashboard.html::link::8",
    "kind": "link",
    "label": "{{ r.name }} {{ r.type }} \u00b7 {{ r.rel_type | replace('Relationship', '') }}",
    "line": null,
@@ -20780,7 +20872,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::8",
+   "id": "app/templates/applications/dashboard.html::link::9",
    "kind": "link",
    "label": "Generate ArchiMate with AI",
    "line": null,
@@ -20802,7 +20894,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::9",
+   "id": "app/templates/applications/dashboard.html::link::10",
    "kind": "link",
    "label": "row.name",
    "line": null,
@@ -20823,7 +20915,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::10",
+   "id": "app/templates/applications/dashboard.html::link::11",
    "kind": "link",
    "label": "Open vendor",
    "line": null,
@@ -20845,7 +20937,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::11",
+   "id": "app/templates/applications/dashboard.html::link::12",
    "kind": "link",
    "label": "What it connects to",
    "line": null,
@@ -20867,7 +20959,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::12",
+   "id": "app/templates/applications/dashboard.html::link::13",
    "kind": "link",
    "label": "Edit Technology Details",
    "line": null,
@@ -20889,7 +20981,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::13",
+   "id": "app/templates/applications/dashboard.html::link::14",
    "kind": "link",
    "label": "app.version_control_url",
    "line": null,
@@ -20910,7 +21002,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::14",
+   "id": "app/templates/applications/dashboard.html::link::15",
    "kind": "link",
    "label": "Manage in Roadmap Workspace",
    "line": null,
@@ -20932,7 +21024,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::15",
+   "id": "app/templates/applications/dashboard.html::link::16",
    "kind": "link",
    "label": "Open Full Roadmap Workspace",
    "line": null,
@@ -20954,7 +21046,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::16",
+   "id": "app/templates/applications/dashboard.html::link::17",
    "kind": "link",
    "label": "Open Roadmap Workspace",
    "line": null,
@@ -20976,7 +21068,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::17",
+   "id": "app/templates/applications/dashboard.html::link::18",
    "kind": "link",
    "label": "{{ r.name }} {{ r.type }} \u00b7 {{ r.rel_type | replace('Relationship', '') }}",
    "line": null,
@@ -20998,7 +21090,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::18",
+   "id": "app/templates/applications/dashboard.html::link::19",
    "kind": "link",
    "label": "Edit Compliance Settings",
    "line": null,
@@ -21020,7 +21112,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::19",
+   "id": "app/templates/applications/dashboard.html::link::20",
    "kind": "link",
    "label": "Edit Health & Quality Metrics",
    "line": null,
@@ -21042,7 +21134,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::20",
+   "id": "app/templates/applications/dashboard.html::link::21",
    "kind": "link",
    "label": "health_metrics.health_check_url",
    "line": null,
@@ -21063,7 +21155,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::21",
+   "id": "app/templates/applications/dashboard.html::link::22",
    "kind": "link",
    "label": "Edit Cost Details",
    "line": null,
@@ -21085,7 +21177,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::22",
+   "id": "app/templates/applications/dashboard.html::link::23",
    "kind": "link",
    "label": "Download",
    "line": null,
@@ -21099,28 +21191,6 @@
    "rendered_on_count": 4,
    "target": {
     "href": "doc.file_url or doc.download_url"
-   },
-   "template": "app/templates/applications/dashboard.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/applications/dashboard.html::link::23",
-   "kind": "link",
-   "label": "{{ r.name }} {{ r.type }} \u00b7 {{ r.rel_type | replace('Relationship', '') }}",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/dashboard/admin/custom-fields",
-    "/dashboard/applications/<int:application_id>/gap-analysis",
-    "/dashboard/applications/<int:id>/roadmap",
-    "/dashboard/dashboard"
-   ],
-   "rendered_on_count": 4,
-   "target": {
-    "endpoint": "architect_ui.element_traceability",
-    "href": "url_for('architect_ui.element_traceability', element_id=r.id)"
    },
    "template": "app/templates/applications/dashboard.html",
    "testid": null,
@@ -21152,6 +21222,28 @@
   {
    "id": "app/templates/applications/dashboard.html::link::25",
    "kind": "link",
+   "label": "{{ r.name }} {{ r.type }} \u00b7 {{ r.rel_type | replace('Relationship', '') }}",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/dashboard/admin/custom-fields",
+    "/dashboard/applications/<int:application_id>/gap-analysis",
+    "/dashboard/applications/<int:id>/roadmap",
+    "/dashboard/dashboard"
+   ],
+   "rendered_on_count": 4,
+   "target": {
+    "endpoint": "architect_ui.element_traceability",
+    "href": "url_for('architect_ui.element_traceability', element_id=r.id)"
+   },
+   "template": "app/templates/applications/dashboard.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/dashboard.html::link::26",
+   "kind": "link",
    "label": "Run Workflow",
    "line": null,
    "mutating": false,
@@ -21171,7 +21263,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/dashboard.html::link::26",
+   "id": "app/templates/applications/dashboard.html::link::27",
    "kind": "link",
    "label": "Go to EA Workflows \u2192",
    "line": null,
@@ -21195,7 +21287,7 @@
    "id": "app/templates/applications/dashboard.html::button::0",
    "kind": "button",
    "label": "",
-   "line": 85,
+   "line": 86,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21214,7 +21306,7 @@
    "id": "app/templates/applications/dashboard.html::button::1",
    "kind": "button",
    "label": "",
-   "line": 99,
+   "line": 100,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21233,7 +21325,7 @@
    "id": "app/templates/applications/dashboard.html::button::2",
    "kind": "button",
    "label": "",
-   "line": 187,
+   "line": 188,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21254,7 +21346,7 @@
    "id": "app/templates/applications/dashboard.html::button::3",
    "kind": "button",
    "label": "Open in the Composer",
-   "line": 373,
+   "line": 374,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21276,7 +21368,7 @@
    "id": "app/templates/applications/dashboard.html::button::4",
    "kind": "button",
    "label": "",
-   "line": 384,
+   "line": 385,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21297,7 +21389,7 @@
    "id": "app/templates/applications/dashboard.html::button::5",
    "kind": "button",
    "label": "",
-   "line": 387,
+   "line": 388,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21318,7 +21410,7 @@
    "id": "app/templates/applications/dashboard.html::button::6",
    "kind": "button",
    "label": "",
-   "line": 396,
+   "line": 397,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21339,7 +21431,7 @@
    "id": "app/templates/applications/dashboard.html::button::7",
    "kind": "button",
    "label": "",
-   "line": 397,
+   "line": 398,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21360,7 +21452,7 @@
    "id": "app/templates/applications/dashboard.html::button::8",
    "kind": "button",
    "label": "",
-   "line": 574,
+   "line": 579,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21379,7 +21471,7 @@
    "id": "app/templates/applications/dashboard.html::button::9",
    "kind": "button",
    "label": "",
-   "line": 712,
+   "line": 717,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21398,7 +21490,7 @@
    "id": "app/templates/applications/dashboard.html::button::10",
    "kind": "button",
    "label": "",
-   "line": 737,
+   "line": 742,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21417,7 +21509,7 @@
    "id": "app/templates/applications/dashboard.html::button::11",
    "kind": "button",
    "label": "",
-   "line": 886,
+   "line": 891,
    "mutating": true,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21438,7 +21530,7 @@
    "id": "app/templates/applications/dashboard.html::button::12",
    "kind": "button",
    "label": "",
-   "line": 889,
+   "line": 894,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21459,7 +21551,7 @@
    "id": "app/templates/applications/dashboard.html::button::13",
    "kind": "button",
    "label": "",
-   "line": 905,
+   "line": 910,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21478,7 +21570,7 @@
    "id": "app/templates/applications/dashboard.html::button::14",
    "kind": "button",
    "label": "",
-   "line": 946,
+   "line": 951,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21497,7 +21589,7 @@
    "id": "app/templates/applications/dashboard.html::button::15",
    "kind": "button",
    "label": "",
-   "line": 978,
+   "line": 983,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21518,7 +21610,7 @@
    "id": "app/templates/applications/dashboard.html::button::16",
    "kind": "button",
    "label": "",
-   "line": 1074,
+   "line": 1079,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21539,7 +21631,7 @@
    "id": "app/templates/applications/dashboard.html::button::17",
    "kind": "button",
    "label": "",
-   "line": 1089,
+   "line": 1094,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21558,7 +21650,7 @@
    "id": "app/templates/applications/dashboard.html::button::18",
    "kind": "button",
    "label": "",
-   "line": 1095,
+   "line": 1100,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21577,7 +21669,7 @@
    "id": "app/templates/applications/dashboard.html::button::19",
    "kind": "button",
    "label": "",
-   "line": 1124,
+   "line": 1129,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21596,7 +21688,7 @@
    "id": "app/templates/applications/dashboard.html::button::20",
    "kind": "button",
    "label": "",
-   "line": 1140,
+   "line": 1145,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21615,7 +21707,7 @@
    "id": "app/templates/applications/dashboard.html::button::21",
    "kind": "button",
    "label": "",
-   "line": 1452,
+   "line": 1457,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21636,7 +21728,7 @@
    "id": "app/templates/applications/dashboard.html::button::22",
    "kind": "button",
    "label": "",
-   "line": 1889,
+   "line": 1894,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21657,7 +21749,7 @@
    "id": "app/templates/applications/dashboard.html::form::0",
    "kind": "form",
    "label": "",
-   "line": 95,
+   "line": 96,
    "mutating": true,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21680,7 +21772,7 @@
    "id": "app/templates/applications/dashboard.html::form::1",
    "kind": "form",
    "label": "",
-   "line": 288,
+   "line": 289,
    "mutating": true,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21704,7 +21796,7 @@
    "id": "app/templates/applications/dashboard.html::form::2",
    "kind": "form",
    "label": "",
-   "line": 572,
+   "line": 577,
    "mutating": true,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21727,7 +21819,7 @@
    "id": "app/templates/applications/dashboard.html::form::3",
    "kind": "form",
    "label": "",
-   "line": 734,
+   "line": 739,
    "mutating": true,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21749,7 +21841,7 @@
    "id": "app/templates/applications/dashboard.html::form::4",
    "kind": "form",
    "label": "",
-   "line": 943,
+   "line": 948,
    "mutating": true,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21771,7 +21863,7 @@
    "id": "app/templates/applications/dashboard.html::form::5",
    "kind": "form",
    "label": "",
-   "line": 1093,
+   "line": 1098,
    "mutating": true,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21794,7 +21886,7 @@
    "id": "app/templates/applications/dashboard.html::form::6",
    "kind": "form",
    "label": "",
-   "line": 1119,
+   "line": 1124,
    "mutating": true,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21817,7 +21909,7 @@
    "id": "app/templates/applications/dashboard.html::form::7",
    "kind": "form",
    "label": "",
-   "line": 1138,
+   "line": 1143,
    "mutating": true,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21840,7 +21932,7 @@
    "id": "app/templates/applications/dashboard.html::table::0",
    "kind": "table",
    "label": "",
-   "line": 676,
+   "line": 681,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21859,7 +21951,7 @@
    "id": "app/templates/applications/dashboard.html::table::1",
    "kind": "table",
    "label": "",
-   "line": 718,
+   "line": 723,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21878,7 +21970,7 @@
    "id": "app/templates/applications/dashboard.html::table::2",
    "kind": "table",
    "label": "",
-   "line": 912,
+   "line": 917,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21897,7 +21989,7 @@
    "id": "app/templates/applications/dashboard.html::table::3",
    "kind": "table",
    "label": "",
-   "line": 985,
+   "line": 990,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21916,7 +22008,7 @@
    "id": "app/templates/applications/dashboard.html::table::4",
    "kind": "table",
    "label": "",
-   "line": 1103,
+   "line": 1108,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -21935,7 +22027,7 @@
    "id": "app/templates/applications/dashboard.html::table::5",
    "kind": "table",
    "label": "",
-   "line": 1919,
+   "line": 1924,
    "mutating": false,
    "rendered_on": [
     "/dashboard/admin/custom-fields",
@@ -22003,14 +22095,14 @@
    "rendered_on_count": 4,
    "target": {},
    "template": "app/templates/applications/dashboard.html",
-   "testid": "vendor-organisations",
+   "testid": "application-description",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/applications/dashboard.html::testid::3",
    "kind": "testid",
-   "label": "li",
+   "label": "div",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -22022,14 +22114,14 @@
    "rendered_on_count": 4,
    "target": {},
    "template": "app/templates/applications/dashboard.html",
-   "testid": "vendor-organisation-row",
+   "testid": "application-description-facts",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/applications/dashboard.html::testid::4",
    "kind": "testid",
-   "label": "p",
+   "label": "span",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -22041,7 +22133,7 @@
    "rendered_on_count": 4,
    "target": {},
    "template": "app/templates/applications/dashboard.html",
-   "testid": "vendor-organisations-empty",
+   "testid": "property-description",
    "type": null,
    "via_macro": null
   },
@@ -22060,7 +22152,7 @@
    "rendered_on_count": 4,
    "target": {},
    "template": "app/templates/applications/dashboard.html",
-   "testid": "suppliers-linked",
+   "testid": "vendor-organisations",
    "type": null,
    "via_macro": null
   },
@@ -22079,7 +22171,7 @@
    "rendered_on_count": 4,
    "target": {},
    "template": "app/templates/applications/dashboard.html",
-   "testid": "supplier-linked-row",
+   "testid": "vendor-organisation-row",
    "type": null,
    "via_macro": null
   },
@@ -22098,12 +22190,69 @@
    "rendered_on_count": 4,
    "target": {},
    "template": "app/templates/applications/dashboard.html",
-   "testid": "costs-withheld",
+   "testid": "vendor-organisations-empty",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/applications/dashboard.html::testid::8",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/dashboard/admin/custom-fields",
+    "/dashboard/applications/<int:application_id>/gap-analysis",
+    "/dashboard/applications/<int:id>/roadmap",
+    "/dashboard/dashboard"
+   ],
+   "rendered_on_count": 4,
+   "target": {},
+   "template": "app/templates/applications/dashboard.html",
+   "testid": "suppliers-linked",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/dashboard.html::testid::9",
+   "kind": "testid",
+   "label": "li",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/dashboard/admin/custom-fields",
+    "/dashboard/applications/<int:application_id>/gap-analysis",
+    "/dashboard/applications/<int:id>/roadmap",
+    "/dashboard/dashboard"
+   ],
+   "rendered_on_count": 4,
+   "target": {},
+   "template": "app/templates/applications/dashboard.html",
+   "testid": "supplier-linked-row",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/dashboard.html::testid::10",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/dashboard/admin/custom-fields",
+    "/dashboard/applications/<int:application_id>/gap-analysis",
+    "/dashboard/applications/<int:id>/roadmap",
+    "/dashboard/dashboard"
+   ],
+   "rendered_on_count": 4,
+   "target": {},
+   "template": "app/templates/applications/dashboard.html",
+   "testid": "costs-withheld",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/dashboard.html::testid::11",
    "kind": "testid",
    "label": "p",
    "line": null,
@@ -63358,12 +63507,16 @@
     "/ai-chat/approvals/inbox",
     "/applications/<int:id>/fact-sheet",
     "/business-architecture/processes/<int:process_id>/diagram",
+    "/dashboard/admin/custom-fields",
+    "/dashboard/applications/<int:application_id>/gap-analysis",
+    "/dashboard/applications/<int:id>/roadmap",
     "/dashboard/compliance",
     "/dashboard/compliance/controls/<int:mapping_id>/evidence",
+    "/dashboard/dashboard",
     "/implementation/work-packages/<int:work_package_id>",
     "/solutions/<int:solution_id>"
    ],
-   "rendered_on_count": 7,
+   "rendered_on_count": 11,
    "target": {},
    "template": "app/templates/components/fact_list.html",
    "testid": "testid",
@@ -63380,12 +63533,16 @@
     "/ai-chat/approvals/inbox",
     "/applications/<int:id>/fact-sheet",
     "/business-architecture/processes/<int:process_id>/diagram",
+    "/dashboard/admin/custom-fields",
+    "/dashboard/applications/<int:application_id>/gap-analysis",
+    "/dashboard/applications/<int:id>/roadmap",
     "/dashboard/compliance",
     "/dashboard/compliance/controls/<int:mapping_id>/evidence",
+    "/dashboard/dashboard",
     "/implementation/work-packages/<int:work_package_id>",
     "/solutions/<int:solution_id>"
    ],
-   "rendered_on_count": 7,
+   "rendered_on_count": 11,
    "target": {},
    "template": "app/templates/components/fact_list.html",
    "testid": "property-{{ p.key }}",
@@ -65547,9 +65704,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {
     "href": "href"
    },
@@ -65566,11 +65724,12 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {
-    "href": "{{ request.path }}?all_actions=1#priority-actions"
+    "href": "show_all_url"
    },
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-actions-show-all",
@@ -65585,11 +65744,12 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {
-    "href": "{{ request.path }}#priority-actions"
+    "href": "show_first_url"
    },
    "template": "app/templates/components/priority_actions.html",
    "testid": null,
@@ -65604,9 +65764,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {},
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-actions",
@@ -65621,9 +65782,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {},
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-actions-rule",
@@ -65638,9 +65800,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {},
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-actions-list",
@@ -65655,9 +65818,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {},
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-action-row",
@@ -65672,9 +65836,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {},
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-actions-empty",
@@ -67383,7 +67548,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 65,
+   "rendered_on_count": 66,
    "target": {
     "button_type": "button"
    },
@@ -67399,7 +67564,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 65,
+   "rendered_on_count": 66,
    "target": {
     "button_type": "button"
    },
@@ -67415,7 +67580,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 65,
+   "rendered_on_count": 66,
    "target": {},
    "template": "app/templates/components/select.html",
    "testid": null,
@@ -76832,7 +76997,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::button::0",
    "kind": "button",
    "label": "Save this run",
-   "line": 83,
+   "line": 84,
    "mutating": true,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -76848,7 +77013,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::button::1",
    "kind": "button",
    "label": "Connect GitHub",
-   "line": 161,
+   "line": 162,
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -76867,7 +77032,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::button::2",
    "kind": "button",
    "label": "Load the sample company",
-   "line": 166,
+   "line": 167,
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -76883,7 +77048,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::button::3",
    "kind": "button",
    "label": "Add an application",
-   "line": 169,
+   "line": 170,
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -76902,7 +77067,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::form::0",
    "kind": "form",
    "label": "",
-   "line": 74,
+   "line": 75,
    "mutating": true,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -76922,7 +77087,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::form::1",
    "kind": "form",
    "label": "",
-   "line": 158,
+   "line": 159,
    "mutating": true,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -88224,6 +88389,23 @@
   {
    "id": "app/templates/public/pricing.html::link::5",
    "kind": "link",
+   "label": "Start with 90 days free",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [],
+   "rendered_on_count": 0,
+   "target": {
+    "endpoint": "main.track_plan_click",
+    "href": "url_for('main.track_plan_click', plan='startup', next=url_for('account.register', plan='startup', interval='year', offer='credit'))"
+   },
+   "template": "app/templates/public/pricing.html",
+   "testid": "credit-startup",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/public/pricing.html::link::6",
+   "kind": "link",
    "label": "Contact sales",
    "line": null,
    "mutating": false,
@@ -88239,7 +88421,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/public/pricing.html::link::6",
+   "id": "app/templates/public/pricing.html::link::7",
    "kind": "link",
    "label": "View on GitHub",
    "line": null,
@@ -88255,7 +88437,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/public/pricing.html::link::7",
+   "id": "app/templates/public/pricing.html::link::8",
    "kind": "link",
    "label": "See what is included",
    "line": null,
@@ -88271,7 +88453,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/public/pricing.html::link::8",
+   "id": "app/templates/public/pricing.html::link::9",
    "kind": "link",
    "label": "See what is included",
    "line": null,
@@ -88280,22 +88462,6 @@
    "rendered_on_count": 0,
    "target": {
     "href": "/team-annual-onboarding"
-   },
-   "template": "app/templates/public/pricing.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/public/pricing.html::link::9",
-   "kind": "link",
-   "label": "contacting us",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {
-    "href": "/contact"
    },
    "template": "app/templates/public/pricing.html",
    "testid": null,
@@ -88321,7 +88487,7 @@
   {
    "id": "app/templates/public/pricing.html::link::11",
    "kind": "link",
-   "label": "Contact us",
+   "label": "contacting us",
    "line": null,
    "mutating": false,
    "rendered_on": [],
@@ -88336,6 +88502,22 @@
   },
   {
    "id": "app/templates/public/pricing.html::link::12",
+   "kind": "link",
+   "label": "Contact us",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [],
+   "rendered_on_count": 0,
+   "target": {
+    "href": "/contact"
+   },
+   "template": "app/templates/public/pricing.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/public/pricing.html::link::13",
    "kind": "link",
    "label": "Contact us",
    "line": null,
@@ -105993,8 +106175,8 @@
    ],
    "rendered_on_count": 1,
    "target": {
-    "endpoint": "strategic.impact_analysis",
-    "href": "{{ url_for('strategic.impact_analysis') }}#priority-actions"
+    "endpoint": "enterprise.impact_analysis",
+    "href": "{{ url_for('enterprise.impact_analysis') }}#priority-actions"
    },
    "template": "app/templates/strategic/impact_analysis.html",
    "testid": "priority-actions-link",
@@ -106580,6 +106762,23 @@
   {
    "id": "app/templates/strategic/investment_matrix.html::link::1",
    "kind": "link",
+   "label": "",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/architecture/investment-priorities",
+    "/strategic/investment-matrix"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/strategic/investment_matrix.html",
+   "testid": "strategic-step",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategic/investment_matrix.html::link::2",
+   "kind": "link",
    "label": "Link a work package",
    "line": null,
    "mutating": false,
@@ -106715,7 +106914,7 @@
    "id": "app/templates/strategic/investment_matrix.html::button::6",
    "kind": "button",
    "label": "",
-   "line": 174,
+   "line": 175,
    "mutating": false,
    "rendered_on": [
     "/architecture/investment-priorities",
@@ -106734,7 +106933,7 @@
    "id": "app/templates/strategic/investment_matrix.html::button::7",
    "kind": "button",
    "label": "",
-   "line": 184,
+   "line": 185,
    "mutating": false,
    "rendered_on": [
     "/architecture/investment-priorities",
@@ -106753,7 +106952,7 @@
    "id": "app/templates/strategic/investment_matrix.html::button::8",
    "kind": "button",
    "label": "",
-   "line": 290,
+   "line": 291,
    "mutating": false,
    "rendered_on": [
     "/architecture/investment-priorities",
@@ -106770,7 +106969,7 @@
    "id": "app/templates/strategic/investment_matrix.html::button::9",
    "kind": "button",
    "label": "",
-   "line": 291,
+   "line": 292,
    "mutating": false,
    "rendered_on": [
     "/architecture/investment-priorities",
@@ -106787,7 +106986,7 @@
    "id": "app/templates/strategic/investment_matrix.html::button::10",
    "kind": "button",
    "label": "",
-   "line": 294,
+   "line": 295,
    "mutating": false,
    "rendered_on": [
     "/architecture/investment-priorities",
@@ -106820,7 +107019,7 @@
   {
    "id": "app/templates/strategic/investment_matrix.html::testid::0",
    "kind": "testid",
-   "label": "div",
+   "label": "p",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -106830,7 +107029,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "total-capabilities",
+   "testid": "investment-costs-withheld",
    "type": null,
    "via_macro": null
   },
@@ -106847,7 +107046,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "total-capabilities-scope",
+   "testid": "total-capabilities",
    "type": null,
    "via_macro": null
   },
@@ -106864,7 +107063,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "critical-priorities",
+   "testid": "total-capabilities-scope",
    "type": null,
    "via_macro": null
   },
@@ -106881,7 +107080,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "total-investment",
+   "testid": "critical-priorities",
    "type": null,
    "via_macro": null
   },
@@ -106898,7 +107097,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "average-strategic-score",
+   "testid": "total-investment",
    "type": null,
    "via_macro": null
   },
@@ -106915,7 +107114,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "investment-load-error",
+   "testid": "average-strategic-score",
    "type": null,
    "via_macro": null
   },
@@ -106932,14 +107131,14 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "investment-empty",
+   "testid": "investment-load-error",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/strategic/investment_matrix.html::testid::7",
    "kind": "testid",
-   "label": "select",
+   "label": "div",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -106949,7 +107148,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "type-filter",
+   "testid": "investment-empty",
    "type": null,
    "via_macro": null
   },
@@ -106966,14 +107165,14 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "per-page-selector",
+   "testid": "type-filter",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/strategic/investment_matrix.html::testid::9",
    "kind": "testid",
-   "label": "div",
+   "label": "select",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -106983,7 +107182,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "bulk-action-bar",
+   "testid": "per-page-selector",
    "type": null,
    "via_macro": null
   },
@@ -107000,12 +107199,29 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "matrix-scroll",
+   "testid": "bulk-action-bar",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/strategic/investment_matrix.html::testid::11",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/architecture/investment-priorities",
+    "/strategic/investment-matrix"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/strategic/investment_matrix.html",
+   "testid": "matrix-scroll",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategic/investment_matrix.html::testid::12",
    "kind": "testid",
    "label": "input",
    "line": null,
@@ -107022,7 +107238,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::12",
+   "id": "app/templates/strategic/investment_matrix.html::testid::13",
    "kind": "testid",
    "label": "tr",
    "line": null,
@@ -107039,7 +107255,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::13",
+   "id": "app/templates/strategic/investment_matrix.html::testid::14",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107056,7 +107272,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::14",
+   "id": "app/templates/strategic/investment_matrix.html::testid::15",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -107073,7 +107289,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::15",
+   "id": "app/templates/strategic/investment_matrix.html::testid::16",
    "kind": "testid",
    "label": "dl",
    "line": null,
@@ -107090,7 +107306,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::16",
+   "id": "app/templates/strategic/investment_matrix.html::testid::17",
    "kind": "testid",
    "label": "dd",
    "line": null,
@@ -107107,7 +107323,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::17",
+   "id": "app/templates/strategic/investment_matrix.html::testid::18",
    "kind": "testid",
    "label": "dd",
    "line": null,
@@ -107124,7 +107340,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::18",
+   "id": "app/templates/strategic/investment_matrix.html::testid::19",
    "kind": "testid",
    "label": "dd",
    "line": null,
@@ -107141,7 +107357,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::19",
+   "id": "app/templates/strategic/investment_matrix.html::testid::20",
    "kind": "testid",
    "label": "dd",
    "line": null,
@@ -107158,7 +107374,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::20",
+   "id": "app/templates/strategic/investment_matrix.html::testid::21",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -107175,7 +107391,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::21",
+   "id": "app/templates/strategic/investment_matrix.html::testid::22",
    "kind": "testid",
    "label": "p",
    "line": null,
@@ -107192,7 +107408,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::22",
+   "id": "app/templates/strategic/investment_matrix.html::testid::23",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -107209,7 +107425,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::23",
+   "id": "app/templates/strategic/investment_matrix.html::testid::24",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107226,7 +107442,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::24",
+   "id": "app/templates/strategic/investment_matrix.html::testid::25",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107243,7 +107459,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::25",
+   "id": "app/templates/strategic/investment_matrix.html::testid::26",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -107260,7 +107476,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::26",
+   "id": "app/templates/strategic/investment_matrix.html::testid::27",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -107277,7 +107493,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::27",
+   "id": "app/templates/strategic/investment_matrix.html::testid::28",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107294,7 +107510,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::28",
+   "id": "app/templates/strategic/investment_matrix.html::testid::29",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107311,7 +107527,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::29",
+   "id": "app/templates/strategic/investment_matrix.html::testid::30",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107328,7 +107544,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::30",
+   "id": "app/templates/strategic/investment_matrix.html::testid::31",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107345,7 +107561,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::31",
+   "id": "app/templates/strategic/investment_matrix.html::testid::32",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -107362,7 +107578,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::32",
+   "id": "app/templates/strategic/investment_matrix.html::testid::33",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -107379,7 +107595,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::33",
+   "id": "app/templates/strategic/investment_matrix.html::testid::34",
    "kind": "testid",
    "label": "p",
    "line": null,
@@ -110348,19 +110564,19 @@
   }
  ],
  "counts": {
-  "controls": 6221,
+  "controls": 6232,
   "controls_by_kind": {
-   "button": 3124,
-   "form": 300,
-   "link": 1019,
+   "button": 3126,
+   "form": 301,
+   "link": 1022,
    "modal": 204,
    "table": 361,
-   "testid": 1213
+   "testid": 1218
   },
-  "controls_mutating": 697,
+  "controls_mutating": 698,
   "pages": 447,
   "pages_without_parameters": 319,
-  "routes": 3918,
+  "routes": 3919,
   "routes_without_a_handler_place": 9,
   "templates": 824,
   "templates_not_reached_by_a_route": 148
@@ -127238,6 +127454,7 @@
     "app/templates/components/drawer.html",
     "app/templates/components/dropdown_menu.html",
     "app/templates/components/empty_state.html",
+    "app/templates/components/fact_list.html",
     "app/templates/components/form_field.html",
     "app/templates/components/input.html",
     "app/templates/components/list_table.html",
@@ -127637,6 +127854,7 @@
     "app/templates/components/drawer.html",
     "app/templates/components/dropdown_menu.html",
     "app/templates/components/empty_state.html",
+    "app/templates/components/fact_list.html",
     "app/templates/components/form_field.html",
     "app/templates/components/input.html",
     "app/templates/components/list_table.html",
@@ -128898,6 +129116,7 @@
     "app/templates/components/drawer.html",
     "app/templates/components/dropdown_menu.html",
     "app/templates/components/empty_state.html",
+    "app/templates/components/fact_list.html",
     "app/templates/components/form_field.html",
     "app/templates/components/input.html",
     "app/templates/components/list_table.html",
@@ -129034,6 +129253,7 @@
     "app/templates/components/drawer.html",
     "app/templates/components/dropdown_menu.html",
     "app/templates/components/empty_state.html",
+    "app/templates/components/fact_list.html",
     "app/templates/components/form_field.html",
     "app/templates/components/input.html",
     "app/templates/components/list_table.html",
@@ -153237,7 +153457,7 @@
    ],
    "handler": "billing_cancel",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 225,
+   "handler_line": 264,
    "has_parameters": false,
    "id": "billing.billing_cancel /admin/billing/cancel",
    "login_required": true,
@@ -153260,7 +153480,7 @@
    ],
    "handler": "billing_change_plan",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 195,
+   "handler_line": 234,
    "has_parameters": false,
    "id": "billing.billing_change_plan /admin/billing/change-plan",
    "login_required": true,
@@ -153283,7 +153503,7 @@
    ],
    "handler": "billing_checkout_complete",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 174,
+   "handler_line": 213,
    "has_parameters": false,
    "id": "billing.billing_checkout_complete /admin/billing/checkout/complete",
    "login_required": true,
@@ -153306,7 +153526,7 @@
    ],
    "handler": "billing_details",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 265,
+   "handler_line": 304,
    "has_parameters": false,
    "id": "billing.billing_details /admin/billing/details",
    "login_required": true,
@@ -153405,6 +153625,7 @@
     "app/templates/components/page_header.html",
     "app/templates/components/popover.html",
     "app/templates/components/see_how.html",
+    "app/templates/components/select.html",
     "app/templates/components/switch.html",
     "app/templates/components/table.html",
     "app/templates/components/toast-container.html",
@@ -153421,7 +153642,7 @@
    ],
    "handler": "billing_index",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 60,
+   "handler_line": 62,
    "has_parameters": false,
    "id": "billing.billing_index /admin/billing/",
    "login_required": true,
@@ -153446,7 +153667,7 @@
    ],
    "handler": "billing_portal",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 287,
+   "handler_line": 326,
    "has_parameters": false,
    "id": "billing.billing_portal /admin/billing/portal",
    "login_required": true,
@@ -153469,7 +153690,7 @@
    ],
    "handler": "billing_resume",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 245,
+   "handler_line": 284,
    "has_parameters": false,
    "id": "billing.billing_resume /admin/billing/resume",
    "login_required": true,
@@ -153485,6 +153706,29 @@
   {
    "blueprint": "billing",
    "closure": [],
+   "endpoint": "billing.billing_startup_credit",
+   "guards": [
+    "admin_required",
+    "login_required"
+   ],
+   "handler": "billing_startup_credit",
+   "handler_file": "app/modules/admin/billing_routes.py",
+   "handler_line": 148,
+   "has_parameters": false,
+   "id": "billing.billing_startup_credit /admin/billing/startup-credit",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/admin/billing/startup-credit",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "billing",
+   "closure": [],
    "endpoint": "billing.billing_upgrade",
    "guards": [
     "admin_required",
@@ -153492,7 +153736,7 @@
    ],
    "handler": "billing_upgrade",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 139,
+   "handler_line": 178,
    "has_parameters": false,
    "id": "billing.billing_upgrade /admin/billing/upgrade",
    "login_required": true,
@@ -153512,7 +153756,7 @@
    "guards": [],
    "handler": "billing_webhook",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 306,
+   "handler_line": 345,
    "has_parameters": false,
    "id": "billing.billing_webhook /admin/billing/webhook",
    "login_required": false,
@@ -172030,7 +172274,7 @@
    ],
    "handler": "enterprise_dashboard",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 1298,
+   "handler_line": 1306,
    "has_parameters": false,
    "id": "enterprise.enterprise_dashboard /enterprise/",
    "login_required": true,
@@ -172251,6 +172495,7 @@
     "app/templates/components/list_table.html",
     "app/templates/components/page_guide_drawer.html",
     "app/templates/components/popover.html",
+    "app/templates/components/priority_actions.html",
     "app/templates/components/provenance.html",
     "app/templates/components/see_how.html",
     "app/templates/components/switch.html",
@@ -172294,7 +172539,7 @@
    ],
    "handler": "impact_analysis_save",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 1176,
+   "handler_line": 1184,
    "has_parameters": false,
    "id": "enterprise.impact_analysis_save /enterprise/analysis/impact-analysis/save",
    "login_required": true,
@@ -172547,7 +172792,7 @@
    ],
    "handler": "process_optimization",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 1197,
+   "handler_line": 1205,
    "has_parameters": false,
    "id": "enterprise.process_optimization /enterprise/analysis/process-optimization",
    "login_required": true,
@@ -221315,7 +221560,7 @@
    ],
    "handler": "approve_tool_action",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1605,
+   "handler_line": 1654,
    "has_parameters": true,
    "id": "unified_ai_chat.approve_tool_action /ai-chat/tools/approve/<int:approval_id>",
    "login_required": true,
@@ -221601,7 +221846,7 @@
    ],
    "handler": "business_output_view",
    "handler_file": "app/modules/ai_chat/routes/chat_views.py",
-   "handler_line": 253,
+   "handler_line": 269,
    "has_parameters": false,
    "id": "unified_ai_chat.business_output_view /ai-chat/business-output",
    "login_required": true,
@@ -221646,7 +221891,7 @@
    ],
    "handler": "clear_chat_history",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1362,
+   "handler_line": 1411,
    "has_parameters": false,
    "id": "unified_ai_chat.clear_chat_history /ai-chat/history/clear",
    "login_required": true,
@@ -221716,7 +221961,7 @@
    ],
    "handler": "confirm_application_change",
    "handler_file": "app/modules/ai_chat/routes/estate_answer_routes.py",
-   "handler_line": 170,
+   "handler_line": 173,
    "has_parameters": false,
    "id": "unified_ai_chat.confirm_application_change /ai-chat/application-change/confirm",
    "login_required": true,
@@ -221850,7 +222095,7 @@
    ],
    "handler": "delete_conversation_thread",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1514,
+   "handler_line": 1563,
    "has_parameters": true,
    "id": "unified_ai_chat.delete_conversation_thread /ai-chat/threads/<thread_id>",
    "login_required": true,
@@ -221916,7 +222161,7 @@
    ],
    "handler": "document_upload_view",
    "handler_file": "app/modules/ai_chat/routes/chat_views.py",
-   "handler_line": 240,
+   "handler_line": 256,
    "has_parameters": false,
    "id": "unified_ai_chat.document_upload_view /ai-chat/document-upload",
    "login_required": true,
@@ -222048,7 +222293,7 @@
    ],
    "handler": "entity_matching_view",
    "handler_file": "app/modules/ai_chat/routes/chat_views.py",
-   "handler_line": 262,
+   "handler_line": 278,
    "has_parameters": false,
    "id": "unified_ai_chat.entity_matching_view /ai-chat/entity-matching",
    "login_required": true,
@@ -222072,7 +222317,7 @@
    ],
    "handler": "estate_answer",
    "handler_file": "app/modules/ai_chat/routes/estate_answer_routes.py",
-   "handler_line": 346,
+   "handler_line": 349,
    "has_parameters": false,
    "id": "unified_ai_chat.estate_answer /ai-chat/estate-answer",
    "login_required": true,
@@ -222492,7 +222737,7 @@
    ],
    "handler": "get_auto_execute",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1666,
+   "handler_line": 1715,
    "has_parameters": false,
    "id": "unified_ai_chat.get_auto_execute /ai-chat/session/auto-execute",
    "login_required": true,
@@ -222514,7 +222759,7 @@
    ],
    "handler": "get_available_domains",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1204,
+   "handler_line": 1253,
    "has_parameters": false,
    "id": "unified_ai_chat.get_available_domains /ai-chat/domains",
    "login_required": true,
@@ -222558,7 +222803,7 @@
    ],
    "handler": "get_available_personas",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1218,
+   "handler_line": 1267,
    "has_parameters": false,
    "id": "unified_ai_chat.get_available_personas /ai-chat/personas",
    "login_required": true,
@@ -222602,7 +222847,7 @@
    ],
    "handler": "get_chat_history",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1342,
+   "handler_line": 1391,
    "has_parameters": false,
    "id": "unified_ai_chat.get_chat_history /ai-chat/history",
    "login_required": true,
@@ -222624,7 +222869,7 @@
    ],
    "handler": "get_conversation_thread",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1496,
+   "handler_line": 1545,
    "has_parameters": true,
    "id": "unified_ai_chat.get_conversation_thread /ai-chat/threads/<thread_id>",
    "login_required": true,
@@ -222712,7 +222957,7 @@
    ],
    "handler": "get_domain_context",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1577,
+   "handler_line": 1626,
    "has_parameters": true,
    "id": "unified_ai_chat.get_domain_context /ai-chat/context/<domain>",
    "login_required": true,
@@ -222867,7 +223112,7 @@
    ],
    "handler": "get_prompt_templates",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1260,
+   "handler_line": 1309,
    "has_parameters": false,
    "id": "unified_ai_chat.get_prompt_templates /ai-chat/templates",
    "login_required": true,
@@ -223044,7 +223289,7 @@
    ],
    "handler": "get_saved_sessions",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1425,
+   "handler_line": 1474,
    "has_parameters": false,
    "id": "unified_ai_chat.get_saved_sessions /ai-chat/sessions",
    "login_required": true,
@@ -223066,7 +223311,7 @@
    ],
    "handler": "get_token_usage",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1117,
+   "handler_line": 1166,
    "has_parameters": false,
    "id": "unified_ai_chat.get_token_usage /ai-chat/token-usage",
    "login_required": true,
@@ -223110,7 +223355,7 @@
    ],
    "handler": "get_workspace",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1535,
+   "handler_line": 1584,
    "has_parameters": true,
    "id": "unified_ai_chat.get_workspace /ai-chat/workspace/<int:workspace_id>",
    "login_required": true,
@@ -223132,7 +223377,7 @@
    ],
    "handler": "get_workspace_versions",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1550,
+   "handler_line": 1599,
    "has_parameters": true,
    "id": "unified_ai_chat.get_workspace_versions /ai-chat/workspace/<int:workspace_id>/versions",
    "login_required": true,
@@ -223335,7 +223580,7 @@
    ],
    "handler": "index",
    "handler_file": "app/modules/ai_chat/routes/chat_views.py",
-   "handler_line": 137,
+   "handler_line": 139,
    "has_parameters": false,
    "id": "unified_ai_chat.index /ai-chat",
    "login_required": true,
@@ -223452,7 +223697,7 @@
    ],
    "handler": "index",
    "handler_file": "app/modules/ai_chat/routes/chat_views.py",
-   "handler_line": 137,
+   "handler_line": 139,
    "has_parameters": false,
    "id": "unified_ai_chat.index /ai-chat/",
    "login_required": true,
@@ -223586,7 +223831,7 @@
    ],
    "handler": "list_conversation_threads",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1479,
+   "handler_line": 1528,
    "has_parameters": false,
    "id": "unified_ai_chat.list_conversation_threads /ai-chat/threads",
    "login_required": true,
@@ -223630,7 +223875,7 @@
    ],
    "handler": "load_chat_session",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1444,
+   "handler_line": 1493,
    "has_parameters": true,
    "id": "unified_ai_chat.load_chat_session /ai-chat/session/<session_id>",
    "login_required": true,
@@ -223873,7 +224118,7 @@
    ],
    "handler": "reject_tool_action",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1644,
+   "handler_line": 1693,
    "has_parameters": true,
    "id": "unified_ai_chat.reject_tool_action /ai-chat/tools/reject/<int:approval_id>",
    "login_required": true,
@@ -224218,7 +224463,7 @@
    ],
    "handler": "save_chat_session",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1387,
+   "handler_line": 1436,
    "has_parameters": false,
    "id": "unified_ai_chat.save_chat_session /ai-chat/session/save",
    "login_required": true,
@@ -224240,7 +224485,7 @@
    ],
    "handler": "send_message",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 336,
+   "handler_line": 359,
    "has_parameters": false,
    "id": "unified_ai_chat.send_message /ai-chat/message",
    "login_required": true,
@@ -224262,7 +224507,7 @@
    ],
    "handler": "send_message_stream",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 852,
+   "handler_line": 889,
    "has_parameters": false,
    "id": "unified_ai_chat.send_message_stream /ai-chat/message/stream",
    "login_required": true,
@@ -224306,7 +224551,7 @@
    ],
    "handler": "submit_message_feedback",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 809,
+   "handler_line": 846,
    "has_parameters": false,
    "id": "unified_ai_chat.submit_message_feedback /ai-chat/feedback",
    "login_required": true,
@@ -224350,7 +224595,7 @@
    ],
    "handler": "toggle_auto_execute",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1686,
+   "handler_line": 1735,
    "has_parameters": false,
    "id": "unified_ai_chat.toggle_auto_execute /ai-chat/session/toggle-auto-execute",
    "login_required": true,
@@ -239203,6 +239448,7 @@
     "app/templates/components/form_field.html",
     "app/templates/components/input.html",
     "app/templates/components/page_header.html",
+    "app/templates/components/select.html",
     "app/templates/components/table.html"
    ],
    "includes": [],
@@ -240310,6 +240556,7 @@
     "app/templates/components/button.html",
     "app/templates/components/card.html",
     "app/templates/components/dense_table.html",
+    "app/templates/components/fact_list.html",
     "app/templates/components/form_field.html",
     "app/templates/components/input.html",
     "app/templates/components/page_header.html",
@@ -244444,7 +244691,7 @@
    "includes": [],
    "name": "components/fact_list.html",
    "parse_errors": [],
-   "rendered_on_count": 7,
+   "rendered_on_count": 11,
    "unresolved_refs": []
   },
   "app/templates/components/figures.html": {
@@ -244683,7 +244930,7 @@
    "includes": [],
    "name": "components/priority_actions.html",
    "parse_errors": [],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "unresolved_refs": []
   },
   "app/templates/components/progress.html": {
@@ -244846,7 +245093,7 @@
    "includes": [],
    "name": "components/select.html",
    "parse_errors": [],
-   "rendered_on_count": 65,
+   "rendered_on_count": 66,
    "unresolved_refs": []
   },
   "app/templates/components/sidebar_breadcrumb.html": {
@@ -245739,7 +245986,9 @@
     "app/templates/components/list_table.html",
     "app/templates/macros/page_shell.html"
    ],
-   "includes": [],
+   "includes": [
+    "app/templates/components/priority_actions.html"
+   ],
    "name": "enterprise/impact_analysis.html",
    "parse_errors": [],
    "rendered_on_count": 1,
@@ -249207,5 +249456,5 @@
   "app/templates/solutions_strategic/partials/_gantt_chart.html",
   "app/templates/tools/gantt_demo.html"
  ],
- "templates_sha256": "1ea5a5d68d8dc04cd6c064acdfbe68fb09290b73f75ee309601ab4d60270cc55"
+ "templates_sha256": "84abecdd6b8dc1e374bbb392232333e2fb6cb03f9ebb78703c175f0de94e9cbc"
 }
