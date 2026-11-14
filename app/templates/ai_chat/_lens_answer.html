@@ -108,7 +108,7 @@
     {% elif lens == 'accountability' and owned %}
         {% call card(class='p-4') %}
             <p class="text-sm text-foreground" data-testid="owner-sentence" data-lens-row>{{ name }} is owned by {{ owned.owner_sentence }}, recorded on <a class="font-medium text-primary underline underline-offset-4" href="{{ owned.page_url }}" data-testid="owner-source">{{ owned.page_label }}</a>.</p>
-            {% for item in (data.owners if data else []) if item.since_text %}<p class="mt-1 text-sm text-muted-foreground" data-owner-since>Since {{ item.since_text }}</p>{% endfor %}
+            {% for item in (data.owners if data else []) if item.since_text and item.name %}<div class="mt-1 flex flex-wrap gap-x-2 text-sm" data-owner-record><span class="font-medium text-foreground" data-owner-since-name>{{ item.name }}</span><p class="text-muted-foreground" data-owner-since>Since {{ item.since_text }}</p></div>{% endfor %}
         {% endcall %}
         {% if footer %}{{ result_footer(footer) }}{% endif %}
         {% if asked_capacity %}<p class="text-sm text-muted-foreground">Capacity and availability data is not yet connected.</p>{% endif %}
