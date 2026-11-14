@@ -80,20 +80,14 @@ def index():
         count_capabilities,
     )
 
-    try:
-        total_capabilities = count_capabilities()
-    except Exception:
-        current_app.logger.exception("Could not count business capabilities")
-        total_capabilities = None
+    # A failure while building the page is a failure: it reaches the 500 handler, not a page that
+    # quietly leaves the figure out.
+    total_capabilities = count_capabilities()
 
-    try:
-        from app.modules.account.services import onboarding_service
+    from app.modules.account.services import onboarding_service
 
-        # Only when nothing is on the map at all: with capabilities present, an empty result is a filter.
-        no_industry_chosen = not total_capabilities and not onboarding_service.choices(current_user.organization)["industry"]
-    except Exception:
-        current_app.logger.exception("Could not read the industry chosen at sign-up")
-        no_industry_chosen = False
+    # Only when nothing is on the map at all: with capabilities present, an empty result is a filter.
+    no_industry_chosen = not total_capabilities and not onboarding_service.choices(current_user.organization)["industry"]
 
     return render_template(
         "capability_map/consolidated.html",
