@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 from sqlalchemy import and_, cast, or_
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import joinedload
 
 from app import db
 from app.datetime_helpers import utcnow
@@ -33,9 +32,7 @@ from app.models import (
     ArchiMateElement,
     ArchiMateRelationship,
     BusinessCapability,
-    ComplianceRequirement,
     Gap,
-    QualityAttribute,
 )
 from app.models.application_portfolio import ApplicationComponent
 from app.services.archimate.implementation_migration_service import ImplementationMigrationService
