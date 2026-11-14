@@ -127,6 +127,16 @@ def _home_use_case_highlights():
     return groups
 
 
+def _plan_context():
+    """The plan record and its display prices, for the pages that describe plans."""
+    from app.services import billing_plans
+
+    return {
+        "plans": {p.key: p for p in billing_plans.PLANS},
+        "plan_prices": {p.key: billing_plans.price_lines(p) for p in billing_plans.PLANS},
+    }
+
+
 @main.route("/", methods=["GET", "POST"])
 @rate_limit(10, "1m", methods=("POST",))
 def index():
@@ -156,6 +166,7 @@ def index():
                     thanks=False,
                     error=error,
                     use_case_highlights=use_case_highlights,
+                    **_plan_context(),
                 )
 
             from app.models.waitlist_signup import WaitlistSignup
@@ -176,6 +187,7 @@ def index():
         thanks=thanks,
         error=error,
         use_case_highlights=use_case_highlights,
+        **_plan_context(),
     )
 
 
@@ -1162,9 +1174,7 @@ def public_site_page(slug):
     template = "public/page.html"
     if page.front_matter.get("template") == "pricing":
         template = "public/pricing.html"
-        from app.services import billing_plans
-        plan_data = {p.key: billing_plans.price_lines(p) for p in billing_plans.PLANS}
-        return render_template(template, page=page, jsonld=build_jsonld(page), plan_prices=plan_data)
+        return render_template(template, page=page, jsonld=build_jsonld(page), **_plan_context())
     return render_template(template, page=page, jsonld=build_jsonld(page))
 
 
