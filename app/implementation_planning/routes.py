@@ -299,6 +299,8 @@ def work_package_detail(work_package_id):
             else:
                 capability_url = url_for("genome_coverage.generate") + "#capability-%s" % capability.id
         gap_records = result_footer_service.gap_rows(org_id, [g["id"] for g in shown["gaps"]])
+        # One owner fact: the linked member, else the name typed in Assigned To.
+        owner_shown = shown["owner_name"] or (work_package.assigned_to or "").strip() or None
         return render_template(
             "implementation_planning/work_package_detail.html",
             capability=capability,
@@ -309,11 +311,13 @@ def work_package_detail(work_package_id):
             events=events,
             gaps=shown["gaps"],
             plateaus=plateaus,
-            owner_name=shown["owner_name"],
+            owner_name=owner_shown,
+            progress_basis=work_package_service.progress_basis(work_package),
+            days_gone=work_package_service.days_gone_label(work_package),
             can_link=bool(current_user.can(Permission.GENERAL)),
             owner_panel=work_package_service.owner_and_approval_panel(work_package, org_id),
             footer=result_footer_service.work_package_detail_footer(
-                work_package, shown["owner_name"], [gap_records.get(g["id"], g) for g in shown["gaps"]], capability),
+                work_package, owner_shown, [gap_records.get(g["id"], g) for g in shown["gaps"]], capability),
         )
 
     except HTTPException:
@@ -452,10 +456,10 @@ def edit_work_package(work_package_id):
             if request.is_json:
                 return jsonify({"success": True})
 
-            flash("Work package updated successfully!", "success")
+            flash("Saved.", "success")
             return redirect(
                 url_for(
-                    "implementation_planning.edit_work_package",
+                    "implementation_planning.work_package_detail",
                     work_package_id=work_package_id,
                 )
             )

@@ -63,6 +63,11 @@
                 </div>
 
                 <div class="space-y-2">
+                    {% call label(for='progress_percentage') %}Progress (%){% endcall %}
+                    {{ input(id='progress_percentage', name='progress_percentage', type='number', value=(posted.get('progress_percentage') if posted else ((work_package.progress_percentage | int | string) if work_package and work_package.progress_percentage is not none else '')), placeholder='Leave empty if not recorded', aria_label='Progress percent', inputmode='numeric', error=field_errors.get('progress_percentage'), attrs_dict={'min': '0', 'max': '100', 'step': '1'}) }}
+                </div>
+
+                <div class="space-y-2">
                     {% call label(for='programme_id') %}Programme{% endcall %}
                     {% set wp_programme = (posted.get('programme_id') | int(0)) if posted else (work_package.enterprise_initiative_id if work_package else '') %}
                     {% call native_select(id='programme_id', name='programme_id', aria_label='Select programme') %}

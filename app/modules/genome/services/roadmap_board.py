@@ -96,13 +96,8 @@ def _card_status(wps: list, target_iso, today: date) -> str:
     statuses = [w.get("status") for w in wps]
     if statuses and all(s == "completed" for s in statuses):
         return "completed"
-    # a plateau whose date has passed and that has no work left to do is a state already reached
-    if not wps and target_iso:
-        try:
-            if date.fromisoformat(target_iso[:10]) <= today:
-                return "completed"
-        except ValueError:
-            pass
+    # an empty plateau is never a state already reached: nothing was planned on it, and a date
+    # passing is not a person marking it done
     if any(s == "in_progress" for s in statuses):
         return "in-progress"
     when = target_iso
@@ -206,4 +201,5 @@ def _card(plateau_id, title, target_iso, wps, today, provenance=None, gaps=None)
         "gaps": gaps,
         "done": done,
         "progress": progress,
+        "measured": len(measured),
     }

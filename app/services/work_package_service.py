@@ -44,39 +44,63 @@ def is_resolved(status: Any) -> bool:
     return status_key(status) in _RESOLVED or status_key(status) == "canceled"
 
 
-def progress_percent(wp: UnifiedWorkPackage, today: Optional[date] = None) -> Optional[int]:
-    """How far a work package has got, as one whole percent: the one figure every
-    screen shows.
-
-    The rule, from the package's status and dates:
-      * completed reads 100; a package not started (planned, on hold) reads the 0 it
-        records, or None when it records nothing;
-      * a percentage someone recorded on a package under way is used as recorded;
-      * otherwise a package under way reads the share of its start-to-end period
-        that has passed, never reaching 100 before it is completed;
-      * under way with no dates and no recorded figure is not measurable: None,
-        shown as a dash, never a zero.
-    Cancelled packages read None.
+def progress_basis(wp: UnifiedWorkPackage) -> Dict[str, Any]:
+    """How far a work package has got and where the figure comes from, as
+    ``{"percent", "source", "label"}``. ``source`` is ``entered`` (a person recorded
+    it), ``status`` (completed), ``computed`` (from the package's own deliverables)
+    or ``none``. The calendar is never a source: elapsed time is its own fact
+    (``days_gone_label``).
     """
     key = status_key(getattr(wp, "status", None))
     if key == "completed":
-        return 100
+        return {"percent": 100, "source": "status", "label": "Completed"}
     if key in ("cancelled", "canceled"):
-        return None
-    recorded = int(getattr(wp, "progress_percentage", None) or 0)
+        return {"percent": None, "source": "none", "label": "Cancelled"}
+    stored = getattr(wp, "progress_percentage", None)
     if key in ("", "planned", "proposed", "not_started", "on_hold"):
-        # Not started: 0 when the package records it, a dash when it records nothing.
-        return None if getattr(wp, "progress_percentage", None) is None else min(recorded, 99)
-    if recorded:
-        return min(recorded, 99)
+        if stored is None:
+            return {"percent": None, "source": "none", "label": "Not recorded"}
+        return {"percent": min(int(stored), 99), "source": "entered", "label": "Entered by the team"}
+    if stored:
+        return {"percent": min(int(stored), 99), "source": "entered", "label": "Entered by the team"}
+    from app.models.implementation_migration import Deliverable
+
+    rows = Deliverable.query.filter_by(unified_work_package_id=wp.id).all() if getattr(wp, "id", None) else []
+    if rows:
+        done = sum(1 for d in rows if status_key(d.delivery_status) == "completed")
+        return {
+            "percent": min(round(done * 100 / len(rows)), 99),
+            "source": "computed",
+            "label": "%d of %d deliverables completed" % (done, len(rows)),
+        }
+    return {"percent": None, "source": "none", "label": "Not recorded"}
+
+
+def progress_percent(wp: UnifiedWorkPackage, today: Optional[date] = None) -> Optional[int]:
+    """How far a work package has got, as one whole percent: the one figure every
+    screen shows. ``today`` is accepted for callers that pass it and is not used:
+    the calendar is never progress.
+
+    The rule (see ``progress_basis`` for the label that goes with it):
+      * completed reads 100; cancelled reads None;
+      * a percentage someone recorded is used as recorded (never 100 before the
+        package is completed);
+      * otherwise a figure computed from the package's own deliverables;
+      * otherwise None, shown as "Not recorded", never a percentage.
+    """
+    return progress_basis(wp)["percent"]
+
+
+def days_gone_label(wp: UnifiedWorkPackage, today: Optional[date] = None) -> Optional[str]:
+    """Elapsed time as its own fact ("25 of 30 days gone"), or None without both dates."""
     if wp.start_date is None or wp.end_date is None:
         return None
-    today = today or date.today()
     start, end = wp.start_date.date(), wp.end_date.date()
     total = (end - start).days
     if total <= 0:
         return None
-    return max(0, min(99, round((today - start).days * 100 / total)))
+    gone = max(0, min(total, ((today or date.today()) - start).days))
+    return "%d of %d days gone" % (gone, total)
 
 _EDITABLE = (
     "name", "description", "status", "priority", "assigned_to", "business_capability",
@@ -255,6 +279,8 @@ def _apply(wp: UnifiedWorkPackage, fields: Dict[str, Any], organization_id: int)
             value = _number(value, key)
             if value is None:
                 continue
+            if key == "progress_percentage" and not 0 <= value <= 100:
+                raise WorkPackageError("Progress must be between 0 and 100.", field=key)
         elif key in ("estimated_effort_hours", "actual_effort_hours"):
             value = _number(value, key)
         elif key == "level":

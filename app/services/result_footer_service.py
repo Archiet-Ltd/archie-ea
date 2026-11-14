@@ -476,13 +476,17 @@ def work_package_facts(wp, link_self: bool = True, name_shown: bool = False) -> 
     facts = [fact("Work package record" if name_shown else wp.name, href=href, source_kind=origin["source_kind"], source_label=origin["source_label"],
                   as_of=when, subject="Work package")]
     # The figure every screen shows: the one work_package_service computes from status, dates and the recorded value.
-    from app.services.work_package_service import progress_percent
+    from app.services.work_package_service import progress_basis
 
-    progress = progress_percent(wp)
+    basis = progress_basis(wp)
+    progress = basis["percent"]
     if progress is None:
         facts.append(fact("Progress: not recorded", missing=True))
     else:
-        facts.append(fact("Progress: %d%%" % progress, href=href, source_kind="manual", subject="Progress", as_of=when))
+        facts.append(fact("Progress: %d%%" % progress if basis["source"] == "entered"
+                          else "Progress: %d%% (%s)" % (progress, basis["label"]), href=href,
+                          source_kind="derived" if basis["source"] in ("computed", "status") else "manual",
+                          subject="Progress", as_of=when))
     if not (getattr(wp, "priority", None) or "").strip():
         facts.append(fact("Priority: not recorded", missing=True))
     return facts

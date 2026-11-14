@@ -42,10 +42,11 @@ def test_progress_is_one_figure_from_status_and_dates(db_session, make_org, tena
         assert service.progress_percent(done) == 100
         assert service.progress_percent(planned) == 0
         assert service.progress_percent(bare) is None
-        assert service.progress_percent(under_way, today=date(2026, 1, 6)) == 50
+        # Elapsed time is not progress: dated, under way, nothing recorded reads no figure.
+        assert service.progress_percent(under_way, today=date(2026, 1, 6)) is None
         assert service.progress_percent(recorded, today=date(2026, 1, 6)) == 40
-        # Past its end date and not completed, it never claims to be finished.
-        assert service.progress_percent(late, today=date(2026, 3, 1)) == 99
+        # Past its end date and not completed, it still reads no figure.
+        assert service.progress_percent(late, today=date(2026, 3, 1)) is None
         # Nothing to measure from is a dash, not a zero.
         assert service.progress_percent(undated) is None
         assert service.progress_percent(cancelled) is None

@@ -53,14 +53,14 @@
             <li class="text-muted-foreground text-xs font-medium" data-testid="roadmap-more-packages">+{{ (item['items'] | length) - visible }} more work packages</li>
             {% endif %}
             {% if not item['items'] %}
-            <li class="text-muted-foreground text-xs">{% if item.status == 'completed' %}This state was reached{% if item.quarter %} by {{ item.quarter }}{% endif %}; no work package is left on it.{% else %}No work package is planned on this plateau yet.{% endif %}</li>
+            <li class="text-muted-foreground text-xs">Nothing planned yet</li>
             {% endif %}
           </ul>
           {% if item.gaps is not none %}
           <p class="text-muted-foreground mt-3 text-xs" data-testid="roadmap-plateau-gaps">{{ item.gaps|length }} {{ 'gap' if item.gaps|length == 1 else 'gaps' }}</p>
           {% endif %}
-          {% if item.progress is not none %}
-          <p class="text-muted-foreground mt-3 text-xs">{{ item.done }} of {{ item['items']|length }} done, {{ item.progress }}% complete</p>
+          {% if item['items'] %}
+          <p class="text-muted-foreground mt-3 text-xs" data-testid="roadmap-plateau-progress">{{ item.done }} of {{ item['items']|length }} done, {% if item.progress is not none %}{{ item.progress }}% complete, based on {{ item.measured }} of {{ item['items']|length }} {{ 'package' if item['items']|length == 1 else 'packages' }}{% else %}progress: Not recorded{% endif %}</p>
           {% endif %}
         {% endcall %}
       {% endcall %}

@@ -208,5 +208,6 @@ def test_a_past_plateau_with_nothing_left_on_it_is_completed_not_planned(db_sess
     with tenant_ctx(mine.id):
         board = build_roadmap_board(mine.id, today=TODAY)
     cols = _cols(board)
-    assert cols["completed"] == {"A Current State"}
-    assert cols["planned"] == {"A Undated", "A Ahead"}
+    # A date passing does not make an empty plateau a state reached: nobody marked it.
+    assert cols["completed"] == set()
+    assert cols["planned"] == {"A Current State", "A Undated", "A Ahead"}
