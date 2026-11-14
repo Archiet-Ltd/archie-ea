@@ -40,7 +40,7 @@ for _route in _INVENTORY.get("routes", []):
 
 
 def _in_nav_registry(template_path: str) -> bool:
-    for _ep in _TEMPLATE_TO_ENDPOINTS.get(template_path, []):
+    for _ep in _TEMPLATE_TO_ENDPOINTS.get("app/templates/" + template_path, []):
         _entry = entry_for_endpoint(_ep)
         if _entry is not None and _entry.key != "home":
             return True
