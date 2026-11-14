@@ -209,6 +209,7 @@ def test_a_risk_linked_later_from_the_register_is_found_by_the_chat_and_the_dial
         expect(dialog.get_by_role("heading", name="Add risk", exact=True)).to_be_visible()
         add_button = dialog.get_by_role("button", name="Add risk", exact=True)
         expect(add_button).to_be_visible()
+        _shot(page, "risk-dialog-add-mode", 1440)
         dialog.locator("#risk-title").fill(title)
         dialog.locator("#risk-likelihood").select_option("3")
         dialog.locator("#risk-impact").select_option("4")
@@ -227,6 +228,7 @@ def test_a_risk_linked_later_from_the_register_is_found_by_the_chat_and_the_dial
         expect(dialog.get_by_role("heading", name="Edit risk", exact=True)).to_be_visible()
         expect(dialog.get_by_role("button", name="Save changes", exact=True)).to_be_visible()
         expect(dialog.get_by_role("heading", name="Add risk", exact=True)).to_have_count(0)
+        _shot(page, "risk-dialog-edit-mode", 1440)
         dialog.get_by_role("button", name="Cancel").click()
 
         # Link it from the register: Row actions > Map to, then choose the application.
