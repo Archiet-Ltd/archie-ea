@@ -317,7 +317,9 @@ def _jsonable(value: Any) -> Any:
 
 
 def _relations_of(kind: str, row: Dict[str, Any]) -> List[Dict[str, Any]]:
-    if kind in (KIND_IMPACT, KIND_DATA_FLOW):
+    if kind == KIND_IMPACT:
+        return list(row.get("relations") or [row["relation"]])
+    if kind == KIND_DATA_FLOW:
         return [row["relation"]]
     if kind == KIND_SET_IMPACT:
         return list(row["relations"])

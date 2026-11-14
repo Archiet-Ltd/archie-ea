@@ -1078,6 +1078,32 @@ def _filter_explicit_by_layer(rows: List[Dict[str, Any]], layer: str) -> List[Di
     ]
 
 
+def _merge_rows_by_element(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """One row per affected element, however many ways the walk reached it.
+
+    A recorded link and the model's own working-out can both reach the same
+    element; each such pair used to be two rows, so the answer counted the element
+    twice. The first row stays (recorded rows come first in the walk) and carries
+    every way the element was reached in ``relations``, recorded ones first, with
+    ``relation`` the first of them. Every row carries ``relations``."""
+    merged: Dict[Any, Dict[str, Any]] = {}
+    order: List[Dict[str, Any]] = []
+    for row in rows:
+        kept = merged.get(row["element_id"])
+        if kept is None:
+            row["relations"] = [row["relation"]]
+            merged[row["element_id"]] = row
+            order.append(row)
+        else:
+            kept["relations"].append(row["relation"])
+            if not kept.get("reason") and row.get("reason"):
+                kept["reason"] = row["reason"]
+    for row in order:
+        row["relations"].sort(key=lambda rel: rel.get("kind") != "explicit")
+        row["relation"] = row["relations"][0]
+    return order
+
+
 def _derived_row(fact: Dict[str, Any], root_id: int) -> Dict[str, Any]:
     if fact["source_element_id"] == root_id:
         element_id = fact["target_element_id"]
@@ -1448,9 +1474,13 @@ class IntelligenceQueryService:
                         # is stripped.
                         row.pop("_endpoints", None)
 
+                    rows = _merge_rows_by_element(rows)
+
                     explicit_count = sum(1 for r in rows if r["relation"]["kind"] == "explicit")
                     derived_count = sum(1 for r in rows if r["relation"]["kind"] == "derived")
-                    stale_count = sum(1 for r in rows if r["relation"].get("stale"))
+                    stale_count = sum(
+                        1 for r in rows if any(rel.get("stale") for rel in r["relations"])
+                    )
 
                     scope.explicit_rows = explicit_count
                     scope.derived_rows = derived_count
