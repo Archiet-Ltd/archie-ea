@@ -17,6 +17,7 @@ from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
+RUN_TIMEOUT = 600_000
 WALK_DIR = os.environ.get("DETECTION_WALK_DIR")
 
 
@@ -32,9 +33,19 @@ def two_detecting_orgs(live_server):
 
     tag = uuid.uuid4().hex[:6]
     out = {"tag": tag}
-    orgs = {k: create_fresh_org("enterprise_architect") for k in ("a", "b")}
+    orgs = {
+        "a": create_fresh_org("enterprise_architect", platform_role="Administrator"),
+        "b": create_fresh_org("enterprise_architect"),
+    }
     app = create_app("testing")
     with app.app_context():
+        from app.models.user import User
+
+        # Running detection is a platform-admin action; organisation A's
+        # person holds that flag, still scoped to organisation A's data.
+        runner = db.session.get(User, orgs["a"]["user_ids"]["enterprise_architect"])
+        runner.is_platform_admin = True
+        db.session.commit()
         for key, org in orgs.items():
             org_id = org["org_id"]
             first = ApplicationComponent(
@@ -171,3 +182,36 @@ def test_second_organisation_reads_only_its_own(
     browser, live_server, two_detecting_orgs, width, theme
 ):
     _read(browser, live_server, two_detecting_orgs, "b", "a", width, theme)
+
+
+def test_second_organisation_unchanged_after_first_runs_detection(
+    browser, live_server, two_detecting_orgs
+):
+    """Organisation A clicks Run Detection; organisation B's groups and figures stay."""
+    world = two_detecting_orgs
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, world["a"]["email"])
+        page.goto(live_server + "/duplicate-detection/simple", timeout=PAGE_TIMEOUT)
+        expect(
+            page.get_by_text(world["a"]["group_name"]).filter(visible=True).first
+        ).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.get_by_role("button", name="Run Detection", exact=True).first.click()
+        dialog = page.locator("[aria-labelledby='run-detection-modal-title']")
+        expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
+        with page.expect_response(
+            lambda r: r.url.endswith("/simple/api/run-detection"),
+            timeout=RUN_TIMEOUT,
+        ) as run_response:
+            dialog.get_by_role("button", name="Start duplicate detection").click()
+        outcome = run_response.value
+        assert outcome.status == 200, outcome.text()[:300]
+        assert outcome.json().get("success") is True, outcome.text()[:300]
+        page.reload(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("Never")).to_have_count(0, timeout=PAGE_TIMEOUT)
+    finally:
+        context.close()
+
+    # Organisation B reads exactly what it read before.
+    _read(browser, live_server, world, "b", "a", 1440)
