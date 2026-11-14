@@ -4,25 +4,25 @@
     alert_dialog_header, alert_dialog_footer, alert_dialog_title, alert_dialog_description, alert_dialog_action %}
 {% call alert_dialog() %}
   {% call alert_dialog_overlay(id='session-warning-overlay') %}{% endcall %}
-  {% call alert_dialog_content(id='session-warning-dialog', attrs={'data-state': 'closed', 'hidden': ''}) %}
+  {% call alert_dialog_content(id='session-warning-dialog', attrs={'data-state': 'closed', 'data-size': 'default', 'hidden': ''}) %}
     {% call alert_dialog_header() %}
       {% call alert_dialog_title() %}You'll be signed out in <span id="session-warning-remaining">2 minutes</span>{% endcall %}
       {% call alert_dialog_description() %}Nothing has happened on this page for a while. Press Stay signed in to keep working.{% endcall %}
     {% endcall %}
     {% call alert_dialog_footer() %}
-      {% call alert_dialog_action(attrs={'type': 'button', 'data-autofocus': '', 'data-session-stay': ''}) %}Stay signed in{% endcall %}
+      {% call alert_dialog_action(class='bg-primary text-primary-foreground h-9 px-4 rounded-md text-sm font-medium', attrs={'type': 'button', 'data-autofocus': '', 'data-session-stay': ''}) %}Stay signed in{% endcall %}
     {% endcall %}
   {% endcall %}
 {% endcall %}
 {% call alert_dialog() %}
   {% call alert_dialog_overlay(id='session-ended-overlay') %}{% endcall %}
-  {% call alert_dialog_content(id='session-ended-dialog', attrs={'data-state': 'closed', 'hidden': ''}) %}
+  {% call alert_dialog_content(id='session-ended-dialog', attrs={'data-state': 'closed', 'data-size': 'default', 'hidden': ''}) %}
     {% call alert_dialog_header() %}
       {% call alert_dialog_title() %}You were signed out{% endcall %}
       {% call alert_dialog_description(attrs={'id': 'session-ended-message'}) %}You were signed out.{% endcall %}
     {% endcall %}
     {% call alert_dialog_footer() %}
-      {% call alert_dialog_action(attrs={'type': 'button', 'data-autofocus': '', 'data-session-signin': ''}) %}Sign in{% endcall %}
+      {% call alert_dialog_action(class='bg-primary text-primary-foreground h-9 px-4 rounded-md text-sm font-medium', attrs={'type': 'button', 'data-autofocus': '', 'data-session-signin': ''}) %}Sign in{% endcall %}
     {% endcall %}
   {% endcall %}
 {% endcall %}

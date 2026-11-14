@@ -42,6 +42,8 @@ def _shot(page, name, width, theme):
     if not SHOTS:
         return
     os.makedirs(SHOTS, exist_ok=True)
+    page.wait_for_timeout(600)  # let the dialog finish opening
+    page.emulate_media(color_scheme=theme)
     page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)
     page.screenshot(path=os.path.join(SHOTS, "%s-%d-%s.png" % (name, width, theme)))
 
@@ -59,6 +61,10 @@ def test_warning_comes_before_the_sign_out_and_stay_signed_in_keeps_the_session(
     stay = dialog.get_by_role("button", name="Stay signed in")
     expect(stay).to_be_focused()
     _shot(page, "warning", 1440, "light")
+    page.set_viewport_size({"width": 390, "height": 800})
+    _shot(page, "warning", 390, "dark")
+    page.emulate_media(color_scheme="light")
+    page.evaluate("document.documentElement.classList.remove('dark')")
     stay.press("Enter")
     expect(dialog).to_be_hidden()
     # Wait past the limit counted from sign-in: only the press can have kept the session.
@@ -83,10 +89,6 @@ def test_open_chat_page_says_at_once_when_the_session_ended_and_signs_back_in_wi
     sign_in_button = ended.get_by_role("button", name="Sign in")
     expect(sign_in_button).to_be_visible()
     _shot(page, "signed-out", 1440, "light")
-    seen = []
-    page.on("framenavigated", lambda f: seen.append(f.url))
-    page.on("response", lambda r: seen.append("%s %s" % (r.status, r.url)) if "login" in r.url else None)
-    target = page.locator("[data-session-signin]").get_attribute("data-href")
     sign_in_button.click()
     page.wait_for_url(lambda url: "/account/login" in url, timeout=PAGE_TIMEOUT)
     login_url = page.url
@@ -96,7 +98,7 @@ def test_open_chat_page_says_at_once_when_the_session_ended_and_signs_back_in_wi
     try:
         page.wait_for_url(lambda url: "/ai-chat" in url, timeout=20000)
     except Exception:
-        raise AssertionError("after signing in the person is at %s (login was %s, button led to %s; seen %s): %s" % (page.url, login_url, target, seen, page.locator("body").inner_text()[:300]))
+        raise AssertionError("after signing in the person is at %s (login was %s): %s" % (page.url, login_url, page.locator("body").inner_text()[:300]))
     box = page.locator("#user-input")
     expect(box).to_have_value(DRAFT, timeout=PAGE_TIMEOUT)
     assert page.get_by_test_id("estate-answer").count() == 0
