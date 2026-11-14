@@ -112,8 +112,8 @@
     {% call ui.alert(variant='destructive', attrs={'data-testid': 'money-error', 'role': 'alert'}) %}{{ ui.alert_description(text=error) }}{% endcall %}
     {% endif %}
     <form method="post" action="{{ url_for('procurement.money') }}" class="space-y-4" data-testid="money-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      {% if replaces %}<input type="hidden" name="replaces_id" value="{{ replaces.id }}">{% endif %}
+      {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
+      {% if replaces %}{{ ui.input(type='hidden', name='replaces_id', value=replaces.id) }}{% endif %}
       {% call ui.field() %}
         {{ ui.field_label(text='What the figure is', attrs={'for': 'money-measure'}) }}
         {% call native_select_wrapper(class='w-full') %}{% call native_select(id='money-measure', name='measure', class='w-full') %}
