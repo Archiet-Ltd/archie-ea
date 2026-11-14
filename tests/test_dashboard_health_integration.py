@@ -23,9 +23,9 @@ def test_dashboard_and_executive_api_agree_for_known_phase_portfolio(db_session,
         ])
         db.session.flush()
     login_as(client, user)
-    overview = client.get("/dashboard/overview")
+    overview = client.get("/dashboard/health")
     assert overview.status_code == 200
-    match = re.search(r'data-testid="health-score-value">([^<]+)</p>', overview.get_data(as_text=True))
+    match = re.search(r'data-testid="health-score-value">([^<]+)</strong>', overview.get_data(as_text=True))
     assert match is not None, "Must exercise the populated dashboard, not skip its health card"
     # One of two solutions is past Phase B. Other components have no observations;
     # reweighting over phase alone gives 50, not maturity_current's measured zero.
