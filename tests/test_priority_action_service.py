@@ -273,7 +273,8 @@ def test_statement_count_is_bounded_whatever_the_row_count(db_session, make_org,
         finally:
             event.remove(db.engine, "before_cursor_execute", _count)
     assert result["total"] == 30 + 30 + svc.RISK_LIMIT
-    assert len(statements) <= 5, statements  # gaps, their links, work packages, dependencies, risks
+    # gaps, their links, work packages, dependencies, deliverables (for the progress shown), risks
+    assert len(statements) <= 6, statements
 
 
 def test_rule_sentence_is_one_sentence():

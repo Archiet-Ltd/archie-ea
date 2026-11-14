@@ -521,6 +521,7 @@ def work_packages():
         .limit(500)
         .all()
     )
+    work_package_service.preload_progress(rows)
     return render_template(
         "enterprise/work_packages.html",
         work_packages=rows,
@@ -653,6 +654,7 @@ def api_work_packages_gantt():
         work_packages = q.order_by(UWP.start_date.asc(), UWP.id.asc()).all()
 
         items = []
+        work_package_service.preload_progress(work_packages)
         for wp in work_packages:
             items.append({
                 "id": wp.id,

@@ -144,6 +144,7 @@ def build_roadmap_slice(org_id: int) -> dict:
         work_package_service.UnifiedWorkPackage.id.asc()
     ).all()
     links = work_package_service.plateau_and_gap_links(work_packages, org_id)
+    work_package_service.preload_progress(work_packages)
 
     element_types = _element_type_by_id()
     plateau_ids = {p.id for p in plateaus}

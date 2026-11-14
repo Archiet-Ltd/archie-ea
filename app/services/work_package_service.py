@@ -44,6 +44,28 @@ def is_resolved(status: Any) -> bool:
     return status_key(status) in _RESOLVED or status_key(status) == "canceled"
 
 
+def _deliverable_statuses(work_packages: List[UnifiedWorkPackage]) -> Dict[int, List[str]]:
+    """Each package's deliverable statuses, one query for the whole list."""
+    from app.models.implementation_migration import Deliverable
+
+    found: Dict[int, List[str]] = {w.id: [] for w in work_packages if getattr(w, "id", None)}
+    if found:
+        for wp_id, delivery_status in db.session.execute(
+            db.select(Deliverable.unified_work_package_id, Deliverable.delivery_status).where(
+                Deliverable.unified_work_package_id.in_(list(found)))
+        ):
+            found[wp_id].append(delivery_status)
+    return found
+
+
+def preload_progress(work_packages: List[UnifiedWorkPackage]) -> None:
+    """Read the deliverable statuses ``progress_basis`` needs for a whole list in one
+    query, so a screen listing many packages does not ask once per package. Call it
+    on the list a request is about to render, not on a long-lived session."""
+    for wp_id, statuses in _deliverable_statuses(work_packages).items():
+        next(w for w in work_packages if getattr(w, "id", None) == wp_id)._deliverable_statuses = statuses
+
+
 def progress_basis(wp: UnifiedWorkPackage) -> Dict[str, Any]:
     """How far a work package has got and where the figure comes from, as
     ``{"percent", "source", "label"}``. ``source`` is ``entered`` (a person recorded
@@ -63,11 +85,12 @@ def progress_basis(wp: UnifiedWorkPackage) -> Dict[str, Any]:
         return {"percent": min(int(stored), 99), "source": "entered", "label": "Entered by the team"}
     if stored:
         return {"percent": min(int(stored), 99), "source": "entered", "label": "Entered by the team"}
-    from app.models.implementation_migration import Deliverable
-
-    rows = Deliverable.query.filter_by(unified_work_package_id=wp.id).all() if getattr(wp, "id", None) else []
-    if rows:
-        done = sum(1 for d in rows if status_key(d.delivery_status) == "completed")
+    statuses = getattr(wp, "_deliverable_statuses", None)
+    if statuses is None:
+        statuses = _deliverable_statuses([wp]).get(getattr(wp, "id", None), [])
+    if statuses:
+        rows = statuses
+        done = sum(1 for d in rows if status_key(d) == "completed")
         return {
             "percent": min(round(done * 100 / len(rows)), 99),
             "source": "computed",

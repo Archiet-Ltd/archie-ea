@@ -158,12 +158,13 @@ def _gap_rows(organization_id: int) -> List[Dict[str, Any]]:
 
 def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]]:
     candidates = {}
-    for wp in work_package_service.query_for(organization_id).all():
+    packages = work_package_service.query_for(organization_id).all()
+    for wp in packages:
         if work_package_service.is_resolved(wp.status):
             continue
         overdue = 0
-        progress = work_package_service.progress_percent(wp, today)
-        if wp.end_date is not None and wp.end_date.date() < today and (progress or 0) < 100:
+        # An unresolved package never reads 100, so a passed end date is enough.
+        if wp.end_date is not None and wp.end_date.date() < today:
             overdue = (today - wp.end_date.date()).days
         if overdue or work_package_service.status_key(wp.status) == "on_hold":
             candidates[wp.id] = [wp, overdue, []]
@@ -173,6 +174,7 @@ def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]
         slot[2] = [b.name for b in entry["blocked_by"]]
 
     rows = []
+    work_package_service.preload_progress([entry[0] for entry in candidates.values()])
     for wp, overdue, blockers in candidates.values():
         pct, due = _percent(work_package_service.progress_percent(wp, today)), _day(wp.end_date)
         reasons = []
