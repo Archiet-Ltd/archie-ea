@@ -1095,10 +1095,12 @@ function blueprintPage() {
         self.complianceGapLoading = true;
         try {
             const data = await Platform.fetch('/solutions/' + self.solutionId + '/api/compliance-gap', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': self.csrfToken },
                 silent: true   // We paint our own error toast below.
             });
             if (!data.success) throw new Error(data.error || 'the analysis did not complete');
-            self.complianceGap = data.gap;
+            self.complianceGap = data;
             self.complianceGapLoaded = true;
             self.complianceGapLoading = false;
         } catch (e) {
