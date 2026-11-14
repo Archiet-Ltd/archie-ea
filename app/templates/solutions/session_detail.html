@@ -48,7 +48,7 @@
 
     <!-- Tabs -->
     <div class="border-b border-border mb-6">
-        <nav class="flex gap-6">
+        <nav class="flex gap-6 overflow-x-auto">
             <button type="button" @click="activeTab = 'overview'"
                     :class="activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
                     class="pb-3 border-b-2 font-medium text-sm transition-colors" aria-label="Show overview tab">
