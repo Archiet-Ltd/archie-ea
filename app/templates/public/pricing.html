@@ -55,7 +55,7 @@
         {# Community #}
         <article class="public-card" data-testid="plan-card-community">
           <h3 class="public-card-title">Community</h3>
-          <p class="pp-for">Evaluation, one-person companies and self-hosters.</p>
+          <p class="pp-for">{{ plans.free.audience }}</p>
           <p class="pp-price">Free</p>
           <p class="pp-note">No trial clock. One organisation, up to three people.</p>
           <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-community">Start free</a>
@@ -70,23 +70,20 @@
         </article>
 
         {# Startup and Team: price and buy button per interval #}
-        {% for key, name, for_whom, items in [
-          ('startup', 'Startup', 'Founders and small services firms, 5 to 50 people.',
-            ['Ten people', 'Email support']),
-          ('team', 'Team', 'Scale-ups and services companies, 50 to 500 people.',
-            ['Pay for editors only; everyone else asks for free', 'Single sign-on', 'The review-board workflow', 'Your own model key', 'Email support'])
-        ] %}
+        {% for key in ['startup', 'team'] %}
+        {% set plan = plans[key] %}
+        {% set name = plan.name %}
         {% set prices = plan_prices[key] %}
         <article class="public-card" data-testid="plan-card-{{ key }}">
           <h3 class="public-card-title">{{ name }}</h3>
-          <p class="pp-for">{{ for_whom }}</p>
+          <p class="pp-for">{{ plan.audience }}</p>
           <p class="pp-price">
             <span data-interval="year">{{ prices[0] }}</span>
             {% if prices[1] %}<span data-interval="month">{{ prices[1] }}</span>{% endif %}
           </p>
           <p class="pp-note">
-            <span data-interval="year">{% if key == 'startup' %}USD 490/year for a team of ten. USD 98 less than twelve months at USD 49/month.{% else %}USD 290/editor/year. People who only ask questions are free.{% endif %}</span>
-            {% if prices[1] %}<span data-interval="month">{% if key == 'startup' %}USD 49/month for a team of ten, or USD 490/year and save USD 98.{% else %}USD 29/editor/month, or USD 290/editor/year and save USD 58 per editor. People who only ask questions are free.{% endif %}</span>{% endif %}
+            <span data-interval="year">{% if key == 'startup' %}USD 490/year for a team of {{ plan.people_words }}. USD 98 less than twelve months at USD 49/month.{% else %}USD 290/editor/year. People who only ask questions are free.{% endif %}</span>
+            {% if prices[1] %}<span data-interval="month">{% if key == 'startup' %}USD 49/month for a team of {{ plan.people_words }}, or USD 490/year and save USD 98.{% else %}USD 29/editor/month, or USD 290/editor/year and save USD 58 per editor. People who only ask questions are free.{% endif %}</span>{% endif %}
             {% if not _billing %}<span class="block mt-1" data-testid="start-free-note-{{ key }}">Start free puts you on Community. {{ name }} is set up in a conversation with us.</span>{% endif %}
           </p>
           {% if _billing %}
@@ -101,7 +98,7 @@
           <div class="pp-alt">{% if key == 'startup' %}<a rel="nofollow" class="underline font-medium" href="{{ url_for('main.track_plan_click', plan='startup', next=url_for('account.register', plan='startup', interval='year', offer='credit')) }}" data-testid="credit-startup" title="For companies founded in the last 36 months that have raised up to USD 1M. Ten people for 90 days.">Start with 90 days free</a>{% endif %}</div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Community, plus</li>
-            {% for item in items %}<li>{{ item }}</li>{% endfor %}
+            {% for item in plan.features %}<li>{{ item }}</li>{% endfor %}
           </ul>
         </article>
         {% endfor %}
@@ -109,7 +106,7 @@
         {# Enterprise #}
         <article class="public-card" data-testid="plan-card-enterprise">
           <h3 class="public-card-title">Enterprise</h3>
-          <p class="pp-for">Enterprise architecture teams.</p>
+          <p class="pp-for">{{ plans.enterprise.audience }}</p>
           <p class="pp-price">{{ plan_prices.enterprise[0] }}</p>
           <p class="pp-note">Annual contract from USD 24,000/year.</p>
           <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-enterprise">Contact sales</a>

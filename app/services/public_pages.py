@@ -1724,6 +1724,11 @@ def _self_hosted_offer() -> dict[str, Any]:
     }
 
 
+def _plan_audience(plan) -> dict[str, Any]:
+    """Who the plan is for, from the same field the pricing page shows."""
+    return {"@type": "Audience", "audienceType": plan.audience}
+
+
 def _flat_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
     """An Offer for a flat (non per-unit) hosted plan price at one interval."""
     suffix = "month" if interval == "month" else "year"
@@ -1734,6 +1739,7 @@ def _flat_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
         "price": str(amount),
         "priceCurrency": plan.display_currency,
         "description": f"{plan.summary} {price_text}, hosted by Entelim.",
+        "audience": _plan_audience(plan),
     }
 
 
@@ -1755,6 +1761,7 @@ def _per_unit_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
         "description": (
             f"{plan.summary} ${amount}/{unit}/{suffix}, hosted by Entelim."
         ),
+        "audience": _plan_audience(plan),
         "priceSpecification": {
             "@type": "UnitPriceSpecification",
             "price": str(amount),
@@ -1788,6 +1795,7 @@ def _enterprise_offer(plan, site_url: str) -> dict[str, Any]:
         "description": (
             f"{plan.summary} Sold by contract, from ${floor:,}/year -- contact sales."
         ),
+        "audience": _plan_audience(plan),
     }
 
 

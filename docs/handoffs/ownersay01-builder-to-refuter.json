@@ -1,0 +1,11 @@
+{
+  "from": "builder",
+  "to": "refuter",
+  "artifact": "docs/handoffs/ownersay01-builder-report.md",
+  "approval_status": "pending",
+  "gate_conditions": [
+    "tests_reported_passing"
+  ],
+  "unmet_conditions": [],
+  "timestamp": "2026-11-13T23:46:00Z"
+}

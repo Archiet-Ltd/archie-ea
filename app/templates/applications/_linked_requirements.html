@@ -1,7 +1,7 @@
 {# The requirements of adopted frameworks (DORA, NIS2, ISO 27001 ...) linked to this application, and the form that links another. #}
 {% import 'basecoat/index.html' as ui %}
 {% set can_link = can('edit', 'application') %}
-<div data-slot="card" class="rounded-lg border border-border bg-card" id="application-requirements" data-testid="application-requirements">
+<div data-slot="card" class="rounded-lg border border-border bg-card scroll-mt-20" id="application-requirements" data-testid="application-requirements">
   <div class="flex flex-col space-y-1.5 p-6 pb-3">
     <h3 class="text-lg font-semibold">Framework requirements ({{ linked_requirements | length }})</h3>
     <p class="text-sm text-muted-foreground">Requirements from the frameworks your organisation adopted, such as DORA or NIS2, that apply to this application.</p>
@@ -11,7 +11,7 @@
     <ul class="space-y-2">
       {% for row in linked_requirements %}
       <li class="flex flex-col gap-0.5" data-testid="application-requirement">
-        <a class="font-medium text-foreground hover:underline" href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', framework=row.framework_id) }}">{{ row.framework }} &middot; {{ row.reference.split(', ')[-1] if row.reference else row.code }} &middot; {{ row.title }}</a>
+        <a class="font-medium text-foreground hover:underline" href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', framework=row.framework_id) }}#requirement-{{ row.control_id }}">{{ row.framework }} &middot; {{ row.reference.split(', ')[-1] if row.reference else row.code }} &middot; {{ row.title }}</a>
         <span class="text-muted-foreground">{{ row.category or 'No group recorded' }} &middot; status: {{ (row.status or 'planned').replace('_', ' ') }}</span>
       </li>
       {% endfor %}

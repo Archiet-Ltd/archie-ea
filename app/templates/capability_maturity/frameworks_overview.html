@@ -3,19 +3,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
 
-{% block title %}Frameworks Overview{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Business Layer', 'href': url_for('archimate_crud.dashboard') + '#business'},
-    {'text': 'Capabilities', 'href': url_for('capability_map.index')},
-    {'text': 'Maturity Frameworks', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Frameworks Overview{% endblock %}{% block content %}
 {# Safe color mapping — dynamic bg-{{ color }}-* classes don't work with CDN Tailwind JIT #}
 {% set color_map = {
     'blue':   {'icon_bg': 'bg-primary/10',   'icon_text': 'text-primary',       'badge': 'bg-primary/10 text-primary',       'bar': 'bg-primary'},
