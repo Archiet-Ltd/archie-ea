@@ -35,10 +35,11 @@ def _shot(page, name):
 def estate(seeded, live_server):
     """One business case, capability, work package, application and consolidation entry with money in the
     seeded organisation, and a business case and work package with other money in a second organisation."""
-    from datetime import datetime
+    from datetime import date, datetime, timedelta
 
     from app import create_app, db
-    from app.models.application_portfolio import ApplicationComponent
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
     from app.models.business_case import BusinessCase
     from app.models.organization import Organization
     from app.models.unified_capability import UnifiedCapability
@@ -63,9 +64,14 @@ def estate(seeded, live_server):
                                              estimated_cost=884422, start_date=datetime(2026, 3, 1),
                                              end_date=datetime(2026, 9, 1), status="planned")
         application = ApplicationComponent(name="Ledger %s" % suffix, organization_id=org_id)
-        db.session.add_all([case, foreign_case, capability, package, foreign_package, application])
+        vendor = VendorOrganization(name="Ledger supplier %s" % suffix)
+        db.session.add_all([case, foreign_case, capability, package, foreign_package, application, vendor])
         db.session.flush()
         set_annual_cost(application, 482917)
+        db.session.add(VendorContract(
+            vendor_id=vendor.id, organization_id=org_id, application_id=application.id,
+            contract_name="Ledger agreement %s" % suffix, status="active", annual_cost=482917,
+            start_date=date.today() - timedelta(days=30), end_date=date.today() + timedelta(days=300)))
         db.session.commit()
         return {"case": case.title, "case_id": case.id, "capability": capability.name, "package": package.name,
                 "application": application.name, "foreign": ("Foreign case", "Foreign cutover")}
@@ -131,7 +137,17 @@ def test_an_architect_reads_the_places_without_an_amount(browser, live_server, s
         page.goto(live_server + "/capability-map/?view=list", wait_until="domcontentloaded")
         expect(page.get_by_text(estate["capability"]).filter(visible=True).first).to_be_visible()
         assert page.get_by_role("columnheader", name="Investment").count() == 0
-        _assert_no_figure(_main_text(page), "the capability list")
+        text = _main_text(page)
+        assert text.count(WITHHELD) == 1, "capability list: the sentence is said once, not %d times" % text.count(WITHHELD)
+        _assert_no_figure(text, "the capability list")
+        # the detail panel of one capability: its measures, with no investment and the sentence not repeated
+        page.get_by_role("button", name="View detail").first.click()
+        panel = page.get_by_role("dialog").filter(has_text=estate["capability"])
+        expect(panel.get_by_text("Maturity", exact=True)).to_be_visible()
+        assert panel.get_by_text("Investment", exact=True).count() == 0, "the panel names an investment measure"
+        _assert_no_figure(panel.inner_text(), "the capability detail panel")
+        assert page.locator("body").inner_text().count(WITHHELD) == 1, "the panel repeats the sentence"
+        _shot(page, "capability-panel-withheld-" + label)
 
         # the work-package timeline feed
         feed = page.request.get(live_server + "/enterprise/api/work-packages/gantt")
@@ -183,6 +199,24 @@ def test_the_chief_technology_officer_reads_the_same_places_with_their_figures(b
         expect(page.get_by_text("£619K").first).to_be_visible()
         assert WITHHELD not in _main_text(page)
         _shot(page, "capability-map-allowed-" + label)
+
+        # the capability list and one capability's detail panel carry the investment figures
+        page.goto(live_server + "/capability-map/?view=list", wait_until="domcontentloaded")
+        row = page.get_by_role("row").filter(has_text=estate["capability"])
+        expect(row.get_by_text("£619K / £620K planned")).to_be_visible()
+        assert WITHHELD not in _main_text(page)
+        row.get_by_role("button", name="View detail").click()
+        panel = page.get_by_role("dialog").filter(has_text=estate["capability"])
+        expect(panel.get_by_text("Now: £619K")).to_be_visible()
+        expect(panel.get_by_text("Planned: £620K")).to_be_visible()
+        _shot(page, "capability-panel-allowed-" + label)
+
+        # the applications list states the run cost, which the architect is not shown
+        page.goto(live_server + "/applications/", wait_until="domcontentloaded")
+        expect(page.get_by_role("link", name=estate["application"]).first).to_be_visible()
+        expect(page.get_by_test_id("run-cost-total")).to_contain_text("482,917")
+        assert WITHHELD not in _main_text(page)
+        _shot(page, "applications-allowed-" + label)
 
         feed = page.request.get(live_server + "/enterprise/api/work-packages/gantt")
         assert feed.ok
