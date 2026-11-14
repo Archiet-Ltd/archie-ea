@@ -23,7 +23,9 @@
             {% call button(type='button', variant='ghost', size='bare', class='w-full text-left px-2.5 py-1.5 text-xs', attrs_dict={'@click': pick, 'x-text': 'entity.name', 'data-testid': 'risk-link-choice'}) %}{% endcall %}
         </template>
     </div>
-    <p x-show="linkSearch.trim().length >= 2 && linkResults.length === 0 && !linkSearching" x-cloak class="text-xs text-muted-foreground">Nothing matches that search. Try part of the name.</p>
+    <p x-show="linkSearch.trim().length >= 2 && linkResults.length === 0 && !linkSearching && !linkFailed" x-cloak class="text-xs text-muted-foreground">Nothing matches that search. Try part of the name.</p>
+    <p x-show="linkFailed && !linkSearching" x-cloak class="text-xs text-destructive" data-testid="risk-link-search-failed" role="alert">The search could not run.
+        {% call button(type='button', variant='link', size='bare', class='text-xs', attrs_dict={'@click': 'searchLinkEntities()'}) %}Try again{% endcall %}</p>
     {% if chips %}
     <ul class="flex flex-wrap gap-2" data-testid="risk-link-chips" x-show="pendingLinks.length > 0" x-cloak>
         <template x-for="chip in pendingLinks" :key="chip.type + ':' + chip.id">
@@ -47,10 +49,11 @@ function riskLinkPicker() {
         linkSearch: '',
         linkResults: [],
         linkSearching: false,
+        linkFailed: false,
 
         searchLinkEntities() {
             const q = this.linkSearch.trim();
-            if (q.length < 2) { this.linkResults = []; return; }
+            if (q.length < 2) { this.linkResults = []; this.linkFailed = false; return; }
             const self = this;
             const endpoints = {
                 application: '/applications/api/list?search=' + encodeURIComponent(q) + '&limit=10',
@@ -60,12 +63,13 @@ function riskLinkPicker() {
             };
             const type = this.linkType;
             this.linkSearching = true;
+            this.linkFailed = false;
             Platform.fetch.get(endpoints[type], null, { silent: true })
                 .then(function (data) {
                     const rows = data.applications || data.items || data.capabilities || data || [];
                     self.linkResults = rows.map(function (r) { return { id: r.id, name: r.name, type: type }; });
                 })
-                .catch(function () { self.linkResults = []; })
+                .catch(function () { self.linkResults = []; self.linkFailed = true; })
                 .finally(function () { self.linkSearching = false; });
         }
     };

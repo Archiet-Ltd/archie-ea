@@ -324,7 +324,7 @@
             <h2 id="create-risk-modal-heading" class="text-base font-semibold text-foreground" x-text="editingId ? 'Edit risk' : 'Add risk'">Add risk</h2>
             <p class="text-sm text-muted-foreground">Record an enterprise architecture risk.</p>
         </div>
-        <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span>. Change what it touches with Map to… on the risk's own row.</p>
+        <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing <span x-text="editingTitle"></span>. Change what it touches with Map to… on the risk's own row.</p>
         {% call form_group(id='risk-title', label='Title', required=true) %}
             {{ input(id='risk-title', type='text', size='sm', placeholder='What could go wrong?', attrs_dict={'x-model': 'form.title'}) }}
         {% endcall %}
@@ -463,6 +463,7 @@ function riskRegister() {
             owner: '', mitigation_plan: ''
         },
         editingId: null,
+        editingTitle: '',
 
         // H2: detail slide-over state.
         panelOpen: false,
@@ -505,6 +506,7 @@ function riskRegister() {
 
         openCreate() {
             this.editingId = null;
+            this.editingTitle = '';
             this.form.title = '';
             this.form.description = '';
             this.form.likelihood = '3';
@@ -525,6 +527,7 @@ function riskRegister() {
             if (!row) return;
             this.panelOpen = false;
             this.editingId = row.id;
+            this.editingTitle = row.title || 'this risk';
             this.form.title = row.title || '';
             this.form.description = row.description || '';
             this.form.likelihood = String(row.likelihood);

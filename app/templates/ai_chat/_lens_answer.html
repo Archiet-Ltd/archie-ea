@@ -19,7 +19,7 @@
     'compliance': 'Which regulations and controls apply to ' ~ name ~ ', and which have no evidence',
 } %}
 {% macro reached(rows) -%}
-{{ rows | length }} connection{{ '' if rows | length == 1 else 's' }} reached
+{%- if rows | length == 0 -%}No connections are recorded for this yet. Add its relationships on its own page to see what it reaches.{%- else -%}{{ rows | length }} connection{{ '' if rows | length == 1 else 's' }} reached{%- endif -%}
 {%- endmacro %}
 {% macro restricted_or(figure_label, value, reason, restricted_reason) -%}
 {%- if value is not none -%}{{ figure_label }}: {{ '%.1f' | format(value) }}%

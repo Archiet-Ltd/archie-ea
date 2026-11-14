@@ -32,6 +32,16 @@ def _shot(page, name, width):
         page.screenshot(path=str(Path(SHOTS) / ("%s-%d.png" % (name, width))), full_page=True)
 
 
+def _shot_narrow_dark(page, name):
+    """The same state at 390 wide in the dark scheme, then back to the desktop light view."""
+    if SHOTS:
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.emulate_media(color_scheme="dark")
+        _shot(page, name, 390)
+        page.set_viewport_size({"width": 1440, "height": 900})
+        page.emulate_media(color_scheme="light")
+
+
 def _seed_application(org_id, name):
     """An application with its ArchiMate element, in the organisation."""
     from app import create_app, db
@@ -228,7 +238,11 @@ def test_a_risk_linked_later_from_the_register_is_found_by_the_chat_and_the_dial
         expect(dialog.get_by_role("heading", name="Edit risk", exact=True)).to_be_visible()
         expect(dialog.get_by_role("button", name="Save changes", exact=True)).to_be_visible()
         expect(dialog.get_by_role("heading", name="Add risk", exact=True)).to_have_count(0)
+        # The risk is named by its title, never by a database number.
+        expect(dialog).to_contain_text("Editing " + title)
+        expect(dialog).not_to_contain_text("Editing risk #")
         _shot(page, "risk-dialog-edit-mode", 1440)
+        _shot_narrow_dark(page, "risk-dialog-edit-mode")
         dialog.get_by_role("button", name="Cancel").click()
 
         # Link it from the register: Row actions > Map to, then choose the application.
@@ -236,7 +250,17 @@ def test_a_risk_linked_later_from_the_register_is_found_by_the_chat_and_the_dial
         row.get_by_role("button", name="Row actions").click()
         page.get_by_role("menuitem", name="Map to…").click()
         detail = page.get_by_role("dialog", name="Risk detail")
+        # A search that fails says so and offers Try again; it never claims nothing matches.
+        page.route("**/applications/api/list*", lambda route: route.abort())
         detail.get_by_label("Search entities to link").fill(billing["name"])
+        failed = detail.get_by_test_id("risk-link-search-failed")
+        expect(failed).to_contain_text("could not run")
+        expect(failed.get_by_role("button", name="Try again")).to_be_visible()
+        expect(detail.get_by_text("Nothing matches that search")).to_be_hidden()
+        _shot(page, "risk-picker-search-failed", 1440)
+        _shot_narrow_dark(page, "risk-picker-search-failed")
+        page.unroute("**/applications/api/list*")
+        failed.get_by_role("button", name="Try again").click()
         with page.expect_response(lambda r: r.url.endswith("/links") and r.request.method == "POST") as linked:
             detail.get_by_test_id("risk-link-choice").first.click()
         assert linked.value.status == 201
