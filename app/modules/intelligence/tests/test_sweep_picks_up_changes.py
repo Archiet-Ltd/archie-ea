@@ -179,7 +179,6 @@ def test_the_panel_counts_relationships_added_since_the_last_run(app, db_session
 def test_a_session_in_another_time_zone_does_not_change_what_counts_as_changed(app, db_session, make_org):
     """Relationship stamps hold the session's local time and runs hold UTC; the two are
     compared in one base, so a London or Auckland session sees the same answer as UTC."""
-    from app.models import ArchiMateRelationship
     from app.modules.intelligence.services.derivation_runner import DerivationRunner
     from app.modules.intelligence.services.derived_facts import derivation_status
     from app.modules.intelligence.services.recompute_job import changed_since_last_run_organization_ids
