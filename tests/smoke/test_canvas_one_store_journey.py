@@ -182,6 +182,7 @@ def test_a_cto_sees_the_cost_lines_and_a_business_architect_is_told_why_not(brow
             card = ask(page, live_server, COST_QUESTION)
             expect(card.locator("[data-catalogue-cards]")).to_have_attribute("data-catalogue-entry", "canvas_box_entries")
             text = card.inner_text()
+            shot(page, "cost-chat-" + persona, 1440, "light")
             if sees:
                 texts = [line["text"] for line in costs["costs"]["lines"]]
                 assert any(t.startswith("Billing ledger: 48,000") for t in texts)
