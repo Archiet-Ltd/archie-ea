@@ -40,7 +40,7 @@ TOP = ["Home", "AI chat", "Approvals"]
 WORK = ["Systems", "Impact", "Changes", "Spend", "Compliance"]
 LAYERS = ["Strategy", "Business", "Application", "Technology", "Physical", "Motivation",
           "Implementation and migration", "Other"]
-MODEL = ["Model map"] + LAYERS + ["Frameworks", "Canvases", "Composer"]
+MODEL = ["Model map"] + LAYERS + ["Products", "Frameworks", "Canvases", "Composer"]
 SECONDARY = ["Connections", "Reports", "Help"]
 
 WORK_CHILDREN = {
@@ -125,7 +125,7 @@ def test_the_groups_hold_the_v31_entries_in_order():
     assert [link.label for link in registry.WORK] == WORK
     assert [link.label for link in registry.MODEL] == MODEL
     assert [link.label for link in registry.SECONDARY] == SECONDARY
-    assert [link.label for link in registry.USER_MENU] == ["Account", "Billing", "Team", "Rate limits", "Organisation administration", "Platform admin"]
+    assert [link.label for link in registry.USER_MENU] == ["Account", "Billing", "Team", "Rate limits", "Settings", "Organisation administration", "Platform admin"]
 
 
 def test_each_work_item_holds_its_pages_in_order():
@@ -328,7 +328,10 @@ def test_every_catalogue_page_has_a_home_in_the_sidebar(app):
 
 
 @pytest.mark.parametrize("endpoint,entry", [
-    ("capability_map.index", "systems"),
+    # the sidebar draws the capability map, value streams and processes under their model layers
+    ("capability_map.index", "layer_strategy"),
+    ("value_stream.index", "layer_strategy"),
+    ("business_architecture.processes", "layer_business"),
     ("unified_applications.vendors", "spend"),
     ("genome_roadmap.index", "changes"),
     ("enterprise.work_packages", "changes"),
@@ -338,7 +341,7 @@ def test_every_catalogue_page_has_a_home_in_the_sidebar(app):
     ("strategic.impact_analysis", "impact"),
     ("intelligence_ui.ask", "ai_chat"),
     ("unified_ai_chat.approval_inbox", "approvals"),
-    ("archimate_crud.list_elements", "archimate_model"),
+    ("archimate_crud.list_elements", "products"),
     ("admin.organizations_list", "platform_admin"),
 ])
 def test_pages_are_filed_under_the_job_they_serve(endpoint, entry):
