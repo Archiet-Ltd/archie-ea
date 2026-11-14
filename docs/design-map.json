@@ -1405,6 +1405,13 @@
   "P36-compare-two-records": "Compare two records or versions"
  },
  "inhouse_exceptions": {
+  "app/templates/governance/risk_register.html": [
+    {
+      "macro": "components/risk_link_picker.html",
+      "keep_until": "riskstore01",
+      "why": "the one picker that links a risk to what it touches, shared by the register slide-over and the Add Risk dialog"
+    }
+  ],
   "app/templates/architecture_assistant/index.html": [
    {
     "macro": "components/unified_mapping_modal.html",
