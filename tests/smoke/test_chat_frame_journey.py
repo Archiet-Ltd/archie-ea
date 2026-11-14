@@ -118,7 +118,7 @@ def test_every_moved_control_is_two_clicks_away_in_chat_options(browser, live_se
         scope.select_option("technology")
         assert scope.input_value() == "technology"
         # approvals, export and the matching page
-        expect(sheet.get_by_role("button", name="Approvals for review")).to_be_visible()
+        expect(sheet.get_by_role("button", name="Reviewed changes")).to_be_visible()
         expect(sheet.get_by_role("button", name="Export conversation")).to_be_visible()
         expect(sheet.get_by_role("button", name="Export context log")).to_be_visible()
         expect(sheet.get_by_role("link", name="Match entities")).to_have_attribute("href", re.compile(r"/ai-chat/.*match|/entity"))
@@ -132,7 +132,7 @@ def test_every_moved_control_is_two_clicks_away_in_chat_options(browser, live_se
         expect(sheet.locator("#health-score")).to_be_visible()
 
         # Approvals opens the review dialog and closes the sheet (no popup on a popup)
-        sheet.get_by_role("button", name="Approvals for review").click()
+        sheet.get_by_role("button", name="Reviewed changes").click()
         expect(page.locator("#ai-chat-approvals-modal")).to_be_visible()
         expect(sheet).to_be_hidden()
         assert page.locator("#ai-chat-approvals-modal").inner_text().strip() != ""
