@@ -1103,7 +1103,7 @@ def share_social(share: dict[str, Any]) -> dict[str, Any]:
     return {
         "title": share["title"],
         "description": share["message"],
-        "url": share["share_url"],
+        "url": f"{base}{SHARE_URL_PREFIX}/{share['slug']}",
         "image": base + share["cover"],
         "image_alt": share["alt"],
         "video": base + share["files"]["wide"]["path"],
