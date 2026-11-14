@@ -420,14 +420,12 @@ def capability_roadmap():
     Server-side: plateau_count, work_package_count for initial tile values so tiles
     never show a figure that disagrees with the evidence line while loading.
     """
-    from app.models.implementation_migration import Plateau
-    from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
-
     org_id = current_organization_id()
-    capability_count = UnifiedCapability.query.count()
-    domain_count = len(CapabilityHealthService().get_capability_health_metrics()["health_by_domain"]) or None
-    plateau_count = Plateau.query.filter(Plateau.organization_id == org_id).count()
-    work_package_count = work_package_service.query_for(org_id).count()
+    figures = result_footer_service.roadmap_figures(org_id)
+    capability_count = figures["capability_count"]
+    domain_count = figures["domain_count"]
+    plateau_count = figures["plateau_count"]
+    work_package_count = figures["work_package_count"]
     domain_basis = None
     if domain_count is None:
         domain_basis = (
@@ -452,9 +450,9 @@ def capability_roadmap():
         work_package_count=work_package_count,
         gap_signals=gap_signals,
         gap_signals_error=gap_signals_error,
-        summary_footer=result_footer_service.roadmap_summary_footer(
-            org_id, capability_count, domain_count,
-            plateau_count=plateau_count, work_package_count=work_package_count),
+        recorded_gaps=figures["recorded_gaps"],
+        ai_generated=figures["ai_generated"],
+        summary_footer_html=figures["footer_html"],
     )
 
 

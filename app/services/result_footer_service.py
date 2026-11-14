@@ -729,7 +729,7 @@ def plateau_footer(plateau, now: Optional[datetime] = None) -> Dict[str, Any]:
 
 def roadmap_summary_footer(organization_id: int, capability_count: int, domain_count: int,
                            plateau_count: Optional[int] = None, work_package_count: Optional[int] = None,
-                           now: Optional[datetime] = None) -> Dict[str, Any]:
+                           gap_count: Optional[int] = None, now: Optional[datetime] = None) -> Dict[str, Any]:
     """Footer for the roadmap's headline counts. The capability and domain counts are the ones the cards show
     (passed in, so footer and card cannot disagree); gaps, plateaus and work packages are counted for this
     organisation. Each is dated by the newest record behind it. When plateau_count or work_package_count are
@@ -758,7 +758,7 @@ def roadmap_summary_footer(organization_id: int, capability_count: int, domain_c
     # Gaps are the register's count (plateau transitions left out), the figure the Recorded gaps card shows.
     gaps_newest = db.session.execute(db.select(db.func.max(Gap.updated_at)).where(
         Gap.organization_id == organization_id, Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION)).scalar()
-    gap_count_fact = named("Gaps", count_gaps(organization_id), "Gaps", "enterprise.gap_analysis", gaps_newest)
+    gap_count_fact = named("Gaps", count_gaps(organization_id) if gap_count is None else gap_count, "Gaps", "enterprise.gap_analysis", gaps_newest)
     capabilities_newest = db.session.execute(db.select(db.func.max(UnifiedCapability.updated_at))).scalar()
     domains_newest = db.session.execute(db.select(db.func.max(BusinessDomain.updated_at))).scalar()
     return build_footer([
@@ -769,6 +769,48 @@ def roadmap_summary_footer(organization_id: int, capability_count: int, domain_c
         counted(UnifiedWorkPackage, "Work packages", "Work packages", "implementation_planning.work_packages_list",
                 count=work_package_count),
     ], now)
+
+
+def plateaus_for(organization_id: int):
+    """The one reader of an organisation's plateaus: a query the roadmap's list and its count both use."""
+    from app.models.implementation_migration import Plateau
+
+    return Plateau.query.filter(Plateau.organization_id == organization_id)
+
+
+def roadmap_figures(organization_id: int) -> Dict[str, Any]:
+    """Every figure the roadmap tiles and the evidence line under them show, counted once for this organisation.
+
+    The page and every answer the page redraws from return this one dictionary: the counts and the line's markup
+    built from those same counts, so a tile and the line cannot disagree."""
+    from app.models.unified_capability import UnifiedCapability
+    from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
+    from app.services import work_package_service
+    from app.services.gap_register_service import count_gaps
+
+    capability_count = UnifiedCapability.query.count()
+    domain_count = len(CapabilityHealthService().get_capability_health_metrics()["health_by_domain"]) or None
+    plateau_count = plateaus_for(organization_id).count()
+    work_package_count = work_package_service.query_for(organization_id).count()
+    recorded_gaps = count_gaps(organization_id)
+    from app import db
+    from app.models.implementation_migration import GAP_KIND_PLATEAU_TRANSITION, Gap
+
+    ai_generated = db.session.execute(db.select(db.func.count(Gap.id)).where(
+        Gap.organization_id == organization_id, Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+        Gap.auto_generated.is_(True))).scalar()
+    footer = roadmap_summary_footer(
+        organization_id, capability_count, domain_count,
+        plateau_count=plateau_count, work_package_count=work_package_count, gap_count=recorded_gaps)
+    return {
+        "capability_count": capability_count,
+        "domain_count": domain_count,
+        "plateau_count": plateau_count,
+        "work_package_count": work_package_count,
+        "recorded_gaps": recorded_gaps,
+        "ai_generated": ai_generated,
+        "footer_html": render_footer(footer),
+    }
 
 
 def connector_repository(element) -> Optional[Dict[str, Any]]:
