@@ -16,6 +16,7 @@ import json
 import secrets
 import threading
 import time
+from socketserver import ThreadingMixIn
 from urllib.parse import parse_qs, urlencode
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
@@ -36,12 +37,8 @@ class _QuietHandler(WSGIRequestHandler):
         pass
 
 
-class _ThreadedServer(WSGIServer):
+class _ThreadedServer(ThreadingMixIn, WSGIServer):
     daemon_threads = True
-
-    def process_request(self, request, client_address):
-        thread = threading.Thread(target=self.process_request_thread, args=(request, client_address), daemon=True)
-        thread.start()
 
 
 class FakeOIDCProvider:

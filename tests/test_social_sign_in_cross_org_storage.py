@@ -56,9 +56,9 @@ def test_m45_no_token_is_stored_or_logged(browser, db_session, caplog):
             for token in tokens:
                 assert token not in row[0], table
     for record in caplog.records:
-        text = record.getMessage() + " " + str(record.args or "") + " " + (record.exc_text or "")
+        line = record.getMessage() + " " + str(record.args or "") + " " + (record.exc_text or "")
         for token in tokens:
-            assert token not in text
+            assert token not in line
     assert "oauth_flow" not in browser.session()
 
 

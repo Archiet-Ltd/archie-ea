@@ -71,6 +71,10 @@ def login():
             safe_next_url(buy_intent.next_candidate(consume=True), url_for("dashboard.overview"))
         )
     form = LoginForm()
+    if request.method == "GET":
+        from app.modules.account.oauth_routes import pending_email
+
+        form.email.data = pending_email() or form.email.data
     if form.validate_on_submit():
         # COM-005: Check email-domain SSO config before password auth.
         # If the user's org has SSO configured and enabled, redirect to IdP.
@@ -113,8 +117,7 @@ def login():
             # Fix Session Fixation: Regenerate session ID after successful authentication
             # Read before the session is cleared: the chosen plan lives in it.
             _landing = buy_intent.next_candidate(consume=True)
-            session.clear()
-            session.modified = True
+            # The sign-in call resets the session itself (and finishes a pending Google or Microsoft connection first).
             _svc.login(user, form.remember_me.data)
             session.permanent = True
             try:
@@ -199,16 +202,15 @@ def _complete_login_after_mfa(user):
     remember = bool(session.pop("_mfa_pending_remember", False))
     next_url = session.pop("_mfa_pending_next", "") or ""
     session.pop("_mfa_pending_user_id", None)
+    method = session.pop("_mfa_pending_method", None) or "password"
 
-    session.clear()
-    session.modified = True
     _svc.login(user, remember)
     session.permanent = True
     try:
         audit_logger.log_authentication(success=True)
     except Exception as _exc:
         _log.warning("Audit log failed on login success: %s", _exc)
-    _login_entry = auth_audit.record_login_success(user)
+    _login_entry = auth_audit.record_login_success(user, method=method)
     if _login_entry is not None:
         session["_login_audit_id"] = _login_entry.id
     flash("You are now logged in. Welcome back!", "success")

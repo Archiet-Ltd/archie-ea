@@ -117,6 +117,16 @@ class Config:
     # Testing can opt in with the environment variable of the same name. No
     # configuration class turns it on by itself, and Production never reads it.
     ALLOW_INTERNAL_WEBHOOK_TARGETS = False
+    # Continue with Google / Continue with Microsoft. A provider is on exactly when both of its
+    # values are set; OAUTH_REDIRECT_HOSTS names the hosts that may start a sign-in. The two
+    # OAUTH_TEST_METADATA_URL_* values point at a stand-in provider and are read only under TESTING.
+    GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or None
+    GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET") or None
+    MICROSOFT_OAUTH_CLIENT_ID = os.environ.get("MICROSOFT_OAUTH_CLIENT_ID") or None
+    MICROSOFT_OAUTH_CLIENT_SECRET = os.environ.get("MICROSOFT_OAUTH_CLIENT_SECRET") or None
+    OAUTH_REDIRECT_HOSTS = os.environ.get("OAUTH_REDIRECT_HOSTS") or "entelim.tech,entelim.org"
+    OAUTH_TEST_METADATA_URL_GOOGLE = os.environ.get("OAUTH_TEST_METADATA_URL_GOOGLE") or None
+    OAUTH_TEST_METADATA_URL_MICROSOFT = os.environ.get("OAUTH_TEST_METADATA_URL_MICROSOFT") or None
     # Extra networks the outbound-URL guard refuses (comma-separated CIDRs).
     SSRF_BLOCKED_CIDRS = [
         c.strip() for c in os.environ.get("SSRF_BLOCKED_CIDRS", "").split(",") if c.strip()

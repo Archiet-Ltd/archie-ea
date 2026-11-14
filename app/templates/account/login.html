@@ -90,6 +90,8 @@
                         'success': get_flashed_messages(category_filter=['form-success'])
                     } %}
 
+                    {% include 'account/_social_sign_in.html' %}
+
                     {{ f.begin_form(form, flashes, action=request.url) }}
                     <form method="post" @submit="handleSubmit" novalidate>
                         {{ form.hidden_tag() }}

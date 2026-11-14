@@ -91,6 +91,7 @@ def _init_blueprints(app):
     # --- Core blueprints (always registered) ---
     _register_main(app)
     _register_account(app)
+    _register_account_oauth(app)
     _register_application_mgmt(app)
     _register_admin(app, csrf)
     _register_vendors(app, csrf)
@@ -389,6 +390,16 @@ def _register_main(app):
         app.register_blueprint(main_blueprint)
     except Exception as e:
         app.logger.warning("Failed to register main blueprint: %s", e)
+
+
+def _register_account_oauth(app):
+    """Continue with Google / Microsoft: one blueprint, whichever account blueprint copy is active."""
+    try:
+        from app.modules.account.oauth_routes import oauth_bp
+
+        app.register_blueprint(oauth_bp)
+    except Exception as e:
+        app.logger.error(f"[MODULE] Account sign-in with Google/Microsoft failed to register: {e}")
 
 
 def _register_account(app):

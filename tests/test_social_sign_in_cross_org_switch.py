@@ -1,6 +1,7 @@
 """Continue with Google / Microsoft: the settings switch, the host list and the start step (M-1 to M-9, M-49, M-50)."""
 import base64
 import hashlib
+import re
 import uuid
 from urllib.parse import parse_qs, urlsplit
 
@@ -43,7 +44,7 @@ def test_m1_both_settings_both_buttons_in_order(browser):
     for path in ("/account/login", "/account/register"):
         html = browser.get(path).get_data(as_text=True)
         assert html.index("Continue with Google") < html.index("Continue with Microsoft"), path
-        assert "By continuing, you agree to the Terms and the Privacy Policy" in html, path
+        assert "By continuing, you agree to the Terms and the Privacy Policy" in re.sub(r"<[^>]+>", "", html), path
 
 
 def test_m2_no_settings_start_is_404(browser, nothing_configured):

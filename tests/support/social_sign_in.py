@@ -64,15 +64,35 @@ class Browser:
         self.host = host
         self.client = app.test_client()
 
+    def _fresh(self):
+        """Forget the signed-in person flask-login cached on ``g``: the test keeps one app context open
+        across requests, which a real server does not, and the cache would carry one browser's person
+        into the next browser's request."""
+        from flask import g, has_app_context
+
+        if has_app_context():
+            for cached in ("_login_user", "_current_user", "current_org_id", "current_org"):
+                if hasattr(g, cached):
+                    delattr(g, cached)
+
     @property
     def base(self):
         return "https://%s" % self.host
 
+    @staticmethod
+    def _done(response):
+        """Read the body and close the response, so work queued for after the response (mail) runs."""
+        response.get_data()
+        response.close()
+        return response
+
     def get(self, path, **kw):
-        return self.client.get(path, base_url=self.base, **kw)
+        self._fresh()
+        return self._done(self.client.get(path, base_url=self.base, **kw))
 
     def post(self, path, data=None, **kw):
-        return self.client.post(path, data=data or {}, base_url=self.base, **kw)
+        self._fresh()
+        return self._done(self.client.post(path, data=data or {}, base_url=self.base, **kw))
 
     def session(self):
         with self.client.session_transaction(base_url=self.base) as sess:
@@ -96,7 +116,8 @@ class Browser:
 
     def callback(self, address):
         parts = urlsplit(address)
-        return self.client.get(parts.path + ("?" + parts.query if parts.query else ""), base_url=self.base)
+        self._fresh()
+        return self._done(self.client.get(parts.path + ("?" + parts.query if parts.query else ""), base_url=self.base))
 
     def sign_in_with(self, key, claims, next_url=None, **misbehave):
         """The whole round trip. Returns the callback response (not followed)."""

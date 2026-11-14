@@ -15,6 +15,7 @@ IdP group memberships into the platform's ``enterprise_role`` field
 
 import logging
 import os
+from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
@@ -350,3 +351,163 @@ def sso_email_claim_is_trusted_for(provider, userinfo, existing_user):
     if not verified_email:
         return False
     return User.normalize_email(verified_email) == User.normalize_email(existing_user.email)
+
+
+# ── Continue with Google / Continue with Microsoft ──────────────────────
+#
+# One settings switch decides everything: a provider is on exactly when both
+# of its settings are non-empty. There is no database flag. The buttons on the
+# sign-in and register pages, and the start, callback and disconnect routes,
+# all ask here.
+
+GOOGLE_METADATA_URL = "https://accounts.google.com/.well-known/openid-configuration"
+MICROSOFT_METADATA_URL = "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration"
+
+# The settings each provider needs, in the order the buttons are shown.
+_PLATFORM_SETTINGS = {
+    "google": ("GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"),
+    "microsoft": ("MICROSOFT_OAUTH_CLIENT_ID", "MICROSOFT_OAUTH_CLIENT_SECRET"),
+}
+PLATFORM_LABELS = {"google": "Google", "microsoft": "Microsoft"}
+
+
+@dataclass(frozen=True)
+class PlatformProvider:
+    """A built-in provider, carrying what :class:`app.services.sso_service.SSOService` reads."""
+
+    key: str
+    client_id: str
+    client_secret: str = field(repr=False)
+    idp_metadata_url: str
+    tenant_issuer: bool = False
+    issuer_aliases: tuple = ()
+    authorize_params: dict = field(default_factory=dict)
+    id_token_only: bool = True
+
+    @property
+    def label(self):
+        return PLATFORM_LABELS[self.key]
+
+
+def _setting(name):
+    from flask import current_app
+
+    value = current_app.config.get(name)
+    return value.strip() if isinstance(value, str) else value
+
+
+def platform_sign_in_status():
+    """Per provider ``{"configured": bool, "missing": [setting names]}``."""
+    status = {}
+    for key, names in _PLATFORM_SETTINGS.items():
+        missing = [name for name in names if not _setting(name)]
+        status[key] = {"configured": not missing, "missing": missing}
+    return status
+
+
+def platform_redirect_hosts():
+    """The hosts that may start a sign-in, lower-cased, in the order configured."""
+    raw = _setting("OAUTH_REDIRECT_HOSTS") or ""
+    return [host.strip().lower() for host in raw.split(",") if host.strip()]
+
+
+def platform_sign_in_buttons(host):
+    """The configured providers, Google then Microsoft, as ``[{"key", "label"}]``.
+
+    Empty when ``host`` is not in ``OAUTH_REDIRECT_HOSTS``: a flow started
+    there could not come back to the same host.
+    """
+    if (host or "").strip().lower() not in platform_redirect_hosts():
+        return []
+    status = platform_sign_in_status()
+    return [{"key": key, "label": PLATFORM_LABELS[key]} for key in _PLATFORM_SETTINGS if status[key]["configured"]]
+
+
+def platform_provider(key):
+    """The built-in provider object for ``key``, or None when it is off."""
+    from flask import current_app
+
+    if key not in _PLATFORM_SETTINGS or not platform_sign_in_status()[key]["configured"]:
+        return None
+    id_name, secret_name = _PLATFORM_SETTINGS[key]
+    default_url = GOOGLE_METADATA_URL if key == "google" else MICROSOFT_METADATA_URL
+    metadata_url = default_url
+    if current_app.config.get("TESTING"):
+        metadata_url = _setting("OAUTH_TEST_METADATA_URL_%s" % key.upper()) or default_url
+    if key == "google":
+        return PlatformProvider(
+            key="google", client_id=_setting(id_name), client_secret=_setting(secret_name),
+            idp_metadata_url=metadata_url, issuer_aliases=("accounts.google.com",),
+            authorize_params={"prompt": "select_account"},
+        )
+    return PlatformProvider(
+        key="microsoft", client_id=_setting(id_name), client_secret=_setting(secret_name),
+        idp_metadata_url=metadata_url, tenant_issuer=True,
+        authorize_params={"prompt": "select_account", "response_mode": "query"},
+    )
+
+
+def platform_redirect_uri(host, key):
+    """The callback address for ``host``, built from the matched list entry, or None.
+
+    Never built from ``url_for`` or a forwarded header. Always https, except
+    that a test run may use plain http for a loopback host.
+    """
+    from flask import current_app
+
+    host = (host or "").strip().lower()
+    if host not in platform_redirect_hosts():
+        return None
+    loopback = host.split(":")[0] in ("127.0.0.1", "localhost")
+    scheme = "http" if loopback and current_app.config.get("TESTING") else "https"
+    return "%s://%s/account/oauth/%s/callback" % (scheme, host, key)
+
+
+# The tenant a personal Microsoft account signs in through. Microsoft verifies those addresses itself.
+MICROSOFT_PERSONAL_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad"
+
+
+def platform_subject(provider, claims):
+    """The provider's stable name for the person, or None when the token lacks it.
+
+    Google: ``sub``. Microsoft: ``<tid>:<oid>`` (Microsoft's ``sub`` differs per
+    application, so it is not used).
+    """
+    if provider == "google":
+        return str(claims.get("sub") or "") or None
+    if provider == "microsoft":
+        if not claims.get("tid") or not claims.get("oid"):
+            return None
+        return external_id_for("azure", claims) or None
+    return None
+
+
+def platform_claims_an_email(claims):
+    return bool(isinstance(claims.get("email"), str) and claims.get("email").strip())
+
+
+def platform_verified_email(provider, claims):
+    """The email address the provider vouches for, or None.
+
+    Google: ``email_verified`` is true (boolean or the string "true").
+    Microsoft: ``xms_edov`` is true (boolean, "true" or 1), or the token is for
+    a personal Microsoft account. ``preferred_username``, ``upn`` and
+    ``unique_name`` are never an email.
+    """
+    if not platform_claims_an_email(claims):
+        return None
+    email = claims["email"].strip()
+    if provider == "google":
+        return email if claims.get("email_verified") in (True, "true") else None
+    if provider == "microsoft":
+        if claims.get("xms_edov") in (True, "true", 1) or claims.get("tid") == MICROSOFT_PERSONAL_TENANT:
+            return email
+    return None
+
+
+def unconfirmed_email_message(provider):
+    """What to say when a provider returned an address it did not verify."""
+    status = platform_sign_in_status()
+    others = [PLATFORM_LABELS[key] for key in _PLATFORM_SETTINGS if key != provider and status[key]["configured"]]
+    advice = "Use Continue with {}, or sign up with email and password.".format(others[0]) if others else "Sign up with email and password."
+    return "{} did not confirm this email address. {}".format(PLATFORM_LABELS[provider], advice)

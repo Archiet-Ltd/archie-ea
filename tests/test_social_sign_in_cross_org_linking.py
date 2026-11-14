@@ -211,10 +211,15 @@ def test_m40_signing_in_with_organisation_b_identity_stays_in_b(browser, db_sess
     app_b = ApplicationComponent(name="Org B billing", organization_id=user_b.organization_id, lifecycle_status="operational")
     db_session.add_all([app_a, app_b])
     db_session.commit()
-    browser.sign_in_with("google", _google(browser, user_b.email, "g-b"))
-    assert browser.signed_in_user_id() == user_b.id
-    assert browser.get("/applications/%d" % app_a.id).status_code == 404
-    assert browser.get("/applications/%d" % app_b.id).status_code == 200
+    ids = {"user_b": user_b.id, "email_b": user_b.email, "app_a": app_a.id, "app_b": app_b.id}
+    # A request is its own session in production; here one session serves the whole test, and an object it
+    # already holds is handed back by id without asking the database, so start the request with none held.
+    db_session.expunge_all()
+    browser.sign_in_with("google", _google(browser, ids["email_b"], "g-b"))
+    assert browser.signed_in_user_id() == ids["user_b"]
+    db_session.expunge_all()
+    assert browser.get("/applications/%d" % ids["app_a"]).status_code == 404
+    assert browser.get("/applications/%d" % ids["app_b"]).status_code == 200
 
 
 def test_m42_returning_identity_of_an_organisation_that_enabled_sso_is_refused(browser, db_session):
