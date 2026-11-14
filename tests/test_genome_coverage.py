@@ -37,10 +37,6 @@ def _seed(db_session, org_id):
     """Seed 2 caps, 2 apps, their elements, and 2 mappings. Returns names."""
     from app.models.application_portfolio import ApplicationComponent
     from app.models.archimate_core import ArchiMateElement
-    from app.models.unified_application_capability_mapping import (
-        UnifiedApplicationCapabilityMapping,
-    )
-
     # ArchiMate elements (the provenance anchors).
     cap_elem_1 = ArchiMateElement(name="Customer Management", type="Capability", layer="business", organization_id=org_id)
     cap_elem_2 = ArchiMateElement(name="Order Fulfilment", type="Capability", layer="business", organization_id=org_id)
@@ -60,16 +56,12 @@ def _seed(db_session, org_id):
     db_session.add_all([app1, app2])
     db_session.flush()
 
-    m1 = UnifiedApplicationCapabilityMapping(
-        application_component_id=app1.id, unified_capability_id=cap1.id,
-        support_level="full", coverage_percentage=90, relationship_type="enables",
-    )
-    m2 = UnifiedApplicationCapabilityMapping(
-        application_component_id=app2.id, unified_capability_id=cap2.id,
-        support_level="partial", coverage_percentage=50, relationship_type="supports",
-    )
-    db_session.add_all([m1, m2])
-    db_session.flush()
+    from app.services.capability_support import record_capability_support
+
+    record_capability_support(org_id, app_elem_1.id, cap_elem_1.id, kind="realization",
+                              facts={"support_level": "primary", "coverage_percentage": 90})
+    record_capability_support(org_id, app_elem_2.id, cap_elem_2.id, kind="serving",
+                              facts={"support_level": "partial", "coverage_percentage": 50})
 
     return {
         "cap_names": {"Customer Management", "Order Fulfilment"},
@@ -179,9 +171,6 @@ def test_missing_provenance_is_a_build_error(db_session, make_org, tenant_ctx):
     """
     from app.models.application_portfolio import ApplicationComponent
     from app.models.archimate_core import ArchiMateElement
-    from app.models.unified_application_capability_mapping import (
-        UnifiedApplicationCapabilityMapping,
-    )
 
     org = make_org("genome")
     app_elem = ArchiMateElement(name="App X", type="ApplicationComponent", layer="application", organization_id=org.id)
@@ -195,17 +184,15 @@ def test_missing_provenance_is_a_build_error(db_session, make_org, tenant_ctx):
     )
     db_session.add(app)
     db_session.flush()
+    from app.services.capability_support import record_capability_support
+
+    record_capability_support(org.id, app_elem.id, cap_elem.id, facts={"support_level": "primary"})
     from app.extensions import db as _db
     _db.session.execute(
         _db.text("UPDATE unified_capabilities SET archimate_element_id = NULL WHERE id = :cid"),
         {"cid": cap.id},
     )
     _db.session.expire(cap)
-    db_session.flush()
-    db_session.add(UnifiedApplicationCapabilityMapping(
-        application_component_id=app.id, unified_capability_id=cap.id,
-        support_level="full", coverage_percentage=100,
-    ))
     db_session.flush()
 
     with tenant_ctx(org.id):

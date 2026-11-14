@@ -34,6 +34,9 @@ _FACT_FIELDS = (
 )
 
 
+SAVE_FAILED = "The link could not be saved, so nothing was changed."
+
+
 class CapabilitySupportRefused(Exception):
     """A support change that cannot be made. The message is a sentence a person can read."""
 
@@ -297,7 +300,22 @@ def _support_relationships(organization_id: int, app_el_id: int, cap_el_id: int)
     )
 
 
-def record_capability_support(
+def record_capability_support(*args, **kwargs) -> SupportResult:
+    """Record that an application supports a capability, once, and return what was recorded.
+
+    Any failure that is not a plain refusal is logged and told as one sentence, with nothing
+    changed, so database text never reaches the person."""
+    try:
+        with db.session.begin_nested():
+            return _record_capability_support(*args, **kwargs)
+    except CapabilitySupportRefused:
+        raise
+    except Exception:
+        logger.exception("could not record capability support")
+        raise CapabilitySupportRefused(SAVE_FAILED)
+
+
+def _record_capability_support(
     organization_id: int,
     application_element_id: int,
     capability_element_id: int,
@@ -305,7 +323,6 @@ def record_capability_support(
     facts: Optional[Dict[str, Any]] = None,
     actor_id: Optional[int] = None,
 ) -> SupportResult:
-    """Record that an application supports a capability, once, and return what was recorded."""
     from app.models.archimate_relationship_sync import _ensure_relationship
     from app.services.archimate_validity_service import ArchimateValidityService
 
@@ -336,7 +353,7 @@ def record_capability_support(
         except ValueError:
             raise CapabilitySupportRefused("That application or capability is not in this workspace.")
         if rel is None:
-            raise CapabilitySupportRefused("The link could not be saved, so nothing was changed.")
+            raise CapabilitySupportRefused(SAVE_FAILED)
         if actor_id and getattr(rel, "created_by_id", None) is None:
             rel.created_by_id = actor_id
     db.session.flush()
@@ -349,7 +366,7 @@ def record_capability_support(
             Row.organization_id == organization_id, Row.archimate_relationship_id == rel.id
         ).first()
     if row is None:
-        raise CapabilitySupportRefused("The link could not be saved, so nothing was changed.")
+        raise CapabilitySupportRefused(SAVE_FAILED)
     for key, value in clean.items():
         setattr(row, key, value)
     row.is_active = True
@@ -510,3 +527,8 @@ def support_summary(organization_id: int) -> Dict[str, Any]:
         "applications": int(applications or 0),
         "generated_at": datetime.now(timezone.utc),
     }
+
+
+def format_generated_at(moment: datetime) -> str:
+    """"14 Nov 2026, 11:20" for the line under the coverage matrix."""
+    return f"{moment.day} {moment:%b %Y}, {moment:%H:%M}"

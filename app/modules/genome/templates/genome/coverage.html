@@ -1,5 +1,6 @@
 {# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Capability Coverage{% endblock %}
 
@@ -8,11 +9,7 @@
     {% macro _ps_actions() %}
     <form method="post" action="{{ url_for('genome_coverage.generate') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="grid-3x3" class="w-4 h-4"></i>
-            Generate coverage matrix
-        </button>
+        {% call ui.button(type='submit', attrs={'data-testid': 'generate-coverage'}) %}{{ lucide('layout-grid') }}Generate coverage matrix{% endcall %}
     </form>
     {% endmacro %}
     {{ page_shell(
@@ -21,12 +18,23 @@
         actions_caller=_ps_actions) }}
 
     {% if error %}
-    <div class="px-3 py-2 border border-destructive/50 bg-destructive/10 rounded-md text-sm text-destructive">
-        {{ error }}
-    </div>
+    {% call ui.alert(variant='destructive', attrs={'role': 'alert', 'data-testid': 'coverage-error'}) %}{{ lucide('circle-alert') }}{{ ui.alert_title(text='The matrix could not be built') }}{{ ui.alert_description(text=error) }}{% endcall %}
     {% endif %}
 
-    {% if matrix_html %}
+    {% if summary %}
+    <p class="text-sm text-muted-foreground" data-testid="coverage-summary">Generated {{ summary.generated_at }} from {{ summary.supports }} recorded {{ 'support' if summary.supports == 1 else 'supports' }} ({{ summary.capabilities }} {{ 'capability' if summary.capabilities == 1 else 'capabilities' }}, {{ summary.applications }} {{ 'application' if summary.applications == 1 else 'applications' }})</p>
+    {% endif %}
+
+    {% if matrix_html and summary and summary.supports == 0 %}
+    {% call ui.empty(attrs={'data-testid': 'coverage-empty'}) %}
+      {% call ui.empty_header() %}
+        {% call ui.empty_icon(variant='icon') %}{{ lucide('layout-grid') }}{% endcall %}
+        {{ ui.empty_title(text='No application is recorded as supporting a capability yet.') }}
+        {{ ui.empty_description(text="Record it on an application's Capabilities tab, on an element page with Add relationship, or ask the AI chat.") }}
+      {% endcall %}
+      {% call ui.empty_content() %}{% call ui.button(href='/applications/', attrs={'data-testid': 'open-applications'}) %}Open applications{% endcall %}{% endcall %}
+    {% endcall %}
+    {% elif matrix_html %}
     <div class="bg-card border border-border rounded-lg p-4 min-w-0 max-w-full">
         {{ matrix_html }}
     </div>
@@ -34,14 +42,14 @@
         Each shaded cell is an application that supports that capability. Hover a cell to see which.
         On a narrow screen, slide the table sideways to see every column.
     </p>
-    {% else %}
-    {% if not error %}
-    <div class="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
-        <i data-lucide="grid-3x3" class="w-8 h-8 mx-auto mb-3 opacity-60"></i>
-        <p>Click <span class="font-medium text-foreground">Generate coverage matrix</span>
-        to see which application supports which capability.</p>
-    </div>
-    {% endif %}
+    {% elif not error %}
+    {% call ui.empty() %}
+      {% call ui.empty_header() %}
+        {% call ui.empty_icon(variant='icon') %}{{ lucide('layout-grid') }}{% endcall %}
+        {{ ui.empty_title(text='No matrix yet') }}
+        {{ ui.empty_description(text='Choose Generate coverage matrix to see which application supports which capability.') }}
+      {% endcall %}
+    {% endcall %}
     {% endif %}
 </div>
 {% endblock %}
