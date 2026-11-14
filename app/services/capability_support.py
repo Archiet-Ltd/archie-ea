@@ -384,11 +384,24 @@ def _record_capability_support(
         ).first()
     if row is None:
         raise CapabilitySupportRefused(SAVE_FAILED)
-    for key, value in clean.items():
-        setattr(row, key, value)
+    _apply_facts(row, clean)
     row.is_active = True
     db.session.flush()
     return SupportResult(created, rel.id, row.id, app_el.name, cap_el.name, kind)
+
+
+def _apply_facts(row, clean: Dict[str, Any]) -> None:
+    """Write each fact that was given, by name. The names are the fixed list in ``_FACT_FIELDS``."""
+    if "support_level" in clean:
+        row.support_level = clean["support_level"]
+    if "coverage_percentage" in clean:
+        row.coverage_percentage = clean["coverage_percentage"]
+    if "maturity_level" in clean:
+        row.maturity_level = clean["maturity_level"]
+    if "is_strategic" in clean:
+        row.is_strategic = clean["is_strategic"]
+    if "notes" in clean:
+        row.notes = clean["notes"]
 
 
 def _row_in_org(organization_id: int, row_id: int):
@@ -403,8 +416,7 @@ def _row_in_org(organization_id: int, row_id: int):
 
 def update_support_facts(organization_id: int, row_id: int, **facts):
     row = _row_in_org(organization_id, row_id)
-    for key, value in _clean_facts(facts).items():
-        setattr(row, key, value)
+    _apply_facts(row, _clean_facts(facts))
     db.session.flush()
     return row
 

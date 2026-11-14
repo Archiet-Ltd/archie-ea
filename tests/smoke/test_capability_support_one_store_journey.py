@@ -113,6 +113,12 @@ def test_support_recorded_on_the_element_page_shows_on_every_reader(page, live_s
     page.get_by_role("button", name=re.compile(re.escape(CAPABILITY))).first.click()
     page.locator("#rel-type-select").select_option("realization")
     _shot(page, "element-add-relationship-1440")
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.evaluate("document.documentElement.classList.add('dark')")
+    expect(page.locator("#rel-type-select")).to_be_visible()
+    _shot(page, "element-add-relationship-dark-390")
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.evaluate("document.documentElement.classList.remove('dark')")
     page.get_by_role("button", name="Create relationship").click()
     # The page reloads itself once the relationship is saved; the line below is what it then shows.
     line = page.get_by_test_id("answer-line").filter(has_text="Supports")
@@ -156,6 +162,19 @@ def test_support_recorded_on_the_element_page_shows_on_every_reader(page, live_s
     assert [(r["application_name"], r["capability_name"], r["kind"]) for r in _supports(org["org_id"])] == [
         (APPLICATION, CAPABILITY, "realization")]
 
+    # Phone width, dark theme: the same support reads on the element page and the matrix.
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto("%s/architecture/application/ApplicationComponent/%d?ae=1" % (live_server, org["app_element_id"]),
+              wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.evaluate("document.documentElement.classList.add('dark')")
+    expect(page.get_by_test_id("answer-line").filter(has_text="Supports")).to_contain_text(CAPABILITY)
+    _shot(page, "element-page-after-dark-390")
+    _generate(page, live_server)
+    page.evaluate("document.documentElement.classList.add('dark')")
+    expect(page.get_by_test_id("coverage-summary")).to_contain_text("from 1 recorded support")
+    expect(page.get_by_test_id("coverage-cell")).to_have_count(1)
+    _shot(page, "coverage-generated-dark-390")
+
 
 def test_support_recorded_on_the_application_page_shows_on_every_reader(page, live_server, org):
     _wide(page)
@@ -169,6 +188,12 @@ def test_support_recorded_on_the_application_page_shows_on_every_reader(page, li
     page.wait_for_load_state("networkidle")
     expect(page.get_by_test_id("mapped-capabilities-table")).to_contain_text("No capabilities mapped")
     _shot(page, "capabilities-tab-empty-1440")
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.evaluate("document.documentElement.classList.add('dark')")
+    expect(page.get_by_test_id("map-capability")).to_be_visible()
+    _shot(page, "capabilities-tab-empty-dark-390")
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.evaluate("document.documentElement.classList.remove('dark')")
 
     # Map Capability: the capability, how it supports, how well.
     page.get_by_test_id("map-capability").click()
@@ -202,6 +227,18 @@ def test_support_recorded_on_the_application_page_shows_on_every_reader(page, li
     expect(page.get_by_test_id("answer-line").filter(has_text="Supports")).to_contain_text("Supports 1 capability")
     _generate(page, live_server)
     expect(page.get_by_test_id("coverage-cell")).to_have_count(1)
+
+    # Phone width, dark theme: the Capabilities tab still lists it, and the dialog is reachable.
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto("%s/applications/%d?tab=capabilities" % (live_server, org["app_id"]), wait_until="networkidle",
+              timeout=PAGE_TIMEOUT)
+    page.evaluate("document.documentElement.classList.add('dark')")
+    expect(page.get_by_test_id("mapped-capability-row")).to_contain_text(CAPABILITY)
+    expect(page.get_by_test_id("map-capability")).to_be_visible()
+    _shot(page, "capabilities-tab-one-dark-390")
+    page.get_by_test_id("map-capability").click()
+    expect(page.locator("#cap-select")).to_be_visible()
+    _shot(page, "map-capability-dialog-dark-390")
 
 
 def test_the_empty_matrix_points_to_the_applications(page, live_server, org):

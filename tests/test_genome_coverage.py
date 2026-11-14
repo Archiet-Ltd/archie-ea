@@ -45,8 +45,8 @@ def _seed(db_session, org_id):
     db_session.add_all([cap_elem_1, cap_elem_2, app_elem_1, app_elem_2])
     db_session.flush()
 
-    cap1 = _capability(org_id, "Customer Management", f"CAP-{org_id}-1", cap_elem_1.id)
-    cap2 = _capability(org_id, "Order Fulfilment", f"CAP-{org_id}-2", cap_elem_2.id)
+    _capability(org_id, "Customer Management", f"CAP-{org_id}-1", cap_elem_1.id)
+    _capability(org_id, "Order Fulfilment", f"CAP-{org_id}-2", cap_elem_2.id)
     app1 = ApplicationComponent(
         name="Salesforce CRM", organization_id=org_id, archimate_element_id=app_elem_1.id,
     )

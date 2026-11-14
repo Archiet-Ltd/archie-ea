@@ -1283,7 +1283,7 @@ class AIChatApprovalService:
             # Refusal was already audit-logged and committed above the raise; nothing to roll back.
             self.logger.warning(f"Approval {approval_id} refused: {e}")
             return {"success": False, "error": str(e), "code": "APPROVAL_DENIED"}
-        except Exception as e:
+        except Exception:
             db.session.rollback()
             self.logger.exception("Failed to approve/execute operation %s", approval_id)
             return {"success": False, "error": "The change could not be saved, so nothing was changed."}
