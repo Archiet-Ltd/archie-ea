@@ -49,6 +49,31 @@ DEFAULT_ENTERPRISE_LIMIT = 500
 BATCH_SIZE = 100
 
 
+def _crosses_organisations(db, org_sql, params, src, tgt, crossing):
+    """True (and counted in crossing) when the row about to be written would
+    join elements of different organisations. Uses the one same-organisation
+    check the model guard uses, because these inserts are plain SQL and the
+    model guard never sees them."""
+    from app.models.relationship_guard import (
+        CrossOrganisationRelationship,
+        assert_relationship_same_organisation,
+    )
+
+    org_id = db.session.execute(db.text(org_sql), params).scalar()
+    try:
+        assert_relationship_same_organisation(
+            db.session.connection(), org_id, src, tgt
+        )
+    except CrossOrganisationRelationship:
+        crossing["count"] += 1
+        return True
+    return False
+
+
+_ORG_OF_ELEMENT = "SELECT organization_id FROM archimate_elements WHERE id = :s"
+_ORG_OF_SOLUTION = "SELECT organization_id FROM solutions WHERE id = :sol"
+
+
 def _build_inference_sql(source_type, target_type, solution_id=None):
     """Build the co-occurrence SQL for a given element type pair.
 
@@ -175,7 +200,7 @@ def _get_existing_relationship_keys(db):
     return {(r.source_id, r.target_id, r.type) for r in rows}
 
 
-def _run_transitive_closure(db, dry_run, max_depth=2):
+def _run_transitive_closure(db, dry_run, max_depth=2, crossing=None):
     """Infer transitive relationships from the existing graph.
 
     For each pair of relationships A→B (type1) and B→C (type2) that
@@ -190,6 +215,7 @@ def _run_transitive_closure(db, dry_run, max_depth=2):
     Returns:
         int: Number of relationships created (or would be created)
     """
+    crossing = crossing if crossing is not None else {"count": 0}
     total_created = 0
 
     for depth in range(1, max_depth):
@@ -210,13 +236,15 @@ def _run_transitive_closure(db, dry_run, max_depth=2):
                     # A→C must stay inside one organisation. The walk sees every
                     # tenant's edges at once, so without this an existing
                     # cross-tenant edge would breed more of them.
-                    if element_orgs.get(a_id) != element_orgs.get(c_id):
-                        continue
+                    crosses = element_orgs.get(a_id) != element_orgs.get(c_id)
 
                     # Check if this matches a transitive rule
                     for rule_ab, rule_bc, inferred_ac in _TRANSITIVE_RULES:
                         if ab_type == rule_ab and bc_type == rule_bc:
                             key = (a_id, c_id, inferred_ac)
+                            if crosses:
+                                crossing["count"] += 1
+                                continue
                             if key not in existing_keys:
                                 candidates.append(key)
                                 existing_keys.add(key)  # prevent duplicates within pass
@@ -225,6 +253,10 @@ def _run_transitive_closure(db, dry_run, max_depth=2):
         for i in range(0, len(candidates), BATCH_SIZE):
             batch = candidates[i:i + BATCH_SIZE]
             for src, tgt, rel_type in batch:
+                if _crosses_organisations(
+                    db, _ORG_OF_ELEMENT, {"s": src}, src, tgt, crossing
+                ):
+                    continue
                 if not dry_run:
                     try:
                         # organization_id inherited from the source element: this
@@ -282,6 +314,7 @@ def backfill_archimate_relationships_command(dry_run, solution_id, enterprise,
         click.echo(f"Scoped to solution_id={solution_id}\n")
 
     total_created = 0
+    crossing = {"count": 0}
 
     # --- Phase 1: Solution-scoped inference via junction table ---
     click.echo("Phase 1: Solution-scoped inference (junction table)")
@@ -305,6 +338,11 @@ def backfill_archimate_relationships_command(dry_run, solution_id, enterprise,
 
             if _check_duplicate_sql(db, src, tgt, rel_type):
                 skipped += 1
+                continue
+
+            if _crosses_organisations(
+                db, _ORG_OF_SOLUTION, {"sol": sol}, src, tgt, crossing
+            ):
                 continue
 
             if not dry_run:
@@ -370,6 +408,11 @@ def backfill_archimate_relationships_command(dry_run, solution_id, enterprise,
                         skipped += 1
                         continue
 
+                    if _crosses_organisations(
+                        db, _ORG_OF_ELEMENT, {"s": src}, src, tgt, crossing
+                    ):
+                        continue
+
                     if not dry_run:
                         try:
                             # organization_id inherited from the source element;
@@ -407,11 +450,17 @@ def backfill_archimate_relationships_command(dry_run, solution_id, enterprise,
     # --- Phase 3: Transitive closure ---
     if transitive:
         click.echo(f"\nPhase 3: Transitive closure (max_depth={max_depth})")
-        transitive_created = _run_transitive_closure(db, dry_run, max_depth=max_depth)
+        transitive_created = _run_transitive_closure(
+            db, dry_run, max_depth=max_depth, crossing=crossing
+        )
         action = "Would create" if dry_run else "Created"
         click.echo(f"  {action} {transitive_created} transitive relationships")
         total_created += transitive_created
 
+    click.echo(
+        f"\nSkipped {crossing['count']} relationships that would join "
+        "elements of different organisations"
+    )
     action = "Would create" if dry_run else "Total created"
     click.echo(f"\n{action}: {total_created} relationships")
 

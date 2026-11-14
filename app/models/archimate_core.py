@@ -27,6 +27,7 @@ if not _FAST_INIT:
 # mixin is imported unconditionally so the column exists in both the normal and
 # APP_FAST_INIT model graphs.
 from .mixins import TenantMixin
+from .relationship_guard import register_relationship_guard
 
 if _FAST_INIT:
 
@@ -212,6 +213,10 @@ if _FAST_INIT:
 
         def __repr__(self):
             return f"<ArchiMateRelationship {self.source_id} -> {self.target_id}>"
+
+    # The same guard the monolithic class carries (models.py): no code path
+    # may store a relationship whose two ends belong to different organisations.
+    register_relationship_guard(ArchiMateRelationship)
 
 
 # -----------------------------------------------------------------------
