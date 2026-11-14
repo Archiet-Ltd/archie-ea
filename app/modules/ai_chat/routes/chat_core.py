@@ -769,7 +769,41 @@ def send_message():
                 ),
                 401,
             )
-        elif "rate limit" in error_msg.lower() or "quota" in error_msg.lower():
+
+        lowered = error_msg.lower()
+        # Credit-balance errors: the AI service's credit has run out
+        is_credit_balance = any(
+            phrase in lowered
+            for phrase in (
+                "credit balance",
+                "insufficient credit",
+                "quota exceeded",
+                "billing",
+                "402",
+            )
+        )
+        # Also catch "credit" alone but not when it's part of "rate limit"
+        if not is_credit_balance and "credit" in lowered:
+            if "rate limit" not in lowered and "429" not in lowered:
+                is_credit_balance = True
+
+        if is_credit_balance:
+            return (
+                jsonify(
+                    {
+                        "error": (
+                            "The AI service's credit has run out. "
+                            "Your organisation administrator (or Entelim support for the platform's key) can restore it."
+                        ),
+                        "error_type": "credit_exhausted",
+                    }
+                ),
+                402,
+            )
+
+        # True rate limit errors: 429 or "rate limit" (without credit/billing context)
+        is_rate_limit = "429" in lowered or "rate limit" in lowered
+        if is_rate_limit:
             return (
                 jsonify(
                     {

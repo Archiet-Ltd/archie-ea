@@ -555,6 +555,8 @@
                     errorTitle = 'Timeout Error';
                 } else if (data.error_type === 'rate_limit') {
                     errorTitle = 'Rate Limit';
+                } else if (data.error_type === 'credit_exhausted') {
+                    errorTitle = 'Credit Exhausted';
                 } else if (data.error_type === 'model_error') {
                     errorTitle = 'Model Error';
                 } else if (!response.ok) {
@@ -589,6 +591,15 @@
                     // in context, which the banner and a toast both lack.
                     errorMessage = configFaultSentence();
                     appendError(errorMessage || fullError, null, { adminLink: true });
+                } else if (data.error_type === 'credit_exhausted') {
+                    // Credit exhausted: show the server's message (which names who can fix it)
+                    // and do NOT offer Retry — retrying won't restore credit.
+                    Platform.toast.error(fullError);
+                    appendError(errorMessage || fullError, null);
+                } else if (data.error_type === 'rate_limit') {
+                    // Rate limit: show the server's message and offer Retry
+                    Platform.toast.error(fullError);
+                    appendError(errorMessage || fullError, () => _retryTurn(message, timestamp));
                 } else {
                     Platform.toast.error(fullError);
                     appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));

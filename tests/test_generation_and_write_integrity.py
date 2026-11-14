@@ -344,9 +344,27 @@ def test_sanitize_agent_error_categories():
         "no llm provider is configured"
         in sanitize_agent_error("No API keys configured").lower()
     )
-    quota = sanitize_agent_error("429 rate limit exceeded for org_9xy")
-    assert "quota" in quota
-    assert "org_9xy" not in quota
-    credits = sanitize_agent_error("Error code: 402 - credits, user_id: u_1abc")
-    assert "402" in credits
-    assert "u_1abc" not in credits
+    # Rate limit errors should say to try again shortly
+    rate_limit = sanitize_agent_error("429 rate limit exceeded for org_9xy")
+    assert "rate limit" in rate_limit.lower()
+    assert "try again" in rate_limit.lower() or "wait" in rate_limit.lower()
+    assert "org_9xy" not in rate_limit
+    # Credit-balance errors should say credit ran out and who can fix it
+    credit_balance = sanitize_agent_error("Error code: 402 - credits, user_id: u_1abc")
+    assert "credit" in credit_balance.lower()
+    assert "run out" in credit_balance.lower() or "exhausted" in credit_balance.lower()
+    assert "administrator" in credit_balance.lower() or "support" in credit_balance.lower()
+    assert "u_1abc" not in credit_balance
+    # Other credit-balance phrases
+    insufficient = sanitize_agent_error("insufficient credits")
+    assert "credit" in insufficient.lower()
+    assert "run out" in insufficient.lower() or "exhausted" in insufficient.lower()
+    assert "administrator" in insufficient.lower() or "support" in insufficient.lower()
+    quota_exceeded = sanitize_agent_error("quota exceeded")
+    assert "credit" in quota_exceeded.lower()
+    assert "run out" in quota_exceeded.lower() or "exhausted" in quota_exceeded.lower()
+    assert "administrator" in quota_exceeded.lower() or "support" in quota_exceeded.lower()
+    billing = sanitize_agent_error("billing error")
+    assert "credit" in billing.lower()
+    assert "run out" in billing.lower() or "exhausted" in billing.lower()
+    assert "administrator" in billing.lower() or "support" in billing.lower()

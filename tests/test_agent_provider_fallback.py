@@ -123,7 +123,12 @@ def test_timeouts_and_dropped_connections_are_retryable():
     request = httpx.Request("POST", "https://example.invalid")
     assert is_retryable_llm_error(openai.APITimeoutError(request=request))
     assert is_retryable_llm_error(openai.APIConnectionError(request=request))
-    assert is_retryable_llm_error(RuntimeError("monthly quota exceeded"))
+    # Rate limit errors (real provider shapes) are retryable
+    assert is_retryable_llm_error(RuntimeError("429 rate limit exceeded"))
+    assert is_retryable_llm_error(RuntimeError("rate limit exceeded: too many requests"))
+    # Credit-balance errors are NOT retryable
+    assert not is_retryable_llm_error(RuntimeError("quota exceeded"))
+    assert not is_retryable_llm_error(RuntimeError("credit balance exhausted"))
     assert not is_retryable_llm_error(ValueError("bad schema"))
 
 
