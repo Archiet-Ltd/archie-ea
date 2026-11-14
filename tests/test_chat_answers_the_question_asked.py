@@ -20,7 +20,7 @@ CATALOGUE_QUESTION = "What do we run and who owns each one?"
 RISK_QUESTION = "Which risks could stop our paid launch and who owns each one?"
 SCENARIO = (
     "Run a scenario: if paid launch slips three months and Ifiok's AI cost is 35% of its "
-    "revenue, what is our margin?"
+    "revenue, what breaks if Ifiok fails?"
 )
 BOARD = (
     "Search the model and answer as our strategy adviser: what is our monthly burn, what "
@@ -65,7 +65,7 @@ def test_a_risk_question_that_says_who_owns_each_is_not_the_application_list(cli
 def test_a_scenario_does_not_get_the_what_breaks_card(client, login_as, make_org):
     org = make_org()
     user = _architect(org, "answer-asked-c@example.com")
-    _make_app_with_cost(org.id, "Ifiok", annual_cost=10)
+    _make_app_with_cost(org.id, "Billing Ledger", annual_cost=10)
     db.session.commit()
     login_as(client, user)
     body = _ask(client, SCENARIO)
