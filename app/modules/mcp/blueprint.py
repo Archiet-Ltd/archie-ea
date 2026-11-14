@@ -45,6 +45,7 @@ from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user
 
 from app.extensions import csrf
+from app.services.origin import canonical_origin
 from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
 from app.modules.ai_chat.tools.route_read_tools import (
     connector_tools,
@@ -289,8 +290,8 @@ def mcp_endpoint():
                     propagate_errors=True,
                 )
             ))
-            # Addresses leave the product, so they are absolute (public base URL).
-            result = absolutise_connector_urls(result, current_app.config.get("PUBLIC_BASE_URL"))
+            # Addresses leave the product, so they are absolute (canonical origin).
+            result = absolutise_connector_urls(result, canonical_origin())
             elapsed_ms = int((time.monotonic() - start) * 1000)
 
             logger.info(

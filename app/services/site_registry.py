@@ -1,4 +1,4 @@
-"""The one registry behind entelim.org's navbar, menus, footer and roles hub.
+"""The one registry behind entelim.tech's navbar, menus, footer and roles hub.
 
 ``content/site/registry.yml`` is the single list of public links. The navbar,
 its Product, Solutions, Roles, Compare and Resources menus, the footer and the

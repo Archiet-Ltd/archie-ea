@@ -7,7 +7,7 @@
 {% block title %}Coming to Entelim{% endblock %}
 {% block meta_description %}
 {% from 'partials/_seo_meta.html' import seo_meta %}
-{{ seo_meta('https://entelim.org/early-access', 'The parts of Entelim you can join the waiting list for. Pick one and we will email you when you can use it.', not indexable) }}
+{{ seo_meta(canonical_origin ~ '/early-access', 'The parts of Entelim you can join the waiting list for. Pick one and we will email you when you can use it.', not indexable) }}
 {% endblock %}
 {% block header %}
 {% include 'components/public_navbar.html' %}

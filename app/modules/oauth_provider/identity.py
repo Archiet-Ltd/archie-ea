@@ -45,6 +45,7 @@ from app.modules.oauth_provider.scopes import (
     MCP_SCOPE_PREFIX,
     carries_family_scope,
 )
+from app.services.origin import _allowed_origins
 
 
 def _is_mcp_scoped_request() -> bool:
@@ -134,9 +135,9 @@ def load_user_from_bearer_token(req):
     if _token_is_refused_for_namespace(token.scope, required_family):
         return None
 
-    public_base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
-    expected_resource = f"{public_base}{resource_suffix}" if public_base else None
-    if expected_resource is None or token.resource != expected_resource:
+    allowed_origins = _allowed_origins()
+    expected_resources = [f"{origin}{resource_suffix}" for origin in allowed_origins]
+    if not expected_resources or token.resource not in expected_resources:
         return None
 
     from app.extensions import db

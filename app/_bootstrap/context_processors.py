@@ -1050,3 +1050,9 @@ def init_context_processors(app):
             return {"sample_company_restore_point_id": None}
         except Exception:
             return {"sample_company_restore_point_id": None}
+
+    @app.context_processor
+    def inject_canonical_origin():
+        """Make the canonical origin available to all templates."""
+        from app.services.origin import canonical_origin
+        return {"canonical_origin": canonical_origin()}

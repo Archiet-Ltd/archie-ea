@@ -59,12 +59,33 @@ def _hash_code_verifier(verifier: str) -> str:
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 
 
+from app.services.origin import canonical_origin, _allowed_origins
+
+
+def _mcp_resource_urls() -> list[str]:
+    """All configured MCP resource identifiers (canonical + aliases)."""
+    return [f"{origin}/mcp" for origin in _allowed_origins()]
+
+
+def _api_resource_urls() -> list[str]:
+    """All configured API resource identifiers (canonical + aliases)."""
+    return [f"{origin}/api/v1" for origin in _allowed_origins()]
+
+
 def _mcp_resource_url() -> str | None:
-    """The one configured resource identifier, or None if unconfigured."""
-    base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+    """The canonical MCP resource identifier, or None if unconfigured."""
+    base = canonical_origin()
     if not base:
         return None
     return f"{base}/mcp"
+
+
+def _api_resource_url() -> str | None:
+    """The canonical API resource identifier, or None if unconfigured."""
+    base = canonical_origin()
+    if not base:
+        return None
+    return f"{base}/api/v1"
 
 
 def _filter_granted_scopes(requested_scope: str | None, user) -> list[str]:
@@ -143,10 +164,10 @@ def authorize():
     if not _CODE_CHALLENGE_FORMAT.match(code_challenge):
         return jsonify({"error": "invalid_request", "error_description": "code_challenge must be 43 to 128 base64url characters"}), 400
 
-    expected_resource = _mcp_resource_url()
-    if not requested_resource or expected_resource is None or requested_resource.rstrip("/") != expected_resource:
+    expected_resources = _mcp_resource_urls()
+    if not requested_resource or not expected_resources or requested_resource.rstrip("/") not in expected_resources:
         return jsonify({"error": "invalid_target", "error_description": "resource does not match this server"}), 400
-    validated_resource = expected_resource
+    validated_resource = requested_resource.rstrip("/")
 
     if request.method == "GET":
         scopes = _filter_granted_scopes(requested_scope, current_user)
@@ -229,23 +250,15 @@ def token():
 
     resource = request.form.get("resource", "")
 
-    expected_resource = _mcp_resource_url()
-    if not resource or expected_resource is None or resource.rstrip("/") != expected_resource:
+    expected_resources = _mcp_resource_urls()
+    if not resource or not expected_resources or resource.rstrip("/") not in expected_resources:
         return jsonify({"error": "invalid_target", "error_description": "resource does not match this server"}), 400
 
     if grant_type == "authorization_code":
-        return _token_authorization_code(expected_resource)
+        return _token_authorization_code(resource.rstrip("/"))
     if grant_type == "refresh_token":
-        return _token_refresh(expected_resource)
+        return _token_refresh(resource.rstrip("/"))
     return jsonify({"error": "unsupported_grant_type"}), 400
-
-
-def _api_resource_url() -> str | None:
-    """The one resource identifier REST tokens are issued for."""
-    base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
-    if not base:
-        return None
-    return f"{base}/api/v1"
 
 
 def _token_client_credentials():
@@ -263,8 +276,8 @@ def _token_client_credentials():
     if not client_id or not client_secret:
         return jsonify({"error": "invalid_request"}), 400
 
-    expected_resource = _api_resource_url()
-    if expected_resource is None or resource.rstrip("/") != expected_resource:
+    expected_resources = _api_resource_urls()
+    if not expected_resources or resource.rstrip("/") not in expected_resources:
         return jsonify({"error": "invalid_target", "error_description": "resource does not match this server"}), 400
 
     client = OAuthClient.query.filter_by(client_id=client_id, is_active=True).first()  # tenant-scoping-ok: platform-level client registry, not tenant-owned data
@@ -307,7 +320,7 @@ def _token_client_credentials():
         client_id=client.client_id,
         user_id=user.id,
         scope=" ".join(scopes),
-        resource=expected_resource,
+        resource=resource.rstrip("/"),
         grant_type="client_credentials",
         organization_id=user.organization_id,
     )

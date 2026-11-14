@@ -57,7 +57,10 @@ def ping_indexnow(app, urls: List[str], base_url: Optional[str] = None) -> Optio
     if not key or not urls:
         return None
 
-    base = base_url or app.config.get("PREFERRED_URL_SCHEME_HOST") or "https://entelim.org"
+    from app.services.origin import canonical_origin
+
+    with app.app_context():
+        base = base_url or canonical_origin()
     payload = build_payload(base, key, urls)
     try:
         response = requests.post(INDEXNOW_ENDPOINT, json=payload, timeout=10)

@@ -1394,7 +1394,7 @@ class AIChatApprovalService:
         try:
             from html import escape
 
-            from flask import after_this_request, current_app, has_request_context, request
+            from flask import after_this_request, current_app, has_request_context
 
             from app._bootstrap._digest_emails import _safe_send_email
             from app.services.architecture_change_impact_service import (
@@ -1445,11 +1445,10 @@ class AIChatApprovalService:
 
             subject = "A change to something you own needs review"
             # The email link must be absolute: a relative href goes nowhere in
-            # a mail client. The public base URL, else this request's host;
-            # with neither, the link is left out rather than sent relative.
-            base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
-            if not base and has_request_context():
-                base = request.host_url.rstrip("/")
+            # a mail client. The canonical origin is used.
+            from app.services.origin import canonical_origin
+
+            base = canonical_origin()
             link = (
                 f'<p><a href="{escape(base + inbox_path)}">Open the approval inbox</a></p>'
                 if base

@@ -33,10 +33,10 @@ import yaml
 from markupsafe import Markup
 
 from app.services.billing_plans import CONTACT_SALES_URL, PLANS
+from app.services.origin import canonical_origin
 
 CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content" / "pages"
 STATIC_ROOT = Path(__file__).resolve().parent.parent / "static"
-SITE_URL = "https://entelim.org"
 
 # ── SEO/GEO audit verdicts (2026-10-06) -- single source of truth ───────────
 # Which pages fold into a parent page (MERGE, 301 from the old URL) and which
@@ -593,11 +593,11 @@ class PublicPage:
 
     @property
     def self_canonical_url(self) -> str:
-        """Every public page is canonical to its own entelim.org address --
+        """Every public page is canonical to its own entelim.tech address --
         no exceptions, including comparison pages that also have an
         ``external_url`` on archiet.ai (section 2 of the SEO/GEO audit:
         the two are different products' content now, not the same page)."""
-        return f"{SITE_URL}{self.url}"
+        return f"{canonical_origin()}{self.url}"
 
     @property
     def is_held(self) -> bool:
@@ -1099,13 +1099,14 @@ def share_page_paths() -> list[str]:
 def share_social(share: dict[str, Any]) -> dict[str, Any]:
     """The link-preview fields of a recording (``partials/_seo_meta.html`` draws them): the cover image, the wide
     file and the type, with every address absolute so a platform can fetch it without the page around it."""
+    base = canonical_origin()
     return {
         "title": share["title"],
         "description": share["message"],
         "url": share["share_url"],
-        "image": SITE_URL + share["cover"],
+        "image": base + share["cover"],
         "image_alt": share["alt"],
-        "video": SITE_URL + share["files"]["wide"]["path"],
+        "video": base + share["files"]["wide"]["path"],
         "video_width": share["files"]["wide"]["width"],
         "video_height": share["files"]["wide"]["height"],
     }
@@ -1401,7 +1402,7 @@ def build_jsonld(page: PublicPage) -> str:
     test_template_escaping.py to flag.
     """
     family = page.page_family
-    site_url = SITE_URL
+    site_url = canonical_origin()
 
     if family == "comparison":
         ld = _jsonld_faq(page, site_url)
@@ -1648,7 +1649,7 @@ def build_hub_jsonld(
     """Structured data for a hub: CollectionPage with an ItemList of every
     linked page, a BreadcrumbList (Home > hub) and an FAQPage only when the
     hub's own intro has a real FAQ section. One @graph, one script block."""
-    site_url = SITE_URL
+    site_url = canonical_origin()
     collection: dict[str, Any] = {
         "@type": "CollectionPage",
         "url": f"{site_url}{path}",
