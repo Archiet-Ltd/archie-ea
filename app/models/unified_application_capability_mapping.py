@@ -21,9 +21,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app import db
+from app.models.mixins import TenantMixin
 
 
-class UnifiedApplicationCapabilityMapping(db.Model):
+class UnifiedApplicationCapabilityMapping(TenantMixin, db.Model):
     """
     Unified Application-Capability Mapping
 
@@ -34,6 +35,16 @@ class UnifiedApplicationCapabilityMapping(db.Model):
     __tablename__ = "unified_application_capability_mapping"
 
     id = Column(db.Integer, primary_key=True)
+
+    # The support relationship this row projects. The relationship is the fact; this row
+    # holds what the relationship cannot (level, coverage, maturity, notes). The row goes
+    # when the relationship goes.
+    archimate_relationship_id = Column(
+        db.Integer,
+        db.ForeignKey("archimate_relationships.id", ondelete="CASCADE"),
+        nullable=True,
+        unique=True,
+    )
 
     # Link entities
     unified_capability_id = Column(
@@ -101,6 +112,7 @@ class UnifiedApplicationCapabilityMapping(db.Model):
     # Relationships
     unified_capability = relationship("UnifiedCapability")
     application = relationship("ApplicationComponent")
+    archimate_relationship = relationship("ArchiMateRelationship", foreign_keys=[archimate_relationship_id])
 
     def __repr__(self):
         return f"<UnifiedAppCapMapping app={self.application_component_id} -> cap={self.unified_capability_id}>"

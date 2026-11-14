@@ -42,6 +42,10 @@ def init_services(app, config_name):
     from app.models.business_capabilities import register_capability_element_followup_listener
     register_capability_element_followup_listener()
 
+    # Support relationships project into the capability support table on every flush.
+    from app.services.capability_support import register_capability_support_listeners
+    register_capability_support_listeners()
+
     # Naming a vendor on a system writes the link to the vendor record.
     from app.services import vendor_register
 
