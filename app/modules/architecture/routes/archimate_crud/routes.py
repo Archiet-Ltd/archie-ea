@@ -2921,6 +2921,7 @@ def api_element_detail(element_id):
         current_app.logger.warning(f"Could not read profile for element {element_id}: {e}")
 
     return jsonify({
+        "success": True,
         "id": element.id,
         "name": element.name,
         "type": element.type,

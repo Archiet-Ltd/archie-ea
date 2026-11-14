@@ -101,7 +101,7 @@ class TestApiElementDetailFarEndFence:
         resp = _get_response(db_session, client, login_as, user, f"/architecture/api/elements/{service_a.id}/detail", fresh)
         assert resp.status_code == 200
         data = resp.get_json()
-        # D1 returns element data directly, not wrapped in success/status
+        assert data["success"] is True
 
         outgoing_ids = {r["target_id"] for r in data["outgoing"]}
         outgoing_names = {r["target_name"] for r in data["outgoing"]}
@@ -128,7 +128,7 @@ class TestApiElementDetailFarEndFence:
         resp = _get_response(db_session, client, login_as, user, f"/architecture/api/elements/{service_a.id}/detail", fresh)
         assert resp.status_code == 200
         data = resp.get_json()
-        # D1 returns element data directly, not wrapped in success/status
+        assert data["success"] is True
 
         incoming_ids = {r["source_id"] for r in data["incoming"]}
         incoming_names = {r["source_name"] for r in data["incoming"]}
@@ -284,7 +284,7 @@ class TestElementDetailSolutionsFarEndFence:
         resp = _get_response(db_session, client, login_as, user, f"/architecture/api/elements/{service_a.id}/detail", fresh)
         assert resp.status_code == 200
         data = resp.get_json()
-        # D1 returns element data directly, not wrapped in success/status
+        assert data["success"] is True
 
         solution_ids = {s["solution_id"] for s in data["solutions"]}
         solution_names = {s["solution_name"] for s in data["solutions"]}
