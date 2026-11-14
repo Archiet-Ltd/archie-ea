@@ -55,7 +55,7 @@ def test_section_order_follows_the_design(home_html):
 
 def test_eyebrows_label_the_sections(home_html):
     eyebrows = [_text(m) for m in re.findall(r'<p class="home-eyebrow">(.*?)</p>', home_html, flags=re.S)]
-    for label in ("The category", "Cited answers", "Capabilities", "AI assistants", "Roadmap", "Use cases",
+    for label in ("The category", "Cited answers", "Capabilities", "AI assistants", "Stages", "Use cases",
                   "Pricing", "Compare", "Questions"):
         assert label in eyebrows
 
