@@ -139,5 +139,5 @@ def test_a_page_that_breaks_its_block_added_on_a_branch_of_the_line_still_fails(
     assert run.returncode != 0
     assert "zz_new_page.html" in run.stdout + run.stderr
     others = [ln for ln in (run.stdout + run.stderr).splitlines()
-              if "app/templates/" in ln and "zz_new_page" not in ln]
+              if ln.startswith("ERROR ") and "zz_new_page" not in ln]
     assert others == []
