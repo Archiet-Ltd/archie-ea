@@ -1440,41 +1440,29 @@
     "why": "The page's design note keeps the ArchiMate Gantt widget; whether the library timeline can replace it is decided in ganttone01 (R36, lead ruling 2 Nov 2026)."
    }
   ],
-"app/templates/consolidation/candidates.html": [
-    {
-     "macro": "components/disabled_action.html",
-     "keep_until": "disabledaction01",
-     "why": "A person without the right to run the comparison sees the action disabled with the reason, as on the decision record page; the data-table block does not yet list the disabled action, decided in disabledaction01 (R36, lead ruling 3 Nov 2026)."
-    }
-   ],
-   "app/templates/analytics/flow_analytics.html": [
-    {
-     "macro": "components/card.html",
-     "keep_until": "flowanalytics01",
-     "why": "Flow analytics uses metric cards (components/card.html + components/metrics_card.html) for KPI summary; the data-table block does not include card components. A follow-up brief will decide whether to migrate to data_card or keep as a dashboard-style summary on a data-table page."
-    },
-    {
-     "macro": "components/metrics_card.html",
-     "keep_until": "flowanalytics01",
-     "why": "Flow analytics uses metric cards (components/card.html + components/metrics_card.html) for KPI summary; the data-table block does not include card components. A follow-up brief will decide whether to migrate to data_card or keep as a dashboard-style summary on a data-table page."
-    }
-   ],
-   "app/templates/enterprise/impact_analysis.html": [
-    {
-     "macro": "components/priority_actions.html",
-     "keep_until": "impactwave03",
-     "why": "The prioritised actions live on this page (impactwave01, impactwave02); the component is allowed on this page only, as on the strategic Impact Analysis page (lead ruling 13 Nov 2026)."
-    }
-   ],
-   "app/templates/strategic/investment_matrix_prereq.html": [
-    {
-     "macro": "components/unified_mapping_modal.html",
-     "keep_until": "mapmodallib01",
-     "why": "shared mapping modal used by five pages; mapmodallib01 moves it onto the library dialog"
-    }
-   ]
-  },
-  "pages": {
+  "app/templates/consolidation/candidates.html": [
+   {
+    "macro": "components/disabled_action.html",
+    "keep_until": "disabledaction01",
+    "why": "A person without the right to run the comparison sees the action disabled with the reason, as on the decision record page; the data-table block does not yet list the disabled action, decided in disabledaction01 (R36, lead ruling 3 Nov 2026)."
+   }
+  ],
+  "app/templates/enterprise/impact_analysis.html": [
+   {
+    "macro": "components/priority_actions.html",
+    "keep_until": "impactwave03",
+    "why": "The prioritised actions live on this page (impactwave01, impactwave02); the component is allowed on this page only, as on the strategic Impact Analysis page (lead ruling 13 Nov 2026)."
+   }
+  ],
+  "app/templates/strategic/investment_matrix_prereq.html": [
+   {
+    "macro": "components/unified_mapping_modal.html",
+    "keep_until": "mapmodallib01",
+    "why": "shared mapping modal used by five pages; mapmodallib01 moves it onto the library dialog"
+   }
+  ]
+ },
+ "pages": {
   "app/modules/architecture_assistant/templates/metamodel/properties.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -13231,13 +13219,15 @@
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
     "components/badge.html",
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
-    "components/checkbox.html",
+    "components/card.html",
     "components/confirmation_dialog.html",
-    "components/data_table.html",
+    "components/data_card.html",
     "components/dense_table.html",
     "components/dialog.html",
     "components/disabled_action.html",
@@ -13248,28 +13238,26 @@
     "components/fact_list.html",
     "components/figures.html",
     "components/filter_bar.html",
-    "components/filter_panel.html",
-    "components/form_field.html",
+    "components/gantt_timeline.html",
     "components/inline_hint.html",
-    "components/input.html",
     "components/list_table.html",
     "components/loading_state.html",
+    "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
-    "components/pagination_controls.html",
+    "components/priority_actions.html",
+    "components/progress.html",
     "components/provenance.html",
+    "components/review_queue_panel.html",
     "components/risk_matrix.html",
-    "components/search_bar.html",
-    "components/select.html",
     "components/skeleton.html",
     "components/status_badge.html",
-    "components/table.html",
+    "components/status_indicator.html",
     "components/tabs.html",
-    "components/workbench_table.html",
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "block": "data-table",
+   "block": "dashboard",
    "charts": [
     "chart-bar-default"
    ],
@@ -13278,13 +13266,14 @@
     "badge",
     "breadcrumb",
     "button",
+    "card",
     "empty",
-    "field",
-    "input",
     "page-header",
-    "pagination",
-    "select",
-    "table"
+    "page-shell",
+    "progress",
+    "table",
+    "tooltip",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -13311,25 +13300,24 @@
     "components/table.html",
     "macros/page_shell.html"
    ],
-   "original": "tasks",
-   "page_type": "data-table",
+   "original": "dashboard-01",
+   "page_type": "dashboard",
    "patterns": [
     "P01-page-header",
+    "P24-kpi-row",
     "P03-data-table",
-    "P04-filter-search-toolbar",
-    "P05-pagination",
     "P23-status-badge"
    ],
-   "persona": "enterprise_architect",
-   "reason": "Flow analytics with two bar charts (cycle time, throughput), stat cards, and a board selector table.",
+   "persona": "operations",
+   "reason": "Flow analytics with two bar charts (cycle time, throughput) and stat cards.",
    "reference": {
     "shadcn": {
-     "name": "shadcn examples: tasks",
-     "url": "https://ui.shadcn.com/examples/tasks"
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
     },
     "basecoat": {
-     "name": "flask-basecoat examples: tasks",
-     "image": "docs/design/reference/basecoat-tasks.webp"
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
     }
    },
    "spec": null,
@@ -32872,7 +32860,7 @@
    "controls": {
     "button": 2,
     "link": 10,
-    "testid": 12
+    "testid": 11
    },
    "departures": [],
    "extends": [
@@ -32957,6 +32945,7 @@
     "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
+    "components/priority_actions.html",
     "components/progress.html",
     "components/provenance.html",
     "components/risk_matrix.html",
@@ -32980,6 +32969,7 @@
     "card",
     "empty",
     "page-header",
+    "priority-actions",
     "tabs",
     "table",
     "select",
@@ -33005,6 +32995,9 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/priority_actions.html"
+   ],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -33019,8 +33012,10 @@
     "components/empty_state.html",
     "components/input.html",
     "components/list_table.html",
+    "components/priority_actions.html",
     "macros/page_shell.html"
    ],
+   "note": "Lead, 13 Nov 2026: the prioritised actions live on this page (impactwave01, impactwave02); the component is allowed on this page only, as on the strategic Impact Analysis page.",
    "original": "example:tasks",
    "page_type": "data-table",
    "patterns": [
