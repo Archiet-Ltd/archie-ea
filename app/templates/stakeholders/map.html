@@ -2,18 +2,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% from 'components/modal.html' import modal %}
-{% block title %}Stakeholder Map{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Motivation Layer', 'href': url_for('archimate_crud.dashboard') + '#motivation'},
-    {'text': 'Stakeholder Map', 'current': true}
-]) }}
-{% endblock %}
-
-{% block extra_css %}
+{% block title %}Stakeholder Map{% endblock %}{% block extra_css %}
 <style>
   /* ── Canvas container ─────────────────────────────── */
   #stk-canvas-wrap {

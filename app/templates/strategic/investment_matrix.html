@@ -9,27 +9,7 @@
 {% from 'components/badge.html' import badge %}
 {% import 'basecoat/index.html' as ui %}
 
-{% block title %}Investment prioritisation matrix{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{#- The trail reads the way the sidebar is laid out: Home, its section, then this page's entry. -#}
-{%- set _where = page_trail() if page_trail is defined else {'trail': [], 'home': url_for('main.index')} -%}
-{%- set _crumbs = namespace(items=[{'text': 'Home', 'href': _where.home, 'icon': 'home'}]) -%}
-{%- for label, href in _where.trail -%}
-{%- if loop.last -%}
-{%- set _crumbs.items = _crumbs.items + [{'text': label, 'current': true}] -%}
-{%- else -%}
-{%- set _crumbs.items = _crumbs.items + [{'text': label, 'href': href} if href else {'text': label}] -%}
-{%- endif -%}
-{%- endfor -%}
-{%- if not _where.trail -%}
-{%- set _crumbs.items = _crumbs.items + [{'text': 'Investments', 'current': true}] -%}
-{%- endif -%}
-{{ breadcrumb_nav(items=_crumbs.items) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Investment prioritisation matrix{% endblock %}{% block content %}
 {# Serialize server-side data for Alpine client-side use #}
 {%- set record_urls = {} -%}
 {%- set has_record_page = 'archimate_crud.detail_element' in flask.current_app.view_functions -%}

@@ -1,7 +1,8 @@
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/empty_state.html" import empty_state %}
-{% import "components/card.html" as card %}
+{% import "basecoat/card.html" as card %}
 
 {% block title %}Transformation Programmes{% endblock %}
 
@@ -12,10 +13,6 @@
   {{ page_header(
       title='Transformation programmes',
       description='Govern business change from its objective and evidence through to accountable outcomes.',
-      breadcrumbs=[
-          {'label': 'Dashboard', 'href': url_for('main.index')},
-          {'label': 'Transformation programmes'}
-      ],
       actions=[
           {'text': 'New transformation programme', 'icon': 'plus', 'href': url_for('solution_design.new_programme'), 'variant': 'default'}
       ]

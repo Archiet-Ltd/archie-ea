@@ -1,17 +1,7 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% block title %}Model Dashboard{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Dashboards'},
-    {'text': 'Model Dashboard', 'current': true}
-]) }}
-{% endblock %}
-{% block content %}
+{% block title %}Model Dashboard{% endblock %}{% block content %}
 <div class="p-6 space-y-6">
   {{ page_shell(title='Model Dashboard') }}
   <div class="max-w-2xl mx-auto py-12 text-center">

@@ -19,11 +19,6 @@
             {{ page_header(
                 title='Architecture Decisions',
                 description='Enterprise architecture decisions linked to ArchiMate elements and ARB sessions',
-                breadcrumbs=[
-                    {'label': 'Dashboard', 'href': url_for('main.index')},
-                    {'label': 'Governance'},
-                    {'label': 'Architecture Decisions'}
-                ],
                 actions=[
                     {'text': 'New Decision', 'icon': 'plus', 'href': url_for('arch_decisions.create_decision', element_id=filter_element.id) if filter_element else url_for('arch_decisions.create_decision'), 'variant': 'default'}
                 ]

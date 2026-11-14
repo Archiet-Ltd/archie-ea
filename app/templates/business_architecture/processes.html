@@ -21,9 +21,9 @@
 
 {% block breadcrumb %}
 {#- Home, the sidebar's section, then this page: the trail reads the way the sidebar is laid out. -#}
-{% set where = page_trail() if page_trail is defined else {'trail': [], 'home': url_for('main.index')} %}
+{% set where = page_trail() if page_trail is defined else {'trail': []} %}
 {% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb'}) %}{% call ui.breadcrumb_list() %}
-  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=where.home) %}Home{% endcall %}{% endcall %}
+  {% call ui.breadcrumb_item() %}{% call ui.breadcrumb_link(href=url_for('main.index')) %}Home{% endcall %}{% endcall %}
   {% for label, href in where.trail[:-1] %}
     {% call ui.breadcrumb_separator() %}{{ lucide('chevron-right') }}{% endcall %}
     {% call ui.breadcrumb_item() %}{% if href %}{% call ui.breadcrumb_link(href=href) %}{{ label }}{% endcall %}{% else %}<span>{{ label }}</span>{% endif %}{% endcall %}

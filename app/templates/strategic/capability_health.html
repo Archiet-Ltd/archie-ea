@@ -9,18 +9,7 @@
 {% from 'components/list_table.html' import list_table %}
 {% from 'basecoat/table.html' import table_cell %}
 
-{% block title %}Capability Health Dashboard{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Strategy Layer', 'href': url_for('archimate_crud.dashboard') + '#strategy'},
-    {'text': 'Capability Health', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Capability Health Dashboard{% endblock %}{% block content %}
 {# Builds the href for a row's record, or an empty string when the blueprint that
    owns the destination failed to register -- blueprints register non-fatally here,
    so an unguarded url_for would raise BuildError and 500 every page rendering the
