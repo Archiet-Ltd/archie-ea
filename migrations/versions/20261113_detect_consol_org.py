@@ -22,7 +22,7 @@ be shown to anyone safely.
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
 Revision ID: 20261113_detect_consol_org
-Revises: 20261112_competitive_advantage
+Revises: 20261114_subscription_offer
 Create Date: 2026-11-13
 """
 import sqlalchemy as sa
@@ -30,7 +30,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261113_detect_consol_org"
-down_revision = "20261112_competitive_advantage"
+down_revision = "20261114_subscription_offer"
 branch_labels = None
 depends_on = None
 
