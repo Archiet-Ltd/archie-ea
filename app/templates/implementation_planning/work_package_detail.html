@@ -22,7 +22,7 @@
     ) }}
 
     {% call card() %}
-        {% call card_content() %}
+        {% call card_content(class='pt-6') %}
         {% set facts = [
             {'label': 'Changes capability', 'key': 'capability'},
             {'label': 'Status', 'key': 'status'},
@@ -36,7 +36,7 @@
                 {% if capability %}
                     <a href="{{ capability_url }}" class="text-primary hover:underline">{{ capability.name }}</a>
                 {% else %}
-                    <span class="text-muted-foreground">No capability linked</span>
+                    <a href="{{ url_for('implementation_planning.edit_work_package', work_package_id=work_package.id) }}" class="text-muted-foreground hover:underline">No capability linked</a>
                 {% endif %}
             </div>
             {% elif p.key == 'status' %}
@@ -64,7 +64,7 @@
                 {% if work_package.start_date and work_package.end_date %}
                     {{ work_package.start_date|format_date }} to {{ work_package.end_date|format_date }}
                 {% else %}
-                    <span class="text-muted-foreground">No dates set</span>
+                    <a href="{{ url_for('implementation_planning.edit_work_package', work_package_id=work_package.id) }}" class="text-muted-foreground hover:underline">No dates set</a>
                 {% endif %}
             </div>
             {% endif %}

@@ -20,7 +20,7 @@
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0">
                     <span class="text-sm font-medium text-foreground truncate">{{ element.element_name or 'Unnamed element' }}</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground">{{ element.kind|capitalize }}</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground">{% if element.kind == 'capability' %}Capability owner{% else %}{{ element.kind|capitalize }}{% endif %}</span>
                 </div>
                 {% if element.has_owner %}
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis">Owner recorded</span>
