@@ -51,6 +51,14 @@ def _application_for(app, org_id, name):
     return app_id
 
 
+def _adopt_dora(app, org_id):
+    """Adopt the DORA framework for the organisation so its controls load."""
+    with app.app_context():
+        from app.modules.account.services import onboarding_service as onboarding
+
+        onboarding._adopt_frameworks(org_id, ["dora"])
+
+
 def _wait_for_framework(page, base, label):
     deadline = time.monotonic() + 120
     while True:
@@ -78,7 +86,8 @@ def test_requirement_figure_lands_with_title_in_view(browser, live_server, app, 
         app_name = "Payments core %s" % uuid.uuid4().hex[:6]
         app_id = _application_for(app, org_id, app_name)
 
-        # Adopt DORA framework.
+        # Adopt DORA framework so its controls load on the compliance page.
+        _adopt_dora(app, org_id)
         _wait_for_framework(page, base, "DORA")
         row = page.locator("tr", has_text=re.compile(r"\bDORA\b")).filter(has_text="Adopted").first
         row.click()
