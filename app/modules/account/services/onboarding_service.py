@@ -910,14 +910,17 @@ def _remember_loaded(org, key: str) -> None:
 
 def _fill_boxes(canvas) -> None:
     """Put the organisation's elements in the boxes that suit them. An element sits in one box of a canvas,
-    so a box that takes a single type is filled first (the actors are the customer segments, not the
-    alternatives), then the rest in canvas order, and a type feeds only the first box that takes it."""
+    so the customer boxes are filled first (the actors are the customer segments, not the partners or the
+    alternatives), then a box that takes a single type, then the rest in canvas order, and a type feeds only
+    the first box that takes it."""
     from app.modules.business_model_canvas import model_service
 
     zones = model_service.zones(canvas)
     boxes = model_service.element_boxes(canvas)
-    ordered = [b for b in boxes if len(zones[b]["element_types"]) == 1] + [
-        b for b in boxes if len(zones[b]["element_types"]) != 1
+    customers = [b for b in boxes if b in ("customer_segments", "early_adopters")]
+    rest = [b for b in boxes if b not in customers]
+    ordered = customers + [b for b in rest if len(zones[b]["element_types"]) == 1] + [
+        b for b in rest if len(zones[b]["element_types"]) != 1
     ]
     used: set = set()
     for box in ordered:
