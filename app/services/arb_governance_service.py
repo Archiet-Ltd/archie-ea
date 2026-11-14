@@ -37,6 +37,15 @@ from app.models.architecture_review_board import (
 logger = logging.getLogger(__name__)
 
 
+def pending_outside_queue_conditions():
+    """The one definition of a pending review the board's queue cannot list: still awaiting a decision and in no
+    review cycle. The dashboard counts these and its link to the review ledger filters to exactly these."""
+    return (
+        ARBReviewItem.status.in_(["submitted", "under_review", "pending_info"]),
+        ARBReviewItem.review_cycle_id.is_(None),
+    )
+
+
 class ARBDecisionError(ValueError):
     """Base class for a decision that record_decision refuses to persist.
 
@@ -983,6 +992,8 @@ class ARBGovernanceService:
         # approved_with_conditions IS an approval -- the list badge already said
         # "Approved" for those rows while this count excluded them, so recording
         # one made the approval rate FALL. Both surfaces now mean the same thing.
+        # Pending reviews the board's queue cannot list: raised before reviews had a cycle in the queue.
+        pending_outside_queue = ARBReviewItem.query.filter(*pending_outside_queue_conditions()).count()
         approved_items = ARBReviewItem.query.filter(
             ARBReviewItem.status.in_(["approved", "approved_with_conditions"])
         ).count()
@@ -1015,9 +1026,13 @@ class ARBGovernanceService:
             "metrics": {
                 "total_items": total_items,
                 "pending_items": pending_items,
+                "pending_outside_queue": pending_outside_queue,
                 "approved_items": approved_items,
                 "rejected_items": rejected_items,
-                "approval_rate": (approved_items / total_items * 100) if total_items > 0 else 0,
+                # Of the reviews decided, not of every review: the card says "among completed reviews", and
+                # a review still pending cannot have been approved or rejected.
+                "approval_rate": (approved_items / (approved_items + rejected_items) * 100)
+                if (approved_items + rejected_items) > 0 else None,
             },
             "recent_reviews": [item.to_dict(include_details=False) for item in recent_reviews],
             "upcoming_sessions": [session.to_dict() for session in upcoming_sessions],

@@ -2712,7 +2712,7 @@
 "/enterprise/strategic/capability-health":["RT","PG-MAP","page","/capability-map/?lens=health","W1"],
 "/enterprise/strategic/initiatives":["RT","PG-PLAN","page","/portfolio/","W5"],
 "/enterprise/strategic/investment-matrix":["RT","PG-PLAN","page","/strategic/investment-matrix","W5"],
-"/enterprise/strategic/risk-assessment":["RT","PG-RISK","page","/risks/","W5"],
+"/enterprise/strategic/risk-assessment":["RT","PG-RISK","page","/enterprise/implementation/gap-analysis","W5"],
 "/enterprise/strategic/roadmap":["RT","PG-ROAD","page","/genome/roadmap/?lens=strategic","W1"],
 "/enterprise/strategic/technology-roadmap":["RT","PG-ROAD","page","/genome/roadmap/?lens=technology","W1"],
 "/epics/hierarchy":["W1","PG-FW","page",null,null],

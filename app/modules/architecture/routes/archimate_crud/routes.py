@@ -911,6 +911,24 @@ def api_field_configs():
     return resp
 
 
+def _layer_architecture_query(layer, query_types=None):
+    """The ``archimate_elements`` rows of one layer, restricted to ``query_types`` when given.
+
+    The one query the layer list and the layer tab count both read, so the
+    number on a tab is the number of rows listed under it. Matches every
+    spelling of the layer. With no types given, every element of the layer
+    is read whatever its stored type, as the model map counts it; a type
+    filter narrows the list only. The model carries no archived or deleted
+    state, so every row counts.
+    """
+    query = ArchiMateElement.query.filter(
+        db.func.lower(ArchiMateElement.layer).in_([a.lower() for a in LAYER_ALIASES.get(layer, [layer])]),
+    )
+    if query_types is not None:
+        query = query.filter(ArchiMateElement.type.in_(query_types))
+    return query
+
+
 @archimate_crud.route("/api/capability-choices")
 @login_required
 def api_capability_choices():
@@ -991,10 +1009,7 @@ def _layer_count_parts(layer):
     # the size of that layer while its own tiles summed to the real total, and
     # the layer's elements were invisible in the UI. Match every spelling.
     try:
-        _aliases = [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
-        ae_count = ArchiMateElement.query.filter(
-            db.func.lower(ArchiMateElement.layer).in_(_aliases),
-        ).count()
+        ae_count = _layer_architecture_query(layer).count()
     except Exception as e:
         current_app.logger.warning(f"_count_layer_elements: archimate_elements count failed for {layer}: {e}")
         return None
@@ -1210,13 +1225,7 @@ def api_layer_elements(layer):
             # catalogue page keeps rendering the layer as empty.
             # With no type asked for, every element of the layer is listed, whatever its stored type: the
             # layer's count has no type filter, and a list narrower than its own count read as a second number.
-            ae_q = ArchiMateElement.query.filter(
-                db.func.lower(ArchiMateElement.layer).in_(
-                    [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
-                ),
-            )
-            if type_filter:
-                ae_q = ae_q.filter(ArchiMateElement.type.in_(query_types))
+            ae_q = _layer_architecture_query(layer, query_types if type_filter else None)
             if search:
                 safe_s = escape_like_literal(search)
                 ae_q = ae_q.filter(
