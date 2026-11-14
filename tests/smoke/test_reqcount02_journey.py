@@ -8,16 +8,12 @@ requirement row to land on that requirement's own anchor, marked on the framewor
 import os
 import re
 import time
+import uuid
 
 import pytest
 from playwright.sync_api import expect
 
-from tests.smoke.test_signup_brings_the_company_in_journey import (  # noqa: F401
-    people,
-    provider,
-    server,
-    sign_up,
-)
+from tests.smoke.fresh_org import create_fresh_org, sign_in
 from tests.smoke.test_connect_github_to_cited_answer_journey import SKIP_WELCOME
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -42,13 +38,11 @@ def shoot(page, name, width, scheme):
     page.screenshot(path=os.path.join(SHOTS, "%s-%d-%s.png" % (name, width, scheme)), full_page=True)
 
 
-def _application_for(app, email, name):
+def _application_for(app, org_id, name):
     with app.app_context():
         from app import db
         from app.models.application_portfolio import ApplicationComponent
-        from app.models.user import User
 
-        org_id = User.query.filter_by(email=email).one().organization_id
         row = ApplicationComponent(name=name, organization_id=org_id)
         db.session.add(row)
         db.session.commit()
@@ -68,17 +62,23 @@ def _wait_for_framework(page, base, label):
 
 
 @pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
-def test_requirement_figure_lands_with_title_in_view(browser, server, people, app, width, scheme):
+def test_requirement_figure_lands_with_title_in_view(browser, live_server, app, width, scheme):
     """Following the Framework requirements tile link on an application page lands with the card's title visible below the top bar."""
-    base = str(server)
+    base = str(live_server)
+    # Create a fresh organisation with an enterprise architect.
+    org = create_fresh_org("enterprise_architect", org_admin=True)
+    org_id = org["org_id"]
+    email = org["emails"]["enterprise_architect"]
+
     context, page = new_page(browser, width, scheme)
     try:
-        email, _started = sign_up(page, base, people)
-        app_name = "Payments core"
-        app_id = _application_for(app, email, app_name)
-        # SKIP_WELCOME skips the welcome steps; we land on the dashboard.
+        sign_in(page, base, email)
         page.wait_for_url("**/dashboard/**")
 
+        app_name = "Payments core %s" % uuid.uuid4().hex[:6]
+        app_id = _application_for(app, org_id, app_name)
+
+        # Adopt DORA framework.
         _wait_for_framework(page, base, "DORA")
         row = page.locator("tr", has_text=re.compile(r"\bDORA\b")).filter(has_text="Adopted").first
         row.click()
