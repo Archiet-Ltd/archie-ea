@@ -150,7 +150,7 @@ def test_visitor_navbar_footer_and_sitemap_lead_only_to_pages_with_content(brows
                 problems.append("%s (%s) is listed as available but opens its early-access page" % (label, href))
         assert not problems, "\n".join(problems)
 
-        xml = page.request.get(wave_server + "/sitemap.xml").text()
+        xml = page.request.get(wave_server + "/sitemap-en.xml").text()
         paths = re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", xml)
         assert paths
         for path in paths:
@@ -419,7 +419,7 @@ def test_a_visitor_with_an_old_link_and_one_from_the_hub_each_read_the_capabilit
             '[data-testid="early-access-hub"] li',
             "els => els.map(e => [e.querySelector('a').getAttribute('href'), e.querySelector('a').innerText.trim(), e.innerText.trim()])")
         assert len(listed) >= 10
-        sitemap_xml = page.request.get(wave_server + "/sitemap.xml").text()
+        sitemap_xml = page.request.get(wave_server + "/sitemap-en.xml").text()
         sitemap_paths = re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml)
         blurbs = set()
         for href, title, line in listed:

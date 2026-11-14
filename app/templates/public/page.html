@@ -18,6 +18,7 @@
 {% extends 'layouts/public_base.html' %}
 {% from 'macros/pricing_cta.html' import plan_buy_section %}
 {% block body_theme %}theme-marketing{% endblock %}
+{% block html_lang %}{{ page.lang }}{% endblock %}
 {% block title %}{{ share_view.title if share_view else page.title }}{% endblock %}
 
 {% block meta_description %}
@@ -28,6 +29,9 @@
 <meta name="twitter:title" content="{{ share_view.title }}">
 {% else %}
 {{ seo_meta(page.self_canonical_url, page.description, page.is_held, social) }}
+{% for code, address in page.alternates %}
+<link rel="alternate" hreflang="{{ code }}" href="{{ address }}">
+{% endfor %}
 <meta property="og:title" content="{{ page.title }}">
 <meta name="twitter:title" content="{{ page.title }}">
 {% endif %}

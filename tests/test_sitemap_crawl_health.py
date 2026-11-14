@@ -43,7 +43,7 @@ _NON_CONTENT_PAGE_PATHS = {"/", "/vs", "/use-cases"}
 
 
 def _sitemap_paths(client) -> list[str]:
-    rv = client.get("/sitemap.xml")
+    rv = client.get("/sitemap-en.xml")
     assert rv.status_code == 200
     xml = rv.data.decode()
     locs = _LOC_RE.findall(xml)

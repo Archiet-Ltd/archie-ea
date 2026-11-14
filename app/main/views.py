@@ -492,6 +492,37 @@ def sitemap_xml():
     return Response(sitemap_text(), mimetype="application/xml")
 
 
+@main.route("/sitemap-<code>.xml")
+def language_sitemap_xml(code):
+    """One language's sitemap, listing only that language's addresses; 404 for a language with no pages."""
+    from flask import Response, abort
+
+    from app.services.crawl_rules import language_for_sitemap, language_sitemap_text
+
+    language = language_for_sitemap(f"sitemap-{code}.xml")
+    text = language_sitemap_text(language) if language else None
+    if text is None:
+        abort(404)
+    return Response(text, mimetype="application/xml")
+
+
+@main.route("/<any('pt-br', 'es', 'fr'):language>/<path:rest>")
+def translated_page(language, rest):
+    """A translated public page at its language's address (/pt-br/about); 404 when that translation does not exist."""
+    from flask import abort
+
+    from app.services.public_pages import _pages_by_url, build_jsonld, translation_page
+
+    page = translation_page(f"/{language}/{rest}")
+    if page is None:
+        abort(404)
+    english = _pages_by_url().get(f"/{rest}")
+    closed = _wave_closed_response(english) if english is not None else None
+    if closed is not None:
+        return closed
+    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+
+
 @main.route("/<key>.txt")
 def indexnow_key_file(key):
     """IndexNow domain-ownership proof: the configured key's own text file.

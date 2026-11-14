@@ -69,7 +69,7 @@ def test_no_route_that_refuses_a_signed_out_visitor_is_allowed_to_crawlers(app, 
 
 def test_no_public_page_is_disallowed(client, robots_text):
     rules = _parse_robots_rules(robots_text, "Googlebot")
-    sitemap = client.get("/sitemap.xml").get_data(as_text=True)
+    sitemap = client.get("/sitemap-en.xml").get_data(as_text=True)
     pages = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap)) | {"/", "/early-access"}
     hub = client.get("/early-access").get_data(as_text=True)
     pages |= {urlsplit(h).path for h in re.findall(r'href="(/(?:early-access|vs)/[^"]*)"', hub)}
@@ -308,7 +308,7 @@ def test_when_ready_builds_robots_and_the_sitemap_before_any_request(app, monkey
     monkeypatch.setattr(crawl_rules, "_build_sitemap", lambda: built.append("sitemap") or "")
     started = time.perf_counter()
     first = app.test_client().get("/robots.txt")
-    app.test_client().get("/sitemap.xml")
+    app.test_client().get("/sitemap-en.xml")
     assert built == [], "the first request after start-up rebuilt a file the server had already built"
     assert "Disallow:" in first.get_data(as_text=True)
     assert time.perf_counter() - started < 1.0
