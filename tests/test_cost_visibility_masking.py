@@ -75,3 +75,57 @@ def test_the_evidence_trail_loses_its_cost_factors_amount_and_the_amounts_in_its
     assert cost["raw_value"] is None and "482" not in cost["rationale"]
     assert users["raw_value"] == 40 and users["rationale"] == "40 active users"
     assert out["costs_withheld_sentence"] == COSTS_WITHHELD
+
+
+# ---- the helper a route calls on the reply it is about to send, as a signed-in person ----
+
+def _signed_in(db_session, make_org, role):
+    import uuid
+
+    from app.models.user import User
+
+    org = make_org("mask-" + uuid.uuid4().hex[:6])
+    user = User(email="mask-%s@example.com" % uuid.uuid4().hex[:8], first_name="M", last_name="P",
+                organization_id=org.id, confirmed=True, enterprise_role=role)
+    user.password = "Sup3rSecret!23"
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def _reply_of(app, user):
+    from flask_login import login_user
+
+    from app.services.cost_visibility import withhold_reply
+
+    reply = {"success": True, "total_estimated_hours": 120, "component_scores": {"fit": 70},
+             "score_weights": {"cost": 0.25}, "cost_efficiency": 0.4,
+             "work_packages": [{"name": "Cutover", "estimated_cost": 374821, "estimated_hours": 40}]}
+    with app.test_request_context("/"):
+        login_user(user)
+        return withhold_reply(reply), reply
+
+
+def test_a_withheld_person_keeps_hours_scores_and_weights_and_loses_the_amounts(app, db_session, make_org):
+    architect = _signed_in(db_session, make_org, "solution_architect")
+    out, sent = _reply_of(app, architect)
+    assert out["total_estimated_hours"] == 120 and out["component_scores"] == {"fit": 70}
+    assert out["score_weights"] == {"cost": 0.25}
+    assert out["work_packages"][0]["estimated_hours"] == 40 and out["work_packages"][0]["name"] == "Cutover"
+    assert out["work_packages"][0]["estimated_cost"] is None and out["cost_efficiency"] is None
+    assert out["costs_withheld"] is True and out["costs_withheld_sentence"] == COSTS_WITHHELD
+    assert sent["work_packages"][0]["estimated_cost"] == 374821
+
+
+def test_an_allowed_person_receives_the_reply_unchanged(app, db_session, make_org):
+    cto = _signed_in(db_session, make_org, "cto")
+    out, sent = _reply_of(app, cto)
+    assert out == sent
+
+
+def test_a_list_of_records_named_for_money_stays_and_loses_its_amounts():
+    reply = {"critical_investments": [{"name": "Payments", "estimated_cost": 90000}], "cost_history": [1, 2, 3]}
+    out = withhold_costs(reply)
+    assert out["critical_investments"][0]["name"] == "Payments"
+    assert out["critical_investments"][0]["estimated_cost"] is None
+    assert out["cost_history"] is None

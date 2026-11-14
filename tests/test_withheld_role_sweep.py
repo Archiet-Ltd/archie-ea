@@ -23,7 +23,7 @@ from datetime import datetime
 
 import pytest
 
-from app.services.cost_visibility import is_money_key
+from app.services.cost_visibility import holds_no_money, is_money_key
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
@@ -186,6 +186,8 @@ def _money_in_json(node, found, trail=""):
     if isinstance(node, dict):
         for key, value in node.items():
             here = "%s.%s" % (trail, key)
+            if holds_no_money(key):
+                continue
             if (isinstance(value, (int, float)) and not isinstance(value, bool) and is_money_key(key)
                     and not NOT_AN_AMOUNT_KEY.search(str(key))):
                 found.append("%s = %s" % (here, value))
@@ -335,3 +337,33 @@ def test_the_other_organisations_architect_is_withheld_from_too(app, client, log
         reply = client.get(path)
         assert reply.status_code == 200, path
         assert not find_money(reply), "%s handed money to the other organisation's architect" % path
+
+
+def test_the_sweep_counts_a_route_that_raises_or_answers_5xx_as_broken_not_as_clean():
+    """A route that cannot answer proves nothing about money, so the sweep reports it."""
+    from flask import Flask, abort
+
+    stand_in = Flask("sweep-stand-in")
+    stand_in.config["PROPAGATE_EXCEPTIONS"] = True
+
+    @stand_in.route("/fine")
+    def fine():
+        return "no money here"
+
+    @stand_in.route("/answers-500")
+    def answers_500():
+        abort(500)
+
+    @stand_in.route("/raises")
+    def raises():
+        raise RuntimeError("boom")
+
+    previous = signal.signal(signal.SIGALRM, _alarm)
+    try:
+        with stand_in.test_client() as stand_in_client:
+            def nobody(_client, _user):
+                return None
+            results = {path: _get(stand_in_client, nobody, None, path)[1] for path in ("/fine", "/answers-500", "/raises")}
+    finally:
+        signal.signal(signal.SIGALRM, previous)
+    assert results == {"/fine": None, "/answers-500": "answered 500", "/raises": "RuntimeError"}

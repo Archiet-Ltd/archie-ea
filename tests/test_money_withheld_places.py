@@ -199,3 +199,101 @@ def test_the_element_export_holds_no_amount_for_the_architect(client, login_as, 
     assert rows and not re.search(r"\b%d\b" % APP_COST, held.get_data(as_text=True))
     shown = _get(client, login_as, world["cto"], path).get_data(as_text=True)
     assert re.search(r"\b%d(\.0+)?\b" % APP_COST, shown)
+
+
+# ---- element exports and the strategic-initiative and work-package feeds
+
+GOAL_BUDGET, RESOURCE_COST, VALUE_AMOUNT = 557731, 448829, 336611
+INITIATIVE_BUDGET, INITIATIVE_SPENT, OTHER_BUDGET = 905163, 268431, 884422
+
+
+@pytest.fixture
+def estate(db_session, make_org, world):
+    """The world's organisation, with one of each element that holds money, an initiative with a budget and a
+    solution, and another organisation's goal and initiative with other money."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.motivation import Goal, Value
+    from app.models.solution_models import Solution
+    from app.models.strategic import StrategicInitiative
+    from app.models.strategy_layer import StrategyResource
+
+    org_id = world["architect"].organization_id
+    other = make_org("places-c")
+    value_element = ArchiMateElement(name="Places value", type="Value", layer="motivation", organization_id=org_id)
+    db_session.add(value_element)
+    db_session.flush()
+    goal = Goal(name="Places goal", organization_id=org_id, investment_required=GOAL_BUDGET)
+    resource = StrategyResource(name="Places resource", organization_id=org_id, annual_cost=RESOURCE_COST)
+    value = Value(name="Places value", organization_id=org_id, amount=VALUE_AMOUNT, archimate_element_id=value_element.id)
+    initiative = StrategicInitiative(name="Places bet", organization_id=org_id, status="in_progress",
+                                     budget_allocated=INITIATIVE_BUDGET, budget_spent=INITIATIVE_SPENT)
+    foreign_goal = Goal(name="Foreign goal", organization_id=other.id, investment_required=OTHER_BUDGET)
+    solution = Solution(name="Places solution", organization_id=org_id, created_by_id=world["architect"].id,
+                        estimated_cost=ESTIMATE, actual_cost=APP_COST, governance_status="draft")
+    db_session.add_all([goal, resource, value, initiative, foreign_goal, solution])
+    db_session.flush()
+    return {**world, "initiative": initiative, "solution": solution}
+
+
+def _shown(response):
+    import html
+
+    return html.unescape(response.get_data(as_text=True))
+
+
+@pytest.mark.parametrize("layer,element_type,figure", [("motivation", "Goal", GOAL_BUDGET),
+                                                       ("strategy", "Resource", RESOURCE_COST),
+                                                       ("motivation", "Value", VALUE_AMOUNT)])
+def test_the_element_export_holds_no_amount_for_the_architect_and_the_figure_for_the_cto(
+        client, login_as, estate, layer, element_type, figure):
+    path = "/architecture/%s/%s/export?format=json" % (layer, element_type)
+    held = _get(client, login_as, estate["architect"], path)
+    assert held.status_code == 200
+    rows = held.get_json()
+    assert rows and any(row["name"].startswith("Places") for row in rows), "the export lists this organisation's element"
+    assert str(figure) not in held.get_data(as_text=True)
+    assert str(OTHER_BUDGET) not in held.get_data(as_text=True)
+    assert not any(isinstance(value, (int, float)) and not isinstance(value, bool) and value > 1000
+                   for row in rows for key, value in row.items() if key != "id"), rows
+    shown = _get(client, login_as, estate["cto"], path)
+    assert str(figure) in shown.get_data(as_text=True), "the chief technology officer reads the figure"
+    assert str(OTHER_BUDGET) not in shown.get_data(as_text=True)
+
+
+FEEDS = ("/api/roadmap/work-packages", "/api/roadmap/statistics", "/api/roadmap-builder/work-packages",
+         "/api/roadmap-builder/summary", "/api/roadmap-builder/dependency-graph")
+
+
+@pytest.mark.parametrize("path", FEEDS)
+def test_the_work_package_feeds_hold_no_amount_for_the_architect_and_the_figure_for_the_cto(client, login_as, estate, path):
+    held = _get(client, login_as, estate["architect"], path)
+    assert held.status_code == 200, (path, held.status_code)
+    text = _shown(held)
+    for figure in (ESTIMATE, "{:,}".format(ESTIMATE), OTHER_ESTIMATE):
+        assert str(figure) not in text, "%s printed %s" % (path, figure)
+    shown = _get(client, login_as, estate["cto"], path)
+    assert shown.status_code == 200
+    assert str(ESTIMATE) in _shown(shown), (path, "the chief technology officer reads the estimate")
+
+
+def test_the_initiative_rollup_holds_no_budget_for_the_architect_and_the_budget_for_the_cto(client, login_as, estate):
+    path = "/solutions/programmes/%d/api/rollup" % estate["initiative"].id
+    held = _get(client, login_as, estate["architect"], path)
+    assert held.status_code == 200, held.status_code
+    assert str(INITIATIVE_BUDGET) not in _shown(held) and str(INITIATIVE_SPENT) not in _shown(held)
+    assert held.get_json().get("costs_withheld") is True
+    shown = _get(client, login_as, estate["cto"], path)
+    assert shown.status_code == 200
+    assert "costs_withheld" not in shown.get_json()
+
+
+def test_the_phase_review_holds_no_amount_for_the_architect_and_the_figures_for_the_cto(client, login_as, estate):
+    path = "/solutions/%d/phase-h/review" % estate["solution"].id
+    held = _get(client, login_as, estate["architect"], path)
+    assert held.status_code == 200, held.status_code
+    text = _shown(held)
+    assert "cost_variance" in text, "the review is returned, not an error"
+    for figure in (ESTIMATE, "{:,}".format(ESTIMATE), APP_COST, "{:,}".format(APP_COST)):
+        assert str(figure) not in text, "%s printed %s" % (path, figure)
+    shown = _shown(_get(client, login_as, estate["cto"], path))
+    assert str(ESTIMATE) in shown and str(APP_COST) in shown

@@ -886,6 +886,11 @@ def init_context_processors(app):
     from app.navigation.registry import element_type_label
     app.jinja_env.filters["type_label"] = element_type_label
 
+    # A page for a person the cost rule withholds from passes the text of a record through this filter.
+    from app.services.cost_visibility import without_amounts
+
+    app.jinja_env.filters["without_amounts"] = without_amounts
+
     # Register date/datetime formatting filters
     def _filter_format_date(value, fmt='%d %b %Y'):
         if value is None:

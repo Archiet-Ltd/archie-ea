@@ -51,6 +51,16 @@ _NOT_MONEY_WORD = re.compile(
     r"currency|status|kind|framework|supported|risk_class|plateau|_name$|label|reason|note|_type$|categories_loaded", re.I)
 
 
+# a part named for a score, a weight or hours holds no money even when its own keys say "cost" (a weight of the
+# cost criterion is a weight), so it is kept whole
+_KEPT_WHOLE = re.compile(r"score|weight|hours", re.I)
+
+
+def holds_no_money(name: Any) -> bool:
+    """True for a part named for a score, a weight or hours: kept whole, whatever its own keys are called."""
+    return bool(_KEPT_WHOLE.search(str(name))) and not _is_money_name(name)
+
+
 def _is_money_name(name: Any) -> bool:
     name = str(name)
     if name in MONEY_KEYS:
@@ -166,6 +176,12 @@ def withhold_change_rows(rows: Any) -> Any:
     return out
 
 
+def _is_records(value: Any) -> bool:
+    """A list of records (``critical_investments``: the capabilities at that priority) is not an amount: the
+    money in each record is left out by name, and the records stay."""
+    return isinstance(value, list) and all(isinstance(item, dict) for item in value)
+
+
 def _withhold(result: Any, extra: tuple) -> Any:
     if isinstance(result, list):
         return [_withhold(item, extra) for item in result]
@@ -174,7 +190,9 @@ def _withhold(result: Any, extra: tuple) -> Any:
     out = {}
     masked = False
     for key, value in result.items():
-        if isinstance(value, bool) or not is_money_key(key, extra):
+        if holds_no_money(key) and not is_money_key(key, extra):
+            out[key] = without_amounts(value)
+        elif isinstance(value, bool) or not is_money_key(key, extra) or _is_records(value):
             out[key] = _withhold(value, extra)
         else:
             out[key] = None

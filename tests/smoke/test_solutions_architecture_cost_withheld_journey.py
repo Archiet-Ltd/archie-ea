@@ -194,3 +194,45 @@ def test_the_refused_view_fits_a_phone(browser, live_server, organisations):
         shot(page, "architect-solarch-phone", 390, "dark")
     finally:
         page.close()
+
+
+@pytest.mark.parametrize("width,scheme", SIZES)
+def test_a_solution_architect_runs_the_analysis_and_reads_the_sentence_once_without_a_cost_column(
+        browser, live_server, organisations, width, scheme):
+    """From the goal 'what are my options for this need': the architect types the need, clicks Run Analysis, and
+    reads the options, the applications that already serve the need and the reason costs are missing, once."""
+    mine, theirs = organisations
+    context, page = open_page(browser, live_server, mine["emails"]["solution_architect"], width, scheme)
+    try:
+        page.goto(live_server + "/architecture/solutions-architecture",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_label("Problem / Requirement").fill("Replace the legacy ledger")
+        page.get_by_role("button", name="Run Analysis").click()
+        page.get_by_text("Top Recommendation").wait_for(timeout=PAGE_TIMEOUT)
+        page.get_by_text("App %s" % mine["tag"]).first.wait_for(timeout=PAGE_TIMEOUT)
+        text = shown_text(page)
+        assert text.count(HELD_BACK) == 1, "the sentence is said %d times, not once" % text.count(HELD_BACK)
+        assert page.get_by_role("columnheader", name="Annual Cost").count() == 0, "a cost column is shown"
+        assert holds_none_of(page.content(), _amounts(mine) + _amounts(theirs)) == []
+        assert "£" not in text
+        assert page.get_by_text("App %s" % theirs["tag"]).count() == 0
+        shot(page, "architect-solarch-results", width, scheme)
+    finally:
+        context.close()
+
+
+def test_a_finance_person_runs_the_analysis_and_reads_the_cost_column(browser, live_server, organisations):
+    mine, theirs = organisations
+    context, page = open_page(browser, live_server, mine["emails"]["finance"], 1440, "light")
+    try:
+        page.goto(live_server + "/architecture/solutions-architecture",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_label("Problem / Requirement").fill("Replace the legacy ledger")
+        page.get_by_role("button", name="Run Analysis").click()
+        page.get_by_text("App %s" % mine["tag"]).first.wait_for(timeout=PAGE_TIMEOUT)
+        assert page.get_by_role("columnheader", name="Annual Cost").count() == 1
+        assert HELD_BACK not in shown_text(page)
+        assert any(form in page.content() for form in ("{:,.0f}".format(mine["figures"]["app_cost"]),
+                                                       str(int(mine["figures"]["app_cost"]))))
+    finally:
+        context.close()
