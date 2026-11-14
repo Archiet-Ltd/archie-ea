@@ -32,15 +32,16 @@ def _money(value):
 
 
 def _variance(initiative):
-    """Spend against approved budget, as a percentage.
+    """Forecast against approved budget, as a percentage.
 
     Returns None when either side is missing rather than implying 0% variance
-    against a budget nobody set.
+    against a budget nobody set. A positive figure means the forecast overruns
+    the budget; a negative figure means it comes in under.
     """
-    budget, spent = initiative.approved_budget, initiative.spent_to_date
-    if budget is None or spent is None or float(budget) == 0:
+    budget, forecast = initiative.approved_budget, initiative.forecast_cost
+    if budget is None or forecast is None or float(budget) == 0:
         return None
-    return round((float(spent) - float(budget)) / float(budget) * 100, 1)
+    return round((float(forecast) - float(budget)) / float(budget) * 100, 1)
 
 
 # What a financial benefit is measured by: its three amounts, and the percentage
