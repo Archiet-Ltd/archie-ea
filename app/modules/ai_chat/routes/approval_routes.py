@@ -152,7 +152,5 @@ __all__ = [
     "approver_queue",
     "decided_approvals",
     "approval_impact",
-    "approve_pending_approval",
-    "reject_pending_approval",
     "approval_inbox",
 ]
