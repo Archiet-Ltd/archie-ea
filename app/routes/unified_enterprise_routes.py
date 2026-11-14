@@ -495,8 +495,9 @@ def work_packages():
     """
     org_id = current_organization_id()
     if request.method == "POST":
-        if not can(current_user, "delete", "work_package"):
-            flash("Your role may read work packages but not delete them. Administrators and architects may create, edit and delete work packages.", "error")
+        single = bool(request.args.getlist("delete")) and not request.form.getlist("ids")
+        if not can(current_user, "delete" if single else "bulk_delete", "work_package"):
+            flash("Your role may not delete these work packages. Administrators may delete several at once; architects may delete one at a time.", "error")
             return redirect(url_for("enterprise.work_packages"))
         ids = request.form.getlist("ids") or request.args.getlist("delete")
         deleted = 0
@@ -809,8 +810,8 @@ def api_update_work_package(wp_id):
 @login_required
 def api_bulk_delete_work_packages():
     """Bulk delete work packages (this organisation's own only)."""
-    if not can(current_user, "delete", "work_package"):
-        return api_error("Your role may read work packages but not delete them. Administrators and architects may create, edit and delete work packages.", "FORBIDDEN", 403)
+    if not can(current_user, "bulk_delete", "work_package"):
+        return api_error("Your role may read work packages but not delete them. Only administrators may delete several work packages at once.", "FORBIDDEN", 403)
     data = request.get_json() or {}
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):

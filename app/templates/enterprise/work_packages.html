@@ -17,7 +17,7 @@
 {% endmacro %}
 
 {% macro _bulk_delete() %}
-{% if can("delete", "work_package") %}
+{% if can("bulk_delete", "work_package") %}
 {% call ui.button(type='submit', variant='outline', size='sm', class='h-8', attrs={'form': 'wp-bulk-form', 'data-testid': 'wp-bulk-delete', 'data-bulk-delete': '', 'hidden': true}) %}{{ lucide('trash-2') }}Delete selected{% endcall %}
 {% endif %}
 {% endmacro %}

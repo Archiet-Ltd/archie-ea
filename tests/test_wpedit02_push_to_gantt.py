@@ -130,3 +130,29 @@ def test_other_organisations_card_is_not_found(client, app):
     finally:
         with app.app_context():
             _tidy(db, [org_a, org_b], [arch_a, arch_b], [card_b], [board_b])
+
+
+def test_architect_cannot_bulk_delete_but_can_delete_one(client, app):
+    from app import db
+    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.services import work_package_service
+
+    with app.app_context():
+        org = _make_org_id(db, "PGB")
+        uid = _make_user_id(db, org, "PgBulk", enterprise_role="enterprise_architect")
+        ids = []
+        for n in ("bulk one", "bulk two"):
+            ids.append(work_package_service.create_work_package(organization_id=org, name=n).id)
+        db.session.commit()
+    try:
+        with app.app_context():
+            _login(client, uid)
+            r = client.delete("/enterprise/api/work-packages/bulk", json={"ids": ids})
+            assert r.status_code == 403, r.get_data(as_text=True)
+            assert db.session.query(UnifiedWorkPackage).filter(UnifiedWorkPackage.id.in_(ids)).count() == 2
+            client.post(f"/enterprise/implementation/work-packages?delete={ids[0]}")
+            db.session.expire_all()
+            assert db.session.query(UnifiedWorkPackage).filter(UnifiedWorkPackage.id.in_(ids)).count() == 1
+    finally:
+        with app.app_context():
+            _tidy(db, [org], [uid], [], [])

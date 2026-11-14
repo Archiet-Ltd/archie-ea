@@ -6,6 +6,10 @@ packages page and sees no New work package button, no row Edit/Delete actions, a
 no bulk Delete. The Administrator opens the same page and sees all of them.
 """
 
+import os
+import tempfile
+from pathlib import Path
+
 import pytest
 from playwright.sync_api import expect
 
@@ -13,6 +17,8 @@ from .conftest import PAGE_TIMEOUT
 from .fresh_org import api, create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+SHOT_DIR = Path(os.environ.get("SMOKE_SCREENSHOT_DIR") or tempfile.gettempdir())
 
 
 def test_viewer_sees_no_work_package_edit_controls(browser, live_server):
@@ -45,7 +51,7 @@ def test_viewer_sees_no_work_package_edit_controls(browser, live_server):
         expect(page.locator('[data-testid="work-packages-empty"] button, [data-testid="work-packages-empty"] a')).to_have_count(0)
 
         # Screenshot at 1440 wide
-        page.screenshot(path="/home/ubuntu/verify/seats/wpedit01_g1/walk/viewer-1440.png",
+        page.screenshot(path=str(SHOT_DIR / "viewer-1440.png"),
                         full_page=True)
     finally:
         context.close()
@@ -65,7 +71,7 @@ def test_viewer_sees_no_work_package_edit_controls(browser, live_server):
         expect(page2.get_by_test_id("work-package-edit")).to_have_count(0)
         expect(page2.get_by_test_id("work-package-delete")).to_have_count(0)
 
-        page2.screenshot(path="/home/ubuntu/verify/seats/wpedit01_g1/walk/viewer-390.png",
+        page2.screenshot(path=str(SHOT_DIR / "viewer-390.png"),
                          full_page=True)
     finally:
         context2.close()
@@ -92,7 +98,7 @@ def test_administrator_sees_all_work_package_edit_controls(browser, live_server)
         # Page renders without error
         expect(page.get_by_role("heading", name="Work packages", exact=True)).to_be_visible()
 
-        page.screenshot(path="/home/ubuntu/verify/seats/wpedit01_g1/walk/admin-1440.png",
+        page.screenshot(path=str(SHOT_DIR / "admin-1440.png"),
                         full_page=True)
     finally:
         context.close()
