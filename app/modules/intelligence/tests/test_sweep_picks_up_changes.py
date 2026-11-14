@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import os
 
-import pytest
-
 from app.extensions import db
 
 FIXTURE = os.path.join(
@@ -64,11 +62,10 @@ def _visited(run):
 def test_an_organisation_with_relationships_and_no_run_is_worked_out_by_one_sweep(app, db_session, make_org):
     from app.modules.intelligence.services.recompute_job import recompute_derived_facts
 
-    never, other = make_org("sw-never"), make_org("sw-other")
+    never = make_org("sw-never")
     _chain(db_session, never.id, "n")
-    _chain(db_session, other.id, "o")
     db_session.commit()
-    never_id, other_id = never.id, other.id
+    never_id = never.id
     with app.app_context():
         assert _derived(never_id) == []
 
