@@ -17,13 +17,13 @@ import subprocess
 import pytest
 
 from tests._published_text_rules import BUILD_PROCESS_WORDS, DATES, PLACEHOLDER_PERSON_NAME
+from app.services.origin import canonical_origin
 from app.services.public_pages import (
     IMG_MODULES_DIR,
     MODULE_RECORDINGS,
     MODULE_RECORDINGS_MANIFEST,
     SHARE_DIR,
     SHARE_MANIFEST,
-    SITE_URL,
     STATIC_ROOT,
     load_share_manifest,
 )
@@ -48,7 +48,7 @@ def _probe(path):
 def test_the_manifest_exists_and_names_every_recording():
     assert (SHARE_DIR / SHARE_MANIFEST).is_file(), "the share manifest has not been generated"
     assert {e["slug"] for e in _entries()} == set(MODULE_RECORDINGS)
-    assert json.loads((SHARE_DIR / SHARE_MANIFEST).read_text(encoding="utf-8"))["site"] == SITE_URL
+    assert json.loads((SHARE_DIR / SHARE_MANIFEST).read_text(encoding="utf-8"))["site"] == canonical_origin()
 
 
 @pytest.mark.parametrize("slug", sorted(MODULE_RECORDINGS))
@@ -59,8 +59,8 @@ def test_an_entry_holds_every_field(slug):
         assert entry[text_field].strip(), "%s is empty" % text_field
     assert entry["claims"] and all(c.strip() for c in entry["claims"])
     assert len(entry["captions"]) == len(entry["caption_seconds"])
-    assert entry["share_url"] == "%s/see/%s" % (SITE_URL, slug)
-    assert entry["module_url"] == "%s/modules/%s" % (SITE_URL, slug)
+    assert entry["share_url"] == "%s/see/%s" % (canonical_origin(), slug)
+    assert entry["module_url"] == "%s/modules/%s" % (canonical_origin(), slug)
     assert set(entry["files"]) == set(SHAPES)
     recorded = MODULE_RECORDINGS[slug]
     assert entry["title"] == recorded["title"] and entry["message"] == recorded["promise"]

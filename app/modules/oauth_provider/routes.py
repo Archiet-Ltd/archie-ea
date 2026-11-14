@@ -19,6 +19,7 @@ from flask import Blueprint, current_app, g, jsonify, redirect, render_template,
 from flask_login import current_user, login_required
 
 from app.extensions import csrf
+from app.services.origin import _allowed_origins, canonical_origin
 from app.modules.oauth_provider.models import (
     OAuthAuthorizationCode,
     OAuthClient,
@@ -57,9 +58,6 @@ def _hash_code_verifier(verifier: str) -> str:
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
     # Base64url-encode without padding, per RFC 7636 Appendix A
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
-
-
-from app.services.origin import canonical_origin, _allowed_origins
 
 
 def _mcp_resource_urls() -> list[str]:

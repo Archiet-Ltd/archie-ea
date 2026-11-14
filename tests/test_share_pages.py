@@ -8,7 +8,8 @@ import re
 
 import pytest
 
-from app.services.public_pages import MODULE_RECORDINGS, MODULE_RECORDING_DEFECTS, SITE_URL
+from app.services.origin import canonical_origin
+from app.services.public_pages import MODULE_RECORDINGS, MODULE_RECORDING_DEFECTS
 
 SLUGS = sorted(MODULE_RECORDINGS)
 
@@ -20,8 +21,8 @@ def _tags(body):
 
 
 def _local(url):
-    assert url.startswith(SITE_URL + "/"), url
-    return url[len(SITE_URL):]
+    assert url.startswith(canonical_origin() + "/"), url
+    return url[len(canonical_origin()):]
 
 
 @pytest.mark.parametrize("slug", SLUGS)
@@ -34,8 +35,8 @@ def test_a_share_page_carries_the_preview_card_and_every_file_answers(app, slug)
         entry = MODULE_RECORDINGS[slug]
         assert tags["og:title"] == entry["title"]
         assert tags["og:description"] == entry["promise"]
-        assert tags["og:url"] == "%s/see/%s" % (SITE_URL, slug)
-        assert 'rel="canonical" href="%s/see/%s"' % (SITE_URL, slug) in body
+        assert tags["og:url"] == "%s/see/%s" % (canonical_origin(), slug)
+        assert 'rel="canonical" href="%s/see/%s"' % (canonical_origin(), slug) in body
         assert tags["og:type"] == "video.other"
         assert tags["twitter:card"] == "summary_large_image"
         assert tags["og:image:alt"] and tags["twitter:image"] == tags["og:image"]
@@ -72,8 +73,8 @@ def test_the_module_page_carries_the_same_card(app, slug):
     with app.test_client() as client:
         tags = _tags(client.get("/modules/%s" % slug).get_data(as_text=True))
         assert tags["og:type"] == "video.other"
-        assert tags["og:image"] == "%s/static/video/share/%s-cover.jpg" % (SITE_URL, slug)
-        assert tags["og:video"] == "%s/static/video/share/%s-wide.mp4" % (SITE_URL, slug)
+        assert tags["og:image"] == "%s/static/video/share/%s-cover.jpg" % (canonical_origin(), slug)
+        assert tags["og:video"] == "%s/static/video/share/%s-wide.mp4" % (canonical_origin(), slug)
         assert tags["twitter:card"] == "summary_large_image"
 
 
@@ -90,7 +91,7 @@ def test_the_sitemap_lists_every_share_page(app):
     with app.test_client() as client:
         sitemap = client.get("/sitemap.xml").get_data(as_text=True)
     for slug in SLUGS:
-        assert "<loc>%s/see/%s</loc>" % (SITE_URL, slug) in sitemap
+        assert "<loc>%s/see/%s</loc>" % (canonical_origin(), slug) in sitemap
 
 
 def _tracked_files():
@@ -213,4 +214,4 @@ def test_the_preview_card_is_drawn_from_the_recording_alone():
     assert list(inspect.signature(share_social).parameters) == ["share"]
     card = share_social(get_share(SLUGS[0]))
     assert (card["title"], card["description"], card["url"]) == (
-        MODULE_RECORDINGS[SLUGS[0]]["title"], MODULE_RECORDINGS[SLUGS[0]]["promise"], "%s/see/%s" % (SITE_URL, SLUGS[0]))
+        MODULE_RECORDINGS[SLUGS[0]]["title"], MODULE_RECORDINGS[SLUGS[0]]["promise"], "%s/see/%s" % (canonical_origin(), SLUGS[0]))

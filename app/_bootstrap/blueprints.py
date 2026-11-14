@@ -632,9 +632,8 @@ def _register_always_on_apis(app, csrf):
             raise RuntimeError(
                 "MCP_ENABLED is true but PUBLIC_BASE_URL is empty. The OAuth "
                 "issuer, every metadata URL and the MCP 'resource' identifier "
-                "are built from PUBLIC_BASE_URL (defaulting to https://entelim.tech "
-                "when empty) — set PUBLIC_BASE_URL to this server's "
-                "externally-reachable origin (e.g. https://app.example.com) "
+                "are built from PUBLIC_BASE_URL, so set PUBLIC_BASE_URL to this "
+                "server's externally-reachable origin (e.g. https://app.example.com) "
                 "before enabling MCP_ENABLED."
             )
 

@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from app.services.origin import canonical_origin
 import app.services.public_pages as public_pages
 from app.services.public_pages import (
     CONTENT_ROOT,
@@ -1881,11 +1882,11 @@ def _robots_allows(rules: list[tuple[str, str]], path: str) -> bool:
     return best_directive == "allow"
 
 
-def _entelim_paths_in(text: str) -> set[str]:
-    """Every ``https://entelim.tech/...`` URL referenced in a rendered
+def _entelim_paths_in(text: str, origin: str) -> set[str]:
+    """Every URL on the site's configured ``origin`` referenced in a rendered
     response, reduced to its path."""
     paths = set()
-    for match in re.finditer(r"https://entelim\.org([^\s)\"'<>]*)", text):
+    for match in re.finditer(re.escape(origin) + r"([^\s)\"'<>]*)", text):
         paths.add(match.group(1) or "/")
     return paths
 
@@ -1900,11 +1901,19 @@ def _collect_must_allow_paths(client) -> set[str]:
     further URLs from.
     """
     paths: set[str] = set(_CRAWLER_FACING_ENDPOINTS)
+    with client.application.app_context():
+        origin = canonical_origin()
     for endpoint in _CRAWLER_FACING_ENDPOINTS:
         response = client.get(endpoint)
         if response.status_code == 200:
-            paths |= _entelim_paths_in(response.data.decode())
+            paths |= _entelim_paths_in(response.data.decode(), origin)
     return paths
+
+
+def test_the_crawl_reads_the_urls_a_sitemap_names():
+    sitemap = "<urlset><url><loc>https://entelim.tech/vs</loc></url></urlset>"
+    assert _entelim_paths_in(sitemap, "https://entelim.tech") == {"/vs"}
+    assert _entelim_paths_in(sitemap, "https://entelim.org") == set()
 
 
 @pytest.mark.parametrize("legal_pages_enabled", [False, True], ids=["legal-off", "legal-on"])
@@ -1921,6 +1930,7 @@ def test_every_crawler_discoverable_url_is_allowed_by_robots_txt(app, legal_page
     finally:
         app.config["LEGAL_PAGES_ENABLED"] = False
 
+    assert len(must_allow) > len(_CRAWLER_FACING_ENDPOINTS), "the crawl found nothing beyond the three endpoint paths"
     assert "/cookie-policy" in sitemap or not legal_pages_enabled, "legal pages missing from the sitemap with the flag on"
     for agent in _ROBOTS_CHECKED_AGENTS:
         rules = _parse_robots_rules(robots, agent)

@@ -58,13 +58,3 @@ def request_origin() -> str:
     if req_origin in allowed:
         return req_origin
     return canonical_origin()
-
-
-def absolutise(path: str) -> str:
-    """Build an absolute URL from a path using the canonical origin."""
-    return f"{canonical_origin()}{path}"
-
-
-def absolutise_for_request(path: str) -> str:
-    """Build an absolute URL from a path using the request's origin (when allowed)."""
-    return f"{request_origin()}{path}"

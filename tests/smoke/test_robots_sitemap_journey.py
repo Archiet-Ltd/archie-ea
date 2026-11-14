@@ -41,12 +41,12 @@ def test_search_engines_may_read_the_early_access_pages(browser, live_server, si
     try:
         _response, robots = _text(page, live_server + "/robots.txt")
         _shot(page, f"robots-{size}")
-        assert "Allow: /" in robots and "Sitemap: https://entelim.org/sitemap.xml" in robots
+        assert "Allow: /" in robots and f"Sitemap: {live_server}/sitemap.xml" in robots
         assert "Disallow: /\n" not in robots + "\n"
         assert "Disallow: /dashboard/" in robots and "Disallow: /api/" in robots
 
         _response, sitemap = _text(page, live_server + "/sitemap.xml")
-        listed = re.findall(r"https://entelim\.org(/early-access[^\s<]*)", sitemap)
+        listed = re.findall(re.escape(live_server) + r"(/early-access[^\s<]*)", sitemap)
         pages = [p for p in listed if p != "/early-access"]
         assert "/early-access" in listed and len(pages) >= 3, listed
         assert len(listed) == len(set(listed)), "an early-access page is listed twice"

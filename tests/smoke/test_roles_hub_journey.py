@@ -33,12 +33,14 @@ def _card_hrefs(page):
     return page.eval_on_selector_all("[data-role-card]", "els => els.map(e => e.getAttribute('href'))")
 
 
-def _ld_urls(page):
+def _ld_urls(page, origin):
     raw = page.eval_on_selector_all('script[type="application/ld+json"]', "els => els.map(e => e.textContent)")
     assert len(raw) == 1
     graph = json.loads(raw[0])["@graph"]
     collection = next(n for n in graph if n["@type"] == "CollectionPage")
-    return [i["url"].removeprefix("https://entelim.org") for i in collection["mainEntity"]["itemListElement"]]
+    urls = [i["url"] for i in collection["mainEntity"]["itemListElement"]]
+    assert all(u.startswith(origin + "/") for u in urls), urls
+    return [u.removeprefix(origin) for u in urls]
 
 
 @pytest.mark.parametrize("name,width,height", VIEWPORTS)
@@ -51,7 +53,7 @@ def test_visitor_sees_a_card_for_every_role_page_and_each_opens(browser, live_se
         page.wait_for_selector("[data-role-card]", timeout=PAGE_TIMEOUT)
         cards = _card_hrefs(page)
         assert cards[:2] == ["/roles/startup-founder", "/roles/scale-up-cto-and-vp-engineering"]
-        assert _ld_urls(page) == cards
+        assert _ld_urls(page, live_server) == cards
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
         first_titles = page.eval_on_selector_all("[data-role-card]", "els => els.slice(0, 2).map(e => e.innerText)")
         assert first_titles[0].startswith("Startup founders") and first_titles[1].startswith("Scale-up CTOs")

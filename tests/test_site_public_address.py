@@ -11,6 +11,8 @@ import re
 
 import pytest
 
+from app.services.origin import canonical_origin
+
 
 def _canonical(html: str) -> str:
     match = re.search(r'<link rel="canonical" href="([^"]+)"', html)
@@ -49,6 +51,19 @@ def _get(path: str, client, host: str):
 
 
 CANONICAL = "https://entelim.tech"
+
+
+@pytest.fixture(params=["", CANONICAL], ids=["base-empty", "base-set"], autouse=True)
+def configured_base(app, request):
+    """Run every test with PUBLIC_BASE_URL empty and with it set to the canonical address."""
+    before = app.config.get("PUBLIC_BASE_URL")
+    app.config["PUBLIC_BASE_URL"] = request.param
+    try:
+        with app.app_context():
+            assert canonical_origin() == CANONICAL
+        yield
+    finally:
+        app.config["PUBLIC_BASE_URL"] = before
 
 
 @pytest.mark.parametrize("path", ["/", "/early-access"])

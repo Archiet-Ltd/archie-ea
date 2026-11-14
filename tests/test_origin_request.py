@@ -1,4 +1,4 @@
-"""Criterion 3: OAuth/MCP metadata answers on both hosts with each host's own origin.
+"""OAuth and MCP metadata answer on both hosts with each host's own origin.
 
 With PUBLIC_BASE_URL=https://entelim.tech and PUBLIC_BASE_URL_ALIASES=https://entelim.org:
 - on host entelim.tech, metadata names https://entelim.tech (issuer, every endpoint, resource https://entelim.tech/mcp)
@@ -6,7 +6,6 @@ With PUBLIC_BASE_URL=https://entelim.tech and PUBLIC_BASE_URL_ALIASES=https://en
 - with a forged Host header (evil.example) and with the server's IP name, metadata names https://entelim.tech
 
 Requires MCP_ENABLED=true before the app fixture is created.
-Red at the line tip (no origin helper, metadata always names entelim.org), green at head.
 """
 
 from __future__ import annotations
@@ -50,6 +49,8 @@ def test_metadata_on_entelim_tech_names_entelim_tech(client, app):
         assert as_["issuer"] == "https://entelim.tech", as_
         assert as_["authorization_endpoint"] == "https://entelim.tech/oauth/authorize", as_
         assert as_["token_endpoint"] == "https://entelim.tech/oauth/token", as_
+        assert as_["revocation_endpoint"] == "https://entelim.tech/oauth/revoke", as_
+        assert as_["registration_endpoint"] == "https://entelim.tech/oauth/register", as_
 
 
 def test_metadata_on_entelim_org_names_entelim_org(client, app):
@@ -63,6 +64,8 @@ def test_metadata_on_entelim_org_names_entelim_org(client, app):
         assert as_["issuer"] == "https://entelim.org", as_
         assert as_["authorization_endpoint"] == "https://entelim.org/oauth/authorize", as_
         assert as_["token_endpoint"] == "https://entelim.org/oauth/token", as_
+        assert as_["revocation_endpoint"] == "https://entelim.org/oauth/revoke", as_
+        assert as_["registration_endpoint"] == "https://entelim.org/oauth/register", as_
 
 
 def test_metadata_on_forged_host_names_canonical(client, app):
