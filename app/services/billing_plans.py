@@ -527,6 +527,51 @@ def user_limit_status(org_id: int) -> Dict:
     return status
 
 
+def ai_usage_status(org_id: int, now=None) -> Dict:
+    """The AI questions *org_id*'s people asked this calendar month, and whose AI answered.
+
+    ``limit`` is None because no plan sets an allowance on AI questions. Reads only: the count is
+    the questions kept in the organisation's conversations (one per question a person typed).
+    """
+    from datetime import datetime
+
+    from app import db
+    from app.models.conversation import ConversationMessageRecord, ConversationThreadRecord
+    from app.models.user import User
+
+    now = now or datetime.utcnow()
+    start = datetime(now.year, now.month, 1)
+    used = (
+        db.session.query(db.func.count(ConversationMessageRecord.id))
+        .join(ConversationThreadRecord, ConversationThreadRecord.id == ConversationMessageRecord.thread_id)
+        .join(User, User.id == ConversationThreadRecord.user_id)
+        .filter(
+            User.organization_id == org_id,
+            ConversationMessageRecord.role == "user",
+            ConversationMessageRecord.created_at >= start,
+        )
+        .scalar()
+    ) or 0
+    return {"used": int(used), "limit": None, "provider": _own_key_provider(org_id)}
+
+
+def _own_key_provider(org_id: int) -> Optional[str]:
+    """The provider name of the organisation's own working key, or None when the built-in AI answers."""
+    from app import db
+    from app.models.models import APISettings
+    from app.modules.account.services.onboarding_service import PROVIDERS
+
+    names = dict(PROVIDERS)
+    row = (
+        db.session.query(APISettings)
+        .filter(APISettings.organization_id == org_id, APISettings.enabled.is_(True),
+                APISettings.provider.in_(list(names)))
+        .order_by(APISettings.id)
+        .first()
+    )
+    return names.get(row.provider) if row is not None else None
+
+
 class PlanLimitReached(Exception):
     """Raised when adding someone would take an organisation past its plan."""
 

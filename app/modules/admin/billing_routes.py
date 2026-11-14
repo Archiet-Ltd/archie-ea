@@ -25,11 +25,29 @@ from app.modules.account.mfa_flow import enrol_first
 
 from app import db
 from app.extensions import csrf
-from app.decorators import admin_required
+from functools import wraps
+
+from flask_login import current_user
+
+from app.middleware.tenant_decorators import require_org_or_platform_admin
 
 logger = logging.getLogger(__name__)
 
 billing_bp = Blueprint("billing", __name__)
+
+
+def admin_required(view):
+    """An administrator of the organisation being acted for, or a platform administrator: the people
+    the account menu offers "Plan and billing" to."""
+
+    @wraps(view)
+    def guarded(*args, **kwargs):
+        if not current_user.is_authenticated:
+            abort(403)
+        require_org_or_platform_admin(getattr(g, "current_org_id", None))
+        return view(*args, **kwargs)
+
+    return guarded
 
 
 def _org():
@@ -126,6 +144,7 @@ def billing_index():
         renewal=billing_plans.renewal_summary(sub, current, live),
         plan_prices={p.key: billing_plans.price_lines(p) for p in billing_plans.PLANS},
         limits=billing_plans.user_limit_status(org.id),
+        ai=billing_plans.ai_usage_status(org.id),
         plans=billing_plans.PLANS,
         payment=config,
         payment_ready=config["ready"],

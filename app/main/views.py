@@ -1471,7 +1471,7 @@ def integrations():
 
 @main.route("/settings")
 @login_required
-@platform_admin_required
+@platform_admin_required(hide=True)
 @admin_required
 def settings():
     """System Settings - Application configuration and user preferences.

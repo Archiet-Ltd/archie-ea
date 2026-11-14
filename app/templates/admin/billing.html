@@ -6,6 +6,7 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/alert.html' import alert %}
+{% from 'components/fact_list.html' import fact_list %}
 {% from 'components/input.html' import input %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/form_field.html' import form_group %}
@@ -85,6 +86,18 @@
                 <p class="text-xs text-muted-foreground mt-1">{{ renewal.note }}</p>
                 {% endif %}
             {% endcall %}{% endcall %}
+        </div>
+
+        <div class="mt-4" data-testid="billing-ai-usage">
+            {% call(f) fact_list(items=[
+                {'label': 'AI questions this month', 'key': 'ai-used'},
+                {'label': 'AI allowance', 'key': 'ai-allowance'},
+                {'label': 'AI answers from', 'key': 'ai-provider'}], testid='billing-ai-facts') %}
+                {%- if f.key == 'ai-used' %}{{ ai.used }}
+                {%- elif f.key == 'ai-allowance' %}{% if ai.limit is none %}No limit on your plan{% else %}{{ ai.limit }} a month{% endif %}
+                {%- else %}{% if ai.provider %}Your own {{ ai.provider }} key. {{ ai.provider }} bills your organisation for the questions.{% else %}The built-in AI. Add your own key in <a href="{{ url_for('admin.api_settings') }}" class="text-primary underline">AI settings</a>.{% endif %}
+                {%- endif %}
+            {% endcall %}
         </div>
 
         {% if limits.limit_reached %}
