@@ -41,9 +41,13 @@ def _link_options():
 @login_required
 def index():
     """List all Business Cases for the current tenant."""
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
     business_cases = service.list_business_cases()
     return render_template(
         "business_case/index.html",
+        costs_withheld=not costs_visible(current_user),
+        costs_withheld_text=COSTS_WITHHELD,
         business_cases=business_cases,
         statuses=BUSINESS_CASE_STATUSES,
     )

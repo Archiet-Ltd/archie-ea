@@ -19,10 +19,10 @@ from app.models.user import User
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
-def _user(db_session, org):
+def _user(db_session, org, role="enterprise_architect"):
     user = User(
         email=f"prod-{uuid.uuid4().hex[:10]}@example.com", first_name="Pat", last_name="Product",
-        organization_id=org.id, confirmed=True, enterprise_role="enterprise_architect",
+        organization_id=org.id, confirmed=True, enterprise_role=role,
     )
     db_session.add(user)
     db_session.flush()
@@ -124,7 +124,7 @@ def test_linked_material_and_cost_are_read_from_their_stores(app, db_session, ma
 
     org = make_org("linked")
     one = _estate(db_session, org, "e")
-    user = _user(db_session, org)
+    user = _user(db_session, org, "cto")
     one["app"].source_kind = "connector"
     one["app"].source_ref = json.dumps({"system": "github", "repository": "acme/order-desk"})
     one["app"].source_label = "GitHub acme/order-desk"
@@ -343,7 +343,7 @@ def test_gaps_and_risks_read_in_plain_words_and_a_risk_opens_its_own_page(app, d
 def test_an_empty_product_explains_every_empty_layer_and_the_empty_summary(app, db_session, make_org, client, login_as):
     org = make_org("empty")
     product = _el(db_session, org, "Bare product", "Product", "business")
-    user = _user(db_session, org)
+    user = _user(db_session, org, "cto")
     html = _get(client, login_as, user, _product_url(product)).get_data(as_text=True)
     assert "No element is joined to Bare product yet." in html
     for sentence in ("No capability, resource or course of action is joined to this product yet.",
@@ -394,7 +394,7 @@ def test_linked_material_gaps_risks_and_cost_of_another_organisation_never_appea
 
     mine, theirs = make_org("iso-a"), make_org("iso-b")
     one = _estate(db_session, mine, "q")
-    user = _user(db_session, mine)
+    user = _user(db_session, mine, "cto")
     own_diagram = SavedDiagram(organization_id=mine.id, name="Own overview q")
     foreign_diagram = SavedDiagram(organization_id=theirs.id, name="Foreign overview q")
     db_session.add_all([own_diagram, foreign_diagram])
@@ -524,3 +524,39 @@ def test_the_product_page_document_link_points_at_a_download_that_works(
     href = _download_url(application, document)
     assert href in html
     assert client.get(href).data == b"%PDF-1.4 desk"
+
+
+def _costed_product(db_session, org, label):
+    from app.models.application_portfolio import ApplicationComponent
+
+    one = _estate(db_session, org, label)
+    db_session.add(ApplicationComponent(organization_id=org.id, name=f"Order Desk {label}",
+                                        archimate_element_id=one["app"].id, total_cost_of_ownership=12000))
+    db_session.flush()
+    return one
+
+
+def test_an_architect_the_cost_rule_withholds_from_reads_no_product_cost_on_the_page_or_in_the_export(
+        app, db_session, make_org, client, login_as):
+    mine, theirs = make_org("cost-a"), make_org("cost-b")
+    one = _costed_product(db_session, mine, "w")
+    other = _costed_product(db_session, theirs, "x")
+    architect = _user(db_session, mine)
+    html = _get(client, login_as, architect, _product_url(one["product"])).get_data(as_text=True)
+    assert html.count("Cost figures are withheld for your role.") == 1
+    assert "12,000" not in html and "product-cost-line" not in html
+    export = _get(client, login_as, architect, f"/architecture/products/{one['product'].id}/export").get_data(as_text=True)
+    assert "12000" not in export and "12,000" not in export
+    assert "Cost figures are withheld for your role." in export
+    foreign = _get(client, login_as, _user(db_session, theirs), _product_url(one["product"]))
+    assert foreign.status_code == 404
+    assert other["product"].id != one["product"].id
+
+
+def test_the_chief_technology_officer_reads_the_product_cost_the_architect_is_denied(
+        app, db_session, make_org, client, login_as):
+    org = make_org("cost-c")
+    one = _costed_product(db_session, org, "y")
+    cto = _user(db_session, org, "cto")
+    html = _get(client, login_as, cto, _product_url(one["product"])).get_data(as_text=True)
+    assert "12,000" in html and "Cost figures are withheld for your role." not in html

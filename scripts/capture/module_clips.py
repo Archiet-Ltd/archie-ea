@@ -21,7 +21,7 @@ import pathlib
 import re
 import time
 
-from scripts.capture.clip_kit import ClipRefused, ffprobe_duration_seconds, record_clip
+from scripts.capture.clip_kit import FORBIDDEN_IN_FRAME, ClipRefused, ffprobe_duration_seconds, record_clip
 from app.services.public_pages import MODULE_RECORDINGS
 from scripts.capture.help_clips import Check, Seen, _click, _open, run_checks, scan_for_leaks
 
@@ -40,14 +40,7 @@ RESERVE_BOTTOM = 120
 # signed-in person's email address under their name in the sidebar.
 HIDE = ["[data-testid='two-factor-banner']", "#user-menu-btn span[title*='@']"]
 
-# Text that puts an empty, unavailable, unset or placeholder state in frame, or a bare zero standing in for a
-# measurement. A clip showing any of it is refused; there is no per-clip exception.
-FORBIDDEN_IN_FRAME = re.compile(
-    r"Not recorded|Not shown for your role|unavailable|No [\w ]+ yet|Something went wrong|don't have access|"
-    r"Nothing here|No data|\bN/A\b|\bTBC\b|\bundefined\b|\bNaN\b|"
-    r"\bNot set\b|\bNot assessed\b|\bNot reviewed\b|\bNo [\w ]+ recorded\b|(?i:\bno (?:owner|capability|vendor|licence|DR)\b)|"
-    r"Appears here|Missing to reach|\bUnassigned\b|"
-    r"(?<![\w.,\u00a3$%/-])0(?![\w.,%/-])|^\u2014$|\t\u2014\t|\t\u2014$|^\u2014\t", re.M)
+# FORBIDDEN_IN_FRAME (what puts an empty, unset or placeholder state in frame) is defined once, in the kit.
 
 
 _IN_VIEW_JS = """() => {

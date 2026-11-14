@@ -29,6 +29,7 @@ from sqlalchemy import or_
 from app import db
 from app.core.auth.decorators import admit_model_changers
 from app.decorators import require_roles
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
 from app.utils.tenant_users import escape_like_literal
 from . import archimate_crud, element_page, product_page
 from .services.ai_generation_service import AIGenerationService
@@ -753,6 +754,15 @@ def _mirror_process_owner(process_id, org_id):
     db.session.commit()
 
 
+_MONEY_COLUMN = re.compile(r"cost|price|budget|spend|saving|tco|revenue")
+_NOT_MONEY_COLUMN = re.compile(r"cost_cent(er|re)|cost_code")
+
+
+def _is_money_column(name):
+    """True for a column that holds an amount of money (not a cost centre code)."""
+    return bool(_MONEY_COLUMN.search(name)) and not _NOT_MONEY_COLUMN.search(name)
+
+
 def _get_display_fields(element, model_class, element_type=None):
     """Introspect a model instance and return a list of (label, value) tuples
     for all non-empty, non-private, non-FK columns worth displaying. A column the record's form
@@ -824,7 +834,8 @@ def _get_display_fields(element, model_class, element_type=None):
         else:
             value = _plain_value(value)
 
-        fields.append({"label": label, "value": str(value), "technical": col_name in _TECHNICAL_FIELDS})
+        fields.append({"label": label, "value": str(value), "technical": col_name in _TECHNICAL_FIELDS,
+                       "money": _is_money_column(col_name)})
 
     return fields
 
@@ -898,6 +909,24 @@ def api_field_configs():
     resp.cache_control.max_age = 3600
     resp.cache_control.private = True
     return resp
+
+
+def _layer_architecture_query(layer, query_types=None):
+    """The ``archimate_elements`` rows of one layer, restricted to ``query_types`` when given.
+
+    The one query the layer list and the layer tab count both read, so the
+    number on a tab is the number of rows listed under it. Matches every
+    spelling of the layer. With no types given, every element of the layer
+    is read whatever its stored type, as the model map counts it; a type
+    filter narrows the list only. The model carries no archived or deleted
+    state, so every row counts.
+    """
+    query = ArchiMateElement.query.filter(
+        db.func.lower(ArchiMateElement.layer).in_([a.lower() for a in LAYER_ALIASES.get(layer, [layer])]),
+    )
+    if query_types is not None:
+        query = query.filter(ArchiMateElement.type.in_(query_types))
+    return query
 
 
 @archimate_crud.route("/api/capability-choices")
@@ -980,10 +1009,7 @@ def _layer_count_parts(layer):
     # the size of that layer while its own tiles summed to the real total, and
     # the layer's elements were invisible in the UI. Match every spelling.
     try:
-        _aliases = [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
-        ae_count = ArchiMateElement.query.filter(
-            db.func.lower(ArchiMateElement.layer).in_(_aliases),
-        ).count()
+        ae_count = _layer_architecture_query(layer).count()
     except Exception as e:
         current_app.logger.warning(f"_count_layer_elements: archimate_elements count failed for {layer}: {e}")
         return None
@@ -1199,13 +1225,7 @@ def api_layer_elements(layer):
             # catalogue page keeps rendering the layer as empty.
             # With no type asked for, every element of the layer is listed, whatever its stored type: the
             # layer's count has no type filter, and a list narrower than its own count read as a second number.
-            ae_q = ArchiMateElement.query.filter(
-                db.func.lower(ArchiMateElement.layer).in_(
-                    [a.lower() for a in LAYER_ALIASES.get(layer, [layer])]
-                ),
-            )
-            if type_filter:
-                ae_q = ae_q.filter(ArchiMateElement.type.in_(query_types))
+            ae_q = _layer_architecture_query(layer, query_types if type_filter else None)
             if search:
                 safe_s = escape_like_literal(search)
                 ae_q = ae_q.filter(
@@ -1727,6 +1747,10 @@ def detail_element(layer, element_type, element_id):
 
     # Auto-discover displayable fields from the model
     all_fields = _get_display_fields(element, model_class, element_type)
+    costs_shown = costs_visible(current_user)
+    if not costs_shown:
+        # A person the one cost rule withholds from reads no amount on any element page.
+        all_fields = [f for f in all_fields if not f.get("money")]
     display_fields = [f for f in all_fields if not f["technical"]]
     display_fields[:0] = _capability_fact(element, element_type)
     # These two are the element's own dates; the owner's assignment date is
@@ -1806,6 +1830,8 @@ def detail_element(layer, element_type, element_id):
         )
 
     product = _product_page(element, element_type, ae_id)
+    if product is not None and not costs_shown:
+        product["cost"] = {"withheld": True}
 
     return render_template(
         "archimate_crud/detail.html",
@@ -1835,7 +1861,8 @@ def detail_element(layer, element_type, element_id):
         source_facts=source_facts,
         live_connectors=live_connectors,
         connectors_url=connectors_url,
-        technology_cost=_technology_cost_panel(ae_id),
+        technology_cost=_technology_cost_panel(ae_id, costs_shown),
+        costs_withheld_text=COSTS_WITHHELD,
         layer_config=LAYER_CONFIG,
         registered_types=list(MODEL_REGISTRY),
     )
@@ -1978,7 +2005,10 @@ def export_product(product_id):
         product_ae, org_id=org_id, href_for=_element_href, owner_for=_owner_names_for, plain_name=_plain_name,
         user=current_user, add_url=None, export_url=None,
         status_words=_plain_label)
-    response = jsonify(product_page.export_payload(product_ae, page))
+    payload = product_page.export_payload(product_ae, page)
+    if not costs_visible(current_user):
+        payload["cost"] = {"withheld": COSTS_WITHHELD}
+    response = jsonify(payload)
     response.headers["Content-Disposition"] = "attachment; filename=product_%d.json" % product_id
     return response
 
@@ -2015,7 +2045,7 @@ def _utc_stamp(value) -> str:
     return f"{moment:%d %b %Y %H:%M} UTC"
 
 
-def _technology_cost_panel(ae_id):
+def _technology_cost_panel(ae_id, costs_shown=True):
     """The cost panel for a node or system software, or None for any other element."""
     from app.modules.architecture.services.application_technology_links import is_technology_element
     from app.services import technology_cost
@@ -2024,9 +2054,18 @@ def _technology_cost_panel(ae_id):
     element = ArchiMateElement.query.filter_by(id=ae_id).first() if ae_id else None
     if element is None or org_id is None or not is_technology_element(element):
         return None
+    allocation = technology_cost.allocation(org_id, element.id)
+    if not costs_shown:
+        # The applications this technology runs stay; every amount and share is left out.
+        allocation = withhold_costs(
+            dict(allocation, facts=[], total=None, missing=[], share_range=None,
+                 applications=[dict(a, share=None) for a in allocation["applications"]]),
+            keys=("total", "share", "share_range"),
+        )
     return {
+        "withheld": not costs_shown,
         "element_id": element.id,
-        "allocation": technology_cost.allocation(org_id, element.id),
+        "allocation": allocation,
         "categories": technology_cost.CATEGORIES,
         "category_labels": dict(technology_cost.CATEGORIES),
         "rule": technology_cost.RULE,

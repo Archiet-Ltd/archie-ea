@@ -7,7 +7,7 @@ shell) gets the standalone page in ``templates/errors``.
 
 from __future__ import annotations
 
-from flask import jsonify, render_template
+from flask import jsonify, render_template, request
 from flask_login import current_user
 from markupsafe import Markup, escape
 
@@ -17,6 +17,11 @@ PLAIN = {
         "You don't have access to this page",
         "Your role does not include this page. Ask an administrator of your organisation to "
         "give you access, or go back to the dashboard.",
+    ),
+    504: (
+        "timer",
+        "The AI provider did not answer in time",
+        "Nothing was changed. Try again in a moment, or go back to the dashboard.",
     ),
     429: (
         "timer",
@@ -47,6 +52,24 @@ ICON_PATHS = {
 }
 
 
+def is_browser_page_request() -> bool:
+    """True when a person's browser is opening this address as a page.
+
+    A browser navigation asks for HTML first; a script, a fetch() call (Accept:
+    */*) or an XMLHttpRequest does not, and keeps getting JSON.
+    """
+    if request.method not in ("GET", "HEAD"):
+        return False
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return False
+    accepted = request.accept_mimetypes
+    # A browser names text/html outright; a script or fetch() sends */* or JSON. (``best`` is not
+    # used: a browser's list ends in signed-exchange, which it picks over text/html.)
+    return any(value == "text/html" for value, _quality in accepted) and (
+        accepted.quality("text/html") >= accepted.quality("application/json")
+    )
+
+
 def plain_json(status: int, error_type: str, **extra):
     """JSON body for an /api/ caller: the same sentence a person would read."""
     return jsonify({
@@ -69,7 +92,7 @@ def render_plain_error(status: int, standalone_template: str | None = None, *, t
     held allowance) passes ``standalone=True`` so the page does not draw a
     sidebar of links that would be refused too, and ``offer_links=False`` when
     no link on the page could land. ``next_step`` is a (label, address) pair that
-    replaces the dashboard link, for a visitor who is not signed in.
+    replaces the dashboard link, for a visitor who is not signed in or a member sent to the person who can act.
     """
     icon, default_title, default_message = PLAIN[status]
     title = title or default_title
@@ -80,6 +103,8 @@ def render_plain_error(status: int, standalone_template: str | None = None, *, t
                 "errors/plain_error.html",
                 error_status=status, error_icon=icon,
                 error_title=title, error_message=message,
+                next_label=next_step[0] if next_step else "Go to the dashboard",
+                next_href=next_step[1] if next_step else "/dashboard/overview",
             ), status
     except Exception:
         # The full shell needs the database; a failing request may have broken it.

@@ -6,6 +6,7 @@ portfolio manager but denied for procurement.
 """
 
 import pytest
+from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
 
@@ -60,12 +61,19 @@ def test_owner_picker_search_shows_users(page, live_server, seeded):
     _visit(page, live_server, "/applications/%d/edit" % app_id)
 
     search = page.locator("#owner_picker_search")
-    # The app manager user name starts with "Smoke" - search for "Smoke"
-    search.fill("Smoke")
-    page.wait_for_timeout(400)  # debounce is 300ms
-
     results = page.locator("#owner_picker_results .owner-picker-result")
+
+    # The app manager's name starts with "Smoke". Wait for the list to appear
+    # (the search is debounced and then answered by the server).
+    search.fill("Smoke")
+    results.first.wait_for(state="visible")
     assert results.count() >= 1, "should find at least one matching user"
+
+    # Typing the whole name, first and last, finds that one person.
+    manager_email = seeded["emails"]["application_manager"]
+    search.fill("Smoke application_")
+    expect(results).to_have_count(1, timeout=PAGE_TIMEOUT)
+    expect(results.first).to_have_attribute("data-email", manager_email, timeout=PAGE_TIMEOUT)
 
 
 def test_coverage_page_allowed_for_cto(page, live_server, seeded):

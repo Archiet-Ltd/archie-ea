@@ -1010,6 +1010,35 @@ TOOL_SCHEMAS = [
         "tier": "auto",
     },
     {
+        "name": "get_application_capabilities",
+        "surfaces": ["chat"],
+        "route": "ApplicationCapabilityMapping.query",
+        "fenced_fields": [],
+        "risk_class": "read",
+        "mutates": False,
+        "record_types_written": [],
+        "description": (
+            "Read which business capabilities one application supports, from the same "
+            "application-to-capability mapping the application's page shows and the chat's "
+            "own answer to 'which capabilities does X support' reads. Use it for every "
+            "phrasing of that question ('what capabilities does X have', 'tell me about X's "
+            "capabilities', 'list X's capabilities', 'which capabilities does X map to'). "
+            "Each row carries the capability's name and the link to its fact sheet; state "
+            "only the rows returned, and say so plainly when none are mapped. Read-only."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "application_name": {
+                    "type": "string",
+                    "description": "The application's name as the person wrote it",
+                },
+            },
+            "required": ["application_name"],
+        },
+        "tier": "auto",
+    },
+    {
         "name": "find_technical_capabilities",
         "surfaces": ["chat"],
         "route": "TechnicalCapability.query",

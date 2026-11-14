@@ -79,13 +79,17 @@ class ComplianceInheritanceService:
         if not application_ids:
             return result
         org_id = organization_id if organization_id is not None else current_org_id()
+        if org_id is None:
+            # No organisation known: nothing is read, never every organisation's controls.
+            for row in result.values():
+                ComplianceInheritanceService._finish(row)
+            return result
         query = (
             db.session.query(ApplicationComplianceControl, ComplianceControl)
             .join(ComplianceControl, ComplianceControl.id == ApplicationComplianceControl.control_id)
             .filter(ApplicationComplianceControl.application_id.in_(application_ids))
+            .filter(ApplicationComplianceControl.organization_id == org_id)
         )
-        if org_id is not None:
-            query = query.filter(ApplicationComplianceControl.organization_id == org_id)
         for mapping, control in query.order_by(ComplianceControl.control_code).all():
             row = result[mapping.application_id]
             status = mapping.implementation_status or "planned"
@@ -138,11 +142,13 @@ class ComplianceInheritanceService:
         from app.models.application_compliance import ApplicationComplianceControl
 
         org_id = organization_id if organization_id is not None else current_org_id()
+        if org_id is None:
+            # No organisation known: nothing is counted, never every organisation's controls.
+            return {"not_started": 0, "in_progress": 0, "total": 0}
         query = db.session.query(ApplicationComplianceControl.implementation_status).filter(
-            ApplicationComplianceControl.application_id.isnot(None)
+            ApplicationComplianceControl.application_id.isnot(None),
+            ApplicationComplianceControl.organization_id == org_id,
         )
-        if org_id is not None:
-            query = query.filter(ApplicationComplianceControl.organization_id == org_id)
         not_started = in_progress = 0
         for (status,) in query.all():
             status = status or "planned"
@@ -177,12 +183,16 @@ class ComplianceInheritanceService:
         if not capability_ids:
             return result
         org_id = organization_id if organization_id is not None else current_org_id()
+        if org_id is None:
+            # No organisation known: nothing is read, never every organisation's mappings.
+            return result
         query = db.session.query(
             ApplicationCapabilityMapping.business_capability_id,
             ApplicationCapabilityMapping.application_component_id,
-        ).filter(ApplicationCapabilityMapping.business_capability_id.in_(capability_ids))
-        if org_id is not None:
-            query = query.filter(ApplicationCapabilityMapping.organization_id == org_id)
+        ).filter(
+            ApplicationCapabilityMapping.business_capability_id.in_(capability_ids),
+            ApplicationCapabilityMapping.organization_id == org_id,
+        )
         apps_by_capability: Dict[int, set] = {}
         for cap_id, app_id in query.all():
             apps_by_capability.setdefault(cap_id, set()).add(app_id)

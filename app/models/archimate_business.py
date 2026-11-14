@@ -350,10 +350,9 @@ class Contract(TenantMixin, db.Model):
     @property
     def days_until_expiry(self):
         """Calculate days until contract expires"""
-        if self.expiry_date:
-            delta = self.expiry_date - date.today()
-            return delta.days
-        return None
+        from app.services.vendor_register import days_until
+
+        return days_until(self.expiry_date)
 
     def to_dict(self):
         """Convert to dictionary for JSON serialization"""

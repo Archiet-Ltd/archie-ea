@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-import re
 
 from email_validator import EmailNotValidError, validate_email
 from flask import Blueprint, abort, make_response, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from app import db
-from app.release_waves import EARLY_ACCESS_PREFIX, code_slug, group_by_slug, has_page, legacy_slug, moved_slug, wave_map
+from app.release_waves import (
+    EARLY_ACCESS_PREFIX, code_slug, configured_wave, entry_for, group_by_slug, has_page, is_released_rule, legacy_slug,
+    moved_slug, wave_map,
+)
+from app.services.crawl_rules import refuses_visitors_when
 from app.services.rate_limiter import rate_limit
 
 early_access_bp = Blueprint("early_access", __name__)
@@ -27,18 +30,34 @@ def simulations_released() -> bool:
     return is_released_endpoint("early_access.simulations")
 
 
-def coming_groups() -> list[dict]:
-    """The capabilities that open in a later release, once each, in alphabetical order.
+def _groups_with_open_pages() -> set[str]:
+    """The groups with at least one registered page the release check lets through, with the switch as it is now."""
+    from flask import current_app, has_app_context
 
-    A capability with a page open in the first release is not listed as coming: the person can already use it."""
+    if not has_app_context():
+        return set()
+    cache = current_app.extensions.setdefault("release_waves_open_groups", {})
+    wave = configured_wave()
+    if wave not in cache:
+        cache[wave] = {
+            entry[1]
+            for rule in current_app.url_map.iter_rules()
+            if "GET" in (rule.methods or ()) and (entry := entry_for(rule.rule, rule.endpoint)) is not None
+            and is_released_rule(rule.rule, rule.endpoint)
+        }
+    return cache[wave]
+
+
+def coming_groups() -> list[dict]:
+    """The capabilities that do not open yet, once each, in alphabetical order.
+
+    The release check decides: a capability with any page that answers normally, with the switch off or in the
+    releases that are open, is not listed as coming, because the person can already use it."""
     doc = wave_map()
-    open_now = {entry[1] for entry in doc["rules"].values() if entry[0] == "W1"}
+    open_now = {entry[1] for entry in doc["rules"].values() if entry[0] == "W1"} | _groups_with_open_pages()
     seen: dict[str, dict] = {}
-    simulations_open = simulations_released()
     for entry in doc["rules"].values():
         wave, code = entry[0], entry[1]
-        if code == SIMULATIONS_GROUP and simulations_open:
-            continue
         if code in open_now or wave in doc["pass_waves"] or wave in ("W1", "X", "RT") or code.startswith("BP:") or code in ("infra", "PG-RT", "PG-RTP", "PG-NEW", "PG-EA", "PG-OPS"):
             continue
         info = doc["groups"].get(code)
@@ -47,39 +66,59 @@ def coming_groups() -> list[dict]:
     return [seen[k] for k in sorted(seen)]
 
 
-def coming_pages() -> list[dict]:
-    """The waiting-list pages the public menu lists as coming, other than a capability group already listed.
+def early_access_paths() -> list[str]:
+    """Every public early-access address the sitemap lists: the hub, when it lists a capability, and the early-access
+    page of each capability the one list of coming capabilities holds. A closed address that answers its early-access
+    page in place is not listed: it is not a page of its own."""
+    from app.services.site_registry import coming_capabilities, hub_capabilities
 
-    Each carries the menu's own label and address and its one-line description without the menu's lead-in words."""
-    from app.services.public_pages import load_page
-    from app.services.site_registry import site_registry
-
-    rules = wave_map()["rules"]
-    taken = {g["code"] for g in coming_groups()}
-    pages = []
-    for item in site_registry()["product"]["coming_soon"]["items"]:
-        # one capability, one row: the menu item and the group name it by the screen's route, not by its title
-        screen = (item.get("signed_in") or {}).get("href")
-        if screen in rules and rules[screen][1] in taken:
-            continue
-        blurb = re.sub(r"^(Coming soon|Early access):\s*", "", item.get("blurb") or "")
-        title = item["label"]
-        module = re.fullmatch(r"/modules/([\w-]+)", item["href"])
-        if module:
-            # a module page is listed only once it is published, under the heading it opens with
-            found = load_page("module", slug=module.group(1))
-            if found is None or found.is_held:
-                continue
-            title = found.heading
-        pages.append({"href": item["href"], "title": title, "blurb": blurb})
-    return sorted(pages, key=lambda p: p["title"])
+    if not hub_capabilities():
+        return []
+    return [EARLY_ACCESS_PREFIX] + [
+        e["url"] for e in coming_capabilities() if e["url"] and e["url"].startswith(EARLY_ACCESS_PREFIX + "/")
+    ]
 
 
 def coming_entries() -> list[dict]:
-    """Every capability the hub lists, once, in one alphabetical list, each with its address, title and blurb."""
-    entries = [{"href": url_for("early_access.page", slug=g["slug"]), "title": g["title"], "blurb": g["blurb"]} for g in coming_groups()]
-    entries += coming_pages()
-    return sorted(entries, key=lambda e: e["title"].lower())
+    """What the hub lists, from the one list of coming capabilities: address, title and blurb for each."""
+    from app.services.site_registry import hub_capabilities
+
+    return [{"href": e["url"], "title": e["name"], "blurb": e["sentence"]} for e in hub_capabilities()]
+
+
+def hub_context() -> dict:
+    """What the hub page shows: its rows, and whether capabilities are coming that only the features page describes."""
+    from app.services.site_registry import coming_capabilities
+
+    rows = coming_entries()
+    return {"entries": rows, "elsewhere": bool(not rows and coming_capabilities())}
+
+
+def named_by_the_list(slug: str, *, features_only: bool = False) -> dict:
+    """The name and sentence the one list of coming capabilities gives this page, when they differ from the group's.
+
+    A capability that a module page or a features-page capability and a group both describe is one entry, named as
+    that page names it; the early-access page it opens says the same name and sentence, so the hub, the features
+    list and the page agree. With ``features_only``, only a features-page capability renames the group: a closed
+    address answered in place then reads as the capability it belongs to, while a screen a module page waits for
+    (``/simulations``) keeps the name of its own group."""
+    from app.release_waves import group_by_slug
+    from app.services.site_registry import coming_capabilities
+
+    found = group_by_slug(slug)
+    if found is None:
+        return {}
+    for entry in coming_capabilities():
+        if features_only and not entry.get("anchor"):
+            continue
+        if entry["url"] == f"{EARLY_ACCESS_PREFIX}/{slug}" and entry["name"] != found[1]["title"]:
+            return {"title": entry["name"], "blurb": entry["sentence"]}
+    return {}
+
+
+def _listed_page(slug: str, **kwargs):
+    """The early-access page of a group, under the name and sentence the one list gives it."""
+    return _page(slug, **{**named_by_the_list(slug), **kwargs})
 
 
 def _page(slug: str, *, thanks: bool = False, error: str | None = None, title: str | None = None, blurb: str | None = None):
@@ -91,11 +130,15 @@ def _page(slug: str, *, thanks: bool = False, error: str | None = None, title: s
         info = {**info, "title": title}
     if blurb:
         info = {**info, "blurb": blurb}
+    # the page at its own early-access address is public and searchable; the same page shown in place of a closed
+    # address, or as the answer to a form post, is not
+    indexable = request.method == "GET" and request.path == f"{EARLY_ACCESS_PREFIX}/{slug}"
     out = make_response(render_template(
         "public/early_access.html", group_slug=slug, group=info, thanks=thanks, error=error,
-        form_action=url_for("early_access.join", slug=slug),
+        form_action=url_for("early_access.join", slug=slug), indexable=indexable,
     ))
-    out.headers["X-Robots-Tag"] = "noindex"
+    if not indexable:
+        out.headers["X-Robots-Tag"] = "noindex"
     return out
 
 
@@ -154,6 +197,7 @@ def recommendations():
 
 
 @early_access_bp.route("/simulations")
+@refuses_visitors_when(simulations_released)
 def simulations():
     """The simulation screen once it is released, for a signed-in person; a visitor is sent to sign in.
 
@@ -171,7 +215,8 @@ def simulations():
 
 @early_access_bp.route("/early-access")
 def hub():
-    return render_template("public/early_access_hub.html", entries=coming_entries())
+    context = hub_context()
+    return render_template("public/early_access_hub.html", indexable=bool(context["entries"]), **context)
 
 
 @early_access_bp.route("/early-access/<slug>")
@@ -181,7 +226,7 @@ def page(slug):
         target = moved_slug(slug)
         if target is not None:
             return redirect(target, code=301)
-    return _page(slug)
+    return _listed_page(slug)
 
 
 @early_access_bp.route("/early-access/<slug>/join", methods=["POST"])
@@ -199,16 +244,16 @@ def join(slug):
         slug = code_slug(found[0])
     email = (request.form.get("email") or "").strip().lower()
     if not email:
-        return _page(slug, error="Please enter an email address.")
+        return _listed_page(slug, error="Please enter an email address.")
     if not request.form.get("consent"):
-        return _page(slug, error="Please agree that we may email you about this.")
+        return _listed_page(slug, error="Please agree that we may email you about this.")
     try:
         email = validate_email(email, check_deliverability=False).normalized
     except EmailNotValidError:
-        return _page(slug, error="Please enter a valid email address.")
+        return _listed_page(slug, error="Please enter a valid email address.")
     # one record per group, whichever form of the address the person joined from
     offer = f"early-access:{legacy_slug(found[0])}"[:50]
     if ProductInquiry.query.filter_by(email=email, offer=offer).first() is None:
         db.session.add(ProductInquiry(email=email, name=None, offer=offer, consent_text=CONSENT_TEXT))
         db.session.commit()
-    return _page(slug, thanks=True)
+    return _listed_page(slug, thanks=True)

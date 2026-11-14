@@ -127,7 +127,7 @@
     {'label': 'Needs attention', 'value': ws_stats.get('needs_attention', 0), 'icon': 'triangle-alert', 'href': '?status=needs_attention', 'testid': 'solutions-stat-needs-attention',
      'sentence': ('Open risks or governance gaps' if ws_stats.get('needs_attention', 0) else 'No risks or governance gaps open')},
     {'label': 'Ready for review', 'value': ws_stats.get('ready_for_review', 0), 'icon': 'badge-check', 'href': '?status=ready_for_review', 'testid': 'solutions-stat-ready',
-     'sentence': ('Strong candidates for the review board' if ws_stats.get('ready_for_review', 0) else 'None is ready for the review board yet')},
+     'sentence': ('Strong candidates for the review board' if ws_stats.get('ready_for_review', 0) else 'No solution is ready for the review board yet')},
 ]) }}
 
 {#- What narrows this list, said once, with the way back. -#}

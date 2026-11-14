@@ -89,6 +89,17 @@ def on_starting(server):
     server.log.info("Entelim starting with %d workers", server.app.cfg.workers)
 
 
+def when_ready(server):
+    """The app is loaded (preload_app) and workers are about to fork: build robots.txt and the sitemap now, so
+    every worker inherits them and the first crawler does not wait."""
+    try:
+        from app.services.crawl_rules import warm
+
+        warm(server.app.wsgi())
+    except Exception:
+        server.log.exception("robots.txt and the sitemap will be built on the first request instead")
+
+
 def _rss_mb() -> "float | None":
     """Best-effort RSS of the current process in MB, or None if unavailable.
 

@@ -147,6 +147,11 @@ def test_edit_page_has_one_breadcrumb_trail(world, client, login_as, db_session)
     html = _page(client, f"/applications/{row.id}/edit")
     trails = re.findall(r'<nav[^>]*aria-label="Breadcrumb"', html)
     assert len(trails) == 1, len(trails)
+    nav = re.search(r'<nav[^>]*aria-label="Breadcrumb".*?</nav>', html, re.S).group(0)
+    trail = [t for t in re.sub(r"<[^>]+>", "\n", nav).split("\n") if t.strip() and t.strip() != ">"]
+    assert [t.strip() for t in trail if t.strip() not in ("/", "›")] == [
+        "Home", "Systems", "Applications", "Edit Application",
+    ], trail
 
 
 def test_abacus_is_named_only_for_the_organisation_that_has_it(world, client, login_as, db_session):
@@ -163,3 +168,69 @@ def test_authentication_method_shows_on_the_technology_tab(world, client, login_
     login_as(client, world["user_a"])
     text = _text(_page(client, f"/applications/{row.id}?tab=technology"))
     assert "Authentication Method SAML single sign-on" in text
+
+
+def _save_advantage(client, row, value):
+    edit = _page(client, f"/applications/{row.id}/edit")
+    token = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', edit).group(1)
+    resp = client.post(
+        f"/applications/{row.id}/edit",
+        data={"csrf_token": token, "name": row.name, "competitive_advantage": value},
+    )
+    assert resp.status_code in (200, 302)
+
+
+def test_a_recorded_no_reads_no_and_an_unset_one_reads_not_recorded(
+    world, client, login_as, db_session
+):
+    chosen = _app(db_session, world["org_a"])
+    never = _app(db_session, world["org_a"])
+    other_org = _app(db_session, world["org_b"])
+    login_as(client, world["user_a"])
+    edit = _text(_page(client, f"/applications/{chosen.id}/edit"))
+    assert "Not recorded" in edit and "Yes" in edit and "No" in edit.split("Competitive Advantage")[1][:80]
+
+    _save_advantage(client, chosen, "no")
+    assert "Competitive Advantage No " in _text(_page(client, f"/applications/{chosen.id}")) + " "
+    assert "Competitive Advantage Not recorded" in _text(_page(client, f"/applications/{never.id}"))
+
+    # The editor shows what was chosen, and a person can go back to unset.
+    html = _page(client, f"/applications/{chosen.id}/edit")
+    assert re.search(r'<option[^>]*value="no"[^>]*selected', html)
+    _save_advantage(client, chosen, "")
+    assert "Competitive Advantage Not recorded" in _text(_page(client, f"/applications/{chosen.id}"))
+
+    login_as(client, world["user_b"])
+    assert "Competitive Advantage Not recorded" in _text(_page(client, f"/applications/{other_org.id}"))
+
+
+def test_acronyms_keep_their_capitals_in_any_title_cased_label(world, client, login_as, db_session):
+    from app.utils.template_utils import title_keep_caps
+
+    assert title_keep_caps("SaaS") == "SaaS"
+    assert title_keep_caps("saas_platform") == "Saas Platform"
+    assert title_keep_caps("SaaS billing API") == "SaaS Billing API"
+    assert title_keep_caps("IoT gateway") == "IoT Gateway"
+    assert title_keep_caps("AI") == "AI"
+    row = _app(db_session, world["org_a"], application_category="SaaS billing", application_type="IoT API")
+    login_as(client, world["user_a"])
+    text = _text(_page(client, f"/applications/{row.id}"))
+    assert "SaaS Billing" in text and "IoT API" in text
+    assert "Saas" not in text and "Iot " not in text
+
+
+def test_there_is_one_title_case_helper(app):
+    from app.utils.template_utils import ENUM_LABEL_OVERRIDES, title_keep_caps
+
+    filters = app.jinja_env.filters
+    assert filters["humanize_key"] is title_keep_caps
+    assert title_keep_caps("arb_submission") == ENUM_LABEL_OVERRIDES["arb_submission"]
+    assert title_keep_caps("some_new_SaaS_code") == "Some New SaaS Code"
+
+
+def test_a_hyphen_in_a_typed_label_is_kept_and_each_part_is_capitalised():
+    from app.utils.template_utils import title_keep_caps
+
+    assert title_keep_caps("off-the-shelf") == "Off-The-Shelf"
+    assert title_keep_caps("line-of-business app") == "Line-Of-Business App"
+    assert title_keep_caps("single_sign_on") == "Single Sign On"

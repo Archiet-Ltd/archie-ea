@@ -50,16 +50,16 @@ def test_module_screenshot_has_a_phone_width_variant_shown_at_natural_size(slug)
 
 
 def test_other_module_screenshots_keep_their_one_x_size():
-    shot = get_page_screenshot(load_page("module", slug="vendors"))
+    shot = get_page_screenshot(load_page("module", slug="solutions"))
     assert shot["mobile"] is None
-    with Image.open(IMG_MODULES_DIR / "vendors.webp") as im:
+    with Image.open(IMG_MODULES_DIR / "solutions.webp") as im:
         assert (shot["width"], shot["height"]) == im.size
 
 
 def test_home_hero_declares_the_captured_pixels(app, client):
     html = client.get("/").get_data(as_text=True)
     assert 'data-testid="home-hero-figure"' in html
-    for name, width_attr in (("chat-answer.webp", 908), ("chat-answer-mobile.webp", 374)):
+    for name, width_attr in (("chat-answer.webp", 624), ("chat-answer-mobile.webp", 374)):
         w, h = _css_size(HOME_IMG / name)
         assert w == width_attr
         tag = re.search(r'(?:width="%d"\s+height="(\d+)"|height="(\d+)"\s+width="%d")' % (w, w), html)

@@ -233,7 +233,7 @@ def mcp_endpoint():
         if not tool_released(catalogue_name):
             return jsonify(_jsonrpc_error(
                 req_id, JSONRPC_METHOD_NOT_FOUND,
-                f"{tool_name} is not available yet. It opens in a later release.",
+                f"{tool_name} is not available yet. It is in early access.",
             )), 404
 
         # Authenticated via Bearer token by the request_loader in

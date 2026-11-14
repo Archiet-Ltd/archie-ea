@@ -10,6 +10,7 @@ answers_use_cases:
   - {id: UC-S3-06, segment: S3}
 capture_status: live
 cta: plans
+description: See current against target maturity for every capability in a heat grid, with unassessed capabilities shown as missing, not guessed.
 icon: gauge
 headline: See where each capability stands against its target
 summary: A heat grid of current against target maturity for every capability, with unassessed capabilities shown as missing, not guessed.

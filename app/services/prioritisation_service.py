@@ -13,7 +13,11 @@ _VALID_MOSCOW = {"MUST", "SHOULD", "COULD", "WONT"}
 
 
 def _req_to_dict(req: Requirement) -> dict:
+    from app.services import result_footer_service
+
     return {
+        "wsjf_missing": result_footer_service.missing_wsjf_inputs(req),
+        "footer_html": result_footer_service.render_footer(result_footer_service.backlog_score_footer(req)),
         "id": req.id,
         "title": req.title,
         "description": req.description,

@@ -2,6 +2,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/button.html" import button %}
+{% from 'intelligence/_entity_picker.html' import entity_picker with context %}
 
 {% block title %}{% if model_map %}Model map{% else %}{{ element.name }} — Impact{% endif %}{% endblock %}
 
@@ -36,6 +37,7 @@
     </div>
   </section>
   {% else %}
+  <div {% if model_map %}x-data="modelMapSearch()"{% endif %}>
 
   {# ── Control bar: depth + counts ─────────────────────────────────────── #}
   <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -65,12 +67,17 @@
     </div>
   </div>
 
+  {% if model_map %}
+  <div class="mb-4 max-w-md" data-testid="model-map-find">{{ entity_picker('map', prompt='Find an element by name') }}</div>
+  {% endif %}
+
   {# ── Graph + side panel ──────────────────────────────────────────────── #}
   <div class="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
     <div class="rounded-lg border border-border bg-card overflow-hidden relative">
       {% if model_map %}
       <svg id="impact-svg" class="w-full block touch-none h-[420px] lg:h-[600px]"
            role="group" aria-label="Model map. Tab to an element to hear its name, type and source; arrow keys move between elements; Enter opens it."
+           tabindex="-1"
            data-mode="model"
            data-layer="{{ map_layer }}"
            data-endpoint="{{ url_for('archimate.api_model_map') }}"
@@ -81,6 +88,13 @@
            data-center-name="{{ element.name | e }}"
            data-endpoint="{{ url_for('archimate.api_element_impact_graph', element_id=element.id) }}"
            data-page="{{ url_for('archimate.element_impact_graph_page', element_id=0) }}"></svg>
+      {% endif %}
+      {% if model_map %}
+      <div class="absolute right-3 top-3 flex gap-1" role="group" aria-label="Zoom the map" data-testid="model-map-zoom">
+        {{ button(text='+', variant='outline', size='icon-sm', aria_label='Zoom in', testid='model-map-zoom-in', attrs_dict={'@click': 'zoomIn()'}) }}
+        {{ button(text='−', variant='outline', size='icon-sm', aria_label='Zoom out', testid='model-map-zoom-out', attrs_dict={'@click': 'zoomOut()'}) }}
+        {{ button(text='Fit', variant='outline', size='sm', aria_label='Fit the whole map in view', testid='model-map-zoom-fit', attrs_dict={'@click': 'fitAll()'}) }}
+      </div>
       {% endif %}
       <div id="impact-empty" class="hidden absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
         {% if model_map %}No elements in this layer.{% else %}This element has no recorded relationships yet.{% endif %}
@@ -110,8 +124,9 @@
         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Selected</h3>
         <div id="impact-selected" class="text-sm text-foreground" data-testid="model-map-selected" aria-live="polite">Hover or focus an element to see its type and where it came from. Click it to open it.</div>
       </div>
+      <p class="mt-4 pt-4 border-t border-border text-xs text-muted-foreground hidden" id="model-map-unconnected" data-testid="model-map-unconnected"></p>
       <p class="mt-4 pt-4 border-t border-border text-xs text-muted-foreground">
-        Lines are relationships. Drag to rearrange, scroll or pinch to zoom.
+        Lines are relationships. Drag to rearrange. Use the plus, minus and fit buttons to zoom, or click the map and then scroll.
       </p>
       {% else %}
       <h2 class="text-sm font-semibold text-foreground mb-3">Legend</h2>
@@ -173,8 +188,17 @@
     {% endfor %}
   </div>
   {% endif %}
+  </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_head_js %}
+{% if model_map %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/model_map_search.js') }}"></script>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}

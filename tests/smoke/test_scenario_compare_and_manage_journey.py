@@ -5,7 +5,7 @@ In the Lantern Quay Systems demonstration organisation (RELEASE_WAVE 3):
   so the two columns are not the same; the export is a table with every cell quoted, and a name holding a comma,
   a quote and a leading = reaches the file as text;
 - renames a saved scenario and deletes another, and both are still so after a reload;
-- finds the picker above the list of prioritised actions;
+- finds the picker above the link to the prioritised actions, and follows it to Impact Analysis;
 - a new organisation with no elements is told its model is empty, offered Connect GitHub, and that link lands on a page with content.
 """
 import csv
@@ -159,10 +159,16 @@ def test_the_picker_comes_before_the_prioritised_actions(browser, server, demo, 
         assert re.sub(r"\s+", " ", crumbs.inner_text()).strip().endswith("Changes Scenarios"), crumbs.inner_text()
         expect(crumbs.get_by_text("Scenarios", exact=True)).to_have_attribute("aria-current", "page")
         picker = page.get_by_role("heading", name="Select Element")
-        actions = page.get_by_test_id("priority-actions")
-        expect(actions).to_be_visible()
-        assert picker.bounding_box()["y"] < actions.bounding_box()["y"], "the picker is below the prioritised actions"
-        assert picker.bounding_box()["y"] < viewport["height"], "a person scrolls past the actions to reach the picker"
+        # the ranked list now lives on Impact Analysis; Scenarios carries no list, only the link, and it sits after the picker
+        expect(page.get_by_test_id("priority-actions")).to_have_count(0)
+        link = page.get_by_test_id("priority-actions-link")
+        expect(link).to_be_visible()
+        assert picker.bounding_box()["y"] < link.bounding_box()["y"], "the picker is below the link to the prioritised actions"
+        assert picker.bounding_box()["y"] < viewport["height"], "a person scrolls past the link to the actions to reach the picker"
+        link.click()
+        # in this release the address moves to the Impact Analysis page the person is shown; either way the title names it
+        page.wait_for_url(re.compile(r"/(strategic|enterprise/analysis)/impact-analysis#priority-actions$"), timeout=PAGE_TIMEOUT)
+        expect(page).to_have_title(re.compile(r"^Impact Analysis\b"))
     finally:
         context.close()
 

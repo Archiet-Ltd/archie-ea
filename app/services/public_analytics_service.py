@@ -76,7 +76,11 @@ def log_page_view(path: str):
 
 
 def log_signup_started():
-    """A visitor reached the registration form."""
+    """A person reached the registration form; a crawler reading the page is not counted."""
+    from app.services.signup_guard import names_itself_a_bot
+
+    if names_itself_a_bot():
+        return None
     return _record("signup_started")
 
 

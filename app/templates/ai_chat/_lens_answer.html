@@ -3,6 +3,7 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/provenance.html' import result_footer %}
 {# One lens answer drawn as cards in the chat: a heading card that says what was asked of
    which element, then a card per record the lens returned, or a plain sentence saying why
    there is none. Every figure arrives already redacted for the signed-in person by the API
@@ -104,6 +105,12 @@
             {{ empty_state(icon='layers', title='This is not something the rationalization view tracks', description=name ~ ' is not an application, so it has no rationalization record to open.', padding='py-6') }}
         {% endif %}
 
+    {% elif lens == 'accountability' and owned %}
+        {% call card(class='p-4') %}
+            <p class="text-sm text-foreground" data-testid="owner-sentence" data-lens-row>{{ name }} is owned by {{ owned.names | join(', ') }}, recorded on <a class="font-medium text-primary underline underline-offset-4" href="{{ owned.page_url }}" data-testid="owner-source">{{ owned.page_label }}</a>.</p>
+        {% endcall %}
+        {% if asked_capacity %}<p class="text-sm text-muted-foreground">Capacity and availability data is not yet connected.</p>{% endif %}
+
     {% elif lens == 'accountability' %}
         {% for item in data.owners %}
         {% call card(class='p-4') %}
@@ -112,12 +119,14 @@
                     <h3 class="min-w-0 break-words text-sm font-semibold text-foreground" data-owner-name>{{ item.name or 'Owner not named' }}</h3>
                     {% if item.role %}{% call badge('neutral') %}{{ item.role }}{% endcall %}{% endif %}
                 </div>
+                {% if item.since_text %}<p class="mt-1 text-sm text-muted-foreground" data-owner-since>Since {{ item.since_text }}</p>{% endif %}
             </div>
         {% endcall %}
         {% else %}
             {{ empty_state(icon='users', title='Ownership data is not yet connected', description='No owner is recorded for ' ~ name ~ ' or anything it affects.', padding='py-6') }}
         {% endfor %}
-        <p class="text-sm text-muted-foreground">Capacity and availability data is not yet connected.</p>
+        {% if footer %}{{ result_footer(footer) }}{% endif %}
+        {% if asked_capacity %}<p class="text-sm text-muted-foreground">Capacity and availability data is not yet connected.</p>{% endif %}
 
     {% elif lens == 'data' %}
         {% if not data.data_objects and not data.flows %}
