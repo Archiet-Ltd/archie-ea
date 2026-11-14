@@ -369,6 +369,7 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Capability", "BusinessProcess"): ["realization", "association"],
     ("Capability", "BusinessFunction"): ["realization", "association"],
     ("Capability", "BusinessService"): ["realization", "association"],
+    ("Capability", "Outcome"): ["realization", "association"],
     # Course of Action relationships
     ("CourseOfAction", "Resource"): ["association"],
     ("CourseOfAction", "Capability"): ["association"],
