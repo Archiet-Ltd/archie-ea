@@ -6917,6 +6917,24 @@
   {
    "id": "app/templates/adm_kanban/gap_analysis.html::link::0",
    "kind": "link",
+   "label": "{{ value }} {{ label }}",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/adm-kanban/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "href"
+   },
+   "template": "app/templates/adm_kanban/gap_analysis.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/adm_kanban/gap_analysis.html::link::1",
+   "kind": "link",
    "label": "Gap register \u2192",
    "line": null,
    "mutating": false,
@@ -6934,7 +6952,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/adm_kanban/gap_analysis.html::link::1",
+   "id": "app/templates/adm_kanban/gap_analysis.html::link::2",
    "kind": "link",
    "label": "Roadmap \u2192",
    "line": null,
@@ -6953,7 +6971,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/adm_kanban/gap_analysis.html::link::2",
+   "id": "app/templates/adm_kanban/gap_analysis.html::link::3",
    "kind": "link",
    "label": "Go to Board",
    "line": null,
@@ -6972,7 +6990,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/adm_kanban/gap_analysis.html::link::3",
+   "id": "app/templates/adm_kanban/gap_analysis.html::link::4",
    "kind": "link",
    "label": "gap.title",
    "line": null,
@@ -6994,7 +7012,7 @@
    "id": "app/templates/adm_kanban/gap_analysis.html::button::0",
    "kind": "button",
    "label": "Add a gap record",
-   "line": 108,
+   "line": 103,
    "mutating": false,
    "rendered_on": [
     "/adm-kanban/gap-analysis"
@@ -7013,7 +7031,7 @@
    "id": "app/templates/adm_kanban/gap_analysis.html::button::1",
    "kind": "button",
    "label": "Add a gap record",
-   "line": 114,
+   "line": 109,
    "mutating": false,
    "rendered_on": [
     "/adm-kanban/gap-analysis"
@@ -7040,7 +7058,7 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/adm_kanban/gap_analysis.html",
-   "testid": "gap-total",
+   "testid": "testid",
    "type": null,
    "via_macro": null
   },
@@ -7056,14 +7074,14 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/adm_kanban/gap_analysis.html",
-   "testid": "gap-unclosed",
+   "testid": "gaps-table",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/adm_kanban/gap_analysis.html::testid::2",
    "kind": "testid",
-   "label": "div",
+   "label": "p",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -7072,7 +7090,7 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/adm_kanban/gap_analysis.html",
-   "testid": "gap-covered",
+   "testid": "gaps-table-empty",
    "type": null,
    "via_macro": null
   },
@@ -7088,28 +7106,12 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/adm_kanban/gap_analysis.html",
-   "testid": "gap-signals",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/adm_kanban/gap_analysis.html::testid::4",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/adm-kanban/gap-analysis"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/adm_kanban/gap_analysis.html",
    "testid": "gap-coverage-summary",
    "type": null,
    "via_macro": null
   },
   {
-   "id": "app/templates/adm_kanban/gap_analysis.html::testid::5",
+   "id": "app/templates/adm_kanban/gap_analysis.html::testid::4",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -9146,7 +9148,7 @@
    "id": "app/templates/admin/billing.html::button::0",
    "kind": "button",
    "label": "Manage billing",
-   "line": 98,
+   "line": 100,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9165,7 +9167,7 @@
    "id": "app/templates/admin/billing.html::button::1",
    "kind": "button",
    "label": "Keep my subscription",
-   "line": 104,
+   "line": 106,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9181,7 +9183,7 @@
    "id": "app/templates/admin/billing.html::button::2",
    "kind": "button",
    "label": "Cancel at the end of the period",
-   "line": 110,
+   "line": 112,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9196,26 +9198,24 @@
   {
    "id": "app/templates/admin/billing.html::button::3",
    "kind": "button",
-   "label": "<expr:Concat>",
-   "line": 147,
+   "label": "Start 90 days free",
+   "line": 148,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
    ],
    "rendered_on_count": 1,
-   "target": {
-    "href": "<expr:Concat>"
-   },
+   "target": {},
    "template": "app/templates/admin/billing.html",
    "testid": null,
-   "type": "navigate",
+   "type": "noop",
    "via_macro": "components/button.html:button"
   },
   {
    "id": "app/templates/admin/billing.html::button::4",
    "kind": "button",
-   "label": "Change seats",
-   "line": 149,
+   "label": "<expr:Concat>",
+   "line": 183,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9232,15 +9232,15 @@
   {
    "id": "app/templates/admin/billing.html::button::5",
    "kind": "button",
-   "label": "Contact sales",
-   "line": 151,
+   "label": "<expr:Concat>",
+   "line": 186,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
    ],
    "rendered_on_count": 1,
    "target": {
-    "href": "contact_sales_url"
+    "href": "<expr:Concat>"
    },
    "template": "app/templates/admin/billing.html",
    "testid": null,
@@ -9250,8 +9250,8 @@
   {
    "id": "app/templates/admin/billing.html::button::6",
    "kind": "button",
-   "label": "label",
-   "line": 176,
+   "label": "Change seats",
+   "line": 188,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9268,8 +9268,44 @@
   {
    "id": "app/templates/admin/billing.html::button::7",
    "kind": "button",
+   "label": "Contact sales",
+   "line": 190,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/billing/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "contact_sales_url"
+   },
+   "template": "app/templates/admin/billing.html",
+   "testid": null,
+   "type": "navigate",
+   "via_macro": "components/button.html:button"
+  },
+  {
+   "id": "app/templates/admin/billing.html::button::8",
+   "kind": "button",
+   "label": "label",
+   "line": 215,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/billing/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "<expr:Concat>"
+   },
+   "template": "app/templates/admin/billing.html",
+   "testid": null,
+   "type": "navigate",
+   "via_macro": "components/button.html:button"
+  },
+  {
+   "id": "app/templates/admin/billing.html::button::9",
+   "kind": "button",
    "label": "<expr:CondExpr>",
-   "line": 210,
+   "line": 249,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9282,10 +9318,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/admin/billing.html::button::8",
+   "id": "app/templates/admin/billing.html::button::10",
    "kind": "button",
    "label": "Save billing details",
-   "line": 245,
+   "line": 284,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9301,7 +9337,7 @@
    "id": "app/templates/admin/billing.html::form::0",
    "kind": "form",
    "label": "",
-   "line": 93,
+   "line": 94,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9321,7 +9357,7 @@
    "id": "app/templates/admin/billing.html::form::1",
    "kind": "form",
    "label": "",
-   "line": 99,
+   "line": 100,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9341,7 +9377,27 @@
    "id": "app/templates/admin/billing.html::form::2",
    "kind": "form",
    "label": "",
-   "line": 190,
+   "line": 125,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/billing/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "action": "url_for('billing.billing_startup_credit')",
+    "endpoint": "billing.billing_startup_credit",
+    "method": "POST"
+   },
+   "template": "app/templates/admin/billing.html",
+   "testid": "startup-credit-form",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/billing.html::form::3",
+   "kind": "form",
+   "label": "",
+   "line": 228,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9358,10 +9414,10 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/admin/billing.html::form::3",
+   "id": "app/templates/admin/billing.html::form::4",
    "kind": "form",
    "label": "",
-   "line": 226,
+   "line": 264,
    "mutating": true,
    "rendered_on": [
     "/admin/billing/"
@@ -9381,7 +9437,7 @@
    "id": "app/templates/admin/billing.html::modal::0",
    "kind": "modal",
    "label": "Cancel your subscription?",
-   "line": 107,
+   "line": 109,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9397,7 +9453,7 @@
    "id": "app/templates/admin/billing.html::table::0",
    "kind": "table",
    "label": "",
-   "line": 266,
+   "line": 305,
    "mutating": false,
    "rendered_on": [
     "/admin/billing/"
@@ -9492,6 +9548,22 @@
   {
    "id": "app/templates/admin/billing.html::testid::5",
    "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/billing/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/billing.html",
+   "testid": "startup-credit-ended",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/billing.html::testid::6",
+   "kind": "testid",
    "label": "p",
    "line": null,
    "mutating": false,
@@ -9502,22 +9574,6 @@
    "target": {},
    "template": "app/templates/admin/billing.html",
    "testid": "plans-currency-note",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/admin/billing.html::testid::6",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/admin/billing/"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/admin/billing.html",
-   "testid": "plan-card-{{ p.key }}",
    "type": null,
    "via_macro": null
   },
@@ -9533,12 +9589,28 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/admin/billing.html",
-   "testid": "plan-price-{{ p.key }}",
+   "testid": "plan-card-{{ p.key }}",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/admin/billing.html::testid::8",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/billing/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/billing.html",
+   "testid": "plan-price-{{ p.key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/billing.html::testid::9",
    "kind": "testid",
    "label": "p",
    "line": null,
@@ -9554,7 +9626,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/admin/billing.html::testid::9",
+   "id": "app/templates/admin/billing.html::testid::10",
    "kind": "testid",
    "label": "dd",
    "line": null,
@@ -54167,6 +54239,25 @@
   {
    "id": "app/templates/capability_roadmap/capability_roadmap.html::link::0",
    "kind": "link",
+   "label": "signal.name or 'Untitled capability'",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/capability-roadmap"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "enterprise_crud.capability_fact_sheet",
+    "href": "url_for('enterprise_crud.capability_fact_sheet', capability_id=signal.capability_id)"
+   },
+   "template": "app/templates/capability_roadmap/capability_roadmap.html",
+   "testid": "gap-signal-link-{{ signal.capability_id }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::link::1",
+   "kind": "link",
    "label": "",
    "line": null,
    "mutating": false,
@@ -54276,7 +54367,7 @@
    "id": "app/templates/capability_roadmap/capability_roadmap.html::button::5",
    "kind": "button",
    "label": "Detect Gaps",
-   "line": 76,
+   "line": 78,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54294,7 +54385,7 @@
    "id": "app/templates/capability_roadmap/capability_roadmap.html::button::6",
    "kind": "button",
    "label": "Detecting\u2026",
-   "line": 77,
+   "line": 79,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54310,7 +54401,7 @@
    "id": "app/templates/capability_roadmap/capability_roadmap.html::button::7",
    "kind": "button",
    "label": "Add Plateau",
-   "line": 78,
+   "line": 80,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54328,7 +54419,7 @@
    "id": "app/templates/capability_roadmap/capability_roadmap.html::button::8",
    "kind": "button",
    "label": "Add Gap",
-   "line": 79,
+   "line": 81,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54345,8 +54436,27 @@
   {
    "id": "app/templates/capability_roadmap/capability_roadmap.html::button::9",
    "kind": "button",
+   "label": "Open the capability map",
+   "line": 159,
+   "mutating": false,
+   "rendered_on": [
+    "/capability-roadmap"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "capability_map.index",
+    "href": "url_for(\"capability_map.index\")"
+   },
+   "template": "app/templates/capability_roadmap/capability_roadmap.html",
+   "testid": null,
+   "type": "navigate",
+   "via_macro": "components/button.html:button"
+  },
+  {
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::10",
+   "kind": "button",
    "label": "Generate roadmap",
-   "line": 206,
+   "line": 234,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54361,10 +54471,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::10",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::11",
    "kind": "button",
    "label": "Add Work Package",
-   "line": 208,
+   "line": 236,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54379,10 +54489,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::11",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::12",
    "kind": "button",
    "label": "Edit",
-   "line": 287,
+   "line": 315,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54397,10 +54507,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::12",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::13",
    "kind": "button",
    "label": "Delete",
-   "line": 288,
+   "line": 316,
    "mutating": true,
    "rendered_on": [
     "/capability-roadmap"
@@ -54415,10 +54525,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::13",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::14",
    "kind": "button",
    "label": "Cancel",
-   "line": 355,
+   "line": 383,
    "mutating": true,
    "rendered_on": [
     "/capability-roadmap"
@@ -54433,10 +54543,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::14",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::15",
    "kind": "button",
    "label": "Save",
-   "line": 356,
+   "line": 384,
    "mutating": true,
    "rendered_on": [
     "/capability-roadmap"
@@ -54449,10 +54559,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::15",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::16",
    "kind": "button",
    "label": "Cancel",
-   "line": 398,
+   "line": 426,
    "mutating": true,
    "rendered_on": [
     "/capability-roadmap"
@@ -54467,10 +54577,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::16",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::17",
    "kind": "button",
    "label": "Create Plateau",
-   "line": 399,
+   "line": 427,
    "mutating": true,
    "rendered_on": [
     "/capability-roadmap"
@@ -54483,10 +54593,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::17",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::18",
    "kind": "button",
    "label": "Cancel",
-   "line": 485,
+   "line": 513,
    "mutating": true,
    "rendered_on": [
     "/capability-roadmap"
@@ -54501,10 +54611,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::18",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::19",
    "kind": "button",
    "label": "Save",
-   "line": 486,
+   "line": 514,
    "mutating": true,
    "rendered_on": [
     "/capability-roadmap"
@@ -54517,10 +54627,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::19",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::20",
    "kind": "button",
    "label": "Discard",
-   "line": 544,
+   "line": 572,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54535,10 +54645,10 @@
    "via_macro": "components/button.html:button"
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::20",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::button::21",
    "kind": "button",
    "label": "Confirm & Create",
-   "line": 545,
+   "line": 573,
    "mutating": true,
    "rendered_on": [
     "/capability-roadmap"
@@ -54554,7 +54664,7 @@
    "id": "app/templates/capability_roadmap/capability_roadmap.html::form::0",
    "kind": "form",
    "label": "",
-   "line": 324,
+   "line": 352,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54572,7 +54682,7 @@
    "id": "app/templates/capability_roadmap/capability_roadmap.html::form::1",
    "kind": "form",
    "label": "",
-   "line": 378,
+   "line": 406,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54590,7 +54700,7 @@
    "id": "app/templates/capability_roadmap/capability_roadmap.html::form::2",
    "kind": "form",
    "label": "",
-   "line": 421,
+   "line": 449,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54662,7 +54772,7 @@
    "id": "app/templates/capability_roadmap/capability_roadmap.html::modal::3",
    "kind": "modal",
    "label": "Roadmap preview",
-   "line": 497,
+   "line": 525,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54678,7 +54788,7 @@
    "id": "app/templates/capability_roadmap/capability_roadmap.html::table::0",
    "kind": "table",
    "label": "",
-   "line": 216,
+   "line": 244,
    "mutating": false,
    "rendered_on": [
     "/capability-roadmap"
@@ -54773,6 +54883,54 @@
   {
    "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::5",
    "kind": "testid",
+   "label": "section",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/capability-roadmap"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/capability_roadmap/capability_roadmap.html",
+   "testid": "gap-signals-section",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::6",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/capability-roadmap"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/capability_roadmap/capability_roadmap.html",
+   "testid": "gap-signals-error",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::7",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/capability-roadmap"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/capability_roadmap/capability_roadmap.html",
+   "testid": "gap-signals-empty",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::8",
+   "kind": "testid",
    "label": "div",
    "line": null,
    "mutating": false,
@@ -54787,7 +54945,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::6",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::9",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -54803,7 +54961,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::7",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::10",
    "kind": "testid",
    "label": "p",
    "line": null,
@@ -54819,7 +54977,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::8",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::11",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -54835,7 +54993,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::9",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::12",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -54851,7 +55009,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::10",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::13",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -54867,7 +55025,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::11",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::14",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -54883,7 +55041,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::12",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::15",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -54899,7 +55057,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::13",
+   "id": "app/templates/capability_roadmap/capability_roadmap.html::testid::16",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -60423,7 +60581,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -60439,7 +60597,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -60455,7 +60613,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -60471,7 +60629,7 @@
    "line": 71,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/admin_header.html",
    "testid": null,
@@ -60485,7 +60643,7 @@
    "line": 80,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/admin_header.html",
    "testid": null,
@@ -60499,7 +60657,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "endpoint": "main.index",
     "href": "url_for('main.index')"
@@ -60516,7 +60674,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "sidebar-search-page",
@@ -60530,7 +60688,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "sidebar-search-record",
@@ -60544,7 +60702,7 @@
    "line": 236,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "href": "nav.connect_url"
    },
@@ -60560,7 +60718,7 @@
    "line": 283,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "endpoint": "account.login",
     "href": "url_for(\"account.login\")"
@@ -60577,7 +60735,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "active-organization-chip",
@@ -60591,7 +60749,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "sidebar-search-results",
@@ -60605,7 +60763,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "nav-main",
@@ -60619,7 +60777,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "nav-work",
@@ -60633,7 +60791,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "nav-model",
@@ -60647,7 +60805,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "connect-source-card",
@@ -60661,7 +60819,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "nav-secondary",
@@ -60675,7 +60833,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "href": "link_href"
    },
@@ -60691,7 +60849,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "button_type": "button"
    },
@@ -60707,7 +60865,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {},
    "template": "app/templates/components/alert.html",
    "testid": "testid",
@@ -61147,7 +61305,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 442,
+   "rendered_on_count": 441,
    "target": {
     "href": "href"
    },
@@ -61194,7 +61352,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 66,
+   "rendered_on_count": 65,
    "target": {
     "endpoint": "main.index",
     "href": "url_for('main.index') if url_for else '/'"
@@ -61211,7 +61369,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 66,
+   "rendered_on_count": 65,
    "target": {
     "href": "item.href"
    },
@@ -61227,7 +61385,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 445,
+   "rendered_on_count": 444,
    "target": {
     "href": "href"
    },
@@ -61243,7 +61401,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 445,
+   "rendered_on_count": 444,
    "target": {
     "button_type": "type",
     "data_action": "data_action"
@@ -62668,7 +62826,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "button_type": "button"
    },
@@ -62684,7 +62842,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {
     "button_type": "button"
    },
@@ -62700,7 +62858,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "target": {},
    "template": "app/templates/components/dialog.html",
    "testid": null,
@@ -62998,7 +63156,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -63014,7 +63172,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/drawer.html",
    "testid": null,
@@ -63028,7 +63186,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "href": "item.href"
    },
@@ -63044,7 +63202,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -63060,7 +63218,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -63076,7 +63234,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "submit",
     "form_method": "POST"
@@ -63093,7 +63251,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button",
     "data_action": "item.data_action"
@@ -63110,7 +63268,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -63126,7 +63284,7 @@
    "line": 220,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "action": "item.post",
     "fields": [
@@ -63167,7 +63325,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "href": "cta_href"
    },
@@ -63183,7 +63341,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "href": "secondary_cta_href"
    },
@@ -63199,7 +63357,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "submit",
     "form_method": "POST"
@@ -63216,7 +63374,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -63232,7 +63390,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -63248,7 +63406,7 @@
    "line": 81,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "action": "cta_href",
     "fields": [
@@ -63268,7 +63426,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/empty_state.html",
    "testid": "heading_testid",
@@ -63282,7 +63440,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/empty_state.html",
    "testid": "description_testid",
@@ -64777,7 +64935,7 @@
    "line": 66,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 52,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -64791,7 +64949,7 @@
    "line": 159,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 52,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -64805,7 +64963,7 @@
    "line": 160,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 52,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -64819,7 +64977,7 @@
    "line": 161,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 52,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -64833,7 +64991,7 @@
    "line": 162,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 52,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -64847,7 +65005,7 @@
    "line": 144,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 52,
+   "rendered_on_count": 53,
    "target": {
     "action": "action",
     "fields": [
@@ -64867,7 +65025,7 @@
    "line": 90,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 52,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": null,
@@ -64881,7 +65039,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 52,
+   "rendered_on_count": 53,
    "target": {},
    "template": "app/templates/components/list_table.html",
    "testid": "{{ testid }}-pager",
@@ -65025,7 +65183,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 48,
+   "rendered_on_count": 47,
    "target": {
     "href": "href"
    },
@@ -65041,7 +65199,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 48,
+   "rendered_on_count": 47,
    "target": {},
    "template": "app/templates/components/metrics_card.html",
    "testid": "value_testid",
@@ -65055,7 +65213,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 48,
+   "rendered_on_count": 47,
    "target": {},
    "template": "app/templates/components/metrics_card.html",
    "testid": "value_testid",
@@ -65295,7 +65453,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -65311,7 +65469,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "submit",
     "form_method": "GET"
@@ -65328,7 +65486,7 @@
    "line": 43,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "dom_id": "page-guide-form",
     "method": "GET"
@@ -65345,7 +65503,7 @@
    "line": 3,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "modal_id": "page-guide"
    },
@@ -65361,7 +65519,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 233,
+   "rendered_on_count": 232,
    "target": {
     "href": "crumb.href"
    },
@@ -65377,7 +65535,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 233,
+   "rendered_on_count": 232,
    "target": {
     "href": "action.href"
    },
@@ -65393,7 +65551,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 233,
+   "rendered_on_count": 232,
    "target": {
     "button_type": "button"
    },
@@ -65409,7 +65567,7 @@
    "line": 88,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 233,
+   "rendered_on_count": 232,
    "target": {},
    "template": "app/templates/components/page_header.html",
    "testid": null,
@@ -65423,7 +65581,7 @@
    "line": 84,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 233,
+   "rendered_on_count": 232,
    "target": {
     "action": "action.post",
     "fields": [
@@ -65443,7 +65601,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 233,
+   "rendered_on_count": 232,
    "target": {},
    "template": "app/templates/components/page_header.html",
    "testid": "{{ action.testid }}-reason",
@@ -65529,7 +65687,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "modal_id": "id"
    },
@@ -65546,9 +65704,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {
     "href": "href"
    },
@@ -65565,11 +65724,12 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {
-    "href": "{{ request.path }}?all_actions=1#priority-actions"
+    "href": "show_all_url"
    },
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-actions-show-all",
@@ -65584,11 +65744,12 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {
-    "href": "{{ request.path }}#priority-actions"
+    "href": "show_first_url"
    },
    "template": "app/templates/components/priority_actions.html",
    "testid": null,
@@ -65603,9 +65764,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {},
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-actions",
@@ -65620,9 +65782,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {},
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-actions-rule",
@@ -65637,9 +65800,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {},
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-actions-list",
@@ -65654,9 +65818,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {},
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-action-row",
@@ -65671,9 +65836,10 @@
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/ai-architecture",
+    "/enterprise/analysis/impact-analysis",
     "/strategic/impact-analysis"
    ],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "target": {},
    "template": "app/templates/components/priority_actions.html",
    "testid": "priority-actions-empty",
@@ -67354,7 +67520,7 @@
    "line": 14,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/see_how.html",
    "testid": null,
@@ -67368,7 +67534,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {},
    "template": "app/templates/components/see_how.html",
    "testid": "see-how-video-{{ c.key }}",
@@ -67382,7 +67548,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 65,
+   "rendered_on_count": 66,
    "target": {
     "button_type": "button"
    },
@@ -67398,7 +67564,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 65,
+   "rendered_on_count": 66,
    "target": {
     "button_type": "button"
    },
@@ -67414,7 +67580,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 65,
+   "rendered_on_count": 66,
    "target": {},
    "template": "app/templates/components/select.html",
    "testid": null,
@@ -67596,7 +67762,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -67612,7 +67778,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -67688,7 +67854,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "target": {
     "button_type": "button"
    },
@@ -75472,7 +75638,7 @@
    "rendered_on_count": 1,
    "target": {
     "endpoint": "enterprise.gap_analysis",
-    "href": "url_for('enterprise.gap_analysis', severity=severity)"
+    "href": "url_for('enterprise.gap_analysis', severity=severity, status='open')"
    },
    "template": "app/templates/enterprise/ai_architecture_analysis.html",
    "testid": "view-gaps-{{ severity }}",
@@ -76488,6 +76654,82 @@
   {
    "id": "app/templates/enterprise/gap_analysis.html::link::5",
    "kind": "link",
+   "label": "Open the Risks register",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "risk.risk_register",
+    "href": "url_for('risk.risk_register')"
+   },
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gap-risks-register-link",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::link::6",
+   "kind": "link",
+   "label": "Previous gaps",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "enterprise.gap_analysis",
+    "href": "url_for('enterprise.gap_analysis', severity=severity_filter or none, status=status_filter or none, work=work_filter or none, sort=current_sort, dir=current_dir, page=page_number - 1)"
+   },
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gap-page-previous",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::link::7",
+   "kind": "link",
+   "label": "Next gaps",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "enterprise.gap_analysis",
+    "href": "url_for('enterprise.gap_analysis', severity=severity_filter or none, status=status_filter or none, work=work_filter or none, sort=current_sort, dir=current_dir, page=page_number + 1)"
+   },
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gap-page-next",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::link::8",
+   "kind": "link",
+   "label": "See all {{ na_total }} gaps with no work package",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "enterprise.gap_analysis",
+    "href": "url_for('enterprise.gap_analysis', status='open', work='none')"
+   },
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gaps-not-addressed-all",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::link::9",
+   "kind": "link",
    "label": "_unprefixed(gap.name) or 'Untitled gap'",
    "line": null,
    "mutating": false,
@@ -76516,6 +76758,25 @@
    "target": {
     "endpoint": "archimate_crud.create_element",
     "href": "url_for(\"archimate_crud.create_element\", layer=\"implementation\", element_type=\"Gap\")"
+   },
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": null,
+   "type": "navigate",
+   "via_macro": "basecoat/index.html:button"
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::button::1",
+   "kind": "button",
+   "label": "Show all gaps",
+   "line": 179,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "enterprise.gap_analysis",
+    "href": "url_for(\"enterprise.gap_analysis\")"
    },
    "template": "app/templates/enterprise/gap_analysis.html",
    "testid": null,
@@ -76614,12 +76875,28 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/enterprise/gap_analysis.html",
-   "testid": "gap-unclosed-count-line",
+   "testid": "gap-no-severity-sentence",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/enterprise/gap_analysis.html::testid::6",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gap-unclosed-count-line",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::testid::7",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -76631,6 +76908,70 @@
    "target": {},
    "template": "app/templates/enterprise/gap_analysis.html",
    "testid": "gap-unclosed-count",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::testid::8",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gap-figures-count-gaps-not-risks",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::testid::9",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gap-page-note",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::testid::10",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gaps-filter-empty",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::testid::11",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gaps-not-addressed-total",
    "type": null,
    "via_macro": null
   },
@@ -76656,7 +76997,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::button::0",
    "kind": "button",
    "label": "Save this run",
-   "line": 83,
+   "line": 84,
    "mutating": true,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -76672,7 +77013,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::button::1",
    "kind": "button",
    "label": "Connect GitHub",
-   "line": 161,
+   "line": 162,
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -76691,7 +77032,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::button::2",
    "kind": "button",
    "label": "Load the sample company",
-   "line": 166,
+   "line": 167,
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -76707,7 +77048,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::button::3",
    "kind": "button",
    "label": "Add an application",
-   "line": 169,
+   "line": 170,
    "mutating": false,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -76726,7 +77067,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::form::0",
    "kind": "form",
    "label": "",
-   "line": 74,
+   "line": 75,
    "mutating": true,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -76746,7 +77087,7 @@
    "id": "app/templates/enterprise/impact_analysis.html::form::1",
    "kind": "form",
    "label": "",
-   "line": 158,
+   "line": 159,
    "mutating": true,
    "rendered_on": [
     "/enterprise/analysis/impact-analysis"
@@ -77753,94 +78094,6 @@
    "via_macro": "components/table.html:table"
   },
   {
-   "id": "app/templates/enterprise/risk_assessment.html::link::0",
-   "kind": "link",
-   "label": "Risks register",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/enterprise/strategic/risk-assessment"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "endpoint": "risk.risk_register",
-    "href": "url_for('risk.risk_register')"
-   },
-   "template": "app/templates/enterprise/risk_assessment.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/enterprise/risk_assessment.html::link::1",
-   "kind": "link",
-   "label": "Open the Gaps page",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/enterprise/strategic/risk-assessment"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "endpoint": "enterprise.gap_analysis",
-    "href": "url_for('enterprise.gap_analysis')"
-   },
-   "template": "app/templates/enterprise/risk_assessment.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/enterprise/risk_assessment.html::link::2",
-   "kind": "link",
-   "label": "gap.name|default('Unnamed gap')",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/enterprise/strategic/risk-assessment"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "href": "_h"
-   },
-   "template": "app/templates/enterprise/risk_assessment.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/enterprise/risk_assessment.html::table::0",
-   "kind": "table",
-   "label": "",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/enterprise/strategic/risk-assessment"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/enterprise/risk_assessment.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/enterprise/risk_assessment.html::testid::0",
-   "kind": "testid",
-   "label": "p",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/enterprise/strategic/risk-assessment"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/enterprise/risk_assessment.html",
-   "testid": "gap-rows-note",
-   "type": null,
-   "via_macro": null
-  },
-  {
    "id": "app/templates/enterprise/software_architecture_dashboard.html::link::0",
    "kind": "link",
    "label": "Application Portfolio",
@@ -78315,7 +78568,7 @@
   {
    "id": "app/templates/enterprise/strategic_planning_dashboard.html::link::3",
    "kind": "link",
-   "label": "Gap Risk Assessment Gaps rated by severity",
+   "label": "Gap analysis Gaps rated by severity",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -78323,8 +78576,8 @@
    ],
    "rendered_on_count": 1,
    "target": {
-    "endpoint": "enterprise.risk_assessment",
-    "href": "url_for('enterprise.risk_assessment')"
+    "endpoint": "enterprise.gap_analysis",
+    "href": "url_for('enterprise.gap_analysis', status='open')"
    },
    "template": "app/templates/enterprise/strategic_planning_dashboard.html",
    "testid": null,
@@ -80403,6 +80656,43 @@
   {
    "id": "app/templates/governance/risk_register.html::link::0",
    "kind": "link",
+   "label": "inner",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/risks/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "href"
+   },
+   "template": "app/templates/governance/risk_register.html",
+   "testid": "testid",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/governance/risk_register.html::link::1",
+   "kind": "link",
+   "label": "Show every risk",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/risks/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "risk.risk_register",
+    "href": "url_for('risk.risk_register')"
+   },
+   "template": "app/templates/governance/risk_register.html",
+   "testid": "register-filter-clear",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/governance/risk_register.html::link::2",
+   "kind": "link",
    "label": "r.title",
    "line": null,
    "mutating": false,
@@ -80420,7 +80710,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/governance/risk_register.html::link::1",
+   "id": "app/templates/governance/risk_register.html::link::3",
    "kind": "link",
    "label": "t.name",
    "line": null,
@@ -80439,7 +80729,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/governance/risk_register.html::link::2",
+   "id": "app/templates/governance/risk_register.html::link::4",
    "kind": "link",
    "label": "t.name",
    "line": null,
@@ -80457,7 +80747,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/governance/risk_register.html::link::3",
+   "id": "app/templates/governance/risk_register.html::link::5",
    "kind": "link",
    "label": "t.name",
    "line": null,
@@ -80497,7 +80787,7 @@
    "id": "app/templates/governance/risk_register.html::button::1",
    "kind": "button",
    "label": "Link it",
-   "line": 125,
+   "line": 140,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80515,7 +80805,7 @@
    "id": "app/templates/governance/risk_register.html::button::2",
    "kind": "button",
    "label": "",
-   "line": 216,
+   "line": 231,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80533,7 +80823,7 @@
    "id": "app/templates/governance/risk_register.html::button::3",
    "kind": "button",
    "label": "Add item",
-   "line": 219,
+   "line": 234,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80551,7 +80841,7 @@
    "id": "app/templates/governance/risk_register.html::button::4",
    "kind": "button",
    "label": "<expr:CondExpr>",
-   "line": 248,
+   "line": 263,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80569,7 +80859,7 @@
    "id": "app/templates/governance/risk_register.html::button::5",
    "kind": "button",
    "label": "Cancel",
-   "line": 305,
+   "line": 320,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80585,7 +80875,7 @@
    "id": "app/templates/governance/risk_register.html::button::6",
    "kind": "button",
    "label": "",
-   "line": 306,
+   "line": 321,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80603,7 +80893,7 @@
    "id": "app/templates/governance/risk_register.html::button::7",
    "kind": "button",
    "label": "Cancel",
-   "line": 344,
+   "line": 359,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80619,7 +80909,7 @@
    "id": "app/templates/governance/risk_register.html::button::8",
    "kind": "button",
    "label": "",
-   "line": 345,
+   "line": 360,
    "mutating": true,
    "rendered_on": [
     "/risks/"
@@ -80637,7 +80927,7 @@
    "id": "app/templates/governance/risk_register.html::button::9",
    "kind": "button",
    "label": "",
-   "line": 378,
+   "line": 393,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80655,7 +80945,7 @@
    "id": "app/templates/governance/risk_register.html::button::10",
    "kind": "button",
    "label": "Map to\u2026",
-   "line": 401,
+   "line": 416,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80673,7 +80963,7 @@
    "id": "app/templates/governance/risk_register.html::button::11",
    "kind": "button",
    "label": "Unmap",
-   "line": 412,
+   "line": 427,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80689,7 +80979,7 @@
    "id": "app/templates/governance/risk_register.html::button::12",
    "kind": "button",
    "label": "",
-   "line": 427,
+   "line": 442,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80705,7 +80995,7 @@
    "id": "app/templates/governance/risk_register.html::button::13",
    "kind": "button",
    "label": "Edit",
-   "line": 437,
+   "line": 452,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80723,7 +81013,7 @@
    "id": "app/templates/governance/risk_register.html::button::14",
    "kind": "button",
    "label": "Delete",
-   "line": 438,
+   "line": 453,
    "mutating": true,
    "rendered_on": [
     "/risks/"
@@ -80757,7 +81047,7 @@
    "id": "app/templates/governance/risk_register.html::modal::1",
    "kind": "modal",
    "label": "Add RAID Item",
-   "line": 270,
+   "line": 285,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80775,7 +81065,7 @@
    "id": "app/templates/governance/risk_register.html::modal::2",
    "kind": "modal",
    "label": "Add Risk",
-   "line": 316,
+   "line": 331,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80793,7 +81083,7 @@
    "id": "app/templates/governance/risk_register.html::table::0",
    "kind": "table",
    "label": "",
-   "line": 168,
+   "line": 183,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80809,7 +81099,7 @@
    "id": "app/templates/governance/risk_register.html::table::1",
    "kind": "table",
    "label": "",
-   "line": 223,
+   "line": 238,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -80833,7 +81123,7 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/governance/risk_register.html",
-   "testid": "register-open",
+   "testid": "testid",
    "type": null,
    "via_macro": null
   },
@@ -80849,7 +81139,71 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/governance/risk_register.html",
+   "testid": "register-total",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/governance/risk_register.html::testid::2",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/risks/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/governance/risk_register.html",
+   "testid": "register-open",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/governance/risk_register.html::testid::3",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/risks/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/governance/risk_register.html",
    "testid": "register-critical",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/governance/risk_register.html::testid::4",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/risks/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/governance/risk_register.html",
+   "testid": "register-mitigated",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/governance/risk_register.html::testid::5",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/risks/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/governance/risk_register.html",
+   "testid": "register-filter-note",
    "type": null,
    "via_macro": null
   },
@@ -81137,7 +81491,7 @@
    "rendered_on_count": 5,
    "target": {
     "endpoint": "enterprise.gap_analysis",
-    "href": "url_for('enterprise.gap_analysis', severity='critical')"
+    "href": "url_for('enterprise.gap_analysis', severity='critical', status='open')"
    },
    "template": "app/templates/implementation_planning/dashboard.html",
    "testid": "critical-gaps-register-link",
@@ -82490,7 +82844,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {
     "href": "#main-content"
    },
@@ -82506,7 +82860,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {
     "href": "#sidebar-nav"
    },
@@ -82522,7 +82876,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {
     "href": "#sidebar-search"
    },
@@ -82538,7 +82892,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {
     "endpoint": "service_status.status_page",
     "href": "url_for('service_status.status_page')"
@@ -82555,7 +82909,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {
     "button_type": "button"
    },
@@ -82571,7 +82925,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {
     "button_type": "button"
    },
@@ -82587,7 +82941,7 @@
    "line": 140,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {},
    "template": "app/templates/layouts/admin_base.html",
    "testid": null,
@@ -82601,7 +82955,7 @@
    "line": 251,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {
     "data_action": "exit()"
    },
@@ -82617,7 +82971,7 @@
    "line": 252,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {
     "data_action": "next()"
    },
@@ -82633,7 +82987,7 @@
    "line": 138,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {
     "action": "url_for('architect_ui.remove_sample_company')",
     "endpoint": "architect_ui.remove_sample_company",
@@ -82651,7 +83005,7 @@
    "line": 137,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {},
    "template": "app/templates/layouts/admin_base.html",
    "testid": null,
@@ -82665,7 +83019,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {},
    "template": "app/templates/layouts/admin_base.html",
    "testid": "sample-company-indicator",
@@ -82679,7 +83033,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "target": {},
    "template": "app/templates/layouts/admin_base.html",
    "testid": "app-footer",
@@ -88035,6 +88389,23 @@
   {
    "id": "app/templates/public/pricing.html::link::5",
    "kind": "link",
+   "label": "Start with 90 days free",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [],
+   "rendered_on_count": 0,
+   "target": {
+    "endpoint": "main.track_plan_click",
+    "href": "url_for('main.track_plan_click', plan='startup', next=url_for('account.register', plan='startup', interval='year', offer='credit'))"
+   },
+   "template": "app/templates/public/pricing.html",
+   "testid": "credit-startup",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/public/pricing.html::link::6",
+   "kind": "link",
    "label": "Contact sales",
    "line": null,
    "mutating": false,
@@ -88050,7 +88421,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/public/pricing.html::link::6",
+   "id": "app/templates/public/pricing.html::link::7",
    "kind": "link",
    "label": "View on GitHub",
    "line": null,
@@ -88066,7 +88437,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/public/pricing.html::link::7",
+   "id": "app/templates/public/pricing.html::link::8",
    "kind": "link",
    "label": "See what is included",
    "line": null,
@@ -88082,7 +88453,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/public/pricing.html::link::8",
+   "id": "app/templates/public/pricing.html::link::9",
    "kind": "link",
    "label": "See what is included",
    "line": null,
@@ -88091,22 +88462,6 @@
    "rendered_on_count": 0,
    "target": {
     "href": "/team-annual-onboarding"
-   },
-   "template": "app/templates/public/pricing.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/public/pricing.html::link::9",
-   "kind": "link",
-   "label": "contacting us",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {
-    "href": "/contact"
    },
    "template": "app/templates/public/pricing.html",
    "testid": null,
@@ -88132,7 +88487,7 @@
   {
    "id": "app/templates/public/pricing.html::link::11",
    "kind": "link",
-   "label": "Contact us",
+   "label": "contacting us",
    "line": null,
    "mutating": false,
    "rendered_on": [],
@@ -88147,6 +88502,22 @@
   },
   {
    "id": "app/templates/public/pricing.html::link::12",
+   "kind": "link",
+   "label": "Contact us",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [],
+   "rendered_on_count": 0,
+   "target": {
+    "href": "/contact"
+   },
+   "template": "app/templates/public/pricing.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/public/pricing.html::link::13",
    "kind": "link",
    "label": "Contact us",
    "line": null,
@@ -105804,8 +106175,8 @@
    ],
    "rendered_on_count": 1,
    "target": {
-    "endpoint": "strategic.impact_analysis",
-    "href": "{{ url_for('strategic.impact_analysis') }}#priority-actions"
+    "endpoint": "enterprise.impact_analysis",
+    "href": "{{ url_for('enterprise.impact_analysis') }}#priority-actions"
    },
    "template": "app/templates/strategic/impact_analysis.html",
    "testid": "priority-actions-link",
@@ -106391,6 +106762,23 @@
   {
    "id": "app/templates/strategic/investment_matrix.html::link::1",
    "kind": "link",
+   "label": "",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/architecture/investment-priorities",
+    "/strategic/investment-matrix"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/strategic/investment_matrix.html",
+   "testid": "strategic-step",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategic/investment_matrix.html::link::2",
+   "kind": "link",
    "label": "Link a work package",
    "line": null,
    "mutating": false,
@@ -106526,7 +106914,7 @@
    "id": "app/templates/strategic/investment_matrix.html::button::6",
    "kind": "button",
    "label": "",
-   "line": 174,
+   "line": 175,
    "mutating": false,
    "rendered_on": [
     "/architecture/investment-priorities",
@@ -106545,7 +106933,7 @@
    "id": "app/templates/strategic/investment_matrix.html::button::7",
    "kind": "button",
    "label": "",
-   "line": 184,
+   "line": 185,
    "mutating": false,
    "rendered_on": [
     "/architecture/investment-priorities",
@@ -106564,7 +106952,7 @@
    "id": "app/templates/strategic/investment_matrix.html::button::8",
    "kind": "button",
    "label": "",
-   "line": 290,
+   "line": 291,
    "mutating": false,
    "rendered_on": [
     "/architecture/investment-priorities",
@@ -106581,7 +106969,7 @@
    "id": "app/templates/strategic/investment_matrix.html::button::9",
    "kind": "button",
    "label": "",
-   "line": 291,
+   "line": 292,
    "mutating": false,
    "rendered_on": [
     "/architecture/investment-priorities",
@@ -106598,7 +106986,7 @@
    "id": "app/templates/strategic/investment_matrix.html::button::10",
    "kind": "button",
    "label": "",
-   "line": 294,
+   "line": 295,
    "mutating": false,
    "rendered_on": [
     "/architecture/investment-priorities",
@@ -106631,7 +107019,7 @@
   {
    "id": "app/templates/strategic/investment_matrix.html::testid::0",
    "kind": "testid",
-   "label": "div",
+   "label": "p",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -106641,7 +107029,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "total-capabilities",
+   "testid": "investment-costs-withheld",
    "type": null,
    "via_macro": null
   },
@@ -106658,7 +107046,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "total-capabilities-scope",
+   "testid": "total-capabilities",
    "type": null,
    "via_macro": null
   },
@@ -106675,7 +107063,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "critical-priorities",
+   "testid": "total-capabilities-scope",
    "type": null,
    "via_macro": null
   },
@@ -106692,7 +107080,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "total-investment",
+   "testid": "critical-priorities",
    "type": null,
    "via_macro": null
   },
@@ -106709,7 +107097,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "average-strategic-score",
+   "testid": "total-investment",
    "type": null,
    "via_macro": null
   },
@@ -106726,7 +107114,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "investment-load-error",
+   "testid": "average-strategic-score",
    "type": null,
    "via_macro": null
   },
@@ -106743,14 +107131,14 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "investment-empty",
+   "testid": "investment-load-error",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/strategic/investment_matrix.html::testid::7",
    "kind": "testid",
-   "label": "select",
+   "label": "div",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -106760,7 +107148,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "type-filter",
+   "testid": "investment-empty",
    "type": null,
    "via_macro": null
   },
@@ -106777,14 +107165,14 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "per-page-selector",
+   "testid": "type-filter",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/strategic/investment_matrix.html::testid::9",
    "kind": "testid",
-   "label": "div",
+   "label": "select",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -106794,7 +107182,7 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "bulk-action-bar",
+   "testid": "per-page-selector",
    "type": null,
    "via_macro": null
   },
@@ -106811,12 +107199,29 @@
    "rendered_on_count": 2,
    "target": {},
    "template": "app/templates/strategic/investment_matrix.html",
-   "testid": "matrix-scroll",
+   "testid": "bulk-action-bar",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/strategic/investment_matrix.html::testid::11",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/architecture/investment-priorities",
+    "/strategic/investment-matrix"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/strategic/investment_matrix.html",
+   "testid": "matrix-scroll",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategic/investment_matrix.html::testid::12",
    "kind": "testid",
    "label": "input",
    "line": null,
@@ -106833,7 +107238,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::12",
+   "id": "app/templates/strategic/investment_matrix.html::testid::13",
    "kind": "testid",
    "label": "tr",
    "line": null,
@@ -106850,7 +107255,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::13",
+   "id": "app/templates/strategic/investment_matrix.html::testid::14",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -106867,7 +107272,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::14",
+   "id": "app/templates/strategic/investment_matrix.html::testid::15",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -106884,7 +107289,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::15",
+   "id": "app/templates/strategic/investment_matrix.html::testid::16",
    "kind": "testid",
    "label": "dl",
    "line": null,
@@ -106901,7 +107306,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::16",
+   "id": "app/templates/strategic/investment_matrix.html::testid::17",
    "kind": "testid",
    "label": "dd",
    "line": null,
@@ -106918,7 +107323,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::17",
+   "id": "app/templates/strategic/investment_matrix.html::testid::18",
    "kind": "testid",
    "label": "dd",
    "line": null,
@@ -106935,7 +107340,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::18",
+   "id": "app/templates/strategic/investment_matrix.html::testid::19",
    "kind": "testid",
    "label": "dd",
    "line": null,
@@ -106952,7 +107357,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::19",
+   "id": "app/templates/strategic/investment_matrix.html::testid::20",
    "kind": "testid",
    "label": "dd",
    "line": null,
@@ -106969,7 +107374,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::20",
+   "id": "app/templates/strategic/investment_matrix.html::testid::21",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -106986,7 +107391,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::21",
+   "id": "app/templates/strategic/investment_matrix.html::testid::22",
    "kind": "testid",
    "label": "p",
    "line": null,
@@ -107003,7 +107408,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::22",
+   "id": "app/templates/strategic/investment_matrix.html::testid::23",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -107020,7 +107425,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::23",
+   "id": "app/templates/strategic/investment_matrix.html::testid::24",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107037,7 +107442,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::24",
+   "id": "app/templates/strategic/investment_matrix.html::testid::25",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107054,7 +107459,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::25",
+   "id": "app/templates/strategic/investment_matrix.html::testid::26",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -107071,7 +107476,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::26",
+   "id": "app/templates/strategic/investment_matrix.html::testid::27",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -107088,7 +107493,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::27",
+   "id": "app/templates/strategic/investment_matrix.html::testid::28",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107105,7 +107510,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::28",
+   "id": "app/templates/strategic/investment_matrix.html::testid::29",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107122,7 +107527,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::29",
+   "id": "app/templates/strategic/investment_matrix.html::testid::30",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107139,7 +107544,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::30",
+   "id": "app/templates/strategic/investment_matrix.html::testid::31",
    "kind": "testid",
    "label": "td",
    "line": null,
@@ -107156,7 +107561,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::31",
+   "id": "app/templates/strategic/investment_matrix.html::testid::32",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -107173,7 +107578,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::32",
+   "id": "app/templates/strategic/investment_matrix.html::testid::33",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -107190,7 +107595,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/investment_matrix.html::testid::33",
+   "id": "app/templates/strategic/investment_matrix.html::testid::34",
    "kind": "testid",
    "label": "p",
    "line": null,
@@ -107279,6 +107684,25 @@
   {
    "id": "app/templates/strategic/risk_assessment.html::link::0",
    "kind": "link",
+   "label": "See every risk in the risk register",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategic/risk-assessment"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "risk.risk_register",
+    "href": "url_for('risk.risk_register')"
+   },
+   "template": "app/templates/strategic/risk_assessment.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategic/risk_assessment.html::link::1",
+   "kind": "link",
    "label": "r.title",
    "line": null,
    "mutating": false,
@@ -107296,7 +107720,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/risk_assessment.html::link::1",
+   "id": "app/templates/strategic/risk_assessment.html::link::2",
    "kind": "link",
    "label": "c.name",
    "line": null,
@@ -107314,7 +107738,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/risk_assessment.html::link::2",
+   "id": "app/templates/strategic/risk_assessment.html::link::3",
    "kind": "link",
    "label": "Open the risk",
    "line": null,
@@ -107333,7 +107757,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategic/risk_assessment.html::link::3",
+   "id": "app/templates/strategic/risk_assessment.html::link::4",
    "kind": "link",
    "label": "Open the risk register",
    "line": null,
@@ -107366,6 +107790,22 @@
    "testid": null,
    "type": "noop",
    "via_macro": "basecoat/index.html:button"
+  },
+  {
+   "id": "app/templates/strategic/risk_assessment.html::testid::0",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategic/risk-assessment"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategic/risk_assessment.html",
+   "testid": "assess-closed-note",
+   "type": null,
+   "via_macro": null
   },
   {
    "id": "app/templates/tech_radar/classify.html::button::0",
@@ -110124,21 +110564,21 @@
   }
  ],
  "counts": {
-  "controls": 6207,
+  "controls": 6232,
   "controls_by_kind": {
-   "button": 3122,
-   "form": 300,
-   "link": 1014,
+   "button": 3126,
+   "form": 301,
+   "link": 1022,
    "modal": 204,
-   "table": 362,
-   "testid": 1205
+   "table": 361,
+   "testid": 1218
   },
-  "controls_mutating": 697,
-  "pages": 448,
-  "pages_without_parameters": 320,
-  "routes": 3918,
+  "controls_mutating": 698,
+  "pages": 447,
+  "pages_without_parameters": 319,
+  "routes": 3919,
   "routes_without_a_handler_place": 9,
-  "templates": 825,
+  "templates": 824,
   "templates_not_reached_by_a_route": 148
  },
  "routes": [
@@ -113028,7 +113468,7 @@
    ],
    "handler": "adm_roadmap_timeline",
    "handler_file": "app/modules/architecture/routes/adm_kanban_view_routes.py",
-   "handler_line": 185,
+   "handler_line": 188,
    "has_parameters": false,
    "id": "adm_kanban_view.adm_roadmap_timeline /adm-kanban/roadmap",
    "login_required": true,
@@ -113442,7 +113882,7 @@
    ],
    "handler": "plateau_roadmap",
    "handler_file": "app/modules/architecture/routes/adm_kanban_view_routes.py",
-   "handler_line": 178,
+   "handler_line": 181,
    "has_parameters": false,
    "id": "adm_kanban_view.plateau_roadmap /adm-kanban/plateau-roadmap",
    "login_required": true,
@@ -113464,7 +113904,7 @@
    ],
    "handler": "search_elements",
    "handler_file": "app/modules/architecture/routes/adm_kanban_view_routes.py",
-   "handler_line": 192,
+   "handler_line": 195,
    "has_parameters": false,
    "id": "adm_kanban_view.search_elements /adm-kanban/api/elements/search",
    "login_required": true,
@@ -141244,7 +141684,7 @@
    ],
    "handler": "add_product_element",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 1945,
+   "handler_line": 1954,
    "has_parameters": true,
    "id": "archimate_crud.add_product_element /architecture/products/<int:product_id>/elements",
    "login_required": true,
@@ -141267,7 +141707,7 @@
    ],
    "handler": "add_technology_cost",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2070,
+   "handler_line": 2079,
    "has_parameters": true,
    "id": "archimate_crud.add_technology_cost /architecture/technology-costs/<int:element_id>",
    "login_required": true,
@@ -141290,7 +141730,7 @@
    ],
    "handler": "ai_generate",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2775,
+   "handler_line": 2784,
    "has_parameters": true,
    "id": "archimate_crud.ai_generate /architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/ai-generate",
    "login_required": true,
@@ -141312,7 +141752,7 @@
    ],
    "handler": "api_capability_choices",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 916,
+   "handler_line": 934,
    "has_parameters": false,
    "id": "archimate_crud.api_capability_choices /architecture/api/capability-choices",
    "login_required": true,
@@ -141334,7 +141774,7 @@
    ],
    "handler": "api_element_detail",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2817,
+   "handler_line": 2826,
    "has_parameters": true,
    "id": "archimate_crud.api_element_detail /architecture/api/elements/<int:element_id>/detail",
    "login_required": true,
@@ -141357,7 +141797,7 @@
    ],
    "handler": "api_element_patch",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2891,
+   "handler_line": 2900,
    "has_parameters": true,
    "id": "archimate_crud.api_element_patch /architecture/api/elements/<int:element_id>",
    "login_required": true,
@@ -141379,7 +141819,7 @@
    ],
    "handler": "api_element_profile",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 4055,
+   "handler_line": 4064,
    "has_parameters": true,
    "id": "archimate_crud.api_element_profile /architecture/api/elements/<int:element_id>/profile",
    "login_required": true,
@@ -141401,7 +141841,7 @@
    ],
    "handler": "api_element_set_kind",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 4068,
+   "handler_line": 4077,
    "has_parameters": true,
    "id": "archimate_crud.api_element_set_kind /architecture/api/elements/<int:element_id>/profile",
    "login_required": true,
@@ -141423,7 +141863,7 @@
    ],
    "handler": "api_element_set_wsjf",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 4102,
+   "handler_line": 4111,
    "has_parameters": true,
    "id": "archimate_crud.api_element_set_wsjf /architecture/api/elements/<int:element_id>/profile/wsjf",
    "login_required": true,
@@ -141467,7 +141907,7 @@
    ],
    "handler": "api_health_scorecard",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 3490,
+   "handler_line": 3499,
    "has_parameters": false,
    "id": "archimate_crud.api_health_scorecard /architecture/api/health-scorecard",
    "login_required": true,
@@ -141490,7 +141930,7 @@
    ],
    "handler": "api_health_scorecard_repair",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 3939,
+   "handler_line": 3948,
    "has_parameters": false,
    "id": "archimate_crud.api_health_scorecard_repair /architecture/api/health-scorecard/repair",
    "login_required": true,
@@ -141512,7 +141952,7 @@
    ],
    "handler": "api_layer_count",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 1007,
+   "handler_line": 1022,
    "has_parameters": true,
    "id": "archimate_crud.api_layer_count /architecture/api/layer/<layer>/count",
    "login_required": true,
@@ -141534,7 +141974,7 @@
    ],
    "handler": "api_layer_counts",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 1030,
+   "handler_line": 1045,
    "has_parameters": false,
    "id": "archimate_crud.api_layer_counts /architecture/api/layer/counts",
    "login_required": true,
@@ -141556,7 +141996,7 @@
    ],
    "handler": "api_layer_elements",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 1045,
+   "handler_line": 1060,
    "has_parameters": true,
    "id": "archimate_crud.api_layer_elements /architecture/api/layer/<layer>/elements",
    "login_required": true,
@@ -141578,7 +142018,7 @@
    ],
    "handler": "api_traceability_sankey",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 3407,
+   "handler_line": 3416,
    "has_parameters": false,
    "id": "archimate_crud.api_traceability_sankey /architecture/api/traceability/sankey",
    "login_required": true,
@@ -141601,7 +142041,7 @@
    ],
    "handler": "bulk_delete",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2645,
+   "handler_line": 2654,
    "has_parameters": true,
    "id": "archimate_crud.bulk_delete /architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/bulk-delete",
    "login_required": true,
@@ -141726,7 +142166,7 @@
    ],
    "handler": "create_element",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 1490,
+   "handler_line": 1499,
    "has_parameters": true,
    "id": "archimate_crud.create_element /architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/new",
    "login_required": true,
@@ -142003,7 +142443,7 @@
    ],
    "handler": "delete_check",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2342,
+   "handler_line": 2351,
    "has_parameters": true,
    "id": "archimate_crud.delete_check /architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/<int:element_id>/delete-check",
    "login_required": true,
@@ -142026,7 +142466,7 @@
    ],
    "handler": "delete_element",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2497,
+   "handler_line": 2506,
    "has_parameters": true,
    "id": "archimate_crud.delete_element /architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/<int:element_id>/delete",
    "login_required": true,
@@ -142154,7 +142594,7 @@
    ],
    "handler": "detail_element",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 1710,
+   "handler_line": 1719,
    "has_parameters": true,
    "id": "archimate_crud.detail_element /architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/<int:element_id>",
    "login_required": true,
@@ -142178,7 +142618,7 @@
    ],
    "handler": "element_relationships",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2800,
+   "handler_line": 2809,
    "has_parameters": true,
    "id": "archimate_crud.element_relationships /architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/<int:element_id>/relationships",
    "login_required": true,
@@ -142200,7 +142640,7 @@
    ],
    "handler": "export_elements",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2705,
+   "handler_line": 2714,
    "has_parameters": true,
    "id": "archimate_crud.export_elements /architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/export",
    "login_required": true,
@@ -142222,7 +142662,7 @@
    ],
    "handler": "export_product",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 1987,
+   "handler_line": 1996,
    "has_parameters": true,
    "id": "archimate_crud.export_product /architecture/products/<int:product_id>/export",
    "login_required": true,
@@ -142390,7 +142830,7 @@
    ],
    "handler": "list_elements",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 1341,
+   "handler_line": 1350,
    "has_parameters": true,
    "id": "archimate_crud.list_elements /architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>",
    "login_required": true,
@@ -142481,7 +142921,7 @@
    ],
    "handler": "remove_technology_cost",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2097,
+   "handler_line": 2106,
    "has_parameters": true,
    "id": "archimate_crud.remove_technology_cost /architecture/technology-costs/<int:element_id>/remove",
    "login_required": true,
@@ -142503,7 +142943,7 @@
    ],
    "handler": "repository_health",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 3400,
+   "handler_line": 3409,
    "has_parameters": false,
    "id": "archimate_crud.repository_health /architecture/health",
    "login_required": true,
@@ -142525,7 +142965,7 @@
    ],
    "handler": "scan_product_repositories",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 1918,
+   "handler_line": 1927,
    "has_parameters": true,
    "id": "archimate_crud.scan_product_repositories /architecture/products/<int:product_id>/repositories",
    "login_required": true,
@@ -142650,7 +143090,7 @@
    ],
    "handler": "update_element",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2185,
+   "handler_line": 2194,
    "has_parameters": true,
    "id": "archimate_crud.update_element /architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/<int:element_id>/edit",
    "login_required": true,
@@ -142675,7 +143115,7 @@
    ],
    "handler": "validate_archimate_element",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2623,
+   "handler_line": 2632,
    "has_parameters": true,
    "id": "archimate_crud.validate_archimate_element /architecture/api/archimate/elements/<int:element_id>/validate",
    "login_required": true,
@@ -142697,7 +143137,7 @@
    ],
    "handler": "validate_archimate_model",
    "handler_file": "app/modules/architecture/routes/archimate_crud/routes.py",
-   "handler_line": 2613,
+   "handler_line": 2622,
    "has_parameters": false,
    "id": "archimate_crud.validate_archimate_model /architecture/api/archimate/validate",
    "login_required": true,
@@ -153017,7 +153457,7 @@
    ],
    "handler": "billing_cancel",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 225,
+   "handler_line": 264,
    "has_parameters": false,
    "id": "billing.billing_cancel /admin/billing/cancel",
    "login_required": true,
@@ -153040,7 +153480,7 @@
    ],
    "handler": "billing_change_plan",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 195,
+   "handler_line": 234,
    "has_parameters": false,
    "id": "billing.billing_change_plan /admin/billing/change-plan",
    "login_required": true,
@@ -153063,7 +153503,7 @@
    ],
    "handler": "billing_checkout_complete",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 174,
+   "handler_line": 213,
    "has_parameters": false,
    "id": "billing.billing_checkout_complete /admin/billing/checkout/complete",
    "login_required": true,
@@ -153086,7 +153526,7 @@
    ],
    "handler": "billing_details",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 265,
+   "handler_line": 304,
    "has_parameters": false,
    "id": "billing.billing_details /admin/billing/details",
    "login_required": true,
@@ -153185,6 +153625,7 @@
     "app/templates/components/page_header.html",
     "app/templates/components/popover.html",
     "app/templates/components/see_how.html",
+    "app/templates/components/select.html",
     "app/templates/components/switch.html",
     "app/templates/components/table.html",
     "app/templates/components/toast-container.html",
@@ -153201,7 +153642,7 @@
    ],
    "handler": "billing_index",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 60,
+   "handler_line": 62,
    "has_parameters": false,
    "id": "billing.billing_index /admin/billing/",
    "login_required": true,
@@ -153226,7 +153667,7 @@
    ],
    "handler": "billing_portal",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 287,
+   "handler_line": 326,
    "has_parameters": false,
    "id": "billing.billing_portal /admin/billing/portal",
    "login_required": true,
@@ -153249,7 +153690,7 @@
    ],
    "handler": "billing_resume",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 245,
+   "handler_line": 284,
    "has_parameters": false,
    "id": "billing.billing_resume /admin/billing/resume",
    "login_required": true,
@@ -153265,6 +153706,29 @@
   {
    "blueprint": "billing",
    "closure": [],
+   "endpoint": "billing.billing_startup_credit",
+   "guards": [
+    "admin_required",
+    "login_required"
+   ],
+   "handler": "billing_startup_credit",
+   "handler_file": "app/modules/admin/billing_routes.py",
+   "handler_line": 148,
+   "has_parameters": false,
+   "id": "billing.billing_startup_credit /admin/billing/startup-credit",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/admin/billing/startup-credit",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "billing",
+   "closure": [],
    "endpoint": "billing.billing_upgrade",
    "guards": [
     "admin_required",
@@ -153272,7 +153736,7 @@
    ],
    "handler": "billing_upgrade",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 139,
+   "handler_line": 178,
    "has_parameters": false,
    "id": "billing.billing_upgrade /admin/billing/upgrade",
    "login_required": true,
@@ -153292,7 +153756,7 @@
    "guards": [],
    "handler": "billing_webhook",
    "handler_file": "app/modules/admin/billing_routes.py",
-   "handler_line": 306,
+   "handler_line": 345,
    "has_parameters": false,
    "id": "billing.billing_webhook /admin/billing/webhook",
    "login_required": false,
@@ -156047,7 +156511,7 @@
    ],
    "handler": "api_capability_traceability",
    "handler_file": "app/modules/capabilities/routes/roadmap_routes.py",
-   "handler_line": 2198,
+   "handler_line": 2199,
    "has_parameters": true,
    "id": "capability_map.api_capability_traceability /capability-map/api/capabilities/<int:capability_id>/traceability",
    "login_required": true,
@@ -156998,7 +157462,7 @@
    ],
    "handler": "api_roadmap_gap_link_plateau",
    "handler_file": "app/modules/capabilities/routes/roadmap_routes.py",
-   "handler_line": 2309,
+   "handler_line": 2310,
    "has_parameters": true,
    "id": "capability_map.api_roadmap_gap_link_plateau /capability-map/api/roadmap/gaps/<int:gap_id>/link-plateau/<int:plateau_id>",
    "login_required": true,
@@ -157021,7 +157485,7 @@
    ],
    "handler": "api_roadmap_gap_link_work_package",
    "handler_file": "app/modules/capabilities/routes/roadmap_routes.py",
-   "handler_line": 2378,
+   "handler_line": 2379,
    "has_parameters": true,
    "id": "capability_map.api_roadmap_gap_link_work_package /capability-map/api/roadmap/gaps/<int:gap_id>/link-work-package/<int:wp_id>",
    "login_required": true,
@@ -157044,7 +157508,7 @@
    ],
    "handler": "api_roadmap_gap_unlink_plateau",
    "handler_file": "app/modules/capabilities/routes/roadmap_routes.py",
-   "handler_line": 2340,
+   "handler_line": 2341,
    "has_parameters": true,
    "id": "capability_map.api_roadmap_gap_unlink_plateau /capability-map/api/roadmap/gaps/<int:gap_id>/unlink-plateau/<int:plateau_id>",
    "login_required": true,
@@ -157067,7 +157531,7 @@
    ],
    "handler": "api_roadmap_gap_unlink_work_package",
    "handler_file": "app/modules/capabilities/routes/roadmap_routes.py",
-   "handler_line": 2407,
+   "handler_line": 2408,
    "has_parameters": true,
    "id": "capability_map.api_roadmap_gap_unlink_work_package /capability-map/api/roadmap/gaps/<int:gap_id>/unlink-work-package/<int:wp_id>",
    "login_required": true,
@@ -157111,7 +157575,7 @@
    ],
    "handler": "api_roadmap_gaps_not_addressed",
    "handler_file": "app/modules/capabilities/routes/roadmap_routes.py",
-   "handler_line": 2458,
+   "handler_line": 2459,
    "has_parameters": false,
    "id": "capability_map.api_roadmap_gaps_not_addressed /capability-map/api/roadmap/gaps/not-addressed",
    "login_required": true,
@@ -157133,7 +157597,7 @@
    ],
    "handler": "api_roadmap_gaps_search",
    "handler_file": "app/modules/capabilities/routes/roadmap_routes.py",
-   "handler_line": 2428,
+   "handler_line": 2429,
    "has_parameters": false,
    "id": "capability_map.api_roadmap_gaps_search /capability-map/api/roadmap/gaps/search",
    "login_required": true,
@@ -157287,7 +157751,7 @@
    ],
    "handler": "api_roadmap_work_packages_search",
    "handler_file": "app/modules/capabilities/routes/roadmap_routes.py",
-   "handler_line": 2446,
+   "handler_line": 2447,
    "has_parameters": false,
    "id": "capability_map.api_roadmap_work_packages_search /capability-map/api/roadmap/work-packages/search",
    "login_required": true,
@@ -171143,7 +171607,7 @@
    ],
    "handler": "ai_architecture_analysis",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 955,
+   "handler_line": 976,
    "has_parameters": false,
    "id": "enterprise.ai_architecture_analysis /enterprise/analysis/ai-architecture",
    "login_required": true,
@@ -171167,7 +171631,7 @@
    ],
    "handler": "api_bulk_delete_work_packages",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 821,
+   "handler_line": 802,
    "has_parameters": false,
    "id": "enterprise.api_bulk_delete_work_packages /enterprise/api/work-packages/bulk",
    "login_required": true,
@@ -171189,7 +171653,7 @@
    ],
    "handler": "api_create_work_package",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 772,
+   "handler_line": 753,
    "has_parameters": false,
    "id": "enterprise.api_create_work_package /enterprise/api/work-packages",
    "login_required": true,
@@ -171233,7 +171697,7 @@
    ],
    "handler": "api_delete_work_package",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 846,
+   "handler_line": 827,
    "has_parameters": true,
    "id": "enterprise.api_delete_work_package /enterprise/api/work-packages/<int:wp_id>",
    "login_required": true,
@@ -171255,7 +171719,7 @@
    ],
    "handler": "api_list_work_packages",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 554,
+   "handler_line": 535,
    "has_parameters": false,
    "id": "enterprise.api_list_work_packages /enterprise/api/work-packages",
    "login_required": true,
@@ -171321,7 +171785,7 @@
    ],
    "handler": "api_update_work_package",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 798,
+   "handler_line": 779,
    "has_parameters": true,
    "id": "enterprise.api_update_work_package /enterprise/api/work-packages/<int:wp_id>",
    "login_required": true,
@@ -171343,7 +171807,7 @@
    ],
    "handler": "api_work_packages_gantt",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 653,
+   "handler_line": 634,
    "has_parameters": false,
    "id": "enterprise.api_work_packages_gantt /enterprise/api/work-packages/gantt",
    "login_required": true,
@@ -171810,7 +172274,7 @@
    ],
    "handler": "enterprise_dashboard",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 1275,
+   "handler_line": 1306,
    "has_parameters": false,
    "id": "enterprise.enterprise_dashboard /enterprise/",
    "login_required": true,
@@ -171931,7 +172395,7 @@
    ],
    "handler": "gap_analysis",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 898,
+   "handler_line": 883,
    "has_parameters": false,
    "id": "enterprise.gap_analysis /enterprise/implementation/gap-analysis",
    "login_required": true,
@@ -172031,6 +172495,7 @@
     "app/templates/components/list_table.html",
     "app/templates/components/page_guide_drawer.html",
     "app/templates/components/popover.html",
+    "app/templates/components/priority_actions.html",
     "app/templates/components/provenance.html",
     "app/templates/components/see_how.html",
     "app/templates/components/switch.html",
@@ -172050,7 +172515,7 @@
    ],
    "handler": "impact_analysis",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 1038,
+   "handler_line": 1061,
    "has_parameters": false,
    "id": "enterprise.impact_analysis /enterprise/analysis/impact-analysis",
    "login_required": true,
@@ -172074,7 +172539,7 @@
    ],
    "handler": "impact_analysis_save",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 1153,
+   "handler_line": 1184,
    "has_parameters": false,
    "id": "enterprise.impact_analysis_save /enterprise/analysis/impact-analysis/save",
    "login_required": true,
@@ -172211,7 +172676,7 @@
    ],
    "handler": "plateaus",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 864,
+   "handler_line": 845,
    "has_parameters": false,
    "id": "enterprise.plateaus /enterprise/implementation/plateaus",
    "login_required": true,
@@ -172327,7 +172792,7 @@
    ],
    "handler": "process_optimization",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 1174,
+   "handler_line": 1205,
    "has_parameters": false,
    "id": "enterprise.process_optimization /enterprise/analysis/process-optimization",
    "login_required": true,
@@ -172344,99 +172809,7 @@
   },
   {
    "blueprint": "enterprise",
-   "closure": [
-    "app/templates/basecoat/accordion.html",
-    "app/templates/basecoat/alert-dialog.html",
-    "app/templates/basecoat/alert.html",
-    "app/templates/basecoat/aspect-ratio.html",
-    "app/templates/basecoat/attachment.html",
-    "app/templates/basecoat/avatar.html",
-    "app/templates/basecoat/badge.html",
-    "app/templates/basecoat/breadcrumb.html",
-    "app/templates/basecoat/bubble.html",
-    "app/templates/basecoat/button-group.html",
-    "app/templates/basecoat/button.html",
-    "app/templates/basecoat/calendar.html",
-    "app/templates/basecoat/card.html",
-    "app/templates/basecoat/carousel.html",
-    "app/templates/basecoat/chart.html",
-    "app/templates/basecoat/checkbox.html",
-    "app/templates/basecoat/code-block.html",
-    "app/templates/basecoat/collapsible.html",
-    "app/templates/basecoat/combobox.html",
-    "app/templates/basecoat/command.html",
-    "app/templates/basecoat/context-menu.html",
-    "app/templates/basecoat/dialog.html",
-    "app/templates/basecoat/direction.html",
-    "app/templates/basecoat/drawer.html",
-    "app/templates/basecoat/dropdown-menu.html",
-    "app/templates/basecoat/empty.html",
-    "app/templates/basecoat/field.html",
-    "app/templates/basecoat/form.html",
-    "app/templates/basecoat/hover-card.html",
-    "app/templates/basecoat/index.html",
-    "app/templates/basecoat/input-group.html",
-    "app/templates/basecoat/input-otp.html",
-    "app/templates/basecoat/input.html",
-    "app/templates/basecoat/item.html",
-    "app/templates/basecoat/kbd.html",
-    "app/templates/basecoat/label.html",
-    "app/templates/basecoat/marker.html",
-    "app/templates/basecoat/menubar.html",
-    "app/templates/basecoat/message-scroller.html",
-    "app/templates/basecoat/message.html",
-    "app/templates/basecoat/native-select.html",
-    "app/templates/basecoat/navigation-menu.html",
-    "app/templates/basecoat/pagination.html",
-    "app/templates/basecoat/popover.html",
-    "app/templates/basecoat/progress.html",
-    "app/templates/basecoat/questionnaire.html",
-    "app/templates/basecoat/radio-group.html",
-    "app/templates/basecoat/resizable.html",
-    "app/templates/basecoat/scroll-area.html",
-    "app/templates/basecoat/select.html",
-    "app/templates/basecoat/separator.html",
-    "app/templates/basecoat/sheet.html",
-    "app/templates/basecoat/sidebar.html",
-    "app/templates/basecoat/skeleton.html",
-    "app/templates/basecoat/slider.html",
-    "app/templates/basecoat/spinner.html",
-    "app/templates/basecoat/switch.html",
-    "app/templates/basecoat/table.html",
-    "app/templates/basecoat/tabs.html",
-    "app/templates/basecoat/textarea.html",
-    "app/templates/basecoat/toast.html",
-    "app/templates/basecoat/toggle-group.html",
-    "app/templates/basecoat/toggle.html",
-    "app/templates/basecoat/tooltip.html",
-    "app/templates/basecoat/trace.html",
-    "app/templates/components/_breadcrumb_root.html",
-    "app/templates/components/admin_header.html",
-    "app/templates/components/admin_sidebar.html",
-    "app/templates/components/alert.html",
-    "app/templates/components/badge.html",
-    "app/templates/components/breadcrumb_nav.html",
-    "app/templates/components/button.html",
-    "app/templates/components/card.html",
-    "app/templates/components/dialog.html",
-    "app/templates/components/drawer.html",
-    "app/templates/components/dropdown_menu.html",
-    "app/templates/components/empty_state.html",
-    "app/templates/components/input.html",
-    "app/templates/components/metrics_card.html",
-    "app/templates/components/page_guide_drawer.html",
-    "app/templates/components/page_header.html",
-    "app/templates/components/popover.html",
-    "app/templates/components/see_how.html",
-    "app/templates/components/switch.html",
-    "app/templates/components/toast-container.html",
-    "app/templates/components/ui_sidebar.html",
-    "app/templates/enterprise/risk_assessment.html",
-    "app/templates/layouts/admin_base.html",
-    "app/templates/partials/_data_load_error.html",
-    "app/templates/partials/_head.html",
-    "app/templates/partials/_scripts_common.html"
-   ],
+   "closure": [],
    "endpoint": "enterprise.risk_assessment",
    "guards": [
     "login_required"
@@ -172450,12 +172823,10 @@
    "methods": [
     "GET"
    ],
-   "page": true,
+   "page": false,
    "rule": "/enterprise/strategic/risk-assessment",
    "template_unresolved": [],
-   "templates": [
-    "app/templates/enterprise/risk_assessment.html"
-   ],
+   "templates": [],
    "templates_missing": []
   },
   {
@@ -172721,7 +173092,7 @@
    ],
    "handler": "technology_roadmap",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 499,
+   "handler_line": 480,
    "has_parameters": false,
    "id": "enterprise.technology_roadmap /enterprise/strategic/technology-roadmap",
    "login_required": true,
@@ -172838,7 +173209,7 @@
    ],
    "handler": "work_packages",
    "handler_file": "app/routes/unified_enterprise_routes.py",
-   "handler_line": 506,
+   "handler_line": 487,
    "has_parameters": false,
    "id": "enterprise.work_packages /enterprise/implementation/work-packages",
    "login_required": true,
@@ -181308,7 +181679,7 @@
    ],
    "handler": "api_create_deliverable",
    "handler_file": "app/implementation_planning/routes.py",
-   "handler_line": 1020,
+   "handler_line": 1023,
    "has_parameters": false,
    "id": "implementation_planning.api_create_deliverable /implementation/api/deliverables",
    "login_required": true,
@@ -181396,7 +181767,7 @@
    ],
    "handler": "api_deliverables",
    "handler_file": "app/implementation_planning/routes.py",
-   "handler_line": 1005,
+   "handler_line": 1008,
    "has_parameters": false,
    "id": "implementation_planning.api_deliverables /implementation/api/deliverables",
    "login_required": true,
@@ -181418,7 +181789,7 @@
    ],
    "handler": "api_discover_gaps",
    "handler_file": "app/implementation_planning/routes.py",
-   "handler_line": 924,
+   "handler_line": 927,
    "has_parameters": false,
    "id": "implementation_planning.api_discover_gaps /implementation/api/gaps/discover",
    "login_required": true,
@@ -181462,7 +181833,7 @@
    ],
    "handler": "api_plateaus",
    "handler_file": "app/implementation_planning/routes.py",
-   "handler_line": 1094,
+   "handler_line": 1097,
    "has_parameters": false,
    "id": "implementation_planning.api_plateaus /implementation/api/plateaus",
    "login_required": true,
@@ -181484,7 +181855,7 @@
    ],
    "handler": "api_roadmap_data",
    "handler_file": "app/implementation_planning/routes.py",
-   "handler_line": 1143,
+   "handler_line": 1146,
    "has_parameters": false,
    "id": "implementation_planning.api_roadmap_data /implementation/api/roadmap-data",
    "login_required": true,
@@ -181506,7 +181877,7 @@
    ],
    "handler": "api_roadmap_timeline",
    "handler_file": "app/implementation_planning/routes.py",
-   "handler_line": 1223,
+   "handler_line": 1226,
    "has_parameters": false,
    "id": "implementation_planning.api_roadmap_timeline /implementation/api/roadmap-timeline",
    "login_required": true,
@@ -181849,7 +182220,7 @@
    ],
    "handler": "deliverables_list",
    "handler_file": "app/implementation_planning/routes.py",
-   "handler_line": 955,
+   "handler_line": 958,
    "has_parameters": false,
    "id": "implementation_planning.deliverables_list /implementation/deliverables",
    "login_required": true,
@@ -182011,7 +182382,7 @@
    ],
    "handler": "estimate_duration",
    "handler_file": "app/implementation_planning/routes.py",
-   "handler_line": 1354,
+   "handler_line": 1357,
    "has_parameters": false,
    "id": "implementation_planning.estimate_duration /implementation/api/estimate-duration",
    "login_required": true,
@@ -182033,7 +182404,7 @@
    ],
    "handler": "estimation_accuracy",
    "handler_file": "app/implementation_planning/routes.py",
-   "handler_line": 1384,
+   "handler_line": 1387,
    "has_parameters": false,
    "id": "implementation_planning.estimation_accuracy /implementation/api/estimation-accuracy",
    "login_required": true,
@@ -182293,7 +182664,7 @@
    ],
    "handler": "generate_report",
    "handler_file": "app/implementation_planning/routes.py",
-   "handler_line": 1292,
+   "handler_line": 1295,
    "has_parameters": false,
    "id": "implementation_planning.generate_report /implementation/reports/generate",
    "login_required": true,
@@ -182526,7 +182897,7 @@
    ],
    "handler": "plateaus_list",
    "handler_file": "app/implementation_planning/routes.py",
-   "handler_line": 1073,
+   "handler_line": 1076,
    "has_parameters": false,
    "id": "implementation_planning.plateaus_list /implementation/plateaus",
    "login_required": true,
@@ -188786,6 +189157,7 @@
     "app/templates/components/dropdown_menu.html",
     "app/templates/components/empty_state.html",
     "app/templates/components/input.html",
+    "app/templates/components/list_table.html",
     "app/templates/components/page_guide_drawer.html",
     "app/templates/components/popover.html",
     "app/templates/components/provenance.html",
@@ -188921,7 +189293,7 @@
    ],
    "handler": "create_capability_work_package",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 622,
+   "handler_line": 633,
    "has_parameters": false,
    "id": "main.create_capability_work_package /api/capability-work-packages",
    "login_required": true,
@@ -188965,7 +189337,7 @@
    ],
    "handler": "create_work_package_deliverable",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 1010,
+   "handler_line": 1021,
    "has_parameters": true,
    "id": "main.create_work_package_deliverable /api/capability-work-packages/<int:wp_id>/deliverables",
    "login_required": true,
@@ -188987,7 +189359,7 @@
    ],
    "handler": "create_work_package_task",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 847,
+   "handler_line": 858,
    "has_parameters": true,
    "id": "main.create_work_package_task /api/capability-work-packages/<int:wp_id>/tasks",
    "login_required": true,
@@ -189189,7 +189561,7 @@
    ],
    "handler": "delete_capability_work_package",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 780,
+   "handler_line": 791,
    "has_parameters": true,
    "id": "main.delete_capability_work_package /api/capability-work-packages/<int:wp_id>",
    "login_required": true,
@@ -189233,7 +189605,7 @@
    ],
    "handler": "delete_work_package_deliverable",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 1092,
+   "handler_line": 1103,
    "has_parameters": true,
    "id": "main.delete_work_package_deliverable /api/capability-work-packages/<int:wp_id>/deliverables/<int:deliverable_id>",
    "login_required": true,
@@ -189255,7 +189627,7 @@
    ],
    "handler": "delete_work_package_task",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 949,
+   "handler_line": 960,
    "has_parameters": true,
    "id": "main.delete_work_package_task /api/capability-work-packages/<int:wp_id>/tasks/<int:task_id>",
    "login_required": true,
@@ -191266,7 +191638,7 @@
    ],
    "handler": "get_capability_work_packages",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 460,
+   "handler_line": 471,
    "has_parameters": false,
    "id": "main.get_capability_work_packages /api/capability-work-packages",
    "login_required": true,
@@ -191537,7 +191909,7 @@
    ],
    "handler": "get_work_package_deliverables",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 977,
+   "handler_line": 988,
    "has_parameters": true,
    "id": "main.get_work_package_deliverables /api/capability-work-packages/<int:wp_id>/deliverables",
    "login_required": true,
@@ -191559,7 +191931,7 @@
    ],
    "handler": "get_work_package_details",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 1123,
+   "handler_line": 1134,
    "has_parameters": true,
    "id": "main.get_work_package_details /api/capability-work-packages/<int:wp_id>/details",
    "login_required": true,
@@ -191581,7 +191953,7 @@
    ],
    "handler": "get_work_package_tasks",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 814,
+   "handler_line": 825,
    "has_parameters": true,
    "id": "main.get_work_package_tasks /api/capability-work-packages/<int:wp_id>/tasks",
    "login_required": true,
@@ -191718,7 +192090,7 @@
    ],
    "handler": "hybrid_roadmap_redirect",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 444,
+   "handler_line": 455,
    "has_parameters": false,
    "id": "main.hybrid_roadmap_redirect /hybrid-roadmap",
    "login_required": true,
@@ -193112,7 +193484,7 @@
    ],
    "handler": "technology_roadmap_redirect",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 451,
+   "handler_line": 462,
    "has_parameters": false,
    "id": "main.technology_roadmap_redirect /technology-roadmap",
    "login_required": true,
@@ -193336,7 +193708,7 @@
    ],
    "handler": "update_capability_work_package",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 709,
+   "handler_line": 720,
    "has_parameters": true,
    "id": "main.update_capability_work_package /api/capability-work-packages/<int:wp_id>",
    "login_required": true,
@@ -193380,7 +193752,7 @@
    ],
    "handler": "update_work_package_deliverable",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 1055,
+   "handler_line": 1066,
    "has_parameters": true,
    "id": "main.update_work_package_deliverable /api/capability-work-packages/<int:wp_id>/deliverables/<int:deliverable_id>",
    "login_required": true,
@@ -193402,7 +193774,7 @@
    ],
    "handler": "update_work_package_task",
    "handler_file": "app/main/routes_capability_roadmap.py",
-   "handler_line": 896,
+   "handler_line": 907,
    "has_parameters": true,
    "id": "main.update_work_package_task /api/capability-work-packages/<int:wp_id>/tasks/<int:task_id>",
    "login_required": true,
@@ -200205,7 +200577,7 @@
    ],
    "handler": "risk_heat_map_page",
    "handler_file": "app/modules/architecture/routes/risk_routes.py",
-   "handler_line": 646,
+   "handler_line": 659,
    "has_parameters": true,
    "id": "risk.risk_heat_map_page /solutions/<int:solution_id>/risks",
    "login_required": true,
@@ -200229,7 +200601,7 @@
    ],
    "handler": "risk_loss_save",
    "handler_file": "app/modules/architecture/routes/risk_routes.py",
-   "handler_line": 619,
+   "handler_line": 632,
    "has_parameters": true,
    "id": "risk.risk_loss_save /risks/<int:risk_id>/loss",
    "login_required": true,
@@ -200343,7 +200715,7 @@
    ],
    "handler": "risk_page",
    "handler_file": "app/modules/architecture/routes/risk_routes.py",
-   "handler_line": 593,
+   "handler_line": 606,
    "has_parameters": true,
    "id": "risk.risk_page /risks/<int:risk_id>",
    "login_required": true,
@@ -200622,7 +200994,7 @@
    ],
    "handler": "create_gap",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1048,
+   "handler_line": 1049,
    "has_parameters": false,
    "id": "roadmap_api.create_gap /api/roadmap/gaps",
    "login_required": true,
@@ -200644,7 +201016,7 @@
    ],
    "handler": "create_plateau",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1199,
+   "handler_line": 1200,
    "has_parameters": false,
    "id": "roadmap_api.create_plateau /api/roadmap/plateaus",
    "login_required": true,
@@ -200732,7 +201104,7 @@
    ],
    "handler": "detect_conflicts",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1418,
+   "handler_line": 1419,
    "has_parameters": false,
    "id": "roadmap_api.detect_conflicts /api/roadmap/automation/detect-conflicts",
    "login_required": true,
@@ -200754,7 +201126,7 @@
    ],
    "handler": "generate_archimate_roadmap",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1655,
+   "handler_line": 1656,
    "has_parameters": false,
    "id": "roadmap_api.generate_archimate_roadmap /api/roadmap/archimate/generate-roadmap",
    "login_required": true,
@@ -200776,7 +201148,7 @@
    ],
    "handler": "generate_single_gap_roadmap",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1790,
+   "handler_line": 1791,
    "has_parameters": true,
    "id": "roadmap_api.generate_single_gap_roadmap /api/roadmap/archimate/generate-single-gap/<int:gap_id>",
    "login_required": true,
@@ -200798,7 +201170,7 @@
    ],
    "handler": "generate_work_packages",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1288,
+   "handler_line": 1289,
    "has_parameters": false,
    "id": "roadmap_api.generate_work_packages /api/roadmap/automation/generate-work-packages",
    "login_required": true,
@@ -200864,7 +201236,7 @@
    ],
    "handler": "get_plateaus",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1152,
+   "handler_line": 1153,
    "has_parameters": false,
    "id": "roadmap_api.get_plateaus /api/roadmap/plateaus",
    "login_required": true,
@@ -200886,7 +201258,7 @@
    ],
    "handler": "get_statistics",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1543,
+   "handler_line": 1544,
    "has_parameters": false,
    "id": "roadmap_api.get_statistics /api/roadmap/statistics",
    "login_required": true,
@@ -200952,7 +201324,7 @@
    ],
    "handler": "optimize_timeline",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1356,
+   "handler_line": 1357,
    "has_parameters": false,
    "id": "roadmap_api.optimize_timeline /api/roadmap/automation/optimize-timeline",
    "login_required": true,
@@ -200974,7 +201346,7 @@
    ],
    "handler": "preview_archimate_roadmap",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1730,
+   "handler_line": 1731,
    "has_parameters": false,
    "id": "roadmap_api.preview_archimate_roadmap /api/roadmap/archimate/preview-roadmap",
    "login_required": true,
@@ -200996,7 +201368,7 @@
    ],
    "handler": "sync_applications",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1506,
+   "handler_line": 1507,
    "has_parameters": false,
    "id": "roadmap_api.sync_applications /api/roadmap/sync/applications",
    "login_required": true,
@@ -201018,7 +201390,7 @@
    ],
    "handler": "sync_capabilities",
    "handler_file": "app/modules/solutions_strategic/v2/routes/roadmap_api.py",
-   "handler_line": 1471,
+   "handler_line": 1472,
    "has_parameters": false,
    "id": "roadmap_api.sync_capabilities /api/roadmap/sync/capabilities",
    "login_required": true,
@@ -217327,7 +217699,7 @@
    ],
    "handler": "api_check_compliance",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 776,
+   "handler_line": 779,
    "has_parameters": false,
    "id": "strategic.api_check_compliance /strategic/api/check-compliance",
    "login_required": true,
@@ -217349,7 +217721,7 @@
    ],
    "handler": "api_compliance_analysis",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 656,
+   "handler_line": 659,
    "has_parameters": false,
    "id": "strategic.api_compliance_analysis /strategic/api/compliance-analysis",
    "login_required": true,
@@ -217371,7 +217743,7 @@
    ],
    "handler": "api_create_health_override",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 937,
+   "handler_line": 940,
    "has_parameters": false,
    "id": "strategic.api_create_health_override /strategic/api/capability-health/overrides",
    "login_required": true,
@@ -217393,7 +217765,7 @@
    ],
    "handler": "api_create_initiative_from_health",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 800,
+   "handler_line": 803,
    "has_parameters": false,
    "id": "strategic.api_create_initiative_from_health /strategic/api/initiatives/from-health",
    "login_required": true,
@@ -217415,7 +217787,7 @@
    ],
    "handler": "api_create_initiative_from_impact",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 887,
+   "handler_line": 890,
    "has_parameters": false,
    "id": "strategic.api_create_initiative_from_impact /strategic/api/initiatives/from-impact",
    "login_required": true,
@@ -217437,7 +217809,7 @@
    ],
    "handler": "api_create_initiative_from_investment",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 829,
+   "handler_line": 832,
    "has_parameters": false,
    "id": "strategic.api_create_initiative_from_investment /strategic/api/initiatives/from-investment",
    "login_required": true,
@@ -217459,7 +217831,7 @@
    ],
    "handler": "api_create_initiative_from_risk",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 858,
+   "handler_line": 861,
    "has_parameters": false,
    "id": "strategic.api_create_initiative_from_risk /strategic/api/initiatives/from-risk",
    "login_required": true,
@@ -217481,7 +217853,7 @@
    ],
    "handler": "api_delete_health_override",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 1098,
+   "handler_line": 1101,
    "has_parameters": true,
    "id": "strategic.api_delete_health_override /strategic/api/capability-health/overrides/<int:override_id>",
    "login_required": true,
@@ -217504,7 +217876,7 @@
    ],
    "handler": "api_delete_scenario",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 520,
+   "handler_line": 523,
    "has_parameters": true,
    "id": "strategic.api_delete_scenario /strategic/api/scenarios/<scenario_id>",
    "login_required": true,
@@ -217526,7 +217898,7 @@
    ],
    "handler": "api_dependency_analysis",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 689,
+   "handler_line": 692,
    "has_parameters": false,
    "id": "strategic.api_dependency_analysis /strategic/api/dependency-analysis",
    "login_required": true,
@@ -217548,7 +217920,7 @@
    ],
    "handler": "api_export_scenarios_csv",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 532,
+   "handler_line": 535,
    "has_parameters": false,
    "id": "strategic.api_export_scenarios_csv /strategic/api/scenarios/export.csv",
    "login_required": true,
@@ -217570,7 +217942,7 @@
    ],
    "handler": "api_generate_recommendations",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 1129,
+   "handler_line": 1132,
    "has_parameters": true,
    "id": "strategic.api_generate_recommendations /strategic/api/recommendations/<dashboard>",
    "login_required": true,
@@ -217592,7 +217964,7 @@
    ],
    "handler": "api_get_arb_portfolio_summary",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 1455,
+   "handler_line": 1458,
    "has_parameters": false,
    "id": "strategic.api_get_arb_portfolio_summary /strategic/api/arb/portfolio-summary",
    "login_required": true,
@@ -217614,7 +217986,7 @@
    ],
    "handler": "api_get_capability_arb_status",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 1384,
+   "handler_line": 1387,
    "has_parameters": true,
    "id": "strategic.api_get_capability_arb_status /strategic/api/arb/capability-status/<int:capability_id>",
    "login_required": true,
@@ -217636,7 +218008,7 @@
    ],
    "handler": "api_get_health_override",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 1032,
+   "handler_line": 1035,
    "has_parameters": true,
    "id": "strategic.api_get_health_override /strategic/api/capability-health/overrides/<int:override_id>",
    "login_required": true,
@@ -217658,7 +218030,7 @@
    ],
    "handler": "api_get_recommendations",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 1267,
+   "handler_line": 1270,
    "has_parameters": true,
    "id": "strategic.api_get_recommendations /strategic/api/recommendations/<dashboard>",
    "login_required": true,
@@ -217680,7 +218052,7 @@
    ],
    "handler": "api_governance_analysis",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 742,
+   "handler_line": 745,
    "has_parameters": false,
    "id": "strategic.api_governance_analysis /strategic/api/governance-analysis",
    "login_required": true,
@@ -217702,7 +218074,7 @@
    ],
    "handler": "api_impact_analysis",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 289,
+   "handler_line": 292,
    "has_parameters": false,
    "id": "strategic.api_impact_analysis /strategic/api/impact-analysis",
    "login_required": true,
@@ -217724,7 +218096,7 @@
    ],
    "handler": "api_impact_analysis_history",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 553,
+   "handler_line": 556,
    "has_parameters": false,
    "id": "strategic.api_impact_analysis_history /strategic/api/impact-analysis/history",
    "login_required": true,
@@ -217768,7 +218140,7 @@
    ],
    "handler": "api_list_health_overrides",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 1003,
+   "handler_line": 1006,
    "has_parameters": false,
    "id": "strategic.api_list_health_overrides /strategic/api/capability-health/overrides",
    "login_required": true,
@@ -217790,7 +218162,7 @@
    ],
    "handler": "api_list_scenarios",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 426,
+   "handler_line": 429,
    "has_parameters": false,
    "id": "strategic.api_list_scenarios /strategic/api/scenarios",
    "login_required": true,
@@ -217812,7 +218184,7 @@
    ],
    "handler": "api_portfolio_impact",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 574,
+   "handler_line": 577,
    "has_parameters": false,
    "id": "strategic.api_portfolio_impact /strategic/api/portfolio-impact",
    "login_required": true,
@@ -217834,7 +218206,7 @@
    ],
    "handler": "api_process_analysis",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 616,
+   "handler_line": 619,
    "has_parameters": false,
    "id": "strategic.api_process_analysis /strategic/api/process-analysis",
    "login_required": true,
@@ -217856,7 +218228,7 @@
    ],
    "handler": "api_rate_recommendation",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 1202,
+   "handler_line": 1205,
    "has_parameters": true,
    "id": "strategic.api_rate_recommendation /strategic/api/recommendations/<int:rec_id>/rate",
    "login_required": true,
@@ -217879,7 +218251,7 @@
    ],
    "handler": "api_rename_scenario",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 501,
+   "handler_line": 504,
    "has_parameters": true,
    "id": "strategic.api_rename_scenario /strategic/api/scenarios/<scenario_id>",
    "login_required": true,
@@ -217901,7 +218273,7 @@
    ],
    "handler": "api_risk_analysis",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 256,
+   "handler_line": 259,
    "has_parameters": false,
    "id": "strategic.api_risk_analysis /strategic/api/risk-analysis",
    "login_required": true,
@@ -217924,7 +218296,7 @@
    ],
    "handler": "api_save_scenario",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 438,
+   "handler_line": 441,
    "has_parameters": false,
    "id": "strategic.api_save_scenario /strategic/api/scenarios",
    "login_required": true,
@@ -217946,7 +218318,7 @@
    ],
    "handler": "api_simulation",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 371,
+   "handler_line": 374,
    "has_parameters": false,
    "id": "strategic.api_simulation /strategic/api/simulations",
    "login_required": true,
@@ -217968,7 +218340,7 @@
    ],
    "handler": "api_submit_capability_to_arb",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 1323,
+   "handler_line": 1326,
    "has_parameters": true,
    "id": "strategic.api_submit_capability_to_arb /strategic/api/arb/submit-capability/<int:capability_id>",
    "login_required": true,
@@ -217990,7 +218362,7 @@
    ],
    "handler": "api_submit_review",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 755,
+   "handler_line": 758,
    "has_parameters": false,
    "id": "strategic.api_submit_review /strategic/api/submit-review",
    "login_required": true,
@@ -218012,7 +218384,7 @@
    ],
    "handler": "api_sync_arb_decision",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 1418,
+   "handler_line": 1421,
    "has_parameters": true,
    "id": "strategic.api_sync_arb_decision /strategic/api/arb/sync-decision/<int:review_id>",
    "login_required": true,
@@ -218034,7 +218406,7 @@
    ],
    "handler": "api_technology_analysis",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 708,
+   "handler_line": 711,
    "has_parameters": false,
    "id": "strategic.api_technology_analysis /strategic/api/technology-analysis",
    "login_required": true,
@@ -218056,7 +218428,7 @@
    ],
    "handler": "api_update_health_override",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 1049,
+   "handler_line": 1052,
    "has_parameters": true,
    "id": "strategic.api_update_health_override /strategic/api/capability-health/overrides/<int:override_id>",
    "login_required": true,
@@ -218170,7 +218542,7 @@
    ],
    "handler": "architecture_governance",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 720,
+   "handler_line": 723,
    "has_parameters": false,
    "id": "strategic.architecture_governance /strategic/architecture-governance",
    "login_required": true,
@@ -218408,7 +218780,7 @@
    ],
    "handler": "compliance_tracking",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 628,
+   "handler_line": 631,
    "has_parameters": false,
    "id": "strategic.compliance_tracking /strategic/compliance-tracking",
    "login_required": true,
@@ -218524,7 +218896,7 @@
    ],
    "handler": "dependency_visualization",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 668,
+   "handler_line": 671,
    "has_parameters": false,
    "id": "strategic.dependency_visualization /strategic/dependency-visualization",
    "login_required": true,
@@ -218645,7 +219017,7 @@
    ],
    "handler": "impact_analysis",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 268,
+   "handler_line": 271,
    "has_parameters": false,
    "id": "strategic.impact_analysis /strategic/impact-analysis",
    "login_required": true,
@@ -218882,7 +219254,7 @@
    ],
    "handler": "process_optimization",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 594,
+   "handler_line": 597,
    "has_parameters": false,
    "id": "strategic.process_optimization /strategic/process-optimization",
    "login_required": true,
@@ -219027,7 +219399,7 @@
    ],
    "handler": "technology_roadmap",
    "handler_file": "app/modules/solutions_strategic/v2/routes/strategic_routes.py",
-   "handler_line": 701,
+   "handler_line": 704,
    "has_parameters": false,
    "id": "strategic.technology_roadmap /strategic/technology-roadmap",
    "login_required": true,
@@ -221188,7 +221560,7 @@
    ],
    "handler": "approve_tool_action",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1605,
+   "handler_line": 1654,
    "has_parameters": true,
    "id": "unified_ai_chat.approve_tool_action /ai-chat/tools/approve/<int:approval_id>",
    "login_required": true,
@@ -221474,7 +221846,7 @@
    ],
    "handler": "business_output_view",
    "handler_file": "app/modules/ai_chat/routes/chat_views.py",
-   "handler_line": 253,
+   "handler_line": 269,
    "has_parameters": false,
    "id": "unified_ai_chat.business_output_view /ai-chat/business-output",
    "login_required": true,
@@ -221519,7 +221891,7 @@
    ],
    "handler": "clear_chat_history",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1362,
+   "handler_line": 1411,
    "has_parameters": false,
    "id": "unified_ai_chat.clear_chat_history /ai-chat/history/clear",
    "login_required": true,
@@ -221589,7 +221961,7 @@
    ],
    "handler": "confirm_application_change",
    "handler_file": "app/modules/ai_chat/routes/estate_answer_routes.py",
-   "handler_line": 170,
+   "handler_line": 173,
    "has_parameters": false,
    "id": "unified_ai_chat.confirm_application_change /ai-chat/application-change/confirm",
    "login_required": true,
@@ -221723,7 +222095,7 @@
    ],
    "handler": "delete_conversation_thread",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1514,
+   "handler_line": 1563,
    "has_parameters": true,
    "id": "unified_ai_chat.delete_conversation_thread /ai-chat/threads/<thread_id>",
    "login_required": true,
@@ -221789,7 +222161,7 @@
    ],
    "handler": "document_upload_view",
    "handler_file": "app/modules/ai_chat/routes/chat_views.py",
-   "handler_line": 240,
+   "handler_line": 256,
    "has_parameters": false,
    "id": "unified_ai_chat.document_upload_view /ai-chat/document-upload",
    "login_required": true,
@@ -221921,7 +222293,7 @@
    ],
    "handler": "entity_matching_view",
    "handler_file": "app/modules/ai_chat/routes/chat_views.py",
-   "handler_line": 262,
+   "handler_line": 278,
    "has_parameters": false,
    "id": "unified_ai_chat.entity_matching_view /ai-chat/entity-matching",
    "login_required": true,
@@ -221945,7 +222317,7 @@
    ],
    "handler": "estate_answer",
    "handler_file": "app/modules/ai_chat/routes/estate_answer_routes.py",
-   "handler_line": 346,
+   "handler_line": 349,
    "has_parameters": false,
    "id": "unified_ai_chat.estate_answer /ai-chat/estate-answer",
    "login_required": true,
@@ -222365,7 +222737,7 @@
    ],
    "handler": "get_auto_execute",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1666,
+   "handler_line": 1715,
    "has_parameters": false,
    "id": "unified_ai_chat.get_auto_execute /ai-chat/session/auto-execute",
    "login_required": true,
@@ -222387,7 +222759,7 @@
    ],
    "handler": "get_available_domains",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1204,
+   "handler_line": 1253,
    "has_parameters": false,
    "id": "unified_ai_chat.get_available_domains /ai-chat/domains",
    "login_required": true,
@@ -222431,7 +222803,7 @@
    ],
    "handler": "get_available_personas",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1218,
+   "handler_line": 1267,
    "has_parameters": false,
    "id": "unified_ai_chat.get_available_personas /ai-chat/personas",
    "login_required": true,
@@ -222475,7 +222847,7 @@
    ],
    "handler": "get_chat_history",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1342,
+   "handler_line": 1391,
    "has_parameters": false,
    "id": "unified_ai_chat.get_chat_history /ai-chat/history",
    "login_required": true,
@@ -222497,7 +222869,7 @@
    ],
    "handler": "get_conversation_thread",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1496,
+   "handler_line": 1545,
    "has_parameters": true,
    "id": "unified_ai_chat.get_conversation_thread /ai-chat/threads/<thread_id>",
    "login_required": true,
@@ -222585,7 +222957,7 @@
    ],
    "handler": "get_domain_context",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1577,
+   "handler_line": 1626,
    "has_parameters": true,
    "id": "unified_ai_chat.get_domain_context /ai-chat/context/<domain>",
    "login_required": true,
@@ -222740,7 +223112,7 @@
    ],
    "handler": "get_prompt_templates",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1260,
+   "handler_line": 1309,
    "has_parameters": false,
    "id": "unified_ai_chat.get_prompt_templates /ai-chat/templates",
    "login_required": true,
@@ -222917,7 +223289,7 @@
    ],
    "handler": "get_saved_sessions",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1425,
+   "handler_line": 1474,
    "has_parameters": false,
    "id": "unified_ai_chat.get_saved_sessions /ai-chat/sessions",
    "login_required": true,
@@ -222939,7 +223311,7 @@
    ],
    "handler": "get_token_usage",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1117,
+   "handler_line": 1166,
    "has_parameters": false,
    "id": "unified_ai_chat.get_token_usage /ai-chat/token-usage",
    "login_required": true,
@@ -222983,7 +223355,7 @@
    ],
    "handler": "get_workspace",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1535,
+   "handler_line": 1584,
    "has_parameters": true,
    "id": "unified_ai_chat.get_workspace /ai-chat/workspace/<int:workspace_id>",
    "login_required": true,
@@ -223005,7 +223377,7 @@
    ],
    "handler": "get_workspace_versions",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1550,
+   "handler_line": 1599,
    "has_parameters": true,
    "id": "unified_ai_chat.get_workspace_versions /ai-chat/workspace/<int:workspace_id>/versions",
    "login_required": true,
@@ -223208,7 +223580,7 @@
    ],
    "handler": "index",
    "handler_file": "app/modules/ai_chat/routes/chat_views.py",
-   "handler_line": 137,
+   "handler_line": 139,
    "has_parameters": false,
    "id": "unified_ai_chat.index /ai-chat",
    "login_required": true,
@@ -223325,7 +223697,7 @@
    ],
    "handler": "index",
    "handler_file": "app/modules/ai_chat/routes/chat_views.py",
-   "handler_line": 137,
+   "handler_line": 139,
    "has_parameters": false,
    "id": "unified_ai_chat.index /ai-chat/",
    "login_required": true,
@@ -223459,7 +223831,7 @@
    ],
    "handler": "list_conversation_threads",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1479,
+   "handler_line": 1528,
    "has_parameters": false,
    "id": "unified_ai_chat.list_conversation_threads /ai-chat/threads",
    "login_required": true,
@@ -223503,7 +223875,7 @@
    ],
    "handler": "load_chat_session",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1444,
+   "handler_line": 1493,
    "has_parameters": true,
    "id": "unified_ai_chat.load_chat_session /ai-chat/session/<session_id>",
    "login_required": true,
@@ -223746,7 +224118,7 @@
    ],
    "handler": "reject_tool_action",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1644,
+   "handler_line": 1693,
    "has_parameters": true,
    "id": "unified_ai_chat.reject_tool_action /ai-chat/tools/reject/<int:approval_id>",
    "login_required": true,
@@ -224091,7 +224463,7 @@
    ],
    "handler": "save_chat_session",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1387,
+   "handler_line": 1436,
    "has_parameters": false,
    "id": "unified_ai_chat.save_chat_session /ai-chat/session/save",
    "login_required": true,
@@ -224113,7 +224485,7 @@
    ],
    "handler": "send_message",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 336,
+   "handler_line": 359,
    "has_parameters": false,
    "id": "unified_ai_chat.send_message /ai-chat/message",
    "login_required": true,
@@ -224135,7 +224507,7 @@
    ],
    "handler": "send_message_stream",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 852,
+   "handler_line": 889,
    "has_parameters": false,
    "id": "unified_ai_chat.send_message_stream /ai-chat/message/stream",
    "login_required": true,
@@ -224179,7 +224551,7 @@
    ],
    "handler": "submit_message_feedback",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 809,
+   "handler_line": 846,
    "has_parameters": false,
    "id": "unified_ai_chat.submit_message_feedback /ai-chat/feedback",
    "login_required": true,
@@ -224223,7 +224595,7 @@
    ],
    "handler": "toggle_auto_execute",
    "handler_file": "app/modules/ai_chat/routes/chat_core.py",
-   "handler_line": 1686,
+   "handler_line": 1735,
    "has_parameters": false,
    "id": "unified_ai_chat.toggle_auto_execute /ai-chat/session/toggle-auto-execute",
    "login_required": true,
@@ -239076,6 +239448,7 @@
     "app/templates/components/form_field.html",
     "app/templates/components/input.html",
     "app/templates/components/page_header.html",
+    "app/templates/components/select.html",
     "app/templates/components/table.html"
    ],
    "includes": [],
@@ -241168,6 +241541,7 @@
   "app/templates/archimate_crud/partials/_repository_workspace.html": {
    "extends": [],
    "imports": [
+    "app/templates/basecoat/skeleton.html",
     "app/templates/components/skeleton.html"
    ],
    "includes": [
@@ -241954,7 +242328,7 @@
    "includes": [],
    "name": "basecoat/accordion.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/alert-dialog.html": {
@@ -241963,7 +242337,7 @@
    "includes": [],
    "name": "basecoat/alert-dialog.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/alert.html": {
@@ -241972,7 +242346,7 @@
    "includes": [],
    "name": "basecoat/alert.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/aspect-ratio.html": {
@@ -241981,7 +242355,7 @@
    "includes": [],
    "name": "basecoat/aspect-ratio.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/attachment.html": {
@@ -241990,7 +242364,7 @@
    "includes": [],
    "name": "basecoat/attachment.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/avatar.html": {
@@ -241999,7 +242373,7 @@
    "includes": [],
    "name": "basecoat/avatar.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/badge.html": {
@@ -242008,7 +242382,7 @@
    "includes": [],
    "name": "basecoat/badge.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/breadcrumb.html": {
@@ -242017,7 +242391,7 @@
    "includes": [],
    "name": "basecoat/breadcrumb.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/bubble.html": {
@@ -242026,7 +242400,7 @@
    "includes": [],
    "name": "basecoat/bubble.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/button-group.html": {
@@ -242035,7 +242409,7 @@
    "includes": [],
    "name": "basecoat/button-group.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/button.html": {
@@ -242044,7 +242418,7 @@
    "includes": [],
    "name": "basecoat/button.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/calendar.html": {
@@ -242053,7 +242427,7 @@
    "includes": [],
    "name": "basecoat/calendar.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/card.html": {
@@ -242062,7 +242436,7 @@
    "includes": [],
    "name": "basecoat/card.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/carousel.html": {
@@ -242071,7 +242445,7 @@
    "includes": [],
    "name": "basecoat/carousel.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/chart.html": {
@@ -242080,7 +242454,7 @@
    "includes": [],
    "name": "basecoat/chart.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/checkbox.html": {
@@ -242089,7 +242463,7 @@
    "includes": [],
    "name": "basecoat/checkbox.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/code-block.html": {
@@ -242098,7 +242472,7 @@
    "includes": [],
    "name": "basecoat/code-block.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/collapsible.html": {
@@ -242107,7 +242481,7 @@
    "includes": [],
    "name": "basecoat/collapsible.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/combobox.html": {
@@ -242116,7 +242490,7 @@
    "includes": [],
    "name": "basecoat/combobox.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/command.html": {
@@ -242125,7 +242499,7 @@
    "includes": [],
    "name": "basecoat/command.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/context-menu.html": {
@@ -242134,7 +242508,7 @@
    "includes": [],
    "name": "basecoat/context-menu.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/dialog.html": {
@@ -242143,7 +242517,7 @@
    "includes": [],
    "name": "basecoat/dialog.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/direction.html": {
@@ -242152,7 +242526,7 @@
    "includes": [],
    "name": "basecoat/direction.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/drawer.html": {
@@ -242161,7 +242535,7 @@
    "includes": [],
    "name": "basecoat/drawer.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/dropdown-menu.html": {
@@ -242170,7 +242544,7 @@
    "includes": [],
    "name": "basecoat/dropdown-menu.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/empty.html": {
@@ -242179,7 +242553,7 @@
    "includes": [],
    "name": "basecoat/empty.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/field.html": {
@@ -242188,7 +242562,7 @@
    "includes": [],
    "name": "basecoat/field.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/form.html": {
@@ -242197,7 +242571,7 @@
    "includes": [],
    "name": "basecoat/form.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/hover-card.html": {
@@ -242206,7 +242580,7 @@
    "includes": [],
    "name": "basecoat/hover-card.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/index.html": {
@@ -242280,7 +242654,7 @@
    "includes": [],
    "name": "basecoat/index.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/input-group.html": {
@@ -242289,7 +242663,7 @@
    "includes": [],
    "name": "basecoat/input-group.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/input-otp.html": {
@@ -242298,7 +242672,7 @@
    "includes": [],
    "name": "basecoat/input-otp.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/input.html": {
@@ -242307,7 +242681,7 @@
    "includes": [],
    "name": "basecoat/input.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/item.html": {
@@ -242316,7 +242690,7 @@
    "includes": [],
    "name": "basecoat/item.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/kbd.html": {
@@ -242325,7 +242699,7 @@
    "includes": [],
    "name": "basecoat/kbd.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/label.html": {
@@ -242334,7 +242708,7 @@
    "includes": [],
    "name": "basecoat/label.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/macros.html": {
@@ -242417,7 +242791,7 @@
    "includes": [],
    "name": "basecoat/marker.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/menubar.html": {
@@ -242426,7 +242800,7 @@
    "includes": [],
    "name": "basecoat/menubar.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/message-scroller.html": {
@@ -242435,7 +242809,7 @@
    "includes": [],
    "name": "basecoat/message-scroller.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/message.html": {
@@ -242444,7 +242818,7 @@
    "includes": [],
    "name": "basecoat/message.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/native-select.html": {
@@ -242453,7 +242827,7 @@
    "includes": [],
    "name": "basecoat/native-select.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/navigation-menu.html": {
@@ -242462,7 +242836,7 @@
    "includes": [],
    "name": "basecoat/navigation-menu.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/pagination.html": {
@@ -242471,7 +242845,7 @@
    "includes": [],
    "name": "basecoat/pagination.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/popover.html": {
@@ -242480,7 +242854,7 @@
    "includes": [],
    "name": "basecoat/popover.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/progress.html": {
@@ -242489,7 +242863,7 @@
    "includes": [],
    "name": "basecoat/progress.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/questionnaire.html": {
@@ -242498,7 +242872,7 @@
    "includes": [],
    "name": "basecoat/questionnaire.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/radio-group.html": {
@@ -242507,7 +242881,7 @@
    "includes": [],
    "name": "basecoat/radio-group.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/resizable.html": {
@@ -242516,7 +242890,7 @@
    "includes": [],
    "name": "basecoat/resizable.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/scroll-area.html": {
@@ -242525,7 +242899,7 @@
    "includes": [],
    "name": "basecoat/scroll-area.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/select.html": {
@@ -242534,7 +242908,7 @@
    "includes": [],
    "name": "basecoat/select.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/separator.html": {
@@ -242543,7 +242917,7 @@
    "includes": [],
    "name": "basecoat/separator.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/sheet.html": {
@@ -242552,7 +242926,7 @@
    "includes": [],
    "name": "basecoat/sheet.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/sidebar.html": {
@@ -242561,7 +242935,7 @@
    "includes": [],
    "name": "basecoat/sidebar.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/skeleton.html": {
@@ -242570,7 +242944,7 @@
    "includes": [],
    "name": "basecoat/skeleton.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/slider.html": {
@@ -242579,7 +242953,7 @@
    "includes": [],
    "name": "basecoat/slider.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/sonner.html": {
@@ -242597,7 +242971,7 @@
    "includes": [],
    "name": "basecoat/spinner.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/switch.html": {
@@ -242606,7 +242980,7 @@
    "includes": [],
    "name": "basecoat/switch.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/table.html": {
@@ -242615,7 +242989,7 @@
    "includes": [],
    "name": "basecoat/table.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/tabs.html": {
@@ -242624,7 +242998,7 @@
    "includes": [],
    "name": "basecoat/tabs.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/textarea.html": {
@@ -242633,7 +243007,7 @@
    "includes": [],
    "name": "basecoat/textarea.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/toast.html": {
@@ -242642,7 +243016,7 @@
    "includes": [],
    "name": "basecoat/toast.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/toggle-group.html": {
@@ -242651,7 +243025,7 @@
    "includes": [],
    "name": "basecoat/toggle-group.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/toggle.html": {
@@ -242660,7 +243034,7 @@
    "includes": [],
    "name": "basecoat/toggle.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/tooltip.html": {
@@ -242669,7 +243043,7 @@
    "includes": [],
    "name": "basecoat/tooltip.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/basecoat/trace.html": {
@@ -242678,7 +243052,7 @@
    "includes": [],
    "name": "basecoat/trace.html",
    "parse_errors": [],
-   "rendered_on_count": 427,
+   "rendered_on_count": 426,
    "unresolved_refs": []
   },
   "app/templates/batch_import/batch_review.html": {
@@ -243366,6 +243740,7 @@
     "app/templates/layouts/admin_base.html"
    ],
    "imports": [
+    "app/templates/basecoat/table.html",
     "app/templates/components/badge.html",
     "app/templates/components/breadcrumb.html",
     "app/templates/components/button.html",
@@ -243374,6 +243749,7 @@
     "app/templates/components/disabled_action.html",
     "app/templates/components/empty_state.html",
     "app/templates/components/input.html",
+    "app/templates/components/list_table.html",
     "app/templates/components/provenance.html",
     "app/templates/components/select.html",
     "app/templates/components/skeleton.html",
@@ -243663,7 +244039,7 @@
    "includes": [],
    "name": "components/_breadcrumb_root.html",
    "parse_errors": [],
-   "rendered_on_count": 417,
+   "rendered_on_count": 416,
    "unresolved_refs": []
   },
   "app/templates/components/accessibility_helpers.html": {
@@ -243687,7 +244063,7 @@
    "includes": [],
    "name": "components/admin_header.html",
    "parse_errors": [],
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "unresolved_refs": []
   },
   "app/templates/components/admin_sidebar.html": {
@@ -243702,7 +244078,7 @@
    "includes": [],
    "name": "components/admin_sidebar.html",
    "parse_errors": [],
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "unresolved_refs": []
   },
   "app/templates/components/alert.html": {
@@ -243711,7 +244087,7 @@
    "includes": [],
    "name": "components/alert.html",
    "parse_errors": [],
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "unresolved_refs": []
   },
   "app/templates/components/answer_cascade.html": {
@@ -243789,7 +244165,7 @@
    "includes": [],
    "name": "components/badge.html",
    "parse_errors": [],
-   "rendered_on_count": 442,
+   "rendered_on_count": 441,
    "unresolved_refs": []
   },
   "app/templates/components/breadcrumb.html": {
@@ -243809,7 +244185,7 @@
    "includes": [],
    "name": "components/breadcrumb_nav.html",
    "parse_errors": [],
-   "rendered_on_count": 66,
+   "rendered_on_count": 65,
    "unresolved_refs": []
   },
   "app/templates/components/button.html": {
@@ -243818,7 +244194,7 @@
    "includes": [],
    "name": "components/button.html",
    "parse_errors": [],
-   "rendered_on_count": 445,
+   "rendered_on_count": 444,
    "unresolved_refs": []
   },
   "app/templates/components/canvas/_frame.html": {
@@ -244047,7 +244423,7 @@
    "includes": [],
    "name": "components/card.html",
    "parse_errors": [],
-   "rendered_on_count": 433,
+   "rendered_on_count": 432,
    "unresolved_refs": []
   },
   "app/templates/components/checkbox.html": {
@@ -244225,7 +244601,7 @@
    "includes": [],
    "name": "components/dialog.html",
    "parse_errors": [],
-   "rendered_on_count": 423,
+   "rendered_on_count": 422,
    "unresolved_refs": []
   },
   "app/templates/components/disabled_action.html": {
@@ -244254,7 +244630,7 @@
    "includes": [],
    "name": "components/drawer.html",
    "parse_errors": [],
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "unresolved_refs": []
   },
   "app/templates/components/dropdown_menu.html": {
@@ -244265,7 +244641,7 @@
    "includes": [],
    "name": "components/dropdown_menu.html",
    "parse_errors": [],
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "unresolved_refs": []
   },
   "app/templates/components/element_table.html": {
@@ -244288,7 +244664,7 @@
    "includes": [],
    "name": "components/empty_state.html",
    "parse_errors": [],
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "unresolved_refs": []
   },
   "app/templates/components/error_boundary.html": {
@@ -244431,7 +244807,7 @@
    "includes": [],
    "name": "components/input.html",
    "parse_errors": [],
-   "rendered_on_count": 437,
+   "rendered_on_count": 436,
    "unresolved_refs": []
   },
   "app/templates/components/list_table.html": {
@@ -244447,7 +244823,7 @@
    "includes": [],
    "name": "components/list_table.html",
    "parse_errors": [],
-   "rendered_on_count": 52,
+   "rendered_on_count": 53,
    "unresolved_refs": []
   },
   "app/templates/components/llm_recommendations.html": {
@@ -244474,7 +244850,7 @@
    "includes": [],
    "name": "components/metrics_card.html",
    "parse_errors": [],
-   "rendered_on_count": 48,
+   "rendered_on_count": 47,
    "unresolved_refs": []
   },
   "app/templates/components/modal.html": {
@@ -244512,7 +244888,7 @@
    "includes": [],
    "name": "components/page_guide_drawer.html",
    "parse_errors": [],
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "unresolved_refs": []
   },
   "app/templates/components/page_header.html": {
@@ -244524,7 +244900,7 @@
    "includes": [],
    "name": "components/page_header.html",
    "parse_errors": [],
-   "rendered_on_count": 233,
+   "rendered_on_count": 232,
    "unresolved_refs": []
   },
   "app/templates/components/pagination_controls.html": {
@@ -244542,7 +244918,7 @@
    "includes": [],
    "name": "components/popover.html",
    "parse_errors": [],
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "unresolved_refs": []
   },
   "app/templates/components/priority_actions.html": {
@@ -244554,7 +244930,7 @@
    "includes": [],
    "name": "components/priority_actions.html",
    "parse_errors": [],
-   "rendered_on_count": 2,
+   "rendered_on_count": 3,
    "unresolved_refs": []
   },
   "app/templates/components/progress.html": {
@@ -244708,7 +245084,7 @@
    "includes": [],
    "name": "components/see_how.html",
    "parse_errors": [],
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "unresolved_refs": []
   },
   "app/templates/components/select.html": {
@@ -244717,7 +245093,7 @@
    "includes": [],
    "name": "components/select.html",
    "parse_errors": [],
-   "rendered_on_count": 65,
+   "rendered_on_count": 66,
    "unresolved_refs": []
   },
   "app/templates/components/sidebar_breadcrumb.html": {
@@ -244780,7 +245156,7 @@
    "includes": [],
    "name": "components/switch.html",
    "parse_errors": [],
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "unresolved_refs": []
   },
   "app/templates/components/table.html": {
@@ -244809,7 +245185,7 @@
    "includes": [],
    "name": "components/toast-container.html",
    "parse_errors": [],
-   "rendered_on_count": 445,
+   "rendered_on_count": 444,
    "unresolved_refs": []
   },
   "app/templates/components/traceability_panel.html": {
@@ -244827,7 +245203,7 @@
    "includes": [],
    "name": "components/ui_sidebar.html",
    "parse_errors": [],
-   "rendered_on_count": 425,
+   "rendered_on_count": 424,
    "unresolved_refs": []
   },
   "app/templates/components/unified_mapping_modal.html": {
@@ -245610,7 +245986,9 @@
     "app/templates/components/list_table.html",
     "app/templates/macros/page_shell.html"
    ],
-   "includes": [],
+   "includes": [
+    "app/templates/components/priority_actions.html"
+   ],
    "name": "enterprise/impact_analysis.html",
    "parse_errors": [],
    "rendered_on_count": 1,
@@ -245707,21 +246085,6 @@
    ],
    "includes": [],
    "name": "enterprise/requirements_traceability.html",
-   "parse_errors": [],
-   "rendered_on_count": 1,
-   "unresolved_refs": []
-  },
-  "app/templates/enterprise/risk_assessment.html": {
-   "extends": [
-    "app/templates/layouts/admin_base.html"
-   ],
-   "imports": [
-    "app/templates/components/breadcrumb_nav.html",
-    "app/templates/components/metrics_card.html",
-    "app/templates/components/page_header.html"
-   ],
-   "includes": [],
-   "name": "enterprise/risk_assessment.html",
    "parse_errors": [],
    "rendered_on_count": 1,
    "unresolved_refs": []
@@ -246562,7 +246925,7 @@
    ],
    "name": "layouts/admin_base.html",
    "parse_errors": [],
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "unresolved_refs": []
   },
   "app/templates/layouts/base.html": {
@@ -246971,7 +247334,7 @@
    "includes": [],
    "name": "partials/_data_load_error.html",
    "parse_errors": [],
-   "rendered_on_count": 422,
+   "rendered_on_count": 421,
    "unresolved_refs": []
   },
   "app/templates/partials/_filter_section.html": {
@@ -247007,7 +247370,7 @@
    "includes": [],
    "name": "partials/_head.html",
    "parse_errors": [],
-   "rendered_on_count": 445,
+   "rendered_on_count": 444,
    "unresolved_refs": []
   },
   "app/templates/partials/_head_common.html": {
@@ -247052,7 +247415,7 @@
    "includes": [],
    "name": "partials/_scripts_common.html",
    "parse_errors": [],
-   "rendered_on_count": 445,
+   "rendered_on_count": 444,
    "unresolved_refs": []
   },
   "app/templates/partials/_seo_meta.html": {
@@ -249093,5 +249456,5 @@
   "app/templates/solutions_strategic/partials/_gantt_chart.html",
   "app/templates/tools/gantt_demo.html"
  ],
- "templates_sha256": "69dec885de341e5dd72d62f3518c75fa3f3a1f5d2ee044d6748f80233eee8a5b"
+ "templates_sha256": "84abecdd6b8dc1e374bbb392232333e2fb6cb03f9ebb78703c175f0de94e9cbc"
 }

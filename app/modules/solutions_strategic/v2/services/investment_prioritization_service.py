@@ -40,11 +40,49 @@ STRATEGIC_UNSCORED_REASON = (
 )
 
 
-def _record_page():
-    """The page where a capability's importance is recorded, or None when it cannot be built."""
+def _record_page(edit_id=None):
+    """The capabilities page opened on one capability's edit form, or None when there is none to open.
+
+    ``edit_id`` is the id of the record that page edits, never an id from another table; with no
+    such record there is no form to open, so there is no link."""
     from app.services.result_footer_service import page_link
 
-    return page_link("unified_low_priority.capability_map_capabilities")
+    href = page_link("unified_low_priority.capability_map_capabilities")
+    if not href or edit_id is None:
+        return None
+    return f"{href}{'&' if '?' in href else '?'}edit={edit_id}"
+
+
+def _editable_records(capabilities):
+    """Capability id -> id of the record the capabilities page edits, for the signed-in person.
+
+    The one link between the two is the capability's own provenance: it was projected from that
+    record (``source_table`` / ``source_id``) in the same organisation. A capability made any other
+    way (adopted from an industry process, the roadmap, the assistant) is not on that page, so it is
+    absent and has no form to open. Empty for a person who may not save a capability: they are
+    offered no step."""
+    from flask_login import current_user
+
+    from app.models.business_capabilities import BusinessCapability
+    from app.decorators import user_has_any_role
+    from app.utils.role_access import can_edit_capabilities
+
+    # The page draws its form for can_edit_capabilities, and the save is refused to anyone
+    # outside the roles its route names, which user_has_any_role judges the way the route does.
+    if not (can_edit_capabilities(current_user) and user_has_any_role(current_user, "admin", "architect")):
+        return {}
+    projected = {
+        int(c.source_id): c for c in capabilities
+        if c.source_table == "business_capability" and str(c.source_id or "").isdigit()
+    }
+    if not projected:
+        return {}
+    found = {}
+    for row in BusinessCapability.query.filter(BusinessCapability.id.in_(list(projected))).all():
+        cap = projected[row.id]
+        if row.organization_id == cap.organization_id:
+            found[cap.id] = row.id
+    return found
 
 
 def currency_symbol() -> str:
@@ -139,6 +177,7 @@ class InvestmentPrioritizationService:
             "streams": self._value_streams_by_capability(capability_ids),
             "risks": self._risks_by_capability(mappings_by_cap),
             "work": self._work_cost_by_capability(capability_ids),
+            "edit_ids": _editable_records(capabilities),
         }
 
         # Build capability → initiative map via RoadmapItem.linked_capabilities JSON
@@ -328,7 +367,10 @@ class InvestmentPrioritizationService:
             ),
             "strategic_derivation": derivation,
             "strategic_step": (
-                None if strategic_score is not None else {"text": STRATEGIC_STEP_TEXT, "href": _record_page()}
+                None if recorded in _IMPORTANCE_POINTS else {
+                    "text": STRATEGIC_STEP_TEXT,
+                    "href": _record_page((evidence.get("edit_ids") or {}).get(capability.id)),
+                }
             ),
             "capability_type": capability.capability_type,
             "coverage_count": coverage_count,

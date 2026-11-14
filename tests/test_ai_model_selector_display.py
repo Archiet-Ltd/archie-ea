@@ -19,6 +19,7 @@ from playwright.sync_api import expect, sync_playwright
 from tests.chat_opening_fixture import (
     APPLICATIONS, APPLICATIONS_PATH, FIRST_QUESTIONS, FIRST_QUESTIONS_PATH, close_chat_options, open_chat_options,
 )
+from app.modules.ai_chat.services.failure_messages import FEATURE_INTROS
 from tests.render_context import app_template_context
 from app.basecoat_kit import register_basecoat_helpers
 
@@ -47,6 +48,7 @@ def html():
     return env.get_template('ai_chat/index.html').render(
         **app_template_context(),
         llm_configured=True, domain_config={},
+        not_set_up_sentence=FEATURE_INTROS['chat'],
         persona_config={'categories': {}, 'personas': {}}, default_chat_persona='',
         chat_persona_preference_key='test-model-display', csrf_token=lambda: 'test-token',
         url_for=lambda endpoint, **kw: '/static/' + kw['filename'] if endpoint == 'static' else '/')
@@ -263,7 +265,10 @@ def test_ordinary_send_click_uses_same_stream_without_navigation(launch):
     page.locator('#user-input').fill('Send click fixture.')
     page.locator('#send-btn').click()
     expect(page.locator('#messages-container .message-content').last).to_contain_text('Fixture response.')
+    # The time already waited is measured in the browser, so it is checked as a short wait, not one number.
+    waited = payloads[0].pop('waited_seconds') if payloads else None
+    assert isinstance(waited, (int, float)) and 0 <= waited < 60, waited
     assert payloads == [{'message': 'Send click fixture.', 'domain': 'general',
                          'element_id': None, 'context_type': None, 'persona': None,
-                         'model': None, 'thread_id': None}]
+                         'model': None, 'thread_id': None, 'retry': False, 'failed_turn_id': None}]
     assert page.url == initial_url

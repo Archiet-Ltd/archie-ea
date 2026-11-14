@@ -13,22 +13,17 @@
 
     {# -- Header --------------------------------------------------------- #}
     {% macro _ps_actions() %}
-            <div class="text-center">
-                <div class="text-2xl font-bold text-foreground" data-testid="gap-total">{{ recorded_count }}</div>
-                <div class="text-xs text-muted-foreground">Recorded gaps</div>
-            </div>
-            <div class="text-center">
-                <div class="text-2xl font-bold {% if unclosed_count > 0 %}text-destructive{% else %}text-foreground{% endif %}" data-testid="gap-unclosed">{{ unclosed_count }}</div>
-                <div class="text-xs text-muted-foreground">Unclosed</div>
-            </div>
-            <div class="text-center">
-                <div class="text-2xl font-bold {% if covered_count > 0 %}text-success{% else %}text-foreground{% endif %}" data-testid="gap-covered">{{ covered_count }}</div>
-                <div class="text-xs text-muted-foreground">Covered</div>
-            </div>
-            <div class="text-center" title="Found by checking the capability map; not recorded as gaps yet">
-                <div class="text-2xl font-bold text-foreground" data-testid="gap-signals">{{ computed_gap_count if computed_gap_count is not none else '—' }}</div>
-                <div class="text-xs text-muted-foreground">Gap signals, not recorded</div>
-            </div>
+            {% macro _count(testid, value, label, href, tone='text-foreground', title=none) %}
+            {% if value and href %}<a href="{{ href }}" class="block rounded-md text-center outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"{% if title %} title="{{ title }}"{% endif %}>{% else %}<div class="text-center"{% if title %} title="{{ title }}"{% endif %}>{% endif %}
+                <div class="text-2xl font-bold {{ tone }}" data-testid="{{ testid }}">{{ value }}</div>
+                <div class="text-xs text-muted-foreground">{{ label }}</div>
+            {% if value and href %}</a>{% else %}</div>{% endif %}
+            {% endmacro %}
+            {{ _count('gap-total', recorded_count, 'Recorded gaps', url_for('enterprise.gap_analysis')) }}
+            {{ _count('gap-unclosed', unclosed_count, 'No work planned', url_for('enterprise.gap_analysis', status='open', work='none'), 'text-destructive' if unclosed_count > 0 else 'text-foreground', 'Open gaps with no work package') }}
+            {{ _count('gap-covered', covered_count, 'Open, covered', url_for('enterprise.gap_analysis', status='open', work='covered'), 'text-success' if covered_count > 0 else 'text-foreground', 'Open gaps with a work package') }}
+            {{ _count('gap-closed', closed_count, 'Closed', url_for('enterprise.gap_analysis', status='closed'), 'text-foreground', 'Resolved, closed or completed in the gap register') }}
+            {{ _count('gap-signals', computed_gap_count if computed_gap_count is not none else '—', 'Gap signals, not recorded', (url_for('main.capability_roadmap', _anchor='gap-signals') if computed_gap_count else none), 'text-foreground', 'Found by checking the capability map; not recorded as gaps yet. Opens the list of those signals on the roadmap') }}
             <a href="{{ url_for('enterprise.gap_analysis') }}"
                class="px-3 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 rounded border border-border transition-colors">
                 Gap register →
@@ -112,6 +107,13 @@
 
     {# -- Gap table ------------------------------------------------------ #}
     {% macro _gap_record_empty_action() %}{{ button(text='Add a gap record', variant='outline', size='sm', href=url_for('adm_kanban_view.index', new='Gap', next=url_for('adm_kanban_view.gap_analysis'))) }}{% endmacro %}
+    {% if not gaps %}
+    {#- No rows: the message is said in the page itself, not inside a table whose last column is pinned and covers it at 390 wide. -#}
+    <div class="rounded-lg border border-border p-6 text-center" data-testid="gaps-table">
+        <p class="text-sm text-muted-foreground" data-testid="gaps-table-empty">{{ ('No gap has been added from the board yet. The ' ~ recorded_count ~ ' recorded ' ~ ('gap is' if recorded_count == 1 else 'gaps are') ~ ' in the gap register.') if recorded_count else 'No gap record has been made yet. The gaps shown above are computed from the capability map.' }}</p>
+        {% if can_change_model() %}<div class="mt-4 flex justify-center">{{ _gap_record_empty_action() }}</div>{% endif %}
+    </div>
+    {% else %}
     {% call(gap) list_table(rows=gaps, columns=[{'label': 'Gap', 'sortable': true}, {'label': 'Domain', 'sortable': true}, {'label': 'Phase', 'sortable': true}, {'label': 'Status', 'sortable': true}, {'label': 'Work packages that close it', 'sortable': false}, {'label': 'Covered', 'align': 'right'}],
                            caption='Gap records and the work packages that close them', testid='gaps-table', row_testid='gap-row',
                            search_placeholder='Filter gaps...',
@@ -179,6 +181,8 @@
         {% endif %}
     {% endcall %}
     {% endcall %}
+
+    {% endif %}
 
     {% from 'basecoat/progress.html' import progress, progress_indicator %}
 

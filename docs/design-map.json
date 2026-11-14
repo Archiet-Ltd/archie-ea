@@ -1446,6 +1446,13 @@
     "keep_until": "disabledaction01",
     "why": "A person without the right to run the comparison sees the action disabled with the reason, as on the decision record page; the data-table block does not yet list the disabled action, decided in disabledaction01 (R36, lead ruling 3 Nov 2026)."
    }
+  ],
+  "app/templates/enterprise/impact_analysis.html": [
+   {
+    "macro": "components/priority_actions.html",
+    "keep_until": "impactwave03",
+    "why": "The prioritised actions live on this page (impactwave01, impactwave02); the component is allowed on this page only, as on the strategic Impact Analysis page (lead ruling 13 Nov 2026)."
+   }
   ]
  },
  "pages": {
@@ -4187,7 +4194,7 @@
    "confidence": "high",
    "controls": {
     "link": 1,
-    "testid": 1
+    "testid": 5
    },
    "departures": [
     {
@@ -4894,7 +4901,8 @@
    "controls": {
     "button": 6,
     "form": 1,
-    "link": 1
+    "link": 1,
+    "testid": 3
    },
    "departures": [
     {
@@ -6166,8 +6174,8 @@
    "confidence": "high",
    "controls": {
     "button": 2,
-    "link": 4,
-    "testid": 6
+    "link": 5,
+    "testid": 5
    },
    "departures": [],
    "extends": [
@@ -7050,7 +7058,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 11,
+    "button": 12,
     "form": 3,
     "link": 7,
     "modal": 2,
@@ -7071,6 +7079,7 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/button.html",
     "components/card.html",
     "components/page_header.html"
    ],
@@ -7535,8 +7544,8 @@
    "controls": {
     "button": 2,
     "form": 1,
-    "link": 1,
-    "testid": 2
+    "link": 3,
+    "testid": 3
    },
    "departures": [
     {
@@ -7779,9 +7788,9 @@
    "controls": {
     "button": 5,
     "form": 3,
-    "link": 2,
+    "link": 3,
     "table": 1,
-    "testid": 1
+    "testid": 9
    },
    "departures": [],
    "extends": [
@@ -12670,7 +12679,8 @@
    "controls": {
     "button": 5,
     "form": 2,
-    "testid": 6
+    "link": 3,
+    "testid": 17
    },
    "departures": [
     {
@@ -12687,6 +12697,7 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/fact_list.html",
     "components/figures.html",
     "components/list_table.html",
     "macros/page_shell.html"
@@ -12894,11 +12905,11 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 35,
+    "button": 37,
     "form": 3,
     "link": 2,
     "modal": 3,
-    "testid": 14
+    "testid": 15
    },
    "departures": [
     {
@@ -14472,11 +14483,11 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 22,
+    "button": 23,
     "form": 8,
-    "link": 24,
+    "link": 27,
     "table": 6,
-    "testid": 1
+    "testid": 9
    },
    "departures": [
     {
@@ -14506,13 +14517,16 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/alert.html",
     "components/badge.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
     "components/card.html",
     "components/dense_table.html",
+    "components/form_field.html",
     "components/input.html",
     "components/page_header.html",
+    "components/select.html",
     "components/unified_mapping_modal.html",
     "macros/nav_macros_shadcn.html",
     "macros/page_shell.html"
@@ -14638,7 +14652,6 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/breadcrumb_nav.html",
     "components/button.html",
     "components/form_field.html",
     "components/input.html",
@@ -14740,7 +14753,7 @@
    "confidence": "high",
    "controls": {
     "link": 7,
-    "testid": 4
+    "testid": 5
    },
    "departures": [
     {
@@ -14888,7 +14901,7 @@
     "link": 11,
     "modal": 2,
     "table": 1,
-    "testid": 32
+    "testid": 33
    },
    "departures": [
     {
@@ -15163,7 +15176,8 @@
    "controls": {
     "button": 38,
     "link": 16,
-    "table": 2
+    "table": 2,
+    "testid": 1
    },
    "departures": [
     {
@@ -16195,8 +16209,8 @@
    "confidence": "high",
    "controls": {
     "button": 3,
-    "link": 1,
-    "table": 1
+    "link": 3,
+    "testid": 2
    },
    "departures": [
     {
@@ -16222,10 +16236,10 @@
     "components/button.html",
     "components/card.html",
     "components/form_field.html",
+    "components/list_table.html",
     "components/page_header.html",
     "components/select.html",
-    "components/status_badge.html",
-    "components/table.html"
+    "components/status_badge.html"
    ],
    "original": "preview",
    "page_type": "record-detail",
@@ -16559,8 +16573,8 @@
    "confidence": "high",
    "controls": {
     "button": 1,
-    "link": 2,
-    "testid": 2
+    "link": 3,
+    "testid": 3
    },
    "departures": [],
    "extends": [
@@ -17054,8 +17068,9 @@
    "controls": {
     "button": 3,
     "form": 3,
-    "link": 3,
-    "modal": 1
+    "link": 4,
+    "modal": 1,
+    "testid": 1
    },
    "departures": [
     {
@@ -17078,6 +17093,7 @@
     "components/button.html",
     "components/empty_state.html",
     "components/form_field.html",
+    "components/input.html",
     "components/modal.html",
     "components/page_header.html",
     "components/select.html",
@@ -17429,11 +17445,11 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 78,
+    "button": 79,
     "link": 1,
     "modal": 6,
     "table": 2,
-    "testid": 3
+    "testid": 4
    },
    "departures": [
     {
@@ -18169,11 +18185,10 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 22,
-    "form": 1,
-    "modal": 4,
+    "button": 17,
+    "modal": 3,
     "table": 2,
-    "testid": 5
+    "testid": 6
    },
    "departures": [
     {
@@ -18310,11 +18325,12 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 11,
-    "link": 13,
-    "modal": 1,
+    "button": 17,
+    "form": 2,
+    "link": 23,
+    "modal": 2,
     "table": 1,
-    "testid": 28
+    "testid": 57
    },
    "departures": [
     {
@@ -18343,9 +18359,15 @@
    "macros": [
     "components/badge.html",
     "components/button.html",
+    "components/checkbox.html",
+    "components/dialog.html",
     "components/disabled_action.html",
+    "components/element_table.html",
+    "components/form_field.html",
     "components/input.html",
     "components/modal.html",
+    "components/provenance.html",
+    "components/select.html",
     "components/table.html",
     "macros/page_shell.html",
     "macros/shadcn_compat.html"
@@ -18454,8 +18476,9 @@
    "controls": {
     "button": 6,
     "form": 1,
+    "link": 1,
     "table": 1,
-    "testid": 21
+    "testid": 23
    },
    "departures": [
     {
@@ -19549,10 +19572,10 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 25,
-    "link": 5,
+    "button": 27,
+    "link": 6,
     "table": 2,
-    "testid": 11
+    "testid": 18
    },
    "departures": [
     {
@@ -19675,9 +19698,9 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 3,
+    "button": 13,
     "link": 3,
-    "testid": 1
+    "testid": 10
    },
    "departures": [
     {
@@ -19694,6 +19717,7 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/button.html",
     "components/page_header.html"
    ],
    "original": "gap:G-4",
@@ -20015,6 +20039,7 @@
    ],
    "confidence": "high",
    "controls": {
+    "link": 1,
     "table": 1
    },
    "departures": [
@@ -22040,9 +22065,9 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 2,
+    "button": 5,
     "table": 2,
-    "testid": 1
+    "testid": 5
    },
    "departures": [
     {
@@ -26453,10 +26478,10 @@
    "controls": {
     "button": 22,
     "form": 3,
-    "link": 1,
+    "link": 2,
     "modal": 4,
     "table": 1,
-    "testid": 11
+    "testid": 17
    },
    "departures": [
     {
@@ -26490,9 +26515,11 @@
     "components/breadcrumb.html",
     "components/button.html",
     "components/card.html",
+    "components/dialog.html",
     "components/disabled_action.html",
     "components/empty_state.html",
     "components/input.html",
+    "components/list_table.html",
     "components/provenance.html",
     "components/select.html",
     "components/skeleton.html",
@@ -27149,9 +27176,9 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 3,
-    "table": 0,
-    "testid": 2
+    "button": 1,
+    "link": 1,
+    "testid": 1
    },
    "departures": [],
    "extends": [
@@ -27511,9 +27538,9 @@
    ],
    "confidence": "low",
    "controls": {
-    "link": 3,
+    "link": 5,
     "table": 2,
-    "testid": 6
+    "testid": 7
    },
    "departures": [],
    "extends": [
@@ -27869,7 +27896,7 @@
    "confidence": "high",
    "controls": {
     "button": 1,
-    "link": 1
+    "link": 2
    },
    "departures": [],
    "extends": [
@@ -28098,7 +28125,8 @@
    "confidence": "high",
    "controls": {
     "button": 1,
-    "table": 1
+    "table": 1,
+    "testid": 2
    },
    "departures": [
     {
@@ -28927,8 +28955,10 @@
    "confidence": "high",
    "controls": {
     "button": 6,
+    "link": 1,
     "modal": 2,
-    "table": 1
+    "table": 1,
+    "testid": 1
    },
    "departures": [
     {
@@ -32264,7 +32294,7 @@
    "controls": {
     "button": 2,
     "link": 5,
-    "testid": 2
+    "testid": 3
    },
    "departures": [],
    "extends": [
@@ -32821,9 +32851,9 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 1,
-    "link": 6,
-    "testid": 5
+    "button": 2,
+    "link": 10,
+    "testid": 11
    },
    "departures": [],
    "extends": [
@@ -32908,6 +32938,7 @@
     "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
+    "components/priority_actions.html",
     "components/progress.html",
     "components/provenance.html",
     "components/risk_matrix.html",
@@ -32931,6 +32962,7 @@
     "card",
     "empty",
     "page-header",
+    "priority-actions",
     "tabs",
     "table",
     "select",
@@ -32956,6 +32988,9 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/priority_actions.html"
+   ],
    "frame": "dashboard-01",
    "grid": "G1",
    "inhouse_components": [
@@ -32970,8 +33005,10 @@
     "components/empty_state.html",
     "components/input.html",
     "components/list_table.html",
+    "components/priority_actions.html",
     "macros/page_shell.html"
    ],
+   "note": "Lead, 13 Nov 2026: the prioritised actions live on this page (impactwave01, impactwave02); the component is allowed on this page only, as on the strategic Impact Analysis page.",
    "original": "example:tasks",
    "page_type": "data-table",
    "patterns": [
@@ -33409,7 +33446,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 26,
+    "button": 27,
     "link": 2,
     "modal": 3,
     "table": 1
@@ -33444,6 +33481,7 @@
     "components/input.html",
     "components/modal.html",
     "components/page_header.html",
+    "components/provenance.html",
     "components/select.html"
    ],
    "original": "example:tasks",
@@ -33609,114 +33647,6 @@
     "empty-first-use",
     "empty-nothing-derived",
     "empty-filtered",
-    "empty-no-permission",
-    "error-region",
-    "populated"
-   ],
-   "status": "mapped",
-   "tier": "B",
-   "type_changed": false
-  },
-  "app/templates/enterprise/risk_assessment.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/app_stats_grid.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/disabled_action.html",
-    "components/dropdown_menu.html",
-    "components/element_table.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/fact_list.html",
-    "components/figures.html",
-    "components/filter_bar.html",
-    "components/gantt_timeline.html",
-    "components/inline_hint.html",
-    "components/list_table.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/priority_actions.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/review_queue_panel.html",
-    "components/risk_matrix.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "dashboard",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "progress",
-    "table"
-   ],
-   "confidence": "low",
-   "controls": {
-    "link": 1,
-    "table": 1
-   },
-   "departures": [],
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "grid": "G1",
-   "inhouse_components": [
-    "breadcrumb_nav:Replace",
-    "metrics_card:Replace",
-    "page-header:Replace"
-   ],
-   "macros": [
-    "components/breadcrumb_nav.html",
-    "components/metrics_card.html",
-    "components/page_header.html"
-   ],
-   "original": "dashboard-01",
-   "page_type": "dashboard",
-   "patterns": [
-    "P01-page-header",
-    "P24-kpi-row",
-    "P03-data-table",
-    "P23-status-badge"
-   ],
-   "persona": "risk",
-   "reason": "Risk assessment summary; regions unclear from the template.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn blocks: dashboard-01",
-     "url": "https://ui.shadcn.com/blocks#dashboard-01"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: dashboard",
-     "image": "docs/design/reference/basecoat-dashboard.webp"
-    }
-   },
-   "spec": null,
-   "states": [
-    "loading",
-    "empty-first-use",
     "empty-no-permission",
     "error-region",
     "populated"
@@ -33891,8 +33821,9 @@
    "confidence": "low",
    "controls": {
     "button": 2,
-    "link": 1,
-    "table": 2
+    "link": 2,
+    "table": 2,
+    "testid": 7
    },
    "departures": [],
    "extends": [
@@ -34138,6 +34069,7 @@
     "components/empty_state.html",
     "components/figures.html",
     "components/list_table.html",
+    "components/provenance.html",
     "macros/page_shell.html"
    ],
    "original": "example:tasks",
@@ -36914,10 +36846,10 @@
    "confidence": "high",
    "controls": {
     "button": 15,
-    "link": 4,
+    "link": 6,
     "modal": 3,
     "table": 2,
-    "testid": 2
+    "testid": 6
    },
    "departures": [
     {
@@ -36949,6 +36881,7 @@
     "components/input.html",
     "components/modal.html",
     "components/provenance.html",
+    "components/risk_matrix.html",
     "components/select.html",
     "macros/page_shell.html"
    ],
@@ -37290,8 +37223,9 @@
    "controls": {
     "button": 2,
     "form": 1,
+    "link": 1,
     "modal": 1,
-    "testid": 3
+    "testid": 4
    },
    "departures": [
     {
@@ -37552,6 +37486,7 @@
    "macros": [
     "components/button.html",
     "components/card.html",
+    "components/fact_list.html",
     "components/input.html",
     "components/page_header.html",
     "components/progress.html",
@@ -38980,7 +38915,7 @@
    "confidence": "high",
    "controls": {
     "button": 2,
-    "link": 31,
+    "link": 30,
     "table": 1,
     "testid": 13
    },
@@ -39616,9 +39551,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 1,
-    "link": 1,
-    "testid": 1
+    "button": 1
    },
    "departures": [
     {
@@ -39637,8 +39570,6 @@
    ],
    "macros": [
     "components/figures.html",
-    "components/list_table.html",
-    "components/provenance.html",
     "macros/page_shell.html"
    ],
    "original": "example:tasks",
@@ -40215,7 +40146,8 @@
    ],
    "confidence": "low",
    "controls": {
-    "button": 1
+    "link": 1,
+    "testid": 2
    },
    "departures": [],
    "extends": [
@@ -40558,7 +40490,8 @@
     "button": 9,
     "form": 8,
     "link": 2,
-    "table": 2
+    "table": 2,
+    "testid": 1
    },
    "departures": [
     {
@@ -40677,7 +40610,7 @@
    "controls": {
     "link": 4,
     "table": 1,
-    "testid": 1
+    "testid": 3
    },
    "departures": [],
    "extends": [
@@ -40819,8 +40752,8 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 1,
-    "testid": 1
+    "link": 2,
+    "testid": 3
    },
    "departures": [],
    "extends": [
@@ -40968,7 +40901,8 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 2
+    "link": 4,
+    "testid": 2
    },
    "departures": [
     {
@@ -41051,9 +40985,9 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 9,
+    "link": 13,
     "table": 1,
-    "testid": 9
+    "testid": 10
    },
    "departures": [
     {
@@ -45835,7 +45769,7 @@
     "button": 1,
     "link": 2,
     "table": 1,
-    "testid": 2
+    "testid": 4
    },
    "departures": [],
    "derived_fields": [
@@ -45958,7 +45892,7 @@
    ],
    "confidence": "low",
    "controls": {
-    "link": 1,
+    "link": 2,
     "testid": 1
    },
    "departures": [],
@@ -45984,7 +45918,8 @@
     "components/card.html",
     "components/list_table.html",
     "components/metrics_card.html",
-    "components/page_header.html"
+    "components/page_header.html",
+    "components/provenance.html"
    ],
    "original": "dashboard-01",
    "page_type": "dashboard",
@@ -46199,9 +46134,12 @@
    ],
    "confidence": "low",
    "controls": {
-    "button": 9,
-    "table": 2,
-    "testid": 1
+    "button": 12,
+    "form": 1,
+    "link": 1,
+    "modal": 1,
+    "table": 3,
+    "testid": 13
    },
    "departures": [
     {
@@ -46239,6 +46177,7 @@
     "components/impact_scenario_comparison_modal.html",
     "components/initiative_modal.html",
     "components/llm_recommendations.html",
+    "components/modal.html",
     "components/page_header.html",
     "components/priority_actions.html"
    ],
@@ -46335,7 +46274,8 @@
    ],
    "confidence": "low",
    "controls": {
-    "link": 2
+    "link": 2,
+    "testid": 1
    },
    "departures": [],
    "derived_fields": [
@@ -46458,9 +46398,10 @@
    ],
    "confidence": "low",
    "controls": {
-    "button": 10,
+    "button": 11,
+    "link": 2,
     "table": 1,
-    "testid": 24
+    "testid": 34
    },
    "departures": [
     {
@@ -46826,7 +46767,8 @@
    "confidence": "low",
    "controls": {
     "button": 1,
-    "link": 4
+    "link": 5,
+    "testid": 1
    },
    "departures": [],
    "derived_fields": [
@@ -48318,11 +48260,11 @@
    ],
    "confidence": "low",
    "controls": {
-    "button": 8,
+    "button": 9,
     "form": 1,
-    "link": 5,
+    "link": 6,
     "modal": 1,
-    "testid": 2
+    "testid": 6
    },
    "departures": [
     {
