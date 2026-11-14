@@ -156,3 +156,22 @@ def test_architect_cannot_bulk_delete_but_can_delete_one(client, app):
     finally:
         with app.app_context():
             _tidy(db, [org], [uid], [], [])
+
+
+def test_viewer_cannot_create_work_package_through_the_other_two_routes(client, app):
+    from app import db
+
+    with app.app_context():
+        org = _make_org_id(db, "PGO")
+        uid = _make_user_id(db, org, "PgOther", enterprise_role="procurement", role_name="Viewer")
+    try:
+        with app.app_context():
+            _login(client, uid)
+            r = client.post("/capability-map/api/archimate/elements",
+                            json={"name": "Viewer element", "type": "WorkPackage"})
+            assert r.status_code == 403, r.get_data(as_text=True)
+            r = client.post("/api/architecture-assistant/roadmap-elements", json={"gap_elements": []})
+            assert r.status_code == 403, r.get_data(as_text=True)
+    finally:
+        with app.app_context():
+            _tidy(db, [org], [uid], [], [])
