@@ -9,6 +9,7 @@ from flask_login import current_user, login_required
 from app import db
 from app.decorators import audit_log
 from app.middleware.tenant_context import current_org_id
+from app.modules.ai_chat.services import model_defaults
 from app.modules.ai_chat.services import application_change
 from app.modules.ai_chat.services.catalogue_answer import answer_catalogue_question
 from app.modules.ai_chat.services.estate_answer import (
@@ -122,7 +123,9 @@ def _empty_steps(answer, organization_id):
 def _catalogue_response(message, thread_id, keep):
     """The catalogue's cited answer to a plain startup question, or ``found: false``."""
     organization_id = current_org_id()
-    answer = answer_catalogue_question(message[:MAX_QUESTION_CHARS], int(organization_id)) if organization_id else None
+    answer = answer_catalogue_question(
+        message[:MAX_QUESTION_CHARS], int(organization_id), time_limit=float(model_defaults.PROVIDER_FIRST_TOKEN_SECONDS)
+    ) if organization_id else None
     if answer is None:
         return jsonify({"success": True, "found": False})
     count = len(answer["records"])

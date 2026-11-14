@@ -21,7 +21,7 @@
             {% endmacro %}
             {{ _count('gap-total', recorded_count, 'Recorded gaps', url_for('enterprise.gap_analysis')) }}
             {{ _count('gap-unclosed', unclosed_count, 'No work planned', url_for('enterprise.gap_analysis', status='open', work='none'), 'text-destructive' if unclosed_count > 0 else 'text-foreground', 'Open gaps with no work package') }}
-            {{ _count('gap-covered', covered_count, 'Covered', url_for('enterprise.gap_analysis', status='open', work='covered'), 'text-success' if covered_count > 0 else 'text-foreground', 'Open gaps with a work package') }}
+            {{ _count('gap-covered', covered_count, 'Open, covered', url_for('enterprise.gap_analysis', status='open', work='covered'), 'text-success' if covered_count > 0 else 'text-foreground', 'Open gaps with a work package') }}
             {{ _count('gap-closed', closed_count, 'Closed', url_for('enterprise.gap_analysis', status='closed'), 'text-foreground', 'Resolved, closed or completed in the gap register') }}
             {{ _count('gap-signals', computed_gap_count if computed_gap_count is not none else '—', 'Gap signals, not recorded', (url_for('main.capability_roadmap', _anchor='gap-signals') if computed_gap_count else none), 'text-foreground', 'Found by checking the capability map; not recorded as gaps yet. Opens the list of those signals on the roadmap') }}
             <a href="{{ url_for('enterprise.gap_analysis') }}"
