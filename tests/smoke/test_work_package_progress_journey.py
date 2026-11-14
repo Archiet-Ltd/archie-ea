@@ -56,7 +56,7 @@ def test_recording_progress_shows_it_with_its_source(
     app = create_app("testing")
     with app.app_context():
         wp = work_package_service.get_work_package(package, seeded["ids"]["org"])
-        wp.progress_percentage = 0
+        wp.progress_percentage = None
         db.session.commit()
         db.session.remove()
 

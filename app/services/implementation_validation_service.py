@@ -225,13 +225,14 @@ class ImplementationValidationService:
                 warnings.append("WorkPackage duration is less than 1 day")
 
         # Validate progress percentage
-        if work_package.progress_percentage < 0 or work_package.progress_percentage > 100:
+        recorded = work_package.progress_percentage
+        if recorded is not None and (recorded < 0 or recorded > 100):
             errors.append("Progress percentage must be between 0 and 100")
 
         # Validate status consistency with progress
-        if work_package.status == "completed" and work_package.progress_percentage < 100:
+        if work_package.status == "completed" and (recorded or 0) < 100:
             warnings.append("Completed WorkPackage should have 100% progress")
-        elif work_package.status == "planned" and work_package.progress_percentage > 0:
+        elif work_package.status == "planned" and (recorded or 0) > 0:
             warnings.append("Planned WorkPackage should have 0% progress")
 
         # Validate cost consistency

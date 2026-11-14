@@ -154,7 +154,8 @@ class UnifiedWorkPackage(TenantMixin, db.Model):
     status = Column(
         String(50), default="planned", index=True
     )  # planned, in_progress, completed, cancelled, on_hold
-    progress_percentage = Column(Float, default=0.0)
+    # NULL means nobody has recorded a figure; 0 means a person entered 0.
+    progress_percentage = Column(Float, nullable=True)
 
     # === Assignment and Responsibility ===
     assigned_to = Column(String(255), index=True)
@@ -314,7 +315,7 @@ class UnifiedWorkPackage(TenantMixin, db.Model):
         )
         wp.end_date = datetime.fromisoformat(props["end_date"]) if props.get("end_date") else None
         wp.status = props.get("status", "planned")
-        wp.progress_percentage = props.get("progress_percentage", 0.0)
+        wp.progress_percentage = props.get("progress_percentage")
         wp.assigned_to = props.get("assigned_to")
         wp.priority = props.get("priority", "medium")
         wp.estimated_cost = props.get("estimated_cost", 0.0)

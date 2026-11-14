@@ -52,8 +52,8 @@
             </div>
             {% elif p.key == 'progress' %}
             <div class="font-medium" data-testid="wp-progress">
-                {% if progress_value is none %}<span class="text-muted-foreground">Not recorded</span>{% else %}{{ progress_value }}%{% endif %}
-                <div class="text-muted-foreground text-xs font-normal" data-testid="wp-progress-source">{% if progress_value is none %}Edit the work package to record it.{% elif progress_basis.source == 'entered' %}Entered by the team{% else %}{{ progress_basis.label }}{% endif %}</div>
+                {% if progress_value is none %}<span class="text-muted-foreground">{{ 'Cancelled' if progress_basis.label == 'Cancelled' else 'Not recorded' }}</span>{% else %}{{ progress_value }}%{% endif %}
+                <div class="text-muted-foreground text-xs font-normal" data-testid="wp-progress-source">{% if progress_value is none and progress_basis.label == 'Cancelled' %}Cancelled, so no progress is expected.{% elif progress_value is none %}Edit the work package to record it.{% elif progress_basis.source == 'entered' %}Entered by the team{% else %}{{ progress_basis.label }}{% endif %}</div>
                 {% if days_gone %}<div class="text-muted-foreground text-xs font-normal" data-testid="wp-days-gone">{{ days_gone }}</div>{% endif %}
                 {% if progress_value is not none %}
                 <div class="mt-1 w-40 max-w-full ml-auto">

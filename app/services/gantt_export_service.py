@@ -302,7 +302,7 @@ class GanttExportService:
                     ax.barh(i, duration, left=start, height=0.8, color=color, alpha=0.8)
 
                     # Add progress bar if available
-                    if wp.get("progress_percentage", 0) > 0:
+                    if (wp.get("progress_percentage") or 0) > 0:
                         progress_duration = duration * (wp["progress_percentage"] / 100)
                         ax.barh(
                             i,
@@ -400,7 +400,7 @@ class GanttExportService:
                 draw.rectangle(
                     [
                         (200, y_offset),
-                        (200 + int(wp.get("progress_percentage", 0) * 2), y_offset + 20),
+                        (200 + int((wp.get("progress_percentage") or 0) * 2), y_offset + 20),
                     ],
                     fill=color,
                 )
@@ -546,7 +546,7 @@ class GanttExportService:
                     ax.barh(i, duration, left=start, height=0.8, color=color, alpha=0.8)
 
                     # Add progress bar if available
-                    if wp.get("progress_percentage", 0) > 0:
+                    if (wp.get("progress_percentage") or 0) > 0:
                         progress_duration = duration * (wp["progress_percentage"] / 100)
                         ax.barh(
                             i,

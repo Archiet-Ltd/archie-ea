@@ -62,8 +62,9 @@ def preload_progress(work_packages: List[UnifiedWorkPackage]) -> None:
     """Read the deliverable statuses ``progress_basis`` needs for a whole list in one
     query, so a screen listing many packages does not ask once per package. Call it
     on the list a request is about to render, not on a long-lived session."""
+    by_id = {w.id: w for w in work_packages if getattr(w, "id", None)}
     for wp_id, statuses in _deliverable_statuses(work_packages).items():
-        next(w for w in work_packages if getattr(w, "id", None) == wp_id)._deliverable_statuses = statuses
+        by_id[wp_id]._deliverable_statuses = statuses
 
 
 def progress_basis(wp: UnifiedWorkPackage) -> Dict[str, Any]:
@@ -79,12 +80,10 @@ def progress_basis(wp: UnifiedWorkPackage) -> Dict[str, Any]:
     if key in ("cancelled", "canceled"):
         return {"percent": None, "source": "none", "label": "Cancelled"}
     stored = getattr(wp, "progress_percentage", None)
+    if stored is not None:
+        return {"percent": min(int(stored), 99), "source": "entered", "label": "Entered by the team"}
     if key in ("", "planned", "proposed", "not_started", "on_hold"):
-        if stored is None:
-            return {"percent": None, "source": "none", "label": "Not recorded"}
-        return {"percent": min(int(stored), 99), "source": "entered", "label": "Entered by the team"}
-    if stored:
-        return {"percent": min(int(stored), 99), "source": "entered", "label": "Entered by the team"}
+        return {"percent": None, "source": "none", "label": "Not recorded"}
     statuses = getattr(wp, "_deliverable_statuses", None)
     if statuses is None:
         statuses = _deliverable_statuses([wp]).get(getattr(wp, "id", None), [])
@@ -300,9 +299,9 @@ def _apply(wp: UnifiedWorkPackage, fields: Dict[str, Any], organization_id: int)
             value = _parse_date(value)
         elif key in ("progress_percentage", "estimated_cost", "actual_cost"):
             value = _number(value, key)
-            if value is None:
+            if value is None and key != "progress_percentage":
                 continue
-            if key == "progress_percentage" and not 0 <= value <= 100:
+            if key == "progress_percentage" and value is not None and not 0 <= value <= 100:
                 raise WorkPackageError("Progress must be between 0 and 100.", field=key)
         elif key in ("estimated_effort_hours", "actual_effort_hours"):
             value = _number(value, key)

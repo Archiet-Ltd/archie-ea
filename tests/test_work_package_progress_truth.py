@@ -191,3 +191,66 @@ def test_a_plateau_averages_only_the_figures_that_exist(db_session, make_org, te
     assert "50% complete, based on 1 of 2 packages" in text
     assert "25%" not in text
     assert "0 of 1 done, progress: Not recorded" in text
+
+
+def test_a_new_package_has_no_figure_until_someone_enters_one(db_session, make_org, tenant_ctx):
+    org = make_org("newpkg")
+    with tenant_ctx(org.id):
+        planned = service.create_work_package(organization_id=org.id, name="Not started", status="planned")
+        held = service.create_work_package(organization_id=org.id, name="Held", status="on_hold")
+        db_session.flush()
+        for wp in (planned, held):
+            assert wp.progress_percentage is None
+            assert service.progress_basis(wp) == {"percent": None, "source": "none", "label": "Not recorded"}
+
+
+def test_a_recorded_zero_reads_zero_entered_by_the_team_in_any_status(db_session, make_org, tenant_ctx):
+    org = make_org("zero")
+    with tenant_ctx(org.id):
+        for status in ("planned", "in_progress"):
+            wp = service.create_work_package(
+                organization_id=org.id, name="Zero " + status, status=status, progress_percentage=0)
+            db_session.flush()
+            assert service.progress_basis(wp) == {"percent": 0, "source": "entered", "label": "Entered by the team"}
+
+
+def test_emptying_the_progress_field_clears_the_figure(db_session, make_org, tenant_ctx):
+    org = make_org("clear")
+    with tenant_ctx(org.id):
+        wp = _under_way(org, progress_percentage=40)
+        db_session.flush()
+        assert service.progress_percent(wp) == 40
+        service.update_work_package(wp.id, organization_id=org.id, progress_percentage="")
+        db_session.flush()
+        assert wp.progress_percentage is None
+        assert service.progress_basis(wp)["label"] == "Not recorded"
+        service.update_work_package(wp.id, organization_id=org.id, name="Renamed")
+        service.update_work_package(wp.id, organization_id=org.id, progress_percentage="25")
+        service.update_work_package(wp.id, organization_id=org.id, name="Renamed again")
+        db_session.flush()
+        assert wp.progress_percentage == 25
+
+
+def test_a_cancelled_package_says_cancelled_and_does_not_invite_progress(db_session, make_org, tenant_ctx, client, login_as):
+    org = make_org("cancelled")
+    user = _user(db_session, org)
+    with tenant_ctx(org.id):
+        wp = service.create_work_package(organization_id=org.id, name="Dropped", status="cancelled")
+        db_session.flush()
+        wp_id = wp.id
+    login_as(client, user)
+    text = _text(client.get(f"/implementation/work-packages/{wp_id}").get_data(as_text=True))
+    assert "Cancelled" in text
+    assert "Edit the work package to record it" not in text
+
+
+def test_a_package_without_a_description_shows_no_subtitle_text(db_session, make_org, tenant_ctx, client, login_as):
+    org = make_org("nodesc")
+    user = _user(db_session, org)
+    with tenant_ctx(org.id):
+        wp = service.create_work_package(organization_id=org.id, name="Plain", status="planned")
+        db_session.flush()
+        wp_id = wp.id
+    login_as(client, user)
+    html = client.get(f"/implementation/work-packages/{wp_id}").get_data(as_text=True)
+    assert not re.search(r">\s*None\s*<", html)
