@@ -57,8 +57,21 @@ def _seed_org(org_id, tag):
     # Created the way the capabilities page creates one, so that page lists it too and its
     # importance can be recorded there.
     db.session.add(BusinessCapability(name=plain_name, organization_id=org_id))
+    # A capability nobody rated whose application is rated high: its score is worked out, not recorded.
+    derived_name = "Run payroll %s" % tag
+    derived_row = BusinessCapability(name=derived_name, organization_id=org_id)
+    db.session.add(derived_row)
+    db.session.flush()
+    derived = UnifiedCapability.query.filter_by(
+        source_table="business_capability", source_id=str(derived_row.id), organization_id=org_id).one()
+    rated_app = ApplicationComponent(
+        name="Payroll system %s" % tag, organization_id=org_id, business_criticality="high")
+    db.session.add(rated_app)
+    db.session.flush()
+    db.session.add(UnifiedApplicationCapabilityMapping(
+        unified_capability_id=derived.id, application_component_id=rated_app.id))
     db.session.commit()
-    return {"funded": funded_name, "plain": plain_name}
+    return {"funded": funded_name, "plain": plain_name, "derived": derived_name, "derived_bc": derived_row.id}
 
 
 @pytest.fixture(scope="module")
@@ -73,7 +86,7 @@ def two_orgs(live_server):
         names = _seed_org(mine["org_id"], "m" + tag)
         foreign = _seed_org(other["org_id"], "f" + tag)
     mine["admin_email"] = "launch.admin.%s@example.com" % mine["suffix"]
-    return {"mine": mine, "names": names, "foreign": foreign}
+    return {"mine": mine, "names": names, "foreign": foreign, "foreign_org_id": other["org_id"]}
 
 
 def _row(page, name):
@@ -138,7 +151,8 @@ def test_a_derived_scores_step_opens_that_capabilitys_own_importance(browser, li
         expect(page.locator("#cap-importance")).to_be_visible()
         # Record the importance through that form.
         page.locator("#cap-importance").select_option("high")
-        page.locator("#cap-save").click()
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.locator("#cap-save").click()
         expect(dialog).to_be_hidden(timeout=PAGE_TIMEOUT)
         # Both pages now show the recorded value for that capability, and no derived tag, no step.
         for path in PAGES:
@@ -196,5 +210,89 @@ def test_the_withheld_sentence_once_on_a_phone_in_the_dark(browser, live_server,
         assert HELD_BACK not in phone_cell.inner_text()
         assert "£" not in page.content()
         _shot(page, "withheld-priorities", 390, "dark")
+    finally:
+        context.close()
+
+
+def _importance_in_database(org_id, name):
+    """What the capability records and its unified record hold for importance, read from the database."""
+    from app import create_app, db
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_capability import UnifiedCapability
+
+    app = create_app("testing")
+    with app.app_context():
+        recorded = db.session.execute(db.select(
+            BusinessCapability.strategic_importance, BusinessCapability.category
+        ).where(BusinessCapability.organization_id == org_id, BusinessCapability.name == name)).one()
+        unified = db.session.execute(db.select(UnifiedCapability.strategic_importance).where(
+            UnifiedCapability.organization_id == org_id, UnifiedCapability.name == name)).scalar_one()
+        return recorded[0], recorded[1], unified
+
+
+def test_a_derived_score_offers_the_step_and_recording_importance_replaces_it(
+        browser, live_server, two_orgs):
+    names, foreign = two_orgs["names"], two_orgs["foreign"]
+    org_id, other_id = two_orgs["mine"]["org_id"], two_orgs["foreign_org_id"]
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1100})
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, two_orgs["mine"]["emails"]["enterprise_architect"])
+        for path in PAGES:
+            page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            row = _row(page, names["derived"])
+            expect(row).to_have_count(1)
+            # Worked out from the application's criticality, tagged so, and the step is offered.
+            expect(row.get_by_test_id("strategic-derived")).to_have_count(1)
+            expect(row.get_by_test_id("strategic-sentence")).to_contain_text("criticality")
+            expect(row.get_by_test_id("strategic-step")).to_have_text("Record its importance")
+        page.goto(live_server + PAGES[1], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = _row(page, names["derived"])
+        row.get_by_test_id("strategic-step").click()
+        page.wait_for_load_state("domcontentloaded")
+        expect(page.locator("#cap-dialog")).to_be_visible()
+        expect(page.locator("#cap-name")).to_have_value(names["derived"])
+        # The category stays as it was: not chosen.
+        expect(page.locator("#cap-category")).to_have_value("")
+        page.locator("#cap-importance").select_option("medium")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.locator("#cap-save").click()
+        expect(page.locator("#cap-dialog")).to_be_hidden(timeout=PAGE_TIMEOUT)
+        for path in PAGES:
+            page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            row = _row(page, names["derived"])
+            expect(row).to_have_count(1)
+            strategic = row.get_by_test_id("cell-strategic").inner_text()
+            assert "medium importance" in strategic, strategic
+            assert strategic.startswith("15/25"), strategic
+            assert row.get_by_test_id("strategic-derived").count() == 0
+            assert row.get_by_test_id("strategic-step").count() == 0
+        _shot(page, "derived-recorded", 1440, "light")
+    finally:
+        context.close()
+    # Importance changed, the category was left alone, and the other organisation's twin did not move.
+    assert _importance_in_database(org_id, names["derived"]) == ("medium", None, "medium")
+    assert _importance_in_database(other_id, foreign["derived"]) == (None, None, None)
+
+
+def test_a_person_the_save_refuses_is_offered_no_step_on_either_page(browser, live_server):
+    from app import create_app
+
+    plain = create_fresh_org("enterprise_architect", platform_role="Viewer")
+    tag = uuid.uuid4().hex[:6]
+    with create_app("testing").app_context():
+        names = _seed_org(plain["org_id"], "u" + tag)
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 390, "height": 844},
+                                  color_scheme="dark")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, plain["emails"]["enterprise_architect"])
+        for path in PAGES:
+            page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            expect(_row(page, names["derived"])).to_have_count(1)
+            expect(_row(page, names["derived"]).get_by_test_id("strategic-derived")).to_have_count(1)
+            assert page.get_by_test_id("strategic-step").count() == 0, path
+            assert page.content().count(HELD_BACK) == 1, path
+        _shot(page, "no-step-plain-user", 390, "dark")
     finally:
         context.close()

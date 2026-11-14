@@ -386,6 +386,10 @@ if (new URLSearchParams(window.location.search).get('new') === '1' && document.g
     if (!editId || !document.getElementById('cap-dialog')) return;
     var card = document.querySelector('.cap-card[data-cap-id="' + String(editId).replace(/"/g, '') + '"]');
     if (card) openCapEdit(card);
+    // Drop the parameter once the form is open, so the reload after a save does not open it again.
+    var url = new URL(window.location.href);
+    url.searchParams.delete('edit');
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash);
 })();
 
 /* CSP-safe: delegate the page actions instead of inline onclick= (DESIGN.md). */

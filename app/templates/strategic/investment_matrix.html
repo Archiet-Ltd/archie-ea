@@ -307,13 +307,13 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
                                         <div>
                                             <span class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground" data-testid="strategic-derived">Derived</span>
                                             <span class="block max-w-40 text-xs text-muted-foreground" data-testid="strategic-sentence" x-text="cap.strategic_derivation.sentence"></span>
-                                            <a x-show="cap.strategic_step && cap.strategic_step.href" :href="cap.strategic_step && cap.strategic_step.href" class="block text-xs text-primary hover:underline" data-testid="strategic-step" x-text="cap.strategic_step && cap.strategic_step.text"></a>
+                                            <template x-if="cap.strategic_step && cap.strategic_step.href"><a :href="cap.strategic_step.href" class="block text-xs text-primary hover:underline" data-testid="strategic-step" x-text="cap.strategic_step.text"></a></template>
                                         </div>
                                     </template>
                                     <template x-if="cap.strategic_basis === null">
                                         <div>
                                             <span class="block max-w-40 text-xs text-muted-foreground">Nothing is recorded to score it from.</span>
-                                            <a x-show="cap.strategic_step && cap.strategic_step.href" :href="cap.strategic_step && cap.strategic_step.href" class="block text-xs text-primary hover:underline" data-testid="strategic-step" x-text="cap.strategic_step && cap.strategic_step.text"></a>
+                                            <template x-if="cap.strategic_step && cap.strategic_step.href"><a :href="cap.strategic_step.href" class="block text-xs text-primary hover:underline" data-testid="strategic-step" x-text="cap.strategic_step.text"></a></template>
                                         </div>
                                     </template>
                                 </td>

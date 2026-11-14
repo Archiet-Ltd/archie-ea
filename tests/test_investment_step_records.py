@@ -125,3 +125,13 @@ def test_saving_only_importance_leaves_an_empty_category_empty(client, login_as,
     bc = db_session.get(BusinessCapability, mine["listed_bc"])
     assert bc.strategic_importance == "high"
     assert not bc.category
+
+
+def test_no_investment_page_prints_its_own_withheld_caption():
+    """The withheld sentence is printed once per page from the one constant; no caption repeats it."""
+    import pathlib
+
+    for template in pathlib.Path("app/templates/strategic").glob("*.html"):
+        text = template.read_text()
+        assert "left out of this page" not in text, template
+        assert "costs are not shown" not in text, template
