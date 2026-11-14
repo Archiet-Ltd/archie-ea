@@ -41,8 +41,10 @@ def test_each_source_is_asked_once_and_plateaus_show_before_work_packages(browse
                     page.wait_for_timeout(100)
                 route.continue_()
                 state["packages_arrived"] = True
-            except Exception:
-                pass
+            except Exception as e:
+                # Only swallow Playwright's closed-target error; surface anything else.
+                if "closed" not in str(e).lower():
+                    raise
 
         try:
             sign_in(page, live_server, org["emails"]["enterprise_architect"])
@@ -73,6 +75,7 @@ def test_each_source_is_asked_once_and_plateaus_show_before_work_packages(browse
             line = page.get_by_test_id("roadmap-summary-footer").inner_text()
             assert "Work packages: 6" in line, line
             assert asked == {"gaps": 1, "plateaus": 1, "work-packages": 1}, asked
+            assert state["packages_arrived"] is True, "the held work packages answer never arrived"
             _frame(page, "loading-done", width, theme)
         finally:
             state["release"] = True
@@ -105,8 +108,10 @@ def test_plateaus_tile_shows_evidence_figure_while_plateaus_answer_held(browser,
                     page.wait_for_timeout(100)
                 route.continue_()
                 state["plateaus_arrived"] = True
-            except Exception:
-                pass
+            except Exception as e:
+                # Only swallow Playwright's closed-target error; surface anything else.
+                if "closed" not in str(e).lower():
+                    raise
 
         try:
             sign_in(page, live_server, org["emails"]["enterprise_architect"])
@@ -137,6 +142,7 @@ def test_plateaus_tile_shows_evidence_figure_while_plateaus_answer_held(browser,
             line = page.get_by_test_id("roadmap-summary-footer").inner_text()
             assert "Plateaus: 3" in line, line
             assert asked == {"gaps": 1, "plateaus": 1, "work-packages": 1}, asked
+            assert state["plateaus_arrived"] is True, "the held plateaus answer never arrived"
             _frame(page, "loading-plateaus-done", width, theme)
         finally:
             state["release"] = True

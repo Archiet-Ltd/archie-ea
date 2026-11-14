@@ -452,7 +452,7 @@ def capability_roadmap():
         gap_signals_error=gap_signals_error,
         recorded_gaps=figures["recorded_gaps"],
         ai_generated=figures["ai_generated"],
-        summary_footer_html=figures["footer_html"],
+        evidence_line_html=figures["footer_html"],
     )
 
 

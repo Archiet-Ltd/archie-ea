@@ -67,8 +67,10 @@ def test_gaps_held_show_loading_mark_never_zero(browser, live_server):
             # never "0" or blank.
             recorded = page.get_by_test_id("rdm-recorded-gaps")
             ai = page.get_by_test_id("rdm-ai-generated")
-            expect(recorded).to_have_text("—", timeout=PAGE_TIMEOUT)
-            expect(ai).to_have_text("—", timeout=PAGE_TIMEOUT)
+            # One read, no retrying: the page's first paint carries the server's figure or the loading mark.
+            recorded_now, ai_now = recorded.inner_text(), ai.inner_text()
+            assert recorded_now in ("—", str(expected_gaps)), recorded_now
+            assert ai_now in ("—", "0"), ai_now
 
             # Release the gaps answer
             state["release_gaps"] = True

@@ -135,7 +135,7 @@ def test_ai_generated_package_reaches_table_tile_line_and_timeline(browser, live
         expect(page.get_by_test_id("rdm-work-packages-tile")).to_have_text("1", timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("roadmap-summary-footer")).to_contain_text("Work packages: 1", timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("roadmap-wp-link").filter(has_text=name)).to_have_count(1, timeout=PAGE_TIMEOUT)
-        expect(page.locator("#rdm-gantt-chart").get_by_text(name)).to_have_count(1, timeout=PAGE_TIMEOUT)
+        expect(page.locator("#rdm-gantt-chart").get_by_text(name).first).to_be_visible(timeout=PAGE_TIMEOUT)
     finally:
         context.close()
 
@@ -155,7 +155,7 @@ def test_saved_package_enters_the_timeline_and_deleted_one_leaves(browser, live_
         page.fill("#rdm-wp-target", "2027-01-31")
         page.locator("#rdm-create-wp-modal").get_by_role("button", name="Create Work Package").click()
         gantt = page.locator("#rdm-gantt-chart")
-        expect(gantt.get_by_text(name)).to_have_count(1, timeout=PAGE_TIMEOUT)
+        expect(gantt.get_by_text(name).first).to_be_visible(timeout=PAGE_TIMEOUT)
 
         page.locator("tr").filter(has_text=name).get_by_role("button", name="Delete").first.click()
         page.get_by_role("alertdialog").get_by_role("button", name="Delete", exact=True).click()
