@@ -32,11 +32,26 @@ def parse(plan, interval) -> Optional[Tuple[str, str]]:
     return plan, interval
 
 
-def target_url(plan, interval) -> Optional[str]:
-    """The billing page's checkout step for a valid plan, else None."""
+CREDIT_OFFER = "credit"
+
+
+def parse_offer(plan, offer) -> Optional[str]:
+    """``"credit"`` when the visitor asked for the 90 days of Startup, free; else None."""
+    return CREDIT_OFFER if (offer == CREDIT_OFFER and plan == "startup") else None
+
+
+def requested_offer() -> Optional[str]:
+    return parse_offer(request.args.get("plan"), request.args.get("offer"))
+
+
+def target_url(plan, interval, offer=None) -> Optional[str]:
+    """The billing page's checkout step for a valid plan, else None. For the free
+    90 days of Startup it is the billing page's credit card."""
     chosen = parse(plan, interval)
     if chosen is None or "billing.billing_index" not in current_app.view_functions:
         return None
+    if parse_offer(chosen[0], offer):
+        return url_for("billing.billing_index") + "#startup-credit"
     return url_for("billing.billing_index", plan=chosen[0], interval=chosen[1]) + "#checkout"
 
 
@@ -50,21 +65,21 @@ def plan_given() -> bool:
 
 
 def remember(chosen: Tuple[str, str]) -> None:
-    session[SESSION_KEY] = {"plan": chosen[0], "interval": chosen[1]}
+    session[SESSION_KEY] = {"plan": chosen[0], "interval": chosen[1], "offer": requested_offer()}
 
 
 def remembered_url() -> Optional[str]:
     held = session.get(SESSION_KEY)
     if not isinstance(held, dict):
         return None
-    return target_url(held.get("plan"), held.get("interval"))
+    return target_url(held.get("plan"), held.get("interval"), held.get("offer"))
 
 
 def pending_url() -> Optional[str]:
     """Checkout step for the plan in this request or remembered in the session."""
     chosen = requested()
     if chosen is not None:
-        return target_url(*chosen)
+        return target_url(*chosen, offer=requested_offer())
     return remembered_url()
 
 

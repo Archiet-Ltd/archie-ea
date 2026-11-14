@@ -161,6 +161,12 @@ def renewal_summary(sub, plan: Plan, live: bool) -> Dict[str, Optional[str]]:
     "Nothing to renew" when the plan is free, never a bare dash."""
     if plan.key == "free":
         return {"label": "Next renewal", "value": "Nothing to renew", "note": None}
+    if sub is not None and sub.offer == "startup_credit" and not live and sub.current_period_end is not None:
+        return {
+            "label": "Free until",
+            "value": sub.current_period_end.strftime("%d %b %Y").lstrip("0"),
+            "note": "Buy Startup before then to keep ten people",
+        }
     if not live or sub is None or sub.current_period_end is None:
         return {"label": "Next renewal", "value": "No renewal yet", "note": None}
     when = sub.current_period_end.strftime("%d %b %Y")
@@ -465,7 +471,9 @@ def user_limit_status(org_id: int) -> Dict:
     sub = current_subscription(org) if org is not None else None
     plan = effective_plan(sub)
     limit = _limit_for(plan, sub.seats_purchased if sub is not None else None)
-    return _status(plan, limit, _count_members(db.session.connection(), org_id, plan.counts))
+    status = _status(plan, limit, _count_members(db.session.connection(), org_id, plan.counts))
+    status["offer"] = sub.offer if sub is not None and not offer_lapsed(sub) else None
+    return status
 
 
 class PlanLimitReached(Exception):

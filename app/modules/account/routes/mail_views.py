@@ -51,7 +51,7 @@ def register_view():
         return redirect("/pricing")
     if chosen is not None and current_user.is_authenticated:
         # Already has an account and is signed in: straight to that plan.
-        return redirect(buy_intent.target_url(*chosen))
+        return redirect(buy_intent.target_url(*chosen, offer=buy_intent.requested_offer()))
     form = RegistrationForm()
     if request.method == "GET":
         # A visitor reaching the sign-up form, not a retry after a failed

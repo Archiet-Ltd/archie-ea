@@ -232,3 +232,89 @@ def startup_credit_state(org, now: Optional[datetime] = None) -> Dict:
     if BillingService.has_live_subscription(sub) or effective_plan(sub).key != "free":
         return {"state": "unavailable", "ends_on": None}
     return {"state": "available", "ends_on": None}
+
+
+def declared_answers(sub) -> Dict:
+    """What the person declared last time, so a refused claim keeps its form filled in."""
+    terms = getattr(sub, "offer_terms", None) or {}
+    return dict(terms.get("declaration") or {})
+
+
+def website_on_file(org) -> Optional[str]:
+    """The company website given at sign-up, to prefill the claim form."""
+    from app.modules.account.services.onboarding_service import website_url
+
+    return website_url(org)
+
+
+REMINDER_DAYS = (14, 3)
+
+
+def _reminder_due(sub, now: datetime) -> Optional[int]:
+    """The reminder (14 or 3 days before the end) this running credit owes, if any.
+    The nearest threshold already passed; a larger one it skipped counts as sent."""
+    terms = sub.offer_terms or {}
+    sent = {item.get("days") for item in terms.get("reminders") or []}
+    remaining = sub.current_period_end - now
+    for days in sorted(REMINDER_DAYS):
+        if remaining <= timedelta(days=days):
+            return None if days in sent else days
+    return None
+
+
+def remind_one_organisation(app, organization_id: int, now: Optional[datetime] = None) -> Dict:
+    """Send the reminder this organisation's credit is due: a bell notification and an
+    email to each administrator, recorded on the row so none is sent twice. Runs inside
+    the organisation's own scope."""
+    from flask import url_for
+
+    from app.models.models import Notification
+    from app.models.organization import Organization
+    from app.models.user import User
+    from app.services.administrator_guard import administrator_ids
+
+    now = now or datetime.utcnow()
+    org = db.session.get(Organization, organization_id)
+    state = startup_credit_state(org, now) if org is not None else {"state": None}
+    if state["state"] != "active":
+        return {"organization_id": organization_id, "sent": 0}
+    sub = org.subscription
+    days = _reminder_due(sub, now)
+    if days is None:
+        return {"organization_id": organization_id, "sent": 0}
+
+    ends = sub.current_period_end.strftime("%d %b %Y").lstrip("0")
+    message = (
+        f"Your 90 days of Startup end on {ends}, {days} days from now. "
+        "Buy Startup before then to keep ten people."
+    )
+    with app.test_request_context():
+        link = url_for("billing.billing_index")
+    # tenant-scoping-ok: this organisation's own administrators, by id
+    admins = User.query.filter(User.id.in_(administrator_ids(organization_id))).all()
+    for person in admins:
+        db.session.add(Notification(
+            user_id=person.id, message=message, url=link, organization_id=organization_id,
+            event_type="startup_credit_ending", entity_type="subscription", entity_id=sub.id,
+        ))
+    terms = dict(sub.offer_terms or {})
+    terms["reminders"] = list(terms.get("reminders") or []) + [{"days": days, "sent_at": now.isoformat()}]
+    sub.offer_terms = terms
+    db.session.commit()
+
+    from app._bootstrap._digest_emails import _safe_send_email
+
+    recipients = [p.email for p in admins if p.email]
+    body = f"<p>{message}</p><p><a href=\"{app.config.get('PUBLIC_BASE_URL', '').rstrip('/')}{link}\">Open billing</a></p>"
+    _safe_send_email(app, "Your 90 days of Startup are ending", recipients, body)
+    return {"organization_id": organization_id, "sent": len(admins), "days": days}
+
+
+def send_offer_reminders(app, *, organization_ids=None, now: Optional[datetime] = None):
+    """The daily job: remind each organisation whose startup credit ends in 14 or 3 days."""
+    from app.jobs.tenant_safe_job import run_for_each_tenant
+
+    return run_for_each_tenant(
+        app, "offer-reminders", lambda organization_id: remind_one_organisation(app, organization_id, now),
+        organization_ids=organization_ids,
+    )
