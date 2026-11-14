@@ -1458,6 +1458,20 @@
      "keep_until": "flowanalytics01",
      "why": "Flow analytics uses metric cards (components/card.html + components/metrics_card.html) for KPI summary; the data-table block does not include card components. A follow-up brief will decide whether to migrate to data_card or keep as a dashboard-style summary on a data-table page."
     }
+   ],
+   "app/templates/enterprise/impact_analysis.html": [
+    {
+     "macro": "components/priority_actions.html",
+     "keep_until": "impactwave03",
+     "why": "The prioritised actions live on this page (impactwave01, impactwave02); the component is allowed on this page only, as on the strategic Impact Analysis page (lead ruling 13 Nov 2026)."
+    }
+   ],
+   "app/templates/strategic/investment_matrix_prereq.html": [
+    {
+     "macro": "components/unified_mapping_modal.html",
+     "keep_until": "mapmodallib01",
+     "why": "shared mapping modal used by five pages; mapmodallib01 moves it onto the library dialog"
+    }
    ]
   },
   "pages": {

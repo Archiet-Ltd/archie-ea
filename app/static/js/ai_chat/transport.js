@@ -73,12 +73,24 @@
        handing a grounded question to a model. */
     async function askEstate(message, options) {
         var remember = !(options && options.remember === false);
-        var resp = await apiFetch('/ai-chat/estate-answer', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember, part: (options && options.part) || null, element_id: (options && options.elementId) || undefined })
-        });
-        var data = await resp.json().catch(function () { return {}; });
+        /* The lookup has one total limit, set by the server from the same budget and margin as the
+           turn: whatever bytes arrive, the request ends then and the chat shows the failure card. */
+        var limit = new AbortController();
+        /* The page carries the limit; with none given the lookup is not cut short by a number written here. */
+        var timer = window.chatLookupAbortMs > 0 ? setTimeout(function () { limit.abort(); }, window.chatLookupAbortMs) : null;
+        var resp, data;
+        try {
+            resp = await apiFetch('/ai-chat/estate-answer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message, thread_id: window.__threadId || null, remember: remember, part: (options && options.part) || null, element_id: (options && options.elementId) || undefined }),
+                signal: limit.signal
+            });
+            data = await resp.json().catch(function () { return {}; });
+            if (limit.signal.aborted) throw new Error('estate answer ran past its limit');
+        } finally {
+            clearTimeout(timer);
+        }
         if (!resp.ok || data.success === false) throw new Error(data.error || 'estate answer ' + resp.status);
         return data;
     }
@@ -284,7 +296,9 @@
                             genomeHtml: (ev.genome_answer && ev.genome_answer.html) || null,
                             paused: !!ev.paused,
                             retryable: !!ev.retryable,
-                            error: ev.error || null
+                            notSetUp: !!ev.not_set_up,
+                            error: ev.error || null,
+                            turnId: ev.turn_id || null
                         };
                     } else if (ev.error) {
                         throw new Error(ev.error);
@@ -324,7 +338,9 @@
             genomeHtml: meta.genomeHtml || null,
             paused: !!meta.paused,
             retryable: !!meta.retryable,
-            error: meta.error || null
+            notSetUp: !!meta.notSetUp,
+            error: meta.error || null,
+            turnId: meta.turnId || null
         });
         return true;
     }

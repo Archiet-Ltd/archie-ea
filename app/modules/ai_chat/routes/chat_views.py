@@ -11,6 +11,8 @@ from typing import Any, Dict
 from flask import current_app, render_template
 from flask_login import current_user, login_required
 
+from app.modules.ai_chat.services import model_defaults
+from app.modules.ai_chat.services.failure_messages import FEATURE_INTROS
 from app.services.multi_domain_chat_service import MultiDomainChatService
 from . import unified_ai_chat_bp
 
@@ -218,8 +220,22 @@ def index():
     # AI_CHAT_CONTEXT_LIMIT (default 50) rows each on every page load and pass
     # them to a template that referenced context_data zero times. The chat loads
     # its context on demand from /ai-chat/context/<domain> instead.
+    # The link to the provider keys after a failed reply is for an administrator whose organisation
+    # has a key of its own; the sign-up's own-key check decides, so the built-in AI never shows it.
+    from app.modules.account.services.onboarding_service import own_key_provider
+
+    try:
+        own_key_admin = bool(current_user.is_admin() and own_key_provider())
+    except Exception:
+        current_app.logger.warning("Could not read the organisation's own AI key", exc_info=True)
+        own_key_admin = False
     return render_template(
         "ai_chat/index.html",
+        own_key_admin=own_key_admin,
+        not_set_up_sentence=FEATURE_INTROS["chat"],
+        lookup_abort_ms=int(
+            (model_defaults.PROVIDER_FIRST_TOKEN_SECONDS + model_defaults.CHAT_TURN_MARGIN_SECONDS) * 1000
+        ),
         domain_config=domain_config,
         persona_config=persona_config,
         chat_bootstrap_error=chat_bootstrap_error,
