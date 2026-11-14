@@ -77,6 +77,7 @@ def test_same_org_reviewer_executes_once_and_receives_allowlisted_queue(
     db_session, make_org, tenant_ctx, monkeypatch
 ):
     """A different authorized user reviews exactly one same-org queued write."""
+    from app.modules.ai_chat.services import change_review
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
     from app.models.ai_chat_crud_approval import AIChatApprovalAuditLog, AIChatCRUDApproval
 
@@ -111,6 +112,9 @@ def test_same_org_reviewer_executes_once_and_receives_allowlisted_queue(
                 "can_approve": True,
                 "approve_note": None,
                 "requester": {"id": requester.id, "display_name": "Requester Reviewer"},
+                "verdict": "In review",
+                "in_review_for": "under a minute",
+                "review": change_review.describe(approval),
             }
         ]
 
