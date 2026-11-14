@@ -105,5 +105,5 @@ def test_requested_by_names_the_import_that_proposed_the_change(app, db_session,
     login_as(client, User.query.get(person.id))
     html = client.get("/ai-chat/approvals/inbox").get_data(as_text=True)
     card = html.split('data-testid="approval-card-%s"' % proposal_id, 1)[1].split("approval-card-", 1)[0]
-    assert "Requested by" in card and "Github connector" in card
+    assert "Requested by" in card and "GitHub connector" in card
     assert "The system" not in html

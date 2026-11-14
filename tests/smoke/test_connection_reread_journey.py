@@ -116,6 +116,19 @@ def run_the_job(app, org_id, now=None):
             return reread_due_connectors(org_id, now=now)
 
 
+def decide_as_the_review_does(app, person, approval_id, reason):
+    """Decline one request through the service, as the automatic review does: the page has no control."""
+    from app import db
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    with app.app_context():
+        with tenant_scope(person["org_id"]):
+            result = AIChatApprovalService(person["user_ids"]["solution_architect"]).reject_approval(approval_id, reason)
+        db.session.commit()
+        assert result.get("success"), result
+
+
 def signed_in(browser, world, who):
     context = browser.new_context(viewport={"width": 1440, "height": 900})
     context.add_init_script(SKIP_WELCOME)
@@ -283,7 +296,8 @@ def test_an_organisation_that_has_not_delegated_is_asked_not_read_and_the_page_s
         queued = page.locator('[data-testid^="approval-card-"]').filter(
             has_text="Run sync for connector 'GitHub (needs approval)'"
         )
-        expect(queued).to_contain_text("Requested by The system")
+        expect(queued).to_contain_text("Requested by Connector sync")
+        expect(queued).not_to_contain_text("The system")
         expect(queued).not_to_contain_text("Recorded by")
 
         # The approver declines the request. The connection is not asked about again at the next
@@ -291,9 +305,10 @@ def test_an_organisation_that_has_not_delegated_is_asked_not_read_and_the_page_s
         card = page.locator('[data-testid^="approval-card-"]').filter(
             has_text="Run sync for connector 'GitHub (needs approval)'"
         )
-        card.get_by_role("button", name="Reject").click()
-        card.get_by_label("Why are you rejecting this?").fill("Not this week")
-        card.get_by_role("button", name="Confirm Reject").click()
+        expect(page.get_by_role("button", name=re.compile("^(Approve|Reject)"))).to_have_count(0)
+        card_id = int(card.get_attribute("data-testid").rsplit("-", 1)[1])
+        decide_as_the_review_does(app, world["three"], card_id, "Not this week")
+        page.reload(wait_until="domcontentloaded")
         page.locator('[data-testid^="approval-decided-"]').first.wait_for(timeout=PAGE_TIMEOUT)
         for minutes in (0, 10, 20):
             tick = run_the_job(app, world["three"]["org_id"], now=datetime.utcnow() + timedelta(minutes=minutes))
@@ -322,7 +337,7 @@ def test_an_organisation_that_has_not_delegated_is_asked_not_read_and_the_page_s
         page.wait_for_load_state("domcontentloaded")
         # the queue holds the declined request and no new one waiting for a decision
         expect(page.get_by_text("Run sync for connector 'GitHub (needs approval)'")).to_have_count(1)
-        expect(card.get_by_role("button", name="Reject")).to_have_count(0)
+        expect(page.get_by_role("button", name=re.compile("^(Approve|Reject)"))).to_have_count(0)
 
         # A connection that is switched off is not read on any schedule, and the page does not say it is.
         from app import db

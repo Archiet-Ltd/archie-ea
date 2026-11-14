@@ -8,14 +8,13 @@ the reviewer fails any change to an application called "Old Ledger".
 * applied: the chat says Applied, the record names both models, the application page reads Production.
 * declined: the reviewer's reason is in the chat and on the record, and the application is unchanged.
 * held: while the workspace has paused the assistant's changes the chat says so, no reviewer is called and
-  nothing changes; after writes resume the person presses Approve, the review passes it and it is applied.
-* approved by hand: the person presses Approve on a change the reviewer fails; it is declined with the
-  reviewer's reason, not applied.
-* switched off: a colleague presses Approve on a change asked for by an account that has been switched off;
-  it is declined with that reason, no reviewer is called, and nothing changes.
+  nothing changes; after writes resume the review picks the change up by itself, passes it and it is applied.
+* waiting and failed: a change waiting for review that the reviewer fails is declined with the reviewer's
+  reason when the review runs, not applied.
+* switched off: a change asked for by an account that has been switched off is declined with that reason when
+  the review runs, no reviewer is called, and nothing changes.
 
-Before this change an Approve button applied the change with no review, and a switched-off account's change
-was applied.
+The page offers no Approve or Reject control: the review is what decides.
 """
 import json
 import os
@@ -63,14 +62,18 @@ def stub():
     s.close()
 
 
-@pytest.fixture(scope="module")
-def deepseek_server(request, app, stub):
+def _stub_env(stub):
     env = {name + "_API_KEY": "" for name in OTHERS}
     env.update(
         LLM_PROVIDER_ORDER="deepseek", DEEPSEEK_API_KEY=KEY, DEEPSEEK_API_BASE=stub.base_url,
         LLM_SPEND_CEILING_USD_DEEPSEEK="62", NO_PROXY="127.0.0.1,localhost", no_proxy="127.0.0.1,localhost",
     )
-    return boot_live_server(request, None, app, extra_env=env)
+    return env
+
+
+@pytest.fixture(scope="module")
+def deepseek_server(request, app, stub):
+    return boot_live_server(request, None, app, extra_env=_stub_env(stub))
 
 
 @pytest.fixture
@@ -228,13 +231,46 @@ def _status_args(name):
 
 
 
-def _press_approve(page, base, approval_id):
-    page.goto(base + "/ai-chat/approvals/inbox?approval=%d" % approval_id, wait_until="domcontentloaded",
-              timeout=PAGE_TIMEOUT)
-    card = page.get_by_test_id("approval-card-%d" % approval_id)
-    expect(card).to_be_visible(timeout=PAGE_TIMEOUT)
-    card.get_by_role("button", name="Approve").click()
-    page.wait_for_load_state("domcontentloaded")
+def _the_review_runs(org_id, approval_id, stub):
+    """What the scheduled review does for a change that has been quiet: settle it. The change is aged past
+    the quiet window, then the organisation is swept with the same stubbed provider the server uses."""
+    from datetime import timedelta
+
+    from app import db
+
+    app = _app_context()
+    env = _stub_env(stub)
+    saved = {k: os.environ.get(k) for k in env}
+    os.environ.update(env)
+    try:
+        with app.app_context():
+            from flask import g
+
+            with app.test_request_context("/"):
+                g.current_org_id = org_id
+                from app.models.ai_chat_crud_approval import AIChatApprovalAuditLog, AIChatCRUDApproval
+                from app.modules.ai_chat.services.change_review import SWEEP_QUIET_MINUTES, sweep_organisation
+
+                older = timedelta(minutes=SWEEP_QUIET_MINUTES + 5)
+                row = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=org_id).one()
+                row.created_at = row.created_at - older
+                for event in AIChatApprovalAuditLog.query.filter_by(approval_id=approval_id).all():
+                    event.created_at = event.created_at - older
+                db.session.commit()
+                sweep_organisation(org_id)
+                db.session.commit()
+            db.session.remove()
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+def _no_decision_control(page):
+    assert page.get_by_role("button", name=re.compile("^(Approve|Reject)")).count() == 0
+    assert page.get_by_role("link", name=re.compile("^(Approve|Reject)")).count() == 0
 
 
 def _open_record_from_decided_list(page, approval_id):
@@ -332,11 +368,12 @@ def test_a_change_is_held_while_writes_are_paused_and_applied_after_they_resume_
         _shot(page, shots, "change-held-record", theme)
         assert _status_of(ws["apps"][name]) == "development"
 
-        # Writes resume; the person presses Approve; the review passes it and it is applied.
+        # Writes resume; the review picks the change up by itself, passes it and it is applied.
         _writes(ws["org_id"], paused=False)
-        _press_approve(page, base, approval_id)
-        assert "The change has been made" in page.locator("body").inner_text()
-        assert len(_reviews(stub)) == reviews_before + 1, "the Approve went through the review"
+        _the_review_runs(ws["org_id"], approval_id, stub)
+        page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _no_decision_control(page)
+        assert len(_reviews(stub)) == reviews_before + 1, "the review ran once"
         _open_record_from_decided_list(page, approval_id)
         expect(page.get_by_test_id("review-record-verdict")).to_have_text("Applied")
         assert _status_of(ws["apps"][name]) == "production"
@@ -345,7 +382,7 @@ def test_a_change_is_held_while_writes_are_paused_and_applied_after_they_resume_
 
 
 @pytest.mark.parametrize("width,theme", VIEWS)
-def test_pressing_approve_on_a_change_the_reviewer_fails_declines_it_with_the_reason(
+def test_a_waiting_change_the_reviewer_fails_is_declined_with_the_reason_when_the_review_runs(
     browser, deepseek_server, stub, shots, width, theme
 ):
     base = deepseek_server
@@ -358,11 +395,14 @@ def test_pressing_approve_on_a_change_the_reviewer_fails_declines_it_with_the_re
         ws = _workspace_of(email, [name])
         approval_id = _waiting_change(ws["org_id"], ws["user_id"], name)
         reviews_before = len(_reviews(stub))
-        _press_approve(page, base, approval_id)
-        body = page.locator("body").inner_text()
+        page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _no_decision_control(page)
+        _the_review_runs(ws["org_id"], approval_id, stub)
+        page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        body = page.locator("main").inner_text()
         assert "Declined" in body and REVIEWER_REASON in body, body
         assert "The change has been made" not in body, body
-        assert len(_reviews(stub)) == reviews_before + 1, "the Approve went through the review"
+        assert len(_reviews(stub)) == reviews_before + 1, "the review ran once"
         _shot(page, shots, "approve-declined-by-review", theme)
         _open_record_from_decided_list(page, approval_id)
         expect(page.get_by_test_id("review-record-verdict")).to_have_text("Declined")
@@ -387,8 +427,10 @@ def test_a_change_asked_for_by_a_switched_off_account_is_declined_and_not_review
         gone = _second_person(ws["org_id"], switched_off=True)
         approval_id = _waiting_change(ws["org_id"], gone, name)
         reviews_before = len(_reviews(stub))
-        _press_approve(page, base, approval_id)
-        body = page.locator("body").inner_text()
+        _the_review_runs(ws["org_id"], approval_id, stub)
+        page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _no_decision_control(page)
+        body = page.locator("main").inner_text()
         assert "has been switched off" in body and "The change has been made" not in body, body
         assert len(_reviews(stub)) == reviews_before, "a switched-off account's change is not reviewed"
         _shot(page, shots, "switched-off-declined", theme)

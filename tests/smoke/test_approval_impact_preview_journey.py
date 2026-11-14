@@ -1,21 +1,23 @@
-"""Approval inbox: see what a change affects before deciding, reject with a
+"""Reviewed changes: see what a change affects, see a declined change with the
 reason that survives a reload, and open a proposal from the notification the
-owner received.
+owner received. The page has no Approve or Reject control.
 
 Two journeys in one fresh organisation:
 
-* Application Manager opens a pending proposal, sees the impact preview
-  (services, interfaces, owners), rejects another with a reason, reloads and
-  still sees it marked rejected with the reason.
+* Application Manager opens a proposal in review, sees the impact preview
+  (services, interfaces, owners), sees no decision control, has the review
+  decline another with a reason, reloads and still sees it declined with the
+  reason.
 * Business Owner (the owner of the changed application) follows the link in the
   in-app notification the proposal produced, sees the preview open on that
-  proposal, approves it, reloads and sees it applied.
+  proposal, has the review apply it, reloads and sees it applied.
 
 The estate and the proposals are created through the product's own services
 (the proposal through AIChatApprovalService, which also writes the owner's
 notification), so the screens read what a real run would have produced.
 """
 
+import re
 import uuid
 
 import pytest
@@ -26,6 +28,32 @@ from tests.smoke.fresh_org import create_fresh_org, sign_in
 ROLE_REVIEWER = "application_manager"
 ROLE_OWNER = "non_technical_owner"
 ROLE_REQUESTER = "solution_architect"
+
+
+def _settle_as_the_review_does(org, approval_id, *, apply, reason=None):
+    """Settle one proposal through the service, as the automatic review does once a change passes: the page has
+    no control."""
+    from app import create_app, db
+
+    app = create_app("testing")
+    with app.app_context():
+        from app.jobs.tenant_safe_job import tenant_scope
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+
+        user_id = org["user_ids"][ROLE_REQUESTER]
+        with tenant_scope(org["org_id"]):
+            if apply:
+                # The record of a change the review passed: its latest round is a pass.
+                row = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=org["org_id"]).one()
+                row.review_reasons = {"checks": [], "rounds": [{"round": 1, "passed": True, "criteria": []}]}
+                db.session.commit()
+            service = AIChatApprovalService(user_id)
+            result = service.approve_and_execute(approval_id, user_id, settled_by_review=True) if apply else service.reject_approval(approval_id, reason)
+        db.session.commit()
+        assert result.get("success"), result
+        db.session.remove()
 
 
 def _seed(org):
@@ -134,15 +162,15 @@ def test_application_manager_sees_impact_and_rejection_reason_survives_reload(br
             "creates something new"
         ).wait_for(timeout=PAGE_TIMEOUT)
 
-        reject_card.get_by_role("button", name="Reject").click()
-        reject_card.get_by_label("Why are you rejecting this?").fill("We already have this capability")
-        reject_card.get_by_role("button", name="Confirm Reject").click()
+        assert page.get_by_role("button", name=re.compile("^(Approve|Reject)")).count() == 0
+        _settle_as_the_review_does(org, seeded["reject_id"], apply=False, reason="We already have this capability")
+        page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.get_by_test_id("approval-decided-%d" % seeded["reject_id"]).wait_for(timeout=PAGE_TIMEOUT)
 
         page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         decided = page.get_by_test_id("approval-decided-%d" % seeded["reject_id"])
         decided.wait_for(timeout=PAGE_TIMEOUT)
-        assert "Rejected" in decided.inner_text()
+        assert "Declined" in decided.inner_text()
         assert "We already have this capability" in decided.inner_text()
         assert page.get_by_test_id("approval-card-%d" % seeded["reject_id"]).count() == 0
     finally:
@@ -178,13 +206,15 @@ def test_business_owner_follows_the_notification_and_approves(browser, live_serv
         impact = page.get_by_test_id("approval-impact-%d" % seeded["affecting_id"])
         impact.get_by_text(seeded["service_name"]).wait_for(timeout=PAGE_TIMEOUT)
 
-        page.get_by_test_id("approval-card-%d" % seeded["affecting_id"]).get_by_role("button", name="Approve").click()
+        assert page.get_by_role("button", name=re.compile("^(Approve|Reject)")).count() == 0
+        _settle_as_the_review_does(org, seeded["affecting_id"], apply=True)
+        page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.get_by_test_id("approval-decided-%d" % seeded["affecting_id"]).wait_for(timeout=PAGE_TIMEOUT)
 
         page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         decided = page.get_by_test_id("approval-decided-%d" % seeded["affecting_id"])
         decided.wait_for(timeout=PAGE_TIMEOUT)
-        assert "Approved" in decided.inner_text()
+        assert "Applied" in decided.inner_text()
         assert page.get_by_test_id("approval-card-%d" % seeded["affecting_id"]).count() == 0
     finally:
         context.close()

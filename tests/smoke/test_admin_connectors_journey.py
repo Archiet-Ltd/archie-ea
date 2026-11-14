@@ -1,4 +1,4 @@
-"""An administrator adds a connector, a second administrator approves it,
+"""An administrator adds a connector, the request is settled by the review (as a second administrator's account),
 and the page then shows it live with a masked credential (H4: PR 448 added
 app/templates/admin/connectors/index.html and changed three other connector
 templates with no tests/smoke/ coverage; this is that coverage).
@@ -14,12 +14,24 @@ import uuid
 
 import pytest
 
-from tests.smoke.conftest import PAGE_TIMEOUT, PASSWORD
+from cryptography.fernet import Fernet
+
+from tests.smoke.conftest import PAGE_TIMEOUT, PASSWORD, boot_live_server
 from tests.smoke.fresh_org import api, sign_in
 
 # Masked credential characters: bullets, or a run of asterisks (a single
 # asterisk marks a required field and is not a mask).
 _MASK = re.compile("[\u2022\u25cf]|\\*{2,}")
+
+
+# The server and the process that settles the request must share the keys that seal a stored credential.
+_KEYS = {"CREDENTIAL_ENCRYPTION_KEY": Fernet.generate_key().decode(),
+         "ORG_ENCRYPTION_MASTER_KEY": Fernet.generate_key().decode()}
+
+
+@pytest.fixture(scope="module")
+def keyed_server(request, app):
+    return boot_live_server(request, None, app, extra_env=_KEYS)
 
 
 def _create_two_admins():
@@ -28,7 +40,7 @@ def _create_two_admins():
 
     app = create_app("testing")
     suffix = uuid.uuid4().hex[:8]
-    out = {"org_id": None, "emails": {}}
+    out = {"org_id": None, "emails": {}, "user_ids": {}}
     with app.app_context():
         from app.models.org_role import OrgRole
         from app.models.organization import Organization
@@ -54,13 +66,34 @@ def _create_two_admins():
             OrgRole.set_role(org.id, user.id, "org_admin", granted_by_id=user.id)
             db.session.commit()
             out["emails"][label] = email
+            out["user_ids"][label] = user.id
         db.session.remove()
     return out
 
 
+def _settle_as_the_review_does(user_id, approval_id):
+    """Apply one request through the approval service, as the automatic review does: the page has no control."""
+    from app import create_app, db
+
+    app = create_app("testing")
+    app.config.update(_KEYS)
+    with app.app_context():
+        from app.jobs.tenant_safe_job import tenant_scope
+        from app.models.user import User
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        org_id = db.session.get(User, user_id).organization_id
+        with tenant_scope(org_id):
+            result = AIChatApprovalService(user_id).approve_and_execute(approval_id, user_id)
+        db.session.commit()
+        assert result.get("success") is True, result
+        db.session.remove()
+
+
 @pytest.mark.smoke
 @pytest.mark.journey
-def test_add_approve_and_see_connector_with_masked_credential(browser, live_server):
+def test_add_approve_and_see_connector_with_masked_credential(browser, keyed_server):
+    live_server = keyed_server
     org = _create_two_admins()
     context = browser.new_context(ignore_https_errors=True)
     # N2 (cloud-review-pr448-505c3c2e-v1.md): without this, a fresh context
@@ -109,12 +142,12 @@ def test_add_approve_and_see_connector_with_masked_credential(browser, live_serv
 
         page.goto(live_server + "/account/logout", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
-        # A second administrator approves it, through the product's own
-        # approval endpoint (the same call the approval-inbox UI makes).
+        # The request waits in Reviewed changes with no Approve or Reject control; it is settled the way the
+        # automatic review settles it, by the second administrator's account through the approval service.
         sign_in(page, live_server, org["emails"]["approver"])
-        status, body = api(page, "POST", "/ai-chat/approvals/%d/approve" % approval_id)
-        assert status == 200, body
-        assert body.get("success") is True, body
+        page.goto(live_server + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.get_by_role("button", name=re.compile("^(Approve|Reject)")).count() == 0
+        _settle_as_the_review_does(org["user_ids"]["approver"], approval_id)
 
         # Reload the connectors page: the connector is now live, not queued,
         # and its credential is shown masked, never in plain text.

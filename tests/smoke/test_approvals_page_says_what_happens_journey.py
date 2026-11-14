@@ -1,11 +1,11 @@
-"""The Approvals page tells a person what is true about each record, and offers Approve only where it acts.
+"""Reviewed changes tells a person what is true about each record, and offers no Approve or Reject anywhere.
 
 A technical founder signs up (a workspace of one). Writes are paused, so a change waits; the page says it waits for
 writes to resume (and links to how it was checked, which says the same). A record the loop does not settle, asked
-for by the founder, carries no Approve button and says why; a colleague's record of the same kind does. After
-writes resume a change with a recorded check says it is applied or declined without waiting for a person, and a
-change with no review on record makes no such claim. At 390 wide the footer, with Reject open, stays inside its
-card. The empty page never promises a second person.
+for by the founder and a colleague's record of the same kind both carry no decision control. After writes resume
+a change with a recorded check says it is applied or declined without waiting for a person, and a change with
+no review on record makes no such claim. When the review runs, the waiting change is applied once. The empty
+page never promises a second person.
 """
 import re
 import uuid
@@ -16,7 +16,7 @@ from playwright.sync_api import expect
 from .conftest import PAGE_TIMEOUT
 from .test_change_review_gaps_journey import (  # noqa: F401 - fixtures and helpers of the sibling journey
     VIEWS, _app_context, _context, _second_person, _shot, _sign_up, _status_of, _waiting_change, _workspace_of,
-    _writes, deepseek_server, shots, stub,
+    _the_review_runs, _writes, deepseek_server, shots, stub,
 )
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -75,10 +75,6 @@ def _record_checks(approval_id):
         db.session.remove()
 
 
-def _inside(box, outer):
-    return box["x"] >= outer["x"] - 1 and box["x"] + box["width"] <= outer["x"] + outer["width"] + 1
-
-
 @pytest.mark.parametrize("width,theme", VIEWS)
 def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_server, stub, shots, width, theme):
     base = deepseek_server
@@ -133,7 +129,6 @@ def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_s
         own = page.get_by_test_id("approval-card-%d" % own_id)
         expect(own).to_be_visible()
         expect(own.get_by_role("button", name="Approve")).to_have_count(0)
-        expect(own.get_by_test_id("approval-own-request-%d" % own_id)).to_contain_text("paused for this workspace")
         theirs = page.get_by_test_id("approval-card-%d" % theirs_id)
         expect(theirs.get_by_role("button", name="Approve")).to_have_count(0)
         _shot(page, shots, "approvals-held-and-own", theme)
@@ -150,20 +145,18 @@ def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_s
         assert _status_of(ws["apps"][checked_name]) == "development"
 
         # Writes resume. The change with a recorded check now says it is settled without a person, and its link
-        # lands on those checks; the row with no review on record makes no such claim and is Approve-able.
+        # lands on those checks; the row with no review on record makes no such claim.
         _writes(ws["org_id"], paused=False)
         page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         checked = page.get_by_test_id("approval-card-%d" % checked_id)
         expect(checked.get_by_test_id("approval-in-review-%d" % checked_id)).to_contain_text(
             "applied or declined without waiting")
-        # Outside a pause the person's own record has no Approve and says another person approves it; a
-        # colleague's record of the same kind has Approve.
+        # Outside a pause neither the person's own record nor a colleague's has a decision control.
         own = page.get_by_test_id("approval-card-%d" % own_id)
         expect(own).to_be_visible()
-        expect(own.get_by_role("button", name="Approve")).to_have_count(0)
-        expect(own.get_by_test_id("approval-own-request-%d" % own_id)).to_contain_text("another person")
+        expect(page.get_by_role("button", name=re.compile("^(Approve|Reject)"))).to_have_count(0)
         theirs = page.get_by_test_id("approval-card-%d" % theirs_id)
-        expect(theirs.get_by_role("button", name="Approve")).to_have_count(1)
+        expect(theirs).to_be_visible()
         _shot(page, shots, "approvals-own-and-colleague", theme)
         pre = page.get_by_test_id("approval-card-%d" % pre_loop_id)
         expect(pre.get_by_test_id("approval-pre-loop-%d" % pre_loop_id)).to_contain_text("nothing has checked it")
@@ -171,16 +164,8 @@ def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_s
         older = page.get_by_test_id("approval-card-%d" % older_id)
         expect(older.get_by_test_id("approval-in-review-%d" % older_id)).to_have_count(0)
         expect(older.get_by_test_id("approval-held-%d" % older_id)).to_have_count(0)
-        expect(older.get_by_role("button", name="Approve")).to_have_count(1)
-        card_box = older.bounding_box()
-        for button in (older.get_by_role("button", name="Approve"), older.locator("summary", has_text="Reject")):
-            assert _inside(button.bounding_box(), card_box), "a footer control is clipped by its card"
-        older.locator("summary", has_text="Reject").click()
-        expect(older.get_by_role("button", name="Confirm Reject")).to_be_visible()
-        card_box = older.bounding_box()
-        assert _inside(older.get_by_role("button", name="Confirm Reject").bounding_box(), card_box)
-        assert _inside(older.get_by_label("Why are you rejecting this?").bounding_box(), card_box)
-        _shot(page, shots, "approvals-reject-open", theme)
+        expect(older.get_by_role("button", name=re.compile("^(Approve|Reject)"))).to_have_count(0)
+        _shot(page, shots, "approvals-no-decision-control", theme)
         checked.get_by_role("link", name="See how it was checked").click()
         page.wait_for_url(re.compile(r"approval=%d" % checked_id), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("review-record-checks")).to_contain_text("The application was found in this workspace")
@@ -189,11 +174,8 @@ def test_the_approvals_page_says_what_happens_to_each_record(browser, deepseek_s
         assert "paused" not in page.get_by_test_id("review-record-verdict").locator("xpath=ancestor::*[1]").inner_text()
         _shot(page, shots, "resumed-record", theme)
 
-        # The person's Approve goes through the review and the change is applied once.
-        page.goto(base + "/ai-chat/approvals/inbox?approval=%d" % older_id, wait_until="domcontentloaded",
-                  timeout=PAGE_TIMEOUT)
-        page.get_by_test_id("approval-card-%d" % older_id).get_by_role("button", name="Approve").click()
-        page.wait_for_load_state("domcontentloaded")
+        # The review runs and the change is applied once.
+        _the_review_runs(ws["org_id"], older_id, stub)
         assert _status_of(ws["apps"][name]) == "production"
         page.goto(base + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("approval-record-link-%d" % older_id)).to_be_visible(timeout=PAGE_TIMEOUT)

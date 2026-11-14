@@ -171,10 +171,20 @@ def span_words(delta: timedelta) -> str:
     return "under a minute"
 
 
+# The sources that propose changes with nobody typing them, in the words a person reads.
+PROPOSER_WORDS = {
+    "connector_config": "Connector sync",
+    "github_connector": "GitHub connector",
+    "vendor_detection": "Vendor catalogue",
+}
+
+
 def proposer_words(source: Optional[str]) -> str:
     """What proposed a change nobody typed: the import, connector or assistant feature named in the
     record's own source column. A record with no source says so."""
-    return _plain(source) if source else "Source not recorded"
+    if not source:
+        return "Source not recorded"
+    return PROPOSER_WORDS.get(source) or _plain(source)
 
 
 def card_words(approval, payload: Dict[str, Any], people: Dict[int, str]) -> Dict[str, Any]:

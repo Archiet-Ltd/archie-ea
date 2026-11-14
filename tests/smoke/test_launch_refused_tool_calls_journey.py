@@ -102,13 +102,12 @@ def test_admin_sees_a_viewers_refused_tool_call_with_the_rule(browser, live_serv
         assert len(queued) == 1, body
         approval_id = queued[0]["id"]
 
-        # The viewer has no approve control on any screen (the approval panel
-        # is offered only to people with write access), so running the queued
-        # tool call goes through the approval interface that panel calls --
-        # the way a stale tab or a script would reach it.
+        # There is no approve address to reach any more: the viewer's stale tab or script finds nothing there,
+        # and the queued tool call is still waiting, not run.
         status, body = api(page, "POST", "/ai-chat/approvals/%d/approve" % approval_id)
-        assert status == 403, (status, body)
-        assert "write" in body["error"]
+        assert status in (404, 405), (status, body)
+        status, body = api(page, "GET", "/ai-chat/approvals/pending")
+        assert status == 200 and [a["id"] for a in body["approvals"] if a.get("entity_type") == TOOL] == [approval_id], body
     finally:
         context.close()
 
