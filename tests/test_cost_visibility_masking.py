@@ -49,6 +49,7 @@ def test_a_name_that_says_money_is_money(name):
 @pytest.mark.parametrize("name", [
     "total_estimated_hours", "component_scores", "score_weights", "application_count", "cost_centre",
     "costs_withheld", "costs_withheld_sentence", "name", "status", "work_package_id", "estimated_days",
+    "invest_business", "invest_technical", "thresholds",
 ])
 def test_a_name_that_is_not_money_is_kept(name):
     assert not is_money_key(name)

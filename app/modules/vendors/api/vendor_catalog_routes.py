@@ -23,6 +23,7 @@ from app.models.vendor.vendor_organization import (
 from app.modules.vendors.services.vendor_product_service import VendorProductService
 from app.utils.pagination import safe_int_arg
 from app.utils.route_guards import require_entity
+from app.services.cost_visibility import withhold_reply
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +45,14 @@ def get_vendors():
         vendors = service.get_all_vendors_with_stats(tier=tier, category=category, search=search)
 
         return jsonify(
-            {
-                "success": True,
-                "vendors": vendors,
-                "total": len(vendors),
-                "filters": {"tier": tier, "category": category, "search": search},
-            }
+            withhold_reply(
+                {
+                    "success": True,
+                    "vendors": vendors,
+                    "total": len(vendors),
+                    "filters": {"tier": tier, "category": category, "search": search},
+                }
+            )
         )
 
     except Exception as e:
@@ -71,7 +74,7 @@ def get_vendor_hierarchy(vendor_id):
         if not hierarchy:
             return jsonify({"success": False, "error": "Vendor not found"}), 404
 
-        return jsonify({"success": True, "hierarchy": hierarchy, "vendor_id": vendor_id})
+        return jsonify(withhold_reply({"success": True, "hierarchy": hierarchy, "vendor_id": vendor_id}))
 
     except HTTPException:
         raise
@@ -286,7 +289,7 @@ def get_vendor_statistics():
         service = VendorProductService()
         stats = service.get_catalog_statistics()
 
-        return jsonify({"success": True, "statistics": stats})
+        return jsonify(withhold_reply({"success": True, "statistics": stats}))
 
     except Exception as e:
         logger.error(f"Error getting vendor statistics: {e}")

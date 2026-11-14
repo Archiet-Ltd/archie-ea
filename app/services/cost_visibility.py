@@ -48,7 +48,8 @@ _MONEY_WORD = re.compile(
     r"payback|financial_benefit|licen[cs]e|projected|forecast", re.I)
 _NOT_MONEY_WORD = re.compile(
     r"cost_cent(er|re)|cost_code|hours|days|duration|effort|points|estimate\w*date|score|weight|count|withheld|visible|_id$|"
-    r"currency|status|kind|framework|supported|risk_class|plateau|_name$|label|reason|note|_type$|categories_loaded", re.I)
+    r"currency|status|kind|framework|supported|risk_class|plateau|_name$|label|reason|note|_type$|categories_loaded|"
+    r"threshold|invest_(business|tech)", re.I)
 
 
 # a part named for a score, a weight or hours holds no money even when its own keys say "cost" (a weight of the

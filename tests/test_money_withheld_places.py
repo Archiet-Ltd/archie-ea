@@ -297,3 +297,20 @@ def test_the_phase_review_holds_no_amount_for_the_architect_and_the_figures_for_
         assert str(figure) not in text, "%s printed %s" % (path, figure)
     shown = _shown(_get(client, login_as, estate["cto"], path))
     assert str(ESTIMATE) in shown and str(APP_COST) in shown
+
+
+def test_the_vendor_catalogue_holds_no_cost_of_ownership_for_the_architect_and_the_figure_for_the_cto(
+        client, login_as, estate, db_session):
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    vendor = VendorOrganization(name="Places supplier")
+    db_session.add(vendor)
+    db_session.flush()
+    held = _get(client, login_as, estate["architect"], "/api/vendors")
+    assert held.status_code == 200
+    mine = [row for row in held.get_json()["vendors"] if row["name"] == "Places supplier"]
+    assert mine, "the catalogue lists this organisation's supplier"
+    assert mine[0]["statistics"]["average_tco"] is None
+    assert held.get_json()["costs_withheld"] is True
+    shown = _get(client, login_as, estate["cto"], "/api/vendors").get_json()["vendors"]
+    assert [row for row in shown if row["name"] == "Places supplier"][0]["statistics"]["average_tco"] is not None
