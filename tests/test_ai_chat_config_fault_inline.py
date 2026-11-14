@@ -13,8 +13,8 @@ from tests.test_ai_model_selector_display import browser, launch  # noqa: F401
 pytestmark = pytest.mark.parametrize('browser', ['chromium', 'firefox', 'webkit'], indirect=True)
 MODEL = {'model': 'fixture-0', 'display_name': 'Fixture 0', 'provider': 'openai',
          'recommended_for': [], 'is_fallback': False, 'fallback_order': 0, 'test_status': None}
-ADMIN_SENTENCE = "The assistant is not set up yet. Add an AI provider in Settings to start getting answers."
-MEMBER_SENTENCE = "The assistant is not set up yet. Ask an administrator of your organisation to add an AI provider."
+ADMIN_SENTENCE = "The assistant is not set up for your organisation yet."
+MEMBER_SENTENCE = "The assistant is not set up for your organisation yet."
 
 
 def assert_plain(text):
