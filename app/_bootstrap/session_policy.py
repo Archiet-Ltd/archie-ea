@@ -143,8 +143,14 @@ def _reject_response(request, code, message):
         resp = jsonify({"success": False, "error": message, "code": code})
         resp.status_code = 401
         return resp
+    # A sign-in link opened with a stale cookie is itself rejected here; it
+    # must carry on to the sign-in page still knowing where the person was going.
+    from app.utils.safe_redirect import is_safe_next_url
+
+    wanted = request.args.get("next") if (request.endpoint or "").endswith("login") else None
+    extra = {"next": wanted} if is_safe_next_url(wanted) else {}
     try:
-        login_url = url_for("account.login", timeout=code)
+        login_url = url_for("account.login", timeout=code, **extra)
     except Exception:
         login_url = "/account/login?timeout={}".format(code)
     return redirect(login_url)

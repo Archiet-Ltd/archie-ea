@@ -219,6 +219,11 @@ class Config:
     SESSION_IDLE_TIMEOUT = timedelta(
         minutes=int(os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", "30") or 30)
     )
+    # A test configuration needs limits of seconds, not minutes; both are unset in production.
+    if os.environ.get("SESSION_IDLE_TIMEOUT_SECONDS"):
+        SESSION_IDLE_TIMEOUT = timedelta(seconds=int(os.environ["SESSION_IDLE_TIMEOUT_SECONDS"]))
+    if os.environ.get("SESSION_IDLE_TIMEOUT_ADMIN_SECONDS"):
+        SESSION_IDLE_TIMEOUT_ADMIN = timedelta(seconds=int(os.environ["SESSION_IDLE_TIMEOUT_ADMIN_SECONDS"]))
     REMEMBER_COOKIE_DURATION = timedelta(days=30)
     SESSION_REFRESH_EACH_REQUEST = True  # FAR-012: Ensure session is refreshed on every request
     REMEMBER_COOKIE_REFRESH_EACH_REQUEST = True  # FAR-012: Refresh remember-me cookie on activity
