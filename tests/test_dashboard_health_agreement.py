@@ -1,7 +1,5 @@
 """Health Score must mean the same measurement in both dashboard consumers."""
 
-import ast
-import logging
 import re
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,39 +7,33 @@ from types import SimpleNamespace
 import pytest
 
 
-def _overview_health_context():
-    """Execute the route's actual health block without its unrelated DB queries."""
-    source = Path(__file__).resolve().parents[1] / "app/modules/dashboard/v2/routes/dashboard_views.py"
-    overview = next(node for node in ast.parse(source.read_text(encoding="utf-8")).body
-                    if isinstance(node, ast.FunctionDef) and node.name == "overview")
-    def assignment(node, name):
-        return isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == name for target in node.targets)
-    start = next(i for i, node in enumerate(overview.body) if assignment(node, "health_score"))
-    end = next(i for i, node in enumerate(overview.body) if assignment(node, "data_coverage"))
-    namespace = {"persona_metrics": {}, "solutions": [], "capability_health": [],
-                 "logger": logging.getLogger(__name__)}
-    exec(compile(ast.Module(body=overview.body[start:end], type_ignores=[]), str(source), "exec"), namespace)
-    return namespace
-
-
-@pytest.mark.parametrize("score,components", [
-    (42.9, {"phase_maturity": 0.0, "risk_posture": None, "capability_coverage": 100.0, "governance": 100.0}),
-    (0.0, {"phase_maturity": 0.0, "risk_posture": 0.0, "capability_coverage": 0.0, "governance": None}),
-    (None, {"phase_maturity": None, "risk_posture": None, "capability_coverage": None, "governance": None}),
+@pytest.mark.parametrize("score,components,shown,not_measured", [
+    (42.9, {"phase_maturity": 0.0, "risk_posture": None, "capability_coverage": 100.0, "governance": 100.0},
+     "42.9", "risk posture"),
+    (0.0, {"phase_maturity": 0.0, "risk_posture": 0.0, "capability_coverage": 0.0, "governance": None},
+     "0.0", "governance"),
+    (None, {"phase_maturity": None, "risk_posture": None, "capability_coverage": None, "governance": None},
+     "\u2014", "phase maturity, risk posture, capability coverage and governance"),
 ])
-def test_overview_preserves_canonical_score_precision_and_missing_components(monkeypatch, score, components):
+def test_health_page_preserves_canonical_score_precision_and_missing_components(
+        monkeypatch, db_session, client, login_as, tenant_ctx, score, components, shown, not_measured):
+    from app import db
     from app.modules.dashboard.v2.services.executive_dashboard_service import ExecutiveDashboardService
+    from tests.test_dashboard_health_score_honesty import _org, _user
     monkeypatch.setattr(ExecutiveDashboardService, "_get_health_score", lambda self: {
         "composite_score": score, "components": components,
         "unavailable_components": [key for key, value in components.items() if value is None],
     })
-    context = _overview_health_context()
-    assert context["health_score"] == score
-    assert context["health_components"] == {
-        "phase_maturity": components["phase_maturity"], "risk_health": components["risk_posture"],
-        "capability_coverage": components["capability_coverage"], "governance": components["governance"],
-    }
+    org = _org(db_session, "health-page-" + shown)
+    with tenant_ctx(org.id):
+        user = _user(org, "healthpage")
+        db.session.flush()
+    login_as(client, user)
+    response = client.get("/dashboard/health")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert re.search(r'data-testid="health-score-value">([^<]+)</strong>', page).group(1) == shown
+    assert re.search(r'data-testid="health-score-not-measured">Not measured: ([^<]+)\.</span>', page).group(1) == not_measured
 
 
 def test_health_card_browser_assertion_uses_rendered_value_element():
