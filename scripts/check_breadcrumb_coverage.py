@@ -13,20 +13,48 @@ is included by a page and must NOT carry its own breadcrumb; the parent page own
 it. Pages that render no header at all are a separate concern (they need a header
 first) and are not counted here.
 
+A page held by the navigation registry gets a shell-rendered breadcrumb from
+page_trail() via page_shell()/page_header() even without a breadcrumbs= argument,
+so it is not counted as missing.
+
 Ratchet @ 0 in verify.py. Escape hatch: a page that deliberately has no breadcrumb
 can carry the marker `breadcrumb-ok:` on any line.
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from app.navigation.registry import entry_for_endpoint  # noqa: E402
 
 ROOTS = ("app/templates", "app/modules")
 SKIP_DIRS = {".git", "__pycache__", "node_modules", ".worktrees", ".claude"}
 _HEADER = re.compile(r"page_(?:shell|header)\s*\(")
 _BC_ARG = re.compile(r"breadcrumbs?\s*=")
 _ALLOW = re.compile(r"breadcrumb-ok:")
+
+# Load the signed-in page inventory so we can map templates to endpoints and
+# check whether page_trail() would return a non-empty trail (i.e. the page is
+# held by the navigation registry). Such pages get a shell-rendered breadcrumb
+# even without a breadcrumbs= argument.
+_INVENTORY = json.loads(Path("docs/component-inventory.json").read_text())
+_TEMPLATE_TO_ENDPOINTS: dict[str, list[str]] = {}
+for _route in _INVENTORY.get("routes", []):
+    if _route.get("page") and _route.get("templates"):
+        for _t in _route["templates"]:
+            _TEMPLATE_TO_ENDPOINTS.setdefault(_t, []).append(_route["endpoint"])
+
+
+def _in_nav_registry(template_path: str) -> bool:
+    """True if any endpoint rendering this template is held by the nav registry."""
+    for _ep in _TEMPLATE_TO_ENDPOINTS.get(template_path, []):
+        _entry = entry_for_endpoint(_ep)
+        if _entry is not None and _entry.key != "home":
+            return True
+    return False
 
 
 def _is_partial(path: Path) -> bool:
@@ -35,7 +63,7 @@ def _is_partial(path: Path) -> bool:
     return "partials" in path.parts
 
 
-def _missing(root: Path) -> list[str]:
+def _missing(root: Path, base: Path) -> list[str]:
     hits = []
     for path in root.rglob("*.html"):
         # Check skip-dirs against the path RELATIVE to root -- the absolute
@@ -55,6 +83,11 @@ def _missing(root: Path) -> list[str]:
             continue
         if "{% block breadcrumb %}" in text:
             continue  # renders its own breadcrumb via the block
+        # Pages held by the nav registry get a shell-rendered breadcrumb from
+        # page_trail() via page_shell()/page_header().
+        template_path = path.relative_to(base).as_posix()
+        if _in_nav_registry(template_path):
+            continue
         if not _HEADER.search(text):
             continue  # no header macro — a different (header-first) concern
         # a header macro is present; does ANY header call carry a breadcrumb arg?
@@ -63,7 +96,7 @@ def _missing(root: Path) -> list[str]:
             for m in _HEADER.finditer(text)
         )
         if not has_bc:
-            hits.append(str(path.relative_to(root.parent.parent) if False else path.as_posix()))
+            hits.append(path.relative_to(base).as_posix())
     return hits
 
 
@@ -74,7 +107,7 @@ def main() -> int:
     for r in ROOTS:
         rp = root / r
         if rp.exists():
-            hits.extend(_missing(rp))
+            hits.extend(_missing(rp, base=root))
     hits.sort()
     if count_only:
         print(len(hits))

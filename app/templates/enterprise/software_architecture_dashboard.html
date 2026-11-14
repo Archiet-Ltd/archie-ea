@@ -3,18 +3,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
-{% block title %}Application Architecture{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Application Architecture', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Application Architecture{% endblock %}{% block content %}
 <div class="space-y-6">
 
     <!-- Page Header -->

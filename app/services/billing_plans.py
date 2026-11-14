@@ -22,6 +22,19 @@ logger = logging.getLogger(__name__)
 
 INTERVALS = ("year", "month")
 
+_NUMBER_WORDS = {
+    1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
+    8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 15: "fifteen",
+    20: "twenty", 25: "twenty-five", 50: "fifty",
+}
+
+STARTUP_USER_LIMIT = 10
+
+
+def _count_words(n: int) -> str:
+    """A head count as the words a person reads (10 -> "ten")."""
+    return _NUMBER_WORDS.get(n, str(n))
+
 
 @dataclass(frozen=True)
 class Plan:
@@ -38,6 +51,25 @@ class Plan:
     # "people" counts every member; "editors" leaves read-only members free.
     counts: str = "people"
     price_env: Dict[str, str] = field(default_factory=dict)
+    # Who the plan is for, in the words the pricing page, the home page and
+    # the structured data all show.
+    audience: str = ""
+    # Feature lines after "everything in the plan below"; a plan with a fixed
+    # user_limit also leads with that head count (see ``features``).
+    extra_features: Tuple[str, ...] = ()
+
+    @property
+    def people_words(self) -> Optional[str]:
+        """The fixed head count in words ("ten"), or None when it is not fixed."""
+        if self.user_limit is None or self.per_seat:
+            return None
+        return _count_words(self.user_limit)
+
+    @property
+    def features(self) -> Tuple[str, ...]:
+        words = self.people_words
+        lead = (f"{words.capitalize()} people",) if words else ()
+        return lead + self.extra_features
 
     # ----------------------------------------------------------------- #
     # Display price: the human-facing dollar figures shown on the        #
@@ -77,16 +109,23 @@ PLANS: Tuple[Plan, ...] = (
         summary="One organisation, three people. Every question, the Business Model Canvas, the ArchiMate Composer.",
         purchasable=False,
         user_limit=3,
+        audience="Evaluation, one-person companies and self-hosters.",
         display_price_monthly=0,
     ),
     Plan(
         key="startup",
         name="Startup",
         summary=(
-            "Ten people and email support, everything in Community included."
+            f"{_count_words(STARTUP_USER_LIMIT).capitalize()} people and email "
+            "support, everything in Community included."
         ),
         purchasable=True,
-        user_limit=10,
+        user_limit=STARTUP_USER_LIMIT,
+        audience=(
+            "Founders and small teams, up to "
+            f"{_count_words(STARTUP_USER_LIMIT)} people."
+        ),
+        extra_features=("Email support",),
         price_env={"month": "STRIPE_PRICE_STARTUP_MONTHLY", "year": "STRIPE_PRICE_STARTUP_ANNUAL"},
         display_price_monthly=49,
         display_price_annual=490,
@@ -103,6 +142,17 @@ PLANS: Tuple[Plan, ...] = (
         per_seat=True,
         default_seats=15,
         counts="editors",
+        audience=(
+            "Growing companies and services firms with more than "
+            f"{_count_words(STARTUP_USER_LIMIT)} people."
+        ),
+        extra_features=(
+            "Pay for editors only; everyone else asks for free",
+            "Single sign-on",
+            "The review-board workflow",
+            "Your own model key",
+            "Email support",
+        ),
         price_env={"month": "STRIPE_PRICE_TEAM_MONTHLY", "year": "STRIPE_PRICE_TEAM_ANNUAL"},
         display_price_monthly=29,
         display_price_annual=290,
@@ -115,6 +165,7 @@ PLANS: Tuple[Plan, ...] = (
         summary="Annual contract. Unlimited editors, SAML, audit export, supported self-hosting.",
         purchasable=False,
         user_limit=None,
+        audience="Enterprise architecture teams.",
         display_price_floor_annual=24000,
     ),
 )

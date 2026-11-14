@@ -1,19 +1,7 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 
-{% block title %}{{ capability.name }} — Line of Sight{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Capabilities', 'href': url_for('capability_map.index')},
-    {'text': 'Maturity Heatmap', 'href': url_for('maturity_management.maturity_heatmap')},
-    {'text': 'Line of Sight', 'current': true}
-]) }}
-{% endblock %}
-
-{#
+{% block title %}{{ capability.name }} — Line of Sight{% endblock %}{#
   Line of sight for one capability.
 
   Order is the argument: how good are we, who owns it, what are we doing about
