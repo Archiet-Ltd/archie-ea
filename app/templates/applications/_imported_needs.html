@@ -42,10 +42,11 @@
       {% if gap.candidates and editable %}
       <div class="flex flex-wrap gap-2" data-testid="owner-candidates">
         {% for person in gap.candidates %}
-        <form method="post" action="{{ url_for('unified_applications.make_owner_from_commits', app_id=app.id) }}" data-testid="owner-candidate-{{ person.user_id }}">
+        <form method="post" action="{{ url_for('unified_applications.make_owner_from_commits', app_id=app.id) }}" class="flex items-center gap-2" data-testid="owner-candidate-{{ person.user_id }}">
+          <span class="text-xs font-medium text-foreground">{{ person.name }}</span>
           {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
           {{ input(type='hidden', name='user_id', value=person.user_id) }}
-          {{ button(text='Make owner', type='submit', variant='outline', size='sm', aria_label='Make ' ~ person.name ~ ' the owner of ' ~ app.name) }}
+          {{ button(text='Make owner', type='submit', variant='outline', size='sm', aria_label='Make owner: ' ~ person.name) }}
         </form>
         {% endfor %}
       </div>
