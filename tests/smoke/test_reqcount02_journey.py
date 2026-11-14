@@ -114,6 +114,16 @@ def test_requirement_figure_lands_with_title_in_view(browser, live_server, app, 
         card_title = page.get_by_test_id("application-requirements").locator("h3").first
         top_bar_bottom = top_bar.bounding_box()["y"] + top_bar.bounding_box()["height"]
         card_title_top = card_title.bounding_box()["y"]
+        # An anchor jump on a long page scrolls the card to the very top; only a
+        # scroll margin at least as tall as the sticky bar keeps its title clear.
+        # Short pages never scroll, so read the margin itself.
+        margin_top = page.get_by_test_id("application-requirements").evaluate(
+            "el => parseFloat(getComputedStyle(el).scrollMarginTop)"
+        )
+        bar_height = top_bar.bounding_box()["height"]
+        assert margin_top >= bar_height, (
+            "card scroll margin %s is smaller than the top bar height %s" % (margin_top, bar_height)
+        )
         assert card_title_top >= top_bar_bottom, (
             "card title top %s is above top bar bottom %s" % (card_title_top, top_bar_bottom)
         )
