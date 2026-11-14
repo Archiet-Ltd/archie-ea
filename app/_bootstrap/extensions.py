@@ -406,6 +406,27 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # Startup credit: the reminders 14 and 3 days before a credit ends, once a day. Declares its
+        # organisation per run through run_for_each_tenant (billing_offers.send_offer_reminders).
+        def run_offer_reminders():
+            with app.app_context():
+                try:
+                    from app.services.billing_offers import send_offer_reminders
+
+                    send_offer_reminders(app)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error("APScheduler offer-reminders error: %s", exc)
+
+        scheduler.add_job(
+            func=run_offer_reminders,
+            trigger=CronTrigger(hour=9, minute=0),
+            id="offer_reminders",
+            name="Startup credit reminders",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # PLT-031: Weekly executive summary (Monday 7am UTC). Declares its
         # organisation per run via run_for_each_tenant / tenant_scope, same as
         # the maturity digest above.
