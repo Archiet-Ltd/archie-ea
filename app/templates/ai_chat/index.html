@@ -286,11 +286,11 @@
         </div>
 
         <div class="space-y-2 border-t border-border pt-4">
-            {# Approvals for review: the pending count is read from the one shared approvals store. #}
+            {# Reviewed changes: the pending count is read from the one shared approvals store. #}
             {% if link_requires_satisfied(current_user, "general") %}
             <div x-data="approvalManager()" x-cloak>
-                {% call button(variant='outline', aria_label='Approvals for review', class='w-full justify-between', attrs_dict={'data-modal-open': 'ai-chat-approvals-modal', '@click': "closeDrawer('chat-options')", 'data-testid': 'chat-options-approvals'}) %}
-                    <span class="flex items-center"><i data-lucide="shield-check" class="mr-2 h-4 w-4" aria-hidden="true"></i>Approvals for review</span>
+                {% call button(variant='outline', aria_label='Reviewed changes', class='w-full justify-between', attrs_dict={'data-modal-open': 'ai-chat-approvals-modal', '@click': "closeDrawer('chat-options')", 'data-testid': 'chat-options-approvals'}) %}
+                    <span class="flex items-center"><i data-lucide="shield-check" class="mr-2 h-4 w-4" aria-hidden="true"></i>Reviewed changes</span>
                     <span x-show="pendingCount > 0" x-cloak>{% call badge('info') %}<span x-text="pendingCount"></span>{% endcall %}</span>
                 {% endcall %}
             </div>
@@ -396,10 +396,10 @@
     <div id="ai-chat-create-solution-status" class="mt-3 hidden text-sm text-muted-foreground" role="status"></div>
 {% endcall %}
 
-{# Approvals for review (ENT-077). Outside every collapsing container, so the dialog is never hidden with its parent. #}
+{# Reviewed changes (ENT-077). Outside every collapsing container, so the dialog is never hidden with its parent. #}
 {% if link_requires_satisfied(current_user, "general") %}
 <div x-data="{}" x-cloak>
-{% call modal(id='ai-chat-approvals-modal', title='Approvals for review', size='default') %}
+{% call modal(id='ai-chat-approvals-modal', title='Reviewed changes', size='default') %}
     <div class="max-h-[60vh] space-y-3 overflow-y-auto" tabindex="0">
         {# Loading, failed and empty are three different states: an unavailable queue must never read as an empty one. #}
         <div x-show="$store.approvals.loading && !$store.approvals.hasLoaded" x-cloak data-testid="approval-queue-loading">
@@ -436,23 +436,6 @@
                         <summary class="cursor-pointer select-none text-muted-foreground hover:text-foreground">View technical detail</summary>
                         <pre class="mt-1 whitespace-pre-wrap break-all rounded-md border border-border bg-muted/50 px-2 py-1.5 text-2xs text-muted-foreground" x-text="JSON.stringify(item.arguments, null, 2)"></pre>
                     </details>
-                    {# $store.approvals.* and not the facade getter: the getter returned the store's nested object and the :disabled effect never re-evaluated, which left every button dead. #}
-                    <template x-if="$store.approvals.rejectingId === item.id">
-                        <div class="space-y-2 pt-1">
-                            <label :for="'reject-reason-' + item.id" class="text-xs font-medium text-foreground">Rejection reason (optional)</label>
-                            {{ textarea(rows=2, placeholder='Why are you rejecting this operation?', aria_label='Why are you rejecting this operation?', class='min-h-0 resize-none', attrs_dict={':id': "'reject-reason-' + item.id", 'x-model': '$store.approvals.rejectReason'}) }}
-                            <div class="flex gap-2">
-                                {{ button(text='Confirm reject', variant='destructive', attrs_dict={'@click': '$store.approvals.confirmReject(item.id)', ':class': "$store.approvals.busyIds[item.id] ? 'opacity-50 pointer-events-none' : ''"}) }}
-                                {{ button(text='Cancel', variant='outline', attrs_dict={'@click': '$store.approvals.cancelReject()'}) }}
-                            </div>
-                        </div>
-                    </template>
-                    <template x-if="$store.approvals.rejectingId !== item.id">
-                        <div class="flex gap-2 pt-1">
-                            {{ button(text='Approve', variant='default', size='sm', icon='check', attrs_dict={'@click': '$store.approvals.approve(item.id)', ':class': "$store.approvals.busyIds[item.id] ? 'opacity-50 pointer-events-none' : ''"}) }}
-                            {{ button(text='Reject', variant='outline', size='sm', icon='x', attrs_dict={'@click': '$store.approvals.startReject(item.id)', ':class': "$store.approvals.busyIds[item.id] ? 'opacity-50 pointer-events-none' : ''"}) }}
-                        </div>
-                    </template>
                 {% endcall %}
             </div>
         </template>

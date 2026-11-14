@@ -3,7 +3,7 @@
  *
  * Polls /ai-chat/approvals/queue every 30 seconds, renders a badge count
  * in the chat header, and provides a modal for a second authorized user to
- * review / approve / reject pending CRUD operations requested via AI chat.
+ * review pending CRUD operations requested via AI chat.
  *
  * State lives in a single Alpine.store('approvals') instance, not in the
  * Alpine.data factory below. Two DOM mounts use x-data="approvalManager"
@@ -26,9 +26,6 @@ function registerApprovalManager() {
         loading: false,
         error: null,
         hasLoaded: false,
-        /** ID of the approval currently being rejected (shows reason textarea) */
-        rejectingId: null,
-        rejectReason: "",
         /** Busy flags keyed by approval id — prevents double-click */
         busyIds: {},
         /** Polling handle */
@@ -100,73 +97,6 @@ function registerApprovalManager() {
         /*  Actions                                                            */
         /* ------------------------------------------------------------------ */
 
-        async approve(approvalId) {
-            if (this.busyIds[approvalId]) return;
-            this.busyIds[approvalId] = true;
-            this.error = null;
-            try {
-                const data = await Platform.fetch.post(
-                    "/ai-chat/approvals/" + approvalId + "/approve",
-                    null, // no body
-                    {
-                        credentials: "same-origin",
-                        silent: true, // We handle errors inline
-                    }
-                );
-                if (data.success) {
-                    this.approvals = this.approvals.filter(
-                        (a) => a.id !== approvalId
-                    );
-                } else {
-                    this.error = data.error || "Approval failed";
-                }
-            } catch (err) {
-                this.error = "Network error — please try again";
-            } finally {
-                delete this.busyIds[approvalId];
-            }
-        },
-
-        startReject(approvalId) {
-            this.rejectingId = approvalId;
-            this.rejectReason = "";
-            this.error = null;
-        },
-
-        cancelReject() {
-            this.rejectingId = null;
-            this.rejectReason = "";
-        },
-
-        async confirmReject(approvalId) {
-            if (this.busyIds[approvalId]) return;
-            this.busyIds[approvalId] = true;
-            this.error = null;
-            try {
-                const data = await Platform.fetch.post(
-                    "/ai-chat/approvals/" + approvalId + "/reject",
-                    { reason: this.rejectReason }, // plain object, auto‑JSON
-                    {
-                        credentials: "same-origin",
-                        silent: true, // We handle errors inline
-                    }
-                );
-                if (data.success) {
-                    this.approvals = this.approvals.filter(
-                        (a) => a.id !== approvalId
-                    );
-                    this.rejectingId = null;
-                    this.rejectReason = "";
-                } else {
-                    this.error = data.error || "Rejection failed";
-                }
-            } catch (err) {
-                this.error = "Network error — please try again";
-            } finally {
-                delete this.busyIds[approvalId];
-            }
-        },
-
         /* ------------------------------------------------------------------ */
         /*  Modal helpers                                                      */
         /* ------------------------------------------------------------------ */
@@ -232,18 +162,6 @@ function registerApprovalManager() {
         get hasLoaded() {
             return Alpine.store("approvals").hasLoaded;
         },
-        get rejectingId() {
-            return Alpine.store("approvals").rejectingId;
-        },
-        set rejectingId(value) {
-            Alpine.store("approvals").rejectingId = value;
-        },
-        get rejectReason() {
-            return Alpine.store("approvals").rejectReason;
-        },
-        set rejectReason(value) {
-            Alpine.store("approvals").rejectReason = value;
-        },
         get busyIds() {
             return Alpine.store("approvals").busyIds;
         },
@@ -252,18 +170,6 @@ function registerApprovalManager() {
         },
         fetchPending() {
             return Alpine.store("approvals").fetchPending();
-        },
-        approve(approvalId) {
-            return Alpine.store("approvals").approve(approvalId);
-        },
-        startReject(approvalId) {
-            return Alpine.store("approvals").startReject(approvalId);
-        },
-        cancelReject() {
-            return Alpine.store("approvals").cancelReject();
-        },
-        confirmReject(approvalId) {
-            return Alpine.store("approvals").confirmReject(approvalId);
         },
         formatDate(iso) {
             return Alpine.store("approvals").formatDate(iso);

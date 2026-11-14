@@ -1,7 +1,7 @@
 """Approval Inbox page tests.
 
 Covers: inbox page renders, sidebar link present for all personas with GENERAL
-permission, two-organisation isolation, approve/reject actions from the page.
+permission, two-organisation isolation, and no approve or reject control or route.
 """
 
 import uuid
@@ -95,11 +95,11 @@ def approval_inbox_setup(db_session, make_org, tenant_ctx):
 
 
 def test_approval_inbox_page_renders(app, approval_inbox_setup, login_as):
-    """The inbox lists the pending proposal with its Approve and Reject forms.
+    """The page lists the change in review with no control that waits for a person.
 
     The page used to load its rows with script behind loading, empty and
     unavailable placeholders; it now renders the queue on the server, so the
-    approver's proposal, its summary and both actions are in the HTML.
+    change and its summary are in the HTML.
     """
     setup = approval_inbox_setup
     client = app.test_client()
@@ -108,12 +108,12 @@ def test_approval_inbox_page_renders(app, approval_inbox_setup, login_as):
     resp = client.get("/ai-chat/approvals/inbox")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
-    assert "Approvals" in html
+    assert "Reviewed changes" in html
     approval_id = setup["approval_id"]
     assert 'data-testid="approval-card-%s"' % approval_id in html
     assert "Create capability &#39;Test Cap&#39;" in html
-    assert "/ai-chat/approvals/%s/approve" % approval_id in html
-    assert "/ai-chat/approvals/%s/reject" % approval_id in html
+    assert "/approve" not in html
+    assert "/reject" not in html
     # The queue loaded, so neither the empty state nor the error alert shows.
     assert 'data-testid="approval-inbox-empty"' not in html
     assert 'data-testid="approval-inbox-unavailable"' not in html
@@ -132,60 +132,45 @@ def test_approval_inbox_api_shows_only_same_org_items(app, approval_inbox_setup,
     assert all(a["summary"] != "Create capability 'Test Cap'" for a in data["approvals"])
 
 
-def test_approval_inbox_approve_action(app, approval_inbox_setup, login_as, tenant_ctx, monkeypatch):
-    """Approving from the inbox executes the operation."""
+def test_approval_inbox_has_no_approve_or_reject_route(app, approval_inbox_setup, login_as):
+    """Nobody can approve or reject over HTTP; the change stays listed in review."""
     setup = approval_inbox_setup
     client = app.test_client()
     login_as(client, setup["approver_a"])
 
-    # Mock the execution
-    import app.modules.ai_chat.services.ai_chat_approval_service as svc_mod
+    for action in ("approve", "reject"):
+        resp = client.post(f"/ai-chat/approvals/{setup['approval_id']}/{action}", json={"reason": "x"})
+        assert resp.status_code in (404, 405)
 
-    calls = []
-
-    class _FakeDataService:
-        def __init__(self, user_id):
-            self.user_id = user_id
-
-        def create_capability(self, payload):
-            calls.append((self.user_id, payload))
-            return {"success": True, "id": 9001}
-
-    monkeypatch.setattr(svc_mod, "AIDataInteractionService", _FakeDataService)
-    # A person's Approve goes through the review, so a reviewer that passes the change stands in.
-    from tests.test_change_review import PASS_ALL, FakeReviewer
-
-    FakeReviewer([PASS_ALL]).install(monkeypatch)
-
-    resp = client.post(f"/ai-chat/approvals/{setup['approval_id']}/approve")
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert body["success"] is True
-
-    # Verify the queue API no longer shows the approved item
-    resp = client.get("/ai-chat/approvals/queue")
-    data = resp.get_json()
-    assert all(a["id"] != setup["approval_id"] for a in data["approvals"])
+    data = client.get("/ai-chat/approvals/queue").get_json()
+    assert any(a["id"] == setup["approval_id"] for a in data["approvals"])
+    rules = {r.rule for r in app.url_map.iter_rules()}
+    assert not any(r.endswith("/approve") or r.endswith("/reject") for r in rules if r.startswith("/ai-chat/approvals/"))
 
 
-def test_approval_inbox_reject_action(app, approval_inbox_setup, login_as, tenant_ctx):
-    """Rejecting from the inbox marks the approval rejected."""
-    setup = approval_inbox_setup
+def test_approval_inbox_own_request_is_listed(app, db_session, make_org, tenant_ctx, login_as):
+    """A one-person organisation sees the change it asked for on the page."""
+    org = make_org("own-request")
+    person = _make_user(db_session, org.id, "OnlyPerson")
+    person_id, org_id = person.id, org.id
+    with tenant_ctx(org_id):
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        row_id = AIChatApprovalService(person_id).create_pending_approval(
+            operation_type="create",
+            entity_type="capability",
+            original_command="create capability Solo Cap",
+            operation_payload={"name": "Solo Cap"},
+            summary="Create capability 'Solo Cap'",
+            chat_session_id="sess-solo",
+        )["approval_id"]
+    from app.models.user import User
+
     client = app.test_client()
-    login_as(client, setup["approver_a"])
-
-    resp = client.post(
-        f"/ai-chat/approvals/{setup['approval_id']}/reject",
-        json={"reason": "Not needed"},
-    )
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert body["success"] is True
-
-    # Verify the queue API no longer shows the rejected item
-    resp = client.get("/ai-chat/approvals/queue")
-    data = resp.get_json()
-    assert all(a["id"] != setup["approval_id"] for a in data["approvals"])
+    login_as(client, User.query.get(person_id))
+    html = client.get("/ai-chat/approvals/inbox").get_data(as_text=True)
+    assert 'data-testid="approval-card-%s"' % row_id in html
+    assert "Solo Cap" in html
 
 
 def test_approval_inbox_sidebar_link_present_for_approver(app, approval_inbox_setup, login_as):
@@ -383,8 +368,9 @@ def test_approval_inbox_template_has_required_elements(app, approval_inbox_setup
     html = resp.get_data(as_text=True)
 
     # Check for key UI elements in the Alpine.js template
-    assert "Approve" in html
-    assert "Reject" in html
+    import re
+
+    assert not re.search(r">\s*(Approve|Reject|Confirm Reject)\s*<", html)
     assert "View technical detail" in html
     assert "Requested by" in html
     assert "Expires:" in html
@@ -404,7 +390,7 @@ def test_approval_inbox_empty_state(app, db_session, make_org, login_as):
     # A person with nothing waiting and nothing decided sees one empty state
     # that says why and points at the next step (the AI chat).
     assert 'data-testid="approval-inbox-empty"' in html
-    assert "No approvals yet" in html
+    assert "No reviewed changes yet" in html
     assert "checked and reviewed automatically" in html
     assert "second person" not in html
 

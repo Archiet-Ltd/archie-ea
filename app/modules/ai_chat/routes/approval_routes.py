@@ -1,6 +1,6 @@
 """AI chat approval workflow routes."""
 
-from flask import flash, jsonify, redirect, render_template, request, url_for
+from flask import jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app.models.ai_chat_crud_approval import AIChatCRUDApproval
@@ -68,47 +68,6 @@ def approval_impact(approval_id):
         return missing
     result = _approval_service().get_approval_impact(approval_id)
     return jsonify(result), _decision_status(result)
-
-
-@unified_ai_chat_bp.route("/approvals/<int:approval_id>/approve", methods=["POST"])
-@login_required
-def approve_pending_approval(approval_id):
-    # approve_and_execute, not approve_approval: the latter has never existed on
-    # AIChatApprovalService, so every approve click from the /ai-chat modal
-    # (static/js/ai_chat/approval_modal.js) raised AttributeError and 500'd. The
-    # queue itself worked - the blueprint page reaches it via a different route -
-    # so the flow was sound and only this call site was wrong.
-    _, missing = require_entity_json(AIChatCRUDApproval, approval_id, label="Approval")
-    if missing:
-        return missing
-    result = _approval_service().approve_and_execute(approval_id, current_user.id)
-    if request.form.get("from_inbox"):
-        return _back_to_inbox(result, "Approved. The change has been made.")
-    return jsonify(result), _decision_status(result)
-
-
-@unified_ai_chat_bp.route("/approvals/<int:approval_id>/reject", methods=["POST"])
-@login_required
-def reject_pending_approval(approval_id):
-    _, missing = require_entity_json(AIChatCRUDApproval, approval_id, label="Approval")
-    if missing:
-        return missing
-    if request.form.get("from_inbox"):
-        result = _approval_service().reject_approval(approval_id, request.form.get("reason") or None)
-        return _back_to_inbox(result, "Rejected. The reason stays with the proposal.")
-    payload = request.get_json(silent=True) or {}
-    reason = payload.get("reason")
-    result = _approval_service().reject_approval(approval_id, reason)
-    return jsonify(result), _decision_status(result)
-
-
-def _back_to_inbox(result, done_message):
-    """The inbox page posts plain forms; send the person back to it with the outcome."""
-    if result.get("success"):
-        flash(done_message, "success")
-    else:
-        flash(result.get("error") or "That decision could not be saved. Try again.", "error")
-    return redirect(url_for("unified_ai_chat.approval_inbox"))
 
 
 def _when(value):
