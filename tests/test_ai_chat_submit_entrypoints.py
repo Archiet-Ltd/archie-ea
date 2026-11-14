@@ -28,8 +28,14 @@ def chat(launch):
 
 def assert_one_reply(page, payloads, message, initial_url):
     expect(page.locator('#messages-container .message-content').last).to_contain_text('Fixture response.')
-    assert payloads == [{'message': message, 'domain': 'general', 'element_id': None,
-                         'context_type': None, 'persona': None, 'model': None, 'thread_id': None}]
+    # A first ask is not a Retry, and says how long the person has already waited (a small number here).
+    assert len(payloads) == 1
+    sent = dict(payloads[0])
+    waited = sent.pop('waited_seconds')
+    assert isinstance(waited, (int, float)) and 0 <= waited < 30
+    assert sent == {'message': message, 'domain': 'general', 'element_id': None,
+                    'context_type': None, 'persona': None, 'model': None, 'thread_id': None,
+                    'retry': False, 'failed_turn_id': None}
     assert page.url == initial_url
 
 
