@@ -270,6 +270,105 @@ def migrate_application_elements(
     return {"dry_run": dry_run, "revert": revert, "organisations": results}
 
 
+_PART_RELATIONSHIPS = ("composition", "aggregation")
+
+
+def _link_organisation(org_id: int, dry_run: bool) -> Dict:
+    """Give every top-level component element of one organisation its application record.
+
+    A component composed or aggregated by an application-kind element is a part and stays
+    without one (ADR-0014 rule 3). Any other component is treated as the import treats it:
+    it becomes an Application element and is linked to the organisation's application of the
+    same name when that application has no live element, otherwise to a new one.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.services.archimate_import_service import ArchiMateImportService
+
+    elements = (
+        db.session.query(ArchiMateElement)
+        .filter(ArchiMateElement.organization_id == org_id)
+        .filter(ArchiMateElement.type.in_([APPLICATION, COMPONENT]))
+        .order_by(ArchiMateElement.id)
+        .all()
+    )
+    live_ids = {e.id for e in elements}
+    linked_ids = {
+        row[0]
+        for row in db.session.query(ApplicationComponent.archimate_element_id)
+        .filter(ApplicationComponent.organization_id == org_id)
+        .filter(ApplicationComponent.archimate_element_id.isnot(None))
+        .all()
+    }
+    parts = {
+        row[0]
+        for row in db.session.query(ArchiMateRelationship.target_id)
+        .filter(ArchiMateRelationship.organization_id == org_id)
+        .filter(db.func.lower(ArchiMateRelationship.type).in_(_PART_RELATIONSHIPS))
+        .filter(ArchiMateRelationship.source_id.in_(live_ids or [0]))
+        .all()
+    }
+    already = linked = created = kept_as_parts = 0
+    for element in elements:
+        if element.id in linked_ids:
+            already += 1
+            continue
+        if element.type == COMPONENT and element.id in parts:
+            kept_as_parts += 1
+            continue
+        if dry_run:
+            linked += 1
+            continue
+        was = element.type
+        element.type = APPLICATION
+        if was == COMPONENT:
+            element.custom_properties = _with_marker(element.custom_properties)
+        domain = ArchiMateImportService._create_domain_row(element)
+        if domain is None:
+            element.type = was
+            if was == COMPONENT:
+                element.custom_properties = _without_marker(element.custom_properties)
+            kept_as_parts += 1
+        elif domain["created"]:
+            created += 1
+        else:
+            linked += 1
+    if not dry_run:
+        db.session.commit()
+    return {
+        "organization_id": org_id,
+        "already_linked": already,
+        "linked_to_existing_application": linked,
+        "new_application_created": created,
+        "left_without_application": kept_as_parts,
+    }
+
+
+def link_application_elements(
+    dry_run: bool = False, organization_ids: Optional[List[int]] = None
+) -> Dict:
+    """Link every unlinked top-level component to an application, one organisation at a time."""
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.models.archimate_core import ArchiMateElement
+
+    if organization_ids:
+        ids = sorted(set(organization_ids))
+    else:
+        ids = sorted(
+            r[0]
+            for r in db.session.query(ArchiMateElement.organization_id)
+            .filter(ArchiMateElement.type.in_([APPLICATION, COMPONENT]))
+            .distinct()
+            .all()
+            if r[0] is not None
+        )
+    results = []
+    for org_id in ids:
+        with tenant_scope(org_id):
+            results.append(_link_organisation(org_id, dry_run))
+    return {"dry_run": dry_run, "organisations": results}
+
+
 application_element_cli = AppGroup(
     "application-element", help="Application element (ADR-0014) maintenance commands."
 )
@@ -323,6 +422,44 @@ def migrate_command(dry_run, revert, org_ids, all_organisations):
             )
         if org["demotion_candidates"]:
             click.echo(f"    demotion_candidates: {org['demotion_candidates']}")
+    click.echo("\nDone.")
+
+
+@application_element_cli.command("link")
+@click.option("--dry-run", is_flag=True, help="Report what would change without writing.")
+@click.option("--org-ids", default=None, help="Comma-separated organisation IDs to process.")
+@click.option(
+    "--all-organisations",
+    "all_organisations",
+    is_flag=True,
+    help="Process every organisation. Required when --org-ids is not given.",
+)
+@with_appcontext
+def link_command(dry_run, org_ids, all_organisations):
+    """Give every top-level application component an application record.
+
+    Parts of another application stay as they are. Safe to run twice: the second run
+    changes nothing. Name the scope: --org-ids 1,2 or --all-organisations.
+    """
+    if bool(org_ids) == bool(all_organisations):
+        click.echo(
+            "Refusing to run: give exactly one of --org-ids (comma-separated) or "
+            "--all-organisations. Nothing was read or written.",
+            err=True,
+        )
+        raise SystemExit(2)
+    click.echo("application-element link" + (" (dry-run)" if dry_run else ""))
+    parsed = [int(x.strip()) for x in org_ids.split(",")] if org_ids else None
+    result = link_application_elements(dry_run=dry_run, organization_ids=parsed)
+    for org in result["organisations"]:
+        click.echo(f"\n  Organisation {org['organization_id']}:")
+        for key in (
+            "already_linked",
+            "linked_to_existing_application",
+            "new_application_created",
+            "left_without_application",
+        ):
+            click.echo(f"    {key}: {org[key]}")
     click.echo("\nDone.")
 
 
