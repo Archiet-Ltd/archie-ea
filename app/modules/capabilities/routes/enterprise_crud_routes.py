@@ -373,7 +373,7 @@ def create_capability():
         # Create capability
         capability = BusinessCapability(
             name=data["name"],
-            category=data.get("type", "operational"),
+            category=data.get("type") or "operational",
             description=data.get("description", ""),
             level=data.get("level", 1),
         )
@@ -439,7 +439,7 @@ def update_capability(capability_id):
         if "name" in data and data["name"] != capability.name:
             changes["name"] = {"from": capability.name, "to": data["name"]}
             capability.name = data["name"]
-        if "type" in data and data["type"] != capability.category:
+        if data.get("type") not in (None, "") and data["type"] != capability.category:
             changes["type"] = {
                 "from": capability.category,
                 "to": data["type"],

@@ -1754,6 +1754,83 @@ class AIChatApprovalService:
         )
         return [approval.to_dict() for approval in approvals]
 
+    def recorded_changes(self, chat_session_ids, turn_id) -> List[Dict[str, Any]]:
+        """The changes one assistant turn, the one that failed, recorded for the signed-in person.
+
+        Read from the one approval record, filtered by the person's organisation, the person, the
+        conversation and the turn (``agent_turn_id``). The turn's id is only a filter: it narrows what the
+        person's own rows already allow and names no change itself. With no turn id nothing is returned;
+        the latest turn is never guessed. ``chat_session_ids`` is the conversation's id, or
+        every id the conversation's changes may carry (the first turn of a new chat is recorded under the
+        person's own stable id, before the conversation has one). Each is
+        ``{"approval_id", "tool", "arguments", "summary", "applied"}``; ``applied`` is False while the
+        change is recorded and waiting. A rejected or expired row is not a recorded change. A retry reads
+        this to leave those changes alone and to say what state each is in.
+        """
+        actor, actor_error = self._acting_user()
+        ids = [i for i in ([chat_session_ids] if isinstance(chat_session_ids, str) else chat_session_ids or []) if i]
+        if actor_error or not ids or not isinstance(turn_id, str) or not turn_id.strip():
+            return []
+        rows = (
+            AIChatCRUDApproval.query.filter(
+                AIChatCRUDApproval.user_id == actor.id,
+                AIChatCRUDApproval.agent_turn_id == turn_id.strip()[:64],
+                AIChatCRUDApproval.organization_id == actor.organization_id,
+                AIChatCRUDApproval.chat_session_id.in_(ids),
+                AIChatCRUDApproval.operation_type == "tool_use",
+                AIChatCRUDApproval.status.in_([ApprovalStatus.PENDING, ApprovalStatus.APPROVED]),
+            )
+            .order_by(AIChatCRUDApproval.created_at.desc(), AIChatCRUDApproval.id.desc())
+            .all()
+        )
+        changes = []
+        for row in reversed(rows):
+            try:
+                arguments = json.loads(row.operation_payload)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if not isinstance(arguments, dict):
+                continue
+            changes.append({
+                "approval_id": row.id,
+                "tool": row.entity_type,
+                "arguments": arguments,
+                "summary": row.summary,
+                "applied": row.status == ApprovalStatus.APPROVED,
+            })
+        return changes
+
+    @staticmethod
+    def same_change(tool: str, arguments: Dict[str, Any], recorded_tool: str, recorded_arguments: Dict[str, Any]) -> bool:
+        """Whether a change a retry asks for is one already recorded: the same tool on the same target record
+        (its ``*_id`` fields), changing the same thing. A reworded name still matches (one name's words are
+        inside the other's); the description, summary and rationale wording never matters. Where there is no
+        name, the same fields changed to the same values match."""
+        if tool != recorded_tool:
+            return False
+
+        def target(args):
+            return {k: v for k, v in args.items() if k == "id" or k.endswith("_id")}
+
+        if target(arguments) != target(recorded_arguments):
+            return False
+        compared = False
+        for field in ("name", "title"):
+            a, b = arguments.get(field), recorded_arguments.get(field)
+            if isinstance(a, str) and isinstance(b, str):
+                compared = True
+                words_a, words_b = set(normalize_name(a).split()), set(normalize_name(b).split())
+                if not words_a or not words_b or not (words_a <= words_b or words_b <= words_a):
+                    return False
+        if compared:
+            return True
+        ignored = ("description", "summary", "original_command", "rationale")
+        fields = lambda args: {  # noqa: E731
+            k: json.dumps(v, sort_keys=True, default=str)
+            for k, v in args.items() if k not in ignored and k not in target(args)
+        }
+        return fields(arguments) == fields(recorded_arguments)
+
     def check_for_confirmation_command(self, message: str) -> Optional[Dict[str, Any]]:
         """
         Check if a chat message is a confirmation command.
