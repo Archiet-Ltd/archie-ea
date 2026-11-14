@@ -66,7 +66,7 @@ package AsBuilt_application_overview {
     part vocabulary_deployment_status_5 : VocabularySource {
         :>> columnName = "deployment_status";
         :>> sourceKind = "template-field";
-        :>> sourceFile = "app/templates/applications/dashboard.html:339";
+        :>> sourceFile = "app/templates/applications/dashboard.html:340";
         :>> origin = "app/services/application_status.py";
         :>> valueList = "";
     }

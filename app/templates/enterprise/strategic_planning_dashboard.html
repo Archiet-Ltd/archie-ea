@@ -65,13 +65,13 @@
                 </div>
             </a>
             
-            <a href="{{ url_for('enterprise.risk_assessment') }}" class="block bg-card rounded-lg border border-border p-6 hover:bg-accent transition-colors">
+            <a href="{{ url_for('enterprise.gap_analysis', status='open') }}" class="block bg-card rounded-lg border border-border p-6 hover:bg-accent transition-colors">
                 <div class="flex items-center gap-4">
                     <div class="w-12 h-12 bg-destructive/10 rounded-lg flex items-center justify-center">
                         <i data-lucide="shield-alert" class="w-6 h-6 text-destructive" aria-hidden="true"></i>
                     </div>
                     <div>
-                        <h3 class="font-semibold text-foreground">Gap Risk Assessment</h3>
+                        <h3 class="font-semibold text-foreground">Gap analysis</h3>
                         <p class="text-sm text-muted-foreground">Gaps rated by severity</p>
                     </div>
                 </div>

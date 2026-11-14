@@ -1044,7 +1044,7 @@ class EAWorkflowEngine:
         Creates implementation work packages from approved remediation items
         using the RoadmapBuilderService.
         """
-        from app.services.roadmap_builder_service import RoadmapBuilderService
+        from app.modules.solutions_strategic.v2.services.roadmap_builder_service import RoadmapBuilderService
 
         service = RoadmapBuilderService()
 
@@ -1064,8 +1064,9 @@ class EAWorkflowEngine:
                 capability_id=item.get("capability_id"),
                 created_by=f"workflow:{instance.instance_code}",
             )
-            if result and result.get("id"):
-                created_ids.append(result["id"])
+            written = (result or {}).get("work_package") or {}
+            if written.get("id"):
+                created_ids.append(written["id"])
 
         return {
             "roadmap_items_created": len(created_ids),

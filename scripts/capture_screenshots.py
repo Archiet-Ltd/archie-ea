@@ -95,10 +95,14 @@ def main() -> int:
     parser.add_argument("--clips-only", action="store_true",
                         help="with --modules: record only the whole-journey module recordings -- see "
                              "scripts/capture/module_clips.py -- and leave the screenshots as they are")
+    parser.add_argument("--with-duplicate-copy", action="store_true",
+                        help="with --modules: also add a copy of one system so the duplicate detection page has an "
+                             "overlap to show. It is a twentieth system a new customer does not have, so leave it "
+                             "off for every other picture")
     args = parser.parse_args()
 
     if args.modules:
-        return run_public_pages_capture(clips_only=args.clips_only,
+        return run_public_pages_capture(with_duplicate_copy=args.with_duplicate_copy, clips_only=args.clips_only,
                                         only=[k for k in args.only.split(",") if k] or None)
     if args.help_clips:
         return run_help_clips_capture(only=[k for k in args.only.split(",") if k] or None)
@@ -248,7 +252,7 @@ def _complete_overlapping_copy(code: str = "LQ-DOCMGMT-DUP") -> None:
     db.session.flush()
 
 
-def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
+def _seed_module_screen_data(org_id: int, demo_user_id: int, with_duplicate_copy: bool = False) -> None:
     """Fill in the modules seed_demo_company() doesn't reach.
 
     That command builds Lantern Quay Systems' ArchiMate model, applications,
@@ -286,47 +290,11 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         apps = _resolve_apps(org_id)
         caps = _resolve_caps(org_id)
 
-        # ── ARB review items (arb.dashboard reads ARBReviewItem) ───────────
-        from app.models.architecture_review_board import ARBReviewItem
+        # The board's reviews come from seed_demo_company (one seed). The capture adds none, so the figures a
+        # picture shows are the seed's.
 
-        arb_rows = [
-            ("REV-2026-001", "Migrate event backbone to a managed message broker",
-             "architecture_change", "submitted", "high"),
-            ("REV-2026-002", "Consolidate supplier onboarding into Supplier Portal",
-             "architecture_change", "under_review", "medium"),
-            ("REV-2026-003", "Adopt predictive maintenance for field service",
-             "architecture_change", "approved", "high"),
-            ("REV-2026-004", "Retire the manual inventory reconciliation spreadsheet",
-             "architecture_change", "rejected", "low"),
-        ]
-        for number, title, review_type, status, priority in arb_rows:
-            if ARBReviewItem.query.filter_by(review_number=number).first():
-                continue
-            db.session.add(ARBReviewItem(
-                review_number=number, title=title, review_type=review_type,
-                status=status, priority=priority, submitter_id=demo_user_id,
-                submitted_at=_dt.datetime.utcnow() - _dt.timedelta(days=14),
-            ))
-        db.session.flush()
-
-        # ── Business cases (business_case.index reads BusinessCase) ────────
-        from app.models.business_case import BusinessCase
-
-        case_rows = [
-            ("Automate calibration batch release", "draft", 450000, 95000, 820000, 22.5, 18),
-            ("Migrate the event backbone to the cloud", "submitted", 210000, 48000, 610000, 31.0, 14),
-            ("Consolidate the supplier panel", "approved", 95000, 15000, 240000, 18.0, 24),
-        ]
-        for title, status, capex, opex, benefit, roi, payback in case_rows:
-            if BusinessCase.query.filter_by(title=title).first():
-                continue
-            db.session.add(BusinessCase(
-                title=title, description=f"Business case: {title.lower()}.",
-                status=status, capex=capex, opex_annual=opex,
-                financial_benefit_annual=benefit, roi_percentage=roi,
-                payback_months=payback, created_by_id=demo_user_id,
-            ))
-        db.session.flush()
+        # Business cases come from seed_demo_company (one seed): three cases with their options, recommendation and
+        # three-year cost and return, tied to the solutions they support.
 
         # ── Business model canvas (business_model.index) ───────────────────
         from app.models.business_model import BusinessModelCanvas
@@ -368,35 +336,38 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         db.session.flush()
 
         # ── Duplicate detection: one real duplicate, then run it ───────────
-        from app.models.application_portfolio import ApplicationComponent
+        # Only when asked: the copy is a twentieth system a new customer does not have, so it would change the
+        # figures every other picture shows. Pictures of the other modules are taken without it.
+        if with_duplicate_copy:
+            from app.models.application_portfolio import ApplicationComponent
 
-        if not ApplicationComponent.query.filter_by(application_code="LQ-DOCMGMT-DUP").first():
-            source = apps.get("Document Management")
-            db.session.add(ApplicationComponent(
-                name="Document Management",
-                lifecycle_status="active", health_status="healthy",
-                archimate_element_id=source.archimate_element_id if source else None,
-                application_code="LQ-DOCMGMT-DUP",
-                implementation_date=_dt.date(2023, 1, 10),
-                go_live_date=_dt.date(2023, 4, 1),
-                total_cost_of_ownership=60000, license_cost_annual=9000,
-                infrastructure_cost_monthly=1800,
-                business_criticality="medium", strategic_importance="medium",
-            ))
-            db.session.flush()
+            if not ApplicationComponent.query.filter_by(application_code="LQ-DOCMGMT-DUP").first():
+                source = apps.get("Document Management")
+                db.session.add(ApplicationComponent(
+                    name="Document Management",
+                    lifecycle_status="active", health_status="healthy",
+                    archimate_element_id=source.archimate_element_id if source else None,
+                    application_code="LQ-DOCMGMT-DUP",
+                    implementation_date=_dt.date(2023, 1, 10),
+                    go_live_date=_dt.date(2023, 4, 1),
+                    total_cost_of_ownership=60000, license_cost_annual=9000,
+                    infrastructure_cost_monthly=1800,
+                    business_criticality="medium", strategic_importance="medium",
+                ))
+                db.session.flush()
 
-        _complete_overlapping_copy()
+            _complete_overlapping_copy()
 
-        try:
-            from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
-                UnifiedDuplicateDetectionService,
-            )
+            try:
+                from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
+                    UnifiedDuplicateDetectionService,
+                )
 
-            UnifiedDuplicateDetectionService().run_detection(
-                similarity_threshold=0.55, strategy="fast"
-            )
-        except Exception as exc:  # pragma: no cover -- capture-time diagnostic only
-            print(f"  duplicate detection run did not complete: {type(exc).__name__}: {exc}")
+                UnifiedDuplicateDetectionService().run_detection(
+                    similarity_threshold=0.55, strategy="fast"
+                )
+            except Exception as exc:  # pragma: no cover -- capture-time diagnostic only
+                print(f"  duplicate detection run did not complete: {type(exc).__name__}: {exc}")
 
         # ── Investment priorities (application <-> capability mapping) ─────
         from app.models.unified_application_capability_mapping import (
@@ -416,79 +387,10 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             ))
         db.session.flush()
 
-        # ── Portfolio (portfolio.index reads EnterpriseInitiative, NOT
-        #    PortfolioInitiative -- two separate, pre-existing models) ──────
-        from app.models.vendor.vendor_organization import EnterpriseInitiative
+        # The portfolio's initiatives come from seed_demo_company (one seed): seven, each with its benefit and the
+        # objective it serves. A second set made here duplicated four of them under other codes.
 
-        initiative_rows = [
-            ("Calibration Modernisation", "LQ-INIT-CAL", "active", "green", "implementation",
-             62, 450000, 320000, "Chief Operations Officer"),
-            ("Field Service Transformation", "LQ-INIT-FSV", "active", "yellow", "design",
-             35, 280000, 95000, "Head of Engineering"),
-            ("Event Backbone Hardening", "LQ-INIT-EVT", "on_hold", "red", "planning",
-             10, 210000, 40000, "Shared Services Director"),
-            ("Supplier Optimisation", "LQ-INIT-SUP", "completed", "green", "closure",
-             100, 95000, 92000, "Regulatory Compliance Officer"),
-        ]
-        for name, code, status, health, phase, pct, budget, spent, sponsor in initiative_rows:
-            if EnterpriseInitiative.query.filter_by(code=code).first():
-                continue
-            db.session.add(EnterpriseInitiative(
-                name=name, code=code, status=status, health_status=health,
-                current_phase=phase, completion_percentage=pct,
-                approved_budget=budget, spent_to_date=spent,
-                executive_sponsor=sponsor,
-                planned_end_date=_dt.datetime.utcnow() + _dt.timedelta(days=180),
-            ))
-        db.session.flush()
-
-        # ── Vendor catalogue + contracts (vendors, procurement.renewals) ───
-        # VendorOrganization is DELIBERATELY not tenant-scoped (ADR-0003): a
-        # shared, name-unique reference catalogue. This capture runs against
-        # an isolated, throwaway database made only to render these static
-        # images -- never a shared or production database -- so adding
-        # fictional entries here cannot leak into any real install. Names
-        # are invented the same way the rest of the seeded cast is.
-        from app.models.application_portfolio import VendorContract
-        from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
-
-        vendor_rows = [
-            ("Meridian Sensor Systems", "software_vendor", "Calibration Ledger"),
-            ("Calderbrook Cloud Services", "cloud_provider", "Event Transport"),
-            ("Northgate Field Equipment", "systems_integrator", "Field Service Scheduler"),
-        ]
-        vendor_ids = []
-        for name, vendor_type, product_name in vendor_rows:
-            vendor = VendorOrganization.query.filter_by(name=name).first()
-            if vendor is None:
-                vendor = VendorOrganization(name=name, display_name=name, vendor_type=vendor_type)
-                db.session.add(vendor)
-                db.session.flush()
-                db.session.add(VendorProduct(
-                    vendor_organization_id=vendor.id, name=product_name,
-                ))
-            vendor_ids.append(vendor.id)
-        db.session.flush()
-
-        today = _dt.date.today()
-        contract_rows = [
-            ("Calibration Ledger support contract", today.replace(year=today.year - 1),
-             today + _dt.timedelta(days=15), vendor_ids[0]),
-            ("Event Transport hosting agreement", today.replace(year=today.year - 2),
-             today + _dt.timedelta(days=45), vendor_ids[1]),
-            ("Field Service Scheduler licence", today.replace(year=today.year - 1),
-             today + _dt.timedelta(days=100), vendor_ids[2]),
-            ("Calibration Ledger disaster-recovery add-on",
-             today.replace(year=today.year - 1), today + _dt.timedelta(days=200), vendor_ids[0]),
-        ]
-        for name, start, renewal, vendor_id in contract_rows:
-            if VendorContract.query.filter_by(contract_name=name).first():
-                continue
-            db.session.add(VendorContract(
-                contract_name=name, start_date=start, renewal_date=renewal,
-                status="active", vendor_id=vendor_id, organization_id=org_id,
-            ))
-        db.session.flush()
+        # The vendors and their contract renewals come from seed_demo_company (one seed); the capture adds none.
 
         # ── Work packages (enterprise.work_packages reads WorkPackage, NOT
         #    UnifiedWorkPackage -- two separate, pre-existing models) ──────
@@ -593,43 +495,8 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
     IndustryAPQCService().seed_default_frameworks()
 
-    # Regulatory compliance frameworks (dashboard/compliance): standard,
-    # real framework/control names (GDPR, ISO 27001 -- not fictional data,
-    # the same two the page's own empty-state copy names as examples).
-    # RegulatoryFrameworkService.seed_manufacturing_frameworks() is the
-    # product's own default-seed path for this, but its hardcoded fallback
-    # (used when app/data/compliance_frameworks.json is absent, as it is
-    # here) passes ComplianceControl a control_id kwarg that model doesn't
-    # have -- a pre-existing bug in that fallback, out of this brief's
-    # scope to fix. Insert directly instead, with the model's real fields.
-    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
-
-    framework_rows = [
-        ("GDPR", "General Data Protection Regulation", "privacy", "EU", "mandatory",
-         [("Art.30", "Records of processing activities"),
-          ("Art.32", "Security of processing")]),
-        ("ISO-27001", "ISO 27001 Information Security", "security", "Global", "recommended",
-         [("A.9.2.1", "User access provisioning"),
-          ("A.12.1.2", "Change management")]),
-    ]
-    for code, name, category, jurisdiction, enforcement, controls in framework_rows:
-        framework = RegulatoryFramework.query.filter_by(code=code).first()
-        if framework is None:
-            framework = RegulatoryFramework(
-                code=code, name=name, category=category,
-                jurisdiction=jurisdiction, enforcement_level=enforcement,
-            )
-            db.session.add(framework)
-            db.session.flush()
-        for control_code, title in controls:
-            if ComplianceControl.query.filter_by(
-                framework_id=framework.id, control_code=control_code
-            ).first():
-                continue
-            db.session.add(ComplianceControl(
-                framework_id=framework.id, control_code=control_code, title=title,
-            ))
-    db.session.commit()
+    # Regulatory compliance frameworks: the seed holds them (seed_demo_company), and the capture adds none, so
+    # the compliance picture counts the frameworks and controls a new customer has.
 
     # Batch import jobs (batch-import.dashboard): scoped by user_id only, no
     # organization_id column on this model at all.
@@ -649,7 +516,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
     db.session.commit()
 
 
-def _seed_lantern_quay(demo_password: str) -> None:
+def _seed_lantern_quay(demo_password: str, with_duplicate_copy: bool = False) -> None:
     """Seed Lantern Quay Systems and grant three capture-only persona roles.
 
     Calls the existing seed_demo_company() unchanged (app/commands/seed_demo_company.py
@@ -692,7 +559,7 @@ def _seed_lantern_quay(demo_password: str) -> None:
 
         org = Organization.query.filter_by(slug="lantern-quay").first()
         demo_user = User.query.filter_by(email=DEMO_EMAIL).first()
-        _seed_module_screen_data(org.id, demo_user.id)
+        _seed_module_screen_data(org.id, demo_user.id, with_duplicate_copy)
 
 
 def _boot(port: int, log_path: pathlib.Path):
@@ -803,7 +670,7 @@ def _wander(page, points) -> None:
         page.wait_for_timeout(500)
 
 
-def run_public_pages_capture(clips_only: bool = False, only=None) -> int:
+def run_public_pages_capture(clips_only: bool = False, only=None, with_duplicate_copy: bool = False) -> int:
     for tool in ("ffmpeg", "ffprobe"):
         if subprocess.run(["where" if os.name == "nt" else "which", tool],
                           capture_output=True).returncode != 0:
@@ -822,7 +689,7 @@ def run_public_pages_capture(clips_only: bool = False, only=None) -> int:
     os.environ["DEMO_USER_PASSWORD"] = demo_password
 
     print("seeding Lantern Quay Systems ...")
-    _seed_lantern_quay(demo_password)
+    _seed_lantern_quay(demo_password, with_duplicate_copy)
 
     port = _free_port()
     scratch = pathlib.Path(os.environ.get("CAPTURE_SCRATCH_DIR",

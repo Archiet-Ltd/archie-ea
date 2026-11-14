@@ -17,7 +17,12 @@ from app.modules.ai_chat.services.estate_answer import (
     owned_element_id,
     recorded_text,
 )
-from app.modules.ai_chat.services.lens_answer import answer_for_lens, answer_lens_question
+from app.modules.ai_chat.services.lens_answer import (
+    answer_for_lens,
+    answer_lens_question,
+    asks_for_capacity,
+    owner_of_element,
+)
 from app.modules.intelligence.services import answer_envelope as envelope
 
 from app.services.conversation_history import persist_turn
@@ -213,7 +218,8 @@ def _recorded_links(answer):
     return relationship_split(int(current_org_id()), int(element_id))
 
 
-def _lens_card(lens):
+def _lens_card(lens, message=""):
+    owned = owner_of_element(lens["element"]) if lens["lens"] == "accountability" and lens["data"] is not None else None
     component_id = ((lens["data"] or {}).get("application_component_id")) if lens["lens"] == "portfolio" else None
     owners = ((lens["data"] or {}).get("owners")) if lens["lens"] == "accountability" else None
     for owner in owners or []:
@@ -225,6 +231,8 @@ def _lens_card(lens):
         lens=lens["lens"],
         element=lens["element"],
         data=lens["data"],
+        owned=owned,
+        asked_capacity=asks_for_capacity(message),
         footer=ownership_footer(current_org_id(), owners) if owners else None,
         planning_url=(
             url_for("unified_applications.rationalization_planning", app_id=component_id) if component_id else None
@@ -307,7 +315,7 @@ def _parts_response(message, thread_id, keep, cards):
             lens = answer_for_lens("accountability", message[:MAX_QUESTION_CHARS])
             if lens is None:
                 return None
-            drawn.append(_lens_card(lens))
+            drawn.append(_lens_card(lens, message))
             lines.append(_lens_line(lens))
             continue
         direction = "upstream" if card == "upstream" else "downstream"
@@ -381,7 +389,7 @@ def estate_answer():
                 "found": True,
                 "thread_id": kept,
                 "lens": lens["lens"],
-                "html": _lens_card(lens),
+                "html": _lens_card(lens, message),
             }
         )
     try:

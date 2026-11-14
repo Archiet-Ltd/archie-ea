@@ -712,7 +712,7 @@ document.addEventListener('alpine:init', () => {
             // among that random slice). Now scopes the diagram to the searched
             // element(s) plus their real one-hop relationship neighbors.
             let vpKey = this.activeLayer ? 'layered' : 'layered';
-            let url = '/api/archimate/viewpoints/' + vpKey + '/diagram?limit=30';
+            let url = '/api/archimate/viewpoints/' + vpKey + '/diagram?limit=20';
             if (this.activeLayer) url += '&layer=' + this.activeLayer;
             if (this.searchQuery) url += '&search=' + encodeURIComponent(this.searchQuery);
             try {
@@ -725,9 +725,18 @@ document.addEventListener('alpine:init', () => {
                 let container = document.getElementById('elements-viewpoint-diagram');
                 if (!container || typeof ComposerRenderer === 'undefined') return;
                 if (this._diagramRenderer) this._diagramRenderer.destroy();
-                this._diagramRenderer = ComposerRenderer.create(container, { mode: 'view', width: '100%', height: 350 });
+                // One band for each layer that has an element in the diagram, in ArchiMate's layer order, so the
+                // picture reads as a layered view: what the business does, the applications that serve it, the
+                // technology they run on.
+                const layerOrder = data.layer_order || [];
+                const present = new Set(data.elements.map(e => (e.layer || '').toLowerCase()));
+                const bands = layerOrder.filter(l => present.has(l))
+                    .map(l => ({ layer: l, label: l.charAt(0).toUpperCase() + l.slice(1) + ' layer' }));
+                this._diagramRenderer = ComposerRenderer.create(container, {
+                    mode: 'view', width: '100%', height: 350, layout: 'bands', bands: bands,
+                    nodeStyle: 'compact', tokens: true, connectionStyle: 'plain', rowAlign: 'centre', zoneLabelSize: 12,
+                });
                 this._diagramRenderer.loadElements(data.elements, data.relationships);
-                this._diagramRenderer.fitToContent();
                 this.diagramLoaded = true;
             } catch(e) {
                 // Optional viewpoint diagram alongside the element list/table; a failed

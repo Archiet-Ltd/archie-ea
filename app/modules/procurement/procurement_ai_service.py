@@ -24,7 +24,9 @@ from typing import Any, Dict, List
 
 from app.services.llm_service import LLMService
 
-from .services import get_days_until_renewal, get_spend_by_category, get_spend_summary
+from app.services.vendor_register import get_days_until_renewal, get_renewal_urgency, renewal_date_of
+
+from .services import get_spend_by_category, get_spend_summary
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +90,7 @@ def _as_str_list(data: Dict[str, Any], key: str) -> List[str]:
 
 def _build_renewal_brief_context(contract) -> Dict[str, Any]:
     days_to_expiry = get_days_until_renewal(contract)
+    renews_on = renewal_date_of(contract)
 
     context: Dict[str, Any] = {
         "contract_name": contract.contract_name,
@@ -101,8 +104,9 @@ def _build_renewal_brief_context(contract) -> Dict[str, Any]:
         "currency": contract.currency,
         "start_date": contract.start_date.isoformat() if contract.start_date else None,
         "end_date": contract.end_date.isoformat() if contract.end_date else None,
-        "renewal_date": contract.renewal_date.isoformat() if contract.renewal_date else None,
+        "renewal_date": renews_on.isoformat() if renews_on else None,
         "days_to_expiry": days_to_expiry,
+        "renewal_urgency": get_renewal_urgency(contract),
         "auto_renewal": contract.auto_renewal,
         "notice_period_days": contract.notice_period_days,
         "vendor_risk": contract.vendor_risk,
@@ -201,11 +205,12 @@ def _build_remediation_context(license_entitlement) -> Dict[str, Any]:
         "compliance_status": license_entitlement.compliance_status,
     }
     if contract is not None:
+        renews_on = renewal_date_of(contract)
         context["contract"] = {
             "contract_name": contract.contract_name,
             "vendor_name": contract.vendor.name if contract.vendor else None,
             "end_date": contract.end_date.isoformat() if contract.end_date else None,
-            "renewal_date": contract.renewal_date.isoformat() if contract.renewal_date else None,
+            "renewal_date": renews_on.isoformat() if renews_on else None,
         }
     return context
 

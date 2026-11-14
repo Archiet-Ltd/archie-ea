@@ -11,13 +11,13 @@
     Empty boxes show a single short line naming the box and pointing at the
     typing area below — no large repeated icon. #}
 
-{% macro canvas_box_entries(zone) %}
+{% macro canvas_box_entries(zone, filled=false) %}
 {# The entries list itself: present, empty. A later change is the only
     thing that ever puts a row in it. #}
 <ul data-testid="canvas-entries-{{ zone.box_key }}" class="sr-only" aria-hidden="true"></ul>
 {% if zone.empty_reason == 'canvas_box_not_derived' %}
 <p data-testid="canvas-box-reason-{{ zone.box_key }}" data-reason="canvas_box_not_derived" role="status" class="text-xs text-muted-foreground mb-2">Composed from the other sections — nothing to show yet</p>
-{% else %}
+{% elif not filled %}
 <p data-testid="canvas-box-reason-{{ zone.box_key }}" data-reason="canvas_box_empty" role="status" class="text-xs text-muted-foreground mb-2">{{ zone.label }} is empty. Write it in the box below.</p>
 {% endif %}
 {% endmacro %}
