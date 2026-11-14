@@ -452,7 +452,8 @@ class AgentRunner:
         self._review_budget = None
         # What ran in this turn: the lookups, and the text they and the context returned. The reply's
         # words about searching, and which facts came from the conversation, are read from these.
-        self._lookups_run = 0
+        self._lookups: list = []
+        self._question = ""
         self._evidence_chunks: list = []
         self._earlier_user: list = []
 
@@ -903,7 +904,8 @@ class AgentRunner:
                 logger.warning("AgentRunner: question name lookup failed", exc_info=True)
         self._nudged = False
         self._gate_cache = None
-        self._lookups_run = 0
+        self._lookups = []
+        self._question = user_message if isinstance(user_message, str) else ""
         self._evidence_chunks = [system_prompt]
         self._earlier_user = [
             str(e.get("content")) for e in (history or [])
@@ -1020,7 +1022,7 @@ class AgentRunner:
         # Records the read tools actually returned this turn, for citation.
         sources = []
         # A question that names business facts is searched before the reply may say anything is missing.
-        found_text = self._look_up_business_facts(user_message, executor, sources)
+        found_text = self._look_up_business_facts(user_message, sources)
         if found_text:
             messages[-1] = {"role": "user", "content": user_message + found_text}
 
@@ -1217,7 +1219,7 @@ class AgentRunner:
                     # Auto-execute
                     self._emit({"type": "tool_start", "tool": tc.name, "args": tc.arguments})
                     result = executor.execute(tc)
-                    self._note_lookup(tc.name, result)
+                    self._note_lookup(tc.name, result, tc.arguments)
                     self._collect_sources(tc.name, result, sources)
                     self._grounding.add_tool_result(
                         result, mutates=tc.name in _MUTATING_TOOLS
@@ -1772,11 +1774,13 @@ class AgentRunner:
     # Message history management                                          #
     # ------------------------------------------------------------------ #
 
-    def _note_lookup(self, tool_name: str, result: dict) -> None:
+    def _note_lookup(self, tool_name: str, result: dict, arguments=None, for_question: bool = False) -> None:
         """Record that a read tool ran, and keep what it returned as evidence for the reply."""
+        from app.modules.ai_chat.services.turn_honesty import record_lookup
+
         if tool_name in _MUTATING_TOOLS:
             return
-        self._lookups_run += 1
+        self._lookups.append(record_lookup(arguments, result, for_question))
         self._evidence_chunks.append(json.dumps(result, default=str))
 
     @staticmethod
@@ -1802,7 +1806,7 @@ class AgentRunner:
             "result": [{"id": r.id, "name": r.name, "type": r.type, "layer": r.layer} for r in rows],
         }
 
-    def _look_up_business_facts(self, user_message: str, executor, sources: list) -> str:
+    def _look_up_business_facts(self, user_message: str, sources: list) -> str:
         """Search the model for each business fact the question names, as lookups of this
         turn (they appear in the trail like any other), and return what they found, fenced,
         to add to the question. Empty when the question names none."""
@@ -1820,7 +1824,7 @@ class AgentRunner:
                 logger.warning("AgentRunner: business-fact lookup failed", exc_info=True)
                 db.session.rollback()
                 result = {"success": False, "error": "The lookup failed."}
-            self._note_lookup("search_elements", result)
+            self._note_lookup("search_elements", result, args, for_question=True)
             self._collect_sources("search_elements", result, sources)
             self._grounding.add_tool_result(result, mutates=False)
             self._emit({"type": "tool_result", "tool": "search_elements", "result": result})
@@ -2449,7 +2453,7 @@ class AgentRunner:
         """*text* with its claims of searching, and its facts from the conversation, made to match what ran."""
         from app.modules.ai_chat.services.turn_honesty import mark_conversation_facts, remove_unbacked_search_claims
 
-        text = remove_unbacked_search_claims(text, self._lookups_run)
+        text = remove_unbacked_search_claims(text, self._lookups, self._question)
         return mark_conversation_facts(text, self._earlier_user, self._evidence_chunks)
 
     def _text_only_fallback(

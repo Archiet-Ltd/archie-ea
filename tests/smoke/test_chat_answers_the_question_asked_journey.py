@@ -36,6 +36,9 @@ SCENARIO = (
     "what breaks if Ifiok fails?"
 )
 COST = "What does it cost us to serve one customer?"
+COST_ELEMENT = "Cost to serve one customer is USD 4 a month"
+DATE = "When does the paid launch happen?"
+DATE_ELEMENT = "Paid launch date is 1 April 2027"
 
 
 class _Model(BaseHTTPRequestHandler):
@@ -45,9 +48,13 @@ class _Model(BaseHTTPRequestHandler):
     def do_POST(self):
         size = int(self.headers.get("Content-Length") or 0)
         request = json.loads(self.rfile.read(size) or b"{}")
-        text = json.dumps(request.get("messages"))
+        text = json.dumps((request.get("messages") or [{}])[-1])
         if RAISE in text:
             reply = "I searched the model. The plan is: %s." % RAISE
+        elif COST_ELEMENT in text:
+            reply = "I searched the model. The record says: %s." % COST_ELEMENT
+        elif DATE_ELEMENT in text:
+            reply = "I searched the model. The record says: %s." % DATE_ELEMENT
         else:
             reply = "I searched and found no such element. Nothing is missing from this answer."
         if request.get("stream"):
@@ -99,7 +106,7 @@ def _seed(org_id):
 
     app = create_app("testing")
     with app.app_context():
-        for name, kind in ((RAISE, "Goal"), ("Monthly burn", "Metric")):
+        for name, kind in ((RAISE, "Goal"), ("Monthly burn", "Metric"), (COST_ELEMENT, "Metric"), (DATE_ELEMENT, "Goal")):
             db.session.add(ArchiMateElement(name=name, type=kind, layer="motivation", organization_id=org_id))
         db.session.commit()
         db.session.remove()
@@ -156,14 +163,29 @@ def test_the_three_part_board_question_is_searched_and_never_says_nothing_is_mis
     assert "Monthly burn element" not in words and "No initiatives recorded" not in words
 
 
-@pytest.mark.parametrize("question,label", [(RISK, "risk"), (SCENARIO, "scenario"), (COST, "cost")])
-def test_a_reply_claims_a_search_only_when_the_footer_shows_a_lookup(page, server, founder, question, label):
+@pytest.mark.parametrize("question,label,element", [(COST, "cost", COST_ELEMENT), (DATE, "date", DATE_ELEMENT)])
+def test_a_cost_or_date_question_in_ordinary_words_runs_a_search_and_shows_its_result(
+    page, server, founder, question, label, element
+):
     sign_in(page, server, founder["emails"]["enterprise_architect"])
     words, footer = _ask(page, server, question, label)
-    searched = "I searched" in words or "Nothing is missing" in words or "found no such" in words
-    if searched:
-        assert "No lookup ran" not in footer and "lookup" in footer, (words, footer)
-    else:
-        assert "No search ran" in words, words
-    assert "What breaks if Ifiok fails" not in words
+    assert element in words, words
+    assert "No lookup ran" not in footer and "lookup" in footer, footer
+
+
+def test_a_question_with_no_business_fact_runs_no_search_and_the_claim_of_one_is_removed(page, server, founder):
+    sign_in(page, server, founder["emails"]["enterprise_architect"])
+    words, footer = _ask(page, server, RISK, "risk")
+    assert "I searched" not in words and "found no such" not in words and "Nothing is missing" not in words, words
+    assert "No search ran, so this answer cannot say nothing is recorded." in words, words
+    assert "No lookup ran" in footer, footer
     assert "Which applications" not in words
+
+
+def test_a_scenario_that_names_revenue_is_searched_and_its_claim_of_a_search_stands(page, server, founder):
+    sign_in(page, server, founder["emails"]["enterprise_architect"])
+    words, footer = _ask(page, server, SCENARIO, "scenario")
+    assert "I searched and found no such element" in words, words
+    assert "No search ran" not in words, words
+    assert "No lookup ran" not in footer and "lookup" in footer, footer
+    assert "What breaks if Ifiok fails" not in words and "Which applications" not in words

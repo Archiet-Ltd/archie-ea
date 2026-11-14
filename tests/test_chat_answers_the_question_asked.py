@@ -95,15 +95,66 @@ def test_the_one_question_about_an_element_still_gets_its_card(client, login_as,
 # --- the reply's words about searching ---------------------------------------
 
 
+def _lookup(query, result, for_question=False):
+    from app.modules.ai_chat.services.turn_honesty import record_lookup
+
+    return record_lookup({"query": query}, result, for_question)
+
+
+FOUND = {"success": True, "result": [{"name": "Monthly burn"}]}
+NOTHING = {"success": True, "result": []}
+FAILED = {"success": False, "error": "The lookup failed."}
+
+
 def test_a_claim_of_a_search_is_removed_when_no_lookup_ran():
     from app.modules.ai_chat.services.turn_honesty import NO_SEARCH_NOTE, remove_unbacked_search_claims
 
     text = "I searched and found no such element. The launch is in April."
-    out = remove_unbacked_search_claims(text, 0)
+    out = remove_unbacked_search_claims(text, [])
     assert "searched" not in out and "found no such" not in out
     assert "The launch is in April." in out and NO_SEARCH_NOTE in out
-    assert remove_unbacked_search_claims("Nothing is missing from this answer.", 0).endswith(NO_SEARCH_NOTE)
-    assert remove_unbacked_search_claims(text, 1) == text
+    assert remove_unbacked_search_claims("Nothing is missing from this answer.", []).endswith(NO_SEARCH_NOTE)
+    assert remove_unbacked_search_claims(text, [_lookup("launch", NOTHING)], "when is the launch") == text
+
+
+def test_a_lookup_that_failed_never_backs_a_claim():
+    from app.modules.ai_chat.services.turn_honesty import NO_SEARCH_NOTE, remove_unbacked_search_claims
+
+    text = "I searched and found no such element. Nothing is missing from this answer."
+    out = remove_unbacked_search_claims(text, [_lookup("burn", FAILED, True)], "what is our burn")
+    assert "searched" not in out and "Nothing is missing" not in out and NO_SEARCH_NOTE in out
+
+
+def test_a_lookup_about_something_else_does_not_back_a_claim():
+    from app.modules.ai_chat.services.turn_honesty import NO_SEARCH_NOTE, remove_unbacked_search_claims
+
+    text = "I searched and found no such element. Nothing is missing from this answer."
+    out = remove_unbacked_search_claims(text, [_lookup("payroll", NOTHING)], "who owns the billing ledger")
+    assert "searched" not in out and "Nothing is missing" not in out and NO_SEARCH_NOTE in out
+
+
+def test_a_matching_lookup_that_succeeded_keeps_the_claim():
+    from app.modules.ai_chat.services.turn_honesty import remove_unbacked_search_claims
+
+    text = "I searched and found no such element named payroll."
+    assert remove_unbacked_search_claims(text, [_lookup("payroll", NOTHING)], "who owns payroll") == text
+    assert remove_unbacked_search_claims(text, [_lookup("burn", NOTHING, True)], "what is our burn") == text
+
+
+def test_nothing_is_missing_is_kept_only_when_a_matching_lookup_found_nothing():
+    from app.modules.ai_chat.services.turn_honesty import remove_unbacked_search_claims
+
+    text = "I searched the model. Nothing is missing from this answer."
+    found = remove_unbacked_search_claims(text, [_lookup("burn", FOUND, True)], "what is our burn")
+    assert "searched" in found and "Nothing is missing" not in found
+    assert remove_unbacked_search_claims(text, [_lookup("burn", NOTHING, True)], "what is our burn") == text
+
+
+def test_looking_for_a_record_is_a_search_claim():
+    from app.modules.ai_chat.services.turn_honesty import NO_SEARCH_NOTE, remove_unbacked_search_claims
+
+    out = remove_unbacked_search_claims("I looked for it but there is no record. The launch is in April.", [])
+    assert "looked for" not in out and "The launch is in April." in out and NO_SEARCH_NOTE in out
 
 
 def test_a_figure_the_person_gave_earlier_is_marked_as_from_the_conversation():
@@ -124,6 +175,20 @@ def test_business_fact_words_name_what_to_search():
     assert "raise" in fact_searches("what funding do we plan to raise, how much, and when?")
     assert {"burn", "revenue"} <= set(fact_searches(BOARD))
     assert fact_searches("Who leads our company?") == []
+
+
+@pytest.mark.parametrize("question,name", [
+    ("What does it cost us to serve one customer?", "cost to serve"),
+    ("What is the cost of serving a customer?", "cost to serve"),
+    ("What is our cost per customer?", "cost per"),
+    ("When does the paid launch happen?", "date"),
+    ("By when must the money land?", "date"),
+    ("What date do we open the round?", "date"),
+])
+def test_business_facts_are_found_by_the_words_a_person_uses(question, name):
+    from app.modules.ai_chat.services.turn_honesty import fact_searches
+
+    assert name in fact_searches(question)
 
 
 # --- the streamed turn: the lookup runs, the footer and the words agree -----------

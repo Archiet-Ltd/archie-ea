@@ -6,7 +6,8 @@ the turn:
 * a question that names business facts (revenue, price, cash, burn, funding, cost
   to serve, targets) is searched before the reply says anything is missing;
 * a reply says it searched, found no such record, or that nothing is missing only
-  when a lookup ran in that turn;
+  when a lookup that succeeded, and that is about what the sentence says was searched,
+  ran in that turn, and "nothing is missing" only when that lookup found nothing;
 * a sentence that repeats what the person said earlier in the conversation, and
   that no record or lookup supports, is marked as coming from the conversation.
 """
@@ -14,6 +15,7 @@ the turn:
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Iterable, List, Optional, Sequence
 
 # Words a question uses for a business fact, and the names to search the model for.
@@ -26,8 +28,19 @@ _FACT_SEARCHES = (
         re.compile(r"\bfunding\b|\braise\b|\braising\b|\bfundrais\w*\b|\binvest(?:or|ment)s?\b|\bpre-?seed\b|\bseed round\b", re.I),
         ("raise", "funding", "pre-seed"),
     ),
-    (re.compile(r"\bcost to serve\b|\bcost per\b|\bunit cost\b", re.I), ("cost to serve", "cost per")),
+    (
+        re.compile(
+            r"\bcosts?\s+(?:us\s+|me\s+|we\s+)?to\s+serve\b|\bcost\s+of\s+serving\b|\bcosts?\s+per\b"
+            r"|\bunit\s+costs?\b|\bserv(?:e|ing)\s+(?:one|each|a|an|every)\s+customer\b",
+            re.I,
+        ),
+        ("cost to serve", "cost per"),
+    ),
     (re.compile(r"\btargets?\b|\bgoals?\b", re.I), ("target", "goal")),
+    (
+        re.compile(r"\bwhen\s+(?:does|do|is|are|will|did|can|should)\b|\bby\s+when\b|\bwhat\s+dates?\b|\bdates?\b|\bdeadlines?\b", re.I),
+        ("date", "deadline"),
+    ),
 )
 
 LOOKUPS_PER_QUESTION = 8
@@ -46,27 +59,62 @@ def fact_searches(message: Optional[str]) -> List[str]:
 
 
 # A sentence that claims a search was made, or that nothing is missing.
+_ABSENCE_CLAIM = re.compile(
+    r"\bfound\s+no\s+such\b|\bnothing\s+is\s+missing\b|\bsearch(?:ed)?\s+(?:found|returned)\s+nothing\b",
+    re.I,
+)
 _SEARCH_CLAIM = re.compile(
-    r"\bI(?:'ve| have)?\s+(?:searched|looked\s+(?:it\s+)?up|looked\s+through|checked\s+the\s+(?:model|records))\b"
-    r"|\bfound\s+no\s+such\b"
-    r"|\bnothing\s+is\s+missing\b"
-    r"|\bsearch(?:ed)?\s+(?:found|returned)\s+nothing\b",
+    r"\bI(?:'ve| have)?\s+(?:searched|looked\s+(?:it\s+)?up|looked\s+(?:for|into|at|through)|checked\s+the\s+(?:model|records))\b",
     re.I,
 )
 _SENTENCE = re.compile(r"[^.!?\n]+[.!?]*\s*")
+_TERM = re.compile(r"[a-z0-9]{4,}")
 
-NO_SEARCH_NOTE = "No search ran for this reply, so it cannot say that nothing is recorded."
+NO_SEARCH_NOTE = "No search ran, so this answer cannot say nothing is recorded."
 
 
-def remove_unbacked_search_claims(text: str, lookups_ran: int) -> str:
-    """*text* without the sentences that claim a search or say nothing is missing, when no
-    lookup ran in the turn. With a lookup it is returned as it was."""
-    if lookups_ran > 0 or not isinstance(text, str) or not _SEARCH_CLAIM.search(text):
+@dataclass(frozen=True)
+class Lookup:
+    """One read lookup of the turn: what it was asked, whether it succeeded, whether it found nothing."""
+
+    terms: frozenset
+    succeeded: bool
+    found_nothing: bool
+    for_question: bool = False
+
+
+def record_lookup(arguments, result, for_question: bool = False) -> Lookup:
+    """A *Lookup* from a tool's arguments and the result it returned."""
+    values = arguments.values() if isinstance(arguments, dict) else []
+    terms = frozenset(t for v in values if isinstance(v, str) for t in _TERM.findall(v.lower()))
+    ok = isinstance(result, dict) and result.get("success") is not False and not result.get("error")
+    payload = result.get("result") if isinstance(result, dict) and "result" in result else None
+    empty = ok and isinstance(payload, (list, dict, str)) and not payload
+    return Lookup(terms, bool(ok), bool(empty), for_question)
+
+
+def _backs(lookup: Lookup, sentence: str, question: str, absence: bool) -> bool:
+    if not lookup.succeeded or (absence and not lookup.found_nothing):
+        return False
+    if lookup.for_question:
+        return True
+    words = set(_TERM.findall((sentence + " " + (question or "")).lower()))
+    return bool(lookup.terms & words)
+
+
+def remove_unbacked_search_claims(text: str, lookups: Sequence[Lookup], question: str = "") -> str:
+    """*text* without the sentences that claim a search, or say nothing is missing, that no
+    lookup of the turn backs: one that succeeded and is about what the sentence says was
+    searched (for "nothing is missing", one that found nothing)."""
+    if not isinstance(text, str) or not (_SEARCH_CLAIM.search(text) or _ABSENCE_CLAIM.search(text)):
         return text
     kept: List[str] = []
     dropped = False
     for sentence in _SENTENCE.findall(text):
-        if _SEARCH_CLAIM.search(sentence):
+        absence = bool(_ABSENCE_CLAIM.search(sentence))
+        if (absence or _SEARCH_CLAIM.search(sentence)) and not any(
+            _backs(look, sentence, question, absence) for look in lookups or ()
+        ):
             dropped = True
         else:
             kept.append(sentence)
