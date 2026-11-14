@@ -450,6 +450,11 @@ class AgentRunner:
         self._verdicts: dict = {}
         self._drafter = None
         self._review_budget = None
+        # What ran in this turn: the lookups, and the text they and the context returned. The reply's
+        # words about searching, and which facts came from the conversation, are read from these.
+        self._lookups_run = 0
+        self._evidence_chunks: list = []
+        self._earlier_user: list = []
 
     GATE_MODES = ("log", "enforce", "off")
 
@@ -898,6 +903,12 @@ class AgentRunner:
                 logger.warning("AgentRunner: question name lookup failed", exc_info=True)
         self._nudged = False
         self._gate_cache = None
+        self._lookups_run = 0
+        self._evidence_chunks = [system_prompt]
+        self._earlier_user = [
+            str(e.get("content")) for e in (history or [])
+            if isinstance(e, dict) and e.get("role") == "user" and e.get("content")
+        ]
 
         # Get provider, model, and first available API key
         try:
@@ -1008,6 +1019,10 @@ class AgentRunner:
         ]
         # Records the read tools actually returned this turn, for citation.
         sources = []
+        # A question that names business facts is searched before the reply may say anything is missing.
+        found_text = self._look_up_business_facts(user_message, executor, sources)
+        if found_text:
+            messages[-1] = {"role": "user", "content": user_message + found_text}
 
         chain_pos = 0
         for iteration in range(MAX_ITERATIONS):
@@ -1198,6 +1213,7 @@ class AgentRunner:
                     # Auto-execute
                     self._emit({"type": "tool_start", "tool": tc.name, "args": tc.arguments})
                     result = executor.execute(tc)
+                    self._note_lookup(tc.name, result)
                     self._collect_sources(tc.name, result, sources)
                     self._grounding.add_tool_result(
                         result, mutates=tc.name in _MUTATING_TOOLS
@@ -1751,6 +1767,68 @@ class AgentRunner:
     # ------------------------------------------------------------------ #
     # Message history management                                          #
     # ------------------------------------------------------------------ #
+
+    def _note_lookup(self, tool_name: str, result: dict) -> None:
+        """Record that a read tool ran, and keep what it returned as evidence for the reply."""
+        if tool_name in _MUTATING_TOOLS:
+            return
+        self._lookups_run += 1
+        self._evidence_chunks.append(json.dumps(result, default=str))
+
+    @staticmethod
+    def _search_model(name: str, limit: int) -> dict:
+        """Elements of the active organisation whose name contains *name*. The route tool of the same
+        name needs a request, which a chat turn's worker thread does not have, so the turn asks the
+        model directly, scoped to the organisation."""
+        from app.extensions import db
+        from app.middleware.tenant_context import current_org_id
+        from app.models import ArchiMateElement
+
+        organization_id = current_org_id()
+        if organization_id is None:
+            return {"success": False, "error": "No organisation is active."}
+        pattern = "%" + name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        rows = db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.name, ArchiMateElement.type, ArchiMateElement.layer)
+            .where(ArchiMateElement.organization_id == organization_id, ArchiMateElement.name.ilike(pattern, escape="\\"))
+            .order_by(ArchiMateElement.name).limit(limit)
+        ).all()
+        return {
+            "success": True,
+            "result": [{"id": r.id, "name": r.name, "type": r.type, "layer": r.layer} for r in rows],
+        }
+
+    def _look_up_business_facts(self, user_message: str, executor, sources: list) -> str:
+        """Search the model for each business fact the question names, as lookups of this
+        turn (they appear in the trail like any other), and return what they found, fenced,
+        to add to the question. Empty when the question names none."""
+        from app.extensions import db
+        from app.modules.ai_chat.services.architect_persona_charters import fence_untrusted
+        from app.modules.ai_chat.services.turn_honesty import RESULTS_PER_LOOKUP, fact_searches
+
+        blocks = []
+        for name in fact_searches(user_message):
+            args = {"query": name, "limit": RESULTS_PER_LOOKUP}
+            self._emit({"type": "tool_start", "tool": "search_elements", "args": args})
+            try:
+                result = self._search_model(name, RESULTS_PER_LOOKUP)
+            except Exception:
+                logger.warning("AgentRunner: business-fact lookup failed", exc_info=True)
+                db.session.rollback()
+                result = {"success": False, "error": "The lookup failed."}
+            self._note_lookup("search_elements", result)
+            self._collect_sources("search_elements", result, sources)
+            self._grounding.add_tool_result(result, mutates=False)
+            self._emit({"type": "tool_result", "tool": "search_elements", "result": result})
+            blocks.append(fence_untrusted("LOOKUP search_elements " + name, json.dumps(result, default=str)))
+        if not blocks:
+            return ""
+        return (
+            "\n\nThe platform has already searched the model for the facts this question names. "
+            "Answer every part of the question from these results; name each part they do not "
+            "answer. Say a record is missing only for a part these searches did not find.\n"
+            + "\n".join(blocks)
+        )
 
     @staticmethod
     def _fenced_result(tc_raw: dict, result: dict) -> str:
@@ -2332,6 +2410,7 @@ class AgentRunner:
         read from the entry that answered (``model_used``), never the first one
         tried. A refused or failed turn carries none, so no model is named."""
         result["turn_id"] = self._turn_id
+        self._apply_honesty_rules(result)
         self._apply_genome_post_check(result, provider_used)
         self._apply_citation_gate(result)
         if (result.get("citation_gate") or {}).get("refused"):
@@ -2354,6 +2433,16 @@ class AgentRunner:
         if record_error:
             result["run_record_error"] = record_error
         return result
+
+    def _apply_honesty_rules(self, result: dict) -> None:
+        """The reply's claims about searching and about where a fact came from match what ran."""
+        text = result.get("response")
+        if result.get("error") or result.get("system_generated") or not isinstance(text, str) or not text.strip():
+            return
+        from app.modules.ai_chat.services.turn_honesty import mark_conversation_facts, remove_unbacked_search_claims
+
+        text = remove_unbacked_search_claims(text, self._lookups_run)
+        result["response"] = mark_conversation_facts(text, self._earlier_user, self._evidence_chunks)
 
     def _text_only_fallback(
         self, message: str, system_prompt: str, provider: str, model: str, api_key: str, LLMService,

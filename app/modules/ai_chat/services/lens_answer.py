@@ -18,6 +18,7 @@ from app.middleware.tenant_context import current_org_id
 from app.models import ArchiMateElement
 from app.modules.ai_chat.services.estate_answer import named_element_ids
 from app.modules.intelligence.services.answer_envelope import OWNER_CUE
+from app.modules.intelligence.services.nl_query_interpreter import asks_one_thing
 
 # key -> (words that ask it, the view that serves it)
 LENSES = {
@@ -48,7 +49,7 @@ LENSES = {
 
 def classify_lens_question(message: Any) -> Optional[str]:
     """The lens a message asks, or None for anything else."""
-    if not isinstance(message, str) or not message.strip():
+    if not isinstance(message, str) or not message.strip() or not asks_one_thing(message):
         return None
     for key, (pattern, _view) in LENSES.items():
         if pattern.search(message):
