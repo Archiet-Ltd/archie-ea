@@ -282,6 +282,11 @@ def init_session_policy(app):
         # refreshed cookie cannot push out, unlike PERMANENT_SESSION_LIFETIME),
         # and its own shorter idle window.
         is_admin = _is_admin(current_user)
+        # Keep a remembered browser remembered (sliding 30 days), never give one
+        # to a browser that did not ask, and never keep one for an administrator.
+        remember_name = app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+        if request.cookies.get(remember_name) and "_remember" not in session:
+            session["_remember"] = "clear" if is_admin else "set"
         if is_admin:
             age = session_registry.age_seconds(sid)
             if age is not None:

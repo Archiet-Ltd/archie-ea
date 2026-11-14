@@ -226,7 +226,10 @@ class Config:
         SESSION_IDLE_TIMEOUT_ADMIN = timedelta(seconds=int(os.environ["SESSION_IDLE_TIMEOUT_ADMIN_SECONDS"]))
     REMEMBER_COOKIE_DURATION = timedelta(days=30)
     SESSION_REFRESH_EACH_REQUEST = True  # FAR-012: Ensure session is refreshed on every request
-    REMEMBER_COOKIE_REFRESH_EACH_REQUEST = True  # FAR-012: Refresh remember-me cookie on activity
+    # Flask-Login's own refresh hands EVERY signed-in response a 30-day remember cookie, ticked or not, which
+    # made "Keep me logged in" meaningless. The refresh is done in app/_bootstrap/session_policy.py instead,
+    # and only for a browser that already holds the cookie.
+    REMEMBER_COOKIE_REFRESH_EACH_REQUEST = False
 
     # Cookie attributes — set explicitly at the base class rather than relying on
     # Flask/Flask-Login's own defaults (finding A-04/ARCH-051/C-10). Flask's
