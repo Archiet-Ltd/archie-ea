@@ -165,7 +165,13 @@ def test_backfill_links_unlinked_components_once_and_changes_nothing_the_second_
             answer = _answer(org_id, element.id, tenant_ctx)
             assert answer["application_component_id"] is not None, name
         part = _element(org_id, "Platform worker")
-        assert _answer(org_id, part.id, tenant_ctx)["application_component_id"] is None
+        whole = _element(org_id, "Platform")
+        whole_answer = _answer(org_id, whole.id, tenant_ctx)
+        # The part answers with its whole's record, and gets no record of its own.
+        assert _answer(org_id, part.id, tenant_ctx)["application_component_id"] == (
+            whole_answer["application_component_id"]
+        )
+        assert len(_rows(org_id)) == 4
 
     second = link_application_elements(organization_ids=[org_id])["organisations"][0]
     assert second["new_application_created"] == 0
@@ -176,6 +182,47 @@ def test_backfill_links_unlinked_components_once_and_changes_nothing_the_second_
     runner = CliRunner()
     out = runner.invoke(application_element_cli, ["link", "--org-ids", str(org_id)], obj=None)
     assert "new_application_created: 0" in out.output
+
+
+@db_required
+def test_dry_run_reports_the_counts_the_real_run_then_produces(
+    app, db_session, make_org, tenant_ctx
+):
+    from app.commands.application_element_migration import link_application_elements
+
+    org = make_org("link-dry-run")
+    org_id = org.id
+    _set_up_switch_off_org(org, db_session, tenant_ctx)
+
+    dry = link_application_elements(dry_run=True, organization_ids=[org_id])["organisations"][0]
+    with tenant_ctx(org_id):
+        assert len(_rows(org_id)) == 1
+    real = link_application_elements(organization_ids=[org_id])["organisations"][0]
+    assert dry == real
+    assert real["new_application_created"] == 3
+
+
+@db_required
+def test_dry_run_counts_a_component_matching_an_application_as_linked(
+    app, db_session, make_org, tenant_ctx
+):
+    from app.commands.application_element_migration import link_application_elements
+
+    org = make_org("link-dry-existing")
+    org_id = org.id
+    with tenant_ctx(org_id):
+        row_id, _ = _existing_application(org, PLAIN_NAME, db_session)
+        db_session.execute(
+            sa.text("UPDATE application_components SET archimate_element_id = NULL WHERE id = :i"),
+            {"i": row_id},
+        )
+        db_session.commit()
+    _import(_oef([("id-t", PLAIN_NAME, "ApplicationComponent")]), org, db_session, tenant_ctx, promote_top_level=False)
+
+    dry = link_application_elements(dry_run=True, organization_ids=[org_id])["organisations"][0]
+    real = link_application_elements(organization_ids=[org_id])["organisations"][0]
+    assert dry == real
+    assert real["linked_to_existing_application"] == 1
 
 
 @db_required

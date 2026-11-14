@@ -270,9 +270,6 @@ def migrate_application_elements(
     return {"dry_run": dry_run, "revert": revert, "organisations": results}
 
 
-_PART_RELATIONSHIPS = ("composition", "aggregation")
-
-
 def _link_organisation(org_id: int, dry_run: bool) -> Dict:
     """Give every top-level component element of one organisation its application record.
 
@@ -283,7 +280,10 @@ def _link_organisation(org_id: int, dry_run: bool) -> Dict:
     """
     from app.models.application_portfolio import ApplicationComponent
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
-    from app.services.archimate_import_service import ArchiMateImportService
+    from app.services.archimate_import_service import (
+        _PARENT_RELATIONSHIPS,
+        ArchiMateImportService,
+    )
 
     elements = (
         db.session.query(ArchiMateElement)
@@ -304,11 +304,29 @@ def _link_organisation(org_id: int, dry_run: bool) -> Dict:
         row[0]
         for row in db.session.query(ArchiMateRelationship.target_id)
         .filter(ArchiMateRelationship.organization_id == org_id)
-        .filter(db.func.lower(ArchiMateRelationship.type).in_(_PART_RELATIONSHIPS))
+        .filter(db.func.lower(ArchiMateRelationship.type).in_(_PARENT_RELATIONSHIPS))
         .filter(ArchiMateRelationship.source_id.in_(live_ids or [0]))
         .all()
     }
     already = linked = created = kept_as_parts = 0
+    # A dry run walks the same rule the import applies, so it reports what the real run will.
+    rows_by_name: Dict[str, List[List]] = {}
+    if dry_run:
+        element_ids = {
+            r[0]
+            for r in db.session.query(ArchiMateElement.id)
+            .filter(ArchiMateElement.organization_id == org_id)
+            .all()
+        }
+        for row_id, row_name, row_element in (
+            db.session.query(
+                ApplicationComponent.id, ApplicationComponent.name, ApplicationComponent.archimate_element_id
+            )
+            .filter(ApplicationComponent.organization_id == org_id)
+            .order_by(ApplicationComponent.id)
+            .all()
+        ):
+            rows_by_name.setdefault((row_name or "").lower(), []).append([row_id, row_element])
     for element in elements:
         if element.id in linked_ids:
             already += 1
@@ -317,7 +335,15 @@ def _link_organisation(org_id: int, dry_run: bool) -> Dict:
             kept_as_parts += 1
             continue
         if dry_run:
-            linked += 1
+            same_name = rows_by_name.setdefault((element.name or "").strip().lower(), [])
+            if not same_name:
+                same_name.append([None, element.id])
+                created += 1
+            elif same_name[0][1] is None or same_name[0][1] not in element_ids:
+                same_name[0][1] = element.id
+                linked += 1
+            else:
+                kept_as_parts += 1
             continue
         was = element.type
         element.type = APPLICATION

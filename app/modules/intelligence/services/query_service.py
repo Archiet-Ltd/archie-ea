@@ -28,6 +28,7 @@ from app.modules.intelligence.services.derived_facts import list_derived_facts
 from app.modules.intelligence.services.latency_probe import record_query_latency
 from app.modules.intelligence.services.plain_terms import plain_terms_sentence
 from app.modules.intelligence.services.reason_codes import validate_reason_code
+from app.services.archimate_import_service import _PARENT_RELATIONSHIPS
 from app.services.relationship_origin import manual_origin_text
 from app.models.archimate_element_types import is_application_kind
 
@@ -110,9 +111,6 @@ SHAPE_B_THRESHOLD_SECONDS = 2.0
 
 
 
-_PART_OF_RELATIONSHIP_TYPES = ("composition", "aggregation")
-
-
 def _own_application_component(element, org_id):
     """The application record the element itself carries (its own link first, the
     reverse link second), inside the asking organisation; None when it has none."""
@@ -151,7 +149,7 @@ def resolve_application_component(element, org_id):
         row
         for row in walk.get("rows") or []
         if row["relation"]["kind"] == "explicit"
-        and str(row["relation"].get("type") or "").lower() in _PART_OF_RELATIONSHIP_TYPES
+        and str(row["relation"].get("type") or "").lower() in _PARENT_RELATIONSHIPS
     ]
     rows.sort(key=lambda row: row["relation"]["depth"])
     for row in rows:
@@ -159,7 +157,7 @@ def resolve_application_component(element, org_id):
         types = db.session.execute(
             db.select(ArchiMateRelationship.type).where(ArchiMateRelationship.id.in_(chain))
         ).scalars().all()
-        if len(types) != len(chain) or any(str(t or "").lower() not in _PART_OF_RELATIONSHIP_TYPES for t in types):
+        if len(types) != len(chain) or any(str(t or "").lower() not in _PARENT_RELATIONSHIPS for t in types):
             continue
         whole = db.session.execute(
             db.select(ArchiMateElement).where(ArchiMateElement.id == row["element_id"])
