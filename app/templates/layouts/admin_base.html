@@ -278,6 +278,7 @@
 
     {# Toast Notification System #}
     {% include 'components/toast-container.html' %}
+    {% include 'components/session_dialogs.html' %}
 
     {# CSRF Protection - Global token for AJAX requests #}
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -377,7 +378,7 @@
                 async poll() {
                     try {
                         const _f = (window.Platform && window.Platform.fetch) || window.apiFetch;
-                        const data = await _f('/api/notifications', { silent: true });
+                        const data = await _f('/api/notifications', { silent: true, headers: { 'X-Background-Poll': '1' } });
                         this.count = data.unread_count ?? 0;
                         this.items = data.items ?? [];
                     } catch (_) {

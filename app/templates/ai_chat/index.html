@@ -470,6 +470,7 @@
     window.personaConfig = {{ persona_config.personas | tojson | safe if persona_config else '{}' | safe }};
     window.defaultChatPersona = {{ default_chat_persona | tojson }};
     window.chatPersonaPreferenceKey = {{ chat_persona_preference_key | tojson }};
+    window.chatDraftKey = {{ chat_draft_key | tojson }};
     window.csrfToken = '{{ csrf_token() }}';
     window.chatIsAdmin = {{ 'true' if current_user.is_admin() else 'false' }};
     window.chatNotSetUpSentence = {{ (not_set_up_sentence | default('')) | tojson }};

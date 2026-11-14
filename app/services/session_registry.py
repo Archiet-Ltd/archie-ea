@@ -64,6 +64,12 @@ def login_and_register(user, remember=False):
     from flask import session
     from flask_login import login_user
 
+    from app._bootstrap.session_policy import _is_admin
+
+    # An administrator is signed out after a short idle window whatever was
+    # ticked, so a remember cookie would only be a promise the policy breaks.
+    if _is_admin(user):
+        remember = False
     session.clear()
     login_user(user, remember=remember)
     session.permanent = True
@@ -86,6 +92,23 @@ def is_active(sid):
         logger.error("session_registry: is_active DB lookup failed for sid=%s...", sid[:8], exc_info=True)
         return False
     return row is not None and row.revoked_at is None
+
+
+def has_active_for_user(user_id):
+    """True if ``user_id`` still has at least one session that has not been
+    revoked. A password change, an administrator reset or an erasure revokes
+    every session, so this is what tells a remembered browser whether the
+    sign-in it remembers is still good."""
+    try:
+        row = db.session.execute(
+            db.select(UserSession.sid)
+            .where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
+            .limit(1)
+        ).first()
+    except Exception:
+        logger.error("session_registry: has_active_for_user lookup failed", exc_info=True)
+        return False
+    return row is not None
 
 
 def age_seconds(sid):

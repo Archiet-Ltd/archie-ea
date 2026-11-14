@@ -248,6 +248,7 @@ def index():
         linkless_next_steps=linkless_next_steps,
         two_factor_notice=two_factor_notice,
         chat_persona_preference_key=f"archie_chat_persona_v2:{current_user.id}",
+        chat_draft_key=f"archie_chat_draft:{current_user.id}",
     )
 
 

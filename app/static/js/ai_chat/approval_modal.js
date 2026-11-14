@@ -67,6 +67,7 @@ function registerApprovalManager() {
             try {
                 const data = await Platform.fetch("/ai-chat/approvals/queue", {
                     credentials: "same-origin",
+                    headers: { "X-Background-Poll": "1" }, // a poll is not the person acting
                     silent: true, // We handle errors inline below
                 });
                 if (!data.success) {

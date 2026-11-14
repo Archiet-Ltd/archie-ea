@@ -293,7 +293,7 @@
 
     function pollNotifications() {
         if (!window.Platform || !window.Platform.fetch) return;
-        Platform.fetch.get('/api/notifications', undefined, { silent: true })
+        Platform.fetch.get('/api/notifications', undefined, { silent: true, headers: { 'X-Background-Poll': '1' } })
             .then(function(data) {
                 notifItems = data.items || [];
                 const count = data.unread_count || 0;

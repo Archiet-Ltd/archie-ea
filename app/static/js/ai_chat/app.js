@@ -324,12 +324,33 @@
        it is also an accessibility defect: the chat could not be submitted from
        the keyboard at all. */
     userInput.addEventListener('keydown', handleEnter);
+    /* A question typed but not sent is kept in this browser, so it is still in the box after a
+       sign-in that the idle limit forced. It is removed as soon as the question is sent or cleared. */
+    const _draftKey = window.chatDraftKey || null;
+    function _saveDraft() {
+        if (!_draftKey) return;
+        try {
+            if (userInput.value.trim()) localStorage.setItem(_draftKey, userInput.value);
+            else localStorage.removeItem(_draftKey);
+        } catch (e) { /* swallow-ok: storage is unavailable; the question stays in the box for this visit */ }
+    }
+    if (_draftKey) {
+        try {
+            const kept = localStorage.getItem(_draftKey);
+            if (kept && !userInput.value) {
+                userInput.value = kept;
+                userInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        } catch (e) { /* swallow-ok: storage is unavailable, so there is no kept question to restore */ }
+        userInput.addEventListener('input', _saveDraft);
+    }
     /* Escape clears what has been typed. */
     userInput.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && userInput.value) {
             e.preventDefault();
             userInput.value = '';
             userInput.style.height = 'auto';
+            _saveDraft();
         }
     });
 
@@ -371,6 +392,7 @@
         // Clear input
         userInput.value = '';
         userInput.style.height = 'auto';
+        _saveDraft();
 
         // Add user message to history
         const timestamp = new Date().toISOString();

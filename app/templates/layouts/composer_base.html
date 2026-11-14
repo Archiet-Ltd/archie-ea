@@ -74,6 +74,7 @@
          x-text="$store.announcer ? $store.announcer.alert : ''"></div>
 
     {% include 'components/toast-container.html' %}
+    {% include 'components/session_dialogs.html' %}
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <script>

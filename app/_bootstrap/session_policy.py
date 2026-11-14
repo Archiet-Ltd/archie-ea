@@ -161,7 +161,17 @@ def init_session_policy(app):
     # number as the server rather than its own hard-coded 8 hours.
     @app.context_processor
     def _inject_idle_timeout():
-        return {"session_idle_timeout_seconds": idle_seconds}
+        # The limit the signed-in person is actually held to: administrators
+        # have a shorter one, and the warning in the page must name that one.
+        from flask_login import current_user
+
+        own = idle_seconds
+        try:
+            if current_user and current_user.is_authenticated and _is_admin(current_user):
+                own = _idle_seconds_admin(app)
+        except Exception as exc:
+            logger.debug("session policy: idle limit for template unavailable: %s", exc)
+        return {"session_idle_timeout_seconds": own}
 
     @app.before_request
     def _enforce_session_policy():
@@ -217,6 +227,21 @@ def init_session_policy(app):
         from app.services import session_registry
 
         sid = session.get("_sid")
+        # "Keep me logged in": a browser that was closed and reopened comes
+        # back with the remember cookie but no session. A remembered
+        # non-administrator gets a fresh session record, as long as the
+        # account still has a live sign-in (a password change or reset
+        # revokes them all and so ends the remembered one too).
+        if (
+            not sid
+            and not _is_admin(current_user)
+            and request.cookies.get(app.config.get("REMEMBER_COOKIE_NAME", "remember_token"))
+            and session_registry.has_active_for_user(current_user.id)
+        ):
+            session_registry.issue(current_user._get_current_object(), remember=True)
+            session.permanent = True
+            session[LAST_ACTIVITY_KEY] = _now()
+            sid = session.get("_sid")
         if not session_registry.is_active(sid):
             user_label = getattr(current_user, "email", None) or current_user.get_id()
             # Captured before logout_user()/session.clear() make current_user
@@ -305,6 +330,11 @@ def init_session_policy(app):
             )
             _force_clear_remember_cookie(resp)
             return resp
+
+        # A page's own background poll is checked above but is not the person
+        # doing anything, so it must not push the idle sign-out further away.
+        if request.headers.get("X-Background-Poll") == "1":
+            return None
 
         # Genuine activity — advance the stamp. ``session.permanent`` is set at
         # login; writing here also refreshes the absolute-lifetime cookie,
