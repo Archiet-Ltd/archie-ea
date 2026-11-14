@@ -1079,12 +1079,10 @@ def send_message_stream():
             from app.modules.ai_chat.services.agent_runner import (
                 sanitize_agent_error as _sanitize,
             )
-            from app.modules.ai_chat.services.failure_messages import reason_code_for_text
 
             event_queue.put({
                 "type": "done",
                 "response": "",
-                "reason_code": reason_code_for_text(str(exc)) or "unknown",
                 "error": _sanitize(str(exc)),
                 "actions_taken": [],
                 "pending_approvals": [],

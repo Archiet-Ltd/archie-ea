@@ -22,7 +22,6 @@ def test_every_reason_code_the_server_sends_has_a_sentence():
     for path in SERVER_FILES:
         sent |= _codes_written_in(path, r'"reason_code":\s*"([a-z_]+)"')
         sent |= _codes_written_in(path, r'reason_code\s*=\s*"([a-z_]+)"')
-    sent |= {fm.reason_code_for_status(s) for s in (401, 403, 408, 413, 502, 503, 504)}
     sent |= {fm.reason_code_for_text(t) for t in ("timed out", "too large", "403", "connection refused")}
     sent.discard(None)
     assert {"timeout", "provider_unreachable"} <= sent, sent

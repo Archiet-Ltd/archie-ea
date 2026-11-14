@@ -38,14 +38,6 @@ SAVED_FAILURE_SENTENCES = (
 )
 
 
-def reason_code_for_status(status) -> "str | None":
-    """The reason code for an HTTP status the chat was answered with, or None when the status says nothing."""
-    return {
-        401: "signed_out", 403: "role_not_allowed", 413: "too_large",
-        408: "timeout", 504: "timeout", 502: "provider_unreachable", 503: "provider_unreachable",
-    }.get(status)
-
-
 def reason_code_for_text(reason) -> "str | None":
     """The reason code a provider or transport failure text points at, or None when it names none."""
     text = str(reason or "").lower()

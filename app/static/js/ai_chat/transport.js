@@ -270,7 +270,7 @@
                            used to make this branch throw unconditionally,
                            discarding the very message the server had just
                            written to the transcript. */
-                        if (ev.error && !ev.response) { var _de = new Error(ev.error); _de.reasonCode = ev.reason_code || null; throw _de; }
+                        if (ev.error && !ev.response) { throw new Error(ev.error); }
                         /* When the server's citation gate refused the answer, its
                            response is what the user sees, whatever was streamed
                            before it. */
