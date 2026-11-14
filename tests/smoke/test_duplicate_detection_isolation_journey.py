@@ -122,9 +122,15 @@ def _read(browser, live_server, world, mine, theirs, width, theme="light"):
             "() => document.documentElement.classList.contains('dark')"
         ) == (theme == "dark")
 
-        # Wait for Alpine.js to load the groups table.
-        expect(page.get_by_text(world[mine]["group_name"]).first).to_be_visible(
-            timeout=PAGE_TIMEOUT
+        # Wait for Alpine.js to load the groups table. At narrow widths the
+        # desktop table link is hidden (hidden lg:block) but still in DOM order
+        # before the mobile card link, so filter to visible elements.
+        expect(
+            page.get_by_text(world[mine]["group_name"]).filter(visible=True).first
+        ).to_be_visible(timeout=PAGE_TIMEOUT)
+        # The figure cards load from their own request, after the groups.
+        expect(page.get_by_text("Not estimated yet")).to_have_count(
+            0, timeout=PAGE_TIMEOUT
         )
         body = _text(page)
         assert world[theirs]["group_name"] not in body
@@ -136,12 +142,12 @@ def _read(browser, live_server, world, mine, theirs, width, theme="light"):
 
         # The group link lands on that group's own detail page, with its name
         # and its applications listed.
-        page.get_by_role("link", name=world[mine]["group_name"]).first.click()
+        page.get_by_role("link", name=world[mine]["group_name"]).filter(visible=True).first.click()
         page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
         assert "/duplicate-detection/simple/group/" in page.url, page.url
-        expect(page.get_by_text(world[mine]["group_name"]).first).to_be_visible(
-            timeout=PAGE_TIMEOUT
-        )
+        expect(
+            page.get_by_text(world[mine]["group_name"]).filter(visible=True).first
+        ).to_be_visible(timeout=PAGE_TIMEOUT)
         detail_body = _text(page)
         assert world[mine]["first"] in detail_body
         assert world[mine]["second"] in detail_body
