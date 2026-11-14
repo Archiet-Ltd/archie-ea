@@ -32,7 +32,7 @@ import markdown
 import yaml
 from markupsafe import Markup
 
-from app.services.billing_plans import CONTACT_SALES_URL, PLANS
+from app.services.billing_plans import CONTACT_SALES_URL, listed_plans
 
 CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content" / "pages"
 STATIC_ROOT = Path(__file__).resolve().parent.parent / "static"
@@ -1798,7 +1798,7 @@ def _hosted_plan_offers(site_url: str) -> list[dict[str, Any]]:
     pricing page or the home page again.
     """
     offers: list[dict[str, Any]] = []
-    for plan in PLANS:
+    for plan in listed_plans():
         if plan.display_price_floor_annual is not None:
             offers.append(_enterprise_offer(plan, site_url))
             continue

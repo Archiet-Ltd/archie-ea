@@ -46,6 +46,9 @@
             {% call card(class='min-w-0') %}{% call card_content(class='p-4') %}
                 <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Plan</p>
                 <p class="text-sm font-semibold" data-testid="billing-current-plan">{{ plan.name }}</p>
+                {% if education %}
+                <p class="text-xs text-muted-foreground mt-1" data-testid="billing-education">{{ education.text }}</p>
+                {% endif %}
                 {% if subscription.billing_interval %}
                 <p class="text-xs text-muted-foreground mt-1">Billed {{ 'annually' if subscription.billing_interval == 'year' else 'monthly' }}</p>
                 {% endif %}
@@ -53,12 +56,12 @@
             {% call card(class='min-w-0') %}{% call card_content(class='p-4') %}
                 <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Status</p>
                 <p class="text-sm font-semibold
-                    {%- if plan.key == 'free' %}text-foreground
+                    {%- if plan.key in ('free', 'education') %}text-foreground
                     {%- elif status_val == 'active' %}text-success-emphasis
                     {%- elif status_val == 'past_due' %}text-warning-emphasis
                     {%- elif status_val == 'cancelled' %}text-destructive-emphasis
                     {%- else %}text-foreground{% endif %}">
-                    {%- if plan.key == 'free' %}Free plan
+                    {%- if plan.key in ('free', 'education') %}Free plan
                     {%- elif status_val == 'past_due' %}Payment overdue
                     {%- elif status_val == 'trialing' %}Trial
                     {%- else %}{{ status_val | title }}{% endif %}

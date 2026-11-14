@@ -1,0 +1,95 @@
+{# design-block: form #}
+{% extends 'layouts/admin_base.html' %}
+{% block title %}Education{% endblock %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
+{% from 'components/button.html' import button %}
+{% from 'components/alert.html' import alert %}
+{% from 'components/input.html' import input %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/radio_group.html' import radio_group %}
+{% from 'components/fact_list.html' import fact_list %}
+
+{% block content %}
+<div class="space-y-6" data-testid="education-page">
+    {{ page_header(
+        title='Education',
+        description='Free for teaching and learning at a university or college.',
+        breadcrumbs=[{'label': 'Admin', 'href': url_for('admin.index')}, {'label': 'Billing', 'href': url_for('billing.billing_index')}, {'label': 'Education'}]
+    ) }}
+
+    {% if error %}
+        {{ alert('danger', text=error) }} {# ui-contract-ok: the alert macro, not a native dialog #}
+    {% endif %}
+
+    {% if status.state == 'ready' %}
+    {% call card(class='max-w-xl') %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}You're at {{ status.institution.name }}{% endcall %}
+            {% call card_description() %}Your address is at a university or college we recognise. Tell us how you use Entelim and your organisation is on Education until {{ period_end.strftime('%d %b %Y') }}, with no limit on people.{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+        <form method="post" action="{{ url_for('education.eligibility') }}" class="space-y-6" data-testid="education-form">
+            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+            {% call(p) fact_list(items=[{'label': 'Institution', 'key': 'institution'}, {'label': 'Country', 'key': 'country'}, {'label': 'Your address', 'key': 'address'}], testid='education-institution') %}
+                {%- if p.key == 'institution' %}{{ status.institution.name }}
+                {%- elif p.key == 'country' %}{{ status.institution.country }}
+                {%- else %}{{ current_user.email }}{% endif %}
+            {% endcall %}
+            {{ radio_group(name='role', label='How do you use it?', required=true, value=role,
+                options=[{'value': 'teach', 'label': roles['teach']}, {'value': 'study', 'label': roles['study']}]) }}
+            {{ checkbox(id='education-terms', name='terms', value='yes', label=terms_sentence, required=true) }}
+            <div class="flex flex-wrap items-center gap-3">
+                {{ button(text='Start using Education', type='submit', testid='education-start') }}
+                {{ button(text='Carry on with Community', href=url_for('dashboard.overview'), variant='outline', testid='education-community') }}
+            </div>
+        </form>
+        {% endcall %}
+    {% endcall %}
+
+    {% elif status.state == 'active' %}
+    {% call card(class='max-w-xl') %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}Your organisation is on Education{% endcall %}
+            {% call card_description() %}Free until {{ status.ends_on.strftime('%d %b %Y') }}, with no limit on people.{% endcall %}
+        {% endcall %}
+        {% call card_footer() %}
+            {{ button(text='See your plan', href=url_for('billing.billing_index'), testid='education-billing') }}
+        {% endcall %}
+    {% endcall %}
+
+    {% elif status.state == 'unavailable' %}
+    {% call card(class='max-w-xl') %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}You're at {{ status.institution.name }}{% endcall %}
+            {% call card_description() %}{{ status.reason }}{% endcall %}
+        {% endcall %}
+        {% call card_footer() %}
+            {{ button(text='Carry on with Community', href=url_for('dashboard.overview'), variant='outline', testid='education-community') }}
+        {% endcall %}
+    {% endcall %}
+
+    {% elif status.state == 'unproven' %}
+    {% call card(class='max-w-xl') %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}You're at {{ status.institution.name }}{% endcall %}
+            {% call card_description() %}Education starts when you open the confirmation link we emailed to {{ current_user.email }}. Open that link, then come back here.{% endcall %}
+        {% endcall %}
+        {% call card_footer() %}
+            {{ button(text='Carry on with Community', href=url_for('dashboard.overview'), variant='outline', testid='education-community') }}
+        {% endcall %}
+    {% endcall %}
+
+    {% else %}
+    {% call card(class='max-w-xl') %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}We don't recognise this address as a university or college.{% endcall %}
+            {% call card_description() %}Your organisation is on Community: three people, every question, the Business Model Canvas and the ArchiMate Composer.{% endcall %}
+        {% endcall %}
+        {% call card_footer() %}
+            {{ button(text='Carry on with Community', href=url_for('dashboard.overview'), testid='education-community') }}
+        {% endcall %}
+    {% endcall %}
+    {% endif %}
+</div>
+{% endblock %}

@@ -32200,6 +32200,112 @@
    "tier": "B",
    "type_changed": false
   },
+  "app/templates/education/eligibility.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/element_table.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
+    "components/file_upload.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/list_table.html",
+    "components/loading_state.html",
+    "components/modal.html",
+    "components/modal_form.html",
+    "components/page_header.html",
+    "components/provenance.html",
+    "components/radio_group.html",
+    "components/risk_matrix.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/stepper.html",
+    "components/switch.html",
+    "components/table.html",
+    "components/tabs.html",
+    "macros/check_password.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "form",
+   "charts": [],
+   "components": [
+    "alert",
+    "button",
+    "card",
+    "checkbox",
+    "field",
+    "input",
+    "page-header"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 6,
+    "form": 1,
+    "testid": 1
+   },
+   "departures": [],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "extra_macros": [],
+   "frame": "dashboard-01",
+   "grid": "G3",
+   "inhouse_components": [],
+   "macros": [
+    "components/alert.html",
+    "components/button.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/fact_list.html",
+    "components/input.html",
+    "components/page_header.html",
+    "components/radio_group.html"
+   ],
+   "original": "preview-02",
+   "page_type": "form",
+   "patterns": [
+    "P01-page-header",
+    "P23-status-badge"
+   ],
+   "persona": "startup_cto",
+   "reason": "Accept the Education offer: the institution, teach or study, and the terms.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: forms",
+     "url": "https://ui.shadcn.com/examples/forms"
+    },
+    "basecoat": {
+     "name": "flask-basecoat gallery: form validation",
+     "image": "docs/design/reference/basecoat-form.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "empty-first-use",
+    "error-region",
+    "read-only",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
   "app/templates/enterprise/ai_architecture_analysis.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",

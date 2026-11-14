@@ -9,7 +9,7 @@ no second store holds it, and the lapse rule that ends it is read at use in
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 from typing import Dict, List, Optional
 from urllib.parse import urlsplit
@@ -22,6 +22,9 @@ from app import db
 logger = logging.getLogger(__name__)
 
 STARTUP_CREDIT = "startup_credit"
+EDUCATION = "education"
+EDUCATION_ROLES = {"teach": "I teach", "study": "I study"}
+EDUCATION_MIN_DAYS = 60
 CREDIT_DAYS = 90
 CREDIT_SEATS = 10
 FOUNDED_WITHIN_MONTHS = 36
@@ -34,6 +37,9 @@ REFUSAL_RAISED = "The credit is for companies that have raised up to USD 1M."
 REFUSAL_WEBSITE = "Your website's domain must match your email's domain."
 REFUSAL_DOMAIN_TAKEN = "This company has already used its 90 days."
 REFUSAL_PAID = "This organisation already has a paid plan."
+REFUSAL_EDUCATION_NOT_ALONE = "Education is for a person's own organisation, and this one has other people in it."
+REFUSAL_EDUCATION_ROLE = "Say whether you teach or study."
+REFUSAL_EDUCATION_TERMS = "Accept the terms to start using Education."
 REFUSAL_USED = "This organisation has already used its 90 days of Startup."
 
 
@@ -232,3 +238,115 @@ def startup_credit_state(org, now: Optional[datetime] = None) -> Dict:
     if BillingService.has_live_subscription(sub) or effective_plan(sub).key != "free":
         return {"state": "unavailable", "ends_on": None}
     return {"state": "available", "ends_on": None}
+
+
+def education_period_end(today: Optional[date] = None) -> datetime:
+    """The end of an Education period: the next 31 August at 23:59:59, or the 31 August
+    a year later when fewer than 60 days remain, so no one starts a period that is
+    nearly over."""
+    today = today or datetime.utcnow().date()
+    end = datetime(today.year, 8, 31, 23, 59, 59)
+    if end.date() < today or (end.date() - today).days < EDUCATION_MIN_DAYS:
+        end = end.replace(year=today.year + 1)
+    return end
+
+
+def grant_education(org, user, role: str, institution, how: str = "list", now: Optional[datetime] = None) -> CreditResult:
+    """Put *org* on Education until the next 31 August, or refuse in plain words and write nothing.
+
+    *institution* is the match from ``academic_domains.match`` for the address the
+    person confirmed; *how* says how it was established (``list``). Only the person's
+    own organisation qualifies: they are its only member, and it holds no live
+    provider subscription or paid plan. The caller commits a granted result.
+    """
+    from app.models.subscription import SubscriptionPlan, SubscriptionStatus
+    from app.models.user import User
+    from app.services.billing_plans import current_subscription, effective_plan, ensure_subscription, offer_lapsed
+    from app.services.billing_service import BillingService
+
+    now = now or datetime.utcnow()
+    if role not in EDUCATION_ROLES:
+        return CreditResult(False, REFUSAL_EDUCATION_ROLE, "role")
+    sub = current_subscription(org)
+    if BillingService.has_live_subscription(sub) or (
+        effective_plan(sub).key != "free" and not offer_lapsed(sub, now)
+    ):
+        return CreditResult(False, REFUSAL_PAID, "paid")
+    if User.query.filter(User.organization_id == org.id).count() > 1:
+        return CreditResult(False, REFUSAL_EDUCATION_NOT_ALONE, "not_alone")
+
+    sub = ensure_subscription(org)
+    sub.plan = SubscriptionPlan.education
+    sub.status = SubscriptionStatus.active
+    sub.current_period_end = education_period_end(now.date())
+    sub.offer = EDUCATION
+    sub.offer_domain = institution.domain
+    sub.offer_granted_at = now
+    sub.offer_terms = {
+        "role": role,
+        "institution_id": institution.institution_id,
+        "institution": institution.name,
+        "country": institution.country,
+        "how": how,
+        "address": getattr(user, "email", None),
+        "terms_accepted_at": now.isoformat(),
+        "granted_by": getattr(user, "id", None),
+        "renewals": [],
+    }
+    db.session.flush()
+    logger.info("education granted to organisation %s", org.id)
+    return CreditResult(True)
+
+
+def confirmed_by_emailed_link(user) -> bool:
+    """Whether this person opened the confirmation link mailed to their address.
+
+    A server with no mail confirms accounts without a link, which proves nothing
+    about the mailbox, so Education is never offered on that path.
+    """
+    from app.jobs.tenant_safe_job import platform_scope
+    from app.models.account_token import PURPOSE_CONFIRM_EMAIL, AccountToken
+
+    tokens = AccountToken.__table__
+    statement = select(
+        exists().where(
+            tokens.c.user_id == user.id,
+            tokens.c.purpose == PURPOSE_CONFIRM_EMAIL,
+            tokens.c.used_at.is_not(None),
+        )
+    )
+    with platform_scope("education: was the confirmation link opened"):
+        return bool(db.session.execute(statement).scalar())
+
+
+def education_state(org, user, now: Optional[datetime] = None) -> Dict:
+    """What the eligibility page says, from the organisation's own row and the confirmed address.
+
+    ``state`` is ``ready`` (the offer can be accepted; ``institution`` is the match),
+    ``active`` (already on Education), ``no_match`` (the address is not at a listed
+    institution), ``unproven`` (the address was not confirmed from a mailed link) or
+    ``unavailable`` (a paid plan, or other people in the organisation; ``reason``
+    says which, in words).
+    """
+    from app.flask_email import mail_available
+    from app.models.user import User
+    from app.services import academic_domains
+    from app.services.billing_plans import current_subscription, effective_plan, offer_lapsed
+    from app.services.billing_service import BillingService
+
+    now = now or datetime.utcnow()
+    sub = current_subscription(org)
+    if effective_plan(sub).key == "education":
+        return {"state": "active", "ends_on": sub.current_period_end}
+    institution = academic_domains.match(getattr(user, "email", None))
+    if institution is None:
+        return {"state": "no_match"}
+    if not mail_available() or not user.confirmed or not confirmed_by_emailed_link(user):
+        return {"state": "unproven", "institution": institution}
+    if BillingService.has_live_subscription(sub) or (
+        effective_plan(sub).key != "free" and not offer_lapsed(sub, now)
+    ):
+        return {"state": "unavailable", "institution": institution, "reason": REFUSAL_PAID}
+    if User.query.filter(User.organization_id == org.id).count() > 1:
+        return {"state": "unavailable", "institution": institution, "reason": REFUSAL_EDUCATION_NOT_ALONE}
+    return {"state": "ready", "institution": institution}
