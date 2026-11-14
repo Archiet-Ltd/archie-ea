@@ -140,9 +140,14 @@
 {% else %}
 {% call ui.card(attrs={'data-testid': 'work-packages-empty'}) %}
   {% call ui.card_content() %}
+    {% if can("create", "work_package") %}
     {{ empty_state(icon='package', title='No work packages yet',
                    description='A work package is a piece of work that closes one or more gaps. Add one here, or convert a gap on the gap analysis page.',
-                   cta_text='New work package', cta_icon='plus', cta_href=url_for('implementation_planning.create_work_package')) if can("create", "work_package") else none }}
+                   cta_text='New work package', cta_icon='plus', cta_href=url_for('implementation_planning.create_work_package')) }}
+    {% else %}
+    {{ empty_state(icon='package', title='No work packages yet',
+                   description='A work package is a piece of work that closes one or more gaps. Your role can read work packages but not create them; ask an administrator or architect to add one.') }}
+    {% endif %}
   {% endcall %}
 {% endcall %}
 {% endif %}

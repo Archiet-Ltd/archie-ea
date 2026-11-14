@@ -13,7 +13,7 @@ from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user, login_required
 
 from app import db
-from app.core.auth.permissions import can_change_model
+from app.core.auth.permissions import can, can_change_model
 from app.decorators import audit_log
 from app.middleware.tenant_context import current_org_id
 from app.utils.tenant_users import same_user_id, user_in_org
@@ -562,13 +562,15 @@ def push_to_gantt(card_ref):
     from app.utils.tenant import current_organization_id
     from datetime import datetime
 
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"success": False, "error": "Your role may read work packages but not create them. Administrators and architects may create, edit and delete work packages."}), 403
     if not card_ref.startswith("task:"):
         return jsonify({"success": False, "error": "Invalid card ref"}), 400
     try:
         card_id = int(card_ref.split(":")[1])
     except (ValueError, TypeError, IndexError):
         return jsonify({"success": False, "error": "Invalid card ref"}), 400
-    card = db.session.get(KanbanCard, card_id)
+    card = KanbanCard.query.filter_by(id=card_id, organization_id=current_org_id()).first()
     if not card:
         return jsonify({"success": False, "error": "Card not found"}), 404
 
