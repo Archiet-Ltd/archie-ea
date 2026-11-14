@@ -98,12 +98,7 @@
           <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-testid="buy-{{ key }}">Start free</a>
           <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="talk-{{ key }}">Talk to us about {{ name }}</a>
           {% endif %}
-          {% if key == 'startup' %}
-          <a rel="nofollow" href="{{ url_for('main.track_plan_click', plan='startup', next=url_for('account.register', plan='startup', interval='year', offer='credit')) }}"
-             class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="credit-startup">Start with 90 days free</a>
-          <p class="pp-note" data-testid="credit-startup-note">For companies founded in the last 36 months that have raised up to USD 1M. Ten people, no card.</p>
-          {% endif %}
-          <div class="pp-alt"></div>
+          <div class="pp-alt">{% if key == 'startup' %}<a rel="nofollow" class="underline font-medium" href="{{ url_for('main.track_plan_click', plan='startup', next=url_for('account.register', plan='startup', interval='year', offer='credit')) }}" data-testid="credit-startup" title="For companies founded in the last 36 months that have raised up to USD 1M. Ten people for 90 days.">Start with 90 days free</a>{% endif %}</div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Community, plus</li>
             {% for item in items %}<li>{{ item }}</li>{% endfor %}
