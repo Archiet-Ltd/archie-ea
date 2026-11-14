@@ -743,7 +743,7 @@ def api_element_relationships(element_id):
     are returned.
     """
     org_id = current_org_id()
-    center = ArchitectureElement.query.filter_by(id=element_id, organization_id=org_id).first_or_404()
+    ArchitectureElement.query.filter_by(id=element_id, organization_id=org_id).first_or_404()
 
     incoming_rels = Relationship.query.filter_by(target_id=element_id).all()
     outgoing_rels = Relationship.query.filter_by(source_id=element_id).all()
