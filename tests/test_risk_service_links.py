@@ -48,3 +48,17 @@ def test_get_risk_is_fenced_by_the_organisation_given(app, db_session, make_org)
         risk = risk_service.create_risk(None, "Mine", None, 1, 1, None, None, organization_id=org_a.id)
         assert risk_service.get_risk(org_a.id, risk.id) is risk
         assert risk_service.get_risk(org_b.id, risk.id) is None
+
+
+def test_renaming_a_risk_renames_its_assessment_element(app, db_session, make_org):
+    from app.models import ArchiMateElement
+
+    org_a, org_b = make_org("risk-rename-a"), make_org("risk-rename-b")
+    with app.test_request_context("/"):
+        g.current_org_id = org_a.id
+        risk = risk_service.create_risk(None, "Old title", None, 2, 2, None, None, organization_id=org_a.id)
+        element_id = risk.archimate_element_id
+        risk_service.update_risk(risk.id, title="New title")
+        element = ArchiMateElement.query.filter_by(id=element_id).one()
+        assert (element.name, element.organization_id) == ("New title", org_a.id)
+    assert org_b.id != org_a.id

@@ -130,8 +130,26 @@ def update_risk(risk_id, **fields):
             if key in ("likelihood", "impact"):
                 value = int(value)
             setattr(risk, key, value)
+    sync_archimate_element(risk)
+    _rename_mirror(risk)
     db.session.commit()
     return risk
+
+
+def _rename_mirror(risk):
+    """Keep the risk's Assessment element carrying the risk's current title, so a search by the new
+    title finds it and the old title no longer does. Fenced to the risk's own organisation."""
+    if risk.archimate_element_id is None or risk.organization_id is None or not risk.title:
+        return
+    from app.models import ArchiMateElement
+    from app.services.archimate_backbone import fit_name
+
+    element = db.session.execute(
+        db.select(ArchiMateElement).where(ArchiMateElement.id == risk.archimate_element_id,
+                                          ArchiMateElement.organization_id == risk.organization_id)
+    ).scalar_one_or_none()
+    if element is not None:
+        element.name = fit_name(risk.title)
 
 
 def delete_risk(risk_id):
