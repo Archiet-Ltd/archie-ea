@@ -221,3 +221,81 @@ def test_administrator_saves_billing_details_and_they_survive_a_reload(browser, 
         assert any(c.get("email") == invoice_email for c in stub.customers.values())
     finally:
         context.close()
+
+
+def _ask_questions(app, email, questions):
+    """Give the person *questions* AI questions asked this month, as kept in their conversations."""
+    import uuid
+    from datetime import datetime
+
+    from app import db
+    from app.models.conversation import ConversationMessageRecord, ConversationThreadRecord
+    from app.models.user import User
+
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        now = datetime.utcnow()
+        thread = ConversationThreadRecord(id=str(uuid.uuid4()), user_id=user.id, title="Plan usage", model="m",
+                                          created_at=now, updated_at=now)
+        db.session.add(thread)
+        db.session.flush()
+        for i in range(questions):
+            db.session.add(ConversationMessageRecord(id=str(uuid.uuid4()), thread_id=thread.id, role="user",
+                                                     content="question %d" % i, created_at=now))
+        db.session.commit()
+        db.session.remove()
+
+
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
+def test_administrator_finds_plan_people_and_ai_from_the_account_menu(browser, live_server, app, tmp_path, width, scheme):
+    import os
+
+    from .test_archetype_journeys import _login
+
+    _org_id, admin_email = _community_org(app, members=1)
+    _ask_questions(app, admin_email, 4)
+    _other_id, other_email = _community_org(app, members=0)
+    _ask_questions(app, other_email, 1)
+    shots = os.environ.get("JOURNEY_SHOT_DIR") or str(tmp_path)
+    os.makedirs(shots, exist_ok=True)
+
+    context = browser.new_context(viewport={"width": width, "height": 900 if width > 500 else 844},
+                                  color_scheme=scheme)
+    page = context.new_page()
+    try:
+        page.add_init_script(_SKIP_WELCOME)
+        _login(page, live_server, admin_email)
+        page.goto(live_server + "/dashboard", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        if width < 500:
+            page.get_by_test_id("sidebar-trigger").click()
+        page.get_by_test_id("user-menu").click()
+        entry = page.get_by_test_id("user-menu-billing")
+        expect(entry).to_have_text("Plan and billing")
+        entry.click()
+        page.wait_for_url(lambda url: "/admin/billing" in url, timeout=PAGE_TIMEOUT)
+
+        assert page.get_by_test_id("billing-current-plan").inner_text().strip() == "Community"
+        # Two people in this organisation (the administrator and one member), of the three Community admits.
+        assert page.get_by_test_id("billing-people-limit").inner_text().strip() == "2 of 3 people"
+        expect(page.get_by_test_id("property-ai-used")).to_have_text("4")
+        expect(page.get_by_test_id("property-ai-allowance")).to_have_text("No limit on your plan")
+        expect(page.get_by_test_id("property-ai-provider")).to_contain_text("The built-in AI")
+        page.screenshot(path=os.path.join(shots, "plan-and-billing-%d-%s.png" % (width, scheme)))
+
+        # The AI settings link lands on a page with content.
+        page.get_by_test_id("property-ai-provider").get_by_role("link", name="AI settings").click()
+        page.wait_for_url(lambda url: "/admin/billing" not in url, timeout=PAGE_TIMEOUT)
+        assert len(page.locator("main").first.inner_text().strip()) > 40
+    finally:
+        context.close()
+
+    # A second organisation's administrator reads that organisation's own figures.
+    context = browser.new_context()
+    page = context.new_page()
+    try:
+        _login(page, live_server, other_email)
+        page.goto(live_server + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("property-ai-used")).to_have_text("1")
+        assert page.get_by_test_id("billing-people-limit").inner_text().strip() == "1 of 3 people"
+    finally:
+        context.close()
