@@ -70,12 +70,32 @@ class Subscription(db.Model):  # migration-exempt
     # Creation time of the newest provider event applied to this row, so an
     # older event delivered late cannot roll the plan back.
     last_event_at = db.Column(db.DateTime, nullable=True)
+    # A free offer the organisation used ("startup_credit"). Provider events
+    # never write these four columns, so after a purchase they stay the record
+    # that the organisation used the offer. NULL on every other row.
+    offer = db.Column(db.String(32), nullable=True)
+    # The registrable company domain the offer was granted on.
+    offer_domain = db.Column(db.String(255), nullable=True)
+    # The declaration, the checks that ran with their results, the person, the
+    # time, and the reminders already sent.
+    offer_terms = db.Column(db.JSON, nullable=True)
+    offer_granted_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=db.func.now(), nullable=False)
     updated_at = db.Column(
         db.DateTime,
         default=db.func.now(),
         onupdate=db.func.now(),
         nullable=False,
+    )
+
+    __table_args__ = (
+        # One startup credit per company domain, held even when two claims race.
+        db.Index(
+            "uq_subscriptions_startup_credit_domain",
+            "offer_domain",
+            unique=True,
+            postgresql_where=db.text("offer = 'startup_credit'"),
+        ),
     )
 
     organization = db.relationship(
