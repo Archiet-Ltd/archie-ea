@@ -20,6 +20,8 @@ from app.models.compliance_models import (
     ProjectConstraint,
     RegulatoryFramework,
 )
+from app.models.implementation_migration import Gap
+from app.services.gap_register_service import create_gap
 
 logger = logging.getLogger(__name__)
 
@@ -393,18 +395,35 @@ class ComplianceCheckerService:
         """
         saved_count = 0
 
+        # Get the architecture to determine organization_id
+        architecture = db.session.get(ArchitectureModel, architecture_id)
+        if not architecture:
+            logger.warning(f"Architecture {architecture_id} not found")
+            return 0
+        org_id = architecture.organization_id
+
         for gap_data in gaps:
-            # Check if gap already exists (avoid duplicates)
-            existing = ComplianceGap.query.filter_by(title=gap_data["title"], status="open").first()
+            # Check if gap already exists (avoid duplicates) - check in register
+            existing = Gap.query.filter_by(name=gap_data["title"], organization_id=org_id).first()
 
             if existing:
                 logger.info(f"Gap already exists: {gap_data['title']}")
                 continue
 
-            gap = ComplianceGap(**gap_data)
-            gap.identified_at = datetime.utcnow()
-
-            db.session.add(gap)
+            # Create gap in the one gap register (replaces ComplianceGap)
+            create_gap(
+                organization_id=org_id,
+                name=gap_data["title"],
+                description=gap_data.get("description", ""),
+                gap_type="compliance",
+                priority=gap_data.get("risk_level", "medium"),
+                severity=gap_data.get("risk_level", "medium"),
+                resolution_status="identified",
+                current_state_ref=gap_data.get("impact_description", ""),
+                target_state_ref=gap_data.get("remediation_action", ""),
+                generation_source="compliance_checker_service",
+                auto_generated=True,
+            )
             saved_count += 1
 
         db.session.commit()

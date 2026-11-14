@@ -40,6 +40,7 @@ from app.models.application_portfolio import ApplicationComponent
 from app.services.archimate.implementation_migration_service import ImplementationMigrationService
 from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService
 from app.services.decorators import transactional
+from app.services.gap_register_service import create_gap
 from app.services.llm_service import LLMService
 
 
@@ -406,19 +407,23 @@ class CapabilityGapAnalysisService:
                 ).first()
 
                 if not existing:
-                    new_gap = ComplianceGap(
-                        gap_type="missing_requirement",
-                        title=f"Compliance Gap: {gap_dict['requirement_title']}",
+                    # Create gap in the one gap register (replaces ComplianceGap)
+                    create_gap(
+                        organization_id=cap.organization_id,
+                        name=f"Compliance Gap: {gap_dict['requirement_title']}",
                         description=(
                             f"Application '{app_val['application_name']}' does not satisfy requirement "
                             f"'{gap_dict['requirement_title']}' inherited from Capability '{cap.name}'."
                         ),
-                        compliance_requirement_id=gap_dict["requirement_id"],
-                        risk_level=gap_dict["severity"] or "medium",
-                        status="open",
-                        identified_at=utcnow(),
+                        gap_type="compliance",
+                        priority=gap_dict["severity"] or "medium",
+                        severity=gap_dict["severity"] or "medium",
+                        resolution_status="identified",
+                        current_state_ref=f"Requirement: {gap_dict['requirement_title']}",
+                        target_state_ref=f"Application: {app_val['application_name']}",
+                        generation_source="capability_gap_service",
+                        auto_generated=True,
                     )
-                    db.session.add(new_gap)
                     gaps_created += 1
 
         db.session.commit()
