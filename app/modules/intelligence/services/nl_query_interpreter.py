@@ -100,6 +100,16 @@ _KEYWORD_RULES = [
         "risk_cost",
         {},
     ),
+    # The top risks of the register, by score. Checked after the cost rule so "what do our top risks cost"
+    # stays a cost question, and before the impact rules.
+    (
+        (
+            "top risks", "biggest risks", "highest risks", "greatest risks", "key risks", "main risks",
+            "worst risks", "most serious risks", "top risk", "risks to reaching", "risks to achieving",
+        ),
+        "top_risks",
+        {},
+    ),
     # UC-S2-01: what breaks if X fails (impact).
     (
         (
@@ -178,6 +188,16 @@ def _extract_application_for_capabilities(question: str, organization_id: Option
     return None
 
 
+def _top_count(lowered: str) -> int:
+    """How many risks a "top five risks" question asks for (five when it gives no number)."""
+    found = re.search(r"\btop\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b", lowered)
+    if not found:
+        return 5
+    word = found.group(1)
+    return int(word) if word.isdigit() else {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                                             "seven": 7, "eight": 8, "nine": 9, "ten": 10}[word]
+
+
 def _keyword_match(question: str, organization_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
     lowered = question.lower()
     application = _extract_application_for_capabilities(question, organization_id)
@@ -189,6 +209,8 @@ def _keyword_match(question: str, organization_id: Optional[int] = None) -> Opti
             resolved = dict(params)
             if entry_id == "company_profile":
                 resolved["topic"] = _profile_topic(lowered)
+            if entry_id == "top_risks":
+                resolved["limit"] = _top_count(lowered)
             if entry_id == "risk_cost":
                 risk = _extract_risk(question)
                 if risk:
