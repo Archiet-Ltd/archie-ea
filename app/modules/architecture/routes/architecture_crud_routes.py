@@ -298,6 +298,8 @@ def list_relationships():
     is the caller's org while the far element belongs to another). Only relationships
     where both source and target elements belong to the current organisation are listed.
     """
+    from app.models.archimate_core import ArchiMateRelationship
+
     page = safe_int_arg('page', 1, minimum=1)
     per_page = 20
 
@@ -306,13 +308,13 @@ def list_relationships():
     # An address that names one relationship ("Open relationship record" in an
     # answer) shows that relationship, so the row it points at is on the page.
     focus_id = request.args.get("relationship", type=int)
-    listing = Relationship.query
+    listing = ArchiMateRelationship.query
     if focus_id is not None:
-        listing = listing.filter(Relationship.id == focus_id)
+        listing = listing.filter(ArchiMateRelationship.id == focus_id)
 
     # Apply the shared fence BEFORE paging so each page holds its full 20 rows
     all_rels = listing.order_by(
-        Relationship.type, Relationship.id
+        ArchiMateRelationship.type, ArchiMateRelationship.id
     ).all()
     filtered_rels = filter_relationships_by_org(all_rels, org_id, direction="both")
 
