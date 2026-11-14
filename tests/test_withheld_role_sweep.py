@@ -23,7 +23,7 @@ from datetime import datetime
 
 import pytest
 
-from app.services.cost_visibility import holds_no_money, is_money_key
+from app.services.cost_visibility import is_money_key, keeps_whole
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
@@ -190,7 +190,7 @@ def _money_in_json(node, found, trail=""):
     if isinstance(node, dict):
         for key, value in node.items():
             here = "%s.%s" % (trail, key)
-            if holds_no_money(key):
+            if keeps_whole(key, value):
                 continue
             if (isinstance(value, (int, float)) and not isinstance(value, bool) and is_money_key(key)
                     and not NOT_AN_AMOUNT_KEY.search(str(key))):

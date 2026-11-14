@@ -52,13 +52,13 @@ _NOT_MONEY_WORD = re.compile(
 
 
 # a part named for a score, a weight or hours holds no money even when its own keys say "cost" (a weight of the
-# cost criterion is a weight), so it is kept whole
+# cost criterion is a weight), so it is kept whole; a list of records (``capability_scores``) is not such a part
 _KEPT_WHOLE = re.compile(r"score|weight|hours", re.I)
 
 
-def holds_no_money(name: Any) -> bool:
-    """True for a part named for a score, a weight or hours: kept whole, whatever its own keys are called."""
-    return bool(_KEPT_WHOLE.search(str(name))) and not _is_money_name(name)
+def keeps_whole(key: Any, value: Any, extra: Iterable[str] = ()) -> bool:
+    """True for a part named for a score, a weight or hours that holds numbers, not records: it is kept whole."""
+    return bool(_KEPT_WHOLE.search(str(key))) and not is_money_key(key, extra) and not _is_records(value)
 
 
 def _is_money_name(name: Any) -> bool:
@@ -86,6 +86,10 @@ _AMOUNT_IN_TEXT = re.compile(
     rf"|\b(?:GBP|USD|EUR)\s?{_NUMBER}{_SCALE}"
     rf"|\b{_NUMBER}{_SCALE}\s?(?:GBP|USD|EUR|pounds?|dollars?|euros?)\b)"
 )
+
+
+# a string that is nothing but an amount: "5000.00", "£5,000", "1.5m"
+_AMOUNT_ONLY = re.compile(r"\s*[£$€]?\s*-?\d[\d,. ]*\s?(?:[kKmM]|bn|GBP|USD|EUR)?\s*")
 
 
 def without_amounts(value: Any) -> Any:
@@ -182,6 +186,26 @@ def _is_records(value: Any) -> bool:
     return isinstance(value, list) and all(isinstance(item, dict) for item in value)
 
 
+def _figures_out(part: dict) -> dict:
+    """A part named for money (``investment_need``, ``cost_breakdown``) with every number in it left out, whatever
+    its own keys are called, and the part flagged."""
+    out = {}
+    for key, value in part.items():
+        if isinstance(value, bool):
+            out[key] = value
+        elif isinstance(value, (int, float)):
+            out[key] = None
+        elif isinstance(value, dict):
+            out[key] = _figures_out(value)
+        elif isinstance(value, list):
+            out[key] = [_figures_out(item) if isinstance(item, dict) else None if isinstance(item, (int, float))
+                        and not isinstance(item, bool) else without_amounts(item) for item in value]
+        else:
+            out[key] = without_amounts(value)
+    out["costs_withheld"] = True
+    return out
+
+
 def _withhold(result: Any, extra: tuple) -> Any:
     if isinstance(result, list):
         return [_withhold(item, extra) for item in result]
@@ -190,10 +214,15 @@ def _withhold(result: Any, extra: tuple) -> Any:
     out = {}
     masked = False
     for key, value in result.items():
-        if holds_no_money(key) and not is_money_key(key, extra):
+        if keeps_whole(key, value, extra):
             out[key] = without_amounts(value)
         elif isinstance(value, bool) or not is_money_key(key, extra) or _is_records(value):
             out[key] = _withhold(value, extra)
+        elif isinstance(value, dict):
+            out[key] = _figures_out(value)
+            masked = True
+        elif isinstance(value, str) and not _AMOUNT_ONLY.fullmatch(value):
+            out[key] = without_amounts(value)
         else:
             out[key] = None
             masked = True

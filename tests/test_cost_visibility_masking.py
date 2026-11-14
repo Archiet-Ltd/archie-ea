@@ -129,3 +129,25 @@ def test_a_list_of_records_named_for_money_stays_and_loses_its_amounts():
     assert out["critical_investments"][0]["name"] == "Payments"
     assert out["critical_investments"][0]["estimated_cost"] is None
     assert out["cost_history"] is None
+
+
+def test_a_list_of_scored_records_still_loses_the_amounts_in_each_record():
+    reply = {"capability_scores": [{"name": "Payments", "score": 7, "estimated_cost": 777777.0}]}
+    out = withhold_costs(reply)
+    assert out["capability_scores"][0]["estimated_cost"] is None
+    assert out["capability_scores"][0]["score"] == 7 and out["capability_scores"][0]["name"] == "Payments"
+
+
+def test_a_part_named_for_money_loses_every_number_in_it_and_says_so():
+    out = withhold_costs({"cost_breakdown": {"licence": 100, "support": 50, "notes": "pays £5,000"}, "name": "x"})
+    assert out["cost_breakdown"]["licence"] is None and out["cost_breakdown"]["support"] is None
+    assert "5,000" not in out["cost_breakdown"]["notes"] and out["cost_breakdown"]["costs_withheld"] is True
+    assert out["name"] == "x"
+
+
+def test_a_sentence_under_a_money_named_key_stays_and_an_amount_written_as_text_goes():
+    out = withhold_costs({"cost_not_saved": "The cost was not saved", "annual_cost": "5000.00", "total_cost": "£5,000",
+                          "note_on_cost": "ask about 12 sites"})
+    assert out["cost_not_saved"] == "The cost was not saved"
+    assert out["annual_cost"] is None and out["total_cost"] is None
+    assert out["note_on_cost"] == "ask about 12 sites"
