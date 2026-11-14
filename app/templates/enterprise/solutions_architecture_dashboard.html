@@ -2,18 +2,7 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 
-{% block title %}Buy / Build / Reuse Analysis{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Solutions Architecture', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Buy / Build / Reuse Analysis{% endblock %}{% block content %}
 <div class="space-y-6" x-data="solutionWorkspace()" x-init="init()">
     <!-- Page Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
