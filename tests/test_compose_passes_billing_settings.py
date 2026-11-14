@@ -6,8 +6,9 @@ is silently unset there, so the billing page keeps saying "Online payment is
 not open yet" even after an operator sets the value in .env.
 
 The names come from the code, not from this file: monelytics_provider.SETTINGS
-for the Monelytics settings, and a scan of app/ for the STRIPE_ settings the
-billing routes and the provider's webhook read.
+for the Monelytics settings, a scan of app/ for the STRIPE_ settings the
+billing routes and the provider's webhook read, and the price_env table of
+billing_plans, which names the Stripe price ids the code reads indirectly.
 """
 
 import re
@@ -15,6 +16,7 @@ from pathlib import Path
 
 import yaml
 
+from app.services.billing_plans import PLANS
 from app.services.monelytics_provider import SETTINGS
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,8 +37,13 @@ def _stripe_names_the_code_reads():
     return sorted(names)
 
 
+def _price_names_the_plans_read():
+    """Stripe price-id settings named in billing_plans' price_env tables."""
+    return sorted({name for plan in PLANS for name in plan.price_env.values()})
+
+
 def _wanted():
-    return sorted(set(SETTINGS) | set(_stripe_names_the_code_reads()))
+    return sorted(set(SETTINGS) | set(_stripe_names_the_code_reads()) | set(_price_names_the_plans_read()))
 
 
 def _compose():
@@ -52,13 +59,8 @@ def _server_environment():
     return _environment(_compose()["services"]["server"])
 
 
-def _worker_environment():
-    worker = _compose()["services"].get("worker")
-    return _environment(worker) if worker is not None else {}
-
-
 def test_the_scan_sees_the_billing_settings_the_code_reads():
-    names = set(SETTINGS) | set(_stripe_names_the_code_reads())
+    names = set(_wanted())
     for expected in (
         "MONELYTICS_BASE_URL",
         "MONELYTICS_KEYCLOAK_TOKEN_URL",
@@ -68,6 +70,10 @@ def test_the_scan_sees_the_billing_settings_the_code_reads():
         "STRIPE_API_BASE",
         "STRIPE_AUTOMATIC_TAX",
         "STRIPE_WEBHOOK_SECRET",
+        "STRIPE_PRICE_STARTUP_MONTHLY",
+        "STRIPE_PRICE_STARTUP_ANNUAL",
+        "STRIPE_PRICE_TEAM_MONTHLY",
+        "STRIPE_PRICE_TEAM_ANNUAL",
     ):
         assert expected in names
 
@@ -89,16 +95,6 @@ def test_no_billing_setting_is_written_into_compose_as_a_value():
     for name in _wanted():
         value = passed.get(name)
         assert value is not None and value.startswith("${"), "%s must not carry a literal value" % name
-
-
-def test_worker_needs_no_billing_settings_because_it_does_not_call_the_provider():
-    imported = any(
-        "monelytics_provider" in text for text in _sources()
-    )
-    # The worker's only job is email; no worker code imports the provider, so
-    # the worker service in docker-compose.yml needs none of these names. If a
-    # worker module ever imports it, add the names above to its environment.
-    assert imported  # billing routes and billing service do, on the server
 
 
 def test_override_environment_matches_the_server_when_it_defines_one():
