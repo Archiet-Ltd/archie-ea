@@ -4194,7 +4194,7 @@
    "confidence": "high",
    "controls": {
     "link": 1,
-    "testid": 1
+    "testid": 5
    },
    "departures": [
     {
@@ -4901,7 +4901,8 @@
    "controls": {
     "button": 6,
     "form": 1,
-    "link": 1
+    "link": 1,
+    "testid": 3
    },
    "departures": [
     {
@@ -6173,8 +6174,8 @@
    "confidence": "high",
    "controls": {
     "button": 2,
-    "link": 4,
-    "testid": 6
+    "link": 5,
+    "testid": 5
    },
    "departures": [],
    "extends": [
@@ -16572,8 +16573,8 @@
    "confidence": "high",
    "controls": {
     "button": 1,
-    "link": 2,
-    "testid": 2
+    "link": 3,
+    "testid": 3
    },
    "departures": [],
    "extends": [
@@ -17067,8 +17068,9 @@
    "controls": {
     "button": 3,
     "form": 3,
-    "link": 3,
-    "modal": 1
+    "link": 4,
+    "modal": 1,
+    "testid": 1
    },
    "departures": [
     {
@@ -17091,6 +17093,7 @@
     "components/button.html",
     "components/empty_state.html",
     "components/form_field.html",
+    "components/input.html",
     "components/modal.html",
     "components/page_header.html",
     "components/select.html",
@@ -26473,12 +26476,12 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 21,
+    "button": 22,
     "form": 3,
-    "link": 1,
+    "link": 2,
     "modal": 4,
     "table": 1,
-    "testid": 14
+    "testid": 17
    },
    "departures": [
     {
@@ -26516,6 +26519,7 @@
     "components/disabled_action.html",
     "components/empty_state.html",
     "components/input.html",
+    "components/list_table.html",
     "components/provenance.html",
     "components/select.html",
     "components/skeleton.html",
@@ -32847,9 +32851,9 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 1,
-    "link": 6,
-    "testid": 7
+    "button": 2,
+    "link": 10,
+    "testid": 11
    },
    "departures": [],
    "extends": [
@@ -33643,115 +33647,6 @@
     "empty-first-use",
     "empty-nothing-derived",
     "empty-filtered",
-    "empty-no-permission",
-    "error-region",
-    "populated"
-   ],
-   "status": "mapped",
-   "tier": "B",
-   "type_changed": false
-  },
-  "app/templates/enterprise/risk_assessment.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/answer_cascade.html",
-    "components/app_stats_grid.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/disabled_action.html",
-    "components/dropdown_menu.html",
-    "components/element_table.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/fact_list.html",
-    "components/figures.html",
-    "components/filter_bar.html",
-    "components/gantt_timeline.html",
-    "components/inline_hint.html",
-    "components/list_table.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/priority_actions.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/review_queue_panel.html",
-    "components/risk_matrix.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "dashboard",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "progress",
-    "table"
-   ],
-   "confidence": "low",
-   "controls": {
-    "link": 3,
-    "table": 1,
-    "testid": 1
-   },
-   "departures": [],
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "grid": "G1",
-   "inhouse_components": [
-    "breadcrumb_nav:Replace",
-    "metrics_card:Replace",
-    "page-header:Replace"
-   ],
-   "macros": [
-    "components/breadcrumb_nav.html",
-    "components/metrics_card.html",
-    "components/page_header.html"
-   ],
-   "original": "dashboard-01",
-   "page_type": "dashboard",
-   "patterns": [
-    "P01-page-header",
-    "P24-kpi-row",
-    "P03-data-table",
-    "P23-status-badge"
-   ],
-   "persona": "risk",
-   "reason": "Risk assessment summary; regions unclear from the template.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn blocks: dashboard-01",
-     "url": "https://ui.shadcn.com/blocks#dashboard-01"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: dashboard",
-     "image": "docs/design/reference/basecoat-dashboard.webp"
-    }
-   },
-   "spec": null,
-   "states": [
-    "loading",
-    "empty-first-use",
     "empty-no-permission",
     "error-region",
     "populated"
@@ -36951,10 +36846,10 @@
    "confidence": "high",
    "controls": {
     "button": 15,
-    "link": 4,
+    "link": 6,
     "modal": 3,
     "table": 2,
-    "testid": 2
+    "testid": 6
    },
    "departures": [
     {
@@ -36986,6 +36881,7 @@
     "components/input.html",
     "components/modal.html",
     "components/provenance.html",
+    "components/risk_matrix.html",
     "components/select.html",
     "macros/page_shell.html"
    ],
@@ -40714,7 +40610,7 @@
    "controls": {
     "link": 4,
     "table": 1,
-    "testid": 2
+    "testid": 3
    },
    "departures": [],
    "extends": [
@@ -46871,7 +46767,8 @@
    "confidence": "low",
    "controls": {
     "button": 1,
-    "link": 4
+    "link": 5,
+    "testid": 1
    },
    "departures": [],
    "derived_fields": [

@@ -38,7 +38,8 @@ def _manifest():
 
 
 def test_there_are_thirty_one_module_pages():
-    assert len(module_recording_slugs()) == 31
+    # thirty-one modules and the SysML early-access page added after this test was named
+    assert len(module_recording_slugs()) == 32
 
 
 def test_every_module_has_a_recording_or_a_named_defect_and_never_both():
