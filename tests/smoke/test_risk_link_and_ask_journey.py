@@ -154,3 +154,38 @@ def test_an_application_with_no_risk_says_so(browser, live_server, seeded, billi
         expect(card.get_by_text("No risks recorded against this element")).to_be_visible()
     finally:
         context.close()
+
+
+def test_a_link_to_another_organisations_application_is_refused_and_writes_no_risk(
+    browser, live_server, seeded, billing, app
+):
+    from app import db
+    from app.models.organization import Organization
+    from app.models.risk import Risk
+
+    with app.app_context():
+        other = Organization(name="Other %s" % uuid.uuid4().hex[:6], slug="other-%s" % uuid.uuid4().hex[:8])
+        db.session.add(other)
+        db.session.commit()
+        other_id = other.id
+        db.session.remove()
+    foreign = _seed_application(other_id, "Foreign Billing %s" % uuid.uuid4().hex[:5])
+    title = "Refused %s" % uuid.uuid4().hex[:6]
+    context = browser.new_context()
+    page = context.new_page()
+    try:
+        sign_in_as(page, live_server, seeded, "solution_architect")
+        page.goto(live_server + "/risks/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        token = page.locator('meta[name="csrf-token"]').get_attribute("content")
+        reply = page.request.post(
+            live_server + "/api/risks",
+            data={"title": title, "likelihood": 3, "impact": 3,
+                  "links": [{"entity_type": "application", "entity_id": foreign["app"]}]},
+            headers={"X-CSRFToken": token},
+        )
+        assert reply.status == 400
+        with app.app_context():
+            assert Risk.query.filter_by(title=title).count() == 0
+            db.session.remove()
+    finally:
+        context.close()

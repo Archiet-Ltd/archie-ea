@@ -78,6 +78,17 @@ with app.app_context():
         el = ArchiMateElement(name=f"{tag}-SECRET-ELEMENT-{sfx}", description=f"{tag}-SECRET-DESC",
                               type="ApplicationComponent", layer="application", organization_id=org.id)
         db.session.add(el); db.session.flush()
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.risk import Risk
+        from app.models.risk_entity_link import RiskEntityLink
+        billing = ApplicationComponent(name=f"{tag}-SECRET-BILLING-{sfx}", organization_id=org.id,
+                                       archimate_element_id=el.id)
+        db.session.add(billing); db.session.flush()
+        risk = Risk(title=f"{tag}-SECRET-RISK-{sfx}", likelihood=4, impact=4, owner="Head of Engineering",
+                    organization_id=org.id)
+        db.session.add(risk); db.session.flush()
+        db.session.add(RiskEntityLink(risk_id=risk.id, entity_type="application", entity_id=billing.id,
+                                      organization_id=org.id))
         bmc = BusinessModelCanvas(name=f"{tag}-SECRET-CANVAS-{sfx}", description="x", organization_id=org.id)
         db.session.add(bmc); db.session.flush()
         bc = BusinessCase(title=f"{tag}-SECRET-CASE-{sfx}", organization_id=org.id)
@@ -171,6 +182,9 @@ for name, args, tag in calls:
     bravo = "BRAVO-SECRET" in body or B["email"] in body
     alpha = "ALPHA-SECRET" in body
     alpha_hits += alpha; leaks += bravo
+risk_a = call("ask_risk", {"element_id": A["element"]})[1] if tool_released("ask_risk") else ""
+risk_b = call("ask_risk", {"element_id": B["element"]})[1] if tool_released("ask_risk") else ""
+print("RISK_LINKED", json.dumps({"a_sees_own": "ALPHA-SECRET-RISK" in risk_a, "a_sees_b": "BRAVO-SECRET-RISK" in risk_b or "BRAVO-SECRET-RISK" in risk_a, "released": tool_released("ask_risk")}))
 print("CALLED", json.dumps(sorted(called)))
 print("BAD_STATUS", json.dumps(bad_status))
 print(f"SUMMARY calls={len(calls)} bravo_leaks={leaks} alpha_hits={alpha_hits}")
@@ -317,6 +331,12 @@ def test_all_tools_see_zero_rows_from_the_other_organisation_under_rls(
         bad_status_line = next(line for line in out.splitlines() if line.startswith("BAD_STATUS"))
         bad_status = json.loads(bad_status_line.split(" ", 1)[1])
         assert bad_status == [], f"non-200 responses: {bad_status}"
+
+        risk_line = next(line for line in out.splitlines() if line.startswith("RISK_LINKED"))
+        risk_seen = json.loads(risk_line.split(" ", 1)[1])
+        if risk_seen["released"]:
+            assert risk_seen["a_sees_own"], f"ask_risk did not list organisation A's linked risk: {risk_line}"
+            assert not risk_seen["a_sees_b"], f"ask_risk showed organisation B's risk: {risk_line}"
 
         summary_line = next(line for line in out.splitlines() if line.startswith("SUMMARY"))
         parts = dict(p.split("=") for p in summary_line.split()[1:])

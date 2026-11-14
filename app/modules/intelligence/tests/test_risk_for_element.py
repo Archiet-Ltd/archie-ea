@@ -196,3 +196,85 @@ def test_cross_tenant_risk_is_invisible_not_leaked(app, db_session, make_org):
 
     assert result["risks"] == []
     assert result["reasons"] == ["element_not_found"]
+
+
+def _application(db_session, org_id, name, element):
+    from app.models.application_portfolio import ApplicationComponent
+
+    row = ApplicationComponent(name=name, organization_id=org_id, archimate_element_id=element.id)
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def test_a_risk_linked_to_an_application_is_found_through_the_applications_element(app, db_session, make_org):
+    from flask import g
+
+    from app.models.risk import Risk
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+    from app.services import risk_service
+
+    org = make_org("risk-lens-linked")
+    billing_element = _element(db_session, org.id, "Billing API")
+    billing = _application(db_session, org.id, "Billing API", billing_element)
+    db_session.commit()
+
+    with app.test_request_context("/"):
+        g.current_org_id = org.id
+        risk = risk_service.create_risk(
+            None, "Vendor lock-in on billing", None, 4, 4, "Head of Engineering", None,
+            links=[("application", billing.id)], organization_id=org.id)
+        # the risk's own mirror is a different element from the application's
+        assert risk.archimate_element_id != billing_element.id
+        result = IntelligenceQueryService.risk_for_element(billing_element.id)
+
+    assert result["reasons"] == []
+    [found] = result["risks"]
+    assert found["title"] == "Vendor lock-in on billing"
+    assert found["owner"] == "Head of Engineering"
+    assert found["risk_level"]
+    assert [t["name"] for t in found["touches"]] == ["Billing API"]
+    assert found["url"] == "/risks/%d" % risk.id
+
+
+def test_a_risk_linked_in_another_organisation_is_not_found(app, db_session, make_org):
+    from flask import g
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+    from app.services import risk_service
+
+    org_a, org_b = make_org("risk-lens-a"), make_org("risk-lens-b")
+    element_a = _element(db_session, org_a.id, "Billing API")
+    element_b = _element(db_session, org_b.id, "Billing API")
+    app_a = _application(db_session, org_a.id, "Billing API", element_a)
+    _application(db_session, org_b.id, "Billing API", element_b)
+    db_session.commit()
+
+    with app.test_request_context("/"):
+        g.current_org_id = org_a.id
+        risk_service.create_risk(None, "Only A", None, 3, 3, None, None,
+                                 links=[("application", app_a.id)], organization_id=org_a.id)
+        g.current_org_id = org_b.id
+        result = IntelligenceQueryService.risk_for_element(element_b.id)
+
+    assert result["risks"] == []
+    assert result["reasons"] == ["no_risk_recorded"]
+
+
+def test_a_risk_linked_to_an_element_directly_is_found(app, db_session, make_org):
+    from flask import g
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+    from app.services import risk_service
+
+    org = make_org("risk-lens-direct")
+    target = _element(db_session, org.id, "Payments Hub")
+    db_session.commit()
+
+    with app.test_request_context("/"):
+        g.current_org_id = org.id
+        risk_service.create_risk(None, "Hub outage", None, 2, 5, "Ops", None,
+                                 links=[("archimate_element", target.id)], organization_id=org.id)
+        result = IntelligenceQueryService.risk_for_element(target.id)
+
+    assert [r["title"] for r in result["risks"]] == ["Hub outage"]
