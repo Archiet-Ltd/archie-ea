@@ -59,9 +59,10 @@ NOT_REQUESTED_PARTS = ("logout", "/stream", "/events", "/sse", "/websocket", "/s
 # Routes that fail for every person in this organisation, with the reason; they are outside the cost rule and
 # are named here so a new failure is not mistaken for one of them.
 BROKEN_FOR_EVERYONE = {
-    "/api/vendors/": "the vendor REST API's documentation and list routes raise TypeError for every person",
-    "/ai-chat/api/health/llm": "answers 503 for every person when no language model provider is configured",
-    "/ai-chat/guide/history": "answers 503 for every person when no language model provider is configured",
+    r"/api/vendors/.*": "the vendor REST API's documentation and list routes raise TypeError for every person",
+    r"/ai-chat/api/health/llm": "answers 503 for every person when no language model provider is configured",
+    r"/ai-chat/guide/history": "answers 503 for every person when no language model provider is configured",
+    r"/api/v1/capabilities/\d+": "answers 500 for every person, the chief technology officer too, with or without the cost rule",
 }
 
 
@@ -318,7 +319,7 @@ def test_the_withheld_architect_receives_no_money_from_any_route(app, client, lo
     failed_by_the_rule = broken_for_the_withheld_person_only(client, login_as, broken, world["cto"])
     assert not failed_by_the_rule, "%d routes fail for the withheld architect and open for the chief technology " \
         "officer:\n%s" % (len(failed_by_the_rule), "\n".join("  %s -> %s" % item for item in sorted(failed_by_the_rule.items())))
-    unnamed = [path for path in broken if not path.startswith(tuple(BROKEN_FOR_EVERYONE))]
+    unnamed = [path for path in broken if not any(re.fullmatch(name, path) for name in BROKEN_FOR_EVERYONE)]
     assert not unnamed, "routes that fail for everyone and are not named:\n%s" % "\n".join(
         "  %s -> %s" % (path, broken[path]) for path in sorted(unnamed))
 
