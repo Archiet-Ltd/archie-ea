@@ -12,7 +12,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.models.ai_service import AIPromptTemplate
-from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE, failure_sentence
+from app.modules.ai_chat.services.failure_messages import failure_sentence
 from app.services.feature_flag_service import FeatureFlagService
 from app.services.rate_limiter import rate_limit
 from app.utils.validators import (
