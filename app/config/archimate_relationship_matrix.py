@@ -1431,11 +1431,29 @@ for _pair, _types in VALID_RELATIONSHIPS.items():
     _tgt = _pair[1]
     if _tgt in OTHER_ELEMENTS or _tgt in CONNECTOR_ELEMENTS:
         continue
-    # Only the four core layers. Strategy's Resource is a legitimate realization
-    # target (a Node realises a Resource) and motivation's Stakeholder is governed by
-    # the motivation rules, so neither is swept up by ALL_ACTIVE_ELEMENTS here.
-    if _tgt in _CORE_ACTIVE_ELEMENTS:
-        _types.remove("realization")
+    # Only remove realization for same-layer pairs where both source and target
+    # are core active structure elements. Cross-layer realizations (e.g.
+    # WorkPackage → ApplicationComponent) are valid per ArchiMate 3.2 Appendix B
+    # and are already handled by the per-direction matrix encoding; removing them
+    # here would be overly restrictive.
+    if _tgt in _CORE_ACTIVE_ELEMENTS and _pair[0] in _CORE_ACTIVE_ELEMENTS:
+        _src_layer = None
+        _tgt_layer = None
+        for layer, types in [
+            ("strategy", STRATEGY_ELEMENTS),
+            ("business", BUSINESS_ELEMENTS),
+            ("application", APPLICATION_ELEMENTS),
+            ("technology", TECHNOLOGY_ELEMENTS),
+            ("physical", PHYSICAL_ELEMENTS),
+            ("motivation", MOTIVATION_ELEMENTS),
+            ("implementation", IMPLEMENTATION_ELEMENTS),
+        ]:
+            if _pair[0] in types:
+                _src_layer = layer
+            if _tgt in types:
+                _tgt_layer = layer
+        if _src_layer == _tgt_layer:
+            _types.remove("realization")
 
 del _pair, _types, _tgt
 
