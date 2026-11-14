@@ -50,7 +50,7 @@ def _application(org_id, name, *, cost=None, lifecycle=None, owner_text=None, el
     return row
 
 
-def _person_owns(org_id, application, first, last):
+def _person_owns(org_id, application, first, last, *, ownership_type="primary"):
     from app.models.user import User
     from app.services.element_ownership_service import set_element_owner
 
@@ -62,7 +62,7 @@ def _person_owns(org_id, application, first, last):
     db.session.flush()
     set_element_owner(
         element_type="application", element_id=application.id, user_id=person.id,
-        organization_id=org_id, ownership_type="primary", commit=False,
+        organization_id=org_id, ownership_type=ownership_type, commit=False,
     )
     return person
 
@@ -137,7 +137,7 @@ def test_an_owner_question_is_one_sentence_with_its_source_and_no_unrelated_line
     login_as(client, user)
     html = _ask(client, "Who owns Ledger Core?")["html"]
     assert re.search(
-        r'Ledger Core is owned by Nneka Okafor, recorded on <a [^>]*href="/applications/%d"[^>]*>the Ledger Core '
+        r'Ledger Core is owned by Nneka Okafor \(primary\), recorded on <a [^>]*href="/applications/%d"[^>]*>the Ledger Core '
         r"application page</a>\." % ledger.id,
         html,
     ), html[:800]
@@ -212,3 +212,72 @@ def test_an_unpromoted_github_import_is_never_called_decommissioned(client, logi
     assert "decommissioned" not in other_html.lower(), other_html[:600]
     assert "web-shop" not in other_html
     assert left_out_applications(other.id)["decommissioned"] == 0
+
+
+def test_two_owners_are_named_with_roles_joined_by_and(client, login_as, make_org):
+    org = make_org()
+    user = _architect(org, "apps-two-owners-%s@example.com" % uuid.uuid4().hex[:6])
+    ledger = _application(org.id, "Ledger Core", cost=12000, lifecycle="2.1 Strategic", element=True)
+    _person_owns(org.id, ledger, "Nneka", "Okafor")
+    _person_owns(org.id, ledger, "Cameron", "Doyle", ownership_type="technical")
+    db.session.commit()
+    login_as(client, user)
+    html = _ask(client, "Who owns Ledger Core?")["html"]
+    assert re.search(
+        r'Ledger Core is owned by Nneka Okafor \(primary\) and Cameron Doyle \(technical\), recorded on '
+        r'<a [^>]*href="/applications/%d"[^>]*>the Ledger Core application page</a>\.' % ledger.id,
+        html,
+    ), html[:800]
+
+
+def test_three_owners_read_as_a_b_and_c(client, login_as, make_org):
+    org = make_org()
+    from app.models.organization import Organization
+    from app.services.billing_plans import set_contract_plan
+
+    set_contract_plan(db.session.get(Organization, org.id), "enterprise", None)
+    db.session.commit()
+    user = _architect(org, "apps-three-owners-%s@example.com" % uuid.uuid4().hex[:6])
+    ledger = _application(org.id, "Ledger Core", cost=12000, lifecycle="2.1 Strategic", element=True)
+    from app.models.user import User
+    from app.services.element_ownership_service import set_element_owner
+
+    people = []
+    for first, last, otype in [
+        ("Nneka", "Okafor", "primary"),
+        ("Cameron", "Doyle", "technical"),
+        ("Samir", "Patel", "business"),
+    ]:
+        person = User(
+            email="%s.%s@example.com" % (first.lower(), uuid.uuid4().hex[:8]), first_name=first, last_name=last,
+            organization_id=org.id, confirmed=True, enterprise_role="enterprise_architect",
+        )
+        db.session.add(person)
+        people.append((person, otype))
+    # One flush for all three users, then one commit for all three owners: multiple flushes
+    # trip the work-package bridge's reentrant-flush guard.
+    db.session.flush()
+    for person, otype in people:
+        set_element_owner(
+            element_type="application", element_id=ledger.id, user_id=person.id,
+            organization_id=org.id, ownership_type=otype, commit=False,
+        )
+    db.session.commit()
+    login_as(client, user)
+    html = _ask(client, "Who owns Ledger Core?")["html"]
+    assert re.search(
+        r'Ledger Core is owned by Nneka Okafor \(primary\), Cameron Doyle \(technical\) and Samir Patel \(business\), recorded on '
+        r'<a [^>]*href="/applications/%d"[^>]*>the Ledger Core application page</a>\.' % ledger.id,
+        html,
+    ), html[:800]
+
+
+def test_an_owner_with_no_recorded_role_shows_the_name_alone():
+    from app.modules.ai_chat.services.lens_answer import human_join
+
+    assert human_join([{"name": "Nneka Okafor", "role": "primary"}]) == "Nneka Okafor (primary)"
+    assert human_join([{"name": "Nneka Okafor", "role": "primary"}, {"name": "Ada Obi", "role": None}]) == \
+        "Nneka Okafor (primary) and Ada Obi"
+    assert human_join([{"name": "Nneka Okafor", "role": "primary"}, {"name": "Cameron Doyle", "role": "technical"},
+                       {"name": "Ada Obi", "role": None}]) == \
+        "Nneka Okafor (primary), Cameron Doyle (technical) and Ada Obi"
