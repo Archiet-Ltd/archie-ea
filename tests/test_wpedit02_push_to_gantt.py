@@ -139,7 +139,7 @@ def test_architect_cannot_bulk_delete_but_can_delete_one(client, app):
 
     with app.app_context():
         org = _make_org_id(db, "PGB")
-        uid = _make_user_id(db, org, "PgBulk", enterprise_role="enterprise_architect")
+        uid = _make_user_id(db, org, "PgBulk", enterprise_role="enterprise_architect", role_name="User")
         ids = []
         for n in ("bulk one", "bulk two"):
             ids.append(work_package_service.create_work_package(organization_id=org, name=n).id)
