@@ -1315,3 +1315,67 @@ entries:
       of the applications that support the capability, then its links to goals, drivers, outcomes or principles,
       then the value streams it serves, then its open risks, and the footer says it was derived. Read the score
       from the service result; do not write a second derivation or a stand-in score for an unrated capability.
+
+  - id: risk-store
+    concept: Where a risk is recorded, what it touches, and which risks touch an element
+    status: active
+    canonical:
+      path: app/services/risk_service.py
+      symbols: [create_risk, get_risk, add_risk_link, risks_linked_to, risk_ids_touching_elements, ranked_risks]
+    reuse: >
+      A risk is a row of risks and what it touches is a row of risk_entity_links, both written by
+      risk_service (create_risk takes the links and the organisation and writes them in one transaction).
+      Ask which risks touch an element with risk_ids_touching_elements, and which risks a record has with
+      risks_linked_to. Do not add a row to solution_risks or risk_assessments, build a risk or a link
+      outside risk_service, or read Risk.archimate_element_id as what the risk touches: it is the risk's
+      own mirror.
+    known_exceptions:
+      - path: app/commands/backfill_solution_risk_merge.py
+        reason: the one-off copy of the old table into the register
+      - path: app/commands/seed_demo_company.py
+        reason: demonstration data
+      - path: app/services/sample_company_service.py
+        reason: demonstration data
+      - path: app/models/
+        reason: the model definitions themselves
+    must_not_create:
+      - id: second-solution-risk-row
+        regex: '\bSolutionRisk\('
+        scope: [app]
+        suffixes: [.py]
+      - id: second-risk-assessment-row
+        regex: '\bRiskAssessment\('
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-link-built-outside-the-service
+        regex: '\bRiskEntityLink\('
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-built-outside-the-service
+        regex: '(?<![A-Za-z_.])Risk\('
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-solution-pointer-read
+        regex: 'Risk\.solution_id'
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-element-pointer-read
+        regex: 'Risk\.archimate_element_id\s*(==|\.in_\()'
+        scope: [app]
+        suffixes: [.py]
+
+  - id: risk-link-picker
+    concept: The control that links a risk to an application, capability, solution or programme
+    status: active
+    canonical:
+      path: app/templates/components/risk_link_picker.html
+      symbols: [risk_link_picker, risk_link_picker_script]
+    reuse: >
+      The register's slide-over and the Add Risk dialog both draw risk_link_picker and spread
+      riskLinkPicker() into their Alpine state. Do not write a second search box, type select or chip list
+      for linking a risk.
+    must_not_create:
+      - id: second-link-search
+        regex: 'searchLinkEntities'
+        scope: [app/templates]
+        suffixes: [.html]
