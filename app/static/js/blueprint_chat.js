@@ -252,32 +252,6 @@ function blueprintChat() {
             }
         },
 
-        async approveAction(approval) {
-            try {
-                const data = await Platform.fetch.post(`/ai-chat/tools/approve/${approval.approval_id}`);
-                if (data.success) {
-                    approval.dismissed = true;
-                    this.messages.push({
-                        role: 'actions',
-                        actions: [{ ...data, undone: false, undoExpired: true }],
-                    });
-                    if (data.result && data.result.entity_type) {
-                        window.dispatchEvent(new CustomEvent('bp-agent-wrote', {
-                            detail: { entity_type: data.result.entity_type, solution_id: this.solutionId },
-                        }));
-                    }
-                } else {
-                    // Platform.fetch would have thrown on non‑ok response, so this branch
-                    // only runs if the server returns a 200 with success:false.
-                    // We keep the existing inline error toast.
-                    Platform.toast.error('Approve failed: ' + (data.error || 'Unknown error'));
-                }
-            } catch (err) {
-                // Platform.fetch has already toasted this failure; the catch only
-                // stops it becoming an unhandled rejection.
-            }
-        },
-
         dismissApproval(approval) {
             approval.dismissed = true;
         },

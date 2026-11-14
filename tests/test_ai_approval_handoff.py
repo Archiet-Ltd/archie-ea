@@ -503,7 +503,10 @@ def test_approval_modal_is_a_reviewer_queue_with_requester_attribution():
     template = (root / "app/templates/ai_chat/index.html").read_text(encoding="utf-8")
 
     assert 'fetch("/ai-chat/approvals/queue"' in js
-    assert "Approvals for review" in template
+    assert "Reviewed changes" in template
+    assert "Approvals for review" not in template
+    assert "$store.approvals.approve" not in template and "$store.approvals.startReject" not in template
+    assert "approve(" not in js and "confirmReject" not in js
     assert "Requested by" in template
     assert 'item.arguments' in template
     assert "hasLoaded: false" in js

@@ -44,6 +44,8 @@ def test_a_one_person_workspace_sees_its_own_request_on_reviewed_changes_with_no
 
         # The sidebar item is called Reviewed changes and opens the page.
         page.goto(base + "/dashboard", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        if width < 768:
+            page.get_by_test_id("sidebar-trigger").first.click()
         page.get_by_role("link", name=re.compile(r"^Reviewed changes")).first.click()
         page.wait_for_url(re.compile(r"/ai-chat/approvals/inbox"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", name="Reviewed changes").first).to_be_visible(timeout=PAGE_TIMEOUT)

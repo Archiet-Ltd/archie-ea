@@ -457,6 +457,34 @@ def _make_user(db_session, org):
     return user
 
 
+class _Decision:
+    """The outcome of one decision, in the shape a response has."""
+
+    def __init__(self, result):
+        self._result = result
+        self.status_code = 200 if result.get("success") else 400
+
+    def get_json(self):
+        return self._result
+
+    def get_data(self, as_text=False):
+        return str(self._result)
+
+
+def _decide(person, approval_id, action="approve"):
+    """Decide a queued change through the service, as the automatic review does: no approve or
+    reject route exists any more."""
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    from flask import g
+
+    g.current_org_id = person.organization_id  # the tenant a request would carry
+    service = AIChatApprovalService(person.id)
+    if action == "approve":
+        return _Decision(service.approve_and_execute(approval_id, person.id))
+    return _Decision(service.reject_approval(approval_id))
+
+
 def _login_second_approver(client, db_session, org):
     """Log in a DIFFERENT user to approve with.
 
@@ -595,7 +623,7 @@ class TestApprovalExecutionParity:
         monkeypatch.setattr(executor_module.ToolExecutor, "execute", _fake_execute)
         return calls
 
-    def test_dedicated_blueprint_endpoint_executes_tool_use(
+    def test_tool_use_approval_executes_through_the_executor(
         self, app, client, db_session, make_org, monkeypatch
     ):
         org = make_org("gov")
@@ -610,8 +638,8 @@ class TestApprovalExecutionParity:
 
         # An approve is a request to settle the change: it is applied only because the review passes it.
         FakeReviewer([PASS_ALL]).install(monkeypatch)
-        _login_second_approver(client, db_session, org)
-        resp = client.post(f"/ai-chat/tools/approve/{record.id}")
+        approver = _login_second_approver(client, db_session, org)
+        resp = _decide(approver, record.id)
         assert resp.status_code == 200
         body = resp.get_json()
         assert body["success"] is True
@@ -638,8 +666,8 @@ class TestApprovalExecutionParity:
 
         # An approve is a request to settle the change: it is applied only because the review passes it.
         FakeReviewer([PASS_ALL]).install(monkeypatch)
-        _login_second_approver(client, db_session, org)
-        resp = client.post(f"/ai-chat/approvals/{record.id}/approve")
+        approver = _login_second_approver(client, db_session, org)
+        resp = _decide(approver, record.id)
         assert resp.status_code == 200, resp.get_json()
         body = resp.get_json()
         assert body["success"] is True
@@ -693,8 +721,8 @@ class TestApprovalExpiry:
 
         # An approve is a request to settle the change: it is applied only because the review passes it.
         FakeReviewer([PASS_ALL]).install(monkeypatch)
-        _login_second_approver(client, db_session, org)
-        resp = client.post(f"/ai-chat/tools/approve/{record.id}")
+        approver = _login_second_approver(client, db_session, org)
+        resp = _decide(approver, record.id)
         assert resp.status_code == 200, resp.get_json()
         assert len(executed) == 1, "an overdue approval must still reach the executor"
 
@@ -731,8 +759,8 @@ class TestApprovalExpiry:
 
         # An approve is a request to settle the change: it is applied only because the review passes it.
         FakeReviewer([PASS_ALL]).install(monkeypatch)
-        _login_second_approver(client, db_session, org)
-        resp = client.post(f"/ai-chat/approvals/{record.id}/approve")
+        approver = _login_second_approver(client, db_session, org)
+        resp = _decide(approver, record.id)
         assert resp.status_code == 200, resp.get_json()
         assert "expired" not in str(resp.get_json()).lower()
 
@@ -833,8 +861,8 @@ class TestRequireAIApprovalDefaultsOn:
 
         # An approve is a request to settle the change: it is applied only because the review passes it.
         FakeReviewer([PASS_ALL]).install(monkeypatch)
-        _login_second_approver(client, db_session, org)
-        approve_resp = client.post(f"/ai-chat/approvals/{approval_id}/approve")
+        approver = _login_second_approver(client, db_session, org)
+        approve_resp = _decide(approver, approval_id)
         assert approve_resp.status_code == 200, approve_resp.get_data(as_text=True)
         approve_body = approve_resp.get_json()
         assert approve_body["success"] is True
@@ -859,7 +887,7 @@ class TestRequireAIApprovalDefaultsOn:
         resp = client.post("/ai-chat/data/create-capability", json={"name": cap_name})
         approval_id = resp.get_json()["approval_id"]
 
-        reject_resp = client.post(f"/ai-chat/approvals/{approval_id}/reject")
+        reject_resp = _decide(user, approval_id, "reject")
         assert reject_resp.status_code == 200, reject_resp.get_data(as_text=True)
 
         assert BusinessCapability.query.filter_by(name=cap_name).first() is None
@@ -918,8 +946,8 @@ class TestRequireAIApprovalDefaultsOn:
 
         # An approve is a request to settle the change: it is applied only because the review passes it.
         FakeReviewer([PASS_ALL]).install(monkeypatch)
-        _login_second_approver(client, db_session, org)
-        approve_resp = client.post(f"/ai-chat/approvals/{approval_id}/approve")
+        approver = _login_second_approver(client, db_session, org)
+        approve_resp = _decide(approver, approval_id)
         assert approve_resp.status_code == 200, approve_resp.get_data(as_text=True)
 
         db_session.refresh(cap)

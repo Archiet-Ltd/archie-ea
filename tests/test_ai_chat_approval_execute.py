@@ -1,10 +1,8 @@
-"""Pins the AI chat approval-execution path reported in the 17 Aug 2026 QA
-sweep: the approve route previously called AIChatApprovalService's
-approve_approval, a method that never existed (AttributeError -> 500), so
-the queue could be polled but never actually executed. Fixed in
-app/modules/ai_chat/routes/approval_routes.py to call approve_and_execute
-instead — this test pins that the route (not just the service) actually
-mutates the target record end-to-end.
+"""Pins the AI chat approval-execution path: a decision on a queued change runs
+AIChatApprovalService.approve_and_execute, which mutates the target record, or
+declines it with the reviewer's reason and leaves the record alone. The page has
+no approve or reject route, so these tests drive the service the way the
+automatic review does.
 
 Uses the shared fixtures in tests/conftest.py.
 """
@@ -56,7 +54,15 @@ def admin_client(app, db_session, make_org):
     return org, client, user
 
 
-def test_approve_route_actually_executes_the_operation(admin_client, app, tenant_ctx, db_session, monkeypatch):
+def _approve_through_service(tenant_ctx, org_id, user_id, approval_id):
+    """The decision as the automatic review makes it; the page has no approve route any more."""
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    with tenant_ctx(org_id):
+        return AIChatApprovalService(user_id).approve_and_execute(approval_id, user_id)
+
+
+def test_approving_actually_executes_the_operation(admin_client, app, tenant_ctx, db_session, monkeypatch):
     """Uses a SECOND admin as approver, not the requester (V-01, 17 Aug 2026
     QA register): approve_and_execute now refuses self-approval, so this test
     would fail with 400 APPROVAL_DENIED if it reused the requester as
@@ -96,9 +102,7 @@ def test_approve_route_actually_executes_the_operation(admin_client, app, tenant
     FakeReviewer([PASS_ALL]).install(monkeypatch)
     _login(client, approver.id)
 
-    resp = client.post(f"/ai-chat/approvals/{approval_id}/approve")
-    assert resp.status_code == 200, resp.get_data(as_text=True)
-    body = resp.get_json()
+    body = _approve_through_service(tenant_ctx, org.id, approver.id, approval_id)
     assert body["success"] is True, body
 
     with tenant_ctx(org.id):
@@ -134,10 +138,7 @@ def test_approve_with_a_failing_review_does_not_execute_and_says_why(
 
     reason = "The new name does not match what the person asked for."
     FakeReviewer([_fail(1, reason)]).install(monkeypatch)
-    _login(client, approver.id)
-
-    resp = client.post(f"/ai-chat/approvals/{approval_id}/approve")
-    body = resp.get_json()
+    body = _approve_through_service(tenant_ctx, org.id, approver.id, approval_id)
     assert body["success"] is False, body
     assert reason in str(body), body
 
@@ -178,9 +179,7 @@ def test_a_requesters_own_approve_with_a_failing_review_does_not_execute_and_say
     FakeReviewer([_fail(1, reason)] * 3, revisions=[{"arguments": {"name": "Own rejected name"},
                                                     "summary": "same"}] * 2).install(monkeypatch)
 
-    _login(client, user.id)
-    resp = client.post(f"/ai-chat/approvals/{approval_id}/approve")
-    body = resp.get_json()
+    body = _approve_through_service(tenant_ctx, org.id, user.id, approval_id)
     assert body["success"] is False, body
     assert reason in str(body), body
 

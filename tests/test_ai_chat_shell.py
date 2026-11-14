@@ -167,7 +167,7 @@ def test_chat_options_sheet_holds_match_export_approvals_and_the_panels(app, db_
     start = html.index('id="drawer-chat-options"')
     sheet = html[start:]
 
-    for text in ("Match entities", "Export conversation", "Export context log", "Approvals for review",
+    for text in ("Match entities", "Export conversation", "Export context log", "Reviewed changes",
                  'id="persona-selector"', 'id="domain-selector"', 'id="nl-query-input"', 'id="domain-context"'):
         assert text in sheet, text
     # the upload control is an icon in the composer, not a menu entry

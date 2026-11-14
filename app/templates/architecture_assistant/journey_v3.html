@@ -364,13 +364,9 @@
                     <template x-if="msg.role === 'approvals'">
                         <template x-for="approval in msg.approvals.filter(a => !a.dismissed)" :key="approval.approval_id">
                             <div class="px-3 py-2.5 rounded-lg border border-warning/30 bg-warning/5 text-xs space-y-2">
-                                <p class="font-medium text-warning-emphasis">Confirm action:</p>
+                                <p class="font-medium text-warning-emphasis">In review:</p>
                                 <p class="text-foreground/80" x-text="approval.summary || approval.tool"></p>
                                 <div class="flex gap-2 pt-1">
-                                    <button type="button" @click="approveAction(approval)"
-                                            class="px-2.5 py-1 rounded bg-primary text-primary-foreground text-2xs font-medium hover:bg-primary/90 transition-colors">
-                                        Approve
-                                    </button>
                                     <button type="button" @click="approval.dismissed = true"
                                             class="px-2.5 py-1 rounded border border-input text-2xs font-medium hover:bg-accent transition-colors">
                                         Dismiss
