@@ -196,10 +196,6 @@ def rationalization_dashboard():
         latest_run_q = UnifiedDetectionRun.query.order_by(
             UnifiedDetectionRun.created_at.desc()
         )
-        if org_id:
-            latest_run_q = latest_run_q.filter(
-                UnifiedDetectionRun.organization_id == org_id
-            )
         latest_run = latest_run_q.first()
 
         # Pipeline counts for workflow stepper
@@ -226,29 +222,16 @@ def rationalization_dashboard():
         from app.models.application_rationalization import ApplicationRationalizationScore
 
         consolidation_count = ConsolidationListEntry.query.count()
-        if org_id:
-            consolidation_count = ConsolidationListEntry.query.filter(
-                ConsolidationListEntry.organization_id == org_id
-            ).count()
         # Scored out of the same applications the total counts: a score kept on a decommissioned
         # or merged-away record is not one of them, so it cannot make "21 of 20".
         scored_in_total = _scored_among_counted_applications()
         time_scored_count = ApplicationRationalizationScore.query.filter(scored_in_total).count()
-        if org_id:
-            time_scored_count = ApplicationRationalizationScore.query.filter(
-                scored_in_total,
-                ApplicationRationalizationScore.organization_id == org_id,
-            ).count()
         roadmap_count = ConsolidationListEntry.query.filter(
             or_(
                 ConsolidationListEntry.recommended_action == "add_to_roadmap",
                 ConsolidationListEntry.roadmap_item_id.isnot(None),
             )
         )
-        if org_id:
-            roadmap_count = roadmap_count.filter(
-                ConsolidationListEntry.organization_id == org_id
-            )
         roadmap_count = roadmap_count.count()
 
         # Combine duplicate group savings + consolidation list savings. When neither
@@ -256,10 +239,6 @@ def rationalization_dashboard():
         consolidation_savings = db.session.query(
             func.sum(ConsolidationListEntry.estimated_savings)
         )
-        if org_id:
-            consolidation_savings = consolidation_savings.filter(
-                ConsolidationListEntry.organization_id == org_id
-            )
         consolidation_savings = consolidation_savings.scalar()
         total_savings = recorded_sum(estimated_savings, consolidation_savings)
 

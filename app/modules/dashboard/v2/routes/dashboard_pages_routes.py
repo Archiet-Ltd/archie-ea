@@ -257,11 +257,6 @@ def rationalization_dashboard():
         try:
             from app.models.application_rationalization import ApplicationRationalizationScore
             time_scored_q = ApplicationRationalizationScore.query
-            org_id = getattr(g, "current_org_id", None)
-            if org_id:
-                time_scored_q = time_scored_q.filter(
-                    ApplicationRationalizationScore.organization_id == org_id
-                )
             stats["time_scored_count"] = time_scored_q.count()
         except Exception:
             stats["time_scored_count"] = 0
@@ -269,11 +264,6 @@ def rationalization_dashboard():
         try:
             from app.models.consolidation_list import ConsolidationListEntry
             consolidation_q = ConsolidationListEntry.query
-            org_id = getattr(g, "current_org_id", None)
-            if org_id:
-                consolidation_q = consolidation_q.filter(
-                    ConsolidationListEntry.organization_id == org_id
-                )
             stats["consolidation_count"] = consolidation_q.count()
         except Exception:
             stats["consolidation_count"] = 0

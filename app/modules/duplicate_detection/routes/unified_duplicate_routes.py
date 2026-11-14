@@ -447,15 +447,10 @@ def get_simple_statistics():
     """Get application consolidation statistics (simple mode)"""
     try:
         # Latest run for simple/fast strategies
-        org_id = getattr(g, "current_org_id", None)
         latest_run_q = UnifiedDetectionRun.query.filter(
             UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
             UnifiedDetectionRun.status == "completed",
         )
-        if org_id:
-            latest_run_q = latest_run_q.filter(
-                UnifiedDetectionRun.organization_id == org_id
-            )
         latest_run = latest_run_q.order_by(
             UnifiedDetectionRun.created_at.desc()
         ).first()
@@ -1067,16 +1062,8 @@ def get_unified_stats():
         enterprise_groups = DuplicateGroup.query.count()
 
         # Get simple stats
-        org_id = getattr(g, "current_org_id", None)
         simple_runs_q = UnifiedDetectionRun.query
         simple_groups_q = UnifiedDuplicateGroup.query
-        if org_id:
-            simple_runs_q = simple_runs_q.filter(
-                UnifiedDetectionRun.organization_id == org_id
-            )
-            simple_groups_q = simple_groups_q.filter(
-                UnifiedDuplicateGroup.organization_id == org_id
-            )
         simple_runs = simple_runs_q.count()
         simple_groups = simple_groups_q.count()
 

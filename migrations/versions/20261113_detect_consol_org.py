@@ -9,14 +9,14 @@ Backfill, in this order:
   * a detection run takes the organisation of the applications it analysed
     (through unified_group_members -> application_components) when those
     applications all belong to one organisation;
-  * a run whose analysed applications span more than one organisation is marked
-    ``cross_organization = TRUE`` and left with no organisation_id, so no
-    organisation's figures count it;
+  * a run whose analysed applications span more than one organisation belongs
+    to none of them, so it is deleted and counted (it is derived data that a new
+    detection run recreates inside one organisation);
   * a run with no analysed applications falls back to its triggering user's
     home organisation (user_id -> users.organization_id);
   * a consolidation entry takes the organisation of its application
     (application_id -> application_components.organization_id).
-A row with no organisation derivable at all is deleted and counted -- it cannot
+A row with no organisation derivable is deleted and counted -- it cannot
 be shown to anyone safely.
 
 Idempotent: every step checks before it acts, so a second run is a no-op.
@@ -92,8 +92,7 @@ def _backfill_detection_runs(bind):
     """A run takes the org of the applications it analysed (through
     unified_group_members -> application_components) when those all belong to
     one organisation. A run whose analysed applications span more than one
-    organisation is marked cross_organization = TRUE and left with no
-    organization_id, so no organisation's figures count it. A run with no
+    organisation is left with no organization_id and deleted afterwards. A run with no
     analysed applications falls back to its triggering user's home
     organisation."""
     rows = bind.execute(
@@ -123,14 +122,8 @@ def _backfill_detection_runs(bind):
                 {"o": org_id, "i": run_id},
             )
         elif len(distinct_orgs) > 1:
-            # Applications span multiple organisations: mark cross_organization,
-            # leave organization_id NULL so no org's figures count this run.
-            bind.execute(
-                text(
-                    "UPDATE unified_detection_runs SET cross_organization = TRUE WHERE id = :i"
-                ),
-                {"i": run_id},
-            )
+            # Applications span multiple organisations: no single owner, so leave
+            # organization_id NULL; the unattributable-row delete below removes it.
             cross_org += 1
         else:
             # No analysed applications: fall back to the triggering user's org.
@@ -148,13 +141,6 @@ def _backfill_detection_runs(bind):
                     {"o": org_id, "i": run_id},
                 )
     return cross_org
-
-
-def _ambiguous_detection_runs(bind):
-    return _scalar(
-        bind,
-        "SELECT COUNT(*) FROM unified_detection_runs WHERE cross_organization = TRUE",
-    )
 
 
 def _backfill_consolidation_entries(bind):
@@ -182,14 +168,6 @@ def _add_column(bind, table):
         op.add_column(table, sa.Column("organization_id", sa.Integer(), nullable=True))
 
 
-def _add_cross_organization_column(bind, table):
-    if not _has_column(bind, table, "cross_organization"):
-        op.add_column(
-            table,
-            sa.Column("cross_organization", sa.Boolean(), nullable=False, server_default=sa.false()),
-        )
-
-
 def _fence(bind, table):
     owned = bind.execute(
         text("SELECT pg_has_role(current_user, c.relowner, 'USAGE') FROM pg_class c WHERE c.oid = to_regclass(:t)"),
@@ -206,6 +184,7 @@ def _fence(bind, table):
         if check is not None:
             clause += f" WITH CHECK ({check})"
         bind.execute(text(f"CREATE POLICY {name} ON public.{table} FOR {command}{clause}"))  # nosec B608 - literal table names
+    bind.execute(text(f"ALTER TABLE public.{table} ENABLE ROW LEVEL SECURITY"))  # nosec B608 - literal table names
     bind.execute(text(f"ALTER TABLE public.{table} FORCE ROW LEVEL SECURITY"))  # nosec B608 - literal table names
     print(f"row-level security: fenced {table}")
 
@@ -216,35 +195,20 @@ def upgrade():
     for table in present:
         _add_column(bind, table)
 
-    # cross_organization column only applies to unified_detection_runs
-    if "unified_detection_runs" in present:
-        _add_cross_organization_column(bind, "unified_detection_runs")
-
     if "unified_detection_runs" in present and _present(bind, "users"):
         cross_org = _backfill_detection_runs(bind)
-        print(f"detection org fence: {cross_org} run(s) link applications of more than one organisation; marked cross_organization, counted by none")
+        print(f"detection org fence: {cross_org} run(s) link applications of more than one organisation; deleted below")
 
     if "consolidation_list_entries" in present and _present(bind, "application_components"):
         _backfill_consolidation_entries(bind)
         ambiguous = _ambiguous_consolidation_entries(bind) if _has_column(bind, "application_components", "organization_id") else 0
         print(f"consolidation org fence: {ambiguous} entry(ies) with no derivable organisation")
 
-    # Rows nothing links to an organisation cannot be shown to anyone safely.
-    # cross_organization runs are intentionally left with NULL organization_id:
-    # they are not unattributable, they are deliberately unassigned so no
-    # organisation's figures count them.
+    # Rows nothing links to an organisation (including runs spanning several
+    # organisations) cannot be shown to anyone safely.
     if "unified_detection_runs" in present:
-        gone = _scalar(
-            bind,
-            "SELECT COUNT(*) FROM unified_detection_runs "
-            "WHERE organization_id IS NULL AND NOT cross_organization",
-        )
-        bind.execute(
-            text(
-                "DELETE FROM unified_detection_runs "
-                "WHERE organization_id IS NULL AND NOT cross_organization"
-            )
-        )
+        gone = _scalar(bind, "SELECT COUNT(*) FROM unified_detection_runs WHERE organization_id IS NULL")
+        bind.execute(text("DELETE FROM unified_detection_runs WHERE organization_id IS NULL"))
         print(f"detection org fence: {gone} unattributable run(s) deleted")
     if "consolidation_list_entries" in present:
         gone = _scalar(bind, "SELECT COUNT(*) FROM consolidation_list_entries WHERE organization_id IS NULL")
@@ -252,23 +216,13 @@ def upgrade():
         print(f"consolidation org fence: {gone} unattributable entry(ies) deleted")
 
     for table in present:
-        # unified_detection_runs keeps organization_id nullable: cross_organization
-        # runs have NULL organization_id and must not be forced to NOT NULL.
-        if table == "unified_detection_runs":
-            op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
-            existing_fk = _fk_name(bind, table, "organization_id")
-            if existing_fk:
-                op.drop_constraint(existing_fk, table, type_="foreignkey")
-            op.create_foreign_key(f"fk_{table}_organization_id", table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
-            _fence(bind, table)
-        else:
-            op.alter_column(table, "organization_id", existing_type=sa.Integer(), nullable=False)
-            op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
-            existing_fk = _fk_name(bind, table, "organization_id")
-            if existing_fk:
-                op.drop_constraint(existing_fk, table, type_="foreignkey")
-            op.create_foreign_key(f"fk_{table}_organization_id", table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
-            _fence(bind, table)
+        op.alter_column(table, "organization_id", existing_type=sa.Integer(), nullable=False)
+        op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
+        existing_fk = _fk_name(bind, table, "organization_id")
+        if existing_fk:
+            op.drop_constraint(existing_fk, table, type_="foreignkey")
+        op.create_foreign_key(f"fk_{table}_organization_id", table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
+        _fence(bind, table)
 
 
 def downgrade():
@@ -283,6 +237,4 @@ def downgrade():
         if existing_fk:
             op.drop_constraint(existing_fk, table, type_="foreignkey")
         op.drop_index(f"ix_{table}_organization_id", table_name=table, if_exists=True)
-        if table == "unified_detection_runs" and _has_column(bind, table, "cross_organization"):
-            op.drop_column(table, "cross_organization")
         op.drop_column(table, "organization_id")

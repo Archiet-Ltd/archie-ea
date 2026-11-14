@@ -137,6 +137,7 @@ def upgrade():
             if check is not None:
                 clause += f" WITH CHECK ({check})"
             bind.execute(text(f"CREATE POLICY {name} ON public.{TABLE} FOR {command}{clause}"))  # nosec B608 - literal table names
+        bind.execute(text(f"ALTER TABLE public.{TABLE} ENABLE ROW LEVEL SECURITY"))  # nosec B608 - literal table names
         bind.execute(text(f"ALTER TABLE public.{TABLE} FORCE ROW LEVEL SECURITY"))  # nosec B608 - literal table names
         print(f"row-level security: fenced {TABLE}")
     else:

@@ -525,8 +525,8 @@ class UnifiedDuplicateDetectionService:
 
         When ``organization_id`` is given, only that organisation's rows are
         deleted from the three detection tables.  When omitted, falls back to
-        ``g.current_org_id``; when that is also absent, all rows are deleted
-        (previous behaviour, kept for callers that have no tenant context).
+        ``g.current_org_id``; when that is also absent, nothing is deleted
+        and an error comes back.
         """
         try:
             if organization_id is None:
@@ -557,9 +557,10 @@ class UnifiedDuplicateDetectionService:
                     {"org_id": organization_id},
                 )
             else:
-                db.session.execute(db.text("DELETE FROM unified_group_members"))
-                db.session.execute(db.text("DELETE FROM unified_duplicate_groups"))
-                db.session.execute(db.text("DELETE FROM unified_detection_runs"))
+                return {
+                    "success": False,
+                    "error": "Clean-up needs an organisation. Nothing was deleted.",
+                }
             db.session.commit()
 
             return {"success": True, "message": "Stale data cleaned up successfully"}

@@ -1284,13 +1284,10 @@ def api_bulk_consolidate():
         app_ids = [a.id for a in applications]
         existing_pending_entries = set()
         if app_ids:
-            org_id = getattr(g, "current_org_id", None)
             query = ConsolidationListEntry.query.filter(
                 ConsolidationListEntry.application_id.in_(app_ids),
                 ConsolidationListEntry.status == "pending",
             )
-            if org_id:
-                query = query.filter(ConsolidationListEntry.organization_id == org_id)
             existing_entries = query.all()
             existing_pending_entries = {e.application_id for e in existing_entries}
 

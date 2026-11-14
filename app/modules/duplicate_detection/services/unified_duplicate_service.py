@@ -120,6 +120,12 @@ class UnifiedDuplicateService:
         Returns:
             Dict with run results
         """
+        if getattr(g, "current_org_id", None) is None:
+            return {
+                "success": False,
+                "error": "Duplicate detection needs an organisation. Sign in to an organisation and run it again.",
+            }
+
         start_time = datetime.utcnow()
 
         try:
