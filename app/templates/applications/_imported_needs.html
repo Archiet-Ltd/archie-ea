@@ -6,6 +6,7 @@
    cap_onclick the script that opens the capability dialog on the page this is drawn on
    sfx         added to the test ids so a list of rows keeps them apart #}
 {% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
 {% if gaps %}
 {% set editable = can('edit', 'application') %}
 {% macro step(gap) %}
@@ -36,7 +37,18 @@
       <p class="text-xs text-muted-foreground">Suggested: <span class="font-medium text-foreground">{{ gap.suggestion }}</span>. {{ gap.evidence }}.</p>
       {% endif %}
       {% if gap.note %}
-      <p class="text-xs text-muted-foreground">{{ gap.note }}</p>
+      <p class="text-xs text-muted-foreground" data-testid="need-{{ gap.key }}-reason">{{ gap.note }}</p>
+      {% endif %}
+      {% if gap.candidates and editable %}
+      <div class="flex flex-wrap gap-2" data-testid="owner-candidates">
+        {% for person in gap.candidates %}
+        <form method="post" action="{{ url_for('unified_applications.make_owner_from_commits', app_id=app.id) }}" data-testid="owner-candidate-{{ person.user_id }}">
+          {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+          {{ input(type='hidden', name='user_id', value=person.user_id) }}
+          {{ button(text='Make owner', type='submit', variant='outline', size='sm', aria_label='Make ' ~ person.name ~ ' the owner of ' ~ app.name) }}
+        </form>
+        {% endfor %}
+      </div>
       {% endif %}
     </li>
     {% endfor %}

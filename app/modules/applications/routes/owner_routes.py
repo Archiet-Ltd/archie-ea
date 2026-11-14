@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import g, jsonify, request
+from flask import abort, flash, g, jsonify, redirect, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -121,6 +121,55 @@ def add_owner(app_id: int):
         "success": True,
         "owner": owner.to_dict(),
     }), 201
+
+
+@unified_applications_bp.route("/<int:app_id>/owners/from-commits", methods=["POST"])
+@login_required
+@audit_log("application_owner_from_commits")
+def make_owner_from_commits(app_id: int):
+    """Make one of the people the recent commits point to the primary owner (form post).
+
+    Only a person the connector kept as a candidate for this application, and who is still a
+    user of the caller's organisation, can be chosen; anyone else answers 404 and writes nothing.
+    """
+    from app.connectors.github import commit_provenance
+    from app.connectors.github_gaps import _commit_hint, _fact
+    from app.core.auth.permissions import can
+    from app.models.archimate_core import ArchiMateElement
+    from app.modules.architecture_assistant.property_service import PropertyService
+    from app.services.element_ownership_service import DuplicateElementOwner
+
+    org_id = g.current_org_id
+    app = _verify_app_in_org(app_id, org_id)
+    if app is None:
+        abort(404)
+    if not can(current_user, "edit", "application"):
+        abort(403)
+    element = db.session.get(ArchiMateElement, app.archimate_element_id) if app.archimate_element_id else None
+    if element is None or element.organization_id != org_id:
+        abort(404)
+    candidates = {c["user_id"]: c for c in _commit_hint(element, org_id).get("candidates") or []}
+    user_id = request.form.get("user_id", type=int)
+    if user_id not in candidates:
+        abort(404)
+    try:
+        set_element_owner(
+            element_type="application", element_id=app_id, user_id=user_id, organization_id=org_id,
+            ownership_type="primary", assigned_by=current_user.id, refuse_duplicate=True, commit=False,
+        )
+    except CrossOrganisationElementOwner:
+        abort(404)
+    except DuplicateElementOwner:
+        pass
+    summary = _fact(element, "github_commit_owners")
+    PropertyService().merge_element_properties(
+        element,
+        {"github_owner_source": {"user_id": user_id, "text": commit_provenance(summary, candidates[user_id])}},
+        source="github",
+    )
+    db.session.commit()
+    flash("%s is now the primary owner." % candidates[user_id]["name"], "success")
+    return redirect(url_for("unified_applications.application_detail", id=app_id) + "#ownership")
 
 
 @unified_applications_bp.route("/<int:app_id>/owners/<int:owner_id>", methods=["PUT"])
