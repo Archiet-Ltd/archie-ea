@@ -360,28 +360,28 @@
             <td>Community</td>
             <td><strong>Free</strong></td>
             <td>No trial clock.</td>
-            <td>For evaluation, one-person companies and self-hosters.</td>
+            <td data-testid="home-plan-for-free">{{ plans.free.audience }}</td>
             <td>One organisation, three people. Every question, the Business Model Canvas, the ArchiMate Composer. File import. Community support.</td>
           </tr>
           <tr>
             <td>Startup</td>
             <td><strong>$49</strong>/month</td>
             <td>$490/year.</td>
-            <td>For founders and small services firms, 5 to 50 people.</td>
-            <td>Ten people and email support, everything in Community included.</td>
+            <td data-testid="home-plan-for-startup">{{ plans.startup.audience }}</td>
+            <td data-testid="home-plan-includes-startup">{{ plans.startup.features|join('. ') }}.</td>
           </tr>
           <tr>
             <td>Team</td>
             <td><strong>$29</strong>/editor/month</td>
             <td>$290/editor/year. Askers free.</td>
-            <td>For scale-ups and services companies, 50 to 500 people.</td>
-            <td>Single sign-on and the review-board workflow.</td>
+            <td data-testid="home-plan-for-team">{{ plans.team.audience }}</td>
+            <td data-testid="home-plan-includes-team">{{ plans.team.features|join('. ') }}.</td>
           </tr>
           <tr>
             <td>Enterprise</td>
             <td><strong>From $24,000</strong>/year</td>
             <td>Annual contract.</td>
-            <td>For enterprise architecture teams.</td>
+            <td data-testid="home-plan-for-enterprise">{{ plans.enterprise.audience }}</td>
             <td>Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</td>
           </tr>
         </tbody>
@@ -421,7 +421,7 @@
         <p class="public-card-body mb-6">
           A startup has a strategy, a handful of systems it cannot live without, suppliers it pays every month and
           risks nobody has written down. Entelim puts all of it in one place on a free plan for up to three people, or
-          on the Startup plan for a team of ten at $49 a month.
+          on the Startup plan for a team of {{ plans.startup.people_words }} at $49 a month.
         </p>
         <a href="/use-cases" class="public-btn public-btn--outline">See it for startups and growing businesses</a>
       </div>
