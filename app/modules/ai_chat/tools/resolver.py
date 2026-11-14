@@ -110,19 +110,86 @@ class EntityResolver:
             from app.modules.dashboard.services.overview_figures import element_named
 
             org_id = current_org_id()
-            meant = element_named(org_id, name) if org_id is not None else None
+            if org_id is None:
+                return {"resolved": False, "candidates": [], "error": "No organisation context"}
+
+            # First, try the standard ArchiMateElement lookup
+            meant = element_named(org_id, name)
             exact = ArchiMateElement.query.filter_by(id=meant, organization_id=org_id).first() if meant else None
             if exact:
                 return {"resolved": True, "id": exact.id, "name": exact.name, "type": exact.type, "layer": exact.layer}
+
+            # Also search motivation element tables that have archimate_element_id
+            # These tables store the "journey layer" motivation entities which mirror to ArchiMateElement
+            motivation_models = []
+            try:
+                from app.models.solution_architect_models import (
+                    SolutionDriver, SolutionGoal, SolutionConstraint,
+                    SolutionRequirement, SolutionRisk
+                )
+                motivation_models = [
+                    (SolutionDriver, "Driver"),
+                    (SolutionGoal, "Goal"),
+                    (SolutionConstraint, "Constraint"),
+                    (SolutionRequirement, "Requirement"),
+                    (SolutionRisk, "Assessment"),
+                ]
+            except ImportError:
+                pass
+
+            for model_class, element_type in motivation_models:
+                # Search by name in the motivation table
+                candidate = model_class.query.filter(
+                    model_class.name.ilike(name),
+                    model_class.organization_id == org_id,
+                    model_class.archimate_element_id.isnot(None)
+                ).first()
+                if candidate:
+                    # Return the linked ArchiMateElement
+                    ae = ArchiMateElement.query.filter_by(
+                        id=candidate.archimate_element_id,
+                        organization_id=org_id
+                    ).first()
+                    if ae:
+                        return {"resolved": True, "id": ae.id, "name": ae.name, "type": ae.type, "layer": ae.layer}
+
+            # Fallback: fuzzy search on ArchiMateElement table
             candidates = ArchiMateElement.query.filter(
-                ArchiMateElement.name.ilike(f"%{name}%")
+                ArchiMateElement.name.ilike(f"%{name}%"),
+                ArchiMateElement.organization_id == org_id
             ).limit(MAX_CANDIDATES).all()
             if len(candidates) == 1:
                 c = candidates[0]
                 return {"resolved": True, "id": c.id, "name": c.name, "type": c.type, "layer": c.layer}
+
+            # Also collect candidates from motivation tables for ambiguity reporting
+            motivation_candidates = []
+            for model_class, element_type in motivation_models:
+                cands = model_class.query.filter(
+                    model_class.name.ilike(f"%{name}%"),
+                    model_class.organization_id == org_id,
+                    model_class.archimate_element_id.isnot(None)
+                ).limit(MAX_CANDIDATES).all()
+                for c in cands:
+                    ae = ArchiMateElement.query.filter_by(
+                        id=c.archimate_element_id,
+                        organization_id=org_id
+                    ).first()
+                    if ae:
+                        motivation_candidates.append({"id": ae.id, "name": ae.name, "type": ae.type})
+
+            all_candidates = [{"id": e.id, "name": e.name, "type": e.type} for e in candidates] + motivation_candidates
+            # Deduplicate by id
+            seen = set()
+            unique_candidates = []
+            for c in all_candidates:
+                if c["id"] not in seen:
+                    seen.add(c["id"])
+                    unique_candidates.append(c)
+
             return {
                 "resolved": False,
-                "candidates": [{"id": e.id, "name": e.name, "type": e.type} for e in candidates],
+                "candidates": unique_candidates[:MAX_CANDIDATES],
             }
         except Exception as e:
             logger.warning("resolve_archimate_element error: %s", e)

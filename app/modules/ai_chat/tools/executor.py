@@ -1606,14 +1606,120 @@ class ToolExecutor:
         elem_r = self._resolver.resolve_archimate_element(args["element_name"])
         if not elem_r["resolved"]:
             return self._clarify("ArchiMate element", elem_r)
+
+        # Load the ArchiMateElement to get description and custom_properties
+        try:
+            from app.models.archimate_core import ArchiMateElement
+        except ImportError:
+            from app.models.models import ArchiMateElement
+
+        ae = ArchiMateElement.query.filter_by(id=elem_r["id"]).first()
+        if not ae:
+            return {"success": False, "error": "Element not found"}
+
+        # Get the provenance chain
         from app.modules.architecture.services.inference_engine_service import ArchiMateInferenceEngine
         engine = ArchiMateInferenceEngine(architecture_id=0)
-        result = engine.explain(elem_r["id"])
+        provenance = engine.explain(ae.id)
+
+        # Build the result with description, custom properties, and provenance
+        result = {
+            "element_id": ae.id,
+            "element_name": ae.name,
+            "element_type": ae.type,
+            "element_layer": ae.layer,
+            "description": ae.description or "",
+            "custom_properties": ae.custom_properties or {},
+            "provenance": {
+                "steps": provenance.steps,
+                "source_element_ids": provenance.source_elements,
+                "rules_applied": provenance.rules_applied,
+                "confidence": provenance.confidence,
+            },
+        }
+
+        # If this element mirrors a motivation entity, include its typed fields
+        typed_record = self._get_typed_record(ae)
+        if typed_record:
+            result["typed_record"] = self._serialize_typed_record(typed_record)
+
         return {
             "success": True,
             "result": result,
-            "message": f"Provenance chain for '{elem_r['name']}' traced.",
+            "message": f"Element '{ae.name}' ({ae.type}) explained with description, properties, and provenance.",
         }
+
+    def _get_typed_record(self, ae):
+        """Find the motivation entity that mirrors this ArchiMateElement."""
+        from app.middleware.tenant_context import current_org_id
+        org_id = current_org_id()
+        if not org_id:
+            return None
+
+        # Check each motivation model that has archimate_element_id
+        try:
+            from app.models.solution_architect_models import (
+                SolutionDriver, SolutionGoal, SolutionConstraint,
+                SolutionRequirement, SolutionRisk
+            )
+        except ImportError:
+            return None
+
+        for model_class in [SolutionDriver, SolutionGoal, SolutionConstraint, SolutionRequirement, SolutionRisk]:
+            record = model_class.query.filter_by(
+                archimate_element_id=ae.id,
+                organization_id=org_id
+            ).first()
+            if record:
+                return record
+        return None
+
+    def _serialize_typed_record(self, record):
+        """Serialize a motivation entity's fields for the tool result."""
+        data = {
+            "model": type(record).__name__,
+            "id": record.id,
+            "name": record.name,
+            "description": getattr(record, "description", "") or "",
+        }
+        # Add type-specific fields
+        if hasattr(record, "driver_type"):
+            data["driver_type"] = record.driver_type.value if record.driver_type else None
+        if hasattr(record, "priority"):
+            data["priority"] = record.priority
+        if hasattr(record, "target_date"):
+            data["target_date"] = record.target_date.isoformat() if record.target_date else None
+        if hasattr(record, "measurement_criteria"):
+            data["measurement_criteria"] = record.measurement_criteria
+        if hasattr(record, "kpis"):
+            data["kpis"] = record.kpis
+        if hasattr(record, "requirement_type"):
+            data["requirement_type"] = record.requirement_type.value if record.requirement_type else None
+        if hasattr(record, "is_mandatory"):
+            data["is_mandatory"] = record.is_mandatory
+        if hasattr(record, "acceptance_criteria"):
+            data["acceptance_criteria"] = record.acceptance_criteria
+        if hasattr(record, "constraint_type"):
+            data["constraint_type"] = record.constraint_type.value if record.constraint_type else None
+        if hasattr(record, "value"):
+            data["value"] = record.value
+        if hasattr(record, "unit"):
+            data["unit"] = record.unit
+        if hasattr(record, "severity"):
+            data["severity"] = record.severity
+        if hasattr(record, "statement"):
+            data["statement"] = record.statement
+        if hasattr(record, "rationale"):
+            data["rationale"] = record.rationale
+        if hasattr(record, "implications"):
+            data["implications"] = record.implications
+        if hasattr(record, "gap_severity"):
+            data["gap_severity"] = record.gap_severity
+        if hasattr(record, "assessed_by"):
+            data["assessed_by"] = record.assessed_by
+        if hasattr(record, "assessed_at"):
+            data["assessed_at"] = record.assessed_at.isoformat() if record.assessed_at else None
+        return data
 
     # ------------------------------------------------------------------ #
     # Tool: simulate_impact (read-only)                                  #
