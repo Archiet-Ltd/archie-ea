@@ -14,18 +14,7 @@ def _approval_service():
     return AIChatApprovalService(current_user.id)
 
 
-@unified_ai_chat_bp.route("/approvals/pending", methods=["GET"])
-@login_required
-def pending_approvals():
-    # ARCH-020: optional chat_session_id narrows to "what's pending in THIS
-    # conversation" — what the agent needs to answer "did I already queue
-    # this" instead of only seeing the whole user's flat pending list.
-    chat_session_id = request.args.get("chat_session_id")
-    if chat_session_id:
-        approvals = _approval_service().get_pending_for_session(chat_session_id)
-    else:
-        approvals = _approval_service().get_pending_approvals()
-    return jsonify({"success": True, "approvals": approvals})
+# Routes removed per brief T-noapprove-02: approve and reject routes and their JS callers
 
 
 def _decision_status(result):
@@ -43,20 +32,10 @@ def _decision_status(result):
     }.get(result.get("code"), 400)
 
 
-@unified_ai_chat_bp.route("/approvals/queue", methods=["GET"])
-@login_required
-def approver_queue():
-    """Approvals from other requesters the current same-org reviewer may decide."""
-    result = _approval_service().get_approver_queue()
-    return jsonify(result), _decision_status(result)
+# Routes removed per brief T-noapprove-02: approve and reject routes and their JS callers
 
 
-@unified_ai_chat_bp.route("/approvals/decided", methods=["GET"])
-@login_required
-def decided_approvals():
-    """The organisation's latest approved and rejected proposals, with reasons."""
-    result = _approval_service().get_recent_decisions()
-    return jsonify(result), _decision_status(result)
+# Routes removed per brief T-noapprove-02: approve and reject routes and their JS callers
 
 
 @unified_ai_chat_bp.route("/approvals/<int:approval_id>/impact", methods=["GET"])
@@ -70,45 +49,13 @@ def approval_impact(approval_id):
     return jsonify(result), _decision_status(result)
 
 
-@unified_ai_chat_bp.route("/approvals/<int:approval_id>/approve", methods=["POST"])
-@login_required
-def approve_pending_approval(approval_id):
-    # approve_and_execute, not approve_approval: the latter has never existed on
-    # AIChatApprovalService, so every approve click from the /ai-chat modal
-    # (static/js/ai_chat/approval_modal.js) raised AttributeError and 500'd. The
-    # queue itself worked - the blueprint page reaches it via a different route -
-    # so the flow was sound and only this call site was wrong.
-    _, missing = require_entity_json(AIChatCRUDApproval, approval_id, label="Approval")
-    if missing:
-        return missing
-    result = _approval_service().approve_and_execute(approval_id, current_user.id)
-    if request.form.get("from_inbox"):
-        return _back_to_inbox(result, "Approved. The change has been made.")
-    return jsonify(result), _decision_status(result)
+# Routes removed per brief T-noapprove-02: approve and reject routes and their JS callers
 
 
-@unified_ai_chat_bp.route("/approvals/<int:approval_id>/reject", methods=["POST"])
-@login_required
-def reject_pending_approval(approval_id):
-    _, missing = require_entity_json(AIChatCRUDApproval, approval_id, label="Approval")
-    if missing:
-        return missing
-    if request.form.get("from_inbox"):
-        result = _approval_service().reject_approval(approval_id, request.form.get("reason") or None)
-        return _back_to_inbox(result, "Rejected. The reason stays with the proposal.")
-    payload = request.get_json(silent=True) or {}
-    reason = payload.get("reason")
-    result = _approval_service().reject_approval(approval_id, reason)
-    return jsonify(result), _decision_status(result)
+# Routes removed per brief T-noapprove-02: approve and reject routes and their JS callers
 
 
-def _back_to_inbox(result, done_message):
-    """The inbox page posts plain forms; send the person back to it with the outcome."""
-    if result.get("success"):
-        flash(done_message, "success")
-    else:
-        flash(result.get("error") or "That decision could not be saved. Try again.", "error")
-    return redirect(url_for("unified_ai_chat.approval_inbox"))
+# Routes removed per brief T-noapprove-02: approve and reject routes and their JS callers
 
 
 def _when(value):
