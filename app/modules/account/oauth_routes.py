@@ -14,7 +14,6 @@ two-factor gate and the session itself.
 """
 import hmac
 import logging
-import secrets
 import time
 
 from flask import Blueprint, abort, current_app, flash, redirect, request, session, url_for

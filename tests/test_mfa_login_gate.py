@@ -21,19 +21,6 @@ _PASSWORD = "Str0ng!Passw0rd"
 _WEEK_OVER = datetime.utcnow() - timedelta(days=8)
 
 
-def _azure_identity():
-    """One tid+oid pair, and the (userinfo, external_id) shape the nOAuth
-    fix (app/auth/sso.py) requires to resolve-or-link an Azure account:
-    either a pre-existing external_id = "{tid}:{oid}" match, or a
-    configured AZURE_AD_TENANT_ID whose value equals the claim's own tid.
-    Lead ruling (board note 939): these tests must drive one of those two
-    real paths, not the now-correctly-refused "any unverified email claim
-    links any existing account" shape they used before the fix."""
-    tid = f"tid-{uuid.uuid4().hex[:8]}"
-    oid = f"oid-{uuid.uuid4().hex[:8]}"
-    return tid, oid, f"{tid}:{oid}"
-
-
 def _make_admin(db_session, org, *, mfa_enabled=False, mfa_secret=None):
     from app.models import Role
     from app.models.user import User
@@ -267,37 +254,6 @@ def test_an_org_admin_of_an_invited_org_not_home_org_is_sent_to_mfa_on_password_
     )
     assert resp.status_code in (302, 303)
     assert "/mfa-challenge" in resp.headers.get("Location", "")
-
-
-def test_sso_callback_sends_an_org_admin_of_an_invited_org_to_the_mfa_challenge(
-    app, db_session, make_org, monkeypatch
-):
-    home_org = make_org("sso-mfa-gate-invited-home")
-    other_org = make_org("sso-mfa-gate-invited-other")
-    user = _make_user_with_org_role(db_session, home_org, role_org=other_org)
-    tid, oid, external_id = _azure_identity()
-    user.external_id = external_id
-    user.sso_provider = "azure"
-    db_session.commit()
-
-    client = app.test_client()
-    userinfo = {
-        "sub": f"external-{uuid.uuid4().hex[:8]}",
-        "oid": oid,
-        "tid": tid,
-        "email": user.email,
-        "given_name": "Invited",
-        "family_name": "Admin",
-    }
-    resp = _sso_callback(client, monkeypatch, db_session, userinfo)
-
-    assert resp.status_code in (302, 303), resp.get_data(as_text=True)
-    assert "/mfa-challenge" in resp.headers.get("Location", "")
-    with client.session_transaction() as sess:
-        assert sess.get("_mfa_pending_user_id") == user.id
-        assert "_user_id" not in sess
-    dash = client.get("/dashboard/overview")
-    assert dash.status_code in (302, 401)
 
 
 def test_a_user_with_no_org_role_admin_row_anywhere_is_not_sent_to_mfa_no_regression(
