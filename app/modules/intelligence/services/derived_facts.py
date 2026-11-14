@@ -235,6 +235,30 @@ def latest_derivation_run(organization_id: int):
     return db.session.execute(stmt).scalars().first()
 
 
+def relationships_changed_since_last_run(organization_id: int, last_run) -> Optional[int]:
+    """How many relationships were added or changed after the last run began.
+
+    ``None`` when there is no run to compare with: the count is then not
+    measurable, and the page says so rather than showing a zero.
+    """
+    if last_run is None:
+        return None
+    from app.models import ArchiMateRelationship
+
+    cutoff = last_run.started_at or last_run.finished_at
+    if cutoff is None:
+        return None
+    changed_at = db.func.coalesce(ArchiMateRelationship.updated_at, ArchiMateRelationship.created_at)
+    return int(
+        db.session.execute(
+            db.select(db.func.count(ArchiMateRelationship.id)).where(
+                ArchiMateRelationship.organization_id == organization_id,
+                changed_at > cutoff,
+            )
+        ).scalar_one()
+    )
+
+
 def derivation_status(organization_id: int, *, recent: int = 5) -> Dict[str, Any]:
     """What the Ask page shows about worked-out connections, for one tenant.
 
@@ -264,11 +288,17 @@ def derivation_status(organization_id: int, *, recent: int = 5) -> Dict[str, Any
         .order_by(DerivedRelationship.stale_reason)
     ).all()
     aggregates = derived_fact_aggregates(organization_id)
+    last_run = runs[0] if runs else None
+    changed_since = relationships_changed_since_last_run(organization_id, last_run)
     return {
         "runs": list(runs),
-        "last_run": runs[0] if runs else None,
+        "last_run": last_run,
         "current_count": aggregates["derived_count"],
         "stale_count": aggregates["stale_count"],
+        "changed_since_count": changed_since,
+        # Rows flagged stale and relationships added since are different
+        # evidence of the same fact; the larger is the honest figure.
+        "out_of_date_count": None if changed_since is None else max(changed_since, aggregates["stale_count"]),
         "stale_reasons": [(reason, int(count)) for reason, count in reasons],
     }
 
@@ -302,5 +332,6 @@ __all__ = [
     "derived_fact_aggregates",
     "get_derived_fact",
     "latest_derivation_run",
+    "relationships_changed_since_last_run",
     "list_derived_facts",
 ]
