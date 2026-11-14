@@ -48,6 +48,15 @@ def _shot(page, name, width, theme):
     page.screenshot(path=os.path.join(SHOTS, "%s-%d-%s.png" % (name, width, theme)))
 
 
+def _login_remembering(page, base, email):
+    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.fill("#email", email)
+    page.fill("#password", PASSWORD)
+    page.check("#remember_me")
+    page.locator("#submit").click()
+    page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
+
+
 def test_warning_comes_before_the_sign_out_and_stay_signed_in_keeps_the_session(browser, short_limit_server):
     org = _administrator()
     page = browser.new_page(viewport={"width": 1440, "height": 900})
@@ -134,15 +143,11 @@ def test_a_session_ended_elsewhere_is_shown_on_the_open_page_within_one_poll(bro
 def test_keep_me_logged_in_holds_for_a_non_administrator_and_is_not_promised_to_an_administrator(browser, short_limit_server):
     person = create_fresh_org("solution_architect", platform_role="Architect")
     admin = _administrator()
-    login = lambda page, email: (page.goto(short_limit_server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT),
-                                 page.fill("#email", email), page.fill("#password", PASSWORD),
-                                 page.check("#remember_me"), page.locator("#submit").click(),
-                                 page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT))
     # A non-administrator who ticks the option is still signed in after the browser is restarted
     # (the session cookie is gone, the remember cookie is what remains).
     ctx = browser.new_context()
     page = ctx.new_page()
-    login(page, person["emails"]["solution_architect"])
+    _login_remembering(page, short_limit_server, person["emails"]["solution_architect"])
     remembered = [c for c in ctx.cookies() if c["name"] == "remember_token"]
     assert remembered, "ticking the option must set the remember cookie for a non-administrator"
     restarted = browser.new_context()
@@ -159,7 +164,7 @@ def test_keep_me_logged_in_holds_for_a_non_administrator_and_is_not_promised_to_
         "Administrators are always signed out after 15 minutes without activity, to protect the organisation's data.")
     ctx2 = browser.new_context()
     page4 = ctx2.new_page()
-    login(page4, admin["emails"]["platform_admin"])
+    _login_remembering(page4, short_limit_server, admin["emails"]["platform_admin"])
     assert not [c for c in ctx2.cookies() if c["name"] == "remember_token"]
     ctx2.close()
     page3.close()

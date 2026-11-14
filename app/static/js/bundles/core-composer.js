@@ -1832,6 +1832,7 @@
     // answered 401 without saying why.
     async function checkSessionEnded() {
         try {
+            // raw-fetch-ok: this IS the session probe; Platform.fetch would treat its 401 as an error to toast
             const r = await nativeFetch(KEEPALIVE_URL, {
                 credentials: 'same-origin',
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', [BACKGROUND_HEADER]: '1' }
@@ -1909,7 +1910,7 @@
 
     // --- Hook into fetch ---
     // Platform.fetch calls global.fetch internally, so wrapping global.fetch
-    // catches both Platform.fetch and any direct fetch() usage. It does two jobs:
+    // catches both Platform.fetch and any direct call. It does two jobs:
     // a request the person caused counts as activity (a page's own poll, marked
     // with the background header, does not), and any answer of 401 that says the
     // session ended puts the signed-out notice on the page straight away.
