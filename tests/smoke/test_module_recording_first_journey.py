@@ -68,4 +68,7 @@ def test_a_module_without_a_recording_keeps_its_screenshot(page, live_server, sl
     page.goto("%s/modules/%s" % (live_server, slug), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id("page-recording")).to_have_count(0)
     expect(page.get_by_test_id("page-screenshot")).to_have_count(1)
-    assert page.locator("[data-testid=page-screenshot] img").get_attribute("src") == "/static/img/modules/%s.webp" % slug
+    # a picture made to the capture standard carries a phone crop too, hidden at this width
+    shown = page.locator("[data-testid=page-screenshot] img:visible")
+    expect(shown).to_have_count(1)
+    assert shown.get_attribute("src") == "/static/img/modules/%s.webp" % slug
