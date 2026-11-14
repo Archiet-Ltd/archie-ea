@@ -187,10 +187,16 @@ def test_data_architect_classification_propagates_to_a_downstream_lineage_hop(ap
     queued_ids = {a["id"] for a in queue.get_json()["approvals"]}
     assert approval_id in queued_ids
 
-    # Accept it from the approval inbox.
-    accept = client.post(f"/ai-chat/approvals/{approval_id}/approve")
-    assert accept.status_code == 200, accept.data[:300]
-    assert accept.get_json()["success"] is True
+    # The page offers no control that waits for a person; the automatic review settles it.
+    assert b"/approve" not in inbox.data and b"/reject" not in inbox.data
+    from flask import g
+
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    with app.test_request_context():
+        g.current_org_id = org_id
+        accept = AIChatApprovalService(approver_id).approve_and_execute(approval_id, approver_id)
+    assert accept["success"] is True, accept
 
     # Reload: the label shows on the entity and on the downstream hop.
     source_detail = client.get(f"/data-governance/entities/{source_id}")
