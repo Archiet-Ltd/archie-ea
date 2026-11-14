@@ -844,16 +844,16 @@ def init_context_processors(app):
         from app.navigation import registry
 
         if not has_request_context():
-            return {"trail": [], "path": None, "home": None}
-        home = registry.resolve(current_user, registry._by_key("home")) if registry._by_key("home") else None
+            return {"trail": [], "path": None}
         # a page filtered the way a sidebar item filters (?layer=motivation) is a view of its own, not the
         # unfiltered entry's page, so its address carries the filter when the header compares the two
         filtered = any(k in request.args for k in registry.filter_keys())
         path = request.full_path.rstrip("?") if filtered else request.path
-        return {"trail": registry.page_trail(current_user, request.endpoint, request.args), "path": path,
-                "home": registry.href(home) if home is not None else "/"}
+        return {"trail": registry.page_trail(current_user, request.endpoint, request.args), "path": path}
 
     app.jinja_env.globals["page_trail"] = _template_page_trail
+    from app.navigation import registry as _registry
+    app.jinja_env.globals["close_trail"] = _registry.close_trail
 
     # E2E-7: the header's role badge (components/admin_header.html) read
     # current_user.role.name -- the legacy Flask-Base Role/Permission table,

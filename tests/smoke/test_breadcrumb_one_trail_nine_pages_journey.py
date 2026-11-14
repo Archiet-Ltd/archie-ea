@@ -18,30 +18,18 @@ WALK_DIR = os.environ.get("BCRUMB_WALK_DIR")
 
 # path -> the sidebar group (or, for a page the sidebar does not list, its nearest listed parent)
 PAGES = [
-    ("/applications/model-dashboard/ApplicationComponent", None),
-    ("/strategic/capability-health", None),
-    ("/enterprise/", None),
-    ("/enterprise/strategic/capability-health", None),
-    ("/enterprise/strategic/risk-assessment", None),
-    ("/enterprise/analysis/process-optimization", None),
+    ("/auto-dashboard/", "Systems"),
+    ("/strategic/capability-health", "Impact"),
+    ("/enterprise/", "Changes"),
+    ("/enterprise/strategic/capability-health", "Changes"),
+    ("/enterprise/strategic/risk-assessment", "Changes"),
+    ("/enterprise/analysis/process-optimization", "Changes"),
     ("/capability-map/", "Strategy"),
     ("/solutions/programmes", "Changes"),
     ("/architecture/decisions/", "Compliance"),
 ]
 
 CRUMBS = "nav[aria-label*=readcrumb i], [data-slot=breadcrumb]"
-
-# the sidebar entries that hold a link marked as the current page: the expandable entry above a
-# sub-link (Systems above Applications), and the section heading above that
-ACTIVE_GROUP_JS = """() => [...document.querySelectorAll('[data-slot=sidebar] a[aria-current=page], aside a[aria-current=page]')]
-  .flatMap(a => {
-    const item = a.closest('[data-slot=sidebar-menu-item]');
-    const parent = item && item.querySelector('[data-slot=sidebar-menu-button]');
-    const g = a.closest('[data-slot=sidebar-group]');
-    const l = g && g.querySelector('[data-slot=sidebar-group-label]');
-    return [parent && parent !== a ? parent.innerText.trim() : null, l ? l.innerText.trim() : null];
-  })
-  .filter(Boolean)"""
 
 
 def _login(page, base, email):
@@ -60,7 +48,7 @@ def _open(page, base, path):
 
 def _trail(page):
     navs = page.locator(CRUMBS)
-    texts = [" > ".join(t.split()) for t in navs.all_inner_texts()]
+    texts = [" > ".join(line.strip() for line in t.splitlines() if line.strip()) for t in navs.all_inner_texts()]
     return texts
 
 
@@ -72,11 +60,8 @@ def _check(page, base, path, group, width, theme):
     assert crumb.lower().startswith("home"), "%s trail does not start at Home: %r" % (path, crumb)
     home = page.locator(CRUMBS).locator("a").first
     assert home.get_attribute("href") == "/", "%s Home crumb goes to %r" % (path, home.get_attribute("href"))
-    expected = [group] if group else page.evaluate(ACTIVE_GROUP_JS)
-    if expected:
-        names = [c.lower() for c in crumb.split(" > ")[1:-1]]
-        assert any(e.lower() in names for e in expected), (
-            "%s trail %r names none of the sidebar groups %r" % (path, crumb, expected))
+    names = [c.lower() for c in crumb.split(" > ")[1:-1]]
+    assert group.lower() in names, "%s trail %r does not name the group %r" % (path, crumb, group)
     assert len(crumb.split(" > ")) >= 2, "%s trail %r names no page" % (path, crumb)
     if WALK_DIR:
         os.makedirs(WALK_DIR, exist_ok=True)
@@ -104,5 +89,43 @@ def test_one_trail_naming_the_sidebar_group_at_390_dark(browser, live_server, se
     try:
         _login(page, live_server, seeded["emails"]["enterprise_architect"])
         _check(page, live_server, path, group, 390, "dark")
+    finally:
+        context.close()
+
+
+def _seed_risk(org_id):
+    from app import create_app, db
+    from app.models.risk import Risk, RiskStatus
+
+    app = create_app("testing")
+    with app.app_context():
+        row = Risk(title="Breadcrumb ledger outage", likelihood=3, impact=4, status=RiskStatus.OPEN,
+                   organization_id=org_id, owner="Risk Owner")
+        db.session.add(row)
+        db.session.commit()
+        risk_id = row.id
+        db.session.remove()
+    return risk_id
+
+
+@pytest.mark.parametrize("width,height,scheme", [(1440, 1000, "light"), (390, 900, "dark")])
+def test_risk_register_and_risk_page_each_show_one_trail_under_compliance(
+        live_server, browser, width, height, scheme):
+    from .fresh_org import create_fresh_org, sign_in
+
+    org = create_fresh_org("enterprise_architect")
+    risk_id = _seed_risk(org["org_id"])
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": width, "height": height},
+                                  color_scheme=scheme)
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        _check(page, live_server, "/risks/", "Compliance", width, scheme)
+        assert "Breadcrumb ledger outage" in page.locator("body").inner_text()
+        _check(page, live_server, "/risks/%d" % risk_id, "Compliance", width, scheme)
+        trail = _trail(page)[0]
+        assert trail.endswith("Breadcrumb ledger outage"), trail
+        assert "Governance" not in trail
     finally:
         context.close()

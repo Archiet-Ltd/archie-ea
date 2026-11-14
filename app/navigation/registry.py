@@ -863,6 +863,21 @@ def filter_keys() -> set:
     return keys
 
 
+def close_trail(trail: list, title: str) -> list:
+    """The crumbs after Home for a page titled `title`, sitting at the end of `trail`.
+
+    One name per page: when the trail already ends in the title's name (or the title carries it),
+    the title stands in for that last crumb; otherwise the title follows the trail. Both page
+    headers call this, so the rule lives here once.
+    """
+    if not title:
+        return list(trail)
+    last = trail[-1][0].lower() if trail else ""
+    if trail and (title.lower() == last or last in title.lower()):
+        return list(trail[:-1]) + [(title, None)]
+    return list(trail) + [(title, None)]
+
+
 def page_trail(user, endpoint: str | None, args=None) -> list:
     """[(label, href)] for where a page sits in the sidebar: its section, then its entry.
 
