@@ -130,6 +130,11 @@ def _assert_cited_dependents(page):
                 "row %r has no as-of date" % name
     for dependent in DEPENDENTS:
         assert dependent in names, "%r not among the cited dependents: %s" % (dependent, names)
+    # The answer and its panel agree: a panel that names a last run never sits under an
+    # answer saying the connections were not worked out.
+    panel = answer.locator("[data-derivation-last-run]").inner_text().strip()
+    assert panel and panel != "\u2014", "the panel names no last run: %s" % text
+    assert "haven't worked out the indirect connections" not in text, text
     return names
 
 
@@ -316,5 +321,51 @@ def test_what_if_a_near_name_is_listed_first_and_unrelated_names_are_not(
         if WALK:
             os.makedirs(WALK, exist_ok=True)
             page.screenshot(path=os.path.join(WALK, shot))
+    finally:
+        context.close()
+
+
+def test_the_answer_says_when_connections_were_last_worked_out_and_how_many_relationships_changed_since(
+    browser, echo_provider_server, app
+):
+    """After a run, relationships are added: the answer names that run and counts them, and
+    the panel's "May be out of date" shows the same number."""
+    import re
+
+    from app.extensions import db
+
+    email, org_id = _empty_organisation_user(echo_provider_server)
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        _login(page, echo_provider_server, email)
+        _load_sample_from_chat(page, echo_provider_server)
+        with app.app_context():
+            db.session.execute(
+                db.text(
+                    "UPDATE intelligence_derivation_runs SET started_at = started_at - interval '1 hour', "
+                    "finished_at = finished_at - interval '1 hour' WHERE organization_id = :o"
+                ),
+                {"o": org_id},
+            )
+            db.session.commit()
+        _ask_what_if(page, echo_provider_server)
+        answer = page.get_by_test_id("estate-answer")
+        expect(answer).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        text = answer.inner_text()
+        figure = answer.locator("[data-derivation-stale]").inner_text().strip()
+        assert figure.isdigit() and int(figure) > 0, text
+        notice = answer.locator("[data-changed-since-notice]").inner_text()
+        assert re.search(r"last updated .*\d{4}", notice), notice
+        assert "%s relationships have been added or changed since" % figure in notice, notice
+        assert "haven't worked out the indirect connections" not in text
+        if WALK:
+            os.makedirs(WALK, exist_ok=True)
+            answer.locator("[data-derivation-status]").scroll_into_view_if_needed()
+            page.screenshot(path=os.path.join(WALK, "changed-since-1440-light.png"))
+            page.set_viewport_size({"width": 390, "height": 844})
+            page.screenshot(path=os.path.join(WALK, "changed-since-390-light.png"))
     finally:
         context.close()
