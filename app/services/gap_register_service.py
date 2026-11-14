@@ -451,15 +451,7 @@ def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
     work package writer records)."""
     from app.services import work_package_service
 
-    gaps = (
-        Gap.query
-        .filter(
-            Gap.organization_id == organization_id,
-            Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-            ~db.func.coalesce(closed_gap_expr(), db.false()),
-        )
-        .all()
-    )
+    gaps = gap_register_query(organization_id, closed=False).all()
     covered = work_package_service.gap_ids_with_work_packages([g.id for g in gaps], organization_id)
     return [(gap, gap.id in covered) for gap in gaps]
 

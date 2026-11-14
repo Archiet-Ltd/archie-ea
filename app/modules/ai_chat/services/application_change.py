@@ -56,11 +56,6 @@ _OF = re.compile(
 _QUOTES = "\"'\u201c\u201d\u2018\u2019`"
 
 
-def _collapse_ws(text: str) -> str:
-    """Collapse runs of whitespace to a single space."""
-    return " ".join(text.split())
-
-
 def _original_value(message: str, tokens: list, collapsed: str, value_start: int) -> str:
     """The value as typed: the original message from the token the value starts at, stripped at both ends.
 

@@ -117,7 +117,7 @@ def test_the_old_gap_severity_address_redirects_to_the_register(db_session, make
     assert dropped.status_code == 301 and dropped.headers["Location"].endswith(register)
 
     landed = client.get(old, follow_redirects=True)
-    assert landed.status_code == 200 and "Open critical" in landed.get_data(as_text=True)
+    assert landed.status_code == 200 and "Open, critical severity" in landed.get_data(as_text=True)
 
 
 def test_the_old_gap_severity_address_needs_a_sign_in(client):
