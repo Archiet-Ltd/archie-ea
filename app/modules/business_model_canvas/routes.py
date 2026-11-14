@@ -8,7 +8,7 @@ Index endpoint (linked from the sidebar by the orchestrator post-merge):
 import logging
 
 from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 # Destructive and mutating routes were guarded by @login_required only, so any
 # authenticated user could delete another user's records. Matches the gating
@@ -22,6 +22,8 @@ from app.models.price_plan import BILLING_PERIODS
 from app.utils.api_response import error_response, not_found_response, success_response
 
 from werkzeug.exceptions import HTTPException
+
+from app.services.cost_visibility import costs_visible
 
 from . import model_service, service
 
@@ -354,6 +356,8 @@ def update_canvas(canvas_id):
     if not request.is_json:
         return _back(canvas_id)
     contents = model_service.canvas_contents(canvas.organization_id, canvas.id)
+    if not costs_visible(current_user):
+        contents = model_service.withhold_cost_lines(contents)
     # Text kept from before a canvas listed elements. It is shown apart, never as a box's entries.
     flat = canvas.to_dict()
     contents["earlier_text"] = {key: flat[key] for key in CANVAS_BLOCKS if flat.get(key)}
@@ -407,6 +411,8 @@ def api_detail(canvas_id):
     if canvas is None:
         return not_found_response("Business Model Canvas")
     contents = model_service.canvas_contents(canvas.organization_id, canvas.id)
+    if not costs_visible(current_user):
+        contents = model_service.withhold_cost_lines(contents)
     # Text kept from before a canvas listed elements. It is shown apart, never as a box's entries.
     flat = canvas.to_dict()
     contents["earlier_text"] = {key: flat[key] for key in CANVAS_BLOCKS if flat.get(key)}

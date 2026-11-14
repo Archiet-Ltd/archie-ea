@@ -415,7 +415,7 @@ def _price_lines(canvas, box_key):
     return [
         {
             "plan_id": plan.id, "element_id": plan.element_id, "entry": priced[plan.element_id].name,
-            "plan_name": plan.name, "price": f"{plan.price:,.2f}", "currency": plan.currency,
+            "plan_name": plan.name, "source_table": "price_plans", "price": f"{plan.price:,.2f}", "currency": plan.currency,
             "period": plan.billing_period, "url": element_href(priced[plan.element_id]),
             "text": f"{priced[plan.element_id].name}: {plan.name}, {plan.price:,.2f} {plan.currency} per {plan.billing_period}",
         }
@@ -434,12 +434,14 @@ def _cost_summary(canvas):
     technology = technology_cost.canvas_figures(canvas.organization_id)
     shown = [
         {
-            "id": line["id"], "text": f"{line['name']}: {line['amount']:,.0f} {line['currency']} a year",
+            "id": line["id"], "kind": "cost", "source_table": "cost_facts",
+            "text": f"{line['name']}: {line['amount']:,.0f} {line['currency']} a year",
             "url": url_for("unified_applications.application_detail", id=line["id"]),
         }
         for line in lines[:COST_LINES_SHOWN]
     ] + [
         {
+            "id": share["id"], "kind": "technology_share", "source_table": "cost_facts",
             "text": f"{share['name']}, technology share: {share['share']:,.2f} {technology['currency']} a year",
             "url": url_for("unified_applications.application_detail", id=share["id"], tab="technology")
             + "#technology-cost-shares",
@@ -455,6 +457,20 @@ def _cost_summary(canvas):
             else f"Total a year: not shown, there is no exchange rate on file to {technology['currency']}"
         )
     return {"lines": shown, "count": count, "not_listed": max(0, count - len(shown)), "text": total}
+
+
+def withhold_cost_lines(contents):
+    """A copy of a canvas without its cost lines and with the one sentence that says why, for a person the
+    cost rule withholds from."""
+    from app.services.cost_visibility import COSTS_WITHHELD
+
+    boxes = []
+    for box in contents["boxes"]:
+        if box["costs"] is not None:
+            box = dict(box, costs={"lines": [], "count": 0, "not_listed": 0, "text": None, "withheld": True},
+                       empty_reason=COSTS_WITHHELD)
+        boxes.append(box)
+    return dict(contents, boxes=boxes)
 
 
 def _box_empty_reason(zone, box_key):

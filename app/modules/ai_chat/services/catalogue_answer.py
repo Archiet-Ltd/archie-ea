@@ -125,21 +125,37 @@ def answer_catalogue_question(message: str, organization_id: int, time_limit: Op
     if not _keep(message, interpretation):
         return None
     entry_id = interpretation["entry_id"]
-    result = run_entry(entry_id, organization_id, **interpretation["params"])
-    seen: Set[Tuple[Any, Any]] = set()
+    params = dict(interpretation["params"])
+    if entry_id == "canvas_box_entries":
+        params["show_costs"] = _cost_shown(organization_id)[0]
+    result = run_entry(entry_id, organization_id, **params)
+    seen: Set[Tuple[Any, Any, Any]] = set()
     records: List[Dict[str, Any]] = []
     show_cost, currency = False, ""
     if entry_id == "applications_and_owners":
         show_cost, currency = _cost_shown(organization_id)
-    rows_by_id = {row.get("id"): row for row in result.get("rows") or [] if isinstance(row, dict)}
+    # A row is found by its kind and id (an element and an application can share a number) and, where one
+    # record has several rows, by the source line as well.
+    rows_by_key: Dict[Tuple[Any, Any, Any], Dict[str, Any]] = {}
+    for row in result.get("rows") or []:
+        if isinstance(row, dict):
+            rows_by_key.setdefault((row.get("kind"), row.get("id"), row.get("source_line")), row)
+            rows_by_key.setdefault((row.get("kind"), row.get("id"), None), row)
     for citation in result.get("citations") or []:
         page = _page_for(citation)
-        key = (citation.get("type"), citation.get("id"))
+        # One application can sit on a canvas twice (its own cost and its technology share): both are kept.
+        several = entry_id == "canvas_box_entries" and citation.get("type") == "application"
+        key = (citation.get("type"), citation.get("id"), citation.get("source_line") if several else None)
         if page is None or key in seen:
             continue
         seen.add(key)
         record = {"name": citation.get("name") or "Unnamed record", "kind": citation["type"], "url": page}
-        row = {} if citation["type"] == "canvas" else rows_by_id.get(citation.get("id")) or {}
+        row = {} if citation["type"] == "canvas" else (
+            rows_by_key.get((citation["type"], citation.get("id"), citation.get("source_line")))
+            or rows_by_key.get((citation["type"], citation.get("id"), None))
+            or rows_by_key.get((None, citation.get("id"), None))
+            or {}
+        )
         count = row.get("depends_on_count")
         if count:
             record["dependents"] = "%d %s" % (count, "thing depends on it" if count == 1 else "things depend on it")
@@ -165,7 +181,7 @@ def answer_catalogue_question(message: str, organization_id: int, time_limit: Op
     return {
         "entry_id": entry_id,
         "title": result.get("title") or CATALOGUE[entry_id].title,
-        "summary": result.get("answer"),
+        "summary": " ".join(part for part in (result.get("answer"), result.get("note")) if part) or None,
         "sentence": _inventory_sentence(result, show_cost) if entry_id == "applications_and_owners" and records else None,
         "total": result.get("total"),
         "reason": result.get("reason"),
@@ -173,7 +189,7 @@ def answer_catalogue_question(message: str, organization_id: int, time_limit: Op
         "complete": complete,
         # A name that matched nothing recorded: the records are not at fault.
         "unmatched": result.get("matched") is False,
-        "next_step": (result.get("next_step") or NEXT_STEPS.get(entry_id)) if not records and not complete else None,
+        "next_step": (result.get("next_step") or NEXT_STEPS.get(entry_id)) if not records and not complete and not result.get("costs_withheld") else None,
         "next_url": result.get("next_url") if not records else None,
         "next_label": result.get("next_label") if not records else None,
         "named_not_found": named_not_found,

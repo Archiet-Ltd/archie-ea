@@ -1073,12 +1073,15 @@ CANVAS_BOX_QUESTIONS = {
 }
 
 
-def _canvas_box_entries(organization_id: int, box: Optional[str] = None, **_: Any) -> Dict[str, Any]:
+def _canvas_box_entries(organization_id: int, box: Optional[str] = None, show_costs: bool = False,
+                        **_: Any) -> Dict[str, Any]:
     """"Who are our customer segments? Who are our key partners?" Answered from the canvases themselves: the
     entries each canvas of the organisation shows in that box, in the order the canvas page shows them, each
     cited to its element and to the canvas it sits on. Read through the one canvas reader the page and the
-    chat's get_canvas use, so the three never disagree."""
+    chat's get_canvas use, so the three never disagree. Cost lines are listed only when ``show_costs`` is
+    true, for a person the cost rule lets read them."""
     from app.modules.business_model_canvas import model_service
+    from app.services.cost_visibility import COSTS_WITHHELD
 
     box = box if box in CANVAS_BOX_QUESTIONS else None
     title, box_title = CANVAS_BOX_QUESTIONS[box] if box else ("What is on our canvas?", "any box")
@@ -1087,24 +1090,36 @@ def _canvas_box_entries(organization_id: int, box: Optional[str] = None, **_: An
     rows: List[Dict[str, Any]] = []
     citations: List[Dict[str, Any]] = []
     canvases: Dict[int, Dict[str, Any]] = {}
+    left_out = 0
+    costs_withheld = False
     for item in found:
         canvas, slice_ = item["canvas"], item["box"]
         line_start = "%s on %s" % (slice_["title"], canvas["name"])
+        costs = slice_["costs"] or {}
+        if costs.get("lines") and not show_costs:
+            costs_withheld = True
+        # (id, name, kind, source line, source table)
         listed = [
-            (entry["id"], entry["name"], "element", "%s · %s" % (line_start, entry["type_name"]))
+            (entry["id"], entry["name"], "element", "%s · %s" % (line_start, entry["type_name"]), "saved_diagram_elements")
             for entry in slice_["entries"]
         ] + [
-            (price["element_id"], price["text"], "element", "%s · price" % line_start) for price in slice_["prices"]
-        ] + [
-            (line["id"], line["text"], "application", "%s · cost" % line_start)
-            for line in ((slice_["costs"] or {}).get("lines") or [])
+            (price["element_id"], price["text"], "element", "%s · price" % line_start, price["source_table"])
+            for price in slice_["prices"]
         ]
+        if show_costs:
+            left_out += costs.get("not_listed") or 0
+            listed += [
+                (line["id"], line["text"], "application",
+                 "%s · %s" % (line_start, "technology share" if line["kind"] == "technology_share" else "cost"),
+                 line["source_table"])
+                for line in costs.get("lines") or []
+            ]
         if not listed:
             continue
         canvases.setdefault(canvas["id"], {"canvas": canvas, "count": 0})["count"] += len(listed)
-        for ident, name, kind, line in listed:
-            rows.append({"id": ident, "name": name, "source_line": line, "source_table": "saved_diagram_elements",
-                         "truth_class": truth_class_for("saved_diagram_elements")})
+        for ident, name, kind, line, table in listed:
+            rows.append({"id": ident, "kind": kind, "name": name, "source_line": line, "source_table": table,
+                         "truth_class": truth_class_for(table)})
             citations.append({"type": kind, "id": ident, "name": name,
                               "target": "/api/v1/elements/%d" % ident if kind == "element" else None, "source_line": line})
     for entry in canvases.values():
@@ -1114,10 +1129,17 @@ def _canvas_box_entries(organization_id: int, box: Optional[str] = None, **_: An
 
     result: Dict[str, Any] = {
         "answer": "what the canvases list under %s" % box_title if box else "what the canvases list",
-        "title": title, "box": box, "rows": rows, "total": len(rows), "citations": citations,
-        "reason": None if rows else "no canvas has an entry in %s yet" % box_title,
+        "title": title, "box": box, "rows": rows, "total": len(rows) + left_out, "citations": citations,
+        "reason": None if rows else (COSTS_WITHHELD if costs_withheld else "no canvas has an entry in %s yet" % box_title),
     }
-    if not rows:
+    if left_out:
+        result["left_out"] = left_out
+        result["answer"] += " (%d cost line%s not listed here, the canvas page lists them)" % (
+            left_out, "" if left_out == 1 else "s")
+    if costs_withheld:
+        result["costs_withheld"] = True
+        result["note"] = COSTS_WITHHELD
+    if not rows and not costs_withheld:
         from flask import url_for
 
         own = model_service.organisation_canvas(organization_id)
