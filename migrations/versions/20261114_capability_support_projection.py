@@ -7,14 +7,14 @@ under the same row-level security as the other organisation tables.
 
 The downgrade drops the policies, the indexes and the two columns.
 
-Revision ID: 20261114_capability_support_projection
+Revision ID: 20261114_capsupport_projection
 Revises: 20261114_subscription_offer
 Create Date: 2026-11-14
 """
 from alembic import op
 from sqlalchemy import text
 
-revision = "20261114_capability_support_projection"
+revision = "20261114_capsupport_projection"
 down_revision = "20261114_subscription_offer"
 branch_labels = None
 depends_on = None
