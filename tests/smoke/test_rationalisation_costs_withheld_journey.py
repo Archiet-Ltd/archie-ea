@@ -44,6 +44,19 @@ def _reply(page, path):
     return body
 
 
+def _holds_a_seeded_row(path, body, org):
+    """True when the reply carries a record this organisation seeded, so an empty reply cannot pass."""
+    names = org["app_names"]
+    text = str(body)
+    if "/executive-summary" in path:
+        return body.get("success") is True and body.get("total_scored", 0) >= 1
+    if "/benefits/" in path:
+        return bool(body.get("benefits"))
+    if "/cost-tiers" in path:
+        return body.get("costs_withheld_sentence") == HELD_BACK
+    return any(name in text for name in names)
+
+
 def _json_replies(org):
     app_id = org["app_ids"][0]
     return (
@@ -94,9 +107,8 @@ def test_a_solution_architect_reads_one_sentence_and_no_amount_on_the_rationalis
         # the replies behind the pages
         for path in _json_replies(mine):
             body = _reply(page, path)
-            # a reply that holds nothing proves nothing, so each carries something before the money check
-            assert body, path
-            assert any(value for value in (body.values() if isinstance(body, dict) else body)), (path, body)
+            # a reply that holds nothing proves nothing, so each shows the seeded row before the money check
+            assert _holds_a_seeded_row(path, body, mine), (path, "the reply holds none of this organisation's records", body)
             assert holds_none_of(str(body), everything) == [], path
         tiers = _reply(page, "/dashboard/api/tco/cost-tiers")
         assert tiers["data"] == [] and tiers["costs_withheld_sentence"] == HELD_BACK

@@ -214,7 +214,7 @@ def test_a_solution_architect_runs_the_analysis_and_reads_the_sentence_once_with
         assert text.count(HELD_BACK) == 1, "the sentence is said %d times, not once" % text.count(HELD_BACK)
         assert page.get_by_role("columnheader", name="Annual Cost").count() == 0, "a cost column is shown"
         assert holds_none_of(page.content(), _amounts(mine) + _amounts(theirs)) == []
-        assert "£" not in text
+        assert not re.search(r"[£$€]\s?\d", text), "an amount is written on the page"
         assert page.get_by_text("App %s" % theirs["tag"]).count() == 0
         shot(page, "architect-solarch-results", width, scheme)
     finally:
