@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -160,6 +161,12 @@ def renewal_summary(sub, plan: Plan, live: bool) -> Dict[str, Optional[str]]:
     "Nothing to renew" when the plan is free, never a bare dash."""
     if plan.key == "free":
         return {"label": "Next renewal", "value": "Nothing to renew", "note": None}
+    if sub is not None and sub.offer == "startup_credit" and not live and sub.current_period_end is not None:
+        return {
+            "label": "Free until",
+            "value": sub.current_period_end.strftime("%d %b %Y").lstrip("0"),
+            "note": "Buy Startup before then to keep ten people",
+        }
     if not live or sub is None or sub.current_period_end is None:
         return {"label": "Next renewal", "value": "No renewal yet", "note": None}
     when = sub.current_period_end.strftime("%d %b %Y")
@@ -251,6 +258,34 @@ def _subscription_row(org_id: int):
     return Subscription.query.filter_by(organization_id=org_id).first()
 
 
+def _name(value) -> Optional[str]:
+    """An enum member or a plain string, as its text."""
+    return getattr(value, "value", value)
+
+
+def offer_lapsed(row, now=None) -> bool:
+    """True when *row* is on a free offer whose end has passed.
+
+    The one lapse rule, read at the moment of use so the limit is exact at the
+    second the offer ends and no job rewrites the row. A row with a live
+    provider subscription (Stripe or Monelytics) is never lapsed: the provider
+    owns its plan. *row* may be a Subscription or a Core row carrying the same
+    columns.
+    """
+    if row is None or not getattr(row, "offer", None):
+        return False
+    if getattr(row, "stripe_subscription_id", None) or getattr(row, "monelytics_subscription_id", None):
+        return False
+    end = getattr(row, "current_period_end", None)
+    if end is None or end >= (now or datetime.utcnow()):
+        return False
+    return (
+        row.offer == "startup_credit"
+        and _name(row.plan) == "startup"
+        and _name(row.status) == "trialing"
+    )
+
+
 def effective_plan(sub) -> Plan:
     """The plan whose limits apply now.
 
@@ -264,6 +299,8 @@ def effective_plan(sub) -> Plan:
     from app.models.subscription import SubscriptionStatus
 
     if sub.status == SubscriptionStatus.cancelled:
+        return _BY_KEY["free"]
+    if offer_lapsed(sub):
         return _BY_KEY["free"]
     return get_plan(sub.plan.value if sub.plan is not None else None)
 
@@ -434,7 +471,9 @@ def user_limit_status(org_id: int) -> Dict:
     sub = current_subscription(org) if org is not None else None
     plan = effective_plan(sub)
     limit = _limit_for(plan, sub.seats_purchased if sub is not None else None)
-    return _status(plan, limit, _count_members(db.session.connection(), org_id, plan.counts))
+    status = _status(plan, limit, _count_members(db.session.connection(), org_id, plan.counts))
+    status["offer"] = sub.offer if sub is not None and not offer_lapsed(sub) else None
+    return status
 
 
 class PlanLimitReached(Exception):
@@ -494,13 +533,21 @@ def check_capacity(connection, org_id: int, change: "_Change") -> None:
     org = connection.execute(columns.with_for_update()).first()
     subs = Subscription.__table__
     row = connection.execute(
-        select(subs.c.plan, subs.c.status, subs.c.seats_purchased)
+        select(
+            subs.c.plan,
+            subs.c.status,
+            subs.c.seats_purchased,
+            subs.c.offer,
+            subs.c.current_period_end,
+            subs.c.stripe_subscription_id,
+            subs.c.monelytics_subscription_id,
+        )
         .where(subs.c.organization_id == org_id)
     ).first()
     if row is None:
         plan_enum, seats = _seed_plan(org.plan, org.max_users)
         plan = get_plan(plan_enum.value)
-    elif row.status == SubscriptionStatus.cancelled:
+    elif row.status == SubscriptionStatus.cancelled or offer_lapsed(row):
         plan, seats = _BY_KEY["free"], None
     else:
         plan, seats = get_plan(row.plan.value if row.plan is not None else None), row.seats_purchased

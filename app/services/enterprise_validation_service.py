@@ -63,7 +63,8 @@ class EnterpriseValidationService:
             errors.append("Capability name cannot be empty")
 
         # Type validation
-        if "type" in data:
+        # An empty category means none was chosen; it is not an invalid one.
+        if data.get("type") not in (None, ""):
             if data["type"] not in EnterpriseValidationService.VALID_CAPABILITY_TYPES:
                 errors.append(
                     f"Invalid capability type. Must be one of: {', '.join(EnterpriseValidationService.VALID_CAPABILITY_TYPES)}"

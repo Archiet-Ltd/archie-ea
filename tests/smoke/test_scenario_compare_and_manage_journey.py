@@ -169,6 +169,8 @@ def test_the_picker_comes_before_the_prioritised_actions(browser, server, demo, 
         # in this release the address moves to the Impact Analysis page the person is shown; either way the title names it
         page.wait_for_url(re.compile(r"/(strategic|enterprise/analysis)/impact-analysis#priority-actions$"), timeout=PAGE_TIMEOUT)
         expect(page).to_have_title(re.compile(r"^Impact Analysis\b"))
+        # the ranked list is readable on the landing page
+        expect(page.get_by_test_id("priority-action-row").first).to_be_visible()
     finally:
         context.close()
 

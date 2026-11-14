@@ -423,7 +423,7 @@
     {% if simulation %}
     {# The prioritised action list belongs to Impact Analysis; this page links to it rather than repeating it. #}
     <p class="text-sm text-muted-foreground" data-testid="priority-actions-link-line">What should be done first is ranked on
-        <a href="{{ url_for('strategic.impact_analysis') }}#priority-actions" class="font-medium text-primary hover:underline" data-testid="priority-actions-link">Impact Analysis</a>.</p>
+        <a href="{{ url_for('enterprise.impact_analysis') }}#priority-actions" class="font-medium text-primary hover:underline" data-testid="priority-actions-link">Impact Analysis</a>.</p>
     {% else %}
     {% include 'components/priority_actions.html' %}
     {% endif %}
