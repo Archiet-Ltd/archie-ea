@@ -124,3 +124,83 @@ def test_page_api_and_chat_list_the_same_customer_segments(browser, live_server,
             assert len(response.text()) > 2000, href
     finally:
         context.close()
+
+
+COST_QUESTION = "what is in our cost structure?"
+
+
+def seed_cost_canvas(org_id, canvas_name):
+    """A canvas whose organisation has two applications with an annual cost and a technology cost that one of
+    them carries, so the cost box holds direct lines and a technology share."""
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.business_model import BusinessModelCanvas
+    from app.services import cost_fact_store, technology_cost
+    from config import CurrencyConfig
+
+    app = create_app("testing")
+    with app.app_context():
+        currency = CurrencyConfig.get_org_currency_code(organization_id=org_id)
+        canvas = BusinessModelCanvas(name=canvas_name, organization_id=org_id)
+        db.session.add(canvas)
+        db.session.flush()
+        apps = []
+        for name in ("Billing ledger", "Order portal"):
+            element = ArchiMateElement(name=name, type="ApplicationComponent", layer="application", organization_id=org_id)
+            db.session.add(element)
+            db.session.flush()
+            row = ApplicationComponent(name=name, organization_id=org_id, archimate_element_id=element.id)
+            db.session.add(row)
+            db.session.flush()
+            apps.append(row)
+        for amount, row in zip((48000, 12000), apps):
+            cost_fact_store.upsert_fact(org_id, "application", row.id, amount, currency, "journey")
+        node = ArchiMateElement(name="Shared cluster", type="Node", layer="technology", organization_id=org_id)
+        db.session.add(node)
+        db.session.flush()
+        db.session.add(ArchiMateRelationship(
+            source_id=node.id, target_id=apps[0].archimate_element_id, type="realization", organization_id=org_id))
+        db.session.flush()
+        technology_cost.record_cost(org_id, node.id, "9000", currency, "hosting")
+        db.session.commit()
+        return {"canvas": canvas.id}
+
+
+def test_a_cto_sees_the_cost_lines_and_a_business_architect_is_told_why_not(browser, live_server, seeded):
+    canvas_name = "Costed model"
+    ids = seed_cost_canvas(seeded["ids"]["org"], canvas_name)
+    for persona, sees in (("cto", True), ("business_architect", False)):
+        context = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True)
+        context.set_default_timeout(PAGE_TIMEOUT)
+        context.set_default_navigation_timeout(PAGE_TIMEOUT)
+        page = context.new_page()
+        try:
+            sign_in_as(page, live_server, seeded, persona)
+            data = page.request.get("%s/business-model/api/%d" % (live_server, ids["canvas"])).json()["data"]
+            costs = next(b for b in data["boxes"] if b["key"] == "cost_structure")
+            card = ask(page, live_server, COST_QUESTION)
+            expect(card.locator("[data-catalogue-cards]")).to_have_attribute("data-catalogue-entry", "canvas_box_entries")
+            text = card.inner_text()
+            if sees:
+                texts = [line["text"] for line in costs["costs"]["lines"]]
+                assert any(t.startswith("Billing ledger: 48,000") for t in texts)
+                assert any(t.startswith("Billing ledger, technology share: 9,000") for t in texts)
+                assert any(t.startswith("Order portal: 12,000") for t in texts)
+                records = [r for r in card.locator("[data-catalogue-record]").all()
+                           if r.locator("[data-catalogue-source]").inner_text().startswith("Cost Structure on %s" % canvas_name)]
+                assert len(records) >= 3
+                assert any("technology share" in r.locator("[data-catalogue-source]").inner_text() for r in records)
+                assert "Billing ledger" in text and "Order portal" in text
+                hrefs = card.locator("[data-testid=catalogue-open]").evaluate_all("els => els.map(e => e.href)")
+                assert hrefs
+                for href in hrefs:
+                    response = context.request.get(href)
+                    assert response.status == 200, href
+                    assert len(response.text()) > 2000, href
+            else:
+                assert costs["costs"]["lines"] == [] and costs["empty_reason"] == "Cost figures are withheld for your role."
+                assert "Cost figures are withheld for your role." in text
+                assert "48,000" not in text and "48000" not in text and "Billing ledger" not in text
+        finally:
+            context.close()
