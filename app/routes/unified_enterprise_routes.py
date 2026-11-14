@@ -1071,10 +1071,13 @@ def impact_analysis():
         from app.models import ArchiMateElement
         from app.models.traceability import ImpactAnalysisResult
         from app.modules.intelligence.services import answer_envelope as envelope
+        from app.services.priority_action_service import limit_for, prioritised_actions
+        from app.services.risk_service import footers_by_risk
         from app.utils.role_access import may_connect_github, may_load_sample_company
 
         element_id = request.args.get("element", type=int)
         has_elements = ArchiMateElement.query.count() > 0
+        model_empty = not has_elements
 
         answer = None
         element_not_found = False
@@ -1147,13 +1150,18 @@ def impact_analysis():
         )
         avg_affected_applications = round(avg_result, 1) if avg_result else 0
 
+        priority_actions = prioritised_actions(current_org_id(), limit=limit_for(request.args),
+                                               risk_footers=footers_by_risk(current_org_id()))
+
         return render_template(
             "enterprise/impact_analysis.html",
             answer=answer,
             element_not_found=element_not_found,
             has_elements=has_elements,
+            model_empty=model_empty,
             may_connect_github=may_connect_github(current_user, current_org_id()),
             may_load_sample_company=may_load_sample_company(current_user),
+            priority_actions=priority_actions,
             recent_analyses=recent_analyses,
             filtered_analyses=filtered_analyses,
             total_analyses=total_analyses,
