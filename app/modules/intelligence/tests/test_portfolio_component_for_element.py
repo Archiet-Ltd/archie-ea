@@ -127,3 +127,109 @@ def test_forward_fk_on_the_element_is_honoured_first(app, db_session, make_org):
     assert result["reasons"] == []
     assert result["application_component_id"] == forward_id
 
+
+
+def _compose(db_session, org_id, whole, part, type_="composition"):
+    from app.models import ArchiMateRelationship
+
+    rel = ArchiMateRelationship(source_id=whole.id, target_id=part.id, type=type_, organization_id=org_id)
+    db_session.add(rel)
+    db_session.flush()
+    return rel
+
+
+def _ask(app, org_id, element_id):
+    from flask import g
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    with app.test_request_context("/"):
+        g.current_org_id = org_id
+        return IntelligenceQueryService.portfolio_component_for_element(element_id)
+
+
+def test_a_part_answers_with_the_application_it_belongs_to(app, db_session, make_org):
+    from app.models.application_portfolio import ApplicationComponent
+
+    org = make_org("portfolio-lens-part")
+    whole = _element(db_session, org.id, "MarketingIQ")
+    part = _element(db_session, org.id, "MarketingIQ — backend (API and workers)")
+    record = ApplicationComponent(name="MarketingIQ", organization_id=org.id, archimate_element_id=whole.id)
+    db_session.add(record)
+    rel = _compose(db_session, org.id, whole, part)
+    db_session.commit()
+
+    result = _ask(app, org.id, part.id)
+
+    assert result["application_component_id"] == record.id
+    assert result["reasons"] == []
+    assert result["part_of"] == (
+        "MarketingIQ — backend (API and workers) is part of MarketingIQ; figures are MarketingIQ's."
+    )
+    assert result["resolved_through"]["parent_element_id"] == whole.id
+    assert result["resolved_through"]["relationship_ids"] == [rel.id]
+
+
+def test_the_nearest_whole_with_a_record_is_used(app, db_session, make_org):
+    from app.models.application_portfolio import ApplicationComponent
+
+    org = make_org("portfolio-lens-nearest")
+    outer = _element(db_session, org.id, "Suite")
+    inner = _element(db_session, org.id, "Module")
+    part = _element(db_session, org.id, "Worker")
+    db_session.add(ApplicationComponent(name="Suite", organization_id=org.id, archimate_element_id=outer.id))
+    inner_record = ApplicationComponent(name="Module", organization_id=org.id, archimate_element_id=inner.id)
+    db_session.add(inner_record)
+    _compose(db_session, org.id, outer, inner)
+    _compose(db_session, org.id, inner, part, type_="aggregation")
+    db_session.commit()
+
+    result = _ask(app, org.id, part.id)
+
+    assert result["application_component_id"] == inner_record.id
+
+
+def test_a_part_of_nothing_with_a_record_says_so(app, db_session, make_org):
+    org = make_org("portfolio-lens-orphan")
+    whole = _element(db_session, org.id, "Whole")
+    part = _element(db_session, org.id, "Part")
+    _compose(db_session, org.id, whole, part)
+    db_session.commit()
+
+    result = _ask(app, org.id, part.id)
+
+    assert result["reasons"] == ["no_application_component"]
+    assert result["message"] == "Part is not part of any application in the model."
+
+
+def test_a_relationship_that_is_not_a_part_does_not_resolve(app, db_session, make_org):
+    from app.models.application_portfolio import ApplicationComponent
+
+    org = make_org("portfolio-lens-serving")
+    whole = _element(db_session, org.id, "Server App")
+    other = _element(db_session, org.id, "Client")
+    db_session.add(ApplicationComponent(name="Server App", organization_id=org.id, archimate_element_id=whole.id))
+    _compose(db_session, org.id, whole, other, type_="serving")
+    db_session.commit()
+
+    assert _ask(app, org.id, other.id)["reasons"] == ["no_application_component"]
+
+
+def test_another_organisations_application_never_answers_for_a_part(app, db_session, make_org):
+    from app.models.application_portfolio import ApplicationComponent
+
+    org_a = make_org("portfolio-lens-part-a")
+    org_b = make_org("portfolio-lens-part-b")
+    part = _element(db_session, org_a.id, "A part")
+    foreign = _element(db_session, org_b.id, "B application")
+    db_session.add(ApplicationComponent(name="B application", organization_id=org_b.id, archimate_element_id=foreign.id))
+    # The relationship row is written directly, as a bad import could, in each organisation's name.
+    _compose(db_session, org_b.id, foreign, part)
+    _compose(db_session, org_a.id, foreign, part)
+    db_session.commit()
+
+    result = _ask(app, org_a.id, part.id)
+
+    assert result["application_component_id"] is None
+    assert result["reasons"] == ["no_application_component"]
+    assert result["resolved_through"] is None

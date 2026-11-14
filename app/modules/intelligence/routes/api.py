@@ -660,6 +660,9 @@ def portfolio_component_for_element(element_id: int):
             "application_component_id": result.get("application_component_id"),
             "reasons": result.get("reasons") or [],
             "component": component,
+            "resolved_through": result.get("resolved_through"),
+            "part_of": result.get("part_of"),
+            "message": result.get("message"),
         }
     )
 
