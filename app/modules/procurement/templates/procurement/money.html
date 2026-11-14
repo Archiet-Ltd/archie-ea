@@ -1,0 +1,171 @@
+{# design-block: dashboard #}
+{% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/figures.html' import stat_cards, section %}
+{% from 'components/fact_list.html' import fact_list %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+{% block title %}Money{% endblock %}
+
+{% macro _pager() %}
+<div class="flex items-center justify-between gap-2 px-2" data-testid="money-history-pages">
+  <p class="text-sm text-muted-foreground tabular-nums">{{ total }} recorded figure{{ '' if total == 1 else 's' }}. Page {{ page }} of {{ pages }}.</p>
+  <div class="flex items-center gap-2">
+    {% if page > 1 %}{{ ui.button(text='Previous', href=url_for('procurement.money', page=page - 1), variant='outline', size='sm') }}{% endif %}
+    {% if page < pages %}{{ ui.button(text='Next', href=url_for('procurement.money', page=page + 1), variant='outline', size='sm') }}{% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Money', subtitle='Cash, outgoings and revenue as figures you state, each with its date and where it came from',
+              breadcrumb=[('Home', url_for('main.index')), ('Spend', url_for('procurement.spend_analytics')), ('Money', none)]) }}
+
+{% if withheld %}
+  {% call ui.card(attrs={'data-testid': 'money-withheld'}) %}
+    {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
+      <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('lock') }}</span>
+      <p class="text-base font-semibold" data-testid="money-withheld-text">{{ withheld_text }}</p>
+    {% endcall %}
+  {% endcall %}
+{% else %}
+  {%- set f = figures -%}
+  {%- set none_recorded = (f.cash is none and f.spend is none and f.revenue is none and total == 0) -%}
+
+  {% if saved %}
+  {% call ui.alert(attrs={'data-testid': 'money-saved', 'role': 'status'}) %}{{ ui.alert_title(text='Recorded') }}{{ ui.alert_description(text='The figure is saved with its date and source. Earlier figures are kept below.') }}{% endcall %}
+  {% endif %}
+
+  {% if none_recorded %}
+  {% call ui.card(attrs={'data-testid': 'money-empty'}) %}
+    {% call ui.card_content(class='flex flex-col items-center gap-3 py-12 text-center') %}
+      <span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide('banknote') }}</span>
+      <p class="text-base font-semibold" data-testid="money-empty-title">No money figures recorded yet</p>
+      <p class="max-w-lg text-sm text-muted-foreground">Start with the cash in your bank. Then add your monthly outgoings and, if you have any, your monthly revenue, and this page works out how many months your cash lasts.</p>
+      {% call ui.button(href=url_for('procurement.money', measure='cash_balance') ~ '#record-fact') %}{{ lucide('arrow-right') }}Record your cash{% endcall %}
+    {% endcall %}
+  {% endcall %}
+  {% else %}
+    {% if f.cash_stale %}
+    {% call ui.alert(variant='destructive', attrs={'data-testid': 'money-cash-stale', 'role': 'alert'}) %}{{ ui.alert_title(text='Cash not updated for ' ~ f.cash_age_days ~ ' days') }}{{ ui.alert_description(text='The cash figure below is from ' ~ day(f.cash.as_of) ~ '. Record the balance in your bank today to bring it up to date.') }}{% endcall %}
+    {% endif %}
+
+    {%- set cards = [] -%}
+    {%- if f.cash -%}
+      {%- set _ = cards.append({'label': 'Cash in bank', 'value': amount_text(f.cash.amount, f.cash.currency), 'icon': 'landmark', 'testid': 'money-cash',
+          'sentence': 'As of ' ~ day(f.cash.as_of) ~ ', from ' ~ f.cash.source_ref}) -%}
+    {%- else -%}
+      {%- set _ = cards.append({'label': 'Cash in bank: not recorded', 'value': none, 'icon': 'landmark', 'testid': 'money-cash',
+          'sentence': 'Record the balance in your bank', 'href': url_for('procurement.money', measure='cash_balance') ~ '#record-fact'}) -%}
+    {%- endif -%}
+    {%- if f.spend -%}
+      {%- set _ = cards.append({'label': 'Monthly outgoings', 'value': amount_text(f.spend.amount, f.spend.currency), 'icon': 'receipt', 'testid': 'money-spend',
+          'sentence': 'As of ' ~ day(f.spend.as_of) ~ ', from ' ~ f.spend.source_ref}) -%}
+    {%- else -%}
+      {%- set _ = cards.append({'label': 'Monthly outgoings: not recorded', 'value': none, 'icon': 'receipt', 'testid': 'money-spend',
+          'sentence': 'Record what you spend each month', 'href': url_for('procurement.money', measure='spend') ~ '#record-fact'}) -%}
+    {%- endif -%}
+    {%- if f.revenue -%}
+      {%- set _ = cards.append({'label': 'Monthly revenue', 'value': amount_text(f.revenue.amount, f.revenue.currency), 'icon': 'trending-up', 'testid': 'money-revenue',
+          'sentence': 'As of ' ~ day(f.revenue.as_of) ~ ', from ' ~ f.revenue.source_ref}) -%}
+    {%- else -%}
+      {%- set _ = cards.append({'label': 'Monthly revenue: not recorded', 'value': none, 'icon': 'trending-up', 'testid': 'money-revenue',
+          'sentence': 'Record what you earn each month', 'href': url_for('procurement.money', measure='revenue') ~ '#record-fact'}) -%}
+    {%- endif -%}
+    {%- if f.months_of_cash -%}
+      {%- set m = f.months_of_cash -%}
+      {%- set _ = cards.append({'label': 'Months of cash', 'value': (m.months|int if m.months == m.months|int else m.months), 'icon': 'timer', 'testid': 'money-months',
+          'sentence': 'From cash on ' ~ day(m.cash_as_of) ~ ' and outgoings as of ' ~ day(m.spend_as_of) ~ (', less revenue as of ' ~ day(m.revenue_as_of) if m.revenue_as_of else ', with no revenue recorded')}) -%}
+    {%- else -%}
+      {%- set _ = cards.append({'label': 'Months of cash: not worked out', 'value': none, 'icon': 'timer', 'testid': 'money-months',
+          'sentence': f.months_of_cash_reason}) -%}
+    {%- endif -%}
+    {{ stat_cards(cards, testid='money-stat-cards') }}
+
+    {% call section(title='Latest figures', description='The newest figure of each kind. Earlier figures stay in the history below.', testid='money-latest') %}
+      {%- set latest_items = [] -%}
+      {%- for key, label in measure_labels.items() -%}
+        {%- set _ = latest_items.append({'label': label, 'key': key}) -%}
+      {%- endfor -%}
+      {% call(p) fact_list(items=latest_items, testid='money-latest-facts') %}
+        {%- set fact = {'cash_balance': f.cash, 'spend': f.spend, 'revenue': f.revenue}.get(p.key) -%}
+        {%- if fact -%}{{ amount_text(fact.amount, fact.currency) }}<span class="block text-xs text-muted-foreground">As of {{ day(fact.as_of) }}, from {{ fact.source_ref }}</span>
+        {%- else -%}<span class="text-muted-foreground">Not recorded</span>{%- endif -%}
+      {% endcall %}
+      {%- if f.burn %}
+      <p class="mt-3 text-sm text-muted-foreground" data-testid="money-burn">Cash used each month: {{ amount_text(f.burn.amount, f.burn.currency) }}, from outgoings as of {{ day(f.burn.spend_as_of) }}{% if f.burn.revenue_recorded %} less revenue as of {{ day(f.burn.revenue_as_of) }}{% else %}; no revenue is recorded, so none is taken off{% endif %}.</p>
+      {%- endif %}
+    {% endcall %}
+  {% endif %}
+
+  <div id="record-fact" class="max-w-2xl scroll-mt-6" data-testid="money-form-card">
+  {% call ui.card() %}
+    {% call ui.card_header() %}
+      {{ ui.card_title(text=('Correct a figure' if replaces else 'Record a figure')) }}
+      {{ ui.card_description(text=('You are replacing ' ~ measure_labels[replaces.measure] ~ ' as of ' ~ day(replaces.as_of) ~ '. The old figure stays in the history, marked as replaced.' if replaces else 'Each figure is kept with its date and source. To correct one, record a new figure that replaces it.')) }}
+    {% endcall %}
+    {% call ui.card_content() %}
+    {% if error %}
+    {% call ui.alert(variant='destructive', attrs={'data-testid': 'money-error', 'role': 'alert'}) %}{{ ui.alert_description(text=error) }}{% endcall %}
+    {% endif %}
+    <form method="post" action="{{ url_for('procurement.money') }}" class="space-y-4" data-testid="money-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if replaces %}<input type="hidden" name="replaces_id" value="{{ replaces.id }}">{% endif %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='What the figure is', attrs={'for': 'money-measure'}) }}
+        {% call native_select_wrapper(class='w-full') %}{% call native_select(id='money-measure', name='measure', class='w-full') %}
+          {% for key, label in measure_labels.items() %}{{ native_select_option(label, value=key, selected=(form.measure == key)) }}{% endfor %}
+        {% endcall %}{% endcall %}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Amount', attrs={'for': 'money-amount'}) }}
+        {{ ui.input(id='money-amount', name='amount', type='text', required=true, autocomplete='off', value=form.amount, attrs={'inputmode': 'decimal'}) }}
+        {{ ui.field_description(text='A number, or a whole number of customers. Monthly figures are for one month.') }}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Currency', attrs={'for': 'money-currency'}) }}
+        {{ ui.input(id='money-currency', name='currency', type='text', required=true, autocomplete='off', value=form.currency, attrs={'maxlength': '3'}) }}
+        {{ ui.field_description(text='Three letters, such as USD. Not needed for customers.') }}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='As of', attrs={'for': 'money-as-of'}) }}
+        {{ ui.input(id='money-as-of', name='as_of', type='date', required=true, value=form.as_of) }}
+        {{ ui.field_description(text='The day the figure was true.') }}
+      {% endcall %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='Where it comes from', attrs={'for': 'money-source'}) }}
+        {{ ui.input(id='money-source', name='source_ref', type='text', required=true, autocomplete='off', value=form.source_ref, placeholder='Bank statement') }}
+      {% endcall %}
+      {% if products %}
+      {% call ui.field() %}
+        {{ ui.field_label(text='What it is about', attrs={'for': 'money-subject'}) }}
+        {% call native_select_wrapper(class='w-full') %}{% call native_select(id='money-subject', name='subject_element_id', class='w-full') %}
+          {{ native_select_option('The whole organisation', value='', selected=(not form.subject_element_id)) }}
+          {% for product in products %}{{ native_select_option(product.name, value=product.id, selected=(form.subject_element_id|string == product.id|string)) }}{% endfor %}
+        {% endcall %}{% endcall %}
+      {% endcall %}
+      {% endif %}
+      {{ ui.button(text=('Replace figure' if replaces else 'Record figure'), attrs={'type': 'submit', 'data-testid': 'money-save'}) }}
+    </form>
+    {% endcall %}
+  {% endcall %}
+  </div>
+
+  {% call(fact) list_table(rows=rows, columns=[('Figure', ''), ('Amount', ''), ('As of', ''), {'label': 'Source', 'class': 'hidden md:table-cell'}, {'label': 'Stated by', 'class': 'hidden md:table-cell'}, ('Replaced', ''), {'label': '', 'class': 'w-24'}],
+                           caption='Every money figure recorded, newest first', testid='money-history', row_testid='money-history-row',
+                           toolbar=false, page_size=25, server_pagination=_pager,
+                           empty_title='Nothing recorded yet', empty_message='Figures you record appear here with their date, source and who stated them.') %}
+    {% call table_cell(class='font-medium whitespace-nowrap') %}{{ measure_labels[fact.measure] }}{% endcall %}
+    {% call table_cell(class='whitespace-nowrap tabular-nums') %}{{ amount_text(fact.amount, fact.currency) if fact.amount is not none else 'Not available' }}{% endcall %}
+    {% call table_cell(class='whitespace-nowrap') %}{{ day(fact.as_of) }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell') %}{{ fact.source_ref }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell') %}{{ fact.stated_by.full_name if fact.stated_by else 'Not recorded' }}{% endcall %}
+    {% call table_cell(class='whitespace-nowrap text-muted-foreground') %}{% if fact.superseded_by_id %}replaced {{ replacement_dates[fact.id] }}{% else %}Current{% endif %}{% endcall %}
+    {% call table_cell(class='text-right') %}{% if not fact.superseded_by_id %}{{ ui.button(text='Correct', href=url_for('procurement.money', replaces=fact.id) ~ '#record-fact', variant='outline', size='sm', attrs={'data-testid': 'money-correct', 'aria-label': 'Correct ' ~ measure_labels[fact.measure] ~ ' as of ' ~ day(fact.as_of)}) }}{% endif %}{% endcall %}
+  {% endcall %}
+{% endif %}
+</div>
+{% endblock %}

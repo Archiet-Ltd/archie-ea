@@ -9,7 +9,7 @@ ADR Reference: docs/adr/0010-procurement-persona.md
 
 from datetime import date
 
-from flask import render_template, request
+from flask import abort, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.decorators import (
@@ -21,7 +21,9 @@ from app.decorators import (
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
 
+from app.services import finance_fact_store
 from app.services.application_cost_accessor import get_reporting_currency
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
 
 from . import procurement_bp
 
@@ -368,3 +370,84 @@ def spend_analytics():
         # page cannot state two different totals or add a missing amount as 0.
         summary=get_spend_summary(org_id),
     )
+
+
+def _day(value):
+    return f"{value.day} {value:%b %Y}"
+
+
+def _amount_text(amount, currency):
+    """An amount the way a person reads it: 2,500 USD, 1,250.50 USD, or 12 for a count."""
+    text = f"{amount:,.0f}" if amount == amount.to_integral_value() else f"{amount:,.2f}"
+    return f"{text} {currency}" if currency else text
+
+
+def _money_page(org_id, *, form=None, error=None, status=200):
+    """The Money page: the latest figures, the history and the form, all from this organisation's facts."""
+    page = request.args.get("page", 1, type=int) or 1
+    figures = finance_fact_store.derived_figures(org_id)
+    rows, total = finance_fact_store.history(org_id, page=page)
+    replacement_dates = {}
+    for fact in rows:
+        if fact.superseded_by_id is not None:
+            replacement_dates[fact.id] = _day(fact.superseded_by.as_of)
+    form = form or {}
+    replaces = None
+    replaces_id = form.get("replaces_id") or request.args.get("replaces")
+    if replaces_id and str(replaces_id).isdigit():
+        try:
+            replaces = finance_fact_store.replaceable_fact(org_id, int(replaces_id))
+        except finance_fact_store.FinanceFactError:
+            replaces = None
+    form_values = {
+        "measure": form.get("measure") or (replaces.measure if replaces else request.args.get("measure", "cash_balance")),
+        "amount": form.get("amount", ""),
+        "currency": form.get("currency") or (replaces.currency if replaces and replaces.currency else get_reporting_currency(org_id)),
+        "as_of": form.get("as_of") or finance_fact_store.today().isoformat(),
+        "source_ref": form.get("source_ref", ""),
+        "subject_element_id": form.get("subject_element_id") or "",
+    }
+    return render_template(
+        "procurement/money.html",
+        withheld=False, figures=figures, rows=rows, total=total, page=page,
+        pages=max(1, -(-total // 20)), replacement_dates=replacement_dates,
+        measure_labels=finance_fact_store.MEASURE_LABELS, form=form_values, error=error, replaces=replaces,
+        products=finance_fact_store.products(org_id), day=_day, amount_text=_amount_text,
+        saved=bool(request.args.get("saved")), today=finance_fact_store.today(),
+    ), status
+
+
+@procurement_bp.route("/spend/money", methods=["GET", "POST"])
+@login_required
+def money():
+    """Money: the organisation's cash, outgoings, revenue, funding and customers as dated facts."""
+    if not costs_visible(current_user):
+        # A plain sentence and no figures; nothing may be recorded.
+        if request.method == "POST":
+            abort(403, description=COSTS_WITHHELD)
+        return render_template("procurement/money.html", withheld=True, withheld_text=COSTS_WITHHELD)
+    from app.middleware.tenant_context import current_org_id
+
+    org_id = current_org_id()
+    if org_id is None:
+        abort(404)
+    if request.method == "GET":
+        return _money_page(org_id)
+
+    form = request.form
+    try:
+        as_of = date.fromisoformat((form.get("as_of") or "").strip())
+    except ValueError:
+        return _money_page(org_id, form=form, error="Enter the date the figure was true.", status=422)
+    subject = (form.get("subject_element_id") or "").strip()
+    replaces = (form.get("replaces_id") or "").strip()
+    try:
+        finance_fact_store.record_fact(
+            org_id, (form.get("measure") or "").strip(), form.get("amount"), as_of, form.get("source_ref"),
+            currency=form.get("currency"), stated_by_user_id=current_user.id, recorded_by_id=current_user.id,
+            subject_element_id=int(subject) if subject.isdigit() else None,
+            replaces_id=int(replaces) if replaces.isdigit() else None,
+        )
+    except finance_fact_store.FinanceFactError as exc:
+        return _money_page(org_id, form=form, error=str(exc), status=422)
+    return redirect(url_for("procurement.money", saved=1))
