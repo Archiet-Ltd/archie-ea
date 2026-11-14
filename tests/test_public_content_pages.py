@@ -641,7 +641,11 @@ def test_indexnow_submission_matches_sitemap_urls(app, monkeypatch):
 
     with app.test_client() as client:
         sitemap_xml = client.get("/sitemap.xml").data.decode()
-    sitemap_paths = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml))
+    # Extract the base URL from the sitemap (first <loc> entry)
+    import re
+    loc_match = re.search(r"<loc>(https://[^/]+)", sitemap_xml)
+    base_url = loc_match.group(1) if loc_match else "https://entelim.tech"
+    sitemap_paths = set(re.findall(rf"<loc>{re.escape(base_url)}([^<]*)</loc>", sitemap_xml))
     submitted_paths = {urlparse(url).path or "/" for url in submitted}
 
     assert submitted_paths == sitemap_paths, (
@@ -726,7 +730,7 @@ def test_llms_txt_has_capabilities_section(app):
             # Title should appear
             assert page.title in text, f"llms.txt Capabilities section missing title '{page.title}'"
             # Should have a descriptive sentence (the — separator)
-            assert f"[{page.title}](https://entelim.org{page.url}) —" in text, (
+            assert f"[{page.title}](https://entelim.tech{page.url}) —" in text, (
                 f"llms.txt Capabilities section missing description for {page.url}"
             )
 
@@ -825,14 +829,14 @@ def test_llms_full_txt_includes_urls(app):
 
         for page in target_pages:
             if _is_merged(page) or page.is_held:
-                # Checked as its own "URL: https://entelim.org<path>" line
+                # Checked as its own "URL: https://entelim.tech<path>" line
                 # (the exact format llms_full_txt emits for an included
                 # page's own entry), not a bare substring: a held/merged
                 # page's old URL can still legitimately appear as an
                 # inline link inside a still-included page's own body
                 # copy, which is not the same as llms-full.txt carrying
                 # its own entry for that page.
-                assert f"URL: https://entelim.org{page.url}" not in text, (
+                assert f"URL: https://entelim.tech{page.url}" not in text, (
                     f"llms-full.txt should not include a merged/held/withdrawn "
                     f"page entry for {page.url}"
                 )
@@ -887,8 +891,8 @@ def test_llms_txt_first_sentence_not_glued_to_title(app):
     # Find the line for portfolio in the Capabilities section
     import re
 
-    # Pattern: - [Portfolio](https://entelim.org/modules/portfolio) — <sentence>
-    pattern = rf"\[{re.escape(page.title)}\]\(https://entelim\.org{re.escape(page.url)}\) — ([^\n]+)"
+    # Pattern: - [Portfolio](https://entelim.tech/modules/portfolio) — <sentence>
+    pattern = rf"\[{re.escape(page.title)}\]\(https://entelim\.tech{re.escape(page.url)}\) — ([^\n]+)"
     match = re.search(pattern, text)
     assert match is not None, "portfolio entry not found in llms.txt Capabilities section"
 
@@ -1316,7 +1320,7 @@ def test_comparison_external_url():
     page = load_page("comparison", slug="leanix")
     assert page is not None
     assert page.external_url == "https://archiet.ai/vs/leanix"
-    assert page.self_canonical_url == "https://entelim.org/vs/leanix"
+    assert page.self_canonical_url == "https://entelim.tech/vs/leanix"
 
 
 def test_non_comparison_no_external_url():
@@ -1712,7 +1716,7 @@ def test_sitemap_includes_homepage(app):
         rv = client.get("/sitemap.xml")
         assert rv.status_code == 200
         xml = rv.data.decode()
-        assert "<loc>https://entelim.org/</loc>" in xml, (
+        assert "<loc>https://entelim.tech/</loc>" in xml, (
             "sitemap.xml missing homepage URL"
         )
 
@@ -1878,7 +1882,7 @@ def _robots_allows(rules: list[tuple[str, str]], path: str) -> bool:
 
 
 def _entelim_paths_in(text: str) -> set[str]:
-    """Every ``https://entelim.org/...`` URL referenced in a rendered
+    """Every ``https://entelim.tech/...`` URL referenced in a rendered
     response, reduced to its path."""
     paths = set()
     for match in re.finditer(r"https://entelim\.org([^\s)\"'<>]*)", text):
@@ -2097,7 +2101,12 @@ def test_cta_plans_url_slug_matches_a_real_route(app):
     """
     from werkzeug.exceptions import MethodNotAllowed, NotFound
 
-    adapter = app.url_map.bind("entelim.org")
+    with app.app_context():
+        from app.services.origin import canonical_origin
+        base = canonical_origin()
+        # Extract host from base URL (e.g., "https://entelim.tech" -> "entelim.tech")
+        host = base.replace("https://", "").replace("http://", "")
+        adapter = app.url_map.bind(host)
     pages = [
         p for p in load_all_pages() if p.family in ("module", "function-per-segment")
     ]
@@ -2404,7 +2413,7 @@ def test_use_cases_index_in_robots_and_sitemap(app):
         rules = _parse_robots_rules(client.get("/robots.txt").get_data(as_text=True))
         assert _robots_allows(rules, "/use-cases"), "robots.txt blocks /use-cases"
         xml = client.get("/sitemap.xml").data.decode()
-    assert "<loc>https://entelim.org/use-cases</loc>" in xml
+    assert "<loc>https://entelim.tech/use-cases</loc>" in xml
 
 
 # ── Home page: curated use-case highlights per segment, plus the /vs hub ──
@@ -2463,8 +2472,8 @@ def test_two_click_reachability_from_home_page(app):
         hrefs = re.findall(r'href="([^"]+)"', html)
         paths = set()
         for href in hrefs:
-            if href.startswith("https://entelim.org"):
-                href = href[len("https://entelim.org"):] or "/"
+            if href.startswith("https://entelim.tech"):
+                href = href[len("https://entelim.tech"):] or "/"
             if href.startswith("/") and not href.startswith("//"):
                 paths.add(urlparse(href).path)
         return paths
@@ -2559,7 +2568,7 @@ def _hub_ld_urls(html: str) -> list[str]:
     """The page URLs the hub's CollectionPage structured data lists, in order."""
     (ld,) = _jsonld_blocks(html)
     items = _graph_types(ld)["CollectionPage"]["mainEntity"]["itemListElement"]
-    return [item["url"].removeprefix("https://entelim.org") for item in items]
+    return [item["url"].removeprefix("https://entelim.tech") for item in items]
 
 
 def test_role_and_connector_feed_pages_are_linked_from_their_hub(app):
@@ -2814,7 +2823,7 @@ def test_hub_jsonld_collection_page(app):
                 linked = _hrefs(html)
                 for family in families:
                     for url, title in _feed_urls(family):
-                        assert named.get(f"https://entelim.org{url}") == title
+                        assert named.get(f"https://entelim.tech{url}") == title
                         assert url in linked
             positions = [item["position"] for item in items["itemListElement"]]
             assert positions == list(range(1, len(positions) + 1))
@@ -2836,9 +2845,9 @@ def test_role_and_connector_pages_breadcrumb(app):
             assert "WebPage" in nodes
             trail = [(i["name"], i["item"]) for i in nodes["BreadcrumbList"]["itemListElement"]]
             assert trail == [
-                ("Home", "https://entelim.org/"),
-                (parent[0], f"https://entelim.org{parent[1]}"),
-                (title, f"https://entelim.org{url}"),
+                ("Home", "https://entelim.tech/"),
+                (parent[0], f"https://entelim.tech{parent[1]}"),
+                (title, f"https://entelim.tech{url}"),
             ]
 
 
@@ -2846,7 +2855,7 @@ def test_hub_noindex_until_intro_exists(app):
     for hub in ("/roles", "/connectors"):
         slug = hub.lstrip("/")
         intro_path = CONTENT_ROOT / "site" / f"{slug}.md"
-        sitemap_loc = f"<loc>https://entelim.org{hub}</loc>"
+        sitemap_loc = f"<loc>https://entelim.tech{hub}</loc>"
         with app.test_client() as client:
             if intro_path.exists():
                 # A real intro has landed: the hub is indexable, listed once.
@@ -2893,7 +2902,7 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
         assert hub.index('aria-labelledby="other-roles"') > hub.index('aria-labelledby="startups-and-scale-ups"')
         landed = client.get("/roles/zzz-e2e-role").data.decode()
         assert "Zzz E2e Role" in landed
-        assert "https://entelim.org/roles/zzz-e2e-role</loc>" in client.get("/sitemap.xml").data.decode()
+        assert "https://entelim.tech/roles/zzz-e2e-role</loc>" in client.get("/sitemap.xml").data.decode()
         rules = _parse_robots_rules(client.get("/robots.txt").get_data(as_text=True))
         assert _robots_allows(rules, "/roles/zzz-e2e-role")
 

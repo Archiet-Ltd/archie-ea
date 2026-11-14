@@ -16,6 +16,7 @@ import pytest
 from flask_login import login_required
 from werkzeug.routing import Rule
 
+from app.services.origin import canonical_origin
 from test_public_content_pages import _parse_robots_rules, _robots_allows
 
 AGENTS = ["*", "Googlebot", "Bingbot", "GPTBot", "ClaudeBot", "PerplexityBot"]
@@ -47,14 +48,16 @@ def robots_text(client):
 def sitemap_paths(client):
     response = client.get("/sitemap.xml")
     assert response.status_code == 200
-    return re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", response.get_data(as_text=True))
+    base = canonical_origin()
+    return re.findall(rf"<loc>{re.escape(base)}([^<]*)</loc>", response.get_data(as_text=True))
 
 
 def _hrefs(html: str) -> set[str]:
     found = set()
+    base = canonical_origin()
     for href in re.findall(r'href="([^"]+)"', html):
-        if href.startswith("https://entelim.org"):
-            href = href[len("https://entelim.org"):] or "/"
+        if href.startswith(base):
+            href = href[len(base):] or "/"
         if href.startswith("/") and not href.startswith("//"):
             found.add(urlsplit(href).path)
     return found
@@ -71,7 +74,7 @@ def linked_paths(client):
 
 
 def test_robots_txt_names_the_sitemap_and_allows_everything_by_default(robots_text):
-    assert "Sitemap: https://entelim.org/sitemap.xml" in robots_text
+    assert f"Sitemap: {canonical_origin()}/sitemap.xml" in robots_text
     assert "Allow: /\n" in robots_text
     assert "Disallow: /\n" not in robots_text
 
@@ -232,9 +235,9 @@ def test_api_documentation_and_tooling_paths_are_disallowed(robots_text, path):
 
 
 def test_the_sitemap_line_uses_the_one_site_address(robots_text):
-    from app.services.public_pages import SITE_URL
+    from app.services.origin import canonical_origin
 
-    assert f"Sitemap: {SITE_URL}/sitemap.xml\n" in robots_text
+    assert f"Sitemap: {canonical_origin()}/sitemap.xml\n" in robots_text
 
 
 def test_robots_txt_and_the_sitemap_are_built_once_and_served_from_memory(app, client, monkeypatch):

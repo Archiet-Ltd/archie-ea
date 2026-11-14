@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from urllib.parse import urlparse
 
+from app.services.origin import canonical_origin
 from app.services.public_pages import (
     CONTENT_ROOT,
     load_all_pages,
@@ -42,7 +43,7 @@ def test_vs_hub_returns_200_and_lists_all_comparison_pages(app):
         assert rv.status_code == 200
         html = rv.data.decode()
         for page in comparison_pages:
-            real_url = page.external_url or f"https://entelim.org{page.url}"
+            real_url = page.external_url or f"{canonical_origin()}{page.url}"
             assert real_url in html, (
                 f"/vs hub missing link to {real_url} ({page.slug})"
             )
@@ -134,7 +135,7 @@ def test_new_vs_pages_have_sourced_front_matter(app):
 def test_new_vs_pages_have_archiet_ai_external_url_for_cross_linking(app):
     """Each new comparison page carries its archiet.ai address as
     external_url (for the /vs hub's cross-link), but its own <link
-    rel="canonical"> in <head> is self -- entelim.org, not archiet.ai
+    rel="canonical"> in <head> is self -- entelim.tech, not archiet.ai
     (SEO/GEO audit item 1/2: these are two different products' content
     now, not one page with two addresses)."""
     with app.test_client() as client:
@@ -144,7 +145,7 @@ def test_new_vs_pages_have_archiet_ai_external_url_for_cross_linking(app):
                 f"{slug}: expected external_url https://archiet.ai/vs/{slug}, got {page.external_url}"
             )
             html = client.get(f"/vs/{slug}").data.decode()
-            assert f'rel="canonical" href="https://entelim.org/vs/{slug}"' in html
+            assert f'rel="canonical" href="{canonical_origin()}/vs/{slug}"' in html
             assert f'rel="canonical" href="{page.external_url}"' not in html
 
 
@@ -209,7 +210,7 @@ def test_sitemap_includes_vs_hub(app):
     """/sitemap.xml includes the /vs hub."""
     with app.test_client() as client:
         xml = client.get("/sitemap.xml").data.decode()
-        assert "<loc>https://entelim.org/vs</loc>" in xml
+        assert f"<loc>{canonical_origin()}/vs</loc>" in xml
 
 
 # ── /vs/avolution and /vs/orbus: merged duplicate pages 301 to the survivor ─

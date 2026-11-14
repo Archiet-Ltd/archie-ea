@@ -30,7 +30,7 @@ from app.services.public_pages import (
 
 MAX_VIDEO_BYTES = 2 * 1024 * 1024
 MAX_POSTER_BYTES = 200 * 1024
-SIGN_UP = "Start free at entelim.org"
+SIGN_UP = "Start free at entelim.tech"
 
 
 def _manifest():

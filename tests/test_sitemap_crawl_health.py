@@ -22,7 +22,8 @@ import re
 from urllib.parse import urlparse
 
 from app.release_waves.routes import early_access_paths
-from app.services.public_pages import SITE_URL, load_all_pages, load_feed_pages, share_page_paths
+from app.services.origin import canonical_origin
+from app.services.public_pages import load_all_pages, load_feed_pages, share_page_paths
 
 def _view_paths(app):
     """The early-access pages and share pages the sitemap lists, asked inside the application as the sitemap is."""
@@ -55,7 +56,7 @@ def _expected_canonical(path: str, pages_by_url: dict) -> str:
     # the expected value is always this page's own URL on this domain,
     # whether or not a PublicPage backs this path (the home page and the
     # two hub indexes do not).
-    return SITE_URL + path
+    return canonical_origin() + path
 
 
 def test_every_sitemap_url_is_crawlable_and_tagged(app):
@@ -93,9 +94,9 @@ def test_every_sitemap_url_is_crawlable_and_tagged(app):
 def test_every_page_canonical_is_self_referencing(app):
     """Every public page -- including a comparison page that also carries
     an archiet.ai external_url for cross-linking only -- is canonical to
-    its own entelim.org URL, with no exception."""
+    its own entelim.tech URL, with no exception."""
     for page in load_all_pages():
-        assert page.self_canonical_url == SITE_URL + page.url, (
+        assert page.self_canonical_url == canonical_origin() + page.url, (
             f"{page.url}: canonical is not self-referencing"
         )
 
