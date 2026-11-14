@@ -3100,7 +3100,6 @@ class IntelligenceQueryService:
 
         from app.models import ArchiMateElement
         from app.models.application_compliance import ApplicationComplianceControl
-        from app.models.application_portfolio import ApplicationComponent
         from app.models.compliance_models import ComplianceControl, RegulatoryFramework
         from app.models.policy_monitoring import ArchitecturePolicy, ComplianceStatus, PolicyViolation
 
