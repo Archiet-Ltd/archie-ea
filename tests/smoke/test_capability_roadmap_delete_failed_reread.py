@@ -13,6 +13,7 @@ from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT
 from .fresh_org import api, create_fresh_org, sign_in
+from .roadmap_frames import settle
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -80,16 +81,63 @@ def test_delete_work_package_failed_reread_shows_error_not_empty(browser, live_s
             wp_row.get_by_role("button", name="Delete").first.click()
             page.get_by_role("alertdialog").get_by_role("button", name="Delete", exact=True).click()
 
-            # The re-read failed: error shown, figures unchanged, never "0" or "none recorded"
-            expect(page.get_by_test_id("rdm-work-packages-tile")).to_have_text("1", timeout=PAGE_TIMEOUT)
-            line_after = page.get_by_test_id("roadmap-summary-footer").inner_text()
-            assert "Work packages: 1" in line_after, line_after
-            assert "Work packages: none recorded" not in line_after, line_after
-
-            # The error banner names the failure
+            # The re-read failed: the error is shown and, once the page has settled, the tile and the
+            # evidence line both still give the figure they gave before the delete.
             banner = page.get_by_test_id("rdm-error-banner")
             expect(banner).to_be_visible(timeout=PAGE_TIMEOUT)
             assert "work packages service unavailable" in banner.inner_text(), banner.inner_text()
+            settle(page)
+            assert page.get_by_test_id("rdm-work-packages-tile").inner_text() == "1"
+            line_after = page.get_by_test_id("roadmap-summary-footer").inner_text()
+            assert line_after == line_before, (line_before, line_after)
         finally:
             state["fail_wp_reread"] = False
+            context.close()
+
+
+PLATEAU_RE = re.compile(r".*/capability-map/api/roadmap/plateaus(\?.*)?$")
+
+
+def test_plateau_save_failed_reread_leaves_tile_and_line_unchanged(browser, live_server):
+    org = create_fresh_org("enterprise_architect")
+    suffix = org["suffix"]
+
+    for width, theme in ((1440, "light"), (390, "dark")):
+        context, page = _page(browser, width, theme)
+        state = {"fail": False}
+
+        def fail_reread(route):
+            try:
+                if state["fail"] and route.request.method == "GET":
+                    route.fulfill(
+                        status=500, body=json.dumps({"success": False, "error": "plateaus service unavailable"}),
+                        headers={"Content-Type": "application/json"})
+                else:
+                    route.continue_()
+            except Exception as e:
+                if "closed" not in str(e).lower():
+                    raise
+
+        try:
+            sign_in(page, live_server, org["emails"]["enterprise_architect"])
+            page.route(PLATEAU_RE, fail_reread)
+            page.goto(live_server + PATH, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            settle(page)
+            tile_before = page.get_by_test_id("rdm-plateaus-tile").inner_text()
+            line_before = page.get_by_test_id("roadmap-summary-footer").inner_text()
+
+            state["fail"] = True
+            page.get_by_role("button", name="Add Plateau").click()
+            page.fill("#rdm-plateau-name", "Plateau %s %d" % (suffix, width))
+            page.fill("#rdm-plateau-order", "9")
+            page.locator("#rdm-create-plateau-modal").get_by_role("button", name="Create Plateau").click()
+
+            banner = page.get_by_test_id("rdm-error-banner")
+            expect(banner).to_be_visible(timeout=PAGE_TIMEOUT)
+            assert "plateaus service unavailable" in banner.inner_text(), banner.inner_text()
+            settle(page)
+            assert page.get_by_test_id("rdm-plateaus-tile").inner_text() == tile_before
+            assert page.get_by_test_id("roadmap-summary-footer").inner_text() == line_before
+        finally:
+            state["fail"] = False
             context.close()
