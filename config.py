@@ -254,6 +254,12 @@ class Config:
     # MCP_ENABLED is true and this is empty, so a misconfigured deploy fails
     # loudly instead of quietly serving relative or wrong-host metadata.
     PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    # Additional origins the OAuth/MCP/connector surfaces also answer on.
+    # Comma-separated list (e.g. "https://entelim.org,https://www.entelim.org").
+    # Each alias must include scheme and host exactly. The request's origin is
+    # used only when it matches the canonical PUBLIC_BASE_URL or one of these
+    # aliases; any other Host value gets the canonical origin.
+    PUBLIC_BASE_URL_ALIASES = os.environ.get("PUBLIC_BASE_URL_ALIASES", "")
     MCP_ENABLED = _env_bool("MCP_ENABLED", False)
 
     # DNS rebinding protection for POST /mcp (app/modules/mcp/blueprint.py):
