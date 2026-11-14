@@ -1,12 +1,13 @@
 """A new workspace owner picks a company kind and loads the sample company with real clicks.
 
-As an architect in a fresh organisation: opens the first screen, clicks Scale-up and is told
-it is saved, reloads and finds it kept, opens Account settings and finds the same choice there
-(the same component, the same store), changes it there and sees the first screen follow. A
-second organisation keeps its own answer. "Load sample" is a button that posts and lands on a
-populated answer page, never on a "405 Method Not Allowed" page. Neither page logs a script
+As an architect in a fresh organisation: opens Account settings, finds Startup chosen, clicks
+Scale-up and is told it is saved, reloads and finds it kept, changes it to Enterprise and finds
+that kept too. A second organisation keeps its own answer. "See a sample company" on the
+assistant page is a button that posts and lands on a populated first screen, never on a "405
+Method Not Allowed page", and the Health Scorecard agrees with it. Neither page logs a script
 error or shows a search error nobody asked for.
 """
+import re
 import uuid
 
 import pytest
@@ -64,16 +65,10 @@ def test_company_kind_saves_and_is_one_component(browser, live_server, seeded, v
     other_email, other_org_id = _empty_organisation_user(live_server)
     context, page, errors = _new_page(browser, live_server, email, viewport)
     try:
-        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        block = page.locator('[data-testid="company-kind-selector"]')
-        expect(block).to_be_visible()
+        page.goto(live_server + "/account/manage", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        card = page.locator('[data-testid="company-kind-card"]')
+        expect(card).to_be_visible()
         assert _selected(page, "startup")
-
-        # "Not now" is offered and keeps Startup, saying so
-        page.locator('[data-testid="company-kind-not-now"]').click()
-        expect(page.locator('[data-testid="company-kind-status"]')).to_contain_text("Startup", timeout=PAGE_TIMEOUT)
-        assert _selected(page, "startup")
-        assert _stored_kind(org_id) == "startup"
 
         page.locator('[data-testid="company-kind-scaleup"]').click()
         expect(page.locator('[data-testid="company-kind-status"]')).to_contain_text("Saved", timeout=PAGE_TIMEOUT)
@@ -83,18 +78,13 @@ def test_company_kind_saves_and_is_one_component(browser, live_server, seeded, v
         page.reload(wait_until="networkidle")
         assert _selected(page, "scaleup")
 
-        # Account settings shows the same choice and changes the same store
-        page.goto(live_server + "/account/manage", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        card = page.locator('[data-testid="company-kind-card"]')
-        expect(card).to_be_visible()
-        assert _selected(page, "scaleup")
         page.locator('[data-testid="company-kind-enterprise"]').click()
         expect(page.locator('[data-testid="company-kind-status"]')).to_contain_text("Enterprise", timeout=PAGE_TIMEOUT)
         assert _stored_kind(org_id) == "enterprise"
         # nobody searched: no search error on screen
         expect(page.get_by_text("Search is unavailable")).to_be_hidden()
 
-        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.reload(wait_until="networkidle")
         assert _selected(page, "enterprise")
 
         # the other organisation keeps its own answer
@@ -109,9 +99,9 @@ def test_load_sample_is_a_real_click_and_lands_on_content(browser, live_server, 
     email, org_id = _empty_organisation_user(live_server)
     context, page, errors = _new_page(browser, live_server, email, {"width": 1440, "height": 900})
     try:
-        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        page.get_by_test_id("first-action-sample").click()
-        # the click posts and the first screen reloads with the sample bar (the start page matches the same address)
+        page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("chat-first-sample").click()
+        # the click posts and the first screen reloads with the sample bar
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
         expect(page.get_by_text("405", exact=False)).to_have_count(0)
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -123,13 +113,16 @@ def test_load_sample_is_a_real_click_and_lands_on_content(browser, live_server, 
         with create_app("testing").app_context():
             stored = ArchiMateElement.query.filter(ArchiMateElement.organization_id == org_id).count()
         assert stored > 0
-        expect(page.locator('[data-testid="health-kpi-elements"]')).to_have_text(str(stored), timeout=PAGE_TIMEOUT)
-        # the first screen shows a working answer: applications and a health score, not a dash or zero
-        applications = page.locator('[data-testid="health-kpi-applications"]').inner_text().strip()
+        # the first screen shows a working answer: the sample's applications, not a dash or zero
+        applications = page.locator('[data-testid="welcome-applications"] span').first.inner_text().strip()
         assert applications.isdigit() and int(applications) >= 8, applications
+        # the Health Scorecard agrees: the element count is the stored one, a score and solutions are shown
+        page.goto(live_server + "/dashboard/health", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-slot="card"]', has_text="ArchiMate Elements")).to_contain_text(
+            re.compile(r"ArchiMate Elements\s*%d\b" % stored), timeout=PAGE_TIMEOUT)
         score = page.locator('[data-testid="health-score-value"]').inner_text().strip()
-        assert score not in ("", "—", "0"), score
-        solutions = page.locator('[data-testid="health-kpi-solutions"]').inner_text().strip()
+        assert score not in ("", "—", "0", "0.0"), score
+        solutions = page.locator('[data-testid="health-total-solutions"]').inner_text().strip()
         assert solutions.isdigit() and int(solutions) > 0, solutions
         # the applications link lands on a list holding those applications
         page.goto(live_server + "/applications/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
@@ -139,7 +132,7 @@ def test_load_sample_is_a_real_click_and_lands_on_content(browser, live_server, 
         page.get_by_role("button", name="Remove it", exact=True).first.click()
         page.locator('[data-testid="sample-company-remove-confirm"]').click()
         expect(page.get_by_text("Sample company removed")).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.locator('[data-testid="guided-setup"]')).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-testid="sample-company-indicator"]')).to_have_count(0, timeout=PAGE_TIMEOUT)
         assert not errors, errors
     finally:
         context.close()
