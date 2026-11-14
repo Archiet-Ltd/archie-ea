@@ -12,7 +12,7 @@
             "method": "POST",
             "route": {
               "file": "app/modules/applications/routes/crud_routes.py",
-              "line": 390,
+              "line": 404,
               "rule": "/applications/<int:id>/retire"
             }
           },
@@ -28,13 +28,13 @@
             "method": "POST",
             "route": {
               "file": "app/modules/applications/routes/update_routes.py",
-              "line": 107,
+              "line": 155,
               "rule": "/applications/<int:id>/overview-update"
             }
           },
           "component": "overview-edit-form",
           "id": "overview-edit-form.submit",
-          "line": 282,
+          "line": 288,
           "type": "submit"
         },
         {
@@ -44,13 +44,13 @@
             "method": "POST",
             "route": {
               "file": "app/modules/applications/routes/crud_routes.py",
-              "line": 485,
+              "line": 505,
               "rule": "/applications/<int:id>/generate-archimate"
             }
           },
-          "component": "form-line-563",
-          "id": "form-line-563.submit",
-          "line": 563,
+          "component": "form-line-572",
+          "id": "form-line-572.submit",
+          "line": 572,
           "type": "submit"
         },
         {
@@ -60,9 +60,9 @@
             "method": "POST",
             "route": null
           },
-          "component": "form-line-725",
-          "id": "form-line-725.submit",
-          "line": 725,
+          "component": "form-line-734",
+          "id": "form-line-734.submit",
+          "line": 734,
           "type": "submit"
         },
         {
@@ -72,9 +72,9 @@
             "method": "POST",
             "route": null
           },
-          "component": "form-line-934",
-          "id": "form-line-934.submit",
-          "line": 934,
+          "component": "form-line-943",
+          "id": "form-line-943.submit",
+          "line": 943,
           "type": "submit"
         },
         {
@@ -84,13 +84,13 @@
             "method": "POST",
             "route": {
               "file": "app/modules/applications/routes/crud_routes.py",
-              "line": 485,
+              "line": 505,
               "rule": "/applications/<int:id>/generate-archimate"
             }
           },
-          "component": "form-line-1084",
-          "id": "form-line-1084.submit",
-          "line": 1084,
+          "component": "form-line-1093",
+          "id": "form-line-1093.submit",
+          "line": 1093,
           "type": "submit"
         },
         {
@@ -104,9 +104,9 @@
               "rule": "/dashboard/applications/<int:id>/vendor-footprint"
             }
           },
-          "component": "form-line-1110",
-          "id": "form-line-1110.submit",
-          "line": 1110,
+          "component": "form-line-1119",
+          "id": "form-line-1119.submit",
+          "line": 1119,
           "type": "submit"
         },
         {
@@ -116,13 +116,13 @@
             "method": "POST",
             "route": {
               "file": "app/modules/applications/routes/crud_routes.py",
-              "line": 485,
+              "line": 505,
               "rule": "/applications/<int:id>/generate-archimate"
             }
           },
-          "component": "form-line-1129",
-          "id": "form-line-1129.submit",
-          "line": 1129,
+          "component": "form-line-1138",
+          "id": "form-line-1138.submit",
+          "line": 1138,
           "type": "submit"
         }
       ],
@@ -136,37 +136,37 @@
         },
         {
           "id": "overview-edit-form",
-          "line": 282,
+          "line": 288,
           "type": "Form"
         },
         {
-          "id": "form-line-563",
-          "line": 563,
+          "id": "form-line-572",
+          "line": 572,
           "type": "Form"
         },
         {
-          "id": "form-line-725",
-          "line": 725,
+          "id": "form-line-734",
+          "line": 734,
           "type": "Form"
         },
         {
-          "id": "form-line-934",
-          "line": 934,
+          "id": "form-line-943",
+          "line": 943,
           "type": "Form"
         },
         {
-          "id": "form-line-1084",
-          "line": 1084,
+          "id": "form-line-1093",
+          "line": 1093,
           "type": "Form"
         },
         {
-          "id": "form-line-1110",
-          "line": 1110,
+          "id": "form-line-1119",
+          "line": 1119,
           "type": "Form"
         },
         {
-          "id": "form-line-1129",
-          "line": 1129,
+          "id": "form-line-1138",
+          "line": 1138,
           "type": "Form"
         }
       ]

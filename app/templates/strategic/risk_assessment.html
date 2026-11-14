@@ -22,16 +22,19 @@
                   actions_caller=_risk_actions) }}
 
     {{ stat_cards([
-        {'label': 'Open risks', 'value': counts.open, 'icon': 'shield', 'sentence': 'Still to be treated, as in the risk register', 'testid': 'assess-open'},
-        {'label': 'Critical risks', 'value': counts.critical, 'icon': 'triangle-alert', 'sentence': ('Immediate mitigation required' if counts.critical else 'No open risk is critical'), 'testid': 'assess-critical'},
-        {'label': 'High risks', 'value': counts.high, 'icon': 'circle-alert', 'sentence': ('Elevated risk requiring active treatment' if counts.high else 'No open risk is high'), 'testid': 'assess-high'},
-        {'label': 'Medium risks', 'value': counts.medium, 'icon': 'info', 'sentence': ('Monitor and plan mitigations' if counts.medium else 'No open risk is medium'), 'testid': 'assess-medium'},
+        {'label': 'Open risks', 'value': counts.open, 'icon': 'shield', 'sentence': 'Still to be treated, as in the risk register', 'href': (url_for('risk.risk_register', show='open') if counts.open else none), 'testid': 'assess-open'},
+        {'label': 'Critical risks', 'value': counts.critical, 'icon': 'triangle-alert', 'sentence': ('Immediate mitigation required' if counts.critical else 'No open risk is critical'), 'href': (url_for('risk.risk_register', show='critical') if counts.critical else none), 'testid': 'assess-critical'},
+        {'label': 'High risks', 'value': counts.high, 'icon': 'circle-alert', 'sentence': ('Elevated risk requiring active treatment' if counts.high else 'No open risk is high'), 'href': (url_for('risk.risk_register', show='high') if counts.high else none), 'testid': 'assess-high'},
+        {'label': 'Medium risks', 'value': counts.medium, 'icon': 'info', 'sentence': ('Monitor and plan mitigations' if counts.medium else 'No open risk is medium'), 'href': (url_for('risk.risk_register', show='medium') if counts.medium else none), 'testid': 'assess-medium'},
     ]) }}
 
+    {% if closed_count and risk_rows %}
+    <p class="text-sm text-muted-foreground" data-testid="assess-closed-note">{{ closed_count }} {{ 'risk is' if closed_count == 1 else 'risks are' }} mitigated, accepted or closed and not listed here. <a href="{{ url_for('risk.risk_register') }}" class="text-primary hover:underline">See every risk in the risk register</a>.</p>
+    {% endif %}
     {% if risk_rows %}
     {% call(r) list_table(rows=risk_rows, columns=[{'label': 'Risk', 'sortable': true}, {'label': 'Level', 'sortable': true}, {'label': 'Score', 'align': 'right', 'sortable': true}, {'label': 'Capabilities it threatens', 'sortable': false}, {'label': 'Status', 'sortable': true}],
                           caption='Risks and the capabilities they threaten', testid='risk-assessment-table', row_testid='risk-assessment-row',
-                          search_placeholder='Filter risks...', toolbar=true, empty_message='No risks recorded yet.') %}
+                          search_placeholder='Filter risks...', toolbar=true, empty_message='No open risks.') %}
       {% call table_cell(class='max-w-xs') %}
         <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="block truncate font-medium text-foreground hover:underline">{{ r.title }}</a>
       {% endcall %}
@@ -58,8 +61,8 @@
     {% call ui.empty(class='p-6 md:p-10', attrs={'data-testid': 'risk-assessment-empty', 'role': 'status'}) %}
       {% call ui.empty_header() %}
         {% call ui.empty_icon(variant='icon') %}{{ lucide('shield-check') }}{% endcall %}
-        {{ ui.empty_title(text='No risks recorded yet') }}
-        {{ ui.empty_description(text='Risks are recorded in the risk register. Once one is linked to a capability it appears here with that capability.') }}
+        {{ ui.empty_title(text='No open risks' if closed_count else 'No risks recorded yet') }}
+        {{ ui.empty_description(text=(closed_count ~ (' risk in the register is' if closed_count == 1 else ' risks in the register are') ~ ' mitigated, accepted or closed.') if closed_count else 'Risks are recorded in the risk register. Each open risk appears here, with the capabilities it threatens once it is linked to them.') }}
       {% endcall %}
       {% call ui.empty_content() %}
         <a href="{{ url_for('risk.risk_register') }}" class="text-primary hover:underline">Open the risk register</a>

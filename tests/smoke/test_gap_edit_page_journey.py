@@ -30,7 +30,7 @@ def _frame(page, name, viewport, theme):
 def _dashboard_critical(page, live_server, expected):
     page.goto(live_server + "/implementation/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id("critical-gap-row")).to_have_count(expected, timeout=PAGE_TIMEOUT)
-    expect(page.get_by_test_id("critical-gaps-total")).to_contain_text("%d critical gap" % expected)
+    expect(page.get_by_test_id("critical-gaps-total")).to_contain_text("%d open critical gap" % expected)
 
 
 def _register_rating(page, live_server, name):

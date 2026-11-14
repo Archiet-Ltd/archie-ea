@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional
 
 from app.utils.policy_enforcer import policy_enforcer
 from app.utils.policy_tool_wrapper import (
-    check_policy_health,
     get_policy_compliance_report,
     policy_enforced_delete,
     policy_enforced_edit,
@@ -168,21 +167,6 @@ def patch_tools_with_policy():
 
 # Auto-patch on import
 patch_tools_with_policy()
-
-
-# Policy monitoring endpoint
-def get_policy_monitoring_data() -> Dict[str, Any]:
-    """Get data for policy monitoring dashboard"""
-
-    return {
-        "health_status": "HEALTHY" if check_policy_health() else "VIOLATIONS_DETECTED",
-        "enforcement_enabled": integrated_tools.enabled,
-        "strict_mode": integrated_tools.strict_mode,
-        "compliance_report": integrated_tools.get_status(),
-        "last_check": policy_enforcer.violation_log[-1].detected_at.isoformat()
-        if policy_enforcer.violation_log
-        else None,
-    }
 
 
 # Policy violation alert system
