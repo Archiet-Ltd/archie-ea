@@ -541,6 +541,10 @@ class Seeder:
             value = self._value(col, marker, context, depth)
             if value is not None:
                 kwargs[prop.key] = value
+        if table_name == "archimate_relationships" and "source_kind" in kwargs:
+            # The same-organisation guard refuses a kind it cannot resolve to a
+            # table, so a generated string would make the row unseedable.
+            kwargs["source_kind"] = "manual"
         try:
             with self.session.begin_nested():
                 row = _construct(model, kwargs)
