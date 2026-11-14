@@ -575,9 +575,14 @@ def filter_relationships_by_org(
     """Return only relationships whose far end belongs to ``org_id``.
 
     This is the single shared fence for every screen that lists relationships.
-    It replaces the inline copies in archimate_crud/routes.py (D1),
-    architecture_crud_routes.py (D2, D3), unified_low_priority_routes.py (ISO-1),
-    and the solutions list in archimate_crud/routes.py (ISO-2).
+    The element drawer, the relationships list, the element relationships
+    endpoint, the enterprise relationships list and the drawer's solutions
+    list all use it, so a far end that belongs to another organisation is
+    left out everywhere.
+
+    Elements carry no shared-reference rows (the element table refuses a row with
+    no organisation), so there is no unowned far end to allow; ``org_id`` of
+    ``None`` sees nothing.
 
     Args:
         relationships: List of ArchiMateRelationship objects (or objects with

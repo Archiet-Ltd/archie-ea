@@ -742,8 +742,8 @@ def api_element_relationships(element_id):
     where the far element belongs to the same organisation as the centre element
     are returned.
     """
-    center = ArchitectureElement.query.get_or_404(element_id)
-    org_id = getattr(center, "organization_id", None)
+    org_id = current_org_id()
+    center = ArchitectureElement.query.filter_by(id=element_id, organization_id=org_id).first_or_404()
 
     incoming_rels = Relationship.query.filter_by(target_id=element_id).all()
     outgoing_rels = Relationship.query.filter_by(source_id=element_id).all()

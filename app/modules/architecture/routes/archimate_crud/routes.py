@@ -2882,7 +2882,7 @@ def api_element_detail(element_id):
                 "source_layer": source.layer,
             })
 
-    # Solutions list: fence on solution's organisation (ISO-2)
+    # Solutions list: fence on solution's organisation (a solution from another organisation is left out)
     solutions = []
     try:
         from app.models.solution_archimate_element import SolutionArchiMateElement

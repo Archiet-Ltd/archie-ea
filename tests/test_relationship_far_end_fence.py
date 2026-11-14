@@ -1,10 +1,9 @@
 """Tests that no screen lists, counts or returns another organisation's element through a relationship row.
 
-D1: /architecture/api/elements/<id>/detail (api_element_detail)
-D2: /architecture/relationships (list_relationships)
-D3: /architecture/api/elements/<id>/relationships (api_element_relationships)
-ISO-1: /enterprise/architecture/relationships (architecture_relationships)
-ISO-2: D1 drawer solutions list (api_element_detail solutions field)
+Screens covered: the element drawer (/architecture/api/elements/<id>/detail), the
+relationships list (/architecture/relationships), the element relationships endpoint
+(/architecture/api/elements/<id>/relationships), the enterprise relationships list
+(/enterprise/architecture/relationships) and the drawer's solutions list.
 """
 
 from __future__ import annotations
@@ -84,11 +83,11 @@ def _get_response(db_session, client, login_as, user, path, fresh):
 
 
 class TestApiElementDetailFarEndFence:
-    """D1: GET /architecture/api/elements/<id>/detail must not return another org's element."""
+    """GET /architecture/api/elements/<id>/detail must not return another org's element."""
 
     @pytest.mark.parametrize("fresh", [False, True], ids=["same", "fresh"])
     def test_outgoing_cross_org_excluded(self, app, db_session, make_org, client, login_as, fresh):
-        mine, theirs = make_org("d1-mine"), make_org("d1-theirs")
+        mine, theirs = make_org("drawer-mine"), make_org("drawer-theirs")
         service_a = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
         service_b = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
         local_target = _el(db_session, mine, "Local target", "BusinessService", "Business")
@@ -115,7 +114,7 @@ class TestApiElementDetailFarEndFence:
 
     @pytest.mark.parametrize("fresh", [False, True], ids=["same", "fresh"])
     def test_incoming_cross_org_excluded(self, app, db_session, make_org, client, login_as, fresh):
-        mine, theirs = make_org("d1-mine2"), make_org("d1-theirs2")
+        mine, theirs = make_org("drawer-mine2"), make_org("drawer-theirs2")
         service_a = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
         service_b = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
         local_source = _el(db_session, mine, "Local source", "BusinessService", "Business")
@@ -142,11 +141,11 @@ class TestApiElementDetailFarEndFence:
 
 
 class TestListRelationshipsFarEndFence:
-    """D2: GET /architecture/relationships must not list or count another org's element."""
+    """GET /architecture/relationships must not list or count another org's element."""
 
     @pytest.mark.parametrize("fresh", [False, True], ids=["same", "fresh"])
     def test_cross_org_relationship_not_listed(self, app, db_session, make_org, client, login_as, fresh):
-        mine, theirs = make_org("d2-mine"), make_org("d2-theirs")
+        mine, theirs = make_org("list-mine"), make_org("list-theirs")
         service_a = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
         service_b = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
         local_target = _el(db_session, mine, "Local target", "BusinessService", "Business")
@@ -176,11 +175,11 @@ class TestListRelationshipsFarEndFence:
 
 
 class TestApiElementRelationshipsFarEndFence:
-    """D3: GET /architecture/api/elements/<id>/relationships must not return another org's element."""
+    """GET /architecture/api/elements/<id>/relationships must not return another org's element."""
 
     @pytest.mark.parametrize("fresh", [False, True], ids=["same", "fresh"])
     def test_outgoing_cross_org_excluded(self, app, db_session, make_org, client, login_as, fresh):
-        mine, theirs = make_org("d3-mine"), make_org("d3-theirs")
+        mine, theirs = make_org("endpoint-mine"), make_org("endpoint-theirs")
         service_a = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
         service_b = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
         local_target = _el(db_session, mine, "Local target", "BusinessService", "Business")
@@ -205,7 +204,7 @@ class TestApiElementRelationshipsFarEndFence:
 
     @pytest.mark.parametrize("fresh", [False, True], ids=["same", "fresh"])
     def test_incoming_cross_org_excluded(self, app, db_session, make_org, client, login_as, fresh):
-        mine, theirs = make_org("d3-mine2"), make_org("d3-theirs2")
+        mine, theirs = make_org("endpoint-mine2"), make_org("endpoint-theirs2")
         service_a = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
         service_b = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
         local_source = _el(db_session, mine, "Local source", "BusinessService", "Business")
@@ -230,11 +229,11 @@ class TestApiElementRelationshipsFarEndFence:
 
 
 class TestEnterpriseRelationshipsFarEndFence:
-    """ISO-1: GET /enterprise/architecture/relationships must not list another org's element."""
+    """GET /enterprise/architecture/relationships must not list another org's element."""
 
     @pytest.mark.parametrize("fresh", [False, True], ids=["same", "fresh"])
     def test_cross_org_relationship_not_listed(self, app, db_session, make_org, client, login_as, fresh):
-        mine, theirs = make_org("iso1-mine"), make_org("iso1-theirs")
+        mine, theirs = make_org("ent-mine"), make_org("ent-theirs")
         service_a = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
         service_b = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
         local_target = _el(db_session, mine, "Local target", "BusinessService", "Business")
@@ -263,11 +262,11 @@ class TestEnterpriseRelationshipsFarEndFence:
 
 
 class TestElementDetailSolutionsFarEndFence:
-    """ISO-2: D1 drawer solutions list must not show another org's solution."""
+    """The drawer solutions list must not show another org's solution."""
 
     @pytest.mark.parametrize("fresh", [False, True], ids=["same", "fresh"])
     def test_cross_org_solution_not_listed(self, app, db_session, make_org, client, login_as, fresh):
-        mine, theirs = make_org("iso2-mine"), make_org("iso2-theirs")
+        mine, theirs = make_org("sol-mine"), make_org("sol-theirs")
         service_a = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
         # Cross-org solution linked to mine's element
         solution_b = Solution(organization_id=theirs.id, name="Foreign solution")
@@ -296,3 +295,31 @@ class TestElementDetailSolutionsFarEndFence:
         assert "Foreign solution" not in solution_names
         # Count should be 1 (only same-org)
         assert len(data["solutions"]) == 1
+
+class TestElementIdFromAnotherOrganisation:
+    """An element id that belongs to another organisation answers 404 on the endpoint."""
+
+    @pytest.mark.parametrize("fresh", [False, True], ids=["same", "fresh"])
+    def test_other_organisations_element_id_is_not_found(self, app, db_session, make_org, client, login_as, fresh):
+        mine, theirs = make_org("lookup-mine"), make_org("lookup-theirs")
+        service_b = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
+        neighbour_b = _el(db_session, theirs, "Billing theirs", "BusinessService", "Business")
+        _rel(db_session, theirs, service_b, neighbour_b, "Serving")
+
+        user = _user(db_session, mine)
+        resp = _get_response(db_session, client, login_as, user, f"/architecture/api/elements/{service_b.id}/relationships", fresh)
+        assert resp.status_code == 404
+        assert b"Billing theirs" not in resp.data
+
+
+class TestElementWithoutOrganisation:
+    """Elements carry no shared-reference rows: the database refuses an element with no organisation."""
+
+    def test_element_requires_an_organisation(self, app, db_session):
+        nullable = db_session.execute(
+            text(
+                "SELECT is_nullable FROM information_schema.columns "
+                "WHERE table_name = 'archimate_elements' AND column_name = 'organization_id'"
+            )
+        ).scalar_one()
+        assert nullable == "NO"
