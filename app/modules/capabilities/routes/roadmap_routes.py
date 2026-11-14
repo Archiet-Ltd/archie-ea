@@ -33,7 +33,7 @@ from datetime import datetime
 
 from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
-from app.core.auth.permissions import can_change_model
+from app.core.auth.permissions import can, can_change_model
 from app.middleware.tenant_context import current_org_id
 
 from app.decorators import audit_log, require_roles
@@ -1515,7 +1515,7 @@ def api_roadmap_create_standalone_work_package():
     }
     Returns 201 with work_package dict on success.
     """
-    if not can_change_model(current_user):
+    if not can(current_user, 'create', 'work_package'):
         return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Plateau
@@ -1654,7 +1654,7 @@ def api_roadmap_update_work_package(wp_id):
 
     Request body: Fields to update (name, dates, status, color, percent_complete, etc.)
     """
-    if not can_change_model(current_user):
+    if not can(current_user, 'edit', 'work_package'):
         return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from datetime import date as date_type
@@ -1727,7 +1727,7 @@ def api_roadmap_update_work_package(wp_id):
 @audit_log("roadmap_work_package_delete")
 def api_roadmap_delete_work_package(wp_id):
     """Delete a WorkPackage (and optionally its children)."""
-    if not can_change_model(current_user):
+    if not can(current_user, 'delete', 'work_package'):
         return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services import work_package_service
@@ -1767,7 +1767,7 @@ def api_roadmap_create_child_work_package(wp_id):
         "estimated_effort_hours": 80
     }
     """
-    if not can_change_model(current_user):
+    if not can(current_user, 'create', 'work_package'):
         return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services import work_package_service
