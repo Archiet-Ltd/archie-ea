@@ -289,6 +289,17 @@ services:
       LLM_PRICE_PER_MTOK_OUT_AZURE: ${LLM_PRICE_PER_MTOK_OUT_AZURE:-}
       LLM_PRICE_PER_MTOK_OUT_OPENROUTER: ${LLM_PRICE_PER_MTOK_OUT_OPENROUTER:-}
       LLM_PRICE_PER_MTOK_OUT_HUGGINGFACE: ${LLM_PRICE_PER_MTOK_OUT_HUGGINGFACE:-}
+      # Billing settings read by the billing routes and the provider webhook
+      # (app/modules/admin/billing_routes.py, app/services/billing_service.py,
+      # app/services/monelytics_provider.py). Set in .env; never a value here.
+      MONELYTICS_BASE_URL: ${MONELYTICS_BASE_URL:-}
+      MONELYTICS_KEYCLOAK_TOKEN_URL: ${MONELYTICS_KEYCLOAK_TOKEN_URL:-}
+      MONELYTICS_CLIENT_ID: ${MONELYTICS_CLIENT_ID:-}
+      MONELYTICS_CLIENT_SECRET: ${MONELYTICS_CLIENT_SECRET:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_API_BASE: ${STRIPE_API_BASE:-}
+      STRIPE_AUTOMATIC_TAX: ${STRIPE_AUTOMATIC_TAX:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       REDISTOGO_URL: redis://redis:6379
       GUNICORN_WORKERS: "3"
       # Was 4x8 (measured on this 2 vCPU box at concurrency 32: 4 workers gave
