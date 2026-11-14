@@ -75,11 +75,15 @@ def _seed(org_id, other_org_id):
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
     from app.models.archimate_core import ArchiMateElement
+    from app.models.organization import Organization
     from app.models.user import User
+    from app.services.billing_plans import set_contract_plan
     from app.services.element_ownership_service import set_element_owner
 
     app = create_app("testing")
     with app.app_context():
+        set_contract_plan(db.session.get(Organization, org_id), "enterprise", None)
+        db.session.commit()
         element = ArchiMateElement(
             name="Ledger Core", type="ApplicationComponent", layer="application", organization_id=org_id
         )
@@ -93,11 +97,19 @@ def _seed(org_id, other_org_id):
             email="nneka.%s@example.com" % uuid.uuid4().hex[:8], first_name="Nneka", last_name="Okafor",
             organization_id=org_id, confirmed=True, enterprise_role="enterprise_architect",
         )
-        db.session.add_all([ledger, owner])
+        technical = User(
+            email="cameron.%s@example.com" % uuid.uuid4().hex[:8], first_name="Cameron", last_name="Doyle",
+            organization_id=org_id, confirmed=True, enterprise_role="enterprise_architect",
+        )
+        db.session.add_all([ledger, owner, technical])
         db.session.flush()
         set_element_owner(
             element_type="application", element_id=ledger.id, user_id=owner.id,
             organization_id=org_id, ownership_type="primary", commit=False,
+        )
+        set_element_owner(
+            element_type="application", element_id=ledger.id, user_id=technical.id,
+            organization_id=org_id, ownership_type="technical", commit=False,
         )
         db.session.add(ApplicationComponent(
             name="Billing Hub", organization_id=org_id, application_owner="Ada Obi",
@@ -207,7 +219,7 @@ def test_an_owner_question_is_answered_in_one_sentence_with_its_source(
         answer = ask(page, server, OWNER_QUESTION, fresh=False)
         sentence = answer.get_by_test_id("owner-sentence")
         expect(sentence).to_have_text(
-            "Ledger Core is owned by Nneka Okafor, recorded on the Ledger Core application page."
+            "Ledger Core is owned by Nneka Okafor (primary) and Cameron Doyle (technical), recorded on the Ledger Core application page."
         )
         text = answer.inner_text()
         assert "not yet connected" not in text and "Capacity" not in text, text
@@ -219,6 +231,53 @@ def test_an_owner_question_is_answered_in_one_sentence_with_its_source(
         page.goto(server + link.get_attribute("href"), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator("main")).to_contain_text("Ledger Core")
         expect(page.locator("main")).to_contain_text("Nneka Okafor")
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("label,persona,viewport,scheme,sees_cost", CASES, ids=[c[0] for c in CASES])
+def test_three_owners_read_as_a_b_and_c(
+    browser, server, organisation, tmp_path, label, persona, viewport, scheme, sees_cost
+):
+    """Three owners read as "A, B and C", each with its role."""
+    from app import create_app, db
+    from app.models.user import User
+    from app.services.element_ownership_service import set_element_owner
+
+    app = create_app("testing")
+    with app.app_context():
+        ledger_id = organisation["ids"]["ledger"]
+        samir = User(
+            email="samir.%s@example.com" % uuid.uuid4().hex[:8], first_name="Samir", last_name="Patel",
+            organization_id=organisation["org_id"], confirmed=True, enterprise_role="enterprise_architect",
+        )
+        db.session.add(samir)
+        db.session.flush()
+        set_element_owner(
+            element_type="application", element_id=ledger_id, user_id=samir.id,
+            organization_id=organisation["org_id"], ownership_type="business", commit=False,
+        )
+        db.session.commit()
+        db.session.remove()
+
+    context, page = _new_page(browser, viewport, scheme)
+    try:
+        sign_in(page, server, organisation["emails"][persona])
+        open_chat(page, server)
+        answer = ask(page, server, OWNER_QUESTION, fresh=False)
+        sentence = answer.get_by_test_id("owner-sentence")
+        expect(sentence).to_have_text(
+            "Ledger Core is owned by Nneka Okafor (primary), Cameron Doyle (technical) and Samir Patel (business), "
+            "recorded on the Ledger Core application page."
+        )
+        text = answer.inner_text()
+        assert "not yet connected" not in text and "Capacity" not in text, text
+        _shot(page, tmp_path, "chat-owner-three-%s.png" % label)
+
+        link = answer.get_by_test_id("owner-source")
+        assert link.get_attribute("href") == "/applications/%d" % organisation["ids"]["ledger"]
+        page.goto(server + link.get_attribute("href"), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.locator("main")).to_contain_text("Ledger Core")
     finally:
         context.close()
 
