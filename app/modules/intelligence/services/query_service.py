@@ -1576,14 +1576,10 @@ class IntelligenceQueryService:
         algorithm, per the platform convention against parallel scoring
         logic.
 
-        Scope note, not silently dropped: ``RiskEntityLink`` (a risk
-        threatening an Application/Solution/Programme with no direct
-        ``archimate_element_id`` of its own on this element) is not resolved
-        here -- none of those three models carry an ArchiMate mirror id
-        today, so there is no element to seed a traversal from. Only
-        directly-mirrored risks are answered; an indirect risk is invisible
-        to this query, not wrongly reported as "none". Tracked as a
-        follow-up, not implemented speculatively.
+        A risk is also found when a link points at the record this element mirrors (an
+        application, capability or programme) or at the element itself, read through
+        ``risk_service.risk_ids_touching_elements``. The legacy pointer branch stays for an
+        element that is not the risk's own mirror.
 
         Score is a **display** label, not a stored fact (per
         ``intelligence-lenses-v1.md`` L6): each risk's own
@@ -1618,13 +1614,21 @@ class IntelligenceQueryService:
                     "elements": {},
                 }
 
+            from app.services import risk_service
+
+            touching = risk_service.risk_ids_touching_elements(org_id, [element_id])
             seed_risks = (
                 db.session.execute(
-                    db.select(Risk).where(Risk.archimate_element_id == element_id)
+                    db.select(Risk).where(
+                        Risk.organization_id == org_id,
+                        db.or_(Risk.archimate_element_id == element_id,
+                               Risk.id.in_(list(touching) or [-1])),
+                    ).order_by(Risk.id)
                 )
                 .scalars()
                 .all()
             )
+            ranked = {row["risk_id"]: row for row in risk_service.ranked_risks(org_id)["rows"]}
 
             if not seed_risks:
                 return {
@@ -1635,14 +1639,15 @@ class IntelligenceQueryService:
 
             all_elements: Dict[str, Dict[str, Any]] = {}
             risk_payloads: List[Dict[str, Any]] = []
+            blast = IntelligenceQueryService.cross_layer_impact(
+                element_id,
+                include_derived=include_derived,
+                max_depth=max_depth,
+                with_owner=True,
+            )
+            all_elements.update(blast.get("elements") or {})
             for risk in seed_risks:
-                blast = IntelligenceQueryService.cross_layer_impact(
-                    element_id,
-                    include_derived=include_derived,
-                    max_depth=max_depth,
-                    with_owner=True,
-                )
-                all_elements.update(blast.get("elements") or {})
+                row = ranked.get(risk.id) or {}
                 risk_payloads.append(
                     {
                         "risk_id": risk.id,
@@ -1655,6 +1660,8 @@ class IntelligenceQueryService:
                         "risk_level": risk.risk_level,
                         "owner": risk.owner,
                         "mitigation_plan": risk.mitigation_plan,
+                        "touches": row.get("touches") or [],
+                        "url": "/risks/%d" % risk.id,
                         "affected_rows": blast.get("rows", []),
                         "affected_summary": blast.get("summary", {}),
                     }

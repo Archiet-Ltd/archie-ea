@@ -41,8 +41,43 @@ def get_heat_map_data(solution_id=None):
     }
 
 
-def create_risk(solution_id, title, description, likelihood, impact, owner, mitigation_plan):
-    """Create and persist a new Risk. Returns the saved Risk instance."""
+def get_risk(organization_id, risk_id):
+    """One risk of one organisation, or None. Names the organisation in the statement, so a caller
+    with no request (the chat's worker, a command) is fenced the same as a request."""
+    return db.session.execute(
+        db.select(Risk).where(Risk.id == risk_id, Risk.organization_id == organization_id)
+    ).scalar_one_or_none()
+
+
+def _own_organization(organization_id):
+    if organization_id is not None:
+        return organization_id
+    from app.middleware.tenant_context import current_org_id
+    return current_org_id()
+
+
+def create_risk(solution_id, title, description, likelihood, impact, owner, mitigation_plan,
+                links=(), organization_id=None):
+    """Create and persist a new Risk with what it touches, in one transaction.
+
+    ``links`` is a list of ``(entity_type, entity_id)`` pairs (or dicts with those keys). A target
+    outside the organisation raises ``ValueError`` and nothing is written. Returns the saved Risk.
+    """
+    organization_id = _own_organization(organization_id)
+    pairs = []
+    for link in links or ():
+        if isinstance(link, dict):
+            link = (link.get("entity_type"), link.get("entity_id"))
+        pairs.append(tuple(link))
+    for entity_type, entity_id in pairs:
+        if entity_type not in ENTITY_TYPES:
+            raise ValueError(f"entity_type must be one of {ENTITY_TYPES}, got {entity_type!r}")
+        try:
+            int(entity_id)
+        except (TypeError, ValueError):
+            raise ValueError(f"{entity_type} needs a numeric entity_id")
+    if solution_id is not None:
+        pairs.append(("solution", solution_id))
     risk = Risk(
         solution_id=solution_id,
         title=title,
@@ -53,9 +88,19 @@ def create_risk(solution_id, title, description, likelihood, impact, owner, miti
         mitigation_plan=mitigation_plan,
         status=RiskStatus.OPEN,
     )
-    db.session.add(risk)
-    sync_archimate_element(risk)
-    db.session.commit()
+    if organization_id is not None:
+        risk.organization_id = organization_id
+    try:
+        db.session.add(risk)
+        db.session.flush()
+        for entity_type, entity_id in pairs:
+            add_risk_link(risk.id, entity_type, int(entity_id), organization_id=organization_id,
+                          commit=False)
+        sync_archimate_element(risk)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
     return risk
 
 
@@ -133,6 +178,9 @@ def _load_linkable_entity(entity_type, entity_id):
     if entity_type == "capability":
         from app.models.business_capabilities import BusinessCapability
         return BusinessCapability.query.filter_by(id=entity_id).first()
+    if entity_type == "archimate_element":
+        from app.models import ArchiMateElement
+        return ArchiMateElement.query.filter_by(id=entity_id).first()
     return None
 
 
@@ -141,7 +189,11 @@ def add_risk_link(risk_id, entity_type, entity_id, organization_id=None, commit=
     record must belong to it; ``commit=False`` leaves the transaction to that caller."""
     if entity_type not in ENTITY_TYPES:
         raise ValueError(f"entity_type must be one of {ENTITY_TYPES}, got {entity_type!r}")
-    Risk.query.get_or_404(risk_id)  # 404s cleanly if the risk does not exist
+    if organization_id is not None:
+        if get_risk(organization_id, risk_id) is None:
+            raise ValueError(f"risk {risk_id} was not found in this organisation")
+    else:
+        Risk.query.get_or_404(risk_id)  # 404s cleanly if the risk does not exist
     target = _load_linkable_entity(entity_type, entity_id)
     if target is None:
         # Covers both "no such row" and "that row belongs to another
@@ -176,16 +228,77 @@ def remove_risk_link(risk_id, link_id):
     db.session.commit()
 
 
-def risks_linked_to(entity_type, entity_id):
+def risks_linked_to(entity_type, entity_id, organization_id=None):
     """The Risk rows linked to one Application/Solution/Programme, as ORM
     objects -- the shared query behind links_for_entity's dicts and any
     other reader (e.g. the solution risk tab's GET list) that needs the rows
-    themselves rather than their serialised form."""
-    links = RiskEntityLink.query.filter_by(entity_type=entity_type, entity_id=entity_id).all()
-    if not links:
-        return []
-    risk_ids = [link.risk_id for link in links]
-    return Risk.query.filter(Risk.id.in_(risk_ids)).order_by(Risk.id).all()
+    themselves rather than their serialised form. ``organization_id`` names the
+    organisation in the statement for a caller with no request."""
+    link_query = db.select(RiskEntityLink.risk_id).where(
+        RiskEntityLink.entity_type == entity_type, RiskEntityLink.entity_id == entity_id)
+    risk_query = db.select(Risk).where(Risk.id.in_(link_query)).order_by(Risk.id)
+    if organization_id is not None:
+        link_query = link_query.where(RiskEntityLink.organization_id == organization_id)
+        risk_query = db.select(Risk).where(
+            Risk.id.in_(link_query), Risk.organization_id == organization_id).order_by(Risk.id)
+    return list(db.session.execute(risk_query).scalars().all())
+
+
+def risk_ids_touching_elements(organization_id, element_ids):
+    """Which risks touch which ArchiMate elements: ``{risk_id: [element_id, ...]}``.
+
+    A risk touches an element when a link points at the record that element mirrors (an application,
+    a capability, a solution or a programme) or at the element itself. The risk's own Assessment
+    mirror is not a touch and is never returned here.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.solution_models import Solution
+    from app.models.strategic import StrategicInitiative
+
+    wanted = {int(e) for e in element_ids or ()}
+    if not wanted or organization_id is None:
+        return {}
+    found = {}
+
+    def note(risk_id, element_id):
+        bucket = found.setdefault(risk_id, [])
+        if element_id not in bucket:
+            bucket.append(element_id)
+
+    for link_type, model in (("application", ApplicationComponent), ("capability", BusinessCapability),
+                             ("solution", Solution), ("programme", StrategicInitiative)):
+        mirror = getattr(model, "archimate_element_id", None)
+        if mirror is None:
+            continue
+        mirrored = {
+            record_id: element_id for record_id, element_id in db.session.execute(
+                db.select(model.id, mirror).where(model.organization_id == organization_id,
+                                                  mirror.in_(sorted(wanted)))
+            ).all()
+        }
+        if not mirrored:
+            continue
+        for risk_id, record_id in db.session.execute(
+            db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_id).where(
+                RiskEntityLink.organization_id == organization_id,
+                RiskEntityLink.entity_type == link_type,
+                RiskEntityLink.entity_id.in_(sorted(mirrored)),
+            ).order_by(RiskEntityLink.id)
+        ).all():
+            note(risk_id, mirrored[record_id])
+    for risk_id, element_id in db.session.execute(
+        db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_id).where(
+            RiskEntityLink.organization_id == organization_id,
+            RiskEntityLink.entity_type == "archimate_element",
+            RiskEntityLink.entity_id.in_(sorted(wanted)),
+        ).order_by(RiskEntityLink.id)
+    ).all():
+        note(risk_id, element_id)
+    owned = set(db.session.execute(
+        db.select(Risk.id).where(Risk.organization_id == organization_id, Risk.id.in_(list(found) or [-1]))
+    ).scalars().all())
+    return {risk_id: elements for risk_id, elements in found.items() if risk_id in owned}
 
 
 def solution_risk_sources(solution_id):

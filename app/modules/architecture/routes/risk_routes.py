@@ -54,8 +54,18 @@ def create_risk():
     missing = [f for f in required if not data.get(f)]
     if missing:
         return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+    from app.middleware.tenant_context import current_org_id
+
+    links = data.get("links") or []
+    if not isinstance(links, list) or any(
+        not isinstance(link, dict) or link.get("entity_type") not in ENTITY_TYPES or not link.get("entity_id")
+        for link in links
+    ):
+        return jsonify({"error": f"links must be a list of entity_type (one of {ENTITY_TYPES}) and entity_id"}), 400
     try:
         risk = risk_service.create_risk(
+            links=[(link["entity_type"], link["entity_id"]) for link in links],
+            organization_id=current_org_id(),
             solution_id=data.get("solution_id"),
             title=data["title"],
             description=data.get("description"),
