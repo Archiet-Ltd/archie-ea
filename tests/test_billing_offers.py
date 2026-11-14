@@ -324,3 +324,22 @@ def test_the_domain_question_under_row_level_security(fenced_probe, make_org, te
         assert billing_offers.startup_credit_domain_taken("acme-robotics.test", a.id) is False
         assert billing_offers.startup_credit_domain_taken("other-company.test", b.id) is False
     session.execute(text("RESET ROLE"))
+
+
+# --- who counts as paying ---------------------------------------------------
+
+
+def test_an_organisation_on_the_credit_is_not_counted_as_paying(db_session, make_org, tenant_ctx):
+    from app.modules.account.services.onboarding_service import on_paying_plan
+    from app.services.billing_plans import ensure_subscription, set_contract_plan
+
+    credit, contract, provider, community = (make_org(n) for n in ("credit", "contract", "provider", "community"))
+    with tenant_ctx(credit.id):
+        assert grant_startup_credit(credit, _founder("ana@acme-robotics.test"), _declaration(), datetime.utcnow()).granted
+    assert set_contract_plan(contract, "team", 5)
+    ensure_subscription(provider).stripe_subscription_id = "sub_live"
+    db_session.flush()
+    assert on_paying_plan(credit) is False
+    assert on_paying_plan(contract) is True
+    assert on_paying_plan(provider) is True
+    assert on_paying_plan(community) is False

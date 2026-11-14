@@ -65,7 +65,7 @@ def register_view():
         return redirect("/pricing")
     if chosen is not None and current_user.is_authenticated:
         # Already has an account and is signed in: straight to that plan.
-        return redirect(buy_intent.target_url(*chosen))
+        return redirect(buy_intent.target_url(*chosen, offer=buy_intent.requested_offer()))
     form = RegistrationForm()
     if request.method == "GET":
         # A visitor reaching the sign-up form, not a retry after a failed
@@ -112,7 +112,7 @@ def register_view():
         )
         if chosen is not None:
             # Usable at once: sign in and go straight to that plan's checkout.
-            return redirect(url_for("account.login", plan=chosen[0], interval=chosen[1]))
+            return redirect(url_for("account.login", plan=chosen[0], interval=chosen[1], offer=buy_intent.requested_offer()))
         if "account.welcome" in current_app.view_functions:
             # Signed in at once: the second step of sign-up.
             return redirect(url_for("account.welcome"))
@@ -125,7 +125,7 @@ def _register_page(form, chosen):
     form.form_issued.data = signup_guard.issue_form_token()
     return render_template(
         "account/register.html", form=form, step=1,
-        signin_args={"plan": chosen[0], "interval": chosen[1]} if chosen else {},
+        signin_args={"plan": chosen[0], "interval": chosen[1], "offer": buy_intent.requested_offer()} if chosen else {},
         turnstile_site_key=current_app.config["TURNSTILE_SITE_KEY"] if signup_guard.turnstile_enabled() else None,
     )
 

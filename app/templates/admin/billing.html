@@ -7,6 +7,7 @@
 {% from 'components/button.html' import button %}
 {% from 'components/alert.html' import alert %}
 {% from 'components/input.html' import input %}
+{% from 'components/select.html' import native_select %}
 {% from 'components/form_field.html' import form_group %}
 {% from 'components/dialog.html' import dialog %}
 {% from 'components/empty_state.html' import empty_state %}
@@ -63,6 +64,7 @@
                     {%- else %}text-foreground{% endif %}">
                     {%- if plan.key in ('free', 'education') %}Free plan
                     {%- elif status_val == 'past_due' %}Payment overdue
+                    {%- elif status_val == 'trialing' and credit and credit.state == 'active' %}Free for 90 days
                     {%- elif status_val == 'trialing' %}Trial
                     {%- else %}{{ status_val | title }}{% endif %}
                 </p>
@@ -119,6 +121,40 @@
         {% endif %}
     {% endcall %}
 
+    {# ---- The 90 days of Startup, free ---- #}
+    {% if credit and credit.state == 'ended' %}
+    <div data-testid="startup-credit-ended">
+        {% call alert('warning', link_href=url_for('billing.billing_index', plan='startup', interval=selected_interval) ~ '#checkout', link_text='Buy Startup') %}Your 90 days of Startup ended on {{ credit.ends_on.strftime('%d %b %Y').lstrip('0') }}. Buy Startup to add people again. Everyone who was here keeps access.{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
+    </div>
+    {% endif %}
+    {% if credit and credit.state == 'available' %}
+    <div id="startup-credit" class="max-w-2xl">
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}90 days of Startup, free{% endcall %}
+            {% call card_description() %}For companies founded in the last 36 months that have raised up to USD 1M. Ten people for 90 days. You can buy Startup at any time.{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+        <form method="post" action="{{ url_for('billing.billing_startup_credit') }}" class="grid grid-cols-1 gap-4" data-testid="startup-credit-form">
+            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+            {% call form_group(id='credit_website', label='Company website', required=true, class='space-y-2', help_text='Its domain must match your work email\'s domain.') %}
+                {{ input(id='credit_website', name='website', type='url', required=true, value=(credit_declared.website or credit_website or ''), attrs_dict={'maxlength': 255, 'autocomplete': 'url'}) }}
+            {% endcall %}
+            {% call form_group(id='credit_founded', label='Month the company was founded', required=true, class='space-y-2') %}
+                {{ input(id='credit_founded', name='founded', type='month', required=true, value=(credit_declared.founded or '')) }}
+            {% endcall %}
+            {% call form_group(id='credit_raised', label='Money raised so far', required=true, class='space-y-2') %}
+                {% call native_select(id='credit_raised', name='raised', class='w-full') %}
+                    {% for key, label in credit_raised_answers.items() %}<option value="{{ key }}"{% if credit_declared.raised == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+                {% endcall %}
+            {% endcall %}
+            <div>{{ button(text='Start 90 days free', type='submit', testid='startup-credit-submit') }}</div>
+        </form>
+        {% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
+
     {# ---- Plans ---- #}
     <section id="plans" aria-labelledby="plans-heading" class="space-y-4">
         <h2 id="plans-heading" class="text-lg font-semibold text-foreground">Plans</h2>
@@ -146,7 +182,10 @@
                         {% elif p.user_limit is not none %}Limit: {{ p.user_limit }} people
                         {% else %}No limit on people{% endif %}
                     </p>
-                    {% if p.purchasable and not is_current %}
+                    {% if p.purchasable and is_current and credit and credit.state == 'active' %}
+                        {{ button(text='Buy ' ~ p.name, href=url_for('billing.billing_index', plan=p.key, interval=selected_interval) ~ '#checkout', variant='outline', class='w-full', testid='plan-choose-' ~ p.key) }}
+                        <p class="text-xs text-muted-foreground">Buying now starts billing today.</p>
+                    {% elif p.purchasable and not is_current %}
                         {{ button(text='Choose ' ~ p.name, href=url_for('billing.billing_index', plan=p.key, interval=selected_interval) ~ '#checkout', variant='outline', class='w-full', testid='plan-choose-' ~ p.key) }}
                     {% elif p.purchasable and is_current and p.per_seat %}
                         {{ button(text='Change seats', href=url_for('billing.billing_index', plan=p.key, interval=subscription.billing_interval or selected_interval) ~ '#checkout', variant='outline', class='w-full', testid='plan-choose-' ~ p.key) }}
