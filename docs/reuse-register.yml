@@ -1315,3 +1315,65 @@ entries:
       of the applications that support the capability, then its links to goals, drivers, outcomes or principles,
       then the value streams it serves, then its open risks, and the footer says it was derived. Read the score
       from the service result; do not write a second derivation or a stand-in score for an unrated capability.
+
+  - id: canvas-store
+    concept: What a framework canvas (Business Model Canvas, Lean Canvas and the rest) shows in each box, and the one writer of a box entry
+    status: active
+    canonical:
+      path: app/modules/business_model_canvas/model_service.py
+      symbols: [canvas_contents, organisation_canvas, box_across_canvases, entries, place, add_entry]
+    reuse: >
+      A canvas entry is an element listed on the canvas's view with its box on that view row. Read what a canvas
+      shows with model_service.canvas_contents (the page, GET /business-model/api/<id>, the chat's get_canvas and
+      the chat's canvas answer all do) and write an entry with model_service.add_entry. Do not read the nine
+      block text columns, the profile an older canvas wrote on an element, or the box an imported model names in
+      its properties, and do not construct a view row with a box anywhere else. The text columns are kept only as
+      earlier text.
+    must_not_create:
+      - id: view-row-constructor
+        regex: 'SavedDiagramElement\('
+        scope: [app]
+        suffixes: [.py]
+      - id: block-accessor
+        regex: '\.(get_block|set_block)\('
+        scope: [app]
+        suffixes: [.py]
+      - id: block-text-read
+        regex: '\bcanvas\.(key_partners|key_activities|key_resources|value_propositions|customer_relationships|channels|customer_segments|cost_structure|revenue_streams)\b'
+        scope: [app]
+        suffixes: [.py]
+      - id: legacy-profile-read
+        regex: 'acm_properties.*profile'
+        scope: [app]
+        suffixes: [.py]
+      - id: imported-box-read
+        regex: 'custom_properties.*canvas_block'
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/models/business_model.py
+        reason: the model that owns the block text columns
+      - path: app/models/archimate_core.py
+        reason: the model that defines the view row
+      - path: app/services/archimate_import_service.py
+        reason: the import that writes the box an imported model names; its placement moves to the canonical writer in a later change
+
+  - id: canvas-view
+    concept: The page that draws a framework canvas and the function that says which element is in which box
+    status: active
+    canonical:
+      path: app/templates/components/canvas/_frame.html
+      symbols: [frame]
+    reuse: >
+      The canvas page is business_model/detail.html drawing the components/canvas frame, fed by
+      model_service.canvas_contents through routes._canvas_boxes. Do not add a second canvas page template, and
+      do not write a second function that decides which element is in which box.
+    must_not_create:
+      - id: second-canvas-membership
+        regex: 'def\s+(canvas_membership|box_members|elements_in_box|canvas_box_elements)\s*\('
+        scope: [app]
+        suffixes: [.py]
+      - id: second-canvas-page
+        regex: '{%-?\s*macro\s+(draw_canvas|render_canvas|canvas_page)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
