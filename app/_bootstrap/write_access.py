@@ -156,7 +156,7 @@ def refuse_read_only(user=None):
     A person who may change the model is let through. A person whose organisation role is viewer
     is never admitted, whatever their platform role or persona.
     """
-    from flask import g, request
+    from flask import request
     from flask_login import current_user
 
     from app.core.auth.permissions import is_read_only_member, may_write

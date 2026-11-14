@@ -127,7 +127,7 @@ def create_task():
     Body: { "title": str, "phase": str, "priority": str, "card_type": str, "description": str }
     Returns: { "success": True, "card": {...} }
     """
-    from app.core.auth.permissions import can_change_model, is_read_only_member
+    from app.core.auth.permissions import is_read_only_member
     from app.models.adm_kanban import ADMPhase, KanbanBoard, KanbanCard
 
     data = request.get_json() or {}
@@ -704,7 +704,7 @@ def complete_deliverable(deliverable_id):
     Body: { "complete": bool }
     Returns: { "success": true, "deliverable": {...} }
     """
-    from app.core.auth.permissions import can_change_model, is_read_only_member, may_write
+    from app.core.auth.permissions import is_read_only_member, may_write
     from app.services.adm_deliverable_service import set_complete
 
     # Ticking a deliverable records progress on the architecture: a person who may change the
