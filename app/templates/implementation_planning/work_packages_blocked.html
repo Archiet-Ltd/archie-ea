@@ -1,11 +1,10 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/button.html' import button %}
-{% from 'components/card.html' import card, card_content, card_header, card_title %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
-{% from 'components/badge.html' import badge %}
-{% from 'components/status_badge.html' import status_badge_auto %}
-{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/figures.html' import state_badge %}
+{% from 'basecoat/table.html' import table_cell %}
 
 {% block title %}Blocked by another programme{% endblock %}
 
@@ -20,38 +19,23 @@
         ] if can("create", "work_package") else []
     ) }}
 
-    {% call card() %}
-        {% call card_header() %}
-            {% call card_title() %}Blocked work packages{% endcall %}
-        {% endcall %}
-        {% call card_content() %}
-            {% if blocked %}
-            {% call table(id='blocked-table') %}
-                {% call table_header() %}
-                    <tr>
-                        {% call table_head() %}Work package{% endcall %}
-                        {% call table_head() %}Programme{% endcall %}
-                        {% call table_head() %}Blocked by{% endcall %}
-                        {% call table_head() %}Blocker's programme{% endcall %}
-                    </tr>
-                {% endcall %}
-                {% call table_body() %}
-                    {% for item in blocked %}
-                    {% for blocker in item.blocked_by %}
-                    {% call table_row(attrs_dict={'data-work-package-id': item.work_package.id}) %}
-                        {% call table_cell() %}{% if can("edit", "work_package") %}<a class="text-primary hover:underline" href="{{ url_for('implementation_planning.edit_work_package', work_package_id=item.work_package.id) }}">{{ item.work_package.name }}</a>{% else %}{{ item.work_package.name }}{% endif %}{% endcall %}
-                        {% call table_cell() %}{{ programme_names.get(item.work_package.enterprise_initiative_id, '') }}{% endcall %}
-                        {% call table_cell() %}{{ blocker.name }} ({{ status_badge_auto(blocker.status) }}){% endcall %}
-                        {% call table_cell() %}{{ programme_names.get(blocker.enterprise_initiative_id, '') }}{% endcall %}
-                    {% endcall %}
-                    {% endfor %}
-                    {% endfor %}
-                {% endcall %}
-            {% endcall %}
-            {% else %}
-            <p id="blocked-empty" class="text-sm text-muted-foreground">No work package is waiting on another programme. When one depends on an unfinished work package in a different programme, it appears here.</p>
-            {% endif %}
-        {% endcall %}
+    {% if blocked %}
+    {%- set pairs = [] -%}
+    {%- for item in blocked %}{% for blocker in item.blocked_by %}{% set _ = pairs.append({'wp': item.work_package, 'blocker': blocker}) %}{% endfor %}{% endfor -%}
+    <div id="blocked-table">
+    {% call(pair) list_table(rows=pairs, columns=['Work package', 'Programme', 'Blocked by', "Blocker's programme"],
+                             caption='Blocked work packages', testid='blocked-work-packages', row_testid='blocked-row',
+                             empty_message='No work package is waiting on another programme.') %}
+        {% call table_cell(attrs={'data-work-package-id': pair.wp.id}) %}{% if can("edit", "work_package") %}<a class="font-medium text-foreground hover:underline" href="{{ url_for('implementation_planning.edit_work_package', work_package_id=pair.wp.id) }}">{{ pair.wp.name }}</a>{% else %}{{ pair.wp.name }}{% endif %}{% endcall %}
+        {% call table_cell() %}{{ programme_names.get(pair.wp.enterprise_initiative_id, '') }}{% endcall %}
+        {% call table_cell() %}{{ pair.blocker.name }} {{ state_badge(pair.blocker.status) }}{% endcall %}
+        {% call table_cell() %}{{ programme_names.get(pair.blocker.enterprise_initiative_id, '') }}{% endcall %}
     {% endcall %}
+    </div>
+    {% else %}
+    {% call ui.card() %}{% call ui.card_content() %}
+    <p id="blocked-empty" class="text-sm text-muted-foreground">No work package is waiting on another programme. When one depends on an unfinished work package in a different programme, it appears here.</p>
+    {% endcall %}{% endcall %}
+    {% endif %}
 </div>
 {% endblock %}
