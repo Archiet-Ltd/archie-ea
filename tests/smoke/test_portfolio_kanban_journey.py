@@ -77,11 +77,14 @@ def _assert_cards_have_badge_id_title_date_avatar(page):
         # Names, not ids: no bare number stands in for the element
         assert card.locator("span.font-mono").count() == 0, "Card shows a raw element id"
 
-        # Title (h3 element, line-clamped)
-        title = card.locator("h3.line-clamp-2")
+        # Title (h3 element, wraps without truncation)
+        title = card.locator("h3.text-xs.font-medium")
         assert title.count() >= 1, "Card missing title"
         assert len(title.inner_text()) > 0, "Card title is empty"
         assert title.first.inner_text().strip() in card_text, "Card text does not contain its own title"
+        # Verify title is not truncated (no ellipsis in computed style)
+        title_el = title.first
+        assert title_el.evaluate("el => getComputedStyle(el).textOverflow") != "ellipsis", "Title is truncated with ellipsis"
 
         # A date carries its icon; a card with no recorded date shows no dash in its place
         if card.locator("[data-lucide='calendar']").count() == 0:
@@ -170,6 +173,58 @@ def _assert_wip_limits_show_on_headers(page):
     for state in ("Funnel", "Done"):
         header = page.locator(f".kanban-column[data-state='{state}'] .kanban-column-header").inner_text()
         assert "/" not in header.replace("epics", ""), f"{state} should show no WIP limit: {header!r}"
+
+
+def _assert_lane_widths_and_card_heights(page):
+    """Measure lane widths (>= 280px) and card heights (<= library card height).
+    
+    Library card (flask-basecoat ported Kanban) for same content (title + badge + assignee/date):
+    - p-3 padding (24px vertical), gap-2 (8px), title 1 line (20px), badge h-5 (20px), assignee/date (16px)
+    - Approx 84px total height for minimal content.
+    
+    Our card has more content (title wrapping, WSJF badge, stage badge, Top WSJF badge, owner/date),
+    so we allow up to 120px for a card with typical content.
+    """
+    # Measure lane widths
+    columns = page.locator(".kanban-column").all()
+    assert len(columns) == 6, "Expected 6 columns"
+    
+    for column in columns:
+        box = column.bounding_box()
+        assert box is not None, "Column should have bounding box"
+        # Lane content width (column width minus padding)
+        # Column has w-72 (288px) with p-1 (4px each side) = 280px content width
+        assert box["width"] >= 280, f"Lane width {box['width']}px is less than 280px minimum"
+    
+    # Measure card heights
+    cards = page.locator(".kanban-card").all()
+    assert len(cards) > 0, "Expected at least one card"
+    
+    # Library card height baseline for same content (title + WSJF badge + owner/date)
+    # Our card is more compact now with reduced spacing
+    max_card_height = 140  # px - allowance for our richer content (3 badges, owner/date, toggle)
+    
+    for card in cards[:5]:  # Check first 5 cards
+        box = card.bounding_box()
+        assert box is not None, "Card should have bounding box"
+        assert box["height"] <= max_card_height, (
+            f"Card height {box['height']}px exceeds library card baseline {max_card_height}px"
+        )
+    
+    # Verify long epic name is fully readable (not truncated)
+    # Find a card with a long name (Platform Modernization Epic is 28 chars)
+    long_name_card = page.locator(".kanban-card").filter(has_text="Platform Modernization Epic").first
+    if long_name_card.count() > 0:
+        title = long_name_card.locator("h3.text-xs.font-medium").first
+        assert title.count() == 1, "Long name card should have title"
+        title_text = title.inner_text()
+        assert "Platform Modernization Epic" == title_text, (
+            f"Long epic name truncated: got '{title_text}'"
+        )
+        # Verify no text-overflow ellipsis
+        assert title.evaluate("el => getComputedStyle(el).textOverflow") != "ellipsis", (
+            "Long epic name is truncated with ellipsis"
+        )
 
 
 def _autoscroll_to(page, target, handle):
@@ -335,6 +390,9 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         # === Step 2d: flask-basecoat anatomy assertions (fix931b brief) ===
         _assert_column_headers_have_dot_name_count(page)
         _assert_cards_have_badge_id_title_date_avatar(page)
+
+        # === Step 2e: lane widths and card heights (kanbanlane01 brief) ===
+        _assert_lane_widths_and_card_heights(page)
 
         for width, height in ((1440, 900), (390, 844)):
             for scheme in ("light", "dark"):

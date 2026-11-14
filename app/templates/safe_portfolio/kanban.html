@@ -91,37 +91,37 @@
             {% set group = stage_group.get(state) %}
             <template x-for="card in columnCards('{{ state }}')" :key="card.id">
                 {% call kanban_card(kanban_states, class='transition-colors', title='card.name', top='isTopCard(card)', can_write=can_write) %}
-                  <div x-data="{ expanded: false }" class="mt-1.5 space-y-1.5">
-                    <div class="flex flex-wrap items-center gap-1.5">
-                        {% call badge(variant='info') %}<span x-text="`WSJF: ${card.wsjf_score}`" title="Weighted Shortest Job First priority score"></span>{% endcall %}
-                        {% call badge(variant='info' if group == 'discovery' else 'success' if group == 'execution' else 'neutral') %}{{ 'Discovery' if group == 'discovery' else 'Execution' if group == 'execution' else 'Done' }}{% endcall %}
+                  <div x-data="{ expanded: false }" class="mt-0 space-y-0.25">
+                    <div class="flex flex-nowrap items-center gap-0.5 overflow-hidden">
+                        {% call badge(variant='info', class='px-1 py-0 text-[10px]') %}<span x-text="`WSJF: ${card.wsjf_score}`" title="Weighted Shortest Job First priority score"></span>{% endcall %}
+                        {% call badge(variant='info' if group == 'discovery' else 'success' if group == 'execution' else 'neutral', class='px-1 py-0 text-[10px]') %}{{ 'Discovery' if group == 'discovery' else 'Execution' if group == 'execution' else 'Done' }}{% endcall %}
                         <template x-if="isTopCard(card)">
-                            {% call badge(variant='success') %}<i data-lucide="star" class="mr-1 h-3 w-3" aria-hidden="true"></i>Top WSJF{% endcall %}
+                            {% call badge(variant='success', class='px-1 py-0 text-[10px]') %}<i data-lucide="star" class="mr-0.5 h-2.5 w-2.5" aria-hidden="true"></i>Top WSJF{% endcall %}
                         </template>
                         {% call button(variant='ghost', size='icon-xs', class='ml-auto shrink-0 text-primary', on_click="expanded = !expanded",
                                        attrs_dict={':aria-expanded': 'expanded', ':aria-label': "`${expanded ? 'Hide' : 'Show'} WSJF factors for ${card.name}`", ':title': "expanded ? 'Hide WSJF factors' : 'Show WSJF factors'"}) %}
-                            <i data-lucide="chevron-right" class="h-3 w-3 transition-transform" :class="{ 'rotate-90': expanded }" aria-hidden="true"></i>
+                            <i data-lucide="chevron-right" class="h-2.5 w-2.5 transition-transform" :class="{ 'rotate-90': expanded }" aria-hidden="true"></i>
                         {% endcall %}
                     </div>
 
                     <template x-if="card.owner_name || card.updated_at || card.created_at">
-                        <div class="flex items-center gap-1 text-xs text-muted-foreground">
+                        <div class="flex items-center gap-0.5 text-[10px] text-muted-foreground">
                             <template x-if="card.owner_name">
-                                {% call avatar(size='sm', class='h-6 w-6 text-xs') %}<span :title="card.owner_name" x-text="card.owner_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()"></span>{% endcall %}
+                                {% call avatar(size='sm', class='h-3.5 w-3.5 text-[8px]') %}<span :title="card.owner_name" x-text="card.owner_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()"></span>{% endcall %}
                             </template>
                             <template x-if="card.updated_at || card.created_at">
-                                <span class="flex items-center gap-1">
-                                    <i data-lucide="calendar" class="h-3 w-3" aria-hidden="true"></i>
+                                <span class="flex items-center gap-0.5">
+                                    <i data-lucide="calendar" class="h-1.5 w-1.5" aria-hidden="true"></i>
                                     <span x-text="card.updated_at || card.created_at"></span>
                                 </span>
                             </template>
                         </div>
                     </template>
 
-                    <div x-show="expanded" x-collapse class="border-t border-border pt-2">
-                        <dl class="space-y-1 text-xs">
+                    <div x-show="expanded" x-collapse class="border-t border-border pt-0.5">
+                        <dl class="space-y-0.5 text-[10px]">
                             {% for label, field in [('Business Value', 'business_value'), ('Time Criticality', 'time_criticality'), ('Risk Reduction', 'risk_reduction'), ('Job Size', 'job_size')] %}
-                            <div class="flex justify-between gap-2">
+                            <div class="flex justify-between gap-1.5">
                                 <dt class="text-muted-foreground">{{ label }}</dt>
                                 <dd class="font-medium text-foreground" x-text="card.{{ field }}"></dd>
                             </div>
