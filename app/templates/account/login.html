@@ -154,24 +154,6 @@
                             Register
                         </a>
                     </div>
-
-                    {% if sso_providers %}
-                    <div class="mt-6">
-                        <div class="relative">
-                            <div class="absolute inset-0 flex items-center">
-                                <span class="w-full border-t border-border"></span>
-                            </div>
-                            <div class="relative flex justify-center text-xs uppercase">
-                                <span class="bg-card px-2 text-muted-foreground">Or continue with</span>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex flex-col gap-2">
-                            {% for provider in sso_providers %}
-                                {{ button(variant='outline', class='w-full', href=url_for('account.sso_login', provider=provider.key, next=request.args.get('next')), text=provider.name) }}
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
                 </div>
                 {% endcall %}
             {% endcall %}

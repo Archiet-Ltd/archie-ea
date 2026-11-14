@@ -408,29 +408,6 @@ class Config:
     CELERY_TIMEZONE = "UTC"
     CELERY_ENABLE_UTC = True
 
-    # SSO / Enterprise Identity (S0-01)
-    # Supports Azure AD and Okta (OIDC).
-    # Feature-flagged: SSO routes only active when FeatureFlag(key='sso_authentication') is enabled.
-    SSO_PROVIDERS = {
-        "azure": {
-            "client_id": os.environ.get("AZURE_AD_CLIENT_ID", ""),
-            "client_secret": os.environ.get("AZURE_AD_CLIENT_SECRET", ""),
-            "server_metadata_url": os.environ.get(
-                "AZURE_AD_METADATA_URL",
-                "https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration".format(
-                    tenant=os.environ.get("AZURE_AD_TENANT_ID", "common")
-                ),
-            ),
-            "client_kwargs": {"scope": "openid email profile"},
-        },
-        "okta": {
-            "client_id": os.environ.get("OKTA_CLIENT_ID", ""),
-            "client_secret": os.environ.get("OKTA_CLIENT_SECRET", ""),
-            "server_metadata_url": os.environ.get("OKTA_METADATA_URL", ""),
-            "client_kwargs": {"scope": "openid email profile"},
-        },
-    }
-
     # Internationalization (S2-01) — date/number/currency formatting
     # Full string translation (gettext) is Phase 2.
     BABEL_DEFAULT_LOCALE = os.environ.get("BABEL_DEFAULT_LOCALE", "en")

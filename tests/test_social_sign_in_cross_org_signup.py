@@ -56,7 +56,10 @@ def test_m22_new_google_person_gets_an_organisation_and_no_confirmation_email(br
     assert [(r.provider, r.subject) for r in rows] == [("google", sub)]
     assert browser.signed_in_user_id() == user.id
     assert outbox == []
-    assert Organization.query.filter_by(id=user.organization_id).one().slug != "default"
+    from app.services.billing_plans import is_holding_slug
+
+    organisation = Organization.query.filter_by(id=user.organization_id).one()
+    assert organisation.slug != "default" and not is_holding_slug(organisation.slug)
     assert user.first_name == "Ada" and user.last_name == "Founder"
 
 
