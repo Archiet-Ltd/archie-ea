@@ -325,19 +325,22 @@ def test_what_if_a_near_name_is_listed_first_and_unrelated_names_are_not(
         context.close()
 
 
+@pytest.mark.parametrize("width,height,dark,shot", [
+    (1440, 900, False, "changed-since-1440-light.png"),
+    (390, 844, False, "changed-since-390-light.png"),
+    (390, 844, True, "changed-since-390-dark.png"),
+])
 def test_the_answer_says_when_connections_were_last_worked_out_and_how_many_relationships_changed_since(
-    browser, echo_provider_server, app
+    browser, echo_provider_server, app, width, height, dark, shot
 ):
     """After a run, relationships are added: the answer names that run and counts them, and
-    the panel's "May be out of date" shows the same number."""
+    the panel's "Relationships added or changed since" shows the same number."""
     import re
 
     from app.extensions import db
 
     email, org_id = _empty_organisation_user(echo_provider_server)
-    context = browser.new_context(viewport={"width": 1440, "height": 900})
-    context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
-    context.set_default_timeout(PAGE_TIMEOUT)
+    context = _unknown_context(browser, width, height, dark)
     page = context.new_page()
     try:
         _login(page, echo_provider_server, email)
@@ -364,8 +367,6 @@ def test_the_answer_says_when_connections_were_last_worked_out_and_how_many_rela
         if WALK:
             os.makedirs(WALK, exist_ok=True)
             answer.locator("[data-derivation-status]").scroll_into_view_if_needed()
-            page.screenshot(path=os.path.join(WALK, "changed-since-1440-light.png"))
-            page.set_viewport_size({"width": 390, "height": 844})
-            page.screenshot(path=os.path.join(WALK, "changed-since-390-light.png"))
+            answer.screenshot(path=os.path.join(WALK, shot))
     finally:
         context.close()
