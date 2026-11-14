@@ -1453,6 +1453,13 @@
     "keep_until": "impactwave03",
     "why": "The prioritised actions live on this page (impactwave01, impactwave02); the component is allowed on this page only, as on the strategic Impact Analysis page (lead ruling 13 Nov 2026)."
    }
+  ],
+  "app/templates/strategic/investment_matrix_prereq.html": [
+   {
+    "macro": "components/unified_mapping_modal.html",
+    "keep_until": "mapmodallib01",
+    "why": "shared mapping modal used by five pages; mapmodallib01 moves it onto the library dialog"
+   }
   ]
  },
  "pages": {
