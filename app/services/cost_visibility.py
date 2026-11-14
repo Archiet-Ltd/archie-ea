@@ -25,7 +25,7 @@ VENDOR_ANALYSIS_MONEY_KEYS = ("tco_total", "license_cost_annual", "support_cost_
 
 # every key that holds a money amount or a figure worked out from one in a business case
 BUSINESS_CASE_MONEY_KEYS = (
-    "financial_benefit_annual", "capex", "opex_annual", "tco_3yr", "roi_percentage", "payback_months", "npv",
+    "financial_benefit_annual", "capex", "opex_annual", "tco_3yr", "roi_percentage", "payback_months",
 )
 
 # the money names that carry no money word, by the kind of reply that uses them
@@ -44,11 +44,11 @@ MONEY_KEYS = COST_KEYS + BUSINESS_CASE_MONEY_KEYS + VENDOR_ANALYSIS_MONEY_KEYS +
 )
 
 _MONEY_WORD = re.compile(
-    r"cost|price|budget|spend|spent|saving|tco|revenue|invest|amount|allocated|remaining|capex|opex|npv|"
+    r"cost|price|budget|spend|spent|saving|tco|revenue|invest|estimate|amount|allocated|remaining|capex|opex|npv|"
     r"payback|financial_benefit|licen[cs]e|projected|forecast", re.I)
 _NOT_MONEY_WORD = re.compile(
-    r"cost_cent(er|re)|cost_code|hours|score|weight|count|withheld|visible|_id$|currency|status|kind|framework|"
-    r"supported|risk_class|plateau|_name$|label|reason|note|_type$|categories_loaded", re.I)
+    r"cost_cent(er|re)|cost_code|hours|days|duration|effort|points|estimate\w*date|score|weight|count|withheld|visible|_id$|"
+    r"currency|status|kind|framework|supported|risk_class|plateau|_name$|label|reason|note|_type$|categories_loaded", re.I)
 
 
 def _is_money_name(name: Any) -> bool:
@@ -137,7 +137,7 @@ def withhold_reply(reply: Any, keys: Iterable[str] = ()) -> Any:
 def withhold_evidence_trail(node: Any) -> Any:
     """An evidence trail with each cost factor's observed amount left out, no amount written into any
     rationale or source, and the withheld sentence said once at the top."""
-    return withhold_costs(without_amounts(node))
+    return withhold_costs(node)
 
 
 def withhold_change_rows(rows: Any) -> Any:
@@ -170,7 +170,7 @@ def _withhold(result: Any, extra: tuple) -> Any:
     if isinstance(result, list):
         return [_withhold(item, extra) for item in result]
     if not isinstance(result, dict):
-        return result
+        return without_amounts(result)
     out = {}
     masked = False
     for key, value in result.items():

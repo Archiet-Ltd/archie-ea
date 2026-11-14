@@ -30,7 +30,7 @@ from sqlalchemy import or_
 from app import db
 from app.core.auth.decorators import admit_model_changers
 from app.decorators import require_roles
-from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, is_money_key, withhold_costs
 from app.utils.tenant_users import escape_like_literal
 from . import archimate_crud, element_page, product_page
 from .services.ai_generation_service import AIGenerationService
@@ -755,15 +755,6 @@ def _mirror_process_owner(process_id, org_id):
     db.session.commit()
 
 
-_MONEY_COLUMN = re.compile(r"cost|price|budget|spend|saving|tco|revenue")
-_NOT_MONEY_COLUMN = re.compile(r"cost_cent(er|re)|cost_code")
-
-
-def _is_money_column(name):
-    """True for a column that holds an amount of money (not a cost centre code)."""
-    return bool(_MONEY_COLUMN.search(name)) and not _NOT_MONEY_COLUMN.search(name)
-
-
 def _get_display_fields(element, model_class, element_type=None):
     """Introspect a model instance and return a list of (label, value) tuples
     for all non-empty, non-private, non-FK columns worth displaying. A column the record's form
@@ -836,7 +827,7 @@ def _get_display_fields(element, model_class, element_type=None):
             value = _plain_value(value)
 
         fields.append({"label": label, "value": str(value), "technical": col_name in _TECHNICAL_FIELDS,
-                       "money": _is_money_column(col_name)})
+                       "money": is_money_key(col_name)})
 
     return fields
 
@@ -2736,8 +2727,7 @@ def export_elements(layer, element_type):
 
         if not costs_visible(current_user):
             # A person the one cost rule withholds from receives no amount in any column of the export.
-            data = withhold_costs(data, keys=tuple(
-                column.key for column in model_class.__table__.columns if _is_money_column(column.key)))
+            data = withhold_costs(data)
 
         response = jsonify(data)
         response.headers["Content-Disposition"] = (

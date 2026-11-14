@@ -21,6 +21,7 @@ from app.models.business_capabilities import BusinessCapability
 from app.models.solution_models import Solution
 from app.models.strategic import StrategicInitiative
 from app.utils.api_response import error_response, not_found_response, success_response
+from app.services.cost_visibility import withhold_reply
 
 from . import service
 
@@ -35,15 +36,6 @@ def _link_options():
     initiatives = StrategicInitiative.query.order_by(StrategicInitiative.name).all()
     solutions = Solution.query.order_by(Solution.name).all()
     return capabilities, initiatives, solutions
-
-
-def _withheld_reply(payload):
-    """A business case reply with every money field left out, for a person the one cost rule withholds from."""
-    from app.services.cost_visibility import BUSINESS_CASE_MONEY_KEYS, costs_visible, withhold_costs
-
-    if costs_visible(current_user):
-        return payload
-    return withhold_costs(payload, keys=BUSINESS_CASE_MONEY_KEYS)
 
 
 def _refuse_money():
@@ -183,7 +175,7 @@ def update(business_case_id):
     except ValueError as exc:
         return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
 
-    return success_response(_withheld_reply(business_case.to_dict()))
+    return success_response(withhold_reply(business_case.to_dict()))
 
 
 @business_case_bp.route("/<int:business_case_id>/delete", methods=["POST"])
@@ -234,7 +226,7 @@ def save_field(business_case_id):
     except ValueError as exc:
         return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
 
-    return success_response(_withheld_reply(business_case.to_dict()))
+    return success_response(withhold_reply(business_case.to_dict()))
 
 
 @business_case_bp.route("/<int:business_case_id>/pull-financials", methods=["POST"])
@@ -279,7 +271,7 @@ def api_detail(business_case_id):
     case = service.get_business_case_or_none(business_case_id)
     if case is None:
         return not_found_response("Business Case")
-    return success_response(_withheld_reply(case.to_dict()))
+    return success_response(withhold_reply(case.to_dict()))
 
 
 # Import AI section-draft route — adds POST /api/<id>/ai-draft-section to this

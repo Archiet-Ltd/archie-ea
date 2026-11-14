@@ -3061,6 +3061,20 @@ def _run_proactive_analysis(app, solution_id: int, organization_id):
             logger.debug("Proactive analysis failed for sol %s: %s", solution_id, _e)
 
 
+def _for_cost_rule(ctx):
+    """A solution page's context for the signed-in person: for one the cost rule withholds from, no cost
+    figure and no amount written into the solution's text, and the page told to say why once."""
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, without_amounts, withhold_costs
+
+    if costs_visible(current_user):
+        return {**ctx, "costs_withheld": False, "costs_withheld_sentence": COSTS_WITHHELD}
+    out = {**withhold_costs(ctx), "costs_withheld": True}
+    solution = ctx.get("solution")
+    if solution is not None:
+        out["solution_description"] = without_amounts(solution.description or "")
+    return out
+
+
 @solution_design_bp.route("/<int:solution_id>", methods=["GET"])
 @login_required
 def view_solution(solution_id: int):
@@ -3080,7 +3094,7 @@ def view_solution(solution_id: int):
             solution, tab=request.args.get("tab"), user=current_user,
         )
         ctx["show_created_banner"] = request.args.get("created") == "1"
-        return render_template("solutions/record.html", **ctx)
+        return render_template("solutions/record.html", **_for_cost_rule(ctx))
 
     # AIC-312: Check for active workbench workspace linked to this solution
     active_workspace_id = None
@@ -3112,7 +3126,7 @@ def view_solution(solution_id: int):
         ctx = _build_solution_detail_context_fallback(solution)
     ctx["show_created_banner"] = request.args.get("created") == "1"
     ctx["active_workspace_id"] = active_workspace_id
-    return render_template("solutions/detail.html", **ctx)
+    return render_template("solutions/detail.html", **_for_cost_rule(ctx))
 
 
 # =============================================================================

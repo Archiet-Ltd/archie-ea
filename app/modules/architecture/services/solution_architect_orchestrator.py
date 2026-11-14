@@ -25,13 +25,7 @@ from app.modules.architecture.services.options_analysis_service import (
     OptionsAnalysisService as ArchimateOptionsService,
 )
 from app.services import application_cost_accessor
-from app.services.cost_visibility import (
-    without_amounts,
-    COSTS_WITHHELD,
-    COST_KEYS,
-    INVESTMENT_MONEY_KEYS,
-    withhold_costs,
-)
+from app.services.cost_visibility import withhold_costs
 from app.services.unified_duplicate_service import UnifiedDuplicateService
 from app.services.vendor_analysis.options_analysis_service import (
     OptionsAnalysisService as VendorOptionsService,
@@ -39,24 +33,6 @@ from app.services.vendor_analysis.options_analysis_service import (
 from app.services.vendor_analysis.vendor_research_service import VendorResearchService
 
 logger = logging.getLogger(__name__)
-
-# Every money key an analyse reply can carry under a name other than the run/scenario money keys.
-ANALYZE_MONEY_KEYS = COST_KEYS + INVESTMENT_MONEY_KEYS + (
-    "estimated_savings", "maintenance_cost_annual", "tco_total",
-    "support_cost_annual", "license_cost_annual", "list_price_annual",
-    "cost_estimate", "estimated_cost_min", "estimated_cost_max",
-)
-
-def withhold_analysis(result: Dict[str, Any]) -> Dict[str, Any]:
-    """A copy of an analysis reply for a person the cost rule withholds from: no money key, no amount
-    written into the AI's option text, and the withheld sentence stated once."""
-    out = withhold_costs(result, keys=ANALYZE_MONEY_KEYS)
-    for part in ("buy_build_analysis", "recommendations", "justification", "pros", "cons"):
-        if part in out:
-            out[part] = without_amounts(out[part])
-    out["costs_withheld_sentence"] = COSTS_WITHHELD
-    return out
-
 
 class SolutionArchitectOrchestrator:
     """
@@ -183,7 +159,7 @@ class SolutionArchitectOrchestrator:
             if not show_costs:
                 # The one cost rule, applied in this one place every analyse caller shares:
                 # a person it withholds from reads no money figure in the reply.
-                result = withhold_analysis(result)
+                result = withhold_costs(result)
 
             logger.info(
                 f"Analysis complete. Top recommendation: {recommendations[0]['option_type']}"

@@ -23,12 +23,13 @@ from datetime import datetime
 
 import pytest
 
+from app.services.cost_visibility import is_money_key
+
 pytestmark = pytest.mark.usefixtures("db_session")
 
 # the figures seeded in the organisation under test, and in the other organisation, as a page would print them
-OWN_FIGURES = (482917, 731519, 268431, 905163, 374821, 619247)
+OWN_FIGURES = (482917, 731519, 268431, 905163, 374821, 619247, 557731, 448829, 336611)
 OTHER_FIGURES = (558833, 884422)
-MONEY_KEY = re.compile(r"cost|tco|budget|spend|saving|invest|estimate|price|licen[cs]e|capex|opex|revenue", re.I)
 # a key that names money but holds a count, a flag, a date, a name or a reference, never an amount
 NOT_AN_AMOUNT_KEY = re.compile(
     r"(count|number|num|total_items|rank|score|percent|pct|ratio|_id$|^id$|_ids$|year|month|days|date|"
@@ -53,6 +54,11 @@ NOT_REQUESTED = {
     "/logout": "ends the session the sweep is using",
 }
 NOT_REQUESTED_PARTS = ("logout", "/stream", "/events", "/sse", "/websocket", "/socket")
+
+
+# Routes that fail for every person in this organisation, with the reason; they are outside the cost rule and
+# are named here so a new failure is not mistaken for one of them.
+BROKEN_FOR_EVERYONE = {}
 
 
 def _user(db_session, org, enterprise_role, label):
@@ -80,7 +86,11 @@ def _seed(db_session, org, figures, label):
     from app.models.vendor.vendor_organization import EnterpriseInitiative
     from app.services.application_cost_accessor import set_annual_cost
 
-    app_cost, case_tco, budget, spent, estimate, annual = (list(figures) * 3)[:6]
+    from app.models.motivation import Goal, Value
+    from app.models.strategy_layer import StrategyResource
+
+    app_cost, case_tco, budget, spent, estimate, annual, goal_budget, resource_cost, value_amount = (
+        list(figures) * 5)[:9]
     application = ApplicationComponent(name="Sweep app %s" % label, organization_id=org.id)
     db_session.add(application)
     db_session.flush()
@@ -98,12 +108,22 @@ def _seed(db_session, org, figures, label):
     solution = Solution(name="Sweep solution %s" % label, organization_id=org.id)
     element = ArchiMateElement(name="Sweep system %s" % label, type="ApplicationComponent", layer="application",
                                organization_id=org.id)
-    db_session.add_all([case, strategic, initiative, capability, package, solution, element])
+    goal = Goal(name="Sweep goal %s" % label, organization_id=org.id, investment_required=goal_budget)
+    resource = StrategyResource(name="Sweep resource %s" % label, organization_id=org.id, annual_cost=resource_cost)
+    value_element = ArchiMateElement(name="Sweep value %s" % label, type="Value", layer="motivation",
+                                     organization_id=org.id)
+    db_session.add(value_element)
+    db_session.flush()
+    value = Value(name="Sweep value %s" % label, organization_id=org.id, amount=value_amount,
+                  archimate_element_id=value_element.id)
+    db_session.add_all([case, strategic, initiative, capability, package, solution, element, goal, resource, value])
     db_session.flush()
     return {"application_id": application.id, "app_id": application.id, "business_case_id": case.id,
             "initiative_id": strategic.id, "strategic_initiative_id": strategic.id,
             "capability_id": capability.id, "work_package_id": package.id, "wp_id": package.id,
-            "solution_id": solution.id, "element_id": element.id, "id": application.id}
+            "solution_id": solution.id, "element_id": element.id, "id": application.id,
+            "elements": [("motivation", "Goal", goal.id), ("strategy", "Resource", resource.id),
+                         ("motivation", "Value", value.id)]}
 
 
 @pytest.fixture
@@ -117,18 +137,32 @@ def world(db_session, make_org):
 
 
 def _fill(rule, own):
-    """The path for ``rule`` with every argument taken from the person's own records, or None when one cannot be."""
+    """The paths for ``rule`` with every argument taken from the person's own records; empty when one cannot be.
+
+    An element route (layer, element type, element id) is filled once for each element record the world holds.
+    """
+    from werkzeug.routing import BuildError
+
+    if "element_type" in rule.arguments:
+        paths = []
+        for layer, element_type, element_id in own["elements"]:
+            values = {"layer": layer, "element_type": element_type, "element_id": element_id}
+            if set(rule.arguments) <= set(values):
+                try:
+                    paths.append(rule.build({k: v for k, v in values.items() if k in rule.arguments},
+                                            append_unknown=False)[1])
+                except BuildError:
+                    pass
+        return sorted(set(paths))
     values = {}
     for argument in rule.arguments:
         if argument not in own:
-            return None
+            return []
         values[argument] = own[argument]
-    from werkzeug.routing import BuildError
-
     try:
-        return rule.build(values, append_unknown=False)[1]
+        return [rule.build(values, append_unknown=False)[1]]
     except BuildError:
-        return None
+        return []
 
 
 def routes_to_request(app, own):
@@ -140,11 +174,11 @@ def routes_to_request(app, own):
         if rule.rule in NOT_REQUESTED or any(part in rule.rule for part in NOT_REQUESTED_PARTS):
             skipped.append(rule.rule)
             continue
-        path = _fill(rule, own) if rule.arguments else rule.rule
-        if path is None:
+        paths = _fill(rule, own) if rule.arguments else [rule.rule]
+        if not paths:
             unfilled.append(rule.rule)
         else:
-            requests.append((path, rule))
+            requests.extend((path, rule) for path in paths)
     return requests, unfilled, skipped
 
 
@@ -152,7 +186,7 @@ def _money_in_json(node, found, trail=""):
     if isinstance(node, dict):
         for key, value in node.items():
             here = "%s.%s" % (trail, key)
-            if (isinstance(value, (int, float)) and not isinstance(value, bool) and MONEY_KEY.search(str(key))
+            if (isinstance(value, (int, float)) and not isinstance(value, bool) and is_money_key(key)
                     and not NOT_AN_AMOUNT_KEY.search(str(key))):
                 found.append("%s = %s" % (here, value))
             else:
@@ -196,36 +230,46 @@ def find_money(reply, own_figures=OWN_FIGURES, other_figures=OTHER_FIGURES):
     return found[:4]
 
 
+def _get(client, login_as, user, path):
+    """(reply, why not): the reply, or None with the reason when the route raised, was too slow or answered 5xx."""
+    login_as(client, user)
+    signal.alarm(SECONDS_PER_ROUTE)
+    try:
+        reply = client.get(path, follow_redirects=True)
+    except _Slow:
+        return None, "no answer in %ss" % SECONDS_PER_ROUTE
+    except Exception as exc:
+        from app import db
+
+        db.session.rollback()
+        return None, type(exc).__name__
+    finally:
+        signal.alarm(0)
+    if reply.status_code >= 500:
+        return reply, "answered %d" % reply.status_code
+    return reply, None
+
+
 def sweep(app, client, login_as, user, own, part=None):
     """Request the routes as ``user`` (every PARTS-th route from ``part``, or all when no part is named).
 
-    Returns (leaks, requested, unfilled, skipped, failed).
+    Returns (leaks, requested, unfilled, skipped, broken): ``broken`` maps each path that raised, was too slow
+    or answered 5xx to the reason. A route that cannot answer is not a route that leaks nothing.
     """
     requests, unfilled, skipped = routes_to_request(app, own)
     if part is not None:
         requests = requests[part::PARTS]
-    leaks, failed = {}, []
+    leaks, broken = {}, {}
     previous = signal.signal(signal.SIGALRM, _alarm)
     try:
         started = time.time()
         for number, (path, rule) in enumerate(requests, 1):
             if number % 50 == 0:
                 print("  %d of %d routes in %ds" % (number, len(requests), time.time() - started), file=sys.stderr, flush=True)
-            login_as(client, user)
-            signal.alarm(SECONDS_PER_ROUTE)
-            try:
-                reply = client.get(path, follow_redirects=True)
-            except _Slow:
-                failed.append("%s (no answer in %ss)" % (path, SECONDS_PER_ROUTE))
+            reply, why = _get(client, login_as, user, path)
+            if why:
+                broken[path] = why
                 continue
-            except Exception as exc:  # a route that raises is not a route that leaks
-                failed.append("%s (%s)" % (path, type(exc).__name__))
-                from app import db
-
-                db.session.rollback()
-                continue
-            finally:
-                signal.alarm(0)
             if rule.rule in PLATFORM_PRICE_PAGES:
                 continue
             money = find_money(reply)
@@ -233,7 +277,16 @@ def sweep(app, client, login_as, user, own, part=None):
                 leaks[path] = money
     finally:
         signal.signal(signal.SIGALRM, previous)
-    return leaks, len(requests), unfilled, skipped, failed
+    return leaks, len(requests), unfilled, skipped, broken
+
+
+def broken_for_the_withheld_person_only(client, login_as, broken, allowed_user):
+    """The broken routes the allowed person opens: the cost rule, not the route, is what fails for the other."""
+    previous = signal.signal(signal.SIGALRM, _alarm)
+    try:
+        return {path: why for path, why in broken.items() if _get(client, login_as, allowed_user, path)[1] is None}
+    finally:
+        signal.signal(signal.SIGALRM, previous)
 
 
 def test_the_routes_are_counted_and_the_ones_not_requested_are_named(app, world, capsys):
@@ -249,20 +302,26 @@ def test_the_routes_are_counted_and_the_ones_not_requested_are_named(app, world,
 
 @pytest.mark.parametrize("part", range(PARTS))
 def test_the_withheld_architect_receives_no_money_from_any_route(app, client, login_as, world, part, capsys):
-    leaks, requested, _unfilled, _skipped, failed = sweep(app, client, login_as, world["architect"], world["own"], part)
+    leaks, requested, _unfilled, _skipped, broken = sweep(app, client, login_as, world["architect"], world["own"], part)
     with capsys.disabled():
-        print("\npart %d of %d as the withheld architect: %d routes requested, %d raised or did not answer"
-              % (part + 1, PARTS, requested, len(failed)))
+        print("\npart %d of %d as the withheld architect: %d routes requested, %d raised, were slow or answered 5xx"
+              % (part + 1, PARTS, requested, len(broken)))
     assert requested > 100
     assert not leaks, "%d routes handed money to a person the cost rule withholds from:\n%s" % (
         len(leaks), "\n".join("  %s -> %s" % (path, "; ".join(found)) for path, found in sorted(leaks.items())))
+    failed_by_the_rule = broken_for_the_withheld_person_only(client, login_as, broken, world["cto"])
+    assert not failed_by_the_rule, "%d routes fail for the withheld architect and open for the chief technology " \
+        "officer:\n%s" % (len(failed_by_the_rule), "\n".join("  %s -> %s" % item for item in sorted(failed_by_the_rule.items())))
+    assert set(broken) <= set(BROKEN_FOR_EVERYONE), "routes that fail for everyone and are not named:\n%s" % "\n".join(
+        "  %s -> %s" % (path, broken[path]) for path in sorted(set(broken) - set(BROKEN_FOR_EVERYONE)))
 
 
 def test_the_same_check_finds_the_money_for_the_chief_technology_officer(app, client, login_as, world):
     login_as(client, world["cto"])
     for path in ("/business-case/api/%d" % world["own"]["business_case_id"],
                  "/enterprise/api/work-packages/gantt", "/capability-map/api/applications",
-                 "/capability-map/api/capabilities/hierarchy"):
+                 "/capability-map/api/capabilities/hierarchy", "/architecture/motivation/Goal/export", "/architecture/strategy/Resource/export",
+                 "/architecture/motivation/Value/export"):
         reply = client.get(path)
         assert reply.status_code == 200, path
         assert find_money(reply), "the check did not find the money the allowed person receives at %s" % path
@@ -271,7 +330,8 @@ def test_the_same_check_finds_the_money_for_the_chief_technology_officer(app, cl
 def test_the_other_organisations_architect_is_withheld_from_too(app, client, login_as, world):
     login_as(client, world["other_architect"])
     for path in ("/enterprise/api/work-packages/gantt", "/capability-map/api/applications",
-                 "/capability-map/api/capabilities/hierarchy"):
+                 "/capability-map/api/capabilities/hierarchy", "/architecture/motivation/Goal/export", "/architecture/strategy/Resource/export",
+                 "/architecture/motivation/Value/export"):
         reply = client.get(path)
         assert reply.status_code == 200, path
         assert not find_money(reply), "%s handed money to the other organisation's architect" % path

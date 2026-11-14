@@ -32,6 +32,19 @@ from app.models.solution_architect_models import SolutionAnalysisSession, Soluti
 solution_architect_bp = Blueprint("solution_architect", __name__, url_prefix="/solutions/architect")
 
 
+def _render_session(session):
+    """The session page; a person the cost rule withholds from sees no budget and no estimated cost on it."""
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
+    return render_template(
+        "solutions/session_detail.html",
+        session=session,
+        problem=session.problem_definition,
+        costs_withheld=not costs_visible(current_user),
+        costs_withheld_sentence=COSTS_WITHHELD,
+    )
+
+
 @solution_architect_bp.route("/")
 @login_required
 def index():
@@ -62,11 +75,7 @@ def workspace(session_id=None):
         current_app.logger.error(f"Error loading workspace session: {e}")
         return redirect(url_for("solution_design.list_solutions"))
 
-    return render_template(
-        "solutions/session_detail.html",
-        session=session,
-        problem=session.problem_definition,
-    )
+    return _render_session(session)
 
 
 # sessions() listing route removed — dev artifact, access sessions from /solutions/
@@ -83,11 +92,7 @@ def session_detail(session_id):
         flash("You don't have access to this session.", "error")
         return redirect(url_for("solution_design.list_solutions"))
 
-    return render_template(
-        "solutions/session_detail.html",
-        session=session,
-        problem=session.problem_definition,
-    )
+    return _render_session(session)
 
 
 @solution_architect_bp.route("/sessions/create", methods=["GET", "POST"])
@@ -360,13 +365,10 @@ def run_session_analysis(session_id):
             RecommendationOptionType,
             SolutionRecommendation,
         )
-        from app.modules.architecture.services.solution_architect_orchestrator import (
-            withhold_analysis,
-        )
         from app.modules.solutions_strategic.v2.services.solution_architect_orchestrator import (
             SolutionArchitectOrchestrator,
         )
-        from app.services.cost_visibility import costs_visible
+        from app.services.cost_visibility import costs_visible, withhold_costs
 
         session = SolutionAnalysisSession.query.get_or_404(session_id)
 
@@ -476,7 +478,7 @@ def run_session_analysis(session_id):
                 "gap_analysis": result.get("gap_analysis"),
         }
         if not costs_visible(current_user):
-            reply = withhold_analysis(reply)
+            reply = withhold_costs(reply)
         return jsonify(reply)
 
     except Exception as e:
@@ -533,11 +535,10 @@ def get_session_analysis_results(session_id):
                     for rec in recommendations
                 ],
         }
-        from app.services.cost_visibility import costs_visible
+        from app.services.cost_visibility import costs_visible, withhold_costs
 
         if not costs_visible(current_user):
-            from app.modules.architecture.services.solution_architect_orchestrator import withhold_analysis
-            reply = withhold_analysis(reply)
+            reply = withhold_costs(reply)
         return jsonify(reply)
 
     except HTTPException:

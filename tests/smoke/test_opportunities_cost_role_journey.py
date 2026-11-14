@@ -110,7 +110,7 @@ def test_the_administrator_reads_amounts_and_the_barred_role_does_not(browser, l
         assert rows.count() == admin_rows
         body = page.locator("main, body").first.inner_text()
         assert not MONEY.search(body), MONEY.findall(body)
-        assert "Cost figures are not shown for your role." in body
+        assert "Cost figures are withheld for your role." in body
         assert len(rows.first.get_by_test_id("opportunity-reason").inner_text()) > 40
         expect(rows.first.get_by_test_id("result-footer")).to_be_visible()
         _shot(page, "opportunities-barred", width)

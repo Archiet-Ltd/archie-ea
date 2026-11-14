@@ -27,7 +27,7 @@ def test_generate_pdf_escapes_application_name(monkeypatch):
         staticmethod(lambda scope=None: [(score, app)]),
     )
 
-    html = RationalizationExportService.generate_pdf().decode("utf-8")
+    html = RationalizationExportService.generate_pdf(show_costs=False).decode("utf-8")
 
     assert MALICIOUS not in html
     assert "&lt;img src=x onerror=alert(1)&gt;" in html

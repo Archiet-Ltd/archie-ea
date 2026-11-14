@@ -152,6 +152,7 @@
 
     <!-- ANALYSIS RESULTS -->
     <div x-show="results" x-cloak x-transition.opacity>
+        <p x-show="costsWithheld" x-cloak class="mb-4 text-sm text-muted-foreground" role="status" data-testid="costs-withheld" x-text="costsWithheldText"></p>
         <div x-show="topRec" x-cloak class="border flex items-center gap-4 px-3 py-2 rounded-md border-2 border-primary/40 bg-primary/10 mb-4">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary">
                 <i data-lucide="award" class="h-5 w-5 text-primary-foreground"></i>
@@ -199,12 +200,6 @@
                                 <i data-lucide="pound-sterling" class="h-4 w-4 text-muted-foreground"></i>
                                 <span class="font-medium" x-text="'£' + formatCost(rec.estimated_cost)"></span>
                                 <span class="text-muted-foreground text-xs">est.</span>
-                            </div>
-                        </template>
-                        <template x-if="rec.estimated_cost && costsWithheld">
-                            <div class="flex items-center gap-1.5">
-                                <i data-lucide="pound-sterling" class="h-4 w-4 text-muted-foreground"></i>
-                                <span class="text-muted-foreground text-xs" x-text="costsWithheldText"></span>
                             </div>
                         </template>
                         <template x-if="rec.timeline_months">
@@ -286,7 +281,7 @@
                                 <th class="px-5 py-3">Application</th>
                                 <th class="px-5 py-3">Status</th>
                                 <th class="px-5 py-3">Relevance</th>
-                                <th class="px-5 py-3">Annual Cost</th>
+                                <th x-show="!costsWithheld" class="px-5 py-3">Annual Cost</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-input">
@@ -307,8 +302,8 @@
                                             <span class="text-xs font-mono" x-text="app.relevance_score + '%'"></span>
                                         </div>
                                     </td>
-                                    <td class="px-5 py-3 font-mono text-xs"
-                                        x-text="costsWithheld ? costsWithheldText : Platform.figure.money(app.annual_cost)"></td>
+                                    <td x-show="!costsWithheld" class="px-5 py-3 font-mono text-xs"
+                                        x-text="Platform.figure.money(app.annual_cost)"></td>
                                 </tr>
                             </template>
                         </tbody>

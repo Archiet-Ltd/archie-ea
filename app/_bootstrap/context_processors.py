@@ -305,6 +305,13 @@ def init_context_processors(app):
             return {"applications": [], "vendors": []}
 
     @app.context_processor
+    def inject_costs_withheld_sentence():
+        """The one sentence a page says when the cost rule withholds figures from the signed-in person."""
+        from app.services.cost_visibility import COSTS_WITHHELD
+
+        return {"costs_withheld_sentence": COSTS_WITHHELD}
+
+    @app.context_processor
     def inject_flask():
         """Make flask object available to all templates to fix flash messaging issues"""
         return {"flask": flask}

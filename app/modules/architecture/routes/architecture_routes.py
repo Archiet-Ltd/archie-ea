@@ -56,7 +56,9 @@ def api_solutions():
     """Get all solutions."""
     try:
         solutions = Solution.query.limit(500).all()
-        return jsonify(
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply(
             [
                 {
                     "id": s.id,
@@ -82,7 +84,7 @@ def api_solutions():
                 }
                 for s in solutions
             ]
-        )
+        ))
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 

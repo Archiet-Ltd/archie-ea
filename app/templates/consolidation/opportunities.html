@@ -45,7 +45,7 @@
         <a href="{{ url_for('unified_low_priority.consolidation_candidates') }}" class="text-primary hover:underline" data-testid="savings-next-step">Review consolidation candidates</a></p>
     {% endif %}
     {% elif forecast_by_year and not with_cost %}
-    {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': 'Savings figures are not shown for your role.', 'testid': 'opportunities-savings'}]) }}
+    {{ stat_cards([{'label': 'Estimated Annual Savings', 'icon': 'trending-up', 'sentence': costs_withheld_sentence, 'testid': 'opportunities-savings'}]) }}
     {% elif forecast_by_year %}
     {% set years = [] %}
     {% for year, amount in forecast_by_year.items() %}

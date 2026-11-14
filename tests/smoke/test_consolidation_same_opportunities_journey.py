@@ -140,7 +140,7 @@ def test_a_person_without_budget_authority_sees_the_opportunities_but_no_cost(br
         assert "/consolidation/opportunities" in page.url, page.url
         expect(page.get_by_test_id("ranked-opportunity-row").first).to_be_visible(timeout=PAGE_TIMEOUT)
         main = page.locator("main").inner_text()
-        assert "Cost figures are not shown for your role" in main
+        assert "Cost figures are withheld for your role" in main
         for sign in ("$", "£", "€"):
             assert sign not in main, (sign, main)
         costs = page.get_by_test_id("opportunity-cost")

@@ -775,7 +775,7 @@
       {# Executive Summary callout #}
       {% if solution.description %}
       <div class="border border-border rounded-lg bg-card px-5 py-4">
-        <p class="text-sm text-foreground/90 leading-relaxed">{{ solution.description }}</p>
+        <p class="text-sm text-foreground/90 leading-relaxed">{{ solution_description if solution_description is defined else solution.description }}</p>
       </div>
       {% else %}
       <div class="border border-border rounded-lg bg-card px-5 py-4">
@@ -2184,7 +2184,7 @@ function openSectionComments(section, label) {
     completedPhases: {{ (solution.adm_phases_completed or [])|tojson }},
     governanceStatus: '{{ solution.governance_status or "draft" }}',
     canSubmitArb: {{ 'true' if solution.arb_readiness and solution.arb_readiness.can_submit else 'false' }},
-    solutionDescription: {{ (solution.description or '')|tojson }},
+    solutionDescription: {{ ((solution_description if solution_description is defined else solution.description) or '')|tojson }},
     archimateElements: {{ (archimate_elements or [])|tojson }},
     initialData: {{ (lifecycle_json or {})|tojson }},
     linkedApplications: {{ (applications_json or [])|tojson }},

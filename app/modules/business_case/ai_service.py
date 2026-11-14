@@ -22,6 +22,7 @@ import json
 import logging
 from typing import Any, Dict
 
+from app.services.cost_visibility import BUSINESS_CASE_MONEY_KEYS
 from app.modules.ai_chat.services.llm_service_impl import LLMService
 
 logger = logging.getLogger(__name__)
@@ -42,14 +43,7 @@ SECTION_LABELS = {
     "key_risks": "Key Risks",
 }
 
-_FINANCIAL_FIELDS = (
-    "capex",
-    "opex_annual",
-    "tco_3yr",
-    "roi_percentage",
-    "financial_benefit_annual",
-    "payback_months",
-)
+_FINANCIAL_FIELDS = BUSINESS_CASE_MONEY_KEYS
 
 
 class BusinessCaseAIDraftError(Exception):

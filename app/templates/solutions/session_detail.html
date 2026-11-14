@@ -44,6 +44,7 @@
         subtitle_caller=_ps_sub,
         actions_caller=_ps_actions
     ) }}
+    {% if costs_withheld %}<p class="mb-4 text-sm text-muted-foreground" role="status" data-testid="costs-withheld">{{ costs_withheld_sentence }}</p>{% endif %}
 
     <!-- Tabs -->
     <div class="border-b border-border mb-6">
@@ -206,12 +207,14 @@
         {% endif %}
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+{% if not costs_withheld %}
             <div class="bg-card rounded-lg border border-border p-6">
                 <h3 class="text-lg font-bold mb-3">Budget</h3>
                 <p class="text-2xl font-bold text-primary">
                     {% if problem.budget_min or problem.budget_max %}{{ "£{:,.0f}".format(problem.budget_min) if problem.budget_min else 'No minimum set' }} – {{ "£{:,.0f}".format(problem.budget_max) if problem.budget_max else 'no maximum set' }}{% else %}No budget set{% endif %}
                 </p>
             </div>
+{% endif %}
             <div class="bg-card rounded-lg border border-border p-6">
                 <h3 class="text-lg font-bold mb-3">Timeline</h3>
                 <p class="text-2xl font-bold text-primary">
@@ -380,7 +383,7 @@
                     <p class="text-sm text-muted-foreground">Rank #{{ rec.rank }} • Score: {{ rec.score }}/100</p>
                 </div>
                 <div class="text-right">
-                    {% if rec.estimated_cost_min and rec.estimated_cost_max %}
+                    {% if rec.estimated_cost_min and rec.estimated_cost_max and not costs_withheld %}
                     <div class="text-lg font-bold text-primary">
                         £{{ "{:,.0f}".format(rec.estimated_cost_min) }} - £{{ "{:,.0f}".format(rec.estimated_cost_max) }}
                     </div>
@@ -536,6 +539,7 @@
                             <div class="p-4 space-y-4">
                                 <!-- Cost & Timeline -->
                                 <div class="grid grid-cols-2 gap-3">
+{% if not costs_withheld %}
                                     <div class="p-3 rounded-lg bg-muted/50">
                                         <div class="text-xs font-medium text-muted-foreground mb-1">Estimated Cost</div>
                                         <div class="text-sm font-bold">
@@ -547,6 +551,7 @@
                                             </template>
                                         </div>
                                     </div>
+{% endif %}
                                     <div class="p-3 rounded-lg bg-muted/50">
                                         <div class="text-xs font-medium text-muted-foreground mb-1">Timeline</div>
                                         <div class="text-sm font-bold"

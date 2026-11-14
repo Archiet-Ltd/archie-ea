@@ -9,7 +9,7 @@
     {% call(item) list_table(rows=items, columns=[('Rank', 'hidden md:table-cell'), ('Opportunity', 'hidden md:table-cell'), ('Why it is listed', 'hidden md:table-cell'), {'label': 'Run cost in play' if with_cost else 'Run cost', 'align': 'right', 'class': 'hidden md:table-cell'}], caption='Opportunities, ranked',
                              testid=testid, row_testid=row_testid, search_placeholder='Filter opportunities...',
                              empty_message=empty_text, empty_action=empty_action, page_size=50,
-                             notice=('Ranked by the annual run cost each opportunity puts in play, largest first. An opportunity whose cost is not recorded follows, and says why; gaps among those go by severity.' if with_cost else 'Cost figures are not shown for your role, so these are ranked by recorded severity, then by kind.')) %}
+                             notice=('Ranked by the annual run cost each opportunity puts in play, largest first. An opportunity whose cost is not recorded follows, and says why; gaps among those go by severity.' if with_cost else costs_withheld_sentence ~ ' These are ranked by recorded severity, then by kind.')) %}
         {# Under md each cell stacks in the row (block), so rank, name, reason, evidence and cost all sit inside the screen. #}
         {% call table_cell(class='block md:table-cell whitespace-normal align-top tabular-nums text-muted-foreground', attrs={'data-sort': item.rank}) %}<span class="md:hidden">Rank </span>{{ item.rank }}{% endcall %}
         {% call table_cell(class='block md:table-cell whitespace-normal font-medium align-top') %}

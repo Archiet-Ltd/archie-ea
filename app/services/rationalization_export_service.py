@@ -43,7 +43,7 @@ class RationalizationExportService:
         return query.all()
 
     @staticmethod
-    def generate_csv(scope=None, *, show_costs=False):
+    def generate_csv(scope=None, *, show_costs):
         """Generate CSV export of scored applications."""
         rows = RationalizationExportService.get_scored_apps(scope)
 
@@ -73,7 +73,7 @@ class RationalizationExportService:
         return output.getvalue().encode("utf-8")
 
     @staticmethod
-    def generate_excel(scope=None, *, show_costs=False):
+    def generate_excel(scope=None, *, show_costs):
         """Generate Excel workbook with multiple sheets."""
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill
@@ -160,7 +160,7 @@ class RationalizationExportService:
         return output.getvalue()
 
     @staticmethod
-    def generate_pdf(scope=None, *, show_costs=False):
+    def generate_pdf(scope=None, *, show_costs):
         """Generate PDF as styled HTML (ReportLab not available)."""
         rows = RationalizationExportService.get_scored_apps(scope)
 
