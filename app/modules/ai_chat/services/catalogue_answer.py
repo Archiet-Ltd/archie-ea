@@ -115,10 +115,10 @@ def _inventory_sentence(result: Dict[str, Any], show_cost: bool) -> str:
     return sentence
 
 
-def answer_catalogue_question(message: str, organization_id: int) -> Optional[Dict[str, Any]]:
+def answer_catalogue_question(message: str, organization_id: int, time_limit: Optional[float] = None) -> Optional[Dict[str, Any]]:
     """The catalogue's answer to *message* with each citation as a page link, or
     ``None`` when the question is not one the catalogue answers."""
-    interpretation = interpret(message, organization_id)
+    interpretation = interpret(message, organization_id, time_limit=time_limit)
     if not _keep(message, interpretation):
         return None
     entry_id = interpretation["entry_id"]
