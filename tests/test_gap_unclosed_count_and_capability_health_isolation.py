@@ -108,7 +108,7 @@ def test_gap_register_shows_risks_register_link(
     assert 'data-testid="gap-risks-register-link"' in html, "the Risks register link is missing"
     assert "These figures count gaps, not risks" in html, "the gaps-not-risks sentence is missing"
 
-    # D-3: the sentence and link also show when a severity filter is active.
+    # The sentence and link also show when a severity filter is active.
     html_critical = client.get("/enterprise/implementation/gap-analysis?severity=critical").get_data(as_text=True)
     assert 'data-testid="gap-risks-register-link"' in html_critical, "the Risks register link is missing with severity=critical"
     assert "These figures count gaps, not risks" in html_critical, "the gaps-not-risks sentence is missing with severity=critical"
