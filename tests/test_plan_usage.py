@@ -57,6 +57,10 @@ def _text(html, testid):
     return re.sub(r"<[^>]+>", "", m.group(1)).strip() if m else None
 
 
+def _labels(sidebar_for, user):
+    return [i.label for i in sidebar_for(user)["user_menu"]]
+
+
 def _page(app, client, login_as, user):
     with app.app_context():
         login_as(client, user)
@@ -120,9 +124,8 @@ def test_account_menu_offers_plan_and_billing_to_an_organisation_administrator_o
         from flask import g
 
         g.current_org_id = org.id
-        labels = lambda u: [i.label for i in sidebar_for(u)["user_menu"]]
-        assert "Plan and billing" in labels(admin)
-        assert "Plan and billing" not in labels(member)
+        assert "Plan and billing" in _labels(sidebar_for, admin)
+        assert "Plan and billing" not in _labels(sidebar_for, member)
 
 
 def test_settings_is_not_found_for_an_organisation_administrator(app, db_session, client, login_as):
