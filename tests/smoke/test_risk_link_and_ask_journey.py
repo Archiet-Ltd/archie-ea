@@ -189,3 +189,65 @@ def test_a_link_to_another_organisations_application_is_refused_and_writes_no_ri
             db.session.remove()
     finally:
         context.close()
+
+
+def test_a_risk_linked_later_from_the_register_is_found_by_the_chat_and_the_dialog_says_which_mode(
+    browser, live_server, seeded, billing
+):
+    """Create with no link, link it from the register's own row, then ask; and the dialog names its mode."""
+    title = "Late link %s" % uuid.uuid4().hex[:6]
+    context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="light")
+    page = context.new_page()
+    try:
+        sign_in_as(page, live_server, seeded, "solution_architect")
+        page.goto(live_server + "/risks/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        # Add mode: the heading and the button both say Add risk.
+        page.get_by_role("button", name="Add Risk").first.click()
+        dialog = page.locator("#create-risk-modal")
+        expect(dialog).to_be_visible()
+        expect(dialog.get_by_role("heading", name="Add risk", exact=True)).to_be_visible()
+        add_button = dialog.get_by_role("button", name="Add risk", exact=True)
+        expect(add_button).to_be_visible()
+        dialog.locator("#risk-title").fill(title)
+        dialog.locator("#risk-likelihood").select_option("3")
+        dialog.locator("#risk-impact").select_option("4")
+        dialog.locator("#risk-owner").fill("Head of Platform")
+        with page.expect_response(lambda r: r.url.endswith("/api/risks") and r.request.method == "POST") as sent:
+            add_button.click()
+        assert sent.value.status == 201
+        page.wait_for_load_state("domcontentloaded")
+        expect(page.locator("#risk-register-table tbody tr", has_text=title)).to_have_count(1, timeout=PAGE_TIMEOUT)
+
+        # Edit mode: the heading and the button say so, so nobody adds a duplicate.
+        row = page.locator("#risk-register-table tbody tr", has_text=title)
+        row.get_by_role("button", name="Row actions").click()
+        page.get_by_role("menuitem", name="Edit", exact=True).click()
+        expect(dialog).to_be_visible()
+        expect(dialog.get_by_role("heading", name="Edit risk", exact=True)).to_be_visible()
+        expect(dialog.get_by_role("button", name="Save changes", exact=True)).to_be_visible()
+        expect(dialog.get_by_role("heading", name="Add risk", exact=True)).to_have_count(0)
+        dialog.get_by_role("button", name="Cancel").click()
+
+        # Link it from the register: Row actions > Map to, then choose the application.
+        row = page.locator("#risk-register-table tbody tr", has_text=title)
+        row.get_by_role("button", name="Row actions").click()
+        page.get_by_role("menuitem", name="Map to…").click()
+        detail = page.get_by_role("dialog", name="Risk detail")
+        detail.get_by_label("Search entities to link").fill(billing["name"])
+        with page.expect_response(lambda r: r.url.endswith("/links") and r.request.method == "POST") as linked:
+            detail.get_by_test_id("risk-link-choice").first.click()
+        assert linked.value.status == 201
+
+        answer = ask(page, live_server, "what could hurt %s" % billing["name"])
+        card = answer.locator("[data-lens-row]").filter(has_text=title)
+        expect(card).to_have_count(1)
+        expect(card).to_contain_text("Head of Platform")
+        expect(card.get_by_test_id("risk-answer-touches")).to_contain_text(billing["name"])
+        card.get_by_test_id("risk-answer-link").click()
+        page.wait_for_url("**/risks/*", timeout=PAGE_TIMEOUT)
+        expect(page.locator("main")).to_contain_text(title)
+        expect(page.locator("main")).to_contain_text(billing["name"])
+    finally:
+        context.close()
+        _drop_risks(billing["org"], title)

@@ -318,8 +318,12 @@
     </div>
 
     {% if can_write %}
-    {% call modal(id='create-risk-modal', title='Add Risk', description='Record an enterprise architecture risk.', size='lg') %}
+    {% call modal(id='create-risk-modal', title='', labelledby='create-risk-modal-heading', size='lg') %}
     <div class="space-y-4">
+        <div class="flex flex-col space-y-1.5 pr-8 -mt-1">
+            <h2 id="create-risk-modal-heading" class="text-base font-semibold text-foreground" x-text="editingId ? 'Edit risk' : 'Add risk'">Add risk</h2>
+            <p class="text-sm text-muted-foreground">Record an enterprise architecture risk.</p>
+        </div>
         <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span>. Change what it touches with Map to… on the risk's own row.</p>
         {% call form_group(id='risk-title', label='Title', required=true) %}
             {{ input(id='risk-title', type='text', size='sm', placeholder='What could go wrong?', attrs_dict={'x-model': 'form.title'}) }}
@@ -352,7 +356,7 @@
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
         {{ button(text='Cancel', type='button', variant='outline', attrs_dict={'data-modal-close': 'create-risk-modal'}) }}
         {% call button(text='', type='button', on_click='submit()', attrs_dict={':disabled': 'saving'}) %}
-            <span x-text="saving ? 'Saving' : (editingId ? 'Save Changes' : 'Add Risk')"></span>
+            <span x-text="saving ? 'Saving' : (editingId ? 'Save changes' : 'Add risk')"></span>
         {% endcall %}
     </div>
     {% endcall %}
