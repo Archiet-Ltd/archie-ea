@@ -64,7 +64,7 @@ def upgraded():
                     module.upgrade()
         engine.dispose()
         with admin.cursor() as cur:
-            cur.execute(f"SELECT rolsuper FROM pg_roles WHERE rolname = current_user")
+            cur.execute("SELECT rolsuper FROM pg_roles WHERE rolname = current_user")
             if not cur.fetchone()[0]:
                 pytest.skip("needs a role that may create roles")
             cur.execute(f"CREATE ROLE {role} LOGIN PASSWORD '{ROLE_PASSWORD}' NOSUPERUSER NOBYPASSRLS")

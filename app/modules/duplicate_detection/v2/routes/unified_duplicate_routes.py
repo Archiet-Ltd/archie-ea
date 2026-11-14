@@ -14,7 +14,6 @@ from difflib import SequenceMatcher
 from flask import (  # dead-code-ok
     Blueprint,
     current_app,
-    g,
     jsonify,
     redirect,
     render_template,
