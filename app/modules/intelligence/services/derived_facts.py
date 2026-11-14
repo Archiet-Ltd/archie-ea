@@ -235,6 +235,16 @@ def latest_derivation_run(organization_id: int):
     return db.session.execute(stmt).scalars().first()
 
 
+def utc_naive(column):
+    """A relationship stamp as naive UTC, the base a run is stamped in.
+
+    Relationship stamps are written by ``now()`` into a plain timestamp, so they
+    hold the database session's local wall-clock time; runs hold naive UTC. Both
+    sides of any "changed since the last run" comparison go through this.
+    """
+    return db.func.timezone("UTC", db.func.timezone(db.func.current_setting("TimeZone"), column))
+
+
 def relationships_changed_since_last_run(organization_id: int, last_run) -> Optional[int]:
     """How many relationships were added or changed after the last run began.
 
@@ -248,7 +258,7 @@ def relationships_changed_since_last_run(organization_id: int, last_run) -> Opti
     cutoff = last_run.started_at or last_run.finished_at
     if cutoff is None:
         return None
-    changed_at = db.func.coalesce(ArchiMateRelationship.updated_at, ArchiMateRelationship.created_at)
+    changed_at = utc_naive(db.func.coalesce(ArchiMateRelationship.updated_at, ArchiMateRelationship.created_at))
     return int(
         db.session.execute(
             db.select(db.func.count(ArchiMateRelationship.id)).where(
@@ -296,9 +306,6 @@ def derivation_status(organization_id: int, *, recent: int = 5) -> Dict[str, Any
         "current_count": aggregates["derived_count"],
         "stale_count": aggregates["stale_count"],
         "changed_since_count": changed_since,
-        # Rows flagged stale and relationships added since are different
-        # evidence of the same fact; the larger is the honest figure.
-        "out_of_date_count": None if changed_since is None else max(changed_since, aggregates["stale_count"]),
         "stale_reasons": [(reason, int(count)) for reason, count in reasons],
     }
 

@@ -214,8 +214,8 @@ def _move_last_run_back_an_hour(org_id):
     db.session.commit()
 
 
-def _panel_count(html):
-    return int(re.search(r"data-derivation-stale>(\d+)<", html).group(1))
+def _panel_count(html):  # relationships changed since the last run
+    return int(re.search(r"data-derivation-changed>(\d+)<", html).group(1))
 
 
 def test_the_answer_and_its_panel_agree_about_the_last_run_and_what_changed_since(client, login_as, make_org):
@@ -237,10 +237,26 @@ def test_the_answer_and_its_panel_agree_about_the_last_run_and_what_changed_sinc
     assert re.search(r"last updated [^<;]*\d{4}[^<;]*; %d relationships? ha(?:s|ve) been added or changed since" % panel, html)
     assert "We haven't worked out the indirect connections for your model yet" not in html
 
+    # One derived connection is flagged out of date: the two quantities differ and each says its own unit.
+    changed = panel
+    db.session.execute(
+        db.text(
+            "UPDATE archimate_derived_relationships SET stale = TRUE, stale_since = now(), stale_reason = 'relationship_changed' "
+            "WHERE id = (SELECT MIN(id) FROM archimate_derived_relationships WHERE organization_id = :o)"
+        ),
+        {"o": org_id},
+    )
+    db.session.commit()
+    html = _ask(client, QUESTION).get_json()["html"]
+    assert re.search(r"Connections that may be out of date</dt><dd[^>]*data-derivation-stale>1<", html)
+    assert re.search(r"Relationships added or changed since</dt><dd[^>]*data-derivation-changed>%d<" % changed, html)
+    assert changed != 1
+
     # The element has no connections worked out but a run is recorded: the answer never claims it was not worked out.
     db.session.execute(db.text("DELETE FROM archimate_derived_relationships WHERE organization_id = :o"), {"o": org_id})
     db.session.commit()
     html = _ask(client, QUESTION).get_json()["html"]
     assert "We haven't worked out the indirect connections for your model yet" not in html
     assert "Not worked out yet." not in html
+    assert "No indirect connections were found for Payments service when your model was last worked out" in html
     assert re.search(r"when your model was last worked out \([^)]*\d{4}[^)]*\); %d relationships? ha(?:s|ve) been added or changed since" % _panel_count(html), html)

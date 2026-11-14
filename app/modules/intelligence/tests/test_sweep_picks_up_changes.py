@@ -151,7 +151,6 @@ def test_the_panel_counts_relationships_added_since_the_last_run(app, db_session
         DerivationRunner().run_and_persist(org_id, trigger="on_demand")
         status = derivation_status(org_id)
         assert status["changed_since_count"] == 0
-        assert status["out_of_date_count"] == 0
 
     from app.models import ArchiMateElement
 
@@ -174,4 +173,48 @@ def test_the_panel_counts_relationships_added_since_the_last_run(app, db_session
             db.session.commit()
             status = derivation_status(org_id)
     assert status["changed_since_count"] == 3
-    assert status["out_of_date_count"] == 3
+    assert status["stale_count"] == 0
+
+
+def test_a_session_in_another_time_zone_does_not_change_what_counts_as_changed(app, db_session, make_org):
+    """Relationship stamps hold the session's local time and runs hold UTC; the two are
+    compared in one base, so a London or Auckland session sees the same answer as UTC."""
+    from app.models import ArchiMateRelationship
+    from app.modules.intelligence.services.derivation_runner import DerivationRunner
+    from app.modules.intelligence.services.derived_facts import derivation_status
+    from app.modules.intelligence.services.recompute_job import changed_since_last_run_organization_ids
+
+    org = make_org("sw-tz")
+    _chain(db_session, org.id, "t")
+    db_session.commit()
+    org_id = org.id
+    for zone in ("UTC", "Europe/London", "Pacific/Auckland", "America/Los_Angeles"):
+        with app.app_context():
+            db.session.execute(db.text("SET TIME ZONE '%s'" % zone))
+            db.session.execute(db.text("DELETE FROM intelligence_derivation_runs WHERE organization_id = :o"), {"o": org_id})
+            # Stamp the relationships as this session would have written them, an hour ago.
+            db.session.execute(
+                db.text(
+                    "UPDATE archimate_relationships SET created_at = now() - interval '1 hour', "
+                    "updated_at = now() - interval '1 hour' WHERE organization_id = :o"
+                ),
+                {"o": org_id},
+            )
+            db.session.commit()
+            DerivationRunner().run_and_persist(org_id, trigger="on_demand")
+            # Written before the run, in the session's own time: nothing has changed since.
+            assert derivation_status(org_id)["changed_since_count"] == 0, zone
+            assert org_id not in changed_since_last_run_organization_ids(), zone
+            # Written after the run: it is counted, whatever the zone.
+            db.session.execute(
+                db.text(
+                    "UPDATE archimate_relationships SET updated_at = clock_timestamp() "
+                    "WHERE organization_id = :o AND type = 'Serving'"
+                ),
+                {"o": org_id},
+            )
+            db.session.commit()
+            assert derivation_status(org_id)["changed_since_count"] == 1, zone
+            assert org_id in changed_since_last_run_organization_ids(), zone
+            db.session.execute(db.text("RESET TIME ZONE"))
+            db.session.commit()

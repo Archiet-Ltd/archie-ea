@@ -95,7 +95,7 @@ def changed_since_last_run_organization_ids() -> list[int]:
                 "  ON d.organization_id = r.organization_id "
                 "WHERE r.organization_id IS NOT NULL "
                 "GROUP BY r.organization_id, d.ran_at "
-                "HAVING d.ran_at IS NULL OR MAX(COALESCE(r.updated_at, r.created_at)) > d.ran_at "
+                "HAVING d.ran_at IS NULL OR MAX(timezone('UTC', timezone(current_setting('TimeZone'), COALESCE(r.updated_at, r.created_at)))) > d.ran_at "
                 "ORDER BY r.organization_id"
             )
         ).all()

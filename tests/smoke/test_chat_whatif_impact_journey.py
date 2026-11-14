@@ -355,7 +355,7 @@ def test_the_answer_says_when_connections_were_last_worked_out_and_how_many_rela
         answer = page.get_by_test_id("estate-answer")
         expect(answer).to_be_visible(timeout=PAGE_TIMEOUT * 2)
         text = answer.inner_text()
-        figure = answer.locator("[data-derivation-stale]").inner_text().strip()
+        figure = answer.locator("[data-derivation-changed]").inner_text().strip()
         assert figure.isdigit() and int(figure) > 0, text
         notice = answer.locator("[data-changed-since-notice]").inner_text()
         assert re.search(r"last updated .*\d{4}", notice), notice
