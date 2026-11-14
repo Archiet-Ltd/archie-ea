@@ -168,7 +168,15 @@ def list_risk_links(risk_id):
     return RiskEntityLink.query.filter_by(risk_id=risk_id).order_by(RiskEntityLink.id).all()
 
 
-def _load_linkable_entity(entity_type, entity_id):
+def _in_organisation(model, entity_id, organization_id):
+    """One row by id, with the organisation named in the statement when the model carries one."""
+    query = model.query.filter_by(id=entity_id)
+    if organization_id is not None and hasattr(model, "organization_id"):
+        query = query.filter(model.organization_id == organization_id)
+    return query.first()
+
+
+def _load_linkable_entity(entity_type, entity_id, organization_id=None):
     """Load an Application/Solution/Programme/Constraint row, tenant-scoped.
 
     Returns ``None`` both when ``entity_id`` does not exist at all and when
@@ -183,22 +191,22 @@ def _load_linkable_entity(entity_type, entity_id):
     """
     if entity_type == "application":
         from app.models.application_portfolio import ApplicationComponent
-        return ApplicationComponent.query.filter_by(id=entity_id).first()
+        return _in_organisation(ApplicationComponent, entity_id, organization_id)
     if entity_type == "solution":
         from app.models.solution_models import Solution
-        return Solution.query.filter_by(id=entity_id).first()
+        return _in_organisation(Solution, entity_id, organization_id)
     if entity_type == "programme":
         from app.models.strategic import StrategicInitiative
-        return StrategicInitiative.query.filter_by(id=entity_id).first()
+        return _in_organisation(StrategicInitiative, entity_id, organization_id)
     if entity_type == "constraint":
         from app.models.solution_architect_models import SolutionConstraint
-        return SolutionConstraint.query.filter_by(id=entity_id).first()
+        return _in_organisation(SolutionConstraint, entity_id, organization_id)
     if entity_type == "capability":
         from app.models.business_capabilities import BusinessCapability
-        return BusinessCapability.query.filter_by(id=entity_id).first()
+        return _in_organisation(BusinessCapability, entity_id, organization_id)
     if entity_type == "archimate_element":
         from app.models import ArchiMateElement
-        return ArchiMateElement.query.filter_by(id=entity_id).first()
+        return _in_organisation(ArchiMateElement, entity_id, organization_id)
     return None
 
 
@@ -207,20 +215,17 @@ def add_risk_link(risk_id, entity_type, entity_id, organization_id=None, commit=
     record must belong to it; ``commit=False`` leaves the transaction to that caller."""
     if entity_type not in ENTITY_TYPES:
         raise ValueError(f"entity_type must be one of {ENTITY_TYPES}, got {entity_type!r}")
+    organization_id = _own_organization(organization_id)
     if organization_id is not None:
         if get_risk(organization_id, risk_id) is None:
             raise ValueError(f"risk {risk_id} was not found in this organisation")
     else:
         Risk.query.get_or_404(risk_id)  # 404s cleanly if the risk does not exist
-    target = _load_linkable_entity(entity_type, entity_id)
+    target = _load_linkable_entity(entity_type, entity_id, organization_id)
     if target is None:
         # Covers both "no such row" and "that row belongs to another
         # organisation" -- refused identically, so a caller learns nothing
         # about what exists outside its own tenant.
-        raise ValueError(
-            f"{entity_type} {entity_id} was not found in this organisation"
-        )
-    if organization_id is not None and getattr(target, "organization_id", None) != organization_id:
         raise ValueError(
             f"{entity_type} {entity_id} was not found in this organisation"
         )
@@ -629,6 +634,25 @@ def ranked_risks(organization_id=None):
         if component_id in components:
             apps_by_risk.setdefault(risk_id, []).append(component_id)
     others_by_risk = _other_links_by_risk(org_id)
+    # An element linked directly: it is both where the risk starts reaching from and something it touches.
+    from app.models import ArchiMateElement
+    element_links = db.session.execute(
+        db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_id).where(
+            RiskEntityLink.organization_id == org_id, RiskEntityLink.entity_type == "archimate_element"
+        ).order_by(RiskEntityLink.id)
+    ).all()
+    linked_element_names = {}
+    if element_links:
+        linked_element_names = dict(db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.name).where(
+                ArchiMateElement.organization_id == org_id,
+                ArchiMateElement.id.in_(sorted({e for _, e in element_links})),
+            )
+        ).all())
+    elements_by_risk = {}
+    for risk_id, element_id in element_links:
+        if element_id in linked_element_names and element_id not in elements_by_risk.setdefault(risk_id, []):
+            elements_by_risk[risk_id].append(element_id)
 
     seeds_by_risk = {}
     unlinked_apps = set()   # risks with an application whose element pointer is empty
@@ -641,6 +665,9 @@ def ranked_risks(organization_id=None):
             if element_id is None:
                 unlinked_apps.add(risk.id)
             elif element_id not in seeds:
+                seeds.append(element_id)
+        for element_id in elements_by_risk.get(risk.id, []):
+            if element_id != risk.archimate_element_id and element_id not in seeds:
                 seeds.append(element_id)
         seeds_by_risk[risk.id] = seeds
 
@@ -689,6 +716,8 @@ def ranked_risks(organization_id=None):
             {"name": components[c][0], "kind": "application", "id": c, "element_id": components[c][1]}
             for c in sorted(apps_by_risk.get(risk.id, []))
         ]
+        touches += [{"name": linked_element_names[e], "kind": "element", "id": e, "element_id": e}
+                    for e in elements_by_risk.get(risk.id, []) if e != risk.archimate_element_id]
         app_elements = {t["element_id"] for t in touches}
         # The risk's own mirrored element is never listed: it is the risk itself,
         # not something the risk touches (its page has no relationships to show).

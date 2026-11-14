@@ -160,8 +160,12 @@ def add_risk_link(risk_id):
         return jsonify(
             {"error": f"entity_type (one of {ENTITY_TYPES}) and entity_id are required"}
         ), 400
+    from app.middleware.tenant_context import current_org_id
+
     try:
-        link = risk_service.add_risk_link(risk_id, entity_type, entity_id)
+        link = risk_service.add_risk_link(
+            risk_id, entity_type, entity_id, organization_id=current_org_id()
+        )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify(
