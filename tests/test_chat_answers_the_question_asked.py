@@ -176,6 +176,8 @@ def test_a_reply_that_says_it_searched_when_nothing_ran_loses_the_claim(client, 
     done = [e for e in events if e["type"] == "done"][0]
     assert "searched" not in done["response"] and "found no such" not in done["response"]
     assert "No search ran" in done["response"]
+    # Nothing is streamed as the model wrote it: the person reads only the corrected reply.
+    assert not [e for e in events if e["type"] == "token" and "searched" in json.dumps(e)]
 
 
 def test_a_reply_that_says_it_searched_is_kept_when_the_trail_has_a_lookup(client, login_as, make_org, monkeypatch):

@@ -1120,7 +1120,11 @@ class AgentRunner:
                     gate_passes = True
                 # An answer that read the genome is shown only after its
                 # citation post-check, drawn by the server (see _finalize).
-                self._release_held_tokens(gate_passes and not self._grounding.genome_slices)
+                # A reply whose words about searching or sources are corrected is not streamed as the
+                # model wrote it: the person reads the corrected reply the done event carries.
+                self._release_held_tokens(
+                    gate_passes and not self._grounding.genome_slices and self._honest_text(final_text) == final_text
+                )
                 return self._finalize(
                     {
                         "response": llm_resp.get("text", ""),
@@ -2439,10 +2443,14 @@ class AgentRunner:
         text = result.get("response")
         if result.get("error") or result.get("system_generated") or not isinstance(text, str) or not text.strip():
             return
+        result["response"] = self._honest_text(text)
+
+    def _honest_text(self, text: str) -> str:
+        """*text* with its claims of searching, and its facts from the conversation, made to match what ran."""
         from app.modules.ai_chat.services.turn_honesty import mark_conversation_facts, remove_unbacked_search_claims
 
         text = remove_unbacked_search_claims(text, self._lookups_run)
-        result["response"] = mark_conversation_facts(text, self._earlier_user, self._evidence_chunks)
+        return mark_conversation_facts(text, self._earlier_user, self._evidence_chunks)
 
     def _text_only_fallback(
         self, message: str, system_prompt: str, provider: str, model: str, api_key: str, LLMService,
