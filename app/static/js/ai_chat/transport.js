@@ -231,6 +231,7 @@
                 (_detail && _detail.message) || ('stream ' + resp.status)
             );
             _err.status = resp.status;
+            _err.reasonCode = (_detail && _detail.reason_code) || null;
             _err.isConfigFault = isProviderConfigurationFault(_detail);
             throw _err;
         }
@@ -269,7 +270,7 @@
                            used to make this branch throw unconditionally,
                            discarding the very message the server had just
                            written to the transcript. */
-                        if (ev.error && !ev.response) throw new Error(ev.error);
+                        if (ev.error && !ev.response) { var _de = new Error(ev.error); _de.reasonCode = ev.reason_code || null; throw _de; }
                         /* When the server's citation gate refused the answer, its
                            response is what the user sees, whatever was streamed
                            before it. */
@@ -297,6 +298,7 @@
                             paused: !!ev.paused,
                             retryable: !!ev.retryable,
                             notSetUp: !!ev.not_set_up,
+                            reasonCode: ev.reason_code || null,
                             error: ev.error || null,
                             turnId: ev.turn_id || null
                         };
@@ -339,6 +341,7 @@
             paused: !!meta.paused,
             retryable: !!meta.retryable,
             notSetUp: !!meta.notSetUp,
+            reasonCode: meta.reasonCode || null,
             error: meta.error || null,
             turnId: meta.turnId || null
         });
