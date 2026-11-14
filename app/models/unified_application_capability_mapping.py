@@ -18,10 +18,14 @@ from sqlalchemy import (
     String,
     Text,
 )
+from sqlalchemy import event, select, table, column
 from sqlalchemy.orm import relationship
 
 from app import db
 from app.models.mixins import TenantMixin
+
+
+application_components = table("application_components", column("id"), column("organization_id"))
 
 
 class UnifiedApplicationCapabilityMapping(TenantMixin, db.Model):
@@ -155,3 +159,16 @@ class UnifiedApplicationCapabilityMapping(TenantMixin, db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+@event.listens_for(UnifiedApplicationCapabilityMapping, "before_insert")
+def _take_the_applications_organisation(mapper, connection, target):
+    """A row written by a path that has not moved to ``capability_support`` yet belongs to the
+    organisation of its application, whatever the request context says (a command, a worker)."""
+    if target.organization_id is not None or target.application_component_id is None:
+        return
+    target.organization_id = connection.execute(
+        select(application_components.c.organization_id).where(
+            application_components.c.id == target.application_component_id
+        )
+    ).scalar()

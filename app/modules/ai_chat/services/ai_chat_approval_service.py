@@ -1285,8 +1285,8 @@ class AIChatApprovalService:
             return {"success": False, "error": str(e), "code": "APPROVAL_DENIED"}
         except Exception as e:
             db.session.rollback()
-            self.logger.error(f"Failed to approve/execute operation {approval_id}: {e}")
-            return {"success": False, "error": f"Execution failed: {str(e)}"}
+            self.logger.exception("Failed to approve/execute operation %s", approval_id)
+            return {"success": False, "error": "The change could not be saved, so nothing was changed."}
 
     def reject_approval(self, approval_id: int, reason: Optional[str] = None) -> Dict[str, Any]:
         """

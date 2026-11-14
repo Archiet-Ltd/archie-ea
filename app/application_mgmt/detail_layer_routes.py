@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 
 from flask import current_app, flash, g, jsonify, request, session
-from flask_login import login_required
+from flask_login import current_user, login_required
 from sqlalchemy import func, select
 
 from .. import db
@@ -29,7 +29,6 @@ from ..models.archimate_technology import (
     TechnologyInteraction,
     TechnologyProcess,
 )
-from ..models.business_capabilities import BusinessCapability
 from ..models.business_layer import (
     BusinessEvent,
 )
@@ -43,7 +42,6 @@ from ..models.technology_layer import (
     TechnologyInterface,
     TechnologyService,
 )
-from ..models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 from ..models.unified_capability import UnifiedCapability
 from ..models.vendor.vendor_organization import VendorProduct, application_vendor_products
 from . import application_mgmt
@@ -55,7 +53,6 @@ from .forms import (
     TechnologyLayerForm,
 )
 from .routes import (
-    CAPABILITY_SUPPORT_LEVEL_CHOICES,
     VENDOR_CRITICALITY_CHOICES,
     VENDOR_DEPLOYMENT_CHOICES,
     VENDOR_HOSTING_CHOICES,
@@ -112,36 +109,28 @@ def update_capability_mapping(id, mapping_id):
 
     # csrf-ok: global CSRFProtect active
 
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping as Row
+    from app.services import capability_support as support
+
+    row = Row.query.filter_by(id=mapping_id, organization_id=app.organization_id).first()
+    if row is None or row.application_component_id != app.id:
+        flash("That capability mapping does not belong to this application.", "error")
+        return _redirect_to_detail(app.id, tab="capabilities")
+
+    facts = {key: request.form.get(key) for key in ("support_level", "coverage_percentage", "maturity_level", "notes")
+             if request.form.get(key)}
+    facts["is_strategic"] = "is_strategic" in request.form
     try:
-        # UnifiedApplicationCapabilityMapping is imported at module level (line ~45).
-        # A local re-import here used to shadow it with a wrong path
-        # (app.models.application_layer, which does not define this class), so the update
-        # always hit the except branch below and never persisted -- caught while adding the
-        # tenant-ownership check just below.
-        mapping = UnifiedApplicationCapabilityMapping.query.get_or_404(mapping_id)
-
-        if mapping.application_component_id != app.id:
-            flash("That capability mapping does not belong to this application.", "error")
-            return _redirect_to_detail(app.id, tab="capabilities")
-
-        # Update mapping fields
-        if request.form.get("support_level"):
-            mapping.support_level = request.form.get("support_level")
-        if request.form.get("coverage_percentage"):
-            mapping.coverage_percentage = float(request.form.get("coverage_percentage"))
-        if request.form.get("maturity_level"):
-            mapping.maturity_level = request.form.get("maturity_level")
-        mapping.is_strategic = "is_strategic" in request.form
-        if request.form.get("notes"):
-            mapping.notes = request.form.get("notes")
-
+        support.update_support_facts(app.organization_id, row.id, **facts)
         db.session.commit()
         flash("Capability mapping updated successfully!", "success")
-
-    except Exception as e:
+    except support.CapabilitySupportRefused as refusal:
         db.session.rollback()
-        current_app.logger.error(f"Error updating capability mapping: {str(e)}")
-        flash("Error updating capability mapping. Please try again.", "error")
+        flash(str(refusal), "error")
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Error updating capability mapping %s", mapping_id)
+        flash("The mapping could not be updated, so nothing was changed.", "error")
 
     return _redirect_to_detail(app.id, tab="capabilities")
 
@@ -338,103 +327,55 @@ def application_vendor_footprint(id):
 @application_mgmt.route("/applications/<int:id>/capability-mappings", methods=["POST"])
 @login_required
 def application_capability_mapping_create(id):
-    """Attach an enterprise capability to an application component."""
+    """Record that this application supports a capability."""
+    from app.services import capability_support as support
+
     app = ApplicationComponent.query.get_or_404(id)
 
     try:
         capability_id = int(request.form.get("capability_id", "0"))
     except (TypeError, ValueError):
         capability_id = 0
-
     if not capability_id:
         flash("Select a capability to link before submitting.", "error")
         return _redirect_to_detail(app.id, tab="capabilities")
 
-    capability = db.session.get(BusinessCapability, capability_id)
-    if not capability:
+    capability = UnifiedCapability.query.filter_by(
+        id=capability_id, organization_id=app.organization_id
+    ).first()
+    if capability is None:
         flash("Selected capability was not found.", "error")
         return _redirect_to_detail(app.id, tab="capabilities")
-
-    # The picker posts a BusinessCapability.id, but UnifiedApplicationCapabilityMapping
-    # FKs to unified_capabilities.id — a different sequence (ADR-0008: unified_capabilities
-    # is the canonical, provenance-tracked projection of business_capability, kept in sync
-    # by `flask project-capabilities`). Resolve the real projected row rather than reusing
-    # the BusinessCapability id directly, which only worked by accident where the two
-    # sequences happened to collide and otherwise violated the FK.
-    unified_capability = UnifiedCapability.query.filter_by(
-        source_table="business_capability", source_id=str(capability_id)
-    ).first()
-    if not unified_capability:
-        flash(
-            f"{capability.name} has not finished syncing to the capability store yet — "
-            "try again shortly, or ask an administrator to run the capability projection.",
-            "error",
-        )
+    if not app.archimate_element_id or not capability.archimate_element_id:
+        flash("That application or capability has no place in the model yet, so the link could not be saved.", "error")
         return _redirect_to_detail(app.id, tab="capabilities")
 
-    existing = UnifiedApplicationCapabilityMapping.query.filter_by(
-        application_component_id=app.id, unified_capability_id=unified_capability.id
-    ).first()
-    if existing:
-        flash("Capability already linked to this application.", "info")
-        return _redirect_to_detail(app.id, tab="capabilities")
-
-    support_level = (request.form.get("support_level") or "").strip().lower()
-    valid_support_levels = {choice[0] for choice in CAPABILITY_SUPPORT_LEVEL_CHOICES}
-    if support_level and support_level not in valid_support_levels:
-        flash("Select a valid support level.", "error")
-        return _redirect_to_detail(app.id, tab="capabilities")
-
-    coverage_raw = (request.form.get("coverage_percentage") or "").strip()
-    coverage_value = None
-    if coverage_raw:
-        try:
-            coverage_value = int(coverage_raw)
-        except ValueError:
-            flash("Coverage percentage must be an integer between 0 and 100.", "error")
-            return _redirect_to_detail(app.id, tab="capabilities")
-        if coverage_value < 0 or coverage_value > 100:
-            flash("Coverage percentage must be between 0 and 100.", "error")
-            return _redirect_to_detail(app.id, tab="capabilities")
-
-    maturity_raw = (request.form.get("maturity_level") or "").strip()
-    maturity_value = None
-    if maturity_raw:
-        try:
-            maturity_value = int(maturity_raw)
-        except ValueError:
-            flash("Maturity level must be between 1 and 5.", "error")
-            return _redirect_to_detail(app.id, tab="capabilities")
-        if maturity_value < 1 or maturity_value > 5:
-            flash("Maturity level must be between 1 and 5.", "error")
-            return _redirect_to_detail(app.id, tab="capabilities")
-
-    notes_value = (request.form.get("notes") or "").strip() or None
-    is_strategic = request.form.get("is_strategic") in {"on", "true", "1"}
-
-    mapping = UnifiedApplicationCapabilityMapping(
-        application_component_id=app.id,
-        unified_capability_id=unified_capability.id,
-        support_level=support_level or None,
-        coverage_percentage=coverage_value,
-        maturity_level=maturity_value,
-        is_strategic=is_strategic,
-        notes=notes_value,
-    )
-
+    facts = {
+        "support_level": request.form.get("support_level"),
+        "coverage_percentage": request.form.get("coverage_percentage"),
+        "maturity_level": request.form.get("maturity_level"),
+        "is_strategic": request.form.get("is_strategic") in {"on", "true", "1"},
+        "notes": request.form.get("notes"),
+    }
     try:
-        db.session.add(mapping)
-        db.session.commit()
-        flash(f"Linked {capability.name} to {app.name}.", "success")
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception(
-            "Failed to link capability %s to application %s", capability_id, app.id
+        result = support.record_capability_support(
+            app.organization_id,
+            app.archimate_element_id,
+            capability.archimate_element_id,
+            kind=request.form.get("kind") or "realization",
+            facts=facts,
+            actor_id=getattr(current_user, "id", None),
         )
-        # Never interpolate the raw exception into user-facing text — it leaked
-        # internal table names, the full INSERT and its parameter dictionary.
-        flash("Unable to link that capability. The team has been notified.", "error")
+        db.session.commit()
+    except support.CapabilitySupportRefused as refusal:
+        db.session.rollback()
+        flash(str(refusal), "error")
+        return _redirect_to_detail(app.id, tab="capabilities")
 
+    if result.created:
+        flash(f"Linked {capability.name} to {app.name}.", "success")
+    else:
+        flash("Capability already linked to this application. Its details were updated.", "info")
     return _redirect_to_detail(app.id, tab="capabilities")
 
 
@@ -444,24 +385,29 @@ def application_capability_mapping_create(id):
 )
 @login_required
 def application_capability_mapping_delete(id, mapping_id):
-    """Detach a capability mapping from an application."""
-    app = ApplicationComponent.query.get_or_404(id)
-    mapping = UnifiedApplicationCapabilityMapping.query.get_or_404(mapping_id)
+    """Take a supported capability off this application."""
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping as Row
+    from app.services import capability_support as support
 
-    if mapping.application_component_id != app.id:
+    app = ApplicationComponent.query.get_or_404(id)
+    row = Row.query.filter_by(id=mapping_id, organization_id=app.organization_id).first()
+    if row is None or row.application_component_id != app.id:
         flash("That capability mapping does not belong to this application.", "error")
         return _redirect_to_detail(app.id, tab="capabilities")
 
-    capability = db.session.get(BusinessCapability, mapping.unified_capability_id)
+    capability = db.session.get(UnifiedCapability, row.unified_capability_id)
     capability_name = capability.name if capability else "Capability"
-
     try:
-        db.session.delete(mapping)
+        support.remove_capability_support(app.organization_id, row.id)
         db.session.commit()
         flash(f"Removed {capability_name} from {app.name}.", "success")
-    except Exception as exc:
+    except support.CapabilitySupportRefused as refusal:
         db.session.rollback()
-        flash(f"Unable to remove capability mapping: {exc}", "error")
+        flash(str(refusal), "error")
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Failed to remove capability mapping %s", mapping_id)
+        flash("The capability could not be removed, so nothing was changed.", "error")
 
     return _redirect_to_detail(app.id, tab="capabilities")
 

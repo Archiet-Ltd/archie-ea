@@ -878,6 +878,15 @@ def capability_citation(capability_id: int, name: str, source_line: Optional[str
     return citation
 
 
+def _capability_element_page(capability) -> Optional[str]:
+    """The element page of a capability that has no business-capability record."""
+    if not capability.archimate_element_id:
+        return None
+    from app.modules.architecture.routes.archimate_crud.routes import _element_href
+
+    return _element_href("strategy", "Capability", capability.archimate_element_id)
+
+
 def _resolve_application(organization_id: int, name: Optional[str]):
     """(application, others): the one application of *organization_id* a name
     names, else ``None`` and the applications it was ambiguous between.
@@ -929,22 +938,32 @@ def _capabilities_of_application(organization_id: int, service: Optional[str] = 
 
     rows, citations = [], []
     for mapping, capability in application_capability_links(application.id, organization_id):
-        # A unified capability points at its business capability by source_id.
-        raw_id = capability.source_id if capability.__class__.__name__ == "UnifiedCapability" else capability.id
-        try:
-            capability_id = int(raw_id)
-        except (TypeError, ValueError):
-            continue
+        # A unified capability points at its business capability by source_id; one made from a model
+        # element alone has none, and is cited to its element page.
+        target = None
+        if capability.__class__.__name__ == "UnifiedCapability":
+            try:
+                capability_id = int(capability.source_id)
+            except (TypeError, ValueError):
+                capability_id = capability.id
+                target = _capability_element_page(capability)
+        else:
+            capability_id = capability.id
         support = (getattr(mapping, "support_level", None) or "").replace("_", " ").capitalize()
         coverage = getattr(mapping, "coverage_percentage", None)
+        kind_word = getattr(mapping, "kind_word", None)
         line = " · ".join(part for part in (
-            f"{support} support" if support else "", f"Coverage: {coverage_text(coverage)}") if part) or None
+            kind_word or "", f"{support} support" if support else "", f"Coverage: {coverage_text(coverage)}") if part) or None
         rows.append({
             "id": capability_id, "name": capability.name, "support_level": support or None,
+            "how": kind_word,
             "coverage_percentage": coverage, "source_table": "application_capability_mapping",
             "truth_class": TRUTH_CLASS_DRAWN,
         })
-        citations.append(capability_citation(capability_id, capability.name, line))
+        citation = capability_citation(capability_id, capability.name, line)
+        if target:
+            citation["target"] = target
+        citations.append(citation)
 
     result = {
         "answer": f"the capabilities {application.name} supports",

@@ -207,6 +207,23 @@ def _project_relationship(session, rel) -> None:
         return
     capability = capability_for_element(rel.organization_id, target, flush=False)
     application = _application_row(rel.organization_id, source, flush=False)
+    if capability.id is not None and application.id is not None:
+        # A row written before the relationship existed (a path that has not moved to this module)
+        # is the pair's row: take it over rather than making a second.
+        orphan = (
+            session.query(Row)
+            .filter(
+                Row.organization_id == rel.organization_id,
+                Row.unified_capability_id == capability.id,
+                Row.application_component_id == application.id,
+                Row.archimate_relationship_id.is_(None),
+            )
+            .order_by(Row.id)
+            .first()
+        )
+        if orphan is not None:
+            orphan.archimate_relationship_id = rel.id
+            return
     row = Row(
         organization_id=rel.organization_id,
         archimate_relationship_id=rel.id,
@@ -532,3 +549,112 @@ def support_summary(organization_id: int) -> Dict[str, Any]:
 def format_generated_at(moment: datetime) -> str:
     """"14 Nov 2026, 11:20" for the line under the coverage matrix."""
     return f"{moment.day} {moment:%b %Y}, {moment:%H:%M}"
+
+
+# ---------------------------------------------------------------------------
+# Names to elements (the chat)
+# ---------------------------------------------------------------------------
+def _elements_named(organization_id: int, name: str, element_type: str) -> List:
+    from app.utils.duplicate_guard import folded_column, normalize_name
+
+    _, Element, _, _, _ = _models()
+    key = normalize_name(str(name or "").translate(str.maketrans("-_", "  ")))
+    if not key:
+        return []
+    rows = (
+        db.session.query(Element)
+        .filter(
+            Element.organization_id == organization_id,
+            Element.deleted_at.is_(None),
+            folded_column(db.func.translate(Element.name, "-_", "  ")) == key,
+        )
+        .order_by(Element.id)
+        .all()
+    )
+    return [e for e in rows if normalised_type(e.type) == element_type]
+
+
+def _page_of(element) -> str:
+    from app.models.application_portfolio import ApplicationComponent
+
+    if normalised_type(element.type) == "applicationcomponent":
+        row = (
+            db.session.query(ApplicationComponent.id)
+            .filter(
+                ApplicationComponent.organization_id == element.organization_id,
+                ApplicationComponent.archimate_element_id == element.id,
+            )
+            .first()
+        )
+        if row:
+            return f"/applications/{row[0]}"
+    from app.modules.architecture.routes.archimate_crud.routes import _element_href
+
+    return _element_href("strategy", "Capability", element.id) or ""
+
+
+def _one_of(organization_id: int, name: str, element_type: str, noun: str):
+    found = _elements_named(organization_id, name, element_type)
+    if not found:
+        raise CapabilitySupportRefused(f"No {noun} named '{name}' exists in this workspace.")
+    if len(found) > 1:
+        listed = "; ".join(f"{e.name} ({_page_of(e)})" for e in found)
+        raise CapabilitySupportRefused(
+            f"More than one {noun} is called '{name}': {listed}. Say which one you mean."
+        )
+    return found[0]
+
+
+def resolve_support_ends(organization_id: int, application_name: str, capability_name: str):
+    """The one application element and the one capability element two names mean, in this
+    organisation. A name that matches nothing, or matches two, is refused in words; a write is
+    never resolved by a silent pick."""
+    application = _one_of(organization_id, application_name, "applicationcomponent", "application")
+    capability = _one_of(organization_id, capability_name, "capability", "capability")
+    return application, capability
+
+
+def application_page(organization_id: int, application_element) -> str:
+    return _page_of(application_element)
+
+
+# ---------------------------------------------------------------------------
+# Counts the store-agreement check compares
+# ---------------------------------------------------------------------------
+def count_support_relationships(organization_id: int) -> int:
+    """Supported pairs as the model holds them: distinct application-to-capability pairs joined by a
+    current Realization or Serving relationship."""
+    _, Element, Relationship, _, _ = _models()
+    source, target = db.aliased(Element), db.aliased(Element)
+    rows = (
+        db.session.query(Relationship.source_id, Relationship.target_id)
+        .join(source, source.id == Relationship.source_id)
+        .join(target, target.id == Relationship.target_id)
+        .filter(
+            Relationship.organization_id == organization_id,
+            source.organization_id == organization_id,
+            target.organization_id == organization_id,
+            Relationship.superseded_at.is_(None),
+            db.func.lower(Relationship.type).in_(SUPPORT_KINDS),
+            db.func.lower(db.func.replace(db.func.replace(source.type, "_", ""), " ", "")) == "applicationcomponent",
+            db.func.lower(target.type) == "capability",
+        )
+        .distinct()
+        .all()
+    )
+    return len(rows)
+
+
+def count_support_rows(organization_id: int) -> int:
+    """Supported pairs as the reader returns them."""
+    return len(support_rows(organization_id))
+
+
+def count_listed_on_application_pages(organization_id: int) -> int:
+    """The capabilities each application page lists, added up over the applications."""
+    from app.services.application_capabilities import application_capability_links
+
+    ApplicationComponent = _models()[0]
+    ids = [i for (i,) in db.session.query(ApplicationComponent.id).filter(
+        ApplicationComponent.organization_id == organization_id)]
+    return sum(len(application_capability_links(i, organization_id)) for i in ids)

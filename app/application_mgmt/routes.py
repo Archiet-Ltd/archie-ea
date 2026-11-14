@@ -20,6 +20,7 @@ from app.models.archimate_element_types import is_application_kind
 # Define the logger
 logger = logging.getLogger(__name__)
 
+from app.services.capability_support import SUPPORT_LEVELS
 from flask import (
     current_app,
     flash,
@@ -1107,7 +1108,7 @@ def validate_archimate_element_creation(
 from sqlalchemy.exc import SQLAlchemyError
 
 # Import statements (moved to proper location)
-from ..models.business_capabilities import BusinessCapability, BusinessFunction
+from ..models.business_capabilities import BusinessFunction
 from ..models.business_layer import (
     BusinessActor,
     BusinessObject,
@@ -1910,8 +1911,8 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     app_obj = ApplicationComponent.query.get_or_404(id)
 
     # --- Capabilities ---
-    # Query ApplicationCapabilityMapping (populated by Abacus sync — 410 rows)
-    # NOT UnifiedApplicationCapabilityMapping (empty table, different schema)
+    # What this application supports is one relationship per capability, read through the one
+    # reader (the same one the coverage matrix and the chat read).
     capabilities = []
     capability_mappings = []
     try:
@@ -1924,27 +1925,39 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         db.session.rollback()
 
     # --- Capability form config (for "Map Capability" modal) ---
-    existing_cap_ids = {c.id for c in capabilities}
+    # The pick list is the capabilities the coverage page lists, one per capability record.
+    existing_element_ids = {c.archimate_element_id for c in capabilities if c.archimate_element_id}
     capability_options = []
     try:
-        all_caps = BusinessCapability.query.order_by(BusinessCapability.name.asc()).all()
+        from app.models.unified_capability import UnifiedCapability
+
+        all_caps = (
+            UnifiedCapability.query.filter(
+                UnifiedCapability.organization_id == app_obj.organization_id,
+                UnifiedCapability.retired_into_id.is_(None),
+            )
+            .order_by(UnifiedCapability.name.asc())
+            .all()
+        )
         for cap in all_caps:
             capability_options.append({
                 "id": cap.id,
                 "label": f"{cap.name} \u00b7 {cap.category or 'Uncategorized'}",
-                "disabled": cap.id in existing_cap_ids,
+                "disabled": cap.archimate_element_id in existing_element_ids,
             })
     except Exception:
         db.session.rollback()
     capability_form_config = {
         "capability_options": capability_options,
-        "support_levels": [
-            ("primary", "Primary"), ("secondary", "Secondary"),
-            ("partial", "Partial"), ("legacy", "Legacy"),
-            ("planned", "Planned"), ("linked", "Linked"),
-        ],
+        "support_levels": [(level, level.capitalize()) for level in SUPPORT_LEVELS],
+        "support_kinds": [("realization", "Realizes"), ("serving", "Serves")],
         "maturity_levels": [(str(i), f"Level {i}") for i in range(1, 6)],
     }
+    # The dialog's choices as (value, label, disabled) triples.
+    capability_form_config["capability_choices"] = [(o["id"], o["label"], o["disabled"]) for o in capability_options]
+    capability_form_config["kind_choices"] = [(v, label, False) for v, label in capability_form_config["support_kinds"]]
+    capability_form_config["level_choices"] = [(v, label, False) for v, label in capability_form_config["support_levels"]]
+    capability_form_config["maturity_choices"] = [(v, label, False) for v, label in capability_form_config["maturity_levels"]]
 
     # --- Requirements of the frameworks the organisation adopted, linked to this application.
     # One call feeds both the figure at the top and the card that lists them.
@@ -2136,6 +2149,7 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
             "label": "Mapped Capabilities",
             "value": str(len(capabilities)),
             "delta": "Enterprise capabilities linked to this application",
+            "href": "?tab=capabilities#mapped-capabilities",
             "icon_svg": "",
         },
         {
@@ -2184,6 +2198,12 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
                 is_strategic = getattr(mapping, "is_strategic", False)
             cap_rows.append({
                 "name": cap.name,
+                "id": mapping.id,
+                "kind_word": getattr(mapping, "kind_word", None),
+                "delete_url": (
+                    url_for("application_mgmt.application_capability_mapping_delete", id=app_obj.id, mapping_id=mapping.id)
+                    if getattr(mapping, "kind", None) else None
+                ),
                 "detail_url": None,
                 "category": cap.category or "",
                 "support_level": support.replace("_", " ").title() if support else "",

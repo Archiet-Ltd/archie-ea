@@ -1,6 +1,8 @@
 {# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/dense_table.html' import dense_table %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
@@ -249,7 +251,7 @@
 {% set tabs = [
   {'id': 'overview',        'label': 'Overview',         'count': none},
   {'id': 'architecture',    'label': 'Architecture',     'count': (archimate_relationships.incoming | length + archimate_relationships.outgoing | length) if archimate_relationships else 0},
-  {'id': 'capabilities',    'label': 'Capabilities',     'count': (capabilities | default([], true)) | length},
+  {'id': 'capabilities',    'label': 'Capabilities',     'count': ((capabilities | default([], true)) | length) or none},
   {'id': 'processes',       'label': 'Processes',        'count': (business_processes | default([], true)) | length},
   {'id': 'vendors',         'label': 'Vendors',          'count': ((vendors_tab_count | default(0)) or none)},
   {'id': 'motivation',      'label': 'Motivation',       'count': (archimate_relationships.incoming + archimate_relationships.outgoing) | selectattr('layer', 'equalto', 'Motivation') | list | length if archimate_relationships else 0},
@@ -896,69 +898,38 @@
     </div>
 
     {# Capabilities Table #}
-    <div data-slot="card" class="rounded-lg border border-border bg-card">
+    <div id="mapped-capabilities" data-slot="card" class="rounded-lg border border-border bg-card scroll-mt-20">
       <div class="flex flex-col space-y-1.5 p-6 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 class="text-lg font-semibold">Mapped Capabilities</h3>
           <p class="text-sm text-muted-foreground">{{ capabilities | length }} {% if capabilities | length == 1 %}capability{% else %}capabilities{% endif %} linked to this application</p>
         </div>
-        {% call button(variant='primary', aria_label="Map a capability to this application", attrs_dict={'data-modal-open': "add-capability-modal"}) %}
+        {% call button(variant='primary', aria_label="Map a capability to this application", attrs_dict={'data-modal-open': "add-capability-modal", 'data-testid': 'map-capability'}) %}
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Map Capability
         {% endcall %}
       </div>
       <div class="p-6 pt-0">
         {% set cap_rows = dashboard_config.tables['application-capabilities'].rows %}
-        {% if cap_rows %}
-{% call dense_table(columns=[('Capability', ''), ('Category', ''), ('Support', ''), ('Coverage', ''), ('Maturity', ''), ('Strategic', ''), ('Compliance', ''), ('Actions', 'text-right')]) %}
-              {% for row in cap_rows %}
-              {% set cap_comp = capabilities_with_compliance | selectattr('capability.name','eq',row.name) | list | first %}
-              <tr class="last:border-0 hover:bg-muted/50 {% if cap_comp and cap_comp.is_penalized %}bg-destructive/5{% endif %}">
-                <td class="px-2">
-                  {% if row.detail_url %}
-                  <a href="{{ row.detail_url }}" class="font-medium text-primary hover:underline">{{ row.name }}</a>
-                  {% else %}
-                  <span class="font-medium">{{ row.name }}</span>
-                  {% endif %}
-                  {% if cap_comp and cap_comp.is_penalized %}
-                  {% call badge(variant='destructive') %}Penalized{% endcall %}
-                  {% endif %}
-                </td>
-                <td class="px-2 text-muted-foreground">{{ row.category }}</td>
-                <td class="px-2">{% call badge(variant='outline') %}{{ row.support_level }}{% endcall %}</td>
-                <td class="px-2">{{ row.coverage }}</td>
-                <td class="px-2">{{ row.maturity }}</td>
-                <td class="px-2">
-                  {% if row.strategic == 'Yes' %}{% call badge(variant='success') %}Yes{% endcall %}
-                  {% else %}{% call badge(variant='neutral') %}No{% endcall %}{% endif %}
-                </td>
-                <td class="px-2">
-                  {% if cap_comp %}
-                  <span class="{% if cap_comp.compliance_score >= 80 %}text-success{% elif cap_comp.compliance_score >= 50 %}text-warning{% else %}text-destructive{% endif %} font-medium">
-                    {{ '%.0f' | format(cap_comp.compliance_score) }}%
-                  </span>
-                  {% else %}—{% endif %}
-                </td>
-                <td class="px-2 text-right">
-                  {% if row.delete_url %}
-                  <form method="POST" action="{{ row.delete_url }}" class="inline"
-                    data-confirm="Remove capability mapping for {{ row.name | e }}?">
-                    {{ input(type="hidden", name="csrf_token", value=(csrf_token())) }}
-                    {% call button(variant='ghost', size='icon', type='submit', class='h-7 w-7 text-destructive-emphasis', aria_label="Remove mapping") %}
-                      <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                    {% endcall %}
-                  </form>
-                  {% endif %}
-                </td>
-              </tr>
-              {% endfor %}
-            {% endcall %}
-        {% else %}
-        <div class="py-8 text-center">
-          <i data-lucide="layers" class="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" aria-hidden="true"></i>
-          <p class="text-sm font-medium text-foreground mb-1">No capabilities mapped</p>
-          <p class="text-xs text-muted-foreground">Map enterprise capabilities to this application to track coverage and maturity.</p>
-        </div>
-        {% endif %}
+        {% call(row) list_table(rows=cap_rows, columns=[('Capability', ''), ('How it supports', ''), ('Support', ''), ('Coverage', ''), ('Maturity', ''), ('Strategic', ''), {'label': 'Actions', 'align': 'right', 'sortable': false}],
+                                caption='Capabilities this application supports', testid='mapped-capabilities-table', row_testid='mapped-capability-row',
+                                empty_message='No capabilities mapped. Use Map Capability to record the first one.') %}
+          {% call table_cell(class='font-medium') %}{% if row.detail_url %}<a href="{{ row.detail_url }}" class="text-primary hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}{% endcall %}
+          {% call table_cell() %}{{ row.kind_word or '—' }}{% endcall %}
+          {% call table_cell() %}{{ row.support_level or '—' }}{% endcall %}
+          {% call table_cell() %}{{ row.coverage }}{% endcall %}
+          {% call table_cell() %}{{ row.maturity or '—' }}{% endcall %}
+          {% call table_cell() %}{{ row.strategic }}{% endcall %}
+          {% call table_cell(class='text-right') %}
+            {% if row.delete_url %}
+            <form method="POST" action="{{ row.delete_url }}" class="inline" data-confirm="Remove capability mapping for {{ row.name | e }}?">
+              {{ input(type="hidden", name="csrf_token", value=(csrf_token())) }}
+              {% call button(variant='ghost', size='icon', type='submit', class='h-7 w-7 text-destructive-emphasis', aria_label="Remove mapping") %}
+                <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
+              {% endcall %}
+            </form>
+            {% endif %}
+          {% endcall %}
+        {% endcall %}
       </div>
     </div>
 

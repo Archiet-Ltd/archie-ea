@@ -22,7 +22,7 @@
     {% endif %}
 
     {% if summary %}
-    <p class="text-sm text-muted-foreground" data-testid="coverage-summary">Generated {{ summary.generated_at }} from {{ summary.supports }} recorded {{ 'support' if summary.supports == 1 else 'supports' }} ({{ summary.capabilities }} {{ 'capability' if summary.capabilities == 1 else 'capabilities' }}, {{ summary.applications }} {{ 'application' if summary.applications == 1 else 'applications' }})</p>
+    <p class="text-sm text-muted-foreground" data-testid="coverage-summary">Generated {{ summary.generated_at }} from <span data-testid="coverage-support-count">{{ summary.supports }}</span> recorded {{ 'support' if summary.supports == 1 else 'supports' }} ({{ summary.capabilities }} {{ 'capability' if summary.capabilities == 1 else 'capabilities' }}, {{ summary.applications }} {{ 'application' if summary.applications == 1 else 'applications' }})</p>
     {% endif %}
 
     {% if matrix_html and summary and summary.supports == 0 %}

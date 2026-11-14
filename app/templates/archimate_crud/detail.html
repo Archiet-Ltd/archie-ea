@@ -201,7 +201,7 @@
             {% for line in page.lines %}
             <li class="rounded-md border border-border bg-card px-4 py-2.5 text-sm text-foreground" data-testid="answer-line">
                 <span class="font-semibold">{{ line.lead }} {{ line.count }} {{ line.noun }}</span><span class="text-muted-foreground">:</span>
-                 {% for row in line['items'] %}{% if row.href %}<a href="{{ row.href }}" class="text-primary underline hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}{{ ', ' if not loop.last }}{% endfor %}{% if line.more %}<a href="#connections" class="ml-1 text-muted-foreground underline hover:text-foreground">and {{ line.more }} more</a>{% endif %}
+                 {% for row in line['items'] %}{% if row.href %}<a href="{{ row.href }}" class="text-primary underline hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}{% if line.show_kind %} <span class="text-muted-foreground">({{ row.relationship }})</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}{% if line.more %}<a href="#connections" class="ml-1 text-muted-foreground underline hover:text-foreground">and {{ line.more }} more</a>{% endif %}
             </li>
             {% endfor %}
         </ul>
