@@ -888,6 +888,9 @@ def update_deliverable(deliverable_id: int):
       404:
         description: Not found
     """
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         deliverable = _deliverable_or_404(deliverable_id)
 
@@ -964,6 +967,9 @@ def delete_deliverable(deliverable_id: int):
       404:
         description: Not found
     """
+    if not can(current_user, "delete", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         deliverable = _deliverable_or_404(deliverable_id)
 

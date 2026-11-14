@@ -76,3 +76,30 @@ def test_tab_lists_work_packages_with_defaults_and_override_is_honoured(
     login_as(client, other_architect)
     assert client.delete(f"/enterprise/api/work-packages/{third}").status_code in (200, 302)
     assert _gone(third)
+
+
+def test_deliverable_writes_follow_the_work_package_override(
+    app, db_session, login_as, client
+):
+    org = _org(db_session, "wpd")
+    admin = _user(db_session, org, "org_admin")
+    architect = _user(db_session, org, "architect")
+    db_session.commit()
+
+    for action in ("edit", "delete"):
+        login_as(client, admin)
+        client.post(
+            "/admin/team/permissions/role",
+            data={
+                "role": "architect",
+                "object_type": "work_package",
+                "action": action,
+                "allowed": "0",
+            },
+        )
+
+    login_as(client, architect)
+    put = client.put("/api/roadmap/deliverables/1", json={"name": "renamed"})
+    assert put.status_code == 403, put.get_data(as_text=True)
+    gone = client.delete("/api/roadmap/deliverables/1")
+    assert gone.status_code == 403, gone.get_data(as_text=True)
