@@ -1,6 +1,6 @@
 """The review loop has no way round it, and every gap found in its independent review stays closed.
 
-* No path applies a change that has not passed review: a person's approve (service, route and the
+* No path applies a change that has not passed review: a person's approve (service and the
   words "approve it"), the sweep and the chat. Each is run against a reviewer that fails the change and a
   reviewer that cannot be reached.
 * A switched-off account's change is declined, with no reviewer called.
@@ -81,17 +81,6 @@ def _person_service(user, approval_id, row):
     return AIChatApprovalService(user.id).approve_and_execute(approval_id, user.id)
 
 
-def _person_route(user, approval_id, row, client=None, login_as=None):
-    from app import db
-
-    user.confirmed = True
-    db.session.flush()
-    login_as(client, user)
-    response = client.post("/ai-chat/approvals/%d/approve" % approval_id)
-    return response.get_json() or {"success": False, "http_status": response.status_code,
-                                   "body": response.get_data(as_text=True)[:300]}
-
-
 def _person_words(user, approval_id, row):
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
 
@@ -107,8 +96,27 @@ def _the_sweep(user, approval_id, row):
     return sweep_organisation(user.organization_id)
 
 
+def test_a_post_to_the_old_approve_address_applies_nothing(db_session, make_org, tenant_ctx, monkeypatch, client, login_as):
+    """The approve address is gone: a post to it changes nothing and the change stays in review."""
+    from app.models.ai_chat_crud_approval import ApprovalStatus
+
+    org = make_org("gap-no-route")
+    user = _user(db_session, org.id)
+    ledger = _application(db_session, org.id, "Ledger %s" % uuid.uuid4().hex[:6], "development")
+    approval_id = _waiting_change(db_session, tenant_ctx, monkeypatch, org, user, ledger)
+    user.confirmed = True
+    db_session.flush()
+    login_as(client, user)
+    for action in ("approve", "reject"):
+        assert client.post("/ai-chat/approvals/%d/%s" % (approval_id, action)).status_code in (404, 405)
+    db_session.expire_all()
+    with tenant_ctx(org.id):
+        assert _status_of(ledger.id) == "development"
+        assert _row(approval_id).status == ApprovalStatus.PENDING
+
+
 @pytest.mark.parametrize("reviewer_kind", ["fails the change", "cannot be reached"])
-@pytest.mark.parametrize("path", ["person_service", "person_route", "person_words", "the_sweep"])
+@pytest.mark.parametrize("path", ["person_service", "person_words", "the_sweep"])
 def test_no_path_applies_a_change_that_has_not_passed_review(
     db_session, make_org, tenant_ctx, monkeypatch, client, login_as, path, reviewer_kind
 ):
@@ -132,10 +140,7 @@ def test_no_path_applies_a_change_that_has_not_passed_review(
         row = _row(approval_id)
     runner = {"person_service": _person_service, "person_words": _person_words, "the_sweep": _the_sweep}.get(path)
     with tenant_ctx(org.id):
-        if path == "person_route":
-            outcome = _person_route(user, approval_id, row, client=client, login_as=login_as)
-        else:
-            outcome = runner(user, approval_id, row)
+        outcome = runner(user, approval_id, row)
 
     db_session.expire_all()
     with tenant_ctx(org.id):

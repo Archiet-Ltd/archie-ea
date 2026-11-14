@@ -459,7 +459,7 @@ def test_the_approvals_page_claims_a_settlement_only_for_a_change_with_a_recorde
         html = client.get("/ai-chat/approvals/inbox").get_data(as_text=True)
     assert "approval-held-%d" % waiting_id in html and "approval-in-review-%d" % waiting_id not in html
     assert "approval-in-review-%d" % older.id not in html
-    assert "/ai-chat/approvals/%d/approve" % older.id not in html
-    assert "approval-own-request-%d" % connector.id in html
+    assert "/approve" not in html and "/reject" not in html
+    assert "approval-card-%d" % connector.id in html
     with tenant_ctx(other.id):
         assert AIChatApprovalService(other_user.id).get_approver_queue()["approvals"] == []

@@ -663,8 +663,11 @@ def test_rejection_reason_is_recorded_and_still_shown_after_reload(app, db_sessi
 
     login_as(client, reviewer)
     assert client.get("/ai-chat/approvals/decided").get_json()["decisions"] == []
-    rejected = client.post(f"/ai-chat/approvals/{approval_id}/reject", json={"reason": "We already have this"})
-    assert rejected.status_code == 200
+    # the review declines it with its reason; no route exists for a person to do it
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    with tenant_ctx(org_a.id):
+        assert AIChatApprovalService(reviewer.id).reject_approval(approval_id, "We already have this")["success"]
 
     # a fresh request, as after a reload
     login_as(client, reviewer)
@@ -681,7 +684,7 @@ def test_rejection_reason_is_recorded_and_still_shown_after_reload(app, db_sessi
 def test_inbox_page_has_the_impact_and_decided_regions(app, db_session, make_org, tenant_ctx, login_as):
     """The inbox is rendered on the server: each proposal offers "What does this
     affect?", which reopens the page with that proposal's impact worked out, and
-    the Recently decided region is always there (empty until something is decided).
+    the decided region is always there (empty until something is decided).
     It used to be an empty shell filled by a script the layout never output."""
     org = make_org("prev-page")
     requester = _user(db_session, org, "requester")

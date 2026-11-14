@@ -5,7 +5,7 @@ in the review of the review loop stay closed.
   a tool call, a person's Approve, the sweep) is applied or sent to the reviewer; each is settled once they resume.
 * Keys, tokens and card numbers are scrubbed from the final text sent to a model, by their shape, in JSON form too.
 * A row from before the loop never counts as a repeat; a person who left the workspace has their change declined;
-  the queue offers Approve only where it will act.
+  the page lists every change in review, with no control that waits for a person.
 
 Every isolation case uses two real organisations.
 """
@@ -18,7 +18,7 @@ import pytest
 
 from tests.test_change_review import PASS_ALL, FakeReviewer, _application, _ask_for_status, _fail, _row, _status_of, _user
 from tests.test_change_review_gaps import (
-    _backdate, _person_route, _person_service, _person_words, _waiting_change,
+    _backdate, _person_service, _person_words, _waiting_change,
 )
 
 pytestmark = pytest.mark.usefixtures("db_session")
@@ -132,7 +132,7 @@ def test_the_chats_own_write_is_held_while_writes_are_paused_and_settled_when_th
 
 
 @pytest.mark.parametrize("shape", ["tool call", "chat create"])
-@pytest.mark.parametrize("path", ["person_service", "person_route", "person_words"])
+@pytest.mark.parametrize("path", ["person_service", "person_words"])
 def test_a_persons_approve_applies_nothing_while_writes_are_paused(
     db_session, make_org, tenant_ctx, monkeypatch, client, login_as, path, shape
 ):
@@ -158,8 +158,6 @@ def test_a_persons_approve_applies_nothing_while_writes_are_paused(
         row = _row(approval_id)
         if path == "person_service":
             _person_service(user, approval_id, row)
-        elif path == "person_route":
-            _person_route(user, approval_id, row, client=client, login_as=login_as)
         else:
             _person_words(user, approval_id, row)
         assert _row(approval_id).status == ApprovalStatus.PENDING
@@ -342,11 +340,11 @@ def test_the_sweep_declines_a_change_whose_requester_moved_to_another_workspace(
 
 
 # --------------------------------------------------------------------------- #
-# Defect 6: Approve is offered only where it will act                          #
+# Defect 6: the page offers no Approve                          #
 # --------------------------------------------------------------------------- #
 
 
-def test_the_queue_offers_approve_only_where_it_will_act(db_session, make_org, tenant_ctx, monkeypatch, client, login_as):
+def test_the_page_lists_every_change_in_review_with_no_approve_control(db_session, make_org, tenant_ctx, monkeypatch, client, login_as):
     from app import db
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService, create_approval_record
 
@@ -373,9 +371,8 @@ def test_the_queue_offers_approve_only_where_it_will_act(db_session, make_org, t
         db.session.flush()
         login_as(client, user)
         html = client.get("/ai-chat/approvals/inbox").get_data(as_text=True)
-    assert "approval-own-request-%d" % own.id in html
-    assert "/ai-chat/approvals/%d/approve" % own.id not in html
-    assert "/ai-chat/approvals/%d/approve" % theirs.id in html
+    assert "approval-card-%d" % own.id in html and "approval-card-%d" % theirs.id in html
+    assert "/approve" not in html and "/reject" not in html
     assert "approval-in-review-%d" % aid in html
     assert "waits here for a second person" not in html
     with tenant_ctx(other.id):
