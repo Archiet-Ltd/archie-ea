@@ -172,7 +172,7 @@ def test_the_api_and_get_canvas_leave_the_amounts_out_for_a_viewer_and_keep_them
 def test_the_chat_leaves_the_amounts_out_for_a_viewer_and_says_why(app, world, tenant_ctx, monkeypatch):
     with tenant_ctx(world["one"].id):
         answer = _chat(app, monkeypatch, world["one"].id, world["architect"])
-    assert answer["records"] == []
+    assert answer["records"] == [] and answer["costs_withheld"] is True
     assert SENTENCE in (answer["summary"] or "") or answer["reason"] == SENTENCE
     assert answer["next_step"] is None
     assert "1,000" not in str(answer) and "1000" not in str(answer)

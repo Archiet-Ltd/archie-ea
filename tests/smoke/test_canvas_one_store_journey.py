@@ -202,6 +202,7 @@ def test_a_cto_sees_the_cost_lines_and_a_business_architect_is_told_why_not(brow
             else:
                 assert costs["costs"]["lines"] == [] and costs["empty_reason"] == "Cost figures are withheld for your role."
                 assert "Cost figures are withheld for your role." in text
+                assert "cannot answer this yet" not in text
                 assert "48,000" not in text and "48000" not in text and "Billing ledger" not in text
         finally:
             context.close()

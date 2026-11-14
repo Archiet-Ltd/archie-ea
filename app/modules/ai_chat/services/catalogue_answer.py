@@ -187,6 +187,8 @@ def answer_catalogue_question(message: str, organization_id: int, time_limit: Op
         "reason": result.get("reason"),
         # A finding of "none" (every application is owned) needs no next step.
         "complete": complete,
+        # The person's role withholds the cost lines: the records are not at fault, the reason says so.
+        "costs_withheld": bool(result.get("costs_withheld")) and not records,
         # A name that matched nothing recorded: the records are not at fault.
         "unmatched": result.get("matched") is False,
         "next_step": (result.get("next_step") or NEXT_STEPS.get(entry_id)) if not records and not complete and not result.get("costs_withheld") else None,
