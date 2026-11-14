@@ -13,6 +13,8 @@
 {% from 'components/input.html' import input, label, textarea %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell as signal_cell %}
 
 {% block title %}Enterprise Capability Roadmap{% endblock %}
 
@@ -119,6 +121,32 @@
     {% endcall %}
   </div>
   <div data-testid="roadmap-summary-footer">{{ result_footer(summary_footer) }}</div>
+
+  {# ── Gap signals: one row for each signal the figure above counts ── #}
+  <section id="gap-signals" class="scroll-mt-20 space-y-3" data-testid="gap-signals-section" aria-labelledby="gap-signals-title">
+    <div>
+      <h2 id="gap-signals-title" class="text-base font-semibold text-foreground">Capability gap signals</h2>
+      <p class="text-sm text-muted-foreground">Found by checking the capability map. They are not recorded as gaps until you detect them.</p>
+    </div>
+    {% if gap_signals_error %}
+    <p class="text-sm text-destructive-emphasis" data-testid="gap-signals-error">The gap signals could not be read. This is not "none found". Reload the page to try again.</p>
+    {% elif gap_signals %}
+    {% call(signal) list_table(rows=gap_signals, columns=[{'label': 'Capability', 'sortable': true}, {'label': 'Finding', 'sortable': true}, {'label': 'Priority', 'sortable': true, 'class': 'hidden md:table-cell'}],
+                               caption='Capability gap signals', testid='gap-signals-table', row_testid='gap-signal-row',
+                               server_pagination=true) %}
+      {% call signal_cell(class='max-w-[360px]') %}
+        <a href="{{ url_for('enterprise_crud.capability_fact_sheet', capability_id=signal.capability_id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="gap-signal-link-{{ signal.capability_id }}">{{ signal.name or 'Untitled capability' }}</a>
+      {% endcall %}
+      {% call signal_cell() %}{{ signal.gap_details|join('; ') if signal.gap_details else (signal.primary_gap or 'unclassified')|capitalize }}{% endcall %}
+      {% call signal_cell(class='hidden md:table-cell whitespace-nowrap', attrs={'data-sort': signal.priority or ''}) %}{{ (signal.priority or 'unrated')|capitalize }}{% endcall %}
+    {% endcall %}
+    {% else %}
+    <div class="rounded-lg border border-border p-6 text-center" data-testid="gap-signals-empty">
+      <p class="text-sm text-muted-foreground">No capability has a coverage, quality, retirement or modernisation finding, so there are no signals. {% if capability_count %}Record a gap yourself if you know of one.{% else %}Add capabilities to the capability map first; the check reads them.{% endif %}</p>
+      <div class="mt-4 flex justify-center">{{ button(text=('Open the capability map'), variant='outline', size='sm', href=url_for('capability_map.index')) }}</div>
+    </div>
+    {% endif %}
+  </section>
 
   {# ── Plateau Timeline ── #}
   {% call card() %}

@@ -29,8 +29,8 @@
     {# ─ Summary Metrics ─ #}
     {{ stat_cards([
         {'label': 'Total Recommendations', 'value': total_recommendations, 'icon': 'lightbulb', 'testid': 'ai-analysis-recommendations'},
-        {'label': 'Open Gaps (Critical)', 'value': gaps_by_severity.critical, 'icon': 'triangle-alert', 'testid': 'ai-analysis-gaps-critical'},
-        {'label': 'Open Gaps (High)', 'value': gaps_by_severity.high, 'icon': 'circle-alert', 'testid': 'ai-analysis-gaps-high'},
+        {'label': 'Open Gaps (Critical)', 'value': gaps_by_severity.critical, 'icon': 'triangle-alert', 'sentence': 'Open gaps rated critical on severity or priority', 'href': (url_for('enterprise.gap_analysis', severity='critical', status='open') if gaps_by_severity.critical else none), 'testid': 'ai-analysis-gaps-critical'},
+        {'label': 'Open Gaps (High)', 'value': gaps_by_severity.high, 'icon': 'circle-alert', 'sentence': 'Open gaps rated high', 'href': (url_for('enterprise.gap_analysis', severity='high', status='open') if gaps_by_severity.high else none), 'testid': 'ai-analysis-gaps-high'},
         {'label': 'Apps Under Review', 'value': review_count, 'icon': 'clock', 'testid': 'ai-analysis-apps-review'}
     ]) }}
 
@@ -139,7 +139,7 @@
                             {% call badge('default') %}{{ count|string }}{% endcall %}
                             {% endif %}
                         </div>
-                        <a href="{{ url_for('enterprise.gap_analysis', severity=severity) }}"
+                        <a href="{{ url_for('enterprise.gap_analysis', severity=severity, status='open') }}"
                            class="text-sm text-primary hover:underline" data-testid="view-gaps-{{ severity }}">
                             View gaps →
                         </a>

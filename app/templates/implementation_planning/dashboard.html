@@ -72,8 +72,8 @@
             </template>
           </ul>
           <p x-show="criticalGaps.length > 0" x-cloak class="mt-3 text-sm text-muted-foreground" data-testid="critical-gaps-total">
-            <span x-text="criticalGapTotal > criticalGaps.length ? 'Showing ' + criticalGaps.length + ' of ' + criticalGapTotal + ' critical gaps.' : criticalGapTotal + ' critical ' + (criticalGapTotal === 1 ? 'gap' : 'gaps') + '.'"></span>
-            {% if 'enterprise.gap_analysis' in flask.current_app.view_functions %}<a href="{{ url_for('enterprise.gap_analysis', severity='critical') }}" class="text-primary underline underline-offset-4 hover:no-underline" data-testid="critical-gaps-register-link">Open <span x-text="criticalGapTotal === 1 ? 'it' : 'them'"></span> in the gap register</a>{% endif %}
+            <span x-text="criticalGapTotal > criticalGaps.length ? 'Showing ' + criticalGaps.length + ' of ' + criticalGapTotal + ' open critical gaps.' : criticalGapTotal + ' open critical ' + (criticalGapTotal === 1 ? 'gap' : 'gaps') + '.'"></span>
+            {% if 'enterprise.gap_analysis' in flask.current_app.view_functions %}<a href="{{ url_for('enterprise.gap_analysis', severity='critical', status='open') }}" class="text-primary underline underline-offset-4 hover:no-underline" data-testid="critical-gaps-register-link">Open <span x-text="criticalGapTotal === 1 ? 'it' : 'them'"></span> in the gap register</a>{% endif %}
           </p>
         {% endcall %}
       {% endcall %}
@@ -150,7 +150,7 @@ function implementationPlanningDashboard() {
                 .then(data => { this.workPackages = data.work_packages || []; })
                 .catch(() => { this.workPackages = []; reportFailure(); });
 
-            Platform.fetch('/implementation/api/gaps?severity=critical&limit=5&footer=1', { silent: true })
+            Platform.fetch('/implementation/api/gaps?severity=critical&open=1&limit=5&footer=1', { silent: true })
                 .then(data => { this.criticalGaps = data.gaps || []; this.criticalGapTotal = data.total ?? this.criticalGaps.length; })
                 .catch(() => { this.criticalGaps = []; this.criticalGapTotal = 0; reportFailure(); });
         },
