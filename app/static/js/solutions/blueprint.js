@@ -1090,7 +1090,7 @@ function blueprintPage() {
     };
     
     // Compliance gap analysis loader
-    base.loadComplianceGap = async function() {
+    base.runComplianceAnalysis = async function() {
         const self = this;
         self.complianceGapLoading = true;
         try {

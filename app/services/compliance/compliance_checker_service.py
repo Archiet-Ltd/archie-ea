@@ -15,7 +15,6 @@ from typing import Dict, List
 from app import db
 from app.models import ArchitectureModel
 from app.models.compliance_models import (
-    ComplianceGap,
     ComplianceRequirement,
     ProjectConstraint,
     RegulatoryFramework,
