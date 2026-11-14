@@ -1280,7 +1280,7 @@ def _canvas_zone(
 # a box_key equals the record column where one exists.
 _BMC_ZONES = [
     _canvas_zone(
-        "customer_segments", "Customer Segments", 1, ["BusinessActor"], "customer_segment",
+        "customer_segments", "Customer Segments", 1, ["BusinessActor", "Stakeholder", "BusinessRole"], "customer_segment",
         "type_profile", "motivation",
     ),
     _canvas_zone(
@@ -1319,7 +1319,7 @@ _BMC_ZONES = [
         fill_relationship={"type": "assignment", "direction": "out"},
     ),
     _canvas_zone(
-        "key_partners", "Key Partnerships", 8, ["BusinessActor"], "key_partner",
+        "key_partners", "Key Partners", 8, ["BusinessActor"], "key_partner",
         "type_profile_anchor", "business",
         anchor_box="key_resources",
         fill_relationship={"type": "association", "direction": "out"},
@@ -1367,8 +1367,8 @@ _LEAN_ZONES = _boxes([
     ("high_level_concept", "High-level concept", ["Value"], "motivation"),
     ("unfair_advantage", "Unfair Advantage", ["Resource", "Capability"], "strategy"),
     ("channels", "Channels", ["BusinessInterface", "ApplicationInterface"], "business"),
-    ("customer_segments", "Customer Segments", ["BusinessActor"], "business"),
-    ("early_adopters", "Early adopters", ["BusinessActor"], "business"),
+    ("customer_segments", "Customer Segments", ["BusinessActor", "Stakeholder", "BusinessRole"], "business"),
+    ("early_adopters", "Early adopters", ["BusinessActor", "Stakeholder", "BusinessRole"], "business"),
     ("cost_structure", "Cost Structure", None, "strategy"),
     ("revenue_streams", "Revenue Streams", None, "motivation"),
 ])
@@ -1459,7 +1459,7 @@ _VISION_BOARD_ZONES = _boxes([
 ])
 
 _VALUE_PROPOSITION_ZONES = _boxes([
-    ("customer_segments", "Customer Segment", ["BusinessActor"], "business"),
+    ("customer_segments", "Customer Segment", ["BusinessActor", "Stakeholder", "BusinessRole"], "business"),
     ("value_propositions", "Value Proposition", ["Value", "BusinessService", "Product"], "motivation"),
     ("products_services", "Products and Services", ["BusinessService", "Product"], "business"),
     ("gain_creators", "Gain Creators", ["Value", "Outcome"], "motivation"),

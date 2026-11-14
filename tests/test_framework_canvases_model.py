@@ -26,10 +26,10 @@ TAKES = {
         "solution": ["BusinessService", "ApplicationService", "Product"], "key_metrics": ["Metric", "Outcome"],
         "unique_value_proposition": ["Value"], "high_level_concept": ["Value"],
         "unfair_advantage": ["Resource", "Capability"], "channels": ["BusinessInterface", "ApplicationInterface"],
-        "customer_segments": ["BusinessActor"], "early_adopters": ["BusinessActor"],
+        "customer_segments": ["BusinessActor", "Stakeholder", "BusinessRole"], "early_adopters": ["BusinessActor", "Stakeholder", "BusinessRole"],
     },
     "value_proposition_canvas": {
-        "customer_segments": ["BusinessActor"], "value_propositions": ["Value", "BusinessService", "Product"],
+        "customer_segments": ["BusinessActor", "Stakeholder", "BusinessRole"], "value_propositions": ["Value", "BusinessService", "Product"],
         "products_services": ["BusinessService", "Product"], "gain_creators": ["Value", "Outcome"],
         "pain_relievers": ["Value", "BusinessService"], "customer_jobs": ["BusinessProcess"],
         "pains": ["Assessment"], "gains": ["Goal", "Outcome"],
