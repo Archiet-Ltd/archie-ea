@@ -108,7 +108,7 @@ def get_archimate_work_packages():
 
         from app.services.cost_visibility import withhold_reply
 
-        return jsonify(withhold_reply({"work_packages": work_packages_list}, keys=("estimated_cost", "actual_cost")))
+        return jsonify(withhold_reply({"work_packages": work_packages_list}))
     except Exception as e:
         logger.error("Error getting ArchiMate work packages: %s", e, exc_info=True)
         return jsonify({"error": "An internal error occurred"}), 500

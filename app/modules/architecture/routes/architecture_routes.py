@@ -358,6 +358,7 @@ def solutions_architecture_dashboard():
         from app import db
         from app.decorators.requires_role import may_see_contract_pages
         from app.models.truly_missing_models import Solution, SolutionPattern
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
         from app.services.vendor_register import register_contracts
 
         # Get counts for metrics cards
@@ -446,6 +447,7 @@ def solutions_architecture_dashboard():
                 "Failed to query ArchiMate application layer counts", exc_info=True
             )
 
+        costs_withheld = not costs_visible(current_user)
         return render_template(
             "enterprise/solutions_architecture_dashboard.html",
             solutions=solutions_list,
@@ -454,6 +456,8 @@ def solutions_architecture_dashboard():
             contract_count=contract_count,
             archimate_app_count=archimate_app_count,
             relationship_count=relationship_count,
+            costs_withheld=costs_withheld,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception as e:
         from app import db
@@ -482,6 +486,8 @@ def api_solutions_architecture_analyze():
     """Run AI-powered Buy/Build/Reuse analysis via SolutionArchitectOrchestrator."""
     from decimal import Decimal
 
+    from app.services.cost_visibility import costs_visible
+
     try:
         data = request.get_json(force=True) or {}
         problem = (data.get("problem_description") or "").strip()
@@ -493,6 +499,7 @@ def api_solutions_architecture_analyze():
         )
 
         orchestrator = SolutionArchitectOrchestrator()
+        # The one cost rule decides inside the orchestrator, the one place both analyse callers share.
         result = orchestrator.analyze_problem(
             problem_description=problem,
             budget_min=Decimal(str(data["budget_min"])) if data.get("budget_min") else None,
@@ -504,7 +511,9 @@ def api_solutions_architecture_analyze():
             industry_vertical=data.get("industry_vertical", "general"),
             existing_constraints=data.get("existing_constraints") or [],
             compliance_requirements=data.get("compliance_requirements") or [],
+            show_costs=costs_visible(current_user),
         )
+
         # Serialize Decimal fields for JSON
         for rec in result.get("recommendations", []):
             if rec.get("estimated_cost") is not None:
@@ -767,7 +776,7 @@ def investment_priorities():
         portfolio_metrics=analysis["portfolio_metrics"],
         recommendations=analysis["recommendations"],
         currency_symbol=currency_symbol,
-        costs_withheld_text=COSTS_WITHHELD,
+        costs_withheld_sentence=COSTS_WITHHELD,
     )
 
 

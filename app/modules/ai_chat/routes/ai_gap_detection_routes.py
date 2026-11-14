@@ -105,7 +105,6 @@ def get_rationalization_opportunities():
                         r.get("estimated_annual_savings", 0) for r in results
                     ),
                 },
-                keys=("total_estimated_savings", "estimated_annual_savings", "estimated_savings", "savings", "cost"),
             )
         )
     except Exception:

@@ -24,6 +24,7 @@ Routes:
 """
 
 from app.services.archimate_backbone import sync_archimate_element
+from app.services.cost_visibility import ROLLUP_FIGURE_KEYS
 import json
 import logging
 import os
@@ -11987,7 +11988,7 @@ def api_outcomes(solution_id):
         summary = service.get_solution_realization_summary(solution_id)
         from app.services.cost_visibility import withhold_reply
 
-        return jsonify(withhold_reply({"success": True, "data": summary}, keys=("cost_variance", "estimated", "actual", "variance", "variance_pct", "estimated_cost", "actual_cost", "total_cost", "budget_allocated", "budget_spent", "tco", "cost", "savings", "total_outcomes")))
+        return jsonify(withhold_reply({"success": True, "data": summary}, keys=ROLLUP_FIGURE_KEYS))
     except HTTPException:
         raise
     except Exception as e:

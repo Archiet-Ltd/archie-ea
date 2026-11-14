@@ -50,6 +50,8 @@ document.addEventListener('alpine:init', function() {
             detailUrl: '/consolidation-list/api/entry/{id}/detail',
             onResponse: function(data) {
                 this.summary = data.summary || {};
+                // the summary reply has arrived: only now may a money card say a figure was not recorded
+                this.summaryLoaded = true;
                 // Store pagination info from API response
                 if (data.pagination) {
                     this.totalItems = data.pagination.total || 0;
@@ -59,6 +61,7 @@ document.addEventListener('alpine:init', function() {
         let pageSpecific = {
                 // ── Page-specific state ──────────────────────────────
                 summary: {},
+                summaryLoaded: false,
                 groupBy: '',
                 pipelineStatusFilter: '',
 
@@ -69,21 +72,30 @@ document.addEventListener('alpine:init', function() {
 
                 // ── Init ─────────────────────────────────────────────
                 init: function() {
+                    // the page says before any reply arrives whether the cost rule withholds from this person
+                    if (this.$el && this.$el.dataset.costsWithheld === 'true') this.summary = { costs_withheld: true };
                     this._tableInit();
                 },
 
                 // ── Summary card data ────────────────────────────────
                 summaryCards: function() {
                     let s = this.summary;
-                    let fmtC = (v) => (v === null || v === undefined ? Platform.figure.NOT_RECORDED : this.fmt.currency(v));
-                    return [
-                        { label: 'Portfolio Annual Cost', value: fmtC(s.portfolio_annual_cost), subtitle: s.portfolio_annual_cost == null ? (s.portfolio_annual_cost_note || '') : '', color: 'text-foreground' },
-                        { label: 'Projected Savings', value: fmtC(s.total_estimated_savings), subtitle: s.savings_verified_total ? fmtC(s.savings_verified_total) + ' verified' : (s.total_estimated_savings == null ? 'No entry on the list states a saving yet.' : ''), color: s.total_estimated_savings == null ? 'text-foreground' : 'text-emerald-600' },
-                        { label: 'Migration Investment', value: fmtC(s.total_migration_cost), subtitle: (s.total_estimated_savings > 0 && s.total_migration_cost != null) ? Math.round(s.total_migration_cost / s.total_estimated_savings * 12) + ' mo payback' : '', color: 'text-foreground' },
+                    // Before the first summary reply arrives no money card states a value at all — at any
+                    // width — so a person the cost rule allows never reads "Not recorded" for a figure the
+                    // reply is still carrying; once the reply lands, a missing figure is stated as such.
+                    let fmtC = (v) => (!this.summaryLoaded ? '' : (v === null || v === undefined ? Platform.figure.NOT_RECORDED : this.fmt.currency(v)));
+                    let others = [
                         { label: 'In Progress', value: String(s.active_count || 0), subtitle: (s.completed_count || 0) + ' completed', color: 'text-primary' },
                         { label: 'Requires Attention', value: String(s.attention_count || 0), color: (s.attention_count || 0) > 0 ? 'text-amber-600' : 'text-foreground' },
                         { label: 'High Risk', value: String(s.high_risk_count || 0), color: (s.high_risk_count || 0) > 0 ? 'text-destructive' : 'text-foreground' }
                     ];
+                    // a role the cost rule withholds from gets the three money cards left out; the page says why once
+                    let money = [
+                        { label: 'Portfolio Annual Cost', value: fmtC(s.portfolio_annual_cost), subtitle: s.portfolio_annual_cost == null ? (s.portfolio_annual_cost_note || '') : '', color: 'text-foreground' },
+                        { label: 'Projected Savings', value: fmtC(s.total_estimated_savings), subtitle: s.savings_verified_total ? fmtC(s.savings_verified_total) + ' verified' : (s.total_estimated_savings == null ? 'No entry on the list states a saving yet.' : ''), color: s.total_estimated_savings == null ? 'text-foreground' : 'text-emerald-600' },
+                        { label: 'Migration Investment', value: fmtC(s.total_migration_cost), subtitle: (s.total_estimated_savings > 0 && s.total_migration_cost != null) ? Math.round(s.total_migration_cost / s.total_estimated_savings * 12) + ' mo payback' : '', color: 'text-foreground' },
+                    ];
+                    return s.costs_withheld ? others : money.concat(others);
                 },
 
                 // ── Pipeline bar segments ────────────────────────────

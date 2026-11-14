@@ -914,7 +914,7 @@ def api_application_tco(app_id):
         breakdown = service.calculate_tco_breakdown(app_obj)
         roi = service.calculate_roi_score(app_obj)
         from app.services.cost_visibility import withhold_reply
-        return success_response(data=withhold_reply({"tco": breakdown, "roi": roi}, keys=("tco", "roi", "total_cost", "cost", "total_cost_of_ownership", "capex", "opex")))
+        return success_response(data=withhold_reply({"tco": breakdown, "roi": roi}))
     except HTTPException:
         raise
     except Exception as e:

@@ -194,11 +194,17 @@
                     <p class="text-sm text-muted-foreground" x-text="rec.description"></p>
 
                     <div class="flex flex-wrap items-center gap-3 text-sm">
-                        <template x-if="rec.estimated_cost">
+                        <template x-if="rec.estimated_cost && !costsWithheld">
                             <div class="flex items-center gap-1.5">
                                 <i data-lucide="pound-sterling" class="h-4 w-4 text-muted-foreground"></i>
                                 <span class="font-medium" x-text="'£' + formatCost(rec.estimated_cost)"></span>
                                 <span class="text-muted-foreground text-xs">est.</span>
+                            </div>
+                        </template>
+                        <template x-if="rec.estimated_cost && costsWithheld">
+                            <div class="flex items-center gap-1.5">
+                                <i data-lucide="pound-sterling" class="h-4 w-4 text-muted-foreground"></i>
+                                <span class="text-muted-foreground text-xs" x-text="costsWithheldText"></span>
                             </div>
                         </template>
                         <template x-if="rec.timeline_months">
@@ -302,7 +308,7 @@
                                         </div>
                                     </td>
                                     <td class="px-5 py-3 font-mono text-xs"
-                                        x-text="app.annual_cost ? '£' + formatCost(app.annual_cost) : ''"></td>
+                                        x-text="costsWithheld ? costsWithheldText : Platform.figure.money(app.annual_cost)"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -381,6 +387,8 @@ function solutionWorkspace() {
         results: null,
         savedSolutions: {},
         savingOption: null,
+        costsWithheld: {{ 'true' if costs_withheld else 'false' }},
+        costsWithheldText: {{ costs_withheld_sentence|tojson }},
 
         init() { if (typeof lucide !== 'undefined') lucide.createIcons(); },
 

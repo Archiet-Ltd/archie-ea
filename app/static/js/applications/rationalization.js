@@ -276,7 +276,8 @@ async function runDetection() {
       document.getElementById('result-groups').textContent = data.groups_found;
       document.getElementById('result-exact').textContent = data.exact_matches || 0;
       document.getElementById('result-fuzzy').textContent = data.fuzzy_matches || 0;
-      document.getElementById('result-savings').textContent = formatCurrency(data.estimated_savings);
+      let savingsEl = document.getElementById('result-savings');  // absent for a role the cost rule withholds from
+      if (savingsEl) savingsEl.textContent = formatCurrency(data.estimated_savings);
 
       // Update "View Results" link to go to this specific run
       let viewResultsLink = document.getElementById('view-results-link');

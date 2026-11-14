@@ -627,7 +627,7 @@ def application_list():
             "applications/list_simple.html",
             run_cost=run_cost,
             costs_withheld=not costs_visible(_viewer),
-            costs_withheld_text=COSTS_WITHHELD,
+            costs_withheld_sentence=COSTS_WITHHELD,
             applications=pagination.items,
             chip_remove_urls=chip_remove_urls,
             total_count=total_count,

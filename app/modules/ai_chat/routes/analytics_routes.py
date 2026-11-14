@@ -90,7 +90,6 @@ def get_portfolio_health():
         return jsonify(
             withhold_reply(
                 result,
-                keys=("cost_efficiency", "component_scores", "score_weights", "cost", "tco", "savings"),
             )
         )
     except Exception as e:

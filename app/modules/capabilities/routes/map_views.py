@@ -100,7 +100,7 @@ def index():
     return render_template(
         "capability_map/consolidated.html",
         costs_withheld=not costs_visible(current_user),
-        costs_withheld_text=COSTS_WITHHELD,
+        costs_withheld_sentence=COSTS_WITHHELD,
         total_capabilities=total_capabilities,
         no_industry_chosen=no_industry_chosen,
     )
@@ -837,7 +837,7 @@ def _api_hierarchy_context():
 @login_required
 def api_capabilities_hierarchy():
     """API endpoint for the new capability map page."""
-    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+    from app.services.cost_visibility import costs_visible, withhold_costs
 
     context = _api_hierarchy_context()
     if context["load_error"]:
@@ -846,6 +846,5 @@ def api_capabilities_hierarchy():
         # The context is stored for the organisation, whoever asked first: the money is left out on the way
         # out, never in the stored copy, so the person it is withheld from and the person it is shown to
         # each get their own answer from the same store.
-        context = withhold_costs(context, keys=("investmentNow", "investmentPlanned"))
-        context["costs_withheld"] = COSTS_WITHHELD
+        context = withhold_costs(context)
     return jsonify(context)

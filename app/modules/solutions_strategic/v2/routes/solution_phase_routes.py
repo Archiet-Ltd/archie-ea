@@ -1,4 +1,5 @@
 from app.services.archimate_backbone import sync_archimate_element
+from app.services.cost_visibility import ROLLUP_FIGURE_KEYS
 import csv
 import io
 import logging
@@ -2163,7 +2164,7 @@ def phase_h_review(solution_id: int):
             if any(m["achievement_pct"] is not None for m in metric_results) else None
         ),
     },
-        keys=("cost_variance", "estimated", "actual", "variance", "variance_pct", "estimated_cost", "actual_cost", "total_cost", "budget_allocated", "budget_spent", "tco", "cost", "savings", "total_outcomes")
+        keys=ROLLUP_FIGURE_KEYS
         )
     )
 

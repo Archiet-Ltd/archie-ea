@@ -76,7 +76,7 @@
                 {% endif %}
             </div>
 
-            <p id="app-costs-withheld" {% if costs_withheld %}role="status" class="mb-4 text-sm text-muted-foreground">{{ costs_withheld_text }}{% else %}hidden role="status" class="mb-4 text-sm text-muted-foreground"{% endif %}></p>
+            <p id="app-costs-withheld" {% if costs_withheld %}role="status" class="mb-4 text-sm text-muted-foreground">{{ costs_withheld_sentence }}{% else %}hidden role="status" class="mb-4 text-sm text-muted-foreground"{% endif %}></p>
 
             <!-- Applications List -->
             <div id="app-list-container" class="border rounded-lg max-h-80 overflow-y-auto">
@@ -201,7 +201,7 @@ function loadAvailableApplications() {
         if (data.costs_withheld) {
             // The cost rule withholds figures from this person: no cost filter, no cost line, the reason once.
             const note = document.getElementById('app-costs-withheld');
-            if (note) { note.textContent = data.costs_withheld; note.hidden = false; }
+            if (note) { note.textContent = data.costs_withheld_sentence; note.hidden = false; }
             const costField = document.getElementById('app-filter-cost-field');
             if (costField) costField.hidden = true;
         }

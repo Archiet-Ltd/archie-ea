@@ -30,7 +30,7 @@ def test_a_role_without_spend_reads_no_cost_on_the_vendor_page(client, login_as,
     login_as(client, reader)
     text = _answer(client.get(f"/applications/vendors/{vendor.id}").get_data(as_text=True))
     assert f"Vendor m{tag}" in text and "2 of your systems" in text
-    assert "Not shown for your role" in text
+    assert "Cost figures are withheld for your role" in text
     for figure in ("48,000", "36,000", "12,000", "777", "from active contracts"):
         assert figure not in text, figure
 
@@ -42,7 +42,7 @@ def test_the_administrator_still_reads_the_cost_on_the_vendor_page(app, db_sessi
     client = _admin_client(app, db_session, mine)
     _forget_cached_user()
     text = _answer(client.get(f"/applications/vendors/{vendor.id}").get_data(as_text=True))
-    assert "48,000" in text and "Not shown for your role" not in text
+    assert "48,000" in text and "Cost figures are withheld for your role" not in text
 
 
 def test_the_register_api_hides_the_basis_with_the_cost(client, login_as, db_session, make_org):

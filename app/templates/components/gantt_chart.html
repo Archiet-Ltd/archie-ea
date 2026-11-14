@@ -462,7 +462,7 @@ function ganttChartManager() {
                 // Platform.fetch throws on non-ok responses, returns parsed JSON directly
                 const data = await Platform.fetch('/enterprise/api/work-packages/gantt', { silent: true });
                 this.workPackages = data.work_packages || [];
-                this.costsWithheld = data.costs_withheld || null;
+                this.costsWithheld = data.costs_withheld ? data.costs_withheld_sentence : null;
                 this.filteredWorkPackages = [...this.workPackages];
                 this.loadError = null;
             } catch (error) {

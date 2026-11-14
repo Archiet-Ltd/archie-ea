@@ -141,8 +141,10 @@ def gap_analysis():
 
     organization_id = current_org_id()
     recorded_count = count_gaps(organization_id)
-    covered_count = count_gaps(organization_id, has_work_package=True)
-    unclosed_count = count_gaps(organization_id, has_work_package=False)
+    # Open gaps only: a resolved gap needs no work planned, so recorded = covered + no work planned + closed.
+    covered_count = count_gaps(organization_id, has_work_package=True, closed=False)
+    unplanned_count = count_gaps(organization_id, has_work_package=False, closed=False)
+    closed_count = count_gaps(organization_id, closed=True)
 
     # Portfolio findings listed under the figures (not gap signals; the signal figure is below).
     computed_gaps = {}
@@ -166,7 +168,8 @@ def gap_analysis():
         gap_closers=gap_closers,
         recorded_count=recorded_count,
         covered_count=covered_count,
-        unclosed_count=unclosed_count,
+        unclosed_count=unplanned_count,
+        closed_count=closed_count,
         board_unclosed_count=board_unclosed_count,
         computed_gaps=computed_gaps,
         computed_gap_count=computed_gap_count,

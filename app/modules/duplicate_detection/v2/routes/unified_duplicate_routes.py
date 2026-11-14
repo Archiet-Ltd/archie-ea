@@ -22,6 +22,7 @@ from flask import (  # dead-code-ok
 )
 from flask_login import current_user, login_required
 from app.middleware.tenant_decorators import platform_admin_required
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, is_money_key, withhold_costs
 
 from app import db
 from app.core.compat import mark_blueprint_guardrailed
@@ -106,7 +107,10 @@ def get_enterprise_groups():
     """Get enterprise duplicate groups"""
     try:
         groups = unified_service.get_duplicate_groups("enterprise")
-        return jsonify({"success": True, "groups": groups}), 200
+        reply = {"success": True, "groups": groups}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply), 200
     except Exception as e:
         current_app.logger.error(f"Enterprise groups route error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -136,7 +140,8 @@ def simple_dashboard():
     """Simple duplicate detection dashboard"""
     from config import CurrencyConfig
     currency_symbol = CurrencyConfig.get_currency_config()["symbol"]
-    return render_template("duplicate_detection/dashboard.html", currency_symbol=currency_symbol)
+    return render_template("duplicate_detection/dashboard.html", currency_symbol=currency_symbol,
+                           costs_withheld=not costs_visible(current_user), costs_withheld_sentence=COSTS_WITHHELD)
 
 
 @unified_duplicate_bp_v2.route("/simple/run-detection", methods=["POST"])
@@ -191,7 +196,10 @@ def get_simple_groups():
     """Get simple duplicate groups"""
     try:
         groups = unified_service.get_duplicate_groups("simple")
-        return jsonify({"success": True, "groups": groups}), 200
+        reply = {"success": True, "groups": groups}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply), 200
     except Exception as e:
         current_app.logger.error(f"Simple groups route error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -321,7 +329,10 @@ def get_group_savings(group_id):
         if not group:
             return jsonify({"success": False, "error": "Group not found"}), 404
         savings = unified_service._estimate_group_savings(group)
-        return jsonify({"success": True, "savings": savings}), 200
+        reply = {"success": True, "savings": savings}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply), 200
     except Exception as e:
         current_app.logger.error(f"Savings route error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -362,7 +373,7 @@ def get_simple_statistics():
         total_estimated_savings = (
             latest_run.estimated_savings or None if latest_run else None
         )
-        return jsonify({
+        reply = {
             "success": True,
             "total_groups": total_groups,
             "high_priority_groups": high_priority_groups,
@@ -374,7 +385,10 @@ def get_simple_statistics():
                 "applications_analyzed": latest_run.applications_analyzed or 0,
                 "created_at": latest_run.created_at.isoformat() if latest_run else None,
             } if latest_run else None,
-        })
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as e:
         current_app.logger.error(f"Simple statistics route error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -387,7 +401,10 @@ def get_simple_groups_api():
     """Get all application consolidation groups"""
     try:
         groups = unified_service.get_duplicate_groups("simple", include_applications=False)
-        return jsonify({"success": True, "groups": groups})
+        reply = {"success": True, "groups": groups}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as e:
         current_app.logger.error(f"Simple groups API route error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -570,7 +587,7 @@ def simple_group_detail(group_id):
             "description": group.description,
             "duplicate_type": group.duplicate_type or "fuzzy",
             "overall_similarity_score": group.similarity_score,
-            "estimated_savings": group.estimated_savings,
+            "estimated_savings": group.estimated_savings if costs_visible(current_user) else None,
             "consolidation_priority": group.risk_level or "medium",
             "functional_similarity": _similarity("functional_similarity"),
             "capability_similarity": _similarity("capability_similarity"),
@@ -639,6 +656,7 @@ def simple_group_detail(group_id):
             "duplicate_detection/group_detail.html",
             group=group_payload, recommendation=None, pairwise_analyses=[],
             currency_symbol=currency_symbol, dashboard_registry_url=dashboard_registry_url,
+            costs_withheld=not costs_visible(current_user), costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception as e:
         current_app.logger.error(f"Error viewing consolidation group: {e}")
@@ -692,7 +710,10 @@ def get_unified_groups():
     try:
         mode = request.args.get("mode", "all")
         groups = unified_service.get_duplicate_groups(mode)
-        return jsonify({"success": True, "groups": groups}), 200
+        reply = {"success": True, "groups": groups}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply), 200
     except Exception as e:
         current_app.logger.error(f"Unified groups route error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -742,7 +763,8 @@ def duplicate_dashboard():
     try:
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"status": "success", "message": "Duplicate detection dashboard loaded", "services": ["enterprise", "simple", "hybrid"]})
-        return render_template("duplicate_detection/dashboard.html")
+        return render_template("duplicate_detection/dashboard.html", costs_withheld=not costs_visible(current_user),
+                               costs_withheld_sentence=COSTS_WITHHELD)
     except Exception as e:
         current_app.logger.error("Error loading duplicate detection dashboard: %s", e, exc_info=True)
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -751,6 +773,7 @@ def duplicate_dashboard():
             return render_template(
                 "duplicate_detection/dashboard.html",
                 load_error="Duplicate detection results could not be read.",
+                costs_withheld=not costs_visible(current_user), costs_withheld_sentence=COSTS_WITHHELD,
             )
 
 
@@ -873,6 +896,10 @@ def api_group_merge_preview(group_id):
             ("technical_owner", "Technical Owner"), ("total_cost_of_ownership", "Total Cost of Ownership"),
             ("license_cost", "License Cost"), ("technology_stack", "Technology Stack"),
         ]
+        # the cost fields are not compared for a person the one cost rule withholds from
+        costs_hidden = not costs_visible(current_user)
+        if costs_hidden:
+            merge_fields = [field for field in merge_fields if not is_money_key(field[0])]
 
         def get_field_val(app, field_name):
             val = getattr(app, field_name, None)
@@ -918,13 +945,16 @@ def api_group_merge_preview(group_id):
         for field_name, field_label in merge_fields:
             primary_data[field_name] = get_field_val(primary, field_name)
 
-        return jsonify({
+        reply = {
             "success": True,
             "data": {
                 "group_id": group_id, "primary": primary_data, "duplicates": duplicates,
                 "merge_summary": {"fields_matching": fields_matching, "fields_conflicting": fields_conflicting, "fields_missing": fields_missing, "total_fields_compared": fields_matching + fields_conflicting + fields_missing},
             },
-        })
+        }
+        if costs_hidden:
+            reply["costs_withheld_sentence"] = COSTS_WITHHELD
+        return jsonify(reply)
     except Exception as e:
         current_app.logger.error(f"Error getting merge preview for {group_id}: {e}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -1070,7 +1100,10 @@ def api_duplicate_groups():
                 "application_count": len(g.applications) if hasattr(g, "applications") else 0,
                 "created_at": g.created_at.isoformat() if hasattr(g, "created_at") and g.created_at else None,
             })
-        return jsonify({"groups": groups_data, "pagination": {"page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "pages": pagination.pages, "has_next": pagination.has_next, "has_prev": pagination.has_prev}})
+        reply = {"groups": groups_data, "pagination": {"page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "pages": pagination.pages, "has_next": pagination.has_next, "has_prev": pagination.has_prev}}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as e:
         current_app.logger.exception(f"Duplicate groups API error: {e}")
         return jsonify({"error": "Could not load duplicate groups"}), 500

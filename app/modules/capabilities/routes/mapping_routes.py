@@ -117,12 +117,11 @@ def api_applications():
                 }
             )
 
-        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+        from app.services.cost_visibility import costs_visible, withhold_costs
 
         reply = {"applications": app_data}
         if not costs_visible(current_user):
-            reply = withhold_costs(reply, keys=("total_cost_of_ownership",))
-            reply["costs_withheld"] = COSTS_WITHHELD
+            reply = withhold_costs(reply)
         return jsonify(reply)
     except SQLAlchemyError as e:
         current_app.logger.error(f"Database error fetching applications: {e}")

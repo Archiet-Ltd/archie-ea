@@ -14,7 +14,9 @@ from app.middleware.tenant_decorators import platform_admin_required
 from app.models.application_portfolio import ApplicationComponent
 from app.core.auth.decorators import require_permission
 from app.services.application_cost_accessor import set_annual_cost
-from app.services.cost_visibility import costs_visible
+from app.services.cost_visibility import (
+    COSTS_WITHHELD, ROLLUP_FIGURE_KEYS, costs_visible, withhold_costs, withhold_evidence_trail, withhold_reply,
+)
 from ._helpers import _verify_app_in_org
 from app.services.rate_limiter import rate_limit
 
@@ -25,7 +27,6 @@ from app.utils.route_guards import require_entity, require_entity_in_active_org
 from app.utils.tenant_users import escape_like_literal
 
 logger = logging.getLogger(__name__)
-
 
 # ── RAT-114: Audit trail helper ──────────────────────────────────────────
 
@@ -282,6 +283,12 @@ def rationalization_dashboard():
             scored_in_total,
         ).count() if time_scored_count > 0 else 0
 
+        # The one cost rule decides; the page prints what it is given.
+        costs_withheld = not costs_visible(current_user)
+        if costs_withheld:
+            stats = withhold_costs(stats)
+            groups = withhold_costs(groups)
+
         return render_template(
             "applications/rationalization/dashboard.html",
             stats=stats,
@@ -292,6 +299,8 @@ def rationalization_dashboard():
             active_tab="dashboard",
             data_quality=data_quality,
             insufficient_count=insufficient_count,
+            costs_withheld=costs_withheld,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception as e:
         current_app.logger.exception("Error loading rationalization dashboard: %s", e)
@@ -418,20 +427,17 @@ def rationalization_tracking():
         current_app.logger.error(f"Error loading tracking financials: {e}")
         financial = {"projected": 0, "actual": 0}
 
-    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
-
-    withheld = not costs_visible(current_user)
-    if withheld:
-        currency_symbol = ""
-        financial = {"projected": None, "actual": None}
+    costs_withheld = not costs_visible(current_user)
+    if costs_withheld:
+        financial = withhold_costs(financial, keys=ROLLUP_FIGURE_KEYS)
 
     return render_template(
         "applications/rationalization/tracking.html",
         currency_symbol=currency_symbol,
         active_tab="tracking",
         financial_summary=financial,
-        costs_withheld=withheld,
-        costs_withheld_text=COSTS_WITHHELD,
+        costs_withheld=costs_withheld,
+        costs_withheld_sentence=COSTS_WITHHELD,
     )
 
 
@@ -505,6 +511,8 @@ def rationalization_run_detection():
         result = service.run_detection(
             similarity_threshold=threshold, strategy=strategy
         )
+        if not costs_visible(current_user):
+            result = withhold_costs(result)
 
         return _reply(result)
     except Exception as e:
@@ -523,7 +531,10 @@ def rationalization_get_groups():
     try:
         service = UnifiedDuplicateDetectionService()
         groups = service.get_duplicate_groups("simple", include_applications=True)
-        return jsonify({"success": True, "groups": groups})
+        reply = {"success": True, "groups": groups}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as e:
         current_app.logger.error(f"Error getting groups: {e}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -1197,8 +1208,6 @@ def rationalization_dependency_impact(app_id):
             and blast_radius.get("risk_level", "low") not in ("critical", "high")
         )
 
-        from app.services.cost_visibility import withhold_reply
-
         return jsonify(
             withhold_reply(
                 {
@@ -1208,8 +1217,7 @@ def rationalization_dependency_impact(app_id):
                     "blockers": blockers,
                     "blast_radius": blast_radius,
                     "retirement_safe": retirement_safe,
-                },
-                keys=("estimated_cost", "actual_cost", "total_cost", "estimated_savings", "total_cost_of_ownership", "estimated_total_decoupling_cost", "cost_efficiency", "invest_bv", "invest_tech")
+                }
             )
         )
     except Exception as e:
@@ -1526,9 +1534,10 @@ def rationalization_evidence_trail(app_id):
         if "error" in result:
             return jsonify({"success": False, "error": result["error"]}), 500
 
-        from app.services.cost_visibility import withhold_reply
-
-        return jsonify(withhold_reply({"success": True, **result}, keys=("estimated_cost", "actual_cost", "total_cost", "estimated_savings", "total_cost_of_ownership", "estimated_total_decoupling_cost", "cost_efficiency", "invest_bv", "invest_tech")))
+        reply = {"success": True, **result}
+        if not costs_visible(current_user):
+            reply = withhold_evidence_trail(reply)
+        return jsonify(reply)
 
     except Exception as e:
         current_app.logger.error(
@@ -3436,7 +3445,7 @@ def rationalization_get_benefits(app_id):
         ).first()
         if not tracker:
             return jsonify({"success": True, "has_tracking": False})
-        return jsonify(
+        reply = (
             {
                 "success": True,
                 "has_tracking": True,
@@ -3469,6 +3478,9 @@ def rationalization_get_benefits(app_id):
                 },
             }
         )
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as exc:
         current_app.logger.error(
             "Error fetching benefits for app %d: %s", app_id, exc, exc_info=True
@@ -3582,9 +3594,7 @@ def rationalization_model_metadata():
 
     try:
         metadata = RationalizationScoringService.get_model_metadata()
-        from app.services.cost_visibility import withhold_reply
-
-        return jsonify(withhold_reply({"success": True, **metadata}, keys=("estimated_cost", "actual_cost", "total_cost", "estimated_savings", "total_cost_of_ownership", "estimated_total_decoupling_cost", "cost_efficiency", "invest_bv", "invest_tech")))
+        return jsonify(withhold_reply({"success": True, **metadata}))
     except Exception as exc:
         current_app.logger.error(f"Error fetching model metadata: {exc}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -3689,7 +3699,7 @@ def rationalization_executive_summary():
             ).group_by(ApplicationRationalizationScore.disposition_confidence).all()
         )
 
-        return jsonify({
+        reply = {
             "success": True,
             "total_scored": total_scored,
             "disposition_distribution": {k: v for k, v in disposition_dist.items() if k},
@@ -3707,7 +3717,10 @@ def rationalization_executive_summary():
             },
             "review_status_distribution": {k: v for k, v in review_dist.items() if k},
             "confidence_distribution": {k: v for k, v in confidence_dist.items() if k},
-        })
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as exc:
         current_app.logger.exception(
             "Error generating executive summary: %s", exc
@@ -3770,7 +3783,7 @@ def rationalization_score_app(app_id):
             details={"overall_score": score.overall_health_score, "action": score.rationalization_action},
         )
 
-        return jsonify({
+        reply = {
             "success": True,
             "score": {
                 "id": score.id,
@@ -3790,7 +3803,10 @@ def rationalization_score_app(app_id):
                 "missing_critical": readiness["missing_critical"],
                 "dimensions": readiness["dimensions"],
             },
-        })
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as exc:
         logger.error("RATA-002 score app %s failed: %s", app_id, exc, exc_info=True)
         return jsonify({"success": False, "error": str(exc)}), 500
@@ -4055,16 +4071,21 @@ def rationalization_portfolio_scores():
     # protect it. With no organisation in context nothing is read or kept.
     org_key = org_scoped_cache_key(f"portfolio_scores:{disposition_filter}")
 
+    def _reply(payload, cache_state):
+        # The cache keeps the full figures for the organisation; the one cost rule is applied to each
+        # reader on the way out, so a person it withholds from never receives them.
+        if not costs_visible(current_user):
+            payload = json.dumps(withhold_costs(json.loads(payload)))
+        resp = current_app.response_class(payload, status=200, mimetype="application/json")
+        resp.headers["X-Cache"] = cache_state
+        return resp
+
     # Return cached payload if still fresh
     cached = _PORTFOLIO_SCORES_CACHE.get(org_key) if org_key else None
     if cached:
         cached_at, payload = cached
         if time.time() - cached_at < _PORTFOLIO_SCORES_TTL:
-            resp = current_app.response_class(
-                payload, status=200, mimetype="application/json"
-            )
-            resp.headers["X-Cache"] = "HIT"
-            return resp
+            return _reply(payload, "HIT")
 
     try:
         # Select only the columns needed for the TIME quadrant scatter plot —
@@ -4110,16 +4131,11 @@ def rationalization_portfolio_scores():
             for r in rows
         ]
 
-        import json
         payload = json.dumps(results)
         if org_key is not None:
             _PORTFOLIO_SCORES_CACHE[org_key] = (time.time(), payload)
 
-        resp = current_app.response_class(
-            payload, status=200, mimetype="application/json"
-        )
-        resp.headers["X-Cache"] = "MISS"
-        return resp
+        return _reply(payload, "MISS")
 
     except Exception as exc:
         logger.exception("RATA-009 portfolio-scores failed: %s", exc)
@@ -4145,7 +4161,7 @@ def rationalization_export():
 
     try:
         if fmt == "csv":
-            data = RationalizationExportService.generate_csv(scope)
+            data = RationalizationExportService.generate_csv(scope, show_costs=costs_visible(current_user))
             return send_file(
                 io.BytesIO(data),
                 mimetype="text/csv",
@@ -4153,7 +4169,7 @@ def rationalization_export():
                 download_name="rationalization_export.csv",
             )
         elif fmt == "excel":
-            data = RationalizationExportService.generate_excel(scope)
+            data = RationalizationExportService.generate_excel(scope, show_costs=costs_visible(current_user))
             return send_file(
                 io.BytesIO(data),
                 mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -4161,7 +4177,7 @@ def rationalization_export():
                 download_name="rationalization_business_case.xlsx",
             )
         elif fmt == "pdf":
-            data = RationalizationExportService.generate_pdf(scope)
+            data = RationalizationExportService.generate_pdf(scope, show_costs=costs_visible(current_user))
             return send_file(
                 io.BytesIO(data),
                 mimetype="text/html",
@@ -4436,9 +4452,10 @@ def rationalization_enrich_candidates():
                 "business_criticality": app_obj.business_criticality or "",
             })
 
-        from app.services.cost_visibility import withhold_reply
-
-        return jsonify(withhold_reply({"success": True, "applications": results}, keys=("estimated_cost", "actual_cost", "total_cost", "estimated_savings", "total_cost_of_ownership", "estimated_total_decoupling_cost", "cost_efficiency", "invest_bv", "invest_tech")))
+        reply = {"success": True, "applications": results}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as exc:
         current_app.logger.error("Enrich candidates failed: %s", exc, exc_info=True)
         return jsonify({"success": False, "error": str(exc)}), 500

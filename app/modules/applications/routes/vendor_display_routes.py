@@ -332,6 +332,7 @@ def vendor_detail(vendor_id):
         # The systems and contracts this organisation attaches to the vendor: the
         # register's answer, so this page agrees with the Vendors list.
         from app.services import vendor_register
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
 
         supplied_systems = vendor_register.systems_of(vendor_id)
         ledger = vendor_register.contract_ledger()
@@ -340,10 +341,9 @@ def vendor_detail(vendor_id):
         known = {a.id for a in deployed_applications}
         deployed_applications = list(deployed_applications) + [
             a for a in supplied_systems if a.id not in known]
-        from app.decorators.requires_role import may_see_spend_pages
 
         # The Vendors list's permission decides every cost figure on this page too.
-        cost_visible = may_see_spend_pages(current_user)
+        cost_visible = costs_visible(current_user)
         supplied_cost = (vendor_register.annual_cost_with_basis(supplied_systems, vendor_id, counted=counted)[0] if cost_visible else None)
         renewing = ledger["renewing_by_vendor"].get(vendor_id, [])
         next_renewal = vendor_register.next_renewal(renewing)
@@ -377,6 +377,8 @@ def vendor_detail(vendor_id):
             vendor_contracts=vendor_contracts,
             supplied_cost=supplied_cost,
             cost_visible=cost_visible,
+            costs_withheld=not cost_visible,
+            costs_withheld_sentence=COSTS_WITHHELD,
             systems_footer=systems_footer,
             next_renewal=next_renewal,
             next_renewal_overdue=next_renewal_overdue,

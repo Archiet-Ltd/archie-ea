@@ -888,7 +888,7 @@ def get_solution_model_drift(solution_id):
         from app.services.cost_visibility import withhold_reply
 
         drift = learning_service.detect_model_drift()
-        return jsonify(withhold_reply(drift, keys=("recent_cost_accuracy", "older_cost_accuracy", "cost", "tco", "estimated_cost", "savings"))), 200
+        return jsonify(withhold_reply(drift)), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -912,7 +912,7 @@ def detect_drift():
         from app.services.cost_visibility import withhold_reply
 
         drift = learning_service.detect_model_drift()
-        return jsonify(withhold_reply(drift, keys=("recent_cost_accuracy", "older_cost_accuracy", "cost", "tco", "estimated_cost", "savings"))), 200
+        return jsonify(withhold_reply(drift)), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 

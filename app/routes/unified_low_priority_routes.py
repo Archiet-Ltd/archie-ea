@@ -24,6 +24,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from app.decorators import audit_log, require_roles, user_has_any_role
+from app.services.cost_visibility import PIPELINE_FIGURE_KEYS
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import or_, text
 
@@ -372,14 +373,14 @@ def strategic_initiatives():
         withheld = not costs_visible(current_user)
         if withheld:
             initiatives_list = withhold_costs(
-                initiatives_list, keys=("budget_allocated", "budget_spent", "budget_remaining", "budget_utilization_percentage"))
+                initiatives_list)
         return render_template(
             "strategic/initiatives.html",
             initiatives=initiatives_list,
             health_scores=health_scores_list,
             status_filter=status_filter,
             costs_withheld=withheld,
-            costs_withheld_text=COSTS_WITHHELD,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception as e:
         db.session.rollback()
@@ -419,7 +420,7 @@ def consolidation_dashboard():
                 if statistics.get("success")
                 else {},
                 savings_forecast=data.get("savings_forecast", {}),
-                costs_withheld=withheld, costs_withheld_text=COSTS_WITHHELD,
+                costs_withheld=withheld, costs_withheld_sentence=COSTS_WITHHELD,
             )
         else:
             return render_template(
@@ -427,7 +428,7 @@ def consolidation_dashboard():
                 total_applications=ApplicationComponent.query.count(),
                 duplicate_candidates=[],
                 consolidation_opportunities=[],
-                costs_withheld=withheld, costs_withheld_text=COSTS_WITHHELD,
+                costs_withheld=withheld, costs_withheld_sentence=COSTS_WITHHELD,
             )
     except Exception as e:
         current_app.logger.error(f"Consolidation dashboard error: {str(e)}")
@@ -777,10 +778,7 @@ def api_consolidation_statistics():
         from app.services.cost_visibility import withhold_reply
 
         result = consolidation_service.get_consolidation_statistics()
-        return jsonify(withhold_reply(result, keys=(
-            "estimated_pipeline", "realized_ytd", "completed_total",
-            "estimated_annual_savings", "estimated_savings", "realized_savings",
-        )))
+        return jsonify(withhold_reply(result, keys=PIPELINE_FIGURE_KEYS))
     except Exception as e:
         current_app.logger.error(f"API consolidation statistics error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500

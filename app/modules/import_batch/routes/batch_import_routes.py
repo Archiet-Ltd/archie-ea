@@ -376,7 +376,6 @@ def list_jobs():
                     "limit": limit,
                     "offset": offset,
                 },
-                keys=("totalCost", "total_cost", "cost", "actual_cost_usd"),
             )
         )
 

@@ -210,8 +210,7 @@ def find_duplicate_applications():
                         "total_duplicate_applications": 0,
                         "estimated_savings": 0,
                         "message": "Need at least 2 applications to detect duplicates",
-                    },
-                    keys=("estimated_savings", "total_cost_of_ownership", "cost", "savings")
+                    }
                 )
             )
 
@@ -267,8 +266,7 @@ def find_duplicate_applications():
                         "estimated_savings": 0,
                         "analyses_count": 0,
                         "message": "No organisation context",
-                    },
-                    keys=("estimated_savings", "total_cost_of_ownership", "cost", "savings")
+                    }
                 )
             )
 
@@ -437,8 +435,7 @@ def find_duplicate_applications():
                     "analyses_count": total_duplicate_groups,
                     "message": f"Found {total_duplicate_groups} duplicate group(s) "
                     f"involving {total_duplicate_applications} application(s)",
-                },
-                keys=("estimated_savings", "total_cost_of_ownership", "cost", "savings")
+                }
             )
         )
 

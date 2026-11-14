@@ -26,6 +26,7 @@ from flask import current_app, g, jsonify, redirect, render_template, request, u
 from flask_login import current_user, login_required
 
 from app import db
+from app.services.cost_visibility import ROLLUP_FIGURE_KEYS
 from app.models.solution_models import Solution
 from app.models.strategic import StrategicInitiative
 
@@ -531,7 +532,7 @@ def programme_rollup(initiative_id):
         return jsonify({"success": False, "error": "Programme not found."}), 404
     from app.services.cost_visibility import withhold_reply
 
-    return jsonify(withhold_reply({"success": True, **rollup}, keys=("cost_variance", "estimated", "actual", "variance", "variance_pct", "estimated_cost", "actual_cost", "total_cost", "budget_allocated", "budget_spent", "tco", "cost", "savings", "total_outcomes")))
+    return jsonify(withhold_reply({"success": True, **rollup}, keys=ROLLUP_FIGURE_KEYS))
 
 
 @solution_design_bp.route("/programmes/<int:initiative_id>/solutions", methods=["POST"])

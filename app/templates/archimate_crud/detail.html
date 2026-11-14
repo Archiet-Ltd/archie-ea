@@ -382,7 +382,7 @@
             <div>
                 <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Yearly cost</h3>
                 {% if product.cost.withheld %}
-                <p class="mt-2 text-sm text-muted-foreground" data-testid="product-cost-total">{{ costs_withheld_text }}</p>
+                <p class="mt-2 text-sm text-muted-foreground" data-testid="product-cost-total">{{ costs_withheld_sentence }}</p>
                 {% elif product.cost.total is not none %}
                 <p class="mt-2 text-sm font-medium" data-testid="product-cost-total">{{ product.cost.total | currency(product.cost.currency) }} a year across {{ product.cost.counted }} cost line{{ '' if product.cost.counted == 1 else 's' }}</p>
                 {% elif product.cost.counted == 0 %}

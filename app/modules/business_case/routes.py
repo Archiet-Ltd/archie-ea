@@ -63,7 +63,7 @@ def index():
     return render_template(
         "business_case/index.html",
         costs_withheld=not costs_visible(current_user),
-        costs_withheld_text=COSTS_WITHHELD,
+        costs_withheld_sentence=COSTS_WITHHELD,
         business_cases=business_cases,
         statuses=BUSINESS_CASE_STATUSES,
     )
@@ -110,7 +110,7 @@ def detail(business_case_id):
     return render_template(
         "business_case/detail.html",
         costs_withheld=not costs_visible(current_user),
-        costs_withheld_text=COSTS_WITHHELD,
+        costs_withheld_sentence=COSTS_WITHHELD,
         business_case=business_case,
         statuses=BUSINESS_CASE_STATUSES,
         capabilities=capabilities,

@@ -138,7 +138,7 @@ def test_the_architect_cannot_pull_financials_into_a_business_case(client, login
 def test_the_capability_map_reply_holds_no_investment_for_the_architect(client, login_as, world):
     path = "/capability-map/api/capabilities/hierarchy"
     held = _get(client, login_as, world["architect"], path).get_json()
-    assert held["costs_withheld"] == SENTENCE
+    assert held["costs_withheld"] is True and held["costs_withheld_sentence"] == SENTENCE
     assert _numbers(held, {"investmentNow", "investmentPlanned"}) == []
     shown = _numbers(_get(client, login_as, world["cto"], path).get_json(), {"investmentNow", "investmentPlanned"})
     assert (("investmentNow", INVEST) in shown) and ("investmentPlanned", INVEST + 1) in shown
@@ -157,7 +157,7 @@ def test_the_capability_map_page_offers_the_architect_no_investment_lens_and_say
 def test_the_timeline_feed_holds_no_estimate_for_the_architect(client, login_as, world):
     path = "/enterprise/api/work-packages/gantt"
     held = _get(client, login_as, world["architect"], path).get_json()
-    assert held["costs_withheld"] == SENTENCE
+    assert held["costs_withheld"] is True and held["costs_withheld_sentence"] == SENTENCE
     assert [item["name"] for item in held["work_packages"]] == ["Places package"]
     assert _numbers(held, {"estimated_cost"}) == []
     shown = _get(client, login_as, world["cto"], path).get_json()
@@ -178,7 +178,7 @@ def test_the_applications_list_says_once_that_the_architect_reads_no_run_cost(cl
 def test_the_application_feed_holds_no_cost_for_the_architect(client, login_as, world):
     path = "/capability-map/api/applications"
     held = _get(client, login_as, world["architect"], path).get_json()
-    assert held["costs_withheld"] == SENTENCE
+    assert held["costs_withheld"] is True and held["costs_withheld_sentence"] == SENTENCE
     assert _numbers(held, {"total_cost_of_ownership"}) == []
     shown = _get(client, login_as, world["cto"], path).get_json()
     assert (("total_cost_of_ownership", APP_COST) in _numbers(shown, {"total_cost_of_ownership"}))

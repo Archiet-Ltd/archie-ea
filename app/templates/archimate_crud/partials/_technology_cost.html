@@ -15,7 +15,7 @@
   </div>
 
   {% if technology_cost.withheld %}
-    <p class="text-sm text-muted-foreground" data-testid="technology-cost-withheld">{{ costs_withheld_text }}</p>
+    <p class="text-sm text-muted-foreground" data-testid="technology-cost-withheld">{{ costs_withheld_sentence }}</p>
     <div class="space-y-3">
       <h3 class="text-sm font-semibold text-foreground">Applications this technology runs</h3>
       {% call(row) list_table(rows=apps, columns=[('Application', '')],

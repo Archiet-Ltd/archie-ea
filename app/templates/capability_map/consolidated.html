@@ -43,7 +43,7 @@
         <p class="text-sm text-muted-foreground" data-testid="capability-total">{{ total_capabilities }} {{ 'capability' if total_capabilities == 1 else 'capabilities' }}</p>
         {% endif %}
         {% if costs_withheld %}
-        <p class="text-sm text-muted-foreground" data-testid="capability-costs-withheld" role="status">{{ costs_withheld_text }}</p>
+        <p class="text-sm text-muted-foreground" data-testid="capability-costs-withheld" role="status">{{ costs_withheld_sentence }}</p>
         {% endif %}
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <!-- Lens ToggleGroup (six lenses) -->

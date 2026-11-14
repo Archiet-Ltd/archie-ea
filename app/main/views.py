@@ -1298,7 +1298,7 @@ def get_widget_metrics():
             "revenue": 45678.90,
             "conversion_rate": 3.45,
         }
-        return jsonify(withhold_reply(metrics, keys=("revenue",)))
+        return jsonify(withhold_reply(metrics))
 
     except Exception as e:
         current_app.logger.error(f"Widget metrics fetch failed: {e}")
