@@ -22,10 +22,12 @@ from werkzeug.wsgi import ClosingIterator
 
 from app.decorators import audit_log, require_roles
 from app.extensions import db
+from app.middleware.tenant_context import current_org_id
 from app.models.archimate_core import (
     ArchiMateElement as ArchitectureElement,
     ArchiMateRelationship as Relationship,
 )
+from app.modules.intelligence.services.query_service import filter_relationships_by_org
 from app.services.architecture_validation_service import ArchitectureValidator
 from app.services.architecture_search_service import ArchitectureSearchService
 from app.services.architecture_import_export_service import (
@@ -296,46 +298,40 @@ def list_relationships():
     is the caller's org while the far element belongs to another). Only relationships
     where both source and target elements belong to the current organisation are listed.
     """
-    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
-    from flask import g
-
     page = safe_int_arg('page', 1, minimum=1)
     per_page = 20
 
-    org_id = getattr(g, "current_org_id", None)
+    org_id = current_org_id()
 
     # An address that names one relationship ("Open relationship record" in an
     # answer) shows that relationship, so the row it points at is on the page.
     focus_id = request.args.get("relationship", type=int)
-    listing = ArchiMateRelationship.query
+    listing = Relationship.query
     if focus_id is not None:
-        listing = listing.filter(ArchiMateRelationship.id == focus_id)
-    pagination = listing.order_by(
-        ArchiMateRelationship.type, ArchiMateRelationship.id
-    ).paginate(page=page, per_page=per_page)
+        listing = listing.filter(Relationship.id == focus_id)
 
-    # Filter out relationships where either end belongs to another organisation
-    filtered_items = []
+    # Apply the shared fence BEFORE paging so each page holds its full 20 rows
+    all_rels = listing.order_by(
+        Relationship.type, Relationship.id
+    ).all()
+    filtered_rels = filter_relationships_by_org(all_rels, org_id, direction="both")
+
+    # Manual pagination on the filtered list
+    total = len(filtered_rels)
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_items = filtered_rels[start:end]
+
     element_ids = set()
-    for rel in pagination.items:
-        source = db.session.get(ArchiMateElement, rel.source_id)
-        target = db.session.get(ArchiMateElement, rel.target_id)
-        if source is None or target is None:
-            continue
-        if org_id is not None:
-            if getattr(source, "organization_id", None) != org_id:
-                continue
-            if getattr(target, "organization_id", None) != org_id:
-                continue
-        filtered_items.append(rel)
+    for rel in page_items:
         element_ids.add(rel.source_id)
         element_ids.add(rel.target_id)
 
     names_by_id = {}
     if element_ids:
         names_by_id = dict(
-            db.session.query(ArchiMateElement.id, ArchiMateElement.name)
-            .filter(ArchiMateElement.id.in_(element_ids))
+            db.session.query(ArchitectureElement.id, ArchitectureElement.name)
+            .filter(ArchitectureElement.id.in_(element_ids))
         )
 
     relationships = [
@@ -347,28 +343,27 @@ def list_relationships():
             "source_name": names_by_id.get(rel.source_id),
             "target_name": names_by_id.get(rel.target_id),
         }
-        for rel in filtered_items
+        for rel in page_items
     ]
 
-    # Create a pagination-like object with filtered results
-    class FilteredPagination:
-        def __init__(self, items, total, page, per_page):
-            self.items = items
-            self.total = total
-            self.page = page
-            self.per_page = per_page
-            self.pages = (total + per_page - 1) // per_page if per_page else 0
-            self.has_prev = page > 1
-            self.has_next = page < self.pages
-            self.prev_num = page - 1 if self.has_prev else None
-            self.next_num = page + 1 if self.has_next else None
-
-    filtered_pagination = FilteredPagination(filtered_items, len(filtered_items), page, per_page)
+    # Pagination data for the template
+    pages = (total + per_page - 1) // per_page if per_page else 0
+    has_prev = page > 1
+    has_next = page < pages
+    prev_num = page - 1 if has_prev else None
+    next_num = page + 1 if has_next else None
 
     return render_template(
         "architecture/relationships.html",
         relationships=relationships,
-        total=filtered_pagination.total,
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=pages,
+        has_prev=has_prev,
+        has_next=has_next,
+        prev_num=prev_num,
+        next_num=next_num,
         focus_id=focus_id,
     )
 
@@ -751,24 +746,14 @@ def api_element_relationships(element_id):
     incoming_rels = Relationship.query.filter_by(target_id=element_id).all()
     outgoing_rels = Relationship.query.filter_by(source_id=element_id).all()
 
-    def _far_end_in_org(rel, want_source: bool) -> bool:
-        """Check if the far end of a relationship is in the centre element's org."""
-        if org_id is None:
-            return True
-        far_id = rel.source_id if want_source else rel.target_id
-        far_el = db.session.get(ArchitectureElement, far_id)
-        if far_el is None:
-            return False
-        return getattr(far_el, "organization_id", None) == org_id
-
-    incoming = [r for r in incoming_rels if _far_end_in_org(r, want_source=True)]
-    outgoing = [r for r in outgoing_rels if _far_end_in_org(r, want_source=False)]
+    incoming_rels = filter_relationships_by_org(incoming_rels, org_id, direction="incoming")
+    outgoing_rels = filter_relationships_by_org(outgoing_rels, org_id, direction="outgoing")
 
     return jsonify(
         {
             "status": "success",
-            "incoming": [_relationship_to_dict(r) for r in incoming],
-            "outgoing": [_relationship_to_dict(r) for r in outgoing],
+            "incoming": [_relationship_to_dict(r) for r in incoming_rels],
+            "outgoing": [_relationship_to_dict(r) for r in outgoing_rels],
         }
     )
 

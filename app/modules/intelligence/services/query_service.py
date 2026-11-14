@@ -569,6 +569,57 @@ def _element_ids_in_rows(rows: List[Dict[str, Any]]) -> List[int]:
     return ids
 
 
+def filter_relationships_by_org(
+    relationships: List[Any], org_id: Optional[int], *, direction: str = "both"
+) -> List[Any]:
+    """Return only relationships whose far end belongs to ``org_id``.
+
+    This is the single shared fence for every screen that lists relationships.
+    It replaces the inline copies in archimate_crud/routes.py (D1),
+    architecture_crud_routes.py (D2, D3), unified_low_priority_routes.py (ISO-1),
+    and the solutions list in archimate_crud/routes.py (ISO-2).
+
+    Args:
+        relationships: List of ArchiMateRelationship objects (or objects with
+            ``source_id`` and ``target_id`` attributes).
+        org_id: The organisation to fence on. If ``None``, returns an empty list
+            (no tenant context means nothing is shown).
+        direction: "incoming" keeps relationships where the source is in the org;
+            "outgoing" keeps relationships where the target is in the org;
+            "both" (default) keeps relationships where both ends are in the org.
+
+    Returns:
+        Filtered list of the same relationship objects, in the same order.
+    """
+
+    if org_id is None:
+        return []
+
+    # Collect all far-end element IDs we need to check
+    far_end_ids: List[int] = []
+    for rel in relationships:
+        if direction in ("incoming", "both"):
+            far_end_ids.append(rel.source_id)
+        if direction in ("outgoing", "both"):
+            far_end_ids.append(rel.target_id)
+
+    # Resolve in one batched query: only elements inside org_id are returned
+    resolved = _resolve_elements_batch(far_end_ids, org_id)
+    allowed_ids = set(resolved.keys())
+
+    # Filter relationships
+    kept = []
+    for rel in relationships:
+        if direction in ("incoming", "both"):
+            if str(rel.source_id) not in allowed_ids:
+                continue
+        if direction in ("outgoing", "both"):
+            if str(rel.target_id) not in allowed_ids:
+                continue
+        kept.append(rel)
+    return kept
+
+
 def _name_in(elements: Dict[str, Dict[str, Any]], element_id: Optional[int]) -> Optional[str]:
     entry = elements.get(str(element_id))
     return entry["name"] if entry is not None else None

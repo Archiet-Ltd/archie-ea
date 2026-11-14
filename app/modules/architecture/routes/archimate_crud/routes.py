@@ -2826,50 +2826,80 @@ def api_element_detail(element_id):
 
     org_id = getattr(element, "organization_id", None)
 
+    # Outgoing relationships: fence on target element's organisation
+    outgoing_rels = ArchiMateRelationship.query.filter_by(source_id=element_id).limit(50).all()
+    from app.modules.intelligence.services.query_service import filter_relationships_by_org
+    outgoing_rels = filter_relationships_by_org(outgoing_rels, org_id, direction="outgoing")
+
     outgoing = []
-    for rel in ArchiMateRelationship.query.filter_by(source_id=element_id).limit(50).all():
-        target = ArchiMateElement.query.get(rel.target_id)
-        if target is None:
-            continue
-        if org_id is not None and getattr(target, "organization_id", None) != org_id:
-            continue
-        outgoing.append({
-            "id": rel.id,
-            "type": rel.type or "",
-            "target_id": rel.target_id,
-            "target_name": target.name,
-            "target_type": target.type,
-            "target_layer": target.layer,
-        })
+    if outgoing_rels:
+        target_ids = [rel.target_id for rel in outgoing_rels]
+        targets = {
+            e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(target_ids)).all()
+        }
+        for rel in outgoing_rels:
+            target = targets.get(rel.target_id)
+            if target is None:
+                continue
+            outgoing.append({
+                "id": rel.id,
+                "type": rel.type or "",
+                "target_id": rel.target_id,
+                "target_name": target.name,
+                "target_type": target.type,
+                "target_layer": target.layer,
+            })
+
+    # Incoming relationships: fence on source element's organisation
+    incoming_rels = ArchiMateRelationship.query.filter_by(target_id=element_id).limit(50).all()
+    incoming_rels = filter_relationships_by_org(incoming_rels, org_id, direction="incoming")
 
     incoming = []
-    for rel in ArchiMateRelationship.query.filter_by(target_id=element_id).limit(50).all():
-        source = ArchiMateElement.query.get(rel.source_id)
-        if source is None:
-            continue
-        if org_id is not None and getattr(source, "organization_id", None) != org_id:
-            continue
-        incoming.append({
-            "id": rel.id,
-            "type": rel.type or "",
-            "source_id": rel.source_id,
-            "source_name": source.name,
-            "source_type": source.type,
-            "source_layer": source.layer,
-        })
+    if incoming_rels:
+        source_ids = [rel.source_id for rel in incoming_rels]
+        sources = {
+            e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(source_ids)).all()
+        }
+        for rel in incoming_rels:
+            source = sources.get(rel.source_id)
+            if source is None:
+                continue
+            incoming.append({
+                "id": rel.id,
+                "type": rel.type or "",
+                "source_id": rel.source_id,
+                "source_name": source.name,
+                "source_type": source.type,
+                "source_layer": source.layer,
+            })
 
+    # Solutions list: fence on solution's organisation (ISO-2)
     solutions = []
     try:
         from app.models.solution_archimate_element import SolutionArchiMateElement
         from app.models.solution_models import Solution
-        for sae in SolutionArchiMateElement.query.filter_by(element_id=element_id).limit(20).all():
-            sol = Solution.query.get(sae.solution_id) if sae.solution_id else None
-            solutions.append({
-                "solution_id": sae.solution_id,
-                "solution_name": sol.name if sol else f"Solution #{sae.solution_id}",
-                "element_role": sae.element_role or "",
-                "created_at": sae.created_at.isoformat() if sae.created_at else None,
-            })
+        sae_rows = SolutionArchiMateElement.query.filter_by(element_id=element_id).limit(20).all()
+        if sae_rows:
+            solution_ids = [sae.solution_id for sae in sae_rows if sae.solution_id]
+            solutions_map = {
+                s.id: s for s in Solution.query.filter(Solution.id.in_(solution_ids)).all()
+            }
+            for sae in sae_rows:
+                if not sae.solution_id:
+                    continue
+                sol = solutions_map.get(sae.solution_id)
+                # Fence: only show solutions belonging to the same organisation as the element.
+                # If sol is None, the tenant isolation listener filtered it out (cross-org solution).
+                if sol is None:
+                    continue
+                if org_id is not None and getattr(sol, "organization_id", None) != org_id:
+                    continue
+                solutions.append({
+                    "solution_id": sae.solution_id,
+                    "solution_name": sol.name,
+                    "element_role": sae.element_role or "",
+                    "created_at": sae.created_at.isoformat() if sae.created_at else None,
+                })
     except Exception as e:
         current_app.logger.warning(f"Could not load solution linkages for element {element_id}: {e}")
 
@@ -3325,6 +3355,8 @@ def _get_element_relationships(element, element_id):
     is loaded by id and organisation, so an edge into another organisation lists
     nothing.
     """
+    from app.modules.intelligence.services.query_service import filter_relationships_by_org
+
     relationships = []
     org_id = getattr(element, "organization_id", None)
 
@@ -3341,47 +3373,55 @@ def _get_element_relationships(element, element_id):
         outgoing = ArchiMateRelationship.query.filter_by(
             source_id=ae_id
         ).all()
-        for rel in outgoing:
-            target_element = ArchiMateElement.query.get(rel.target_id)
-            if target_element is None:
-                continue
-            if org_id is not None and getattr(target_element, "organization_id", None) != org_id:
-                continue
-            relationships.append(
-                {
-                    "type": rel.type,
-                    "direction": "outgoing",
-                    "target": {
-                        "id": target_element.id,
-                        "name": target_element.name,
-                        "type": target_element.type,
-                        "layer": target_element.layer,
-                    },
-                }
-            )
+        outgoing = filter_relationships_by_org(outgoing, org_id, direction="outgoing")
+        if outgoing:
+            target_ids = [rel.target_id for rel in outgoing]
+            targets = {
+                e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(target_ids)).all()
+            }
+            for rel in outgoing:
+                target_element = targets.get(rel.target_id)
+                if target_element is None:
+                    continue
+                relationships.append(
+                    {
+                        "type": rel.type,
+                        "direction": "outgoing",
+                        "target": {
+                            "id": target_element.id,
+                            "name": target_element.name,
+                            "type": target_element.type,
+                            "layer": target_element.layer,
+                        },
+                    }
+                )
 
         # Incoming relationships — only from elements in this organisation
         incoming = ArchiMateRelationship.query.filter_by(
             target_id=ae_id
         ).all()
-        for rel in incoming:
-            source_element = ArchiMateElement.query.get(rel.source_id)
-            if source_element is None:
-                continue
-            if org_id is not None and getattr(source_element, "organization_id", None) != org_id:
-                continue
-            relationships.append(
-                {
-                    "type": rel.type,
-                    "direction": "incoming",
-                    "source": {
-                        "id": source_element.id,
-                        "name": source_element.name,
-                        "type": source_element.type,
-                        "layer": source_element.layer,
-                    },
-                }
-            )
+        incoming = filter_relationships_by_org(incoming, org_id, direction="incoming")
+        if incoming:
+            source_ids = [rel.source_id for rel in incoming]
+            sources = {
+                e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(source_ids)).all()
+            }
+            for rel in incoming:
+                source_element = sources.get(rel.source_id)
+                if source_element is None:
+                    continue
+                relationships.append(
+                    {
+                        "type": rel.type,
+                        "direction": "incoming",
+                        "source": {
+                            "id": source_element.id,
+                            "name": source_element.name,
+                            "type": source_element.type,
+                            "layer": source_element.layer,
+                        },
+                    }
+                )
 
     return relationships
 
