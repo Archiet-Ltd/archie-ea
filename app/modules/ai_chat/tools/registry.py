@@ -2264,6 +2264,11 @@ def _archimate_element_schemas() -> list:
 
 TOOL_SCHEMAS.extend(_archimate_element_schemas())
 
+# Refresh the lookup in place now that every schema is in the list, so a tool
+# the chat is offered is always one the review loop and risk classifier can find.
+TOOL_SCHEMA_BY_NAME.clear()
+TOOL_SCHEMA_BY_NAME.update({s["name"]: s for s in TOOL_SCHEMAS})
+
 
 def mutating_tool_names() -> set:
     """Names of every tool that writes to the repository."""
