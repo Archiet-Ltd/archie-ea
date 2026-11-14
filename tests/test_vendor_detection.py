@@ -223,6 +223,18 @@ def test_the_people_who_decide_are_told_and_the_bell_opens_the_inbox(orgs, catal
     assert viewer_bell == [], "a Viewer cannot decide proposals, so is not asked to"
 
 
+def _decide(tenant_ctx, org_id, person, approval_id, action="approve", reason=None):
+    """Settle a proposal through the service, as the automatic review does: the page has no approve or
+    reject address."""
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    with tenant_ctx(org_id):
+        service = AIChatApprovalService(person.id)
+        if action == "approve":
+            return service.approve_and_execute(approval_id, person.id)
+        return service.reject_approval(approval_id, reason)
+
+
 def test_approving_records_the_vendor_product_and_link_in_that_organisation_only(
         orgs, catalogue, tenant_ctx, client, login_as):
     from app.models.application_portfolio import ApplicationComponent
@@ -234,11 +246,8 @@ def test_approving_records_the_vendor_product_and_link_in_that_organisation_only
     with tenant_ctx(org.id):
         propose_from_names(org.id, ["Okta"], words="we use Okta")
         approval_id = _by_slug(org.id)["okta"].id
-    login_as(client, orgs["a_admin"])
-    resp = client.post(f"/ai-chat/approvals/{approval_id}/approve")
-    assert resp.status_code == 200, resp.get_data(as_text=True)[:400]
-    body = resp.get_json()
-    assert body["success"] is True
+    body = _decide(tenant_ctx, org.id, orgs["a_admin"], approval_id)
+    assert body["success"] is True, body
 
     with tenant_ctx(org.id):
         app_row = ApplicationComponent.query.filter_by(organization_id=org.id, name="Okta Workforce Identity").one()
@@ -267,14 +276,12 @@ def test_the_architecture_is_its_own_approval_and_cites_the_catalogue(
     with tenant_ctx(org.id):
         propose_from_names(org.id, ["Okta"])
         approval_id = _by_slug(org.id)["okta"].id
-    login_as(client, orgs["a_admin"])
-    assert client.post(f"/ai-chat/approvals/{approval_id}/approve").get_json()["success"] is True
+    assert _decide(tenant_ctx, org.id, orgs["a_admin"], approval_id)["success"] is True
     with tenant_ctx(org.id):
         before = ArchiMateElement.query.filter_by(organization_id=org.id).count()
         architecture = _pending(org.id, "vendor_architecture")[0]
         assert "Okta Workforce Identity" in architecture.summary
-    login_as(client, orgs["a_admin"])
-    body = client.post(f"/ai-chat/approvals/{architecture.id}/approve").get_json()
+    body = _decide(tenant_ctx, org.id, orgs["a_admin"], architecture.id)
     assert body["success"] is True, body
     with tenant_ctx(org.id):
         app_row = ApplicationComponent.query.filter_by(organization_id=org.id, name="Okta Workforce Identity").one()
@@ -296,9 +303,7 @@ def test_rejecting_leaves_nothing_and_it_is_not_proposed_again(orgs, catalogue, 
         propose_from_names(org.id, ["Datadog"])
         approval_id = _by_slug(org.id)["datadog"].id
         before = _counts(org.id)
-    login_as(client, orgs["a_admin"])
-    resp = client.post(f"/ai-chat/approvals/{approval_id}/reject", json={"reason": "We moved off Datadog"})
-    assert resp.get_json()["success"] is True
+    assert _decide(tenant_ctx, org.id, orgs["a_admin"], approval_id, "reject", "We moved off Datadog")["success"] is True
     with tenant_ctx(org.id):
         assert _counts(org.id) == before
         again = propose_from_names(org.id, ["Datadog"])
@@ -316,8 +321,7 @@ def test_another_organisation_cannot_see_or_decide_the_proposal(orgs, catalogue,
     login_as(client, orgs["b_admin"])
     queue = client.get("/ai-chat/approvals/queue").get_json()
     assert approval_id not in [a["id"] for a in queue.get("approvals", [])]
-    resp = client.post(f"/ai-chat/approvals/{approval_id}/approve")
-    assert resp.status_code == 404
+    assert _decide(tenant_ctx, orgs["b"].id, orgs["b_admin"], approval_id)["code"] == "NOT_FOUND"
     with tenant_ctx(org.id):
         assert _counts(org.id) == before
         assert len(_pending(org.id)) == 1
