@@ -289,7 +289,7 @@
             {# Approvals for review: the pending count is read from the one shared approvals store. #}
             {% if link_requires_satisfied(current_user, "general") %}
             <div x-data="approvalManager()" x-cloak>
-                # Button removed per brief T-noapprove-02: approve and reject routes and their JS callers
+                {% call button(variant='outline', aria_label='Approvals for review', class='w-full justify-between', attrs_dict={'data-modal-open': 'ai-chat-approvals-modal', '@click': "closeDrawer('chat-options')", 'data-testid': 'chat-options-approvals'}) %}
                     <span class="flex items-center"><i data-lucide="shield-check" class="mr-2 h-4 w-4" aria-hidden="true"></i>Approvals for review</span>
                     <span x-show="pendingCount > 0" x-cloak>{% call badge('info') %}<span x-text="pendingCount"></span>{% endcall %}</span>
                 {% endcall %}
