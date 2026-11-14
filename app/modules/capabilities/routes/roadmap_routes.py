@@ -766,7 +766,12 @@ def api_roadmap_create_gap():
 
         plateau_id = data.get("plateau_id")
         if plateau_id:
-            plateau = Plateau.query.get(plateau_id)
+            # Only this organisation's own plateau: a lookup that always reaches the
+            # database, so another organisation's row is never handed back from cache.
+            plateau = Plateau.query.filter(
+                Plateau.id == plateau_id,
+                Plateau.organization_id == current_org_id(),
+            ).first()
             if not plateau:
                 return jsonify({"success": False, "error": "Plateau not found"}), 404
 
@@ -1542,7 +1547,12 @@ def api_roadmap_create_standalone_work_package():
 
         plateau = None
         if plateau_id:
-            plateau = Plateau.query.get(plateau_id)
+            # Only this organisation's own plateau: a lookup that always reaches the
+            # database, so another organisation's row is never handed back from cache.
+            plateau = Plateau.query.filter(
+                Plateau.id == plateau_id,
+                Plateau.organization_id == current_org_id(),
+            ).first()
             if not plateau:
                 return jsonify({"success": False, "error": "Plateau not found"}), 404
 

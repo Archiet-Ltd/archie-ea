@@ -13,6 +13,7 @@ from app import db
 from app.utils.recorded_figures import as_figure
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.main.views import main
+from app.core.auth.permissions import can_change_model
 from app.models.roadmap import RoadmapTask
 from app.models.implementation_migration import Deliverable
 from app.models.unified_capability import BusinessDomain, UnifiedCapability
@@ -31,6 +32,15 @@ def _require_wp(wp_id):
     return work_package
 
 logger = logging.getLogger(__name__)
+
+_READ_ONLY_REFUSAL = "Your role may read the roadmap but not change it."
+
+
+def _refuse_unless_may_change():
+    """The plain refusal for a role that may read the roadmap but not change it."""
+    if not can_change_model(current_user):
+        return jsonify({"error": _READ_ONLY_REFUSAL}), 403
+    return None
 
 # ============================================================================
 # CAPABILITY MANAGEMENT API - Grouped Selection and User-Driven Addition
@@ -238,6 +248,9 @@ def list_capabilities():
 @login_required
 def create_capability():
     """Create a new capability with duplicate prevention"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         data = request.get_json()
 
@@ -315,13 +328,14 @@ def create_capability():
             try:
                 parent_capability_id = int(parent_capability_id)
                 # Verify parent exists
-                parent_cap = UnifiedCapability.query.get(parent_capability_id)
+                parent_cap = UnifiedCapability.visible_to_organization(
+                    parent_capability_id, current_organization_id())
                 if not parent_cap:
                     return (
                         jsonify(
                             {"error": f"Parent capability with ID {parent_capability_id} not found"}
                         ),
-                        400,
+                        404,
                     )
                 # Validate hierarchy: L2 can only have L1 parent, L3 can have L1 or L2 parent
                 if level == 2 and parent_cap.level != 1:
@@ -366,7 +380,7 @@ def create_capability():
         # Get domain name directly to avoid lazy loading issues
         domain_name = None
         if domain_id:
-            domain = BusinessDomain.query.get(domain_id)
+            domain = BusinessDomain.query.filter_by(id=domain_id).first()
             domain_name = domain.name if domain else None
 
         return (
@@ -638,6 +652,9 @@ def get_capability_work_packages():
 @login_required
 def create_capability_work_package():
     """Create new capability work package with multi-capability support"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         data = request.get_json()
 
@@ -725,6 +742,9 @@ def create_capability_work_package():
 @login_required
 def update_capability_work_package(wp_id):
     """Update capability work package"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         data = request.get_json()
 
@@ -796,6 +816,9 @@ def update_capability_work_package(wp_id):
 @login_required
 def delete_capability_work_package(wp_id):
     """Delete capability work package"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         work_package_service.delete_work_package(
             wp_id, organization_id=current_organization_id()
@@ -863,6 +886,9 @@ def get_work_package_tasks(wp_id):
 @login_required
 def create_work_package_task(wp_id):
     """Create a new task for a work package"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package exists
         _require_wp(wp_id)
@@ -912,6 +938,9 @@ def create_work_package_task(wp_id):
 @login_required
 def update_work_package_task(wp_id, task_id):
     """Update a task"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package and task exist
         _require_wp(wp_id)
@@ -965,6 +994,9 @@ def update_work_package_task(wp_id, task_id):
 @login_required
 def delete_work_package_task(wp_id, task_id):
     """Delete a task"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package and task exist
         _require_wp(wp_id)
@@ -1026,6 +1058,9 @@ def get_work_package_deliverables(wp_id):
 @login_required
 def create_work_package_deliverable(wp_id):
     """Create a new deliverable for a work package"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package exists
         _require_wp(wp_id)
@@ -1071,6 +1106,9 @@ def create_work_package_deliverable(wp_id):
 @login_required
 def update_work_package_deliverable(wp_id, deliverable_id):
     """Update a deliverable"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package and deliverable exist
         _require_wp(wp_id)
@@ -1108,6 +1146,9 @@ def update_work_package_deliverable(wp_id, deliverable_id):
 @login_required
 def delete_work_package_deliverable(wp_id, deliverable_id):
     """Delete a deliverable"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package and deliverable exist
         _require_wp(wp_id)
