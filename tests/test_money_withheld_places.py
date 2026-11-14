@@ -13,6 +13,8 @@ from datetime import datetime
 
 import pytest
 
+from app.services.cost_visibility import is_money_key
+
 pytestmark = pytest.mark.usefixtures("db_session")
 
 SENTENCE = "Cost figures are withheld for your role."
@@ -253,8 +255,8 @@ def test_the_element_export_holds_no_amount_for_the_architect_and_the_figure_for
     assert rows and any(row["name"].startswith("Places") for row in rows), "the export lists this organisation's element"
     assert str(figure) not in held.get_data(as_text=True)
     assert str(OTHER_BUDGET) not in held.get_data(as_text=True)
-    assert not any(isinstance(value, (int, float)) and not isinstance(value, bool) and value > 1000
-                   for row in rows for key, value in row.items() if key != "id"), rows
+    assert not any(isinstance(value, (int, float)) and not isinstance(value, bool) and is_money_key(key)
+                   for row in rows for key, value in row.items()), rows
     shown = _get(client, login_as, estate["cto"], path)
     assert str(figure) in shown.get_data(as_text=True), "the chief technology officer reads the figure"
     assert str(OTHER_BUDGET) not in shown.get_data(as_text=True)
