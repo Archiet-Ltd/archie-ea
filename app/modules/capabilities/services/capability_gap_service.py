@@ -417,6 +417,7 @@ class CapabilityGapAnalysisService:
                     target_state_ref=f"Application: {app_val['application_name']}",
                     generation_source="capability_gap_service",
                     auto_generated=True,
+                    source_capability_id=cap.id,
                 )
                 if created:
                     gaps_created += 1
@@ -960,13 +961,14 @@ class CapabilityGapAnalysisService:
 
         return (
             Gap.query.filter(
+                Gap.gap_type == "compliance",
                 or_(
                     Gap.source_capability_id == capability_id,
                     and_(
                         Gap.source_table == "compliance_requirement",
                         cast(Gap.gap_sub_types, JSONB).contains({"applies_to_capability_id": capability_id}),
                     ),
-                )
+                ),
             )
             .all()
         )
