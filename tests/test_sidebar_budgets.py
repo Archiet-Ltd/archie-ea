@@ -29,7 +29,7 @@ from app.models.user import (
     VALID_ROLES,
 )
 from app.navigation import registry
-from app.utils.role_access import SIDEBAR_LINK_BUDGET
+from app.utils.role_access import CONNECTION_ARCHITECT_ROLES, SIDEBAR_LINK_BUDGET
 
 # The retired Ask page's address; these tests assert it is absent and never open it.
 RETIRED_ASK = "/intelligence/ask"
@@ -73,7 +73,8 @@ COST_VIEWERS = {ROLE_CTO, ROLE_PORTFOLIO_MANAGER, ROLE_PLATFORM_ADMIN, ROLE_PROC
 # The roles with the data integration section: the Interfaces page's own guard.
 INTERFACE_ROLES = {ROLE_BUSINESS_ARCHITECT, ROLE_DATA_ARCHITECT, ROLE_ENTERPRISE_ARCHITECT, ROLE_PLATFORM_ADMIN,
                    ROLE_SECURITY_ARCHITECT, ROLE_SOLUTION_ARCHITECT}
-CONNECTING_ROLES = {ROLE_ENTERPRISE_ARCHITECT, ROLE_BUSINESS_ARCHITECT, ROLE_SOLUTION_ARCHITECT, ROLE_CTO}
+# One list, shared with the Connections page's own guard, so the two can never disagree.
+CONNECTING_ROLES = set(CONNECTION_ARCHITECT_ROLES)
 
 
 class _Person:
