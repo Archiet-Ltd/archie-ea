@@ -105,7 +105,7 @@ def test_a_role_barred_from_cost_reads_no_amount_on_opportunities(client, login_
     assert w["cap_a"].name in body and f"Archive support a {w['tag']}" in body
     # ... but no contract or run-cost amount reaches the page, and it says why
     assert not re.search(r"£\s?[\d,]{5,}", body), re.findall(r"£\s?[\d,]+", body)
-    assert "Cost figures are not shown for your role." in body
+    assert "Cost figures are withheld for your role." in body
     # a person the rule admits still reads the amounts
     login_as(client, w["user_a"])
     assert re.search(r"£\s?1,200,000", client.get("/opportunities").get_data(as_text=True))

@@ -42,6 +42,7 @@
             {'label': vendor.name}
         ]
     ) }}
+    {% if costs_withheld %}<p class="text-sm text-muted-foreground" data-testid="costs-withheld">{{ costs_withheld_sentence }}</p>{% endif %}
 
     <div class="flex flex-wrap items-center gap-2 mb-6">
         <a href="{{ url_for('unified_applications.vendors') }}"
@@ -106,7 +107,7 @@
                 {% call card_description() %}
                     {% if supplied_systems %}
                         {{ supplied_systems|length }} of your systems
-                        {%- if not cost_visible %} · Not shown for your role{% elif supplied_cost is not none %}, {{ supplied_cost|currency }} a year{% endif %}
+                        {%- if not costs_withheld and supplied_cost is not none %}, {{ supplied_cost|currency }} a year{% endif %}
                         {%- if next_renewal %}, next renewal {{ next_renewal.strftime('%d %b %Y') }}{% if next_renewal_overdue %} ({{ next_renewal_overdue|lower }}){% endif %}{% endif %}
                     {% else %}
                         No system of yours names {{ vendor.name }} as its vendor.
@@ -136,11 +137,11 @@
                     {% for contract, reason in vendor_contracts %}
                     <li class="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm">
                         <span>{{ contract.contract_name }}</span>
-                        <span class="text-xs text-muted-foreground text-right">
-                            {{ contract.end_date.strftime('%d %b %Y') if contract.end_date else 'No end date recorded' }}
-                            {%- if cost_visible and contract.annual_cost is not none and (not reason or reason.startswith('Not added: stated in')) %} · {{ contract.annual_cost|format_currency(currency=contract.currency) }} a year{% endif %}
-                            {%- if reason %}<br>{{ reason }}{% endif %}
-                        </span>
+<span class="text-xs text-muted-foreground text-right">
+                             {{ contract.end_date.strftime('%d %b %Y') if contract.end_date else 'No end date recorded' }}
+                             {%- if not costs_withheld and contract.annual_cost is not none and (not reason or reason.startswith('Not added: stated in')) %} · {{ contract.annual_cost|format_currency(currency=contract.currency) }} a year{% endif %}
+                             {%- if reason %}<br>{{ reason }}{% endif %}
+                         </span>
                     </li>
                     {% endfor %}
                 </ul>
@@ -310,18 +311,18 @@
                         <span class="text-muted-foreground">End Date</span>
                         <span class="font-medium">{{ vendor.contract_end_date.strftime('%Y-%m-%d') if vendor.contract_end_date else '-' }}</span>
                     </div>
+                    {% if not costs_withheld %}
                     <div class="flex items-center justify-between">
                         <span class="text-muted-foreground">Annual Contract Value (USD)</span>
                         <span class="font-medium">
-                            {% if not cost_visible %}
-                            <span class="text-muted-foreground">Not shown for your role</span>
-                            {% elif vendor.contract_value_annual is not none %}
+                            {% if vendor.contract_value_annual is not none %}
                             {{ vendor.contract_value_annual|currency('USD') }}
                             {% else %}
                             <span class="text-muted-foreground">Not recorded</span>
                             {% endif %}
                         </span>
                     </div>
+                    {% endif %}
                 </div>
 
                 {% if contract_status == 'catalog' %}
