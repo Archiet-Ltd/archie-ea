@@ -1149,7 +1149,7 @@ def share_social(share: dict[str, Any]) -> dict[str, Any]:
     base = canonical_origin()
     return {
         "title": share["title"],
-        "description": share["message"],
+        "description": share.get("description") or share["message"],
         "url": f"{base}{SHARE_URL_PREFIX}/{share['slug']}",
         "image": base + share["cover"],
         "image_alt": share["alt"],
