@@ -1825,7 +1825,7 @@ class AgentRunner:
 
         if tool_name in _MUTATING_TOOLS:
             return
-        self._lookups.append(record_lookup(arguments, result, for_question))
+        self._lookups.append(record_lookup(arguments, result, for_question, tool_name))
         self._evidence_chunks.append(json.dumps(result, default=str))
 
     @staticmethod

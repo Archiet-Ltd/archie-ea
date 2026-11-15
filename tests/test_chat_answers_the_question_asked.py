@@ -126,7 +126,7 @@ def test_a_lookup_that_failed_never_backs_a_claim():
 
 
 def test_a_lookup_about_something_else_does_not_back_a_claim():
-    from app.modules.ai_chat.services.turn_honesty import NO_SEARCH_NOTE, remove_unbacked_search_claims
+    from app.modules.ai_chat.services.turn_honesty import PARTIAL_SEARCH_NOTE, remove_unbacked_search_claims
 
     text = "I searched and found no such element. Nothing is missing from this answer."
     out = remove_unbacked_search_claims(text, [_lookup("payroll", NOTHING)], "who owns the billing ledger")
@@ -332,3 +332,35 @@ def test_a_question_started_lookup_reads_only_the_organisation_asking(app, make_
     assert look_a.found_nothing and not look_b.found_nothing
     assert remove_unbacked_search_claims(text, [look_a], "what is our revenue") == text
     assert "Nothing is missing" not in remove_unbacked_search_claims(text, [look_b], "what is our revenue")
+
+
+def _named_lookup(tool_name, arguments, result):
+    from app.modules.ai_chat.services.turn_honesty import record_lookup
+
+    return record_lookup(arguments, result, False, tool_name)
+
+
+def test_a_lookup_the_model_chose_about_a_named_application_keeps_the_claim():
+    from app.modules.ai_chat.services.turn_honesty import NO_SEARCH_NOTE, remove_unbacked_search_claims
+
+    text = "I looked up who owns Payroll Hub. The owner is Dana Reyes."
+    look = _named_lookup("get_application_owner", {"name": "Payroll Hub"}, FOUND)
+    kept = remove_unbacked_search_claims(text, [look], "who owns Payroll Hub")
+    assert kept == text and NO_SEARCH_NOTE not in kept
+
+
+def test_a_topic_comes_from_the_tool_name_when_the_arguments_do_not_say_it():
+    look = _named_lookup("find_dependencies", {"id": "42"}, FOUND)
+    assert "dependency" in look.topics
+    from app.modules.ai_chat.services.turn_honesty import PARTIAL_SEARCH_NOTE, remove_unbacked_search_claims
+
+    cut = remove_unbacked_search_claims("I searched the model for revenue.", [look], "what is our revenue")
+    assert cut.endswith(PARTIAL_SEARCH_NOTE)
+
+
+def test_a_lookup_that_succeeded_never_leaves_the_note_saying_no_search_ran():
+    from app.modules.ai_chat.services.turn_honesty import NO_SEARCH_NOTE, remove_unbacked_search_claims
+
+    look = _named_lookup("get_application_cost", {"name": "Payroll Hub"}, FOUND)
+    cut = remove_unbacked_search_claims("I searched for burn. Cost is fine.", [look], "who owns Payroll Hub")
+    assert NO_SEARCH_NOTE not in cut

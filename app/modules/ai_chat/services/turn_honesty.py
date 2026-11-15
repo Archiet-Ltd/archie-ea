@@ -104,22 +104,24 @@ class Lookup:
     topics: frozenset = frozenset()
 
 
-def record_lookup(arguments, result, for_question: bool = False) -> Lookup:
-    """A *Lookup* from a tool's arguments and the result it returned."""
+def record_lookup(arguments, result, for_question: bool = False, tool_name: str = "") -> Lookup:
+    """A *Lookup* from a tool's arguments and the result it returned; what it is about comes
+    from the tool's name as well as from its arguments."""
     values = list(arguments.values()) if isinstance(arguments, dict) else []
     terms = frozenset(t for v in values if isinstance(v, str) for t in _TERM.findall(v.lower()))
     ok = isinstance(result, dict) and result.get("success") is not False and not result.get("error")
     payload = result.get("result") if isinstance(result, dict) and "result" in result else None
     empty = ok and isinstance(payload, (list, dict, str)) and not payload
     asked = " ".join(v.lower() for v in values if isinstance(v, str)) if isinstance(arguments, dict) else ""
-    return Lookup(terms, bool(ok), bool(empty), for_question, _topics(asked))
+    named = (tool_name or "").replace("_", " ").replace("-", " ")
+    return Lookup(terms, bool(ok), bool(empty), for_question, _topics(asked) | _topics(named))
 
 
 def _backs(lookup: Lookup, sentence: str, question: str, absence: bool) -> bool:
     if not lookup.succeeded or (absence and not lookup.found_nothing):
         return False
     about = _topics(sentence)
-    if about:
+    if about and lookup.topics:
         return about <= lookup.topics
     if lookup.for_question:
         return True
@@ -160,7 +162,7 @@ def remove_unbacked_search_claims(text: str, lookups: Sequence[Lookup], question
             kept.append(sentence)
     if not dropped:
         return text
-    searched = any(look.succeeded and look.for_question for look in lookups or ())
+    searched = any(look.succeeded for look in lookups or ())
     return ("".join(kept).strip() + " " + (PARTIAL_SEARCH_NOTE if searched else NO_SEARCH_NOTE)).strip()
 
 
