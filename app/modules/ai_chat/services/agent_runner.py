@@ -2091,6 +2091,7 @@ class AgentRunner:
     def _fallback(self, reason: str, busy: bool = False) -> dict:
         reason_l = (reason or "").lower()
         not_set_up = False
+        reason_code = None
         if "answers are paused" in reason_l:
             from app.modules.ai_chat.services.llm_service_impl import PAUSED_MESSAGE
 
@@ -2113,15 +2114,18 @@ class AgentRunner:
                 "Wait a minute, then press Retry."
             )
         else:
-            from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
+            from app.modules.ai_chat.services.failure_messages import failure_sentence, reason_code_for_text
 
-            msg = ASSISTANT_UNAVAILABLE
+            reason_code = reason_code_for_text(reason)
+            msg = failure_sentence(reason_code)
         result = {
             "response": msg,
             "actions_taken": [],
             "pending_approvals": [],
             "error": reason,
         }
+        if reason_code:
+            result["reason_code"] = reason_code
         if not_set_up:
             # The browser shows an administrator the way to the provider settings, and a member nothing.
             result["not_set_up"] = True
