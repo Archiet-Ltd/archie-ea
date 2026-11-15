@@ -210,6 +210,103 @@ def _load_linkable_entity(entity_type, entity_id, organization_id=None):
     return None
 
 
+def element_type_word(element_type):
+    """An ArchiMate type as a person reads it: ``BusinessActor`` becomes ``Business actor``."""
+    import re
+    words = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", element_type or "").strip()
+    return (words[:1].upper() + words[1:].lower()) if words else None
+
+
+#: What a risk's Assessment element has to each thing the risk touches. Association is valid between
+#: any two elements, so one rule serves every kind of target.
+LINK_RELATIONSHIP = "association"
+
+#: Provenance of a relationship the mapping drew itself (the model's "derived" kind).
+PROJECTED_SOURCE_KIND = "derived"
+
+
+def _link_target_element(link, organization_id):
+    """The ArchiMate element a link points at (for a record, the element that record mirrors, created
+    when the record has none), or None when the record is gone or is not mirrored."""
+    from app.models import ArchiMateElement
+    from app.services.archimate_backbone import ensure_archimate_element
+
+    if link.entity_type == "archimate_element":
+        return db.session.execute(
+            db.select(ArchiMateElement).where(ArchiMateElement.id == link.entity_id,
+                                              ArchiMateElement.organization_id == organization_id)
+        ).scalar_one_or_none()
+    record = _load_linkable_entity(link.entity_type, link.entity_id, organization_id)
+    if record is None:
+        return None
+    return ensure_archimate_element(record)
+
+
+def _mirror_relationships(source_id, target_id, organization_id):
+    from app.models.archimate_core import ArchiMateRelationship
+
+    return db.session.execute(
+        db.select(ArchiMateRelationship).where(
+            ArchiMateRelationship.organization_id == organization_id,
+            ArchiMateRelationship.type == LINK_RELATIONSHIP,
+            ArchiMateRelationship.source_id == source_id,
+            ArchiMateRelationship.target_id == target_id,
+        )
+    ).scalars().all()
+
+
+def project_link_on_model(risk, link, organization_id):
+    """Draw a link on the model: an association from the risk's Assessment element to the target's.
+
+    The link row stays the one record of what a risk touches; this is its projection, written with it
+    and removed with it. Returns the relationship, or None when the target has no element to draw to.
+    """
+    from app.models import ArchiMateElement
+    from app.modules.architecture.services.archimate_relationship_service import (
+        ArchiMateRelationshipService,
+    )
+    from app.services.archimate_backbone import ensure_archimate_element
+
+    source = ensure_archimate_element(risk)
+    target = _link_target_element(link, organization_id)
+    if source is None or target is None or source.id == target.id:
+        return None
+    existing = _mirror_relationships(source.id, target.id, organization_id)
+    if existing:
+        return existing[0]
+    source = db.session.get(ArchiMateElement, source.id)
+    relationship = ArchiMateRelationshipService.create_relationship(
+        source, target, LINK_RELATIONSHIP,
+        architecture_id=source.architecture_id or target.architecture_id,
+        organization_id=organization_id, rollback=False,
+    )
+    if relationship is not None:
+        # Drawn by the mapping, not by a person: only a relationship carrying this mark is taken
+        # off again when the mapping goes.
+        relationship.source_kind = PROJECTED_SOURCE_KIND
+    return relationship
+
+
+def unproject_link_from_model(risk, link, organization_id):
+    """Take a link's association off the model, unless another of the risk's links still reaches the
+    same element."""
+    if risk.archimate_element_id is None:
+        return 0
+    target = _link_target_element(link, organization_id)
+    if target is None:
+        return 0
+    for other in RiskEntityLink.query.filter(RiskEntityLink.risk_id == risk.id,
+                                             RiskEntityLink.id != link.id).all():
+        other_target = _link_target_element(other, organization_id)
+        if other_target is not None and other_target.id == target.id:
+            return 0
+    removed = [r for r in _mirror_relationships(risk.archimate_element_id, target.id, organization_id)
+               if r.source_kind == PROJECTED_SOURCE_KIND]
+    for relationship in removed:
+        db.session.delete(relationship)
+    return len(removed)
+
+
 def add_risk_link(risk_id, entity_type, entity_id, organization_id=None, commit=True):
     """Link a risk to one record. A caller with no request (the demo seed) names the organisation and the
     record must belong to it; ``commit=False`` leaves the transaction to that caller."""
@@ -238,17 +335,66 @@ def add_risk_link(risk_id, entity_type, entity_id, organization_id=None, commit=
     if organization_id is not None:
         link.organization_id = organization_id
     db.session.add(link)
+    db.session.flush()
+    if organization_id is not None:
+        project_link_on_model(get_risk(organization_id, risk_id), link, organization_id)
     if commit:
         db.session.commit()
-    else:
-        db.session.flush()
     return link
 
 
 def remove_risk_link(risk_id, link_id):
     link = RiskEntityLink.query.filter_by(id=link_id, risk_id=risk_id).first_or_404()
+    if link.organization_id is not None:
+        risk = get_risk(link.organization_id, risk_id)
+        if risk is not None:
+            unproject_link_from_model(risk, link, link.organization_id)
     db.session.delete(link)
     db.session.commit()
+
+
+def project_all_links(organization_id=None, dry_run=False):
+    """Give every existing link its association on the model, once. Returns ``(links seen, drawn)``.
+
+    Idempotent: a link whose association exists is left alone, so a second run draws nothing.
+    """
+    from app.models.archimate_core import ArchiMateRelationship
+
+    query = db.select(RiskEntityLink).order_by(RiskEntityLink.id)
+    if organization_id is not None:
+        query = query.where(RiskEntityLink.organization_id == organization_id)
+    seen = drawn = 0
+    planned = set()
+    for link in db.session.execute(query).scalars().all():
+        if link.organization_id is None:
+            continue
+        risk = get_risk(link.organization_id, link.risk_id)
+        if risk is None:
+            continue
+        seen += 1
+        before = db.session.scalar(
+            db.select(db.func.count()).select_from(ArchiMateRelationship).where(
+                ArchiMateRelationship.organization_id == link.organization_id,
+                ArchiMateRelationship.type == LINK_RELATIONSHIP))
+        if dry_run:
+            target = _link_target_element(link, link.organization_id)
+            mirror_id = risk.archimate_element_id
+            if (target is not None and target.id != mirror_id
+                    and (risk.id, target.id) not in planned
+                    and (mirror_id is None
+                         or not _mirror_relationships(mirror_id, target.id, link.organization_id))):
+                planned.add((risk.id, target.id))
+                drawn += 1
+            continue
+        project_link_on_model(risk, link, link.organization_id)
+        after = db.session.scalar(
+            db.select(db.func.count()).select_from(ArchiMateRelationship).where(
+                ArchiMateRelationship.organization_id == link.organization_id,
+                ArchiMateRelationship.type == LINK_RELATIONSHIP))
+        drawn += 1 if after > before else 0
+    if not dry_run:
+        db.session.commit()
+    return seen, drawn
 
 
 def risks_linked_to(entity_type, entity_id, organization_id=None):
@@ -642,13 +788,16 @@ def ranked_risks(organization_id=None):
         ).order_by(RiskEntityLink.id)
     ).all()
     linked_element_names = {}
+    linked_element_types = {}
     if element_links:
-        linked_element_names = dict(db.session.execute(
-            db.select(ArchiMateElement.id, ArchiMateElement.name).where(
+        element_rows = db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.name, ArchiMateElement.type).where(
                 ArchiMateElement.organization_id == org_id,
                 ArchiMateElement.id.in_(sorted({e for _, e in element_links})),
             )
-        ).all())
+        ).all()
+        linked_element_names = {row[0]: row[1] for row in element_rows}
+        linked_element_types = {row[0]: element_type_word(row[2]) for row in element_rows}
     elements_by_risk = {}
     for risk_id, element_id in element_links:
         if element_id in linked_element_names and element_id not in elements_by_risk.setdefault(risk_id, []):
@@ -716,7 +865,8 @@ def ranked_risks(organization_id=None):
             {"name": components[c][0], "kind": "application", "id": c, "element_id": components[c][1]}
             for c in sorted(apps_by_risk.get(risk.id, []))
         ]
-        touches += [{"name": linked_element_names[e], "kind": "element", "id": e, "element_id": e}
+        touches += [{"name": linked_element_names[e], "kind": "element", "id": e, "element_id": e,
+                     "type_word": linked_element_types.get(e)}
                     for e in elements_by_risk.get(risk.id, []) if e != risk.archimate_element_id]
         app_elements = {t["element_id"] for t in touches}
         # The risk's own mirrored element is never listed: it is the risk itself,

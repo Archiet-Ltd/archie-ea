@@ -72,6 +72,7 @@ flask --app manage backfill-architect-role
 flask --app manage backfill-vendor-links || echo 'WARN vendor link backfill skipped - systems that name a vendor only as text stay out of the Vendors list until it runs'
 flask --app manage backfill-decision-register-consolidation || echo 'WARN decision register consolidation backfill skipped - decision_ledger rows remain untenanted and architecture_decision_records rows stay unpaired with the canonical register until it runs' >&2
 flask --app manage backfill-solution-risk-merge || echo 'WARN solution risk merge backfill skipped - solution risks stay unlinked from the one risk register (no risk_entity_links row, no shared score history) until it runs'
+flask --app manage backfill-risk-link-relationships || echo 'WARN risk link relationship backfill skipped - risks mapped before now show no connections on their model element until it runs'
 # RUN-01: copy ARB, ArchiMate composer and rationalisation audit history into
 # soc2_audit_log (the system of record per ADR 0008). Runs here because
 # CREATE INDEX IF NOT EXISTS ix_soc2_audit_org_id requires table ownership
