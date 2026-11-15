@@ -63,6 +63,10 @@ def test_a_provider_with_no_credit_tells_the_person_who_can_restore_it(page, liv
     assert "organisation administrator" in text and "Entelim support" in text, text
     assert "rate limit" not in text.lower() and "try again" not in text.lower(), text
     assert messages.get_by_role("button", name="Retry").count() == 0, text
+    folder = os.environ.get("SMOKE_SCREENSHOT_DIR")
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+        page.screenshot(path=os.path.join(folder, "credit-%s-%d.png" % (name, size["width"])), full_page=True)
     sent = [r for r in required_protocol.records[before:] if r["scenario"] == name]
     assert sent, "the refusal never came from the provider"
 
@@ -71,6 +75,10 @@ def test_a_per_minute_limit_is_not_called_a_spent_balance(page, live_server, req
     messages = _ask(page, live_server, "rate_per_minute")
     messages.get_by_role("button", name="Retry").first.wait_for(state="visible", timeout=PAGE_TIMEOUT)
     text = messages.inner_text()
+    folder = os.environ.get("SMOKE_SCREENSHOT_DIR")
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+        page.screenshot(path=os.path.join(folder, "rate-limit-1440.png"), full_page=True)
     assert "credit" not in text.lower(), text
     assert "busy" in text.lower() or "wait" in text.lower() or "try again" in text.lower(), text
 
