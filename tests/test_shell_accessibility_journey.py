@@ -70,6 +70,9 @@ PAGES = {
     "/ea-workflows/deliverables/vision": ["link-in-text-block"],
     "/integration/": ["scrollable-region-focusable"],
     "/capability-roadmap": ["scrollable-region-focusable"],
+    # a11ylink02: links inside running text on the two pages that still failed
+    "/strategic/risk-assessment": ["link-in-text-block"],
+    "/enterprise/implementation/gap-analysis": ["link-in-text-block"],
 }
 RUN = """async () => { const r = await axe.run(document, {runOnly: {type: 'tag',
   values: ['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']}, resultTypes: ['violations']});
@@ -98,6 +101,17 @@ def _seed_applications(db_session, org):
     db_session.flush()
 
 
+def _seed_risks_and_gaps(db_session, org):
+    """An open and a closed risk and a gap, so the sentences with links in them are on the two pages."""
+    from app.models.implementation_migration import Gap
+    from app.models.risk import Risk, RiskStatus
+
+    for title, status in (("Supplier outage", RiskStatus.OPEN), ("Expired licence", RiskStatus.CLOSED)):
+        db_session.add(Risk(title=title, likelihood=3, impact=4, status=status, organization_id=org.id))
+    db_session.add(Gap(name="No single customer record", organization_id=org.id))
+    db_session.flush()
+
+
 def _signed_in_pages(client, db_session, make_org):
     from flask import g
 
@@ -110,6 +124,7 @@ def _signed_in_pages(client, db_session, make_org):
     OrganizationSignal.__table__.create(db.session.connection(), checkfirst=True)
     org = make_org("axe")
     _seed_applications(db_session, org)
+    _seed_risks_and_gaps(db_session, org)
     user = User(email="axe-%s@example.com" % uuid.uuid4().hex[:8], first_name="Axel", last_name="Reader",
                 organization_id=org.id, confirmed=True, enterprise_role="platform_admin", is_org_admin=True)
     db_session.add(user)
@@ -223,5 +238,14 @@ def test_no_page_loses_a_screen_reader_user_to_this_rule(swept, rule):
             continue
         for violation in result["violations"]:
             if violation["id"] == rule:
+                failures.append("%s %s %s: %s" % (path, size, scheme, violation["nodes"][:2]))
+    assert failures == [], "\n".join(failures)
+
+
+def test_no_link_inside_a_sentence_relies_on_colour_alone_on_any_page(swept):
+    failures = []
+    for (path, size, scheme), result in swept.items():
+        for violation in result["violations"]:
+            if violation["id"] == "link-in-text-block":
                 failures.append("%s %s %s: %s" % (path, size, scheme, violation["nodes"][:2]))
     assert failures == [], "\n".join(failures)
