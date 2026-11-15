@@ -46,7 +46,7 @@ def robots_text(client):
 
 @pytest.fixture(scope="module")
 def sitemap_paths(client):
-    response = client.get("/sitemap.xml")
+    response = client.get("/sitemap-en.xml")
     assert response.status_code == 200
     base = canonical_origin()
     return re.findall(rf"<loc>{re.escape(base)}([^<]*)</loc>", response.get_data(as_text=True))

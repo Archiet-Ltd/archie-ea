@@ -1219,6 +1219,12 @@
     "components/risk_detail_modal.html"
    ]
   },
+  "risk-link-picker": {
+   "source": "app",
+   "macros": [
+    "components/risk_link_picker.html"
+   ]
+  },
   "risk-matrix": {
    "source": "app",
    "macros": [
@@ -1407,11 +1413,11 @@
  },
  "inhouse_exceptions": {
   "app/templates/governance/risk_register.html": [
-    {
-      "macro": "components/risk_link_picker.html",
-      "keep_until": "riskstore01",
-      "why": "the one picker that links a risk to what it touches, shared by the register slide-over and the Add Risk dialog"
-    }
+   {
+    "macro": "components/risk_link_picker.html",
+    "keep_until": "riskstore01",
+    "why": "the one picker that links a risk to what it touches, shared by the register slide-over and the Add Risk dialog"
+   }
   ],
   "app/templates/architecture_assistant/index.html": [
    {
@@ -4914,7 +4920,7 @@
    "controls": {
     "button": 5,
     "form": 1,
-    "testid": 5
+    "testid": 6
    },
    "departures": [],
    "extends": [
@@ -5407,7 +5413,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 2,
+    "button": 1,
     "form": 1,
     "link": 2
    },
@@ -5535,11 +5541,11 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 5,
-    "form": 3,
+    "button": 6,
+    "form": 4,
     "link": 3,
     "table": 2,
-    "testid": 12
+    "testid": 14
    },
    "departures": [
     {
@@ -5846,8 +5852,8 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 2,
-    "testid": 3
+    "link": 4,
+    "testid": 5
    },
    "departures": [
     {
@@ -7434,16 +7440,18 @@
     "card",
     "table",
     "alert-dialog",
-    "dialog"
+    "dialog",
+    "select",
+    "fact-list"
    ],
    "confidence": "high",
    "controls": {
     "button": 11,
     "form": 5,
-    "link": 6,
+    "link": 7,
     "modal": 1,
     "table": 1,
-    "testid": 11
+    "testid": 13
    },
    "departures": [],
    "extends": [
@@ -7464,6 +7472,7 @@
     "components/card.html",
     "components/dialog.html",
     "components/empty_state.html",
+    "components/fact_list.html",
     "components/form_field.html",
     "components/input.html",
     "components/page_header.html",
@@ -12805,7 +12814,8 @@
     "dropdown-menu",
     "figures",
     "list-table",
-    "page-shell"
+    "page-shell",
+    "fact-list"
    ],
    "confidence": "high",
    "controls": {
@@ -14611,7 +14621,10 @@
     "table",
     "tabs",
     "unified-mapping-modal",
-    "item"
+    "item",
+    "fact-list",
+    "field",
+    "select"
    ],
    "confidence": "high",
    "controls": {
@@ -15034,7 +15047,7 @@
     "link": 11,
     "modal": 2,
     "table": 1,
-    "testid": 33
+    "testid": 34
    },
    "departures": [
     {
@@ -15310,7 +15323,7 @@
     "button": 38,
     "link": 16,
     "table": 2,
-    "testid": 1
+    "testid": 2
    },
    "departures": [
     {
@@ -15429,7 +15442,7 @@
    "controls": {
     "button": 9,
     "form": 2,
-    "testid": 3
+    "testid": 4
    },
    "departures": [],
    "extends": [
@@ -15869,7 +15882,8 @@
    "controls": {
     "button": 6,
     "modal": 1,
-    "table": 2
+    "table": 2,
+    "testid": 1
    },
    "departures": [],
    "extends": [
@@ -18453,7 +18467,8 @@
     "element-table",
     "field",
     "provenance",
-    "select"
+    "select",
+    "checkbox"
    ],
    "confidence": "high",
    "controls": {
@@ -23235,7 +23250,7 @@
     "form": 1,
     "link": 2,
     "modal": 1,
-    "testid": 20
+    "testid": 21
    },
    "departures": [
     {
@@ -24864,7 +24879,7 @@
     "button": 13,
     "modal": 1,
     "table": 1,
-    "testid": 10
+    "testid": 11
    },
    "departures": [],
    "extends": [
@@ -26592,7 +26607,8 @@
     "page-shell",
     "select",
     "provenance",
-    "disabled-action"
+    "disabled-action",
+    "list-table"
    ],
    "confidence": "high",
    "controls": {
@@ -26601,7 +26617,7 @@
     "link": 2,
     "modal": 4,
     "table": 1,
-    "testid": 17
+    "testid": 22
    },
    "departures": [
     {
@@ -28125,7 +28141,8 @@
    "confidence": "high",
    "controls": {
     "button": 32,
-    "table": 1
+    "table": 1,
+    "testid": 1
    },
    "departures": [
     {
@@ -31185,7 +31202,8 @@
     "button": 16,
     "link": 1,
     "modal": 1,
-    "table": 2
+    "table": 2,
+    "testid": 1
    },
    "departures": [],
    "extends": [
@@ -31296,7 +31314,8 @@
    "controls": {
     "button": 2,
     "link": 1,
-    "table": 4
+    "table": 4,
+    "testid": 1
    },
    "departures": [
     {
@@ -32379,7 +32398,6 @@
     "components/status_badge.html",
     "components/stepper.html",
     "components/switch.html",
-    "components/table.html",
     "components/tabs.html",
     "macros/check_password.html",
     "macros/form_macros.html",
@@ -32393,9 +32411,11 @@
     "button",
     "card",
     "checkbox",
+    "fact-list",
     "field",
     "input",
-    "page-header"
+    "page-header",
+    "radio-group"
    ],
    "confidence": "high",
    "controls": {
@@ -34037,7 +34057,7 @@
     "button": 2,
     "link": 2,
     "table": 2,
-    "testid": 7
+    "testid": 8
    },
    "departures": [],
    "extends": [
@@ -37023,6 +37043,7 @@
     "components/page_header.html",
     "components/pagination_controls.html",
     "components/provenance.html",
+    "components/risk_link_picker.html",
     "components/risk_matrix.html",
     "components/search_bar.html",
     "components/select.html",
@@ -37034,9 +37055,6 @@
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "extra_macros": [
-     "components/risk_link_picker.html"
-   ],
    "block": "data-table",
    "charts": [],
    "components": [
@@ -37054,11 +37072,13 @@
     "select",
     "table",
     "tabs",
-    "provenance"
+    "provenance",
+    "risk-matrix",
+    "risk-link-picker"
    ],
    "confidence": "high",
    "controls": {
-    "button": 15,
+    "button": 14,
     "link": 6,
     "modal": 3,
     "table": 2,
@@ -37072,6 +37092,9 @@
    ],
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/risk_link_picker.html"
    ],
    "frame": "dashboard-01",
    "grid": "G1",
@@ -37093,6 +37116,7 @@
     "components/input.html",
     "components/modal.html",
     "components/provenance.html",
+    "components/risk_link_picker.html",
     "components/risk_matrix.html",
     "components/select.html",
     "macros/page_shell.html"
@@ -37672,7 +37696,8 @@
     "table",
     "input",
     "progress",
-    "provenance"
+    "provenance",
+    "fact-list"
    ],
    "confidence": "high",
    "controls": {
@@ -37912,8 +37937,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 1,
-    "table": 1
+    "link": 1
    },
    "departures": [],
    "extends": [
@@ -37925,13 +37949,9 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/badge.html",
-    "components/button.html",
-    "components/card.html",
-    "components/empty_state.html",
-    "components/page_header.html",
-    "components/status_badge.html",
-    "components/table.html"
+    "components/figures.html",
+    "components/list_table.html",
+    "components/page_header.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -41108,8 +41128,8 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 4,
-    "testid": 2
+    "link": 5,
+    "testid": 3
    },
    "departures": [
     {
@@ -43452,7 +43472,7 @@
     "button": 22,
     "form": 2,
     "link": 11,
-    "testid": 47
+    "testid": 48
    },
    "data_types": [
     {
@@ -43849,7 +43869,8 @@
    ],
    "confidence": "low",
    "controls": {
-    "button": 28
+    "button": 28,
+    "testid": 1
    },
    "departures": [
     {
@@ -46091,7 +46112,8 @@
     "page-header",
     "progress",
     "table",
-    "list-table"
+    "list-table",
+    "provenance"
    ],
    "confidence": "low",
    "controls": {
@@ -48461,7 +48483,7 @@
     "form": 1,
     "link": 6,
     "modal": 1,
-    "testid": 6
+    "testid": 7
    },
    "departures": [
     {
@@ -48710,7 +48732,7 @@
     "link": 14,
     "modal": 1,
     "table": 2,
-    "testid": 1
+    "testid": 2
    },
    "departures": [
     {

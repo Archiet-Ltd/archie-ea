@@ -135,7 +135,7 @@ def test_sign_in_and_pricing_carry_the_new_wording(browser, live_server):
 
 
 def test_no_public_page_gives_a_date_for_a_capability(live_server):
-    status, xml = _get(live_server + "/sitemap.xml")
+    status, xml = _get(live_server + "/sitemap-en.xml")
     assert status == 200
     locs = [e.text for e in ET.fromstring(xml).iter() if e.tag.endswith("loc")]
     assert len(locs) > 20, locs
