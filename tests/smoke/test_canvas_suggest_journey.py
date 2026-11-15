@@ -2,8 +2,7 @@
 the proposals with their sources and the AI label, dismisses one, accepts the other, and finds it in the box
 and as a record of the model after a reload.
 
-The model provider is a stub on a loopback port; the real route, prompt, provider call and parse run against it. Runs at 1440 wide in the light theme and at 390 wide in
-the dark theme.
+The model provider is a stub on a loopback port; the real route, prompt, provider call and parse run against it. Runs at 1440 and 390 wide, in the light and the dark theme.
 """
 
 import json
@@ -98,7 +97,7 @@ def records_named(org_id, name):
         return found
 
 
-@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (1440, "dark"), (390, "light"), (390, "dark")])
 def test_suggest_proposes_with_sources_and_an_accepted_entry_becomes_a_record(
     browser, deepseek_server, width, scheme
 ):
@@ -118,11 +117,18 @@ def test_suggest_proposes_with_sources_and_an_accepted_entry_becomes_a_record(
         assert page.locator('[data-canvas-notes="key-partners"] > li').count() == 1
         assert page.locator('[data-canvas-notes="%s"] > li' % BOX).count() == 0
 
+        shot(page, "canvas", width, scheme)
         page.locator('[data-bmc-suggest="%s"]' % BOX).first.click()
         panel = page.get_by_test_id("bmc-suggest-panel")
         items = panel.locator("[data-suggest-item]")
         expect(items).to_have_count(2)
-        expect(panel.locator("[data-suggest-notice]").first).to_contain_text("written by AI")
+        from app.modules.ai_chat.tools.executor import GENOME_NOTICE
+
+        # A suggestion answers no question: it says so, while a chat answer keeps its own wording.
+        assert GENOME_NOTICE == "Answer written by AI from your model"
+        for notice in panel.locator("[data-suggest-notice]").all():
+            expect(notice).to_have_text("Suggested by AI from this canvas and your model")
+        assert GENOME_NOTICE not in panel.inner_text()
         for item in items.all():
             assert item.locator("[data-suggest-source]").inner_text().strip()
         shot(page, "panel", width, scheme)
