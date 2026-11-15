@@ -636,7 +636,7 @@
       signalCount: 0,
       gapsLoading: true,
       plateausLoading: true,
-      figuresSequence: 0,
+      shownSequence: {},
       workPackagesLoading: true,
 
       get gapModalTitle() {
@@ -682,6 +682,7 @@
       async loadGaps(again) {
         try {
           const d = await window.rdmSource('gaps', again);
+          if (!this.isNewest('gaps', d.sequence)) return;
           this.gaps = d.gaps || [];
           this.applyFigures(d.figures, d.sequence);
           this.signalCount = d.signal_count === undefined ? this.gaps.length : d.signal_count;
@@ -699,6 +700,7 @@
       async loadPlateaus(again) {
         try {
           const d = await window.rdmSource('plateaus', again);
+          if (!this.isNewest('plateaus', d.sequence)) return;
           this.plateaus = d.plateaus || [];
           this.applyFigures(d.figures, d.sequence);
           this.plateausError = '';
@@ -715,6 +717,7 @@
       async loadWorkPackages(again) {
         try {
           const d = await window.rdmSource('work-packages', again);
+          if (!this.isNewest('work-packages', d.sequence)) return;
           this.workPackages = d.work_packages || [];
           this.applyFigures(d.figures, d.sequence);
           this.workPackagesError = '';
@@ -746,12 +749,17 @@
       // Every answer carries the figures and the evidence line counted together; the tiles and the line
       // are set from that one answer in the same step. An answer that failed never reaches here, and an answer
       // older than the one already shown is left out.
+      // The one guard: an answer is shown only if no newer answer for the same part has been shown already.
+      isNewest(part, sequence) {
+        if (sequence === undefined) return true;
+        if (sequence < (this.shownSequence[part] || 0)) return false;
+        this.shownSequence[part] = sequence;
+        return true;
+      },
+
       applyFigures(figures, sequence) {
         if (!figures) return;
-        if (sequence !== undefined) {
-          if (sequence < this.figuresSequence) return;
-          this.figuresSequence = sequence;
-        }
+        if (!this.isNewest('figures', sequence)) return;
         this.plateauCount = figures.plateau_count;
         this.workPackageCount = figures.work_package_count;
         this.recordedGaps = figures.recorded_gaps;
