@@ -654,6 +654,13 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register solution risk merge backfill CLI: {e}")
 
+    try:
+        from app.commands.backfill_risk_link_relationships import init_app as init_risk_link_relationships
+        init_risk_link_relationships(app)
+        app.logger.info("✅ Risk link relationship backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register risk link relationship backfill CLI: {e}")
+
     # Gap register consolidation: merge roadmap_gaps, implementation_gaps and compliance_gaps into gaps
     try:
         from app.commands.consolidate_gaps import init_app as init_consolidate_gaps
