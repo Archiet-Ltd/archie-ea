@@ -141,7 +141,7 @@ def test_a_tab_says_it_is_counting_while_the_counts_load(browser, live_server, o
         assert held, "the counts request was not made"
         loading_text = _plain(page.locator("main").inner_text())
         assert "unavailable" not in loading_text.lower(), loading_text[:600]
-        assert "counting" in _plain(header.inner_text()).lower()
+        assert "loading layer total" in _plain(header.inner_text()).lower()
         _shot(page, "dashboard-loading", viewport, scheme)
         gate["open"] = True
         for route in held:
