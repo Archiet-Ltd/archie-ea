@@ -26,6 +26,7 @@ from app.release_waves import (
     wave_map,
 )
 from app.release_waves.build import build, dump, MAP_PATH
+from app.services.origin import canonical_origin
 
 
 @pytest.fixture
@@ -268,7 +269,8 @@ def test_the_public_menus_footer_and_sitemap_list_only_released_pages(wave1):
                and link["label"] not in coming and not link["href"].startswith("/early-access")]
         assert not bad, bad
     xml = wave1.test_client().get("/sitemap.xml").get_data(as_text=True)
-    paths = re.findall(r"<loc>https://entelim.org([^<]*)</loc>", xml)
+    base = canonical_origin()
+    paths = re.findall(rf"<loc>{re.escape(base)}([^<]*)</loc>", xml)
     assert paths
     assert [p for p in paths if not is_released_path(p)] == []
 

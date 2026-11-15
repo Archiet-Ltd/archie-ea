@@ -1,0 +1,87 @@
+"""Origin resolution for the site's canonical address and request-scoped origin.
+
+PUBLIC_BASE_URL is the one configured canonical origin (e.g. https://entelim.tech).
+PUBLIC_BASE_URL_ALIASES is a comma-separated list of additional origins that the
+OAuth/MCP/connector surfaces also answer on (e.g. https://entelim.org).
+
+An origin is taken from the request ONLY when it matches the canonical origin or
+a listed alias exactly (scheme and host). Any other Host value — including the
+server's IP address name and a forged header — gets the canonical origin.
+"""
+
+from __future__ import annotations
+
+import os
+from urllib.parse import urlsplit
+
+from flask import current_app, has_app_context, request
+
+
+def _parse_aliases(raw: str | None) -> list[str]:
+    """Parse comma-separated aliases, stripping whitespace and trailing slashes."""
+    if not raw:
+        return []
+    return [a.strip().rstrip("/") for a in raw.split(",") if a.strip()]
+
+
+def canonical_origin() -> str:
+    """The site's canonical origin.
+
+    Returns PUBLIC_BASE_URL when set, otherwise defaults to https://entelim.tech.
+    Never returns an empty string. Outside an application context it reads the same variable from the
+    environment, so scripts name the address the deployment is configured with.
+    """
+    if has_app_context():
+        base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+        if base:
+            return base
+    else:
+        base = (os.environ.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+        if base:
+            return base
+    return "https://entelim.tech"
+
+
+def allowed_origins() -> list[str]:
+    """All origins this deployment answers on: canonical + aliases."""
+    if has_app_context():
+        aliases = _parse_aliases(current_app.config.get("PUBLIC_BASE_URL_ALIASES"))
+    else:
+        aliases = []
+    return [canonical_origin()] + aliases
+
+
+def request_origin() -> str:
+    """The origin to use for the current request.
+
+    Returns the request's own origin (scheme + host) ONLY when it exactly matches
+    the canonical origin or one of the configured aliases. Otherwise returns the
+    canonical origin. This prevents origin poisoning from forged Host headers or
+    the server's IP address name.
+    """
+    allowed = allowed_origins()
+    # request.host includes port if non-standard; request.host_url is scheme+host+/
+    # We need just the origin (scheme+host).
+    req_origin = request.host_url.rstrip("/")
+    if req_origin in allowed:
+        return req_origin
+    return canonical_origin()
+
+
+def site_host() -> str:
+    """The host name of the canonical origin, for text that names the site without a scheme."""
+    return urlsplit(canonical_origin()).netloc
+
+
+def www_redirect_target(host: str, url: str) -> str | None:
+    """Where a request to ``www.`` plus one of this site's own hosts should go, else None.
+
+    Only the canonical host and the listed aliases are covered; any other host is left alone.
+    """
+    bare = (host or "").split(":", 1)[0].lower()
+    if not bare.startswith("www."):
+        return None
+    own = {urlsplit(origin).hostname for origin in allowed_origins()}
+    if bare[4:] not in own:
+        return None
+    return url.replace(bare, bare[4:], 1)
