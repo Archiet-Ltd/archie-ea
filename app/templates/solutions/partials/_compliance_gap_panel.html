@@ -1,0 +1,76 @@
+{# Compliance check: Run Analysis lists the controls a solution meets, misses and has not assessed yet.
+   State (complianceGap, complianceGapLoaded, complianceGapLoading) and loadComplianceGap() come from the
+   enclosing Alpine component: the blueprint editor, or the solution record's review tab. #}
+<div class="mt-7" data-testid="compliance-check">
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-foreground flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-primary inline-block"></span>Compliance Gap Analysis</h3>
+        <button type="button" @click="loadComplianceGap()"
+                x-show="!complianceGapLoaded && !complianceGapLoading" x-cloak
+                data-testid="compliance-run"
+                class="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+            Run Analysis
+        </button>
+    </div>
+    <div x-show="complianceGapLoading" x-cloak class="flex items-center gap-2 text-sm text-muted-foreground">
+        <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+        Checking compliance…
+    </div>
+    <div x-show="complianceGapLoaded && complianceGap" x-cloak data-testid="compliance-result">
+        <div class="flex items-center gap-2 mb-3">
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+                  :class="complianceGap && complianceGap.compliance_status === 'compliant'
+ ? 'bg-success/10 text-success-emphasis'
+ : complianceGap && complianceGap.compliance_status === 'partial'
+ ? 'bg-warning/10 text-warning-emphasis'
+ : 'bg-destructive/10 text-destructive-emphasis'">
+                <i data-lucide="shield" class="w-3 h-3"></i>
+                <span data-testid="compliance-status" x-text="complianceGap && complianceGap.compliance_status ? complianceGap.compliance_status.replace('_',' ') : 'not assessed'"></span>
+            </span>
+            <span class="text-xs text-muted-foreground" data-testid="compliance-summary" x-show="complianceGap && complianceGap.total > 0"
+                  x-text="complianceGap ? ((complianceGap.met || []).length + ' met, ' + (complianceGap.gaps || []).length + ' missed, ' + (complianceGap.not_assessed || []).length + ' not assessed yet') : ''"></span>
+        </div>
+        <template x-if="complianceGap && complianceGap.total === 0">
+            <p class="text-sm text-muted-foreground" data-testid="compliance-empty">No controls are mapped to this solution yet, so there is nothing to check. Add a compliance mapping to the governance record, then run the analysis again.</p>
+        </template>
+        <template x-if="complianceGap && complianceGap.met && complianceGap.met.length > 0">
+            <div class="mb-3">
+                <p class="text-xs font-semibold text-foreground mb-2">Met</p>
+                <ul class="space-y-1.5" data-testid="compliance-met">
+                    <template x-for="item in complianceGap.met" :key="'met-' + item.id">
+                        <li class="flex items-start gap-2 text-sm" data-testid="compliance-met-item">
+                            <i data-lucide="check-circle-2" class="w-3.5 h-3.5 shrink-0 mt-0.5 text-success"></i>
+                            <span class="text-muted-foreground"><span class="font-medium text-foreground" x-text="item.source"></span><span x-show="item.description" x-text="' — ' + item.description"></span></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </template>
+        <template x-if="complianceGap && complianceGap.gaps && complianceGap.gaps.length > 0">
+            <div class="mb-3">
+                <p class="text-xs font-semibold text-foreground mb-2">Missed</p>
+                <ul class="space-y-1.5" data-testid="compliance-missed">
+                    <template x-for="item in complianceGap.gaps" :key="'gap-' + item.id">
+                        <li class="flex items-start gap-2 text-sm" data-testid="compliance-missed-item">
+                            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0 mt-0.5 text-warning"></i>
+                            <span class="text-muted-foreground"><span class="font-medium text-foreground" x-text="item.source"></span><span x-show="item.description" x-text="' — ' + item.description"></span><span x-text="' (' + item.status.replace('_', ' ') + ')'"></span></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </template>
+        <template x-if="complianceGap && complianceGap.not_assessed && complianceGap.not_assessed.length > 0">
+            <div class="mb-3">
+                <p class="text-xs font-semibold text-foreground mb-2">Not assessed yet</p>
+                <ul class="space-y-1.5" data-testid="compliance-not-assessed">
+                    <template x-for="item in complianceGap.not_assessed" :key="'na-' + item.id">
+                        <li class="flex items-start gap-2 text-sm">
+                            <i data-lucide="circle-help" class="w-3.5 h-3.5 shrink-0 mt-0.5 text-muted-foreground"></i>
+                            <span class="text-muted-foreground"><span class="font-medium text-foreground" x-text="item.source"></span></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </template>
+    </div>
+</div>

@@ -312,6 +312,17 @@
             {% endif %}
           {% endcall %}
         {% endcall %}
+        {% call card() %}
+          {% call card_header(class='pb-3') %}
+            {% call card_title(class='text-base') %}Compliance{% endcall %}
+            {% call card_description() %}Which controls the solution meets and which it misses, each with the framework it comes from.{% endcall %}
+          {% endcall %}
+          {% call card_content(class='pt-0') %}
+            <div x-data="complianceCheck()">
+              {% include 'solutions/partials/_compliance_gap_panel.html' %}
+            </div>
+          {% endcall %}
+        {% endcall %}
         {% endif %}
 
       {% elif tab == 'requirements' %}
@@ -668,6 +679,29 @@
 {% endblock %}
 
 {% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+/* Window-level factory for x-data="complianceCheck()": the CSP-safe Alpine evaluator resolves it from window. */
+function complianceCheck() {
+  return {
+    complianceGap: null, complianceGapLoaded: false, complianceGapLoading: false,
+    async loadComplianceGap() {
+      this.complianceGapLoading = true;
+      try {
+        const data = await Platform.fetch('/solutions/{{ solution.id }}/api/compliance-gap', { silent: true });
+        if (!data.success) throw new Error(data.error || 'the analysis did not complete');
+        this.complianceGap = data.gap;
+        this.complianceGapLoaded = true;
+      } catch (e) {
+        this.complianceGap = null;
+        this.complianceGapLoaded = false;
+        Platform.toast.error('The compliance check did not complete, so nothing was assessed. Use Run Analysis to try again.');
+      } finally {
+        this.complianceGapLoading = false;
+      }
+    }
+  };
+}
+</script>
 <script nonce="{{ csp_nonce }}">
 (function () {
   // Platform.fetch sends the CSRF token, parses the reply and raises on a failed request; the

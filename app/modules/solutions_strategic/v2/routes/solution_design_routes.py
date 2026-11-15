@@ -3129,6 +3129,70 @@ def view_solution(solution_id: int):
     return render_template("solutions/detail.html", **_for_cost_rule(ctx))
 
 
+def _compliance_check_for(solution) -> dict:
+    """What a solution meets and misses: each control mapped to it, with the framework and control it
+    comes from, split by its recorded verification. Controls not yet assessed are listed apart, never
+    counted as met or missed. A missed control that already has a record in the gap register carries
+    that record's id, read through the register's own query."""
+    from app.models.implementation_migration import Gap
+    from app.models.solution_sad_models import SolutionComplianceMapping
+    from app.services.gap_register_service import gap_register_query
+
+    rows = (SolutionComplianceMapping.query.filter_by(solution_id=solution.id)
+            .order_by(SolutionComplianceMapping.framework, SolutionComplianceMapping.control_id).all())
+    registered = {}
+    ids = [r.id for r in rows]
+    if ids and solution.organization_id:
+        for g in (gap_register_query(solution.organization_id)
+                  .filter(Gap.source_table == "solution_compliance_mappings", Gap.source_id.in_(ids)).all()):
+            registered.setdefault(g.source_id, g.id)
+    met, missed, not_assessed = [], [], []
+    for r in rows:
+        status = (r.verification_status or "not_assessed").strip().lower()
+        item = {
+            "id": r.id,
+            "source": "%s %s" % (r.framework, r.control_id),
+            "framework": r.framework,
+            "control_id": r.control_id,
+            "description": (r.control_description or "").strip(),
+            "element_name": r.element_name or "",
+            "status": status,
+            "evidence_link": r.evidence_link or "",
+            "gap_id": registered.get(r.id),
+        }
+        if status in ("verified", "compliant", "met"):
+            met.append(item)
+        elif status in ("not_assessed", "pending", ""):
+            not_assessed.append(item)
+        else:
+            missed.append(item)
+    if not rows:
+        overall = "not_assessed"
+    elif missed:
+        overall = "partial" if met else "non_compliant"
+    elif not_assessed:
+        overall = "partial" if met else "not_assessed"
+    else:
+        overall = "compliant"
+    return {
+        "compliance_status": overall,
+        "total": len(rows),
+        "met": met,
+        "gaps": missed,
+        "not_assessed": not_assessed,
+    }
+
+
+@solution_design_bp.route("/<int:solution_id>/api/compliance-gap", methods=["GET"])
+@login_required
+def api_compliance_gap(solution_id: int):
+    """The compliance check behind a solution's Run Analysis button."""
+    solution = Solution.query.get_or_404(solution_id)
+    if not _check_solution_access(solution):
+        abort(403)
+    return jsonify({"success": True, "gap": _compliance_check_for(solution)})
+
+
 # =============================================================================
 # AI COPILOT: PROACTIVE INSIGHTS API
 # =============================================================================
