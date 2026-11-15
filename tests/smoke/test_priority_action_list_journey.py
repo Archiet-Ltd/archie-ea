@@ -374,6 +374,13 @@ def test_phone_landing_from_scenarios_shows_priority_actions_in_view(browser, li
         link.click()
         page.wait_for_url(lambda url: ENTERPRISE_IMPACT_PAGE in url and "#priority-actions" in url, timeout=PAGE_TIMEOUT)
 
+        # The picker must not steal focus from the hash target: with the old
+        # behaviour the picker always autofocuses, which moves the page away
+        # from #priority-actions; the fix only focuses it when there is no hash.
+        focused_id = page.evaluate("() => document.activeElement && document.activeElement.id")
+        assert focused_id != "impact-page-picker-input", \
+            "picker input stole focus from the #priority-actions hash target: %s" % focused_id
+
         # The priority-actions section should be in the viewport
         section = page.get_by_test_id("priority-actions")
         expect(section).to_be_visible()
