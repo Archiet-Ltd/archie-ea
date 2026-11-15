@@ -10,7 +10,7 @@ import pathlib
 import pytest
 
 from .conftest import PAGE_TIMEOUT
-from .fresh_org import create_fresh_org, sign_in
+from .fresh_org import api, create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -58,6 +58,29 @@ def estate(live_server, seeded):
         "checked": _solution(a["org_id"], uid_a, "Plant Safety Platform", MAPPINGS_A),
         "empty": _solution(a["org_id"], uid_a, "Unmapped Pilot", ()),
         "other": _solution(b["org_id"], uid_b, "Clinic Records Platform", MAPPINGS_B),
+    }
+
+
+@pytest.fixture(scope="module")
+def estate_two(live_server, seeded):
+    """One person who belongs to two organisations and made a solution in the second, and a person of the
+    first organisation only."""
+    a = create_fresh_org("solution_architect")
+    b = create_fresh_org("solution_architect")
+    uid_a = a["user_ids"]["solution_architect"]
+    from app import create_app, db
+    from app.models.org_role import OrgRole
+
+    app = create_app("testing")
+    with app.app_context():
+        OrgRole.set_role(b["org_id"], uid_a, "org_admin", granted_by_id=uid_a)
+        db.session.commit()
+        db.session.remove()
+    return {
+        "member_email": a["emails"]["solution_architect"],
+        "outsider_email": create_fresh_org("solution_architect")["emails"]["solution_architect"],
+        "second_org": b["org_id"],
+        "second_solution": _solution(b["org_id"], uid_a, "Clinic Records Platform", MAPPINGS_B),
     }
 
 
@@ -125,5 +148,71 @@ def test_a_solution_with_no_controls_says_why_and_what_to_do(browser, live_serve
         empty.wait_for(state="visible")
         assert "No controls are mapped to this solution yet" in empty.inner_text()
         assert page.get_by_test_id("compliance-summary").is_hidden()
+    finally:
+        context.close()
+
+
+def _switch_organisation(page, live_server, org_id):
+    """Switch the open organisation the way the account page does: a form post with the page's token."""
+    status = page.evaluate(
+        """async ([org]) => {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            const body = new URLSearchParams({organization_id: String(org)});
+            if (meta) body.set('csrf_token', meta.content);
+            const r = await fetch('/account/switch-organization', {method: 'POST', body, credentials: 'same-origin'});
+            return r.status;
+        }""", [org_id])
+    assert status == 200, status
+
+
+def test_a_member_of_two_organisations_runs_the_analysis_in_the_one_they_switched_to(
+        browser, live_server, estate_two):
+    context = _context(browser, 1440, "light")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, estate_two["member_email"])
+        page.goto("%s/account/manage" % live_server, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        _switch_organisation(page, live_server, estate_two["second_org"])
+        page.goto("%s/solutions/%d?tab=review" % (live_server, estate_two["second_solution"]),
+                  wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("compliance-run").click()
+        page.get_by_test_id("compliance-result").wait_for(state="visible")
+        assert page.get_by_test_id("compliance-status").inner_text().strip() == "non compliant"
+        assert "HIPAA 164.312" in page.get_by_test_id("compliance-missed").inner_text()
+    finally:
+        context.close()
+
+
+def test_a_member_of_one_organisation_gets_no_answer_for_another_organisations_solution(
+        browser, live_server, estate_two):
+    context = _context(browser, 1440, "light")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, estate_two["outsider_email"])
+        status, _ = api(page, "GET", "/solutions/%d/api/compliance-gap" % estate_two["second_solution"])
+        assert status == 404
+    finally:
+        context.close()
+
+
+def test_a_missed_control_with_a_gap_record_links_to_that_record(browser, live_server, estate):
+    context = _context(browser, 1440, "light")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, estate["email"])
+        page.goto("%s/solutions/%d?tab=review" % (live_server, estate["checked"]), wait_until="networkidle",
+                  timeout=PAGE_TIMEOUT)
+        status, data = api(page, "POST", "/solutions/%d/api/compliance-gap" % estate["checked"], {})
+        assert status == 200, data
+        page.get_by_test_id("compliance-run").click()
+        page.get_by_test_id("compliance-result").wait_for(state="visible")
+        links = page.get_by_test_id("compliance-gap-link")
+        assert links.count() == 2
+        for icon in ("circle-check", "triangle-alert", "circle-help"):
+            assert page.locator("[data-testid='compliance-result'] svg.lucide-%s" % icon).count() >= 1, icon
+        href = links.first.get_attribute("href")
+        page.goto(live_server + href, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        body = page.locator("main").inner_text()
+        assert "GDPR" in body or "Art. 3" in body, body[:300]
     finally:
         context.close()

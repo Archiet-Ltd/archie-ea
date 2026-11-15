@@ -29,7 +29,9 @@ def test_solution_governance_uses_an_icon_shipped_by_the_lucide_bundle():
     template = GOVERNANCE.read_text(encoding="utf-8") + COMPLIANCE_PANEL.read_text(encoding="utf-8")
 
     assert 'data-lucide="loader-circle"' not in template
-    assert 'data-lucide="loader-2"' in template
+    # the spinner sits inside an Alpine template, so it is drawn inline rather than by the icon script
+    assert "lucide('loader'" in template
+    assert 'data-lucide="loader-2"' not in template
 
 
 def test_dashboard_cards_never_use_coloured_edge_accents():

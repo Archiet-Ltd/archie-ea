@@ -3221,9 +3221,10 @@ def _compliance_check_for(solution) -> dict:
     registered = {}
     ids = [r.id for r in rows]
     if ids and solution.organization_id:
+        refs = {"solution_compliance_mappings:%d" % i: i for i in ids}
         for g in (gap_register_query(solution.organization_id)
-                  .filter(Gap.source_table == "solution_compliance_mappings", Gap.source_id.in_(ids)).all()):
-            registered.setdefault(g.source_id, g.id)
+                  .filter(Gap.current_state_ref.in_(list(refs))).order_by(Gap.id).all()):
+            registered.setdefault(refs[g.current_state_ref], g.id)
     met, missed, not_assessed = [], [], []
     for r in rows:
         status = (r.verification_status or "not_assessed").strip().lower()
@@ -3237,6 +3238,8 @@ def _compliance_check_for(solution) -> dict:
             "status": status,
             "evidence_link": r.evidence_link or "",
             "gap_id": registered.get(r.id),
+            "gap_url": (url_for("archimate_crud.detail_element", layer="implementation", element_type="Gap",
+                                element_id=registered[r.id]) if r.id in registered else None),
         }
         if status in ("verified", "compliant", "met"):
             met.append(item)
@@ -3263,11 +3266,12 @@ def _compliance_check_for(solution) -> dict:
 
 @solution_design_bp.route("/<int:solution_id>/api/compliance-gap", methods=["GET"])
 @login_required
-def api_compliance_gap(solution_id: int):
-    """The compliance check behind a solution's Run Analysis button. A solution of another organisation
-    answers 404, whether or not its row is already held in the session."""
-    solution = Solution.query.filter_by(
-        id=solution_id, organization_id=current_user.organization_id).first_or_404()
+def api_compliance_check(solution_id: int):
+    """The compliance check behind a solution's Run Analysis button. A solution outside the organisation
+    the person has open answers 404, whether or not its row is already held in the session."""
+    from app.middleware.tenant_context import current_org_id
+
+    solution = Solution.query.filter_by(id=solution_id, organization_id=current_org_id()).first_or_404()
     if not _check_solution_access(solution):
         abort(403)
     return jsonify({"success": True, "gap": _compliance_check_for(solution)})
