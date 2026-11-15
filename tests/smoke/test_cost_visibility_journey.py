@@ -18,8 +18,10 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 def _login(page, base, email):
     page.goto(base + "/account/logout", wait_until="domcontentloaded",
               timeout=PAGE_TIMEOUT)
-    page.locator('[data-testid="logout-confirm"]').click()
-    page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
+    confirm = page.locator('[data-testid="logout-confirm"]')
+    if confirm.count():
+        confirm.click()
+        page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
     page.context.clear_cookies()
     page.goto(base + "/account/login", wait_until="domcontentloaded",
               timeout=PAGE_TIMEOUT)
