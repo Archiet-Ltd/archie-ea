@@ -60,10 +60,11 @@ def in_customer_words(text):
     out = re.sub(r"\bgenome patch\b", "proposed change to your model", out, flags=re.IGNORECASE)
     for name in _tool_names():
         if name in out:
-            out = re.sub(r"`?\b%s\b`?" % re.escape(name), "that lookup" if name.startswith(("explain", "get", "find", "search", "diagnose", "simulate")) else "that step", out)
+            out = re.sub(r"(?:\b(?:the|a)\s+)?(?:\b(?:lookup|tool|step|function)\s+)?`?\b%s\b`?" % re.escape(name), "that lookup", out, flags=re.IGNORECASE)
+    out = re.sub(r"\bwith\s+`?\bsupported\b`?\s*[:=]\s*`?false`?", "and it is not supported", out, flags=re.IGNORECASE)
     out = re.sub(r"(?:\bhas\s+)?`?\bsupported\b`?\s*[:=]\s*`?false`?", "is not supported", out, flags=re.IGNORECASE)
-    out = re.sub(r"(?:\bhas\s+)?`?\bsupported\b`?\s*[:=]\s*`?true`?", "is supported", out, flags=re.IGNORECASE)
-    out = re.sub(r"`?\bsupported_by\b`?\s+is\s+(?:empty|null|missing|None)", "nothing is recorded as supporting it", out)
+    out = re.sub(r"(?:\b(?:has|with)\s+)?`?\bsupported\b`?\s*[:=]\s*`?true`?", "is supported", out, flags=re.IGNORECASE)
+    out = re.sub(r"`?\bsupported_by\b`?\s+(?:is\s+)?(?:empty|null|missing|None)", "nothing is recorded as supporting it", out)
     out = re.sub(r"\bevery `?(\w+)`? field is (?:null|empty)", lambda m: "no %s is recorded" % _spoken(m.group(1)), out, flags=re.IGNORECASE)
     out = re.sub(r"`?\b(\w+)\b`?\s*(?:[:=]|is|are)\s*`?(?:null|None)`?(?![\w])",
                  lambda m: "%s is not recorded" % _spoken(m.group(1)) if m.group(1).lower() not in ("is", "are") else m.group(0), out)
