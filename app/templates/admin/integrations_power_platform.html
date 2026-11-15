@@ -238,6 +238,7 @@
         Platform.fetch.post('/admin/integrations/power-platform/save', formData())
         .then(function (d) {
             if (d.success) {
+                credentialsSaved = true;
                 showAlert('Credentials saved successfully.', 'success');
             } else {
                 showAlert('Save failed — ' + (d.error || 'unknown error'), 'error');
@@ -266,8 +267,14 @@
     // ------------------------------------------------------------------ discover
     let _discovered = [];
 
+    let credentialsSaved = {{ 'true' if config.configured else 'false' }};
+
     document.getElementById('btn-discover').addEventListener('click', function () {
         let btn = this;
+        if (!credentialsSaved) {
+            showAlert('Power Platform credentials not configured. Save credentials first.', 'error');
+            return;
+        }
         setLoading(btn, true, 'search');
         Platform.fetch.post('/admin/integrations/power-platform/discover', {})
         .then(function (d) {
