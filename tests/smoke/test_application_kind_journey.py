@@ -27,7 +27,8 @@ SHOTS = Path(os.environ.get("SMOKE_SHOT_DIR") or tempfile.mkdtemp(prefix="applic
 
 
 def sign_in(page, base, email):
-    """Sign in from a signed-out browser and wait only until the login page is left."""
+    """Sign out whoever is signed in, sign in as the next person, and wait only until the login page is left."""
+    page.goto(base + "/account/logout", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.context.clear_cookies()
     fresh_org.sign_in(page, base, email)
 
@@ -172,4 +173,4 @@ def test_a_viewer_reads_the_kind_and_the_reason_but_cannot_change_it(page, live_
         "/applications/%d/kind" % billing,
     )
     assert answer[0] == 403
-    assert "does not have write access to Applications" in answer[1]
+    assert "read-only, so it cannot make this change" in answer[1], answer[1]

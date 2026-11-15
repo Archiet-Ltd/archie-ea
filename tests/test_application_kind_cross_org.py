@@ -81,9 +81,10 @@ def test_the_kind_control_refuses_another_organisations_record(two_orgs, client,
 
 def test_an_architect_changes_the_kind_and_a_viewer_is_refused(two_orgs, client, login_as):
     login_as(client, two_orgs["viewer"])
-    answer = client.post("/applications/%d/kind" % two_orgs["whole"].id, data={"application_kind": "not_software"})
+    answer = client.post("/applications/%d/kind" % two_orgs["whole"].id, data={"application_kind": "not_software"},
+                         headers={"Accept": "application/json"})
     assert answer.status_code == 403
-    assert "does not have write access" in answer.get_data(as_text=True) or "may read" in answer.get_data(as_text=True)
+    assert "read-only, so it cannot make this change" in answer.get_json()["error"], answer.get_data(as_text=True)[:300]
     assert ApplicationComponent.query.get(two_orgs["whole"].id).application_kind is None
 
     login_as(client, two_orgs["architect"])
