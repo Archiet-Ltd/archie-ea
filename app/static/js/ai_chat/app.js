@@ -464,9 +464,8 @@
                 return;
             }
         } catch (_estateErr) {
-            { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
-            appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
-            return;
+            /* The records lookup is an extra step before the AI, not the answer. When it fails the question
+               goes on to the AI exactly as if the lookup had found nothing; the turn does not end here. */
         }
 
         const startTime = performance.now();
@@ -519,7 +518,7 @@
                    compounding the wait. */
                 const _l = document.getElementById(loadingId);
                 if (_l) _l.remove();
-                appendError(_streamErr.message, () => _retryTurn(message, timestamp));
+                appendFailure('timeout', () => _retryTurn(message, timestamp));
                 return;
             }
             if (_streamErr && _streamErr.isConfigFault) {
@@ -546,6 +545,11 @@
         try {
             const response = await ArchieChat.transport.sendMessage(_buildPayload());
 
+            if (response.status === 401 || response.redirected) {
+                { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
+                appendFailure('signed_out', null);
+                return;
+            }
             const data = await response.json();
             // Remember the conversation this turn was saved to, and refresh the
             // history rail so a brand-new chat appears immediately.
@@ -630,7 +634,8 @@
                     appendError(errorMessage || fullError, null, { adminLink: true });
                 } else {
                     Platform.toast.error(fullError);
-                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.' + recordedNote(data.pending_approvals), () => _retryTurn(message, timestamp, data.turn_id));
+                    const _code = data.reason_code || failureCodeForStatus(response.status, data.error_type);
+                    appendFailure(_code, failureRetryable(_code) ? () => _retryTurn(message, timestamp, data.turn_id) : null, recordedNote(data.pending_approvals));
                 }
             } else {
                 // Add AI response to history
@@ -681,7 +686,7 @@
 
         } catch (error) {
             { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
-            appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
+            appendFailure(error && error.reasonCode, () => _retryTurn(message, timestamp));
         }
     }
 
@@ -731,10 +736,31 @@
             : '';
     }
 
+    /* The words for why a turn could not be answered. The sentences are the server's table
+       (failure_messages.py), handed to the page once; the browser only picks one by its code. */
+    function failureTable() { return window.chatFailureTable || { reasons: {}, no_retry: [], saved: [] }; }
+    function failureSentence(code) { return code ? (failureTable().reasons[code] || '') : ''; }
+    function failureRetryable(code) { return failureTable().no_retry.indexOf(code) === -1; }
+    function failureCodeForStatus(status, errorType) {
+        if (status === 401) return 'signed_out';
+        if (status === 403) return 'role_not_allowed';
+        if (status === 413) return 'too_large';
+        if (status === 408 || status === 504 || errorType === 'timeout') return 'timeout';
+        if (status === 502 || status === 503 || errorType === 'connection' || errorType === 'auth') return 'provider_unreachable';
+        return 'unknown';
+    }
+    /* A failure card that names the reason and, unless asking again cannot help, carries Retry. */
+    function appendFailure(code, onRetry, note) {
+        const text = failureSentence(code) || failureSentence('unknown');
+        return appendError(text + (note || ''), failureRetryable(code) ? onRetry : null);
+    }
+
     function _retryTurn(message, timestamp, failedTurnId) {
         _setSendingUI(true);
         _deliverTurn(message, timestamp, true, failedTurnId).finally(() => _setSendingUI(false));
     }
+    /* A reopened chat's failure card asks again from outside this module. */
+    ArchieChat.retryTurn = function (message) { _retryTurn(message, new Date().toISOString()); };
 
     // Stream an AI reply via SSE. Renders tokens live into a bubble; returns true
     // when it rendered a reply (caller then stops), throws/returns false to let
@@ -798,8 +824,8 @@
                         const _madeNote = _made.length
                             ? ' Already done, and not repeated on Retry: ' + _made.map(a => a.message || a.tool).join('; ') + '.'
                             : '';
-                        appendError((result.text || 'The assistant is busy right now. Wait a minute, then press Retry.') + _madeNote + recordedNote(result.pendingApprovals),
-                            _msg && !result.notSetUp ? () => _retryTurn(_msg, timestamp, result.turnId) : null,
+                        appendError((failureSentence(result.reasonCode) || result.text || 'The assistant is busy right now. Wait a minute, then press Retry.') + _madeNote + recordedNote(result.pendingApprovals),
+                            _msg && !result.notSetUp && failureRetryable(result.reasonCode) ? () => _retryTurn(_msg, timestamp, result.turnId) : null,
                             result.notSetUp ? { adminLink: true } : { ownKeyLink: true });
                         return;
                     }
@@ -1482,7 +1508,17 @@ Would you like me to provide more details about the extracted elements or help y
          had already switched, so the next message continued a thread the user
          could not see. A guard that can be false for a module this file depends
          on is not a safety net, it is the bug. */
+      var savedFailures = ((window.chatFailureTable || {}).saved) || [];
+      var lastAsked = '';
       msgs.forEach(function (m) {
+        if (m.role === 'user') lastAsked = m.content;
+        /* A turn that ended in a failure was saved as the assistant's reply. It reads as the failure
+           it was, and its Retry asks the question above it again. */
+        if (m.role === 'assistant' && savedFailures.indexOf(String(m.content || '').trim()) !== -1) {
+          var asked = lastAsked;
+          render.appendError(m.content, asked ? function () { window.ArchieChat.retryTurn(asked); } : null);
+          return;
+        }
         render.appendMessage(
           m.role === 'assistant' ? 'ai' : m.role,
           m.content,

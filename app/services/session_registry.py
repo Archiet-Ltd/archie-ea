@@ -70,10 +70,18 @@ def login_and_register(user, remember=False):
     # ticked, so a remember cookie would only be a promise the policy breaks.
     if _is_admin(user):
         remember = False
+
+    # A Google or Microsoft account waiting to be connected is read before the reset, and finished only
+    # when the person who has just signed in is the account it was waiting for. It is discarded either way.
+    pending = session.get("oauth_pending_link")
     session.clear()
     login_user(user, remember=remember)
     session.permanent = True
     issue(user, remember=remember)
+    if pending is not None:
+        from app.modules.account.services.account_service import AccountService
+
+        AccountService.complete_pending_link(user, pending)
 
 
 def is_active(sid):
