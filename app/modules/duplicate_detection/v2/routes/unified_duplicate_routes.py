@@ -14,6 +14,7 @@ from difflib import SequenceMatcher
 from flask import (  # dead-code-ok
     Blueprint,
     current_app,
+    g,
     jsonify,
     redirect,
     render_template,
@@ -348,12 +349,18 @@ def get_group_savings(group_id):
 def get_simple_statistics():
     """Get application consolidation statistics (simple mode)"""
     try:
-        latest_run = (
-            UnifiedDetectionRun.query.filter(
-                UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
-                UnifiedDetectionRun.status == "completed",
+        latest_runs = UnifiedDetectionRun.query.filter(
+            UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
+            UnifiedDetectionRun.status == "completed",
+        )
+        # Runs carry their organisation; the model is not tenant-filtered by the
+        # mixin, so the predicate is explicit.
+        if getattr(g, "current_org_id", None) is not None:
+            latest_runs = latest_runs.filter(
+                UnifiedDetectionRun.organization_id == g.current_org_id
             )
-            .order_by(UnifiedDetectionRun.created_at.desc())
+        latest_run = (
+            latest_runs.order_by(UnifiedDetectionRun.created_at.desc())
             .first()
         )
         total_groups, high_priority_groups = count_organisation_groups()

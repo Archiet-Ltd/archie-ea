@@ -260,3 +260,39 @@ def test_a_run_clears_groups_left_with_no_live_members_and_spares_other_organisa
     assert UnifiedDuplicateGroup.query.filter_by(id=other_id).count() == 1
     assert [g.similarity_score for g in _groups_of(world["own"])] == [pytest.approx(0.58)]
 
+
+
+def test_last_detection_is_the_signed_in_organisations_own_run(
+    app, db_session, tenant_ctx, login_as, client, world
+):
+    from app.models.unified_duplicate_detection import UnifiedDetectionRun
+
+    _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
+    _apps(db_session, world["other"], "Payroll Hub", "Payroll Hub Copy")
+    own_user = _user(db_session, world["own"])
+    other_user = _user(db_session, world["other"])
+    _run_detection(tenant_ctx, world["own"], 0.50, score=0.53)
+    _run_detection(tenant_ctx, world["other"], 0.50, score=0.90)
+    # the other organisation runs last, so an unscoped "latest" would be theirs
+    db_session.commit()
+    own_run = UnifiedDetectionRun.query.filter_by(organization_id=world["own"].id).one()
+    other_run = UnifiedDetectionRun.query.filter_by(organization_id=world["other"].id).one()
+    assert own_run.id != other_run.id
+
+    for user, expected, foreign in ((own_user, own_run, other_run), (other_user, other_run, own_run)):
+        login_as(client, user)
+        body = client.get("/duplicate-detection/simple/api/statistics").get_json()
+        assert body["latest_run"]["id"] == expected.id
+        assert body["latest_run"]["id"] != foreign.id
+
+
+def test_an_organisation_that_never_ran_detection_has_no_last_detection(
+    app, db_session, tenant_ctx, login_as, client, world
+):
+    _apps(db_session, world["other"], "Payroll Hub", "Payroll Hub Copy")
+    _run_detection(tenant_ctx, world["other"], 0.50, score=0.90)
+    quiet_user = _user(db_session, world["own"])
+    db_session.commit()
+    login_as(client, quiet_user)
+    body = client.get("/duplicate-detection/simple/api/statistics").get_json()
+    assert body["latest_run"] is None

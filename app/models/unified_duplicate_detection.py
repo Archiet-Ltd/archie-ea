@@ -78,6 +78,13 @@ unified_group_members = db.Table(
 )
 
 
+def _signed_in_organisation_id():
+    """The organisation of the request that creates a run (None on the command line)."""
+    from flask import g, has_request_context
+
+    return getattr(g, "current_org_id", None) if has_request_context() else None
+
+
 class UnifiedDetectionRun(db.Model):
     """
     Tracks individual detection run executions.
@@ -119,6 +126,14 @@ class UnifiedDetectionRun(db.Model):
     # Audit
     triggered_by = Column(String(50), default="user")  # user, scheduled, api
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    # Nullable: runs made before this column existed have no owner and are shown to nobody.
+    organization_id = Column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_signed_in_organisation_id,
+    )
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
