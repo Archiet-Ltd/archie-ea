@@ -375,23 +375,26 @@ class PredictiveInsightsService:
     # Private helper methods
 
     def _gather_lifecycle_signals(self, app_id: int) -> Dict[str, Any]:
-        """Gather signals for lifecycle prediction from database."""
+        """Gather signals for lifecycle prediction from database using ORM."""
         try:
-            from app.extensions import db
+            from app.models.application_portfolio import ApplicationComponent
 
-            result = db.session.execute(  # tenant-filtered: scoped via app PK
-                db.text(
-                    "SELECT created_at, technology_stack, vendor_support_status "
-                    "FROM applications WHERE id = :aid"
-                ),
-                {"aid": app_id},
-            ).fetchone()
-            if result and result[0]:
-                age = (datetime.utcnow() - result[0]).days / 365.25
+            app = ApplicationComponent.query.get(app_id)
+            if app and app.created_at:
+                age = (datetime.utcnow() - app.created_at).days / 365.25
+                # Determine vendor support status from available fields
+                vendor_support = "unknown"
+                if app.vendor_risk:
+                    vendor_support = app.vendor_risk
+                elif app.support_level:
+                    vendor_support = app.support_level
+                elif app.vendor_type:
+                    vendor_support = app.vendor_type
+
                 return {
                     "age_years": round(age, 1),
                     "technology_currency": 0,
-                    "vendor_support_status": result[2] or "unknown",
+                    "vendor_support_status": vendor_support,
                     "usage_trend": "unknown",
                     "maintenance_cost_trend": "unknown",
                     "incident_frequency": "unknown",

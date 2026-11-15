@@ -580,20 +580,21 @@ class RoadmapDataSync:
         """Archive deliverables for deleted applications"""
         archived = 0
 
-        orphaned_deliverables = db.session.execute(  # tenant-filtered: scoped via parent FK (source_application_id → applications)
-            text(
-                """
-            SELECT d.id FROM planning_deliverables d
-            LEFT JOIN applications a ON d.source_application_id = a.id
-            WHERE d.source_application_id IS NOT NULL
-            AND a.id IS NULL
-            AND d.status != 'archived'
-        """
+        # Use ORM to find orphaned deliverables (source_application_id points to non-existent ApplicationComponent)
+        orphaned_deliverables = (
+            Deliverable.query.filter(
+                Deliverable.source_application_id.isnot(None),
+                Deliverable.status != "archived",
             )
-        ).fetchall()
+            .outerjoin(
+                ApplicationComponent,
+                ApplicationComponent.id == Deliverable.source_application_id,
+            )
+            .filter(ApplicationComponent.id.is_(None))
+            .all()
+        )
 
-        for deliverable_id in orphaned_deliverables:
-            deliverable = Deliverable.query.get(deliverable_id[0])
+        for deliverable in orphaned_deliverables:
             deliverable.status = "archived"
             deliverable.updated_at = datetime.utcnow()
             archived += 1

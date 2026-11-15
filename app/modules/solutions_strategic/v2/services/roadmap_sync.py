@@ -17,6 +17,7 @@ from app.models.roadmap_models import (  # dead-code-ok
     PlanningDeliverable,
     RoadmapAudit,
     RoadmapWorkPackage,
+    RoadmapDeliverable,
 )
 
 # Aliases for backwards compatibility
@@ -137,9 +138,9 @@ class RoadmapDataSync:
             for application in applications:
                 try:
                     # Check if deliverable already exists
-                    existing_deliverable = Deliverable.query.filter(
-                        Deliverable.source_application_id == application.id,
-                        Deliverable.created_by.in_(org_users),
+                    existing_deliverable = RoadmapDeliverable.query.filter(
+                        RoadmapDeliverable.source_application_id == application.id,
+                        RoadmapDeliverable.created_by.in_(org_users),
                     ).first()
 
                     if existing_deliverable:
@@ -157,7 +158,7 @@ class RoadmapDataSync:
 
                 except Exception as e:
                     error_msg = f"Error syncing application {application.id}: {str(e)}"
-                    logger.error(error_msg)
+                    logger.error(error_msg, exc_info=True)
                     sync_results["errors"].append(error_msg)
 
             # Archive deliverables for deleted applications
@@ -168,7 +169,7 @@ class RoadmapDataSync:
             return sync_results
 
         except Exception as e:
-            logger.error(f"Error in application sync: {e}")
+            logger.error(f"Error in application sync: {e}", exc_info=True)
             raise
 
     def sync_gaps_to_initiatives(self) -> Dict[str, Any]:
@@ -488,8 +489,8 @@ class RoadmapDataSync:
             db.session.add(wp)
             db.session.commit()
 
-        # Create deliverable
-        deliverable = Deliverable(
+        # Create deliverable (use RoadmapDeliverable which has source_application_id)
+        deliverable = RoadmapDeliverable(
             name=f"{application.name} Modernization",
             description=f"Complete modernization of {application.name}",
             work_package_id=wp.id,
@@ -497,13 +498,14 @@ class RoadmapDataSync:
             auto_generated=True,
             generation_method="application_sync",
             created_by=user_id or 1,
+            status="planned",
         )
 
         db.session.add(deliverable)
         db.session.commit()
 
     def _update_application_deliverable(
-        self, deliverable: Deliverable, application: ApplicationComponent
+        self, deliverable: RoadmapDeliverable, application: ApplicationComponent
     ) -> bool:
         """Update deliverable from application"""
         updated = False
@@ -606,22 +608,22 @@ class RoadmapDataSync:
         if organization_id is None:
             raise ValueError("organization_id is required to archive deliverables")
 
-        orphaned_deliverables = db.session.execute(  # tenant-filtered: scoped via parent FK (source_application_id)
-            text(
-                """
-            SELECT d.id FROM planning_deliverables d
-            LEFT JOIN applications a ON d.source_application_id = a.id
-            WHERE d.source_application_id IS NOT NULL
-            AND a.id IS NULL
-            AND d.status != 'archived'
-            AND d.created_by IN (SELECT id FROM users WHERE organization_id = :org_id)
-        """
-            ),
-            {"org_id": organization_id},
-        ).fetchall()
+        # RoadmapDeliverable has TenantMixin and source_application_id FK to application_components
+        # The tenant isolation filter will automatically scope to organization_id
+        orphaned_deliverables = (
+            RoadmapDeliverable.query.filter(
+                RoadmapDeliverable.source_application_id.isnot(None),
+                RoadmapDeliverable.status != "archived",
+            )
+            .outerjoin(
+                ApplicationComponent,
+                RoadmapDeliverable.source_application_id == ApplicationComponent.id,
+            )
+            .filter(ApplicationComponent.id.is_(None))
+            .all()
+        )
 
-        for deliverable_id in orphaned_deliverables:
-            deliverable = Deliverable.query.get(deliverable_id[0])
+        for deliverable in orphaned_deliverables:
             deliverable.status = "archived"
             deliverable.updated_at = datetime.utcnow()
             archived += 1
@@ -850,23 +852,35 @@ class RoadmapDataSync:
         return type_mapping.get(gap.gap_type, "general_improvement")
 
     def _get_primary_capability_for_application(self, application_id: int) -> str:
-        """Get primary capability for application"""
-        result = db.session.execute(  # tenant-filtered: scoped via parent FK (application_id)
-            text(
-                """
-            -- application_capability_mapping names its capability FK
-            -- business_capability_id; there is no capability_id column on that
-            -- table, so this join raised UndefinedColumn.
-            SELECT uc.name FROM unified_capabilities uc
-            JOIN application_capability_mapping acm ON uc.id = acm.business_capability_id
-            WHERE acm.application_id = :app_id
-            LIMIT 1
-        """
-            ),
-            {"app_id": application_id},
-        ).fetchone()
+        """Get primary capability for application using ORM"""
+        from app.models.application_capability import ApplicationCapabilityMapping
+        from app.models.unified_capability import UnifiedCapability
 
-        return result[0] if result else "unknown_capability"
+        mapping = (
+            ApplicationCapabilityMapping.query.filter(
+                ApplicationCapabilityMapping.application_component_id == application_id,
+                ApplicationCapabilityMapping.is_primary_enabler == True,
+            )
+            .join(UnifiedCapability, UnifiedCapability.id == ApplicationCapabilityMapping.business_capability_id)
+            .first()
+        )
+
+        if mapping and mapping.business_capability:
+            return mapping.business_capability.name
+
+        # Fallback: get any capability for this application
+        mapping = (
+            ApplicationCapabilityMapping.query.filter(
+                ApplicationCapabilityMapping.application_component_id == application_id,
+            )
+            .join(UnifiedCapability, UnifiedCapability.id == ApplicationCapabilityMapping.business_capability_id)
+            .first()
+        )
+
+        if mapping and mapping.business_capability:
+            return mapping.business_capability.name
+
+        return "unknown_capability"
 
     def _application_needs_deliverable(self, application: ApplicationComponent) -> bool:
         """Determine if application needs a deliverable"""

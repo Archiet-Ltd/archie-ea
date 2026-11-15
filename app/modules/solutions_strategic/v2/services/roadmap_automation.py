@@ -10,8 +10,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional  # dead-code-ok
 
-from sqlalchemy import text  # dead-code-ok
-
 from app import db
 from app.models.roadmap_models import (  # dead-code-ok
     ImplementationGap,
@@ -19,6 +17,8 @@ from app.models.roadmap_models import (  # dead-code-ok
 )
 from app.models.unified_work_package import UnifiedWorkPackage
 from app.services import work_package_service
+from app.services.capability_support import applications_of_capability
+from app.utils.tenant import current_organization_id
 
 # Aliases for backwards compatibility
 Deliverable = PlanningDeliverable
@@ -97,19 +97,23 @@ class RoadmapAutomationEngine:
         self, capability_id: int, options: GenerationOptions
     ) -> List[Dict[str, Any]]:
         """Generate work packages from business capability"""
-        capability = UnifiedCapability.query.get_or_404(capability_id)
+        org_id = current_organization_id()
+        # Get capability scoped to current organisation
+        capability = UnifiedCapability.query.filter(
+            UnifiedCapability.id == capability_id,
+            UnifiedCapability.organization_id == org_id,
+        ).first_or_404()
 
-        # Get related applications
-        applications = db.session.execute(  # tenant-filtered: scoped via capability_id FK
-            text(
-                """
-            SELECT a.* FROM applications a
-            JOIN application_capability_mapping acm ON a.id = acm.application_id
-            WHERE acm.capability_id = :cap_id
-        """
-            ),
-            {"cap_id": capability_id},
-        ).fetchall()
+        # Get related applications using the canonical reader (org-scoped)
+        app_dicts = applications_of_capability(org_id, capability_id)
+
+        # Fetch ApplicationComponent objects for the application IDs
+        app_ids = [d["application_id"] for d in app_dicts]
+        applications = []
+        if app_ids:
+            applications = ApplicationComponent.query.filter(
+                ApplicationComponent.id.in_(app_ids)
+            ).all()
 
         # Get related gaps
         gaps = ImplementationGap.query.filter_by(source_capability_id=capability_id).all()

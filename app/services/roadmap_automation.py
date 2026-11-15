@@ -98,17 +98,12 @@ class RoadmapAutomationEngine:
         """Generate work packages from business capability"""
         capability = UnifiedCapability.query.get_or_404(capability_id)
 
-        # Get related applications
-        applications = db.session.execute(  # tenant-filtered: scoped via capability_id FK
-            text(
-                """
-            SELECT a.* FROM applications a
-            JOIN application_capability_mapping acm ON a.id = acm.application_id
-            WHERE acm.capability_id = :cap_id
-        """
-            ),
-            {"cap_id": capability_id},
-        ).fetchall()
+        # Get organization_id from capability for tenant scoping
+        organization_id = capability.organization_id
+
+        # Get related applications using canonical reader
+        from app.services.capability_support import applications_of_capability
+        applications = applications_of_capability(organization_id, capability_id)
 
         # Get related gaps
         gaps = ImplementationGap.query.filter_by(source_capability_id=capability_id).all()
