@@ -5,13 +5,13 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/alert.html' import alert %}
 {% from 'components/button.html' import button %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
-{% from 'components/select.html' import native_select %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/card.html' import card, card_header, card_title, card_content, card_description %}
 
-{% block title %}Flow Analytics — Throughput &amp; Cycle Time{% endblock %}
+{% block title %}Flow Analytics — Throughput & Cycle Time{% endblock %}
 
 {% block content %}
 <meta name="shadcn-nearest" content="dashboard-01">
@@ -21,14 +21,41 @@
 
     {% macro _ps_actions() %}
     {% if boards %}
-    {% call native_select(id='board-selector', size='sm', aria_label='Select Board', attrs_dict={'x-model': 'boardId', '@change': 'loadAll()'}) %}
-        {% for board in boards %}
-        <option value="{{ board.id }}"
-                {% if selected_board_id is not none and board.id|string == selected_board_id|string %}selected{% endif %}>
-            {{ board.name }}
-        </option>
-        {% endfor %}
-    {% endcall %}
+    <div x-data="{ open: false }" class="relative">
+        <button
+            @click="open = !open"
+            type="button"
+            class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Select Board"
+            aria-expanded="false"
+            aria-haspopup="listbox"
+            :aria-controls="open ? 'board-menu' : null">
+            <span x-text="selectedBoardName || 'Select Board'"></span>
+            <i data-lucide="chevron-down" class="h-4 w-4 opacity-50"></i>
+        </button>
+        <div
+            id="board-menu"
+            x-show="open" x-cloak @keydown.escape.window="open = false"
+            @click.away="open = false"
+            x-transition
+            class="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground hidden"
+            role="listbox"
+            aria-label="Select Board">
+            <div class="p-1">
+                <template x-for="board in boards" :key="board.id">
+                    <button
+                        @click="selectedBoardId = board.id; selectedBoardName = board.name; open = false; loadAll()"
+                        type="button"
+                        role="option"
+                        :aria-selected="board.id == selectedBoardId"
+                        class="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground">
+                        <span x-text="board.name"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+        <input type="hidden" name="board_id" x-bind:value="selectedBoardId">
+    </div>
     {% else %}
     <span class="text-sm text-muted-foreground">No boards found</span>
     {% endif %}
@@ -139,24 +166,23 @@
                             {% endcall %}
                         {% endcall %}
                         {% call card_content() %}
-                            {% call table() %}
-                                {% call table_header() %}
-                                    {% call table_row() %}
-                                        {% call table_head() %}Board column{% endcall %}
-                                        {% call table_head(class='text-right') %}Cards{% endcall %}
-                                    {% endcall %}
+                            {% call(row) list_table(
+                                rows=wipData.columns,
+                                columns=[
+                                    {'label': 'Board column', 'class': ''},
+                                    {'label': 'Cards', 'class': 'text-right', 'align': 'right'}
+                                ],
+                                caption='WIP by board column',
+                                testid='wip-table',
+                                row_testid='wip-row',
+                                page_size=25,
+                                empty_message='No WIP data.'
+                            ) %}
+                                {% call table_cell() %}
+                                    <span x-text="columnLabel(row.column)"></span>
                                 {% endcall %}
-                                {% call table_body(attrs_dict={'x-data': ''}) %}
-                                    <template x-for="col in wipData.columns" :key="col.column">
-                                        {% call table_row() %}
-                                            {% call table_cell() %}
-                                                <span x-text="columnLabel(col.column)"></span>
-                                            {% endcall %}
-                                            {% call table_cell(class='text-right font-semibold') %}
-                                                <span x-text="col.card_count"></span>
-                                            {% endcall %}
-                                        {% endcall %}
-                                    </template>
+                                {% call table_cell(class='text-right font-semibold') %}
+                                    <span x-text="row.card_count"></span>
                                 {% endcall %}
                             {% endcall %}
                         {% endcall %}
@@ -182,6 +208,8 @@ function flowAnalytics(initialBoardId) {
     }
     return {
         boardId: initialBoardId ? String(initialBoardId) : null,
+        selectedBoardId: initialBoardId ? String(initialBoardId) : null,
+        selectedBoardName: null,
         cycleData: null,
         throughputData: null,
         leadData: null,
@@ -213,7 +241,12 @@ function flowAnalytics(initialBoardId) {
 
         // Alpine calls init() itself; it must not also be called from x-init.
         async init() {
-            if (this.boardId) await this.loadAll();
+            if (this.boardId) {
+                // Find the board name for the initial board
+                const board = this.$el.querySelector('[x-data]').__x.$data.boards?.find(b => String(b.id) === String(this.boardId));
+                if (board) this.selectedBoardName = board.name;
+                await this.loadAll();
+            }
         },
 
         _leg(url, what) {
