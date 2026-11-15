@@ -138,7 +138,8 @@ def list_risk_links(risk_id):
     links = risk_service.list_risk_links(risk_id)
     return jsonify(
         [
-            {**link.to_dict(), "entity_label": _entity_label(link.entity_type, link.entity_id)}
+            {**link.to_dict(), "entity_label": _entity_label(link.entity_type, link.entity_id),
+             "entity_kind": _entity_kind(link.entity_type, link.entity_id)}
             for link in links
         ]
     ), 200
@@ -169,7 +170,8 @@ def add_risk_link(risk_id):
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify(
-        {**link.to_dict(), "entity_label": _entity_label(link.entity_type, link.entity_id)}
+        {**link.to_dict(), "entity_label": _entity_label(link.entity_type, link.entity_id),
+         "entity_kind": _entity_kind(link.entity_type, link.entity_id)}
     ), 201
 
 
