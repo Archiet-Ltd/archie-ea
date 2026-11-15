@@ -104,7 +104,7 @@
             <div class="flex flex-wrap items-center gap-2">
                 {% if element.type %}{% call badge('neutral') %}{{ element.type | type_label }}{% endcall %}{% endif %}
                 {% if row.health %}
-                    {% call badge('success' if row.health == 'Healthy' else ('warning' if row.health == 'Warning' else 'danger')) %}<span aria-label="Health: {{ row.health }}">{{ row.health }}</span>{% endcall %}
+                    {% call badge('success' if row.health == 'Healthy' else ('warning' if row.health == 'Warning' else ('neutral' if row.health == 'Not assessed' else 'danger'))) %}<span aria-label="Health: {{ row.health }}">{{ row.health }}</span>{% endcall %}
                 {% else %}
                     {% call badge('neutral') %}Health not recorded{% endcall %}
                 {% endif %}
