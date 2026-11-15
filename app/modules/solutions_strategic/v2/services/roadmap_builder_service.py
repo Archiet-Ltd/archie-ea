@@ -363,9 +363,9 @@ class RoadmapBuilderService:
         depends_on = work_package_service.get_work_package(depends_on_id, org_id)
 
         if not work_package:
-            return {"success": False, "error": "Work package not found"}
+            return {"success": False, "error": "Work package not found", "not_found": True}
         if not depends_on:
-            return {"success": False, "error": "Dependency work package not found"}
+            return {"success": False, "error": "Dependency work package not found", "not_found": True}
 
         try:
             work_package_service.add_dependency(
