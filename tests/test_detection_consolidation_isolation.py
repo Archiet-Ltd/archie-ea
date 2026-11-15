@@ -26,6 +26,14 @@ from app.models.unified_duplicate_detection import (
 from app.models.user import User
 
 
+
+def _tag(model, organization_id):
+    """The organisation a row is created for, when the model carries one. A model
+    without the column leaves the row untagged, so a test fails by showing
+    another organisation's rows rather than at setup."""
+    return {"organization_id": organization_id} if hasattr(model, "organization_id") else {}
+
+
 def _user(db_session, org):
     from app.models import Role
 
@@ -71,7 +79,7 @@ def _world(db_session, make_org):
         run_name="Org A's run",
         strategy="fast",
         status="completed",
-        organization_id=org_a.id,
+        **_tag(UnifiedDetectionRun, org_a.id),
         applications_analyzed=1,
         groups_found=0,
     )
@@ -79,7 +87,7 @@ def _world(db_session, make_org):
         run_name="Org B's run",
         strategy="fast",
         status="completed",
-        organization_id=org_b.id,
+        **_tag(UnifiedDetectionRun, org_b.id),
         applications_analyzed=1,
         groups_found=0,
     )
@@ -91,14 +99,14 @@ def _world(db_session, make_org):
         source_group_name="probe",
         recommended_action="pending_review",
         priority="high",
-        organization_id=org_a.id,
+        **_tag(ConsolidationListEntry, org_a.id),
     )
     entry_b = ConsolidationListEntry(
         application_id=app_b.id,
         source_group_name="probe",
         recommended_action="pending_review",
         priority="high",
-        organization_id=org_b.id,
+        **_tag(ConsolidationListEntry, org_b.id),
     )
     db_session.add_all([entry_a, entry_b])
     db_session.commit()
@@ -221,7 +229,7 @@ def test_run_detection_does_not_delete_other_orgs_groups(
         run_name="Org B's run",
         strategy="fast",
         status="completed",
-        organization_id=org_b_id,
+        **_tag(UnifiedDetectionRun, org_b_id),
         applications_analyzed=1,
         groups_found=1,
     )
@@ -231,7 +239,7 @@ def test_run_detection_does_not_delete_other_orgs_groups(
     group_b = UnifiedDuplicateGroup(
         name="Org B's group",
         detection_run_id=run_b.id,
-        organization_id=org_b_id,
+        **_tag(UnifiedDuplicateGroup, org_b_id),
         duplicate_type="exact",
         similarity_score=1.0,
     )
