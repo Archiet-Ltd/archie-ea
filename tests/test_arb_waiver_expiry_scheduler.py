@@ -26,6 +26,7 @@ ESTABLISHED_JOBS = {
     "change_feed_consumer",
     "connector_reread",
     "event_log_partition_maintenance",
+    "offer_reminders",
 }
 WAIVER_JOB = "typed_arb_waiver_expiry"
 # Registered only when their own interval setting exists, which this bare test app does not carry.

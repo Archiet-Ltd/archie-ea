@@ -105,7 +105,7 @@ def asks_for_capacity(message: Any) -> bool:
 def human_join(owners: List[Dict[str, Optional[str]]]) -> str:
     """Join owner dicts ``{"name": str, "role": str|None}`` into a sentence fragment.
 
-    One owner shows just the name (with its role in parentheses when one is recorded).
+    One owner shows just the name (with its role in parentheses when one is recorded, after a comma when the name already ends in a bracket).
     Two owners are joined by " and ". Three or more use commas with a final " and ".
     An owner with no recorded role shows the name alone.
     """
@@ -115,7 +115,12 @@ def human_join(owners: List[Dict[str, Optional[str]]]) -> str:
         if not name:
             continue
         role = (owner.get("role") or "").strip()
-        parts.append("%s (%s)" % (name, role) if role else name)
+        if not role:
+            parts.append(name)
+        elif name.endswith(")"):
+            parts.append("%s, %s" % (name, role))
+        else:
+            parts.append("%s (%s)" % (name, role))
     if not parts:
         return ""
     if len(parts) == 1:

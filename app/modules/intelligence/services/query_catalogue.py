@@ -26,7 +26,7 @@ TRUTH_CLASS_SYNCHRONISED = "synchronised"
 # that recompute a value from other rows are "derived". Nothing in this
 # catalogue reads from a sync-mirror table today, so "synchronised" is
 # available for a future entry but unused here — never guessed per row.
-_DRAWN_SOURCE_TABLES = {"application_owners", "application_components", "company_profile"}
+_DRAWN_SOURCE_TABLES = {"application_owners", "application_components", "company_profile", "saved_diagram_elements"}
 
 
 def truth_class_for(source_table: Optional[str]) -> str:
@@ -762,6 +762,51 @@ def _risk_cost(organization_id: int, risk: Optional[str] = None, **_: Any) -> Di
     return out
 
 
+
+
+def _top_risks(organization_id: int, limit: Any = None, **_: Any) -> Dict[str, Any]:
+    """"What are our top risks?" -- the open risks of the register, highest score first, each with its
+    level, score, owner and what it touches. Read from the one risk register (``risks``) through
+    ``risk_service.ranked_risks``; the order is the recorded score, ties by title, and nothing is
+    invented when the register holds none."""
+    from app.models.risk import RiskStatus
+    from app.services import risk_service
+
+    try:
+        shown = max(1, min(int(limit), 25)) if limit else 5
+    except (TypeError, ValueError):
+        shown = 5
+    rows_all = [r for r in risk_service.ranked_risks(organization_id)["rows"]
+                if r["status"] != RiskStatus.CLOSED.value]
+    rows_all.sort(key=lambda r: (-(r["risk_score"] or 0), (r["title"] or "").lower(), r["risk_id"]))
+    owners = {}
+    if rows_all:
+        from app.models.risk import Risk
+        owners = dict(db.session.execute(
+            db.select(Risk.id, Risk.owner).where(Risk.organization_id == organization_id)).all())
+    rows: List[Dict[str, Any]] = []
+    citations: List[Dict[str, Any]] = []
+    for r in rows_all[:shown]:
+        touches = ", ".join(t["name"] for t in r["touches"][:3]) or "no linked records yet"
+        rows.append({
+            "id": r["risk_id"],
+            "name": r["title"],
+            "source_line": "%s, %s of 25. Owner: %s. Touches: %s." % (
+                (r["risk_level"] or "Level not recorded"), r["risk_score"],
+                owners.get(r["risk_id"]) or "not recorded", touches),
+            "source_table": "risks",
+            "truth_class": truth_class_for("risks"),
+        })
+        citations.append(risk_citation(r["risk_id"], r["title"]))
+    if rows:
+        answer = "the %d highest-scoring open risks in the risk register" % len(rows)
+        reason = "%d open risks are recorded; these score highest" % len(rows_all)
+    else:
+        answer = "the highest-scoring open risks in the risk register"
+        reason = "no open risks are recorded in the risk register yet"
+    return {"answer": answer, "rows": rows, "total": len(rows_all), "citations": citations, "reason": reason}
+
+
 def _risk_url(risk_id: int) -> Optional[str]:
     from flask import has_request_context, url_for
 
@@ -1058,6 +1103,102 @@ def _company_profile(organization_id: int, topic: Optional[str] = None, **_: Any
     }
 
 
+# What each plain question about a canvas box asks: the box, in the words a person asks it.
+CANVAS_BOX_QUESTIONS = {
+    "customer_segments": ("Who are our customer segments?", "Customer Segments"),
+    "early_adopters": ("Who are our early adopters?", "Early adopters"),
+    "value_propositions": ("What are our value propositions?", "Value Propositions"),
+    "revenue_streams": ("What are our revenue streams?", "Revenue Streams"),
+    "key_partners": ("Who are our key partners?", "Key Partners"),
+    "key_activities": ("What are our key activities?", "Key Activities"),
+    "key_resources": ("What are our key resources?", "Key Resources"),
+    "cost_structure": ("What is in our cost structure?", "Cost Structure"),
+    "customer_relationships": ("What are our customer relationships?", "Customer Relationships"),
+    "channels": ("What are our channels?", "Channels"),
+}
+
+
+def _canvas_box_entries(organization_id: int, box: Optional[str] = None, show_costs: bool = False,
+                        **_: Any) -> Dict[str, Any]:
+    """"Who are our customer segments? Who are our key partners?" Answered from the canvases themselves: the
+    entries each canvas of the organisation shows in that box, in the order the canvas page shows them, each
+    cited to its element and to the canvas it sits on. Read through the one canvas reader the page and the
+    chat's get_canvas use, so the three never disagree. Cost lines are listed only when ``show_costs`` is
+    true, for a person the cost rule lets read them."""
+    from app.modules.business_model_canvas import model_service
+    from app.services.cost_visibility import COSTS_WITHHELD
+
+    box = box if box in CANVAS_BOX_QUESTIONS else None
+    title, box_title = CANVAS_BOX_QUESTIONS[box] if box else ("What is on our canvas?", "any box")
+    found = model_service.box_across_canvases(organization_id, [box] if box else list(CANVAS_BOX_QUESTIONS))
+
+    rows: List[Dict[str, Any]] = []
+    citations: List[Dict[str, Any]] = []
+    canvases: Dict[int, Dict[str, Any]] = {}
+    left_out = 0
+    costs_withheld = False
+    for item in found:
+        canvas, slice_ = item["canvas"], item["box"]
+        line_start = "%s on %s" % (slice_["title"], canvas["name"])
+        costs = slice_["costs"] or {}
+        if costs.get("lines") and not show_costs:
+            costs_withheld = True
+        # (id, name, kind, source line, source table)
+        listed = [
+            (entry["id"], entry["name"], "element", "%s · %s" % (line_start, entry["type_name"]), "saved_diagram_elements")
+            for entry in slice_["entries"]
+        ] + [
+            (price["element_id"], price["text"], "element", "%s · price" % line_start, price["source_table"])
+            for price in slice_["prices"]
+        ]
+        if show_costs:
+            left_out += costs.get("not_listed") or 0
+            listed += [
+                (line["id"], line["text"], "application",
+                 "%s · %s" % (line_start, "technology share" if line["kind"] == "technology_share" else "cost"),
+                 line["source_table"])
+                for line in costs.get("lines") or []
+            ]
+        if not listed:
+            continue
+        canvases.setdefault(canvas["id"], {"canvas": canvas, "count": 0})["count"] += len(listed)
+        for ident, name, kind, line, table in listed:
+            rows.append({"id": ident, "kind": kind, "name": name, "source_line": line, "source_table": table,
+                         "truth_class": truth_class_for(table)})
+            citations.append({"type": kind, "id": ident, "name": name,
+                              "target": "/api/v1/elements/%d" % ident if kind == "element" else None, "source_line": line})
+    for entry in canvases.values():
+        canvas = entry["canvas"]
+        citations.append({"type": "canvas", "id": canvas["id"], "name": canvas["name"], "target": canvas["url"],
+                          "source_line": "%s · %d listed" % (canvas["type_name"], entry["count"])})
+
+    result: Dict[str, Any] = {
+        "answer": "what the canvases list under %s" % box_title if box else "what the canvases list",
+        "title": title, "box": box, "rows": rows, "total": len(rows) + left_out, "citations": citations,
+        "reason": None if rows else (COSTS_WITHHELD if costs_withheld else "no canvas has an entry in %s yet" % box_title),
+    }
+    if left_out:
+        result["left_out"] = left_out
+        result["answer"] += " (%d cost line%s not listed here, the canvas page lists them)" % (
+            left_out, "" if left_out == 1 else "s")
+    if costs_withheld:
+        result["costs_withheld"] = True
+        result["note"] = COSTS_WITHHELD
+    if not rows and not costs_withheld:
+        from flask import url_for
+
+        own = model_service.organisation_canvas(organization_id)
+        result["next_step"] = ("Open your canvas and add the first entry." if own is not None
+                               else "Make a canvas, then add the first entry.")
+        result["next_label"] = "Open your canvas" if own is not None else "Open the canvases"
+        try:
+            result["next_url"] = (url_for("business_model.detail", canvas_id=own.id) if own is not None
+                                  else url_for("business_model.index"))
+        except RuntimeError:  # outside a request there is no page to point to
+            result["next_url"] = None
+    return result
+
+
 CATALOGUE: Dict[str, CatalogueEntry] = {
     "applications_without_owner": CatalogueEntry(
         id="applications_without_owner",
@@ -1108,6 +1249,13 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         params=["topic"],
         run=_company_profile,
     ),
+    "top_risks": CatalogueEntry(
+        id="top_risks",
+        title="What are our top risks?",
+        description="The open risks in the risk register with the highest scores, each with its level, owner and what it touches.",
+        params=["limit"],
+        run=_top_risks,
+    ),
     "risk_cost": CatalogueEntry(
         id="risk_cost",
         title="What does a risk cost us?",
@@ -1121,6 +1269,13 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         description="The business capabilities mapped to a named application, read from the same mapping the application page shows, each cited to its fact sheet.",
         params=["service"],
         run=_capabilities_of_application,
+    ),
+    "canvas_box_entries": CatalogueEntry(
+        id="canvas_box_entries",
+        title="What is in a box of our canvas?",
+        description="The entries each canvas shows in one box (customer segments, key partners, value propositions and the rest), in the order the canvas page shows them, each cited to its element and its canvas.",
+        params=["box"],
+        run=_canvas_box_entries,
     ),
     "what_breaks_if_fails": CatalogueEntry(
         id="what_breaks_if_fails",

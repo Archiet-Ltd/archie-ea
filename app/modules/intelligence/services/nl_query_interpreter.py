@@ -28,6 +28,17 @@ logger = logging.getLogger(__name__)
 # more specific rules come first: "what came from GitHub" and "what we run"
 # are both checked before the broad "no owner" and "what breaks" rules so a
 # question that mentions both lands on the one it is really asking.
+# The canvas box a phrase asks about (None: the canvas as a whole), in the order they are tried.
+_CANVAS_PHRASES = (
+    ("customer segment", "customer_segments"), ("our segments", "customer_segments"),
+    ("early adopter", "early_adopters"), ("value proposition", "value_propositions"),
+    ("revenue stream", "revenue_streams"), ("key partner", "key_partners"), ("our partners", "key_partners"),
+    ("key activit", "key_activities"), ("key resource", "key_resources"), ("cost structure", "cost_structure"),
+    ("customer relationship", "customer_relationships"), ("our channels", "channels"),
+    ("on our canvas", None), ("business model canvas", None), ("lean canvas", None),
+)
+
+
 _KEYWORD_RULES = [
     # UC-S2-04: what came from the GitHub connector.
     (
@@ -100,6 +111,16 @@ _KEYWORD_RULES = [
         "risk_cost",
         {},
     ),
+    # The top risks of the register, by score. Checked after the cost rule so "what do our top risks cost"
+    # stays a cost question, and before the impact rules.
+    (
+        (
+            "top risks", "biggest risks", "highest risks", "greatest risks", "key risks", "main risks",
+            "worst risks", "most serious risks", "top risk", "risks to reaching", "risks to achieving",
+        ),
+        "top_risks",
+        {},
+    ),
     # UC-S2-01: what breaks if X fails (impact).
     (
         (
@@ -120,6 +141,13 @@ _KEYWORD_RULES = [
         ),
         "business_continuity_criticality",
         {"criticality": "Critical"},
+    ),
+    # What a canvas lists in one box (customer segments, key partners, value propositions...). Last, so the
+    # impact and inventory questions keep their own entries; the box is the first phrase below that matches.
+    (
+        tuple(phrase for phrase, _box in _CANVAS_PHRASES),
+        "canvas_box_entries",
+        {},
     ),
 ]
 
@@ -201,6 +229,16 @@ def asks_one_thing(question: str) -> bool:
     )
 
 
+def _top_count(lowered: str) -> int:
+    """How many risks a "top five risks" question asks for (five when it gives no number)."""
+    found = re.search(r"\btop\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b", lowered)
+    if not found:
+        return 5
+    word = found.group(1)
+    return int(word) if word.isdigit() else {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                                             "seven": 7, "eight": 8, "nine": 9, "ten": 10}[word]
+
+
 def _keyword_match(question: str, organization_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
     lowered = question.lower()
     if not asks_one_thing(question):
@@ -217,6 +255,12 @@ def _keyword_match(question: str, organization_id: Optional[int] = None) -> Opti
             resolved = dict(params)
             if entry_id == "company_profile":
                 resolved["topic"] = _profile_topic(lowered)
+            if entry_id == "canvas_box_entries":
+                box = next((box for phrase, box in _CANVAS_PHRASES if phrase in lowered), None)
+                if box:
+                    resolved["box"] = box
+            if entry_id == "top_risks":
+                resolved["limit"] = _top_count(lowered)
             if entry_id == "risk_cost":
                 risk = _extract_risk(question)
                 if risk:
@@ -423,6 +467,13 @@ def evaluation_set() -> List[Dict[str, Any]]:
         {"question": "Which records cite a GitHub commit as their origin?", "expected_entry_id": "github_sourced_records"},
         {"question": "What came into the catalogue from the GitHub integration?", "expected_entry_id": "github_sourced_records"},
         {"question": "List the GitHub-sourced applications and their repositories.", "expected_entry_id": "github_sourced_records"},
+        # What a canvas lists in a box.
+        {"question": "Who are our customer segments?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "Who are our key partners?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "What are our value propositions?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "What are our revenue streams?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "Who are our early adopters?", "expected_entry_id": "canvas_box_entries"},
+        {"question": "What is on our business model canvas?", "expected_entry_id": "canvas_box_entries"},
         # Outside the catalogue — must map to nothing, never a guessed answer.
         {"question": "what's the weather today", "expected_entry_id": None},
         {"question": "how many users do we have", "expected_entry_id": None},
