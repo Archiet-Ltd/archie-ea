@@ -6,7 +6,7 @@
 {% from 'components/loading_state.html' import loading_inline %}
 {% from 'components/error_boundary.html' import error_boundary %}
 {% from 'components/button.html' import button %}
-{% from 'components/alert.html' import alert %}
+{% from 'components/alert.html' import alert as quiet_alert %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content with context %}
 {% block extra_css %}
 <style>
@@ -82,7 +82,7 @@
                     'idle': 'Your session ended after a period of inactivity. Sign in again to carry on.',
                     'admin_absolute': 'Administrator sessions end after a fixed time. Sign in again to carry on.'
                 }.get(request.args.get('timeout', '')) %}
-                {% if why_here %}{{ alert('info', text=why_here, testid='login-why') }}{% endif %}
+                {% if why_here %}{{ quiet_alert('info', text=why_here, testid='login-why', class='mb-4') }}{% endif %}
                 <div
                      x-data="{
                        isSubmitting: false,

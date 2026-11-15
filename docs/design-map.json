@@ -5352,6 +5352,92 @@
    "tier": "A",
    "type_changed": false
   },
+  "app/templates/account/logout_confirm.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/button.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/error_boundary.html",
+    "components/file_upload.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/progress.html",
+    "components/radio_group.html",
+    "components/select.html",
+    "components/stepper.html",
+    "components/switch.html",
+    "macros/check_password.html",
+    "macros/form_macros.html"
+   ],
+   "basis": "reviewed",
+   "block": "onboarding",
+   "charts": [],
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "empty",
+    "field",
+    "input",
+    "page-header",
+    "card"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 1,
+    "form": 1,
+    "link": 1
+   },
+   "departures": [
+    {
+     "rule": "brand",
+     "what": "Entelim logo and product name fill the block's logo slot; the original shows its own."
+    }
+   ],
+   "extends": [
+    "layouts/public_base.html"
+   ],
+   "frame": "login-01",
+   "grid": "G3",
+   "inhouse_components": [],
+   "macros": [
+    "components/button.html",
+    "components/card.html",
+    "components/input.html"
+   ],
+   "original": "login-01",
+   "page_type": "onboarding",
+   "patterns": [
+    "P17-empty-state",
+    "P26-error-state"
+   ],
+   "persona": "startup_cto",
+   "reason": "Sign-out confirmation inside the login-01 card; a Sign out button posts, a link keeps the person signed in.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: authentication",
+     "url": "https://ui.shadcn.com/examples/authentication"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: onboarding",
+     "image": "docs/design/reference/basecoat-onboarding.webp"
+    }
+   },
+   "spec": "docs/design/specs/first-screen.md",
+   "states": [
+    "loading",
+    "error-region",
+    "populated"
+   ],
+   "status": "specified",
+   "tier": "A",
+   "type_changed": false
+  },
   "app/templates/account/manage.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",

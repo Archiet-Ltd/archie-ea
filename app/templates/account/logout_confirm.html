@@ -2,6 +2,7 @@
 {% extends 'layouts/public_base.html' %}
 {% block title %}Sign out{% endblock %}
 {% from 'components/button.html' import button %}
+{% from 'macros/form_macros.html' import begin_form, end_form %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content with context %}
 
 {% block content %}
@@ -13,11 +14,10 @@
                 {% call card_description() %}Sign out of your workspace on this device?{% endcall %}
             {% endcall %}
             {% call card_content(class='pt-4') %}
-                <form method="post" action="{{ url_for('account.logout') }}" class="flex gap-3">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {{ begin_form(form, {}, action=url_for('account.logout'), extra_classes='flex gap-3') }}
                     {{ button(type='submit', variant='destructive', class='flex-1', text='Sign out', testid='logout-confirm') }}
                     {{ button(href=url_for('dashboard.overview'), variant='outline', class='flex-1', text='Stay signed in') }}
-                </form>
+                {{ end_form(form) }}
             {% endcall %}
         {% endcall %}
     </div>

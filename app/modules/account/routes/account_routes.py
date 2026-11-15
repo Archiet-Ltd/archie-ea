@@ -284,7 +284,9 @@ def logout():
     if request.method == "GET":
         # A link, prefetch or crawler fetching this URL must not end a session:
         # signing out is a POST with the form's token.
-        return render_template("account/logout_confirm.html")
+        from flask_wtf import FlaskForm
+
+        return render_template("account/logout_confirm.html", form=FlaskForm())
     try:
         audit_logger.log_logout()
     except Exception as _exc:
