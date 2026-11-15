@@ -28,8 +28,10 @@ NEXT_STEPS = {
     "applications_and_owners": "Add your applications to the portfolio, with an owner and an annual cost for each.",
     "duplicate_tooling_by_capability": "Map each application to the capabilities it covers.",
     "github_sourced_records": "Connect a GitHub repository so its records come into the model.",
+    "top_risks": "Record a risk in the risk register, with its likelihood and impact.",
     "risk_cost": "Open a risk in the register and enter the four Open FAIR factors to work out what it could cost each year.",
     "capabilities_of_application": "Name an application in your model, or map capabilities to it on its Capabilities tab.",
+    "canvas_box_entries": "Open your canvas and add the first entry to that box.",
     "what_breaks_if_fails": "Name a service that is in your model, or draw how your systems depend on each other.",
 }
 
@@ -76,6 +78,8 @@ def _page_for(citation: Dict[str, Any]) -> Optional[str]:
         return url_for("enterprise_crud.capability_fact_sheet", capability_id=ident)
     if citation.get("type") == "risk":
         return url_for("risk.risk_page", risk_id=ident)
+    if citation.get("type") == "canvas":
+        return url_for("business_model.detail", canvas_id=ident)
     if citation.get("type") == "element":
         return url_for("archimate.element_impact_graph_page", element_id=ident)
     return None
@@ -122,21 +126,37 @@ def answer_catalogue_question(message: str, organization_id: int, time_limit: Op
     if not _keep(message, interpretation):
         return None
     entry_id = interpretation["entry_id"]
-    result = run_entry(entry_id, organization_id, **interpretation["params"])
-    seen: Set[Tuple[Any, Any]] = set()
+    params = dict(interpretation["params"])
+    if entry_id == "canvas_box_entries":
+        params["show_costs"] = _cost_shown(organization_id)[0]
+    result = run_entry(entry_id, organization_id, **params)
+    seen: Set[Tuple[Any, Any, Any]] = set()
     records: List[Dict[str, Any]] = []
     show_cost, currency = False, ""
     if entry_id == "applications_and_owners":
         show_cost, currency = _cost_shown(organization_id)
-    rows_by_id = {row.get("id"): row for row in result.get("rows") or [] if isinstance(row, dict)}
+    # A row is found by its kind and id (an element and an application can share a number) and, where one
+    # record has several rows, by the source line as well.
+    rows_by_key: Dict[Tuple[Any, Any, Any], Dict[str, Any]] = {}
+    for row in result.get("rows") or []:
+        if isinstance(row, dict):
+            rows_by_key.setdefault((row.get("kind"), row.get("id"), row.get("source_line")), row)
+            rows_by_key.setdefault((row.get("kind"), row.get("id"), None), row)
     for citation in result.get("citations") or []:
         page = _page_for(citation)
-        key = (citation.get("type"), citation.get("id"))
+        # One application can sit on a canvas twice (its own cost and its technology share): both are kept.
+        several = entry_id == "canvas_box_entries" and citation.get("type") == "application"
+        key = (citation.get("type"), citation.get("id"), citation.get("source_line") if several else None)
         if page is None or key in seen:
             continue
         seen.add(key)
         record = {"name": citation.get("name") or "Unnamed record", "kind": citation["type"], "url": page}
-        row = rows_by_id.get(citation.get("id")) or {}
+        row = {} if citation["type"] == "canvas" else (
+            rows_by_key.get((citation["type"], citation.get("id"), citation.get("source_line")))
+            or rows_by_key.get((citation["type"], citation.get("id"), None))
+            or rows_by_key.get((None, citation.get("id"), None))
+            or {}
+        )
         count = row.get("depends_on_count")
         if count:
             record["dependents"] = "%d %s" % (count, "thing depends on it" if count == 1 else "things depend on it")
@@ -162,15 +182,17 @@ def answer_catalogue_question(message: str, organization_id: int, time_limit: Op
     return {
         "entry_id": entry_id,
         "title": result.get("title") or CATALOGUE[entry_id].title,
-        "summary": result.get("answer"),
+        "summary": " ".join(part for part in (result.get("answer"), result.get("note")) if part) or None,
         "sentence": _inventory_sentence(result, show_cost) if entry_id == "applications_and_owners" and records else None,
         "total": result.get("total"),
         "reason": result.get("reason"),
         # A finding of "none" (every application is owned) needs no next step.
         "complete": complete,
+        # The person's role withholds the cost lines: the records are not at fault, the reason says so.
+        "costs_withheld": bool(result.get("costs_withheld")) and not records,
         # A name that matched nothing recorded: the records are not at fault.
         "unmatched": result.get("matched") is False,
-        "next_step": (result.get("next_step") or NEXT_STEPS.get(entry_id)) if not records and not complete else None,
+        "next_step": (result.get("next_step") or NEXT_STEPS.get(entry_id)) if not records and not complete and not result.get("costs_withheld") else None,
         "next_url": result.get("next_url") if not records else None,
         "next_label": result.get("next_label") if not records else None,
         "named_not_found": named_not_found,

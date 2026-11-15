@@ -27,8 +27,6 @@ ALLOWED = {
     "account.session_keepalive",
     "account.join",
     "account.join_from_invite",
-    "account.sso_login",
-    "account.sso_callback",
     "static",
 }
 

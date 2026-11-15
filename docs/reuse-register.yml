@@ -577,19 +577,22 @@ entries:
       symbols:
         - set_element_owner
         - set_application_owner
+        - set_named_person_owner
         - application_owner_text
         - application_owner_expression
         - application_is_owned_expression
         - application_is_owned
         - resolve_user_by_name
     reuse: >
-      An owner is a person recorded as an ApplicationOwner row, written only through set_element_owner (an
-      application is element_type "application"). The business_owner, technical_owner and application_owner
-      fields on an application are attributes that read and assign through that service, so assigning them
-      is allowed and records the owner; in SQL use the same attributes, which carry the matching expression.
-      The legacy_* columns behind them hold only a name that matched no user and are written by the service and
-      the backfill alone. Do not write a second owner row, a second name-to-user lookup, or read an owner text
-      column directly. The retirement of those columns is a named follow-up, not part of this entry.
+      An owner is a person recorded as an ApplicationOwner row. A user owner is written through
+      set_element_owner (an application is element_type "application") or set_application_owner. A named
+      person without an account is written through set_named_person_owner (aichatapp01). The business_owner,
+      technical_owner and application_owner fields on an application are attributes that read and assign
+      through that service, so assigning them is allowed and records the owner; in SQL use the same
+      attributes, which carry the matching expression. The legacy_* columns behind them hold only a name
+      that matched no user and are written by the service and the backfill alone. Do not write a second
+      owner row, a second name-to-user lookup, or read an owner text column directly. The retirement of
+      those columns is a named follow-up, not part of this entry.
       "Owned" (an application has an accountable owner: a primary or business owner record, or a legacy
       application or business owner text) is defined once, by application_is_owned_expression and
       application_is_owned; the dashboard owner coverage and the Ask question on applications with no owner
@@ -1098,6 +1101,27 @@ entries:
       - path: app/modules/solutions_strategic/v2/services/compliance_tracking_service.py
         reason: the page service that reads the one scorer for the tracking screen
 
+  - id: coverage-formatter
+    concept: Formatting a percentage figure for display (capability coverage or compliance score)
+    status: active
+    canonical:
+      path: app/utils/recorded_figures.py
+      symbols: [coverage_text]
+    reuse: >
+      Capability coverage uses coverage_text (recorded_figures.py): "40%", "0%", or "Not recorded" for None.
+      Compliance score uses ComplianceInheritanceService.format_score (compliance_inheritance_service.py):
+      "62.5%", "50%", or "Not assessed" for None. They differ because coverage is a recorded figure
+      (a person may have entered 0%) while compliance is computed (None means no controls mapped).
+      Do not write a second percentage formatter; call the one for your domain.
+    must_not_create:
+      - id: second-coverage-formatter
+        regex: 'def\s+_?(format|print|render)_(coverage|score|percentage)\s*\('
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/services/compliance/compliance_inheritance_service.py
+        reason: format_score is the canonical compliance formatter; coverage_text is the canonical capability coverage formatter
+
   - id: application-control-link-writer
     concept: Writing the link between an application and a control of an adopted framework
     status: active
@@ -1116,6 +1140,26 @@ entries:
     known_exceptions:
       - path: app/services/adm_requirement_service.py
         reason: links an ADM requirement to a solution, a different concept with the same verb
+
+  - id: may-change-the-model
+    concept: Whether a person may change the model (the write guard, the AI chat and routes that ask the write rule themselves)
+    status: active
+    canonical:
+      path: app/core/auth/permissions.py
+      symbols: [may_write, can, can_change_model]
+    reuse: >
+      Ask may_write(user) for "may this person change the model", or may_write(user, object_type=..., action=...) for
+      one kind of record; it reads the permission matrix through can(). The write guard in app/_bootstrap/write_access.py
+      and user_can_write in the AI tool executor both call it. A route that must give its own answer calls
+      refuse_read_only() after its own lookup; a read that saves a derived figure calls commit_unless_read_only().
+      Do not write a second answer from Permission.GENERAL, a role name or a persona.
+    must_not_create:
+      - id: second-write-answer
+        regex: 'def\s+(may_write|user_can_write|can_write_model)\s*\('
+        reason: one rule answers whether a person may change the model
+    known_exceptions:
+      - path: app/modules/ai_chat/tools/executor.py
+        reason: user_can_write loads the acting user by id and calls may_write; it holds no rule of its own
 
   - id: chat-turn-budget
     concept: How long a chat request may wait, whatever a provider sends, and what a Retry says of a change already recorded
@@ -1315,3 +1359,127 @@ entries:
       of the applications that support the capability, then its links to goals, drivers, outcomes or principles,
       then the value streams it serves, then its open risks, and the footer says it was derived. Read the score
       from the service result; do not write a second derivation or a stand-in score for an unrated capability.
+
+  - id: canvas-store
+    concept: What a framework canvas (Business Model Canvas, Lean Canvas and the rest) shows in each box, and the one writer of a box entry
+    status: active
+    canonical:
+      path: app/modules/business_model_canvas/model_service.py
+      symbols: [canvas_contents, organisation_canvas, box_across_canvases, entries, place, add_entry]
+    reuse: >
+      A canvas entry is an element listed on the canvas's view with its box on that view row. Read what a canvas
+      shows with model_service.canvas_contents (the page, GET /business-model/api/<id>, the chat's get_canvas and
+      the chat's canvas answer all do) and write an entry with model_service.add_entry. Do not read the nine
+      block text columns, the profile an older canvas wrote on an element, or the box an imported model names in
+      its properties, and do not construct a view row with a box anywhere else. The text columns are kept only as
+      earlier text.
+    must_not_create:
+      - id: view-row-constructor
+        regex: 'SavedDiagramElement\('
+        scope: [app]
+        suffixes: [.py]
+      - id: block-accessor
+        regex: '\.(get_block|set_block)\('
+        scope: [app]
+        suffixes: [.py]
+      - id: block-text-read
+        regex: '\bcanvas\.(key_partners|key_activities|key_resources|value_propositions|customer_relationships|channels|customer_segments|cost_structure|revenue_streams)\b'
+        scope: [app]
+        suffixes: [.py]
+      - id: legacy-profile-read
+        regex: 'acm_properties.*profile'
+        scope: [app]
+        suffixes: [.py]
+      - id: imported-box-read
+        regex: 'custom_properties.*canvas_block'
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/models/business_model.py
+        reason: the model that owns the block text columns
+      - path: app/models/archimate_core.py
+        reason: the model that defines the view row
+      - path: app/services/archimate_import_service.py
+        reason: the import that writes the box an imported model names; its placement moves to the canonical writer in a later change
+
+  - id: canvas-view
+    concept: The page that draws a framework canvas and the function that says which element is in which box
+    status: active
+    canonical:
+      path: app/templates/components/canvas/_frame.html
+      symbols: [frame]
+    reuse: >
+      The canvas page is business_model/detail.html drawing the components/canvas frame, fed by
+      model_service.canvas_contents through routes._canvas_boxes. Do not add a second canvas page template, and
+      do not write a second function that decides which element is in which box.
+    must_not_create:
+      - id: second-canvas-membership
+        regex: 'def\s+(canvas_membership|box_members|elements_in_box|canvas_box_elements)\s*\('
+        scope: [app]
+        suffixes: [.py]
+      - id: second-canvas-page
+        regex: '{%-?\s*macro\s+(draw_canvas|render_canvas|canvas_page)\s*\('
+
+  - id: risk-store
+    concept: Where a risk is recorded, what it touches, and which risks touch an element
+    status: active
+    canonical:
+      path: app/services/risk_service.py
+      symbols: [create_risk, get_risk, add_risk_link, risks_linked_to, risk_ids_touching_elements, ranked_risks]
+    reuse: >
+      A risk is a row of risks and what it touches is a row of risk_entity_links, both written by
+      risk_service (create_risk takes the links and the organisation and writes them in one transaction).
+      Ask which risks touch an element with risk_ids_touching_elements, and which risks a record has with
+      risks_linked_to. Do not add a row to solution_risks or risk_assessments, build a risk or a link
+      outside risk_service, or read Risk.archimate_element_id as what the risk touches: it is the risk's
+      own mirror.
+    known_exceptions:
+      - path: app/commands/backfill_solution_risk_merge.py
+        reason: the one-off copy of the old table into the register
+      - path: app/commands/seed_demo_company.py
+        reason: demonstration data
+      - path: app/services/sample_company_service.py
+        reason: demonstration data
+      - path: app/models/
+        reason: the model definitions themselves
+    must_not_create:
+      - id: second-solution-risk-row
+        regex: '\bSolutionRisk\('
+        scope: [app]
+        suffixes: [.py]
+      - id: second-risk-assessment-row
+        regex: '\bRiskAssessment\('
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-link-built-outside-the-service
+        regex: '\bRiskEntityLink\('
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-built-outside-the-service
+        regex: '(?<![A-Za-z_.])Risk\('
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-solution-pointer-read
+        regex: 'Risk\.solution_id'
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-element-pointer-read
+        regex: 'Risk\.archimate_element_id\s*(==|\.in_\()'
+        scope: [app]
+        suffixes: [.py]
+
+  - id: risk-link-picker
+    concept: The control that links a risk to an application, capability, solution or programme
+    status: active
+    canonical:
+      path: app/templates/components/risk_link_picker.html
+      symbols: [risk_link_picker, risk_link_picker_script]
+    reuse: >
+      The register's slide-over and the Add Risk dialog both draw risk_link_picker and spread
+      riskLinkPicker() into their Alpine state. Do not write a second search box, type select or chip list
+      for linking a risk.
+    must_not_create:
+      - id: second-link-search
+        regex: 'searchLinkEntities'
+        scope: [app/templates]
+        suffixes: [.html]

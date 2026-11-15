@@ -27,7 +27,12 @@ are recorded as facts. A person is written to the one owner record
 address that belongs to exactly one user of the organisation; a team or a
 GitHub handle is never turned into a person. A primary owner a person recorded
 is never overwritten: the connector queues an ``owner_proposal`` in the approval
-queue instead. Unowned repositories stay unowned.
+queue instead. When no code owner names a person, the commits of the last 90 days are counted
+by author e-mail: an author whose e-mail belongs to exactly one user of the
+organisation is a candidate, and a candidate with more than half of the members'
+commits becomes the primary owner, with the count and the commit range kept as the
+source. Otherwise the candidates (up to three) are kept as suggestions for a person
+to choose from. Unowned repositories stay unowned.
 
 Unmatched repositories become proposals in the approval queue (one per
 repository, never repeated once decided), each with a classification decided by
@@ -75,7 +80,7 @@ import json
 import logging
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
@@ -109,6 +114,8 @@ PAGE_SIZE = 100
 MAX_PAGES = 50  # 5,000 items per listing
 RATE_LIMIT_PER_MINUTE = 80  # 5,000 requests an hour is the authenticated allowance
 MAX_CODEOWNERS_BYTES = 200_000
+COMMIT_WINDOW_DAYS = 90  # the recent commits that name a likely owner
+MAX_SUGGESTED_OWNERS = 3
 
 _ORG_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 _REPO_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
@@ -250,6 +257,105 @@ def default_code_owners(text: str) -> List[str]:
     if rules and all(owners == rules[0][1] for _p, owners in rules):
         return rules[0][1]
     return []
+
+
+def _made_since(commit: Any, start: datetime) -> bool:
+    """Whether a commit record was authored inside the window (a record with no readable date counts)."""
+    detail = commit.get("commit") if isinstance(commit, dict) else None
+    stamp = str(((detail or {}).get("author") or {}).get("date") or "")
+    try:
+        return datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ") >= start
+    except ValueError:
+        return True
+
+
+def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str, Any]:
+    """Who of this organisation made the recent commits of a repository.
+
+    ``commits`` is a page of GitHub commit records. An author counts only when the e-mail
+    on the commit belongs to exactly one user of the organisation; a handle, a team or an
+    address nobody here has is never turned into a person. Returns the repository, the
+    commit range read, the number of commits made by members and the candidates, most
+    commits first, as ``{"user_id", "commits"}``.
+    """
+    from app.models.user import User
+
+    by_email: Dict[str, int] = {}
+    stamps: List[Tuple[str, str]] = []
+    for item in commits or []:
+        detail = item.get("commit") if isinstance(item, dict) else None
+        author = (detail or {}).get("author") or {}
+        email = str(author.get("email") or "").strip().lower()
+        if str(item.get("sha") or "") and author.get("date"):
+            stamps.append((str(author["date"]), str(item["sha"])[:7]))
+        if email:
+            by_email[email] = by_email.get(email, 0) + 1
+    members: Dict[str, List[int]] = {}
+    if by_email:
+        for user in db.session.execute(
+            db.select(User).where(db.func.lower(User.email).in_(list(by_email))).where(User.organization_id == org_id)
+        ).scalars():
+            members.setdefault(user.email.lower(), []).append(user.id)
+    counts: Dict[int, int] = {}
+    for email, ids in members.items():
+        if len(ids) == 1:
+            counts[ids[0]] = counts.get(ids[0], 0) + by_email[email]
+    candidates = sorted(
+        ({"user_id": uid, "commits": n} for uid, n in counts.items()),
+        key=lambda c: (-c["commits"], c["user_id"]),
+    )
+    stamps.sort()
+    return {
+        "repository": repository,
+        "days": COMMIT_WINDOW_DAYS,
+        "oldest": stamps[0][1] if stamps else None,
+        "newest": stamps[-1][1] if stamps else None,
+        "member_commits": sum(counts.values()),
+        "candidates": candidates[:MAX_SUGGESTED_OWNERS],
+    }
+
+
+def commit_leader(summary: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The one candidate with more than half of the members' commits, else None."""
+    candidates = (summary or {}).get("candidates") or []
+    total = (summary or {}).get("member_commits") or 0
+    if candidates and total and candidates[0]["commits"] * 2 > total:
+        return candidates[0]
+    return None
+
+
+def commit_provenance(summary: Dict[str, Any], candidate: Dict[str, Any]) -> str:
+    """The words that say why a person was named owner from the commits."""
+    span = ""
+    if summary.get("oldest") and summary.get("newest"):
+        span = f", commits {summary['oldest']} to {summary['newest']}"
+    return (
+        f"From commit history: {candidate['commits']} of {summary['member_commits']} commits "
+        f"in the last {summary.get('days') or COMMIT_WINDOW_DAYS} days ({summary['repository']}{span})"
+    )
+
+
+def apply_commit_history(org_id, element, component, summary: Dict[str, Any], assigned_by=None) -> bool:
+    """Keep what the commits show on the element and, where one member leads, record that member
+    as the primary owner through the one owner writer. An application that already has a primary
+    owner, however it got one, is left as it is. Returns True when an owner was written."""
+    from app.models.application_owner import ApplicationOwner
+    from app.services.element_ownership_service import set_application_owner
+
+    facts: Dict[str, Any] = {"github_commit_owners": summary}
+    leader = commit_leader(summary)
+    owned = bool(component is not None and ApplicationOwner.query.filter_by(
+        application_id=component.id, organization_id=org_id, ownership_type="primary").first())
+    written = False
+    if leader is not None and component is not None and not owned:
+        record = set_application_owner(
+            component, leader["user_id"], "primary", organization_id=org_id, assigned_by=assigned_by)
+        record.source_table = PROPOSAL_SOURCE
+        facts["github_owner_source"] = {"user_id": leader["user_id"], "text": commit_provenance(summary, leader)}
+        written = True
+    _write_facts(element, facts)
+    db.session.flush()
+    return written
 
 
 def execute_github_proposal(approval, data_service=None) -> Dict[str, Any]:
@@ -428,6 +534,8 @@ def _facts_from_payload(payload) -> Dict[str, Any]:
         facts["github_owning_team"] = payload["owning_team"]
     if payload.get("group"):
         facts["github_group"] = payload["group"]
+    if payload.get("commit_owners"):
+        facts["github_commit_owners"] = payload["commit_owners"]
     return facts
 
 
@@ -588,6 +696,8 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     db.session.flush()
     _write_facts(element, _facts_from_payload(payload))
     _assign_owner_from_payload(org_id, row, payload.get("owners") or [], assigned_by)
+    if payload.get("commit_owners") and not _person_in_org(org_id, payload.get("owners") or []):
+        apply_commit_history(org_id, element, row, payload["commit_owners"], assigned_by)
     if not row.component_type:
         # The connector classified it as a deployable service or application, so it is one from now,
         # derived from GitHub; a missing owner is a gap the ownership screens show, not a reason to hide it.
@@ -1068,6 +1178,7 @@ class _RepositoryEvidence:
         self._dirs: Dict[Tuple[str, str], List[dict]] = {}
         self._texts: Dict[Tuple[str, str], Optional[str]] = {}
         self._derived: Dict[str, Dict[str, Any]] = {}
+        self._histories: Dict[str, Dict[str, Any]] = {}
 
     # ----- reading more of a repository (all cached, all read-only) -------
 
@@ -1274,7 +1385,47 @@ class _RepositoryEvidence:
             facts["github_repository_missing"] = False
 
         changed = _write_facts(element, facts)
-        return self._apply_owner(element, full_name, owners) or changed
+        owned = self._apply_owner(element, full_name, owners)
+        if self._person_for(owners) is None:
+            owned = self._owner_from_commits(element, full_name) or owned
+        return owned or changed
+
+    def _commit_history(self, full_name: str) -> Dict[str, Any]:
+        """The commits of the last 90 days, counted by member (read once per repository)."""
+        if full_name not in self._histories:
+            start = datetime.utcnow() - timedelta(days=COMMIT_WINDOW_DAYS)
+            since = start.strftime("%Y-%m-%dT%H:%M:%SZ")
+            commits: List[dict] = []
+            for page in range(1, MAX_PAGES + 1):
+                response = self.client.get(
+                    f"repos/{full_name}/commits",
+                    params={"since": since, "per_page": PAGE_SIZE, "page": page},
+                    use_cache=False,
+                )
+                if not response.success:
+                    if getattr(response, "status_code", None) in (404, 409):
+                        break  # no such history (an empty repository answers 409)
+                    raise self.connector._failure(response)
+                data = response.data if isinstance(response.data, list) else []
+                inside = [c for c in data if _made_since(c, start)]
+                commits.extend(inside)
+                if len(data) < PAGE_SIZE or len(inside) < len(data):
+                    break
+            else:
+                raise GitHubConnectorError(
+                    f"More than {MAX_PAGES * PAGE_SIZE} commits were listed; the read was stopped")
+            self._histories[full_name] = summarise_commits(self.org_id, full_name, commits)
+        return self._histories[full_name]
+
+    def _owner_from_commits(self, element, full_name: str) -> bool:
+        from app.models.application_portfolio import ApplicationComponent
+
+        component = ApplicationComponent.query.filter_by(
+            archimate_element_id=element.id, organization_id=self.org_id
+        ).first()
+        if component is None:
+            return False
+        return apply_commit_history(self.org_id, element, component, self._commit_history(full_name))
 
     def _person_for(self, owners: List[str]):
         """The one user of the organisation named by an e-mail code owner, else None."""
@@ -1393,6 +1544,7 @@ class _RepositoryEvidence:
 
         commit = self._commit(full_name)
         owners = self._code_owners(full_name, root)
+        history = self._commit_history(full_name) if self._person_for(owners) is None else None
         team = self._owning_team(full_name)
         parent_full = info["parent"]
         parent_name = _title(self.repos[parent_full].get("name") or "") if parent_full in self.repos else None
@@ -1416,6 +1568,7 @@ class _RepositoryEvidence:
                 "parent": parent_full if kind == "component" else None,
                 "parent_name": parent_name if kind == "component" else None,
                 "owners": owners,
+                "commit_owners": history,
                 "owning_team": team,
                 "product_id": self.product_id,
             }

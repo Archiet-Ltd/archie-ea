@@ -3,17 +3,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/provenance.html' import result_footer %}
 
-{% block title %}Portfolio{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Portfolio', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Portfolio{% endblock %}{% block content %}
 <div class="p-6 space-y-6 mx-auto">
 
   {{ page_shell(title='Portfolio', subtitle='Transformation initiatives — budget, health and benefits') }}
@@ -27,7 +17,7 @@
     {% if costs_withheld %}
     <div class="rounded-lg border border-border bg-card p-6 md:col-span-2" data-testid="portfolio-costs-withheld">
       <p class="text-sm font-medium text-muted-foreground">Budget and spend</p>
-      <p class="text-sm mt-3 text-muted-foreground">{{ costs_withheld_text }}</p>
+      <p class="text-sm mt-3 text-muted-foreground">{{ costs_withheld_sentence }}</p>
     </div>
     {% else %}
     <div class="rounded-lg border border-border bg-card p-6">
