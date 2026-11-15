@@ -184,6 +184,6 @@ def test_known_pages_lists_only_what_the_role_may_open_under_its_sidebar_name(ap
 
     with app.test_request_context("/"):
         pages = known_pages(app, Person())
-        shown = {l["label"] for z in get_sidebar_zones(Person()) for l in z["links"]}
+        shown = {link["label"] for z in get_sidebar_zones(Person()) for link in z["links"]}
     assert pages and set(pages.values()) <= shown
     assert not [p for p in pages if p.startswith("/api")]
