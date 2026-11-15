@@ -158,8 +158,14 @@ class RoadmapDataSync:
 
             sync_results = {"created": 0, "updated": 0, "resolved": 0, "errors": []}
 
+            if not org_id:
+                # The gap register holds every organisation's gaps: without an
+                # organisation there is nothing safe to read.
+                sync_results["errors"].append("Gap sync needs an organisation; no gaps were read.")
+                return sync_results
+
             # Get unresolved gaps from gap register
-            query = gap_register_query(org_id) if org_id else Gap.query
+            query = gap_register_query(org_id)
             unresolved_gaps = query.filter(
                 Gap.resolution_status.in_(["open", "in_progress"])
             ).all()
@@ -600,7 +606,10 @@ class RoadmapDataSync:
         """Mark work packages as completed when gaps are resolved"""
         resolved = 0
 
-        query = gap_register_query(org_id) if org_id else Gap.query
+        if not org_id:
+            return resolved
+
+        query = gap_register_query(org_id)
         resolved_gaps = query.filter(Gap.resolution_status == "resolved").all()
 
         for gap in resolved_gaps:

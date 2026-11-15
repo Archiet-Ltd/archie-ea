@@ -22,7 +22,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-from sqlalchemy import or_
+from sqlalchemy import and_, cast, or_
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import joinedload
 
 from app import db
@@ -39,6 +40,7 @@ from app.models import (
 from app.models.application_portfolio import ApplicationComponent
 from app.services.archimate.implementation_migration_service import ImplementationMigrationService
 from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService
+from app.services.archimate_backbone import ensure_archimate_element
 from app.services.decorators import transactional
 from app.services.gap_register_service import create_gap
 from app.services.llm_service import LLMService
@@ -403,7 +405,7 @@ class CapabilityGapAnalysisService:
             for gap_dict in app_val.get("gaps", []):
                 # Create gap in the one gap register (replaces ComplianceGap)
                 # create_gap handles duplicate refusal based on name+org
-                create_gap(
+                _gap, created = create_gap(
                     organization_id=cap.organization_id,
                     name=f"Compliance Gap: {gap_dict['requirement_title']}",
                     description=(
@@ -419,7 +421,8 @@ class CapabilityGapAnalysisService:
                     generation_source="capability_gap_service",
                     auto_generated=True,
                 )
-                gaps_created += 1
+                if created:
+                    gaps_created += 1
 
         db.session.commit()
 
@@ -959,8 +962,10 @@ class CapabilityGapAnalysisService:
             Gap.query.filter(
                 or_(
                     Gap.source_capability_id == capability_id,
-                    Gap.source_table == "compliance_requirement"
-                    and Gap.gap_sub_types.contains({"applies_to_capability_id": capability_id}),
+                    and_(
+                        Gap.source_table == "compliance_requirement",
+                        cast(Gap.gap_sub_types, JSONB).contains({"applies_to_capability_id": capability_id}),
+                    ),
                 )
             )
             .all()
@@ -973,8 +978,15 @@ class CapabilityGapAnalysisService:
         sources: List[int] = []
 
         # The new Gap model tracks source capability via source_capability_id and source_table
+        # source_capability_id is a capability id, not an element id: join the
+        # capability's own ArchiMate element.
         if gap.source_capability_id:
-            sources.append(gap.source_capability_id)
+            capability = db.session.get(BusinessCapability, gap.source_capability_id)
+            capability_element = (
+                ensure_archimate_element(capability) if capability is not None else None
+            )
+            if capability_element is not None:
+                sources.append(capability_element.id)
 
         # Check gap_sub_types for additional source info
         gap_sub_types = gap.gap_sub_types or {}
