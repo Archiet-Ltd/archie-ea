@@ -397,10 +397,11 @@ def test_phone_landing_from_scenarios_shows_priority_actions_in_view(browser, li
 
 
 def test_show_all_preserves_element_parameter(browser, live_server):
-    """Clicking 'Show all N actions' keeps the chosen ?element= parameter in the URL."""
+    """Clicking 'Show all' keeps the chosen element and its impact answer rows."""
     org = create_fresh_org("enterprise_architect")
     suffix = org["suffix"]
     from app import create_app, db
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
     from app.models.implementation_migration import Gap
 
     app = create_app("testing")
@@ -408,30 +409,49 @@ def test_show_all_preserves_element_parameter(browser, live_server):
         for n in range(13):
             db.session.add(Gap(name="Show-all gap %02d %s" % (n, suffix), severity="high",
                                organization_id=org["org_id"]))
+        source = ArchiMateElement(name="Show-all source %s" % suffix, type="application_component",
+                                  layer="application", organization_id=org["org_id"])
+        target = ArchiMateElement(name="Show-all target %s" % suffix, type="application_component",
+                                  layer="application", organization_id=org["org_id"])
+        db.session.add_all([source, target])
         db.session.commit()
+        db.session.add(ArchiMateRelationship(
+            type="serving", source_id=source.id, target_id=target.id,
+            organization_id=org["org_id"],
+        ))
+        db.session.commit()
+        element_id = source.id
         db.session.remove()
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
     page = context.new_page()
     try:
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
-        # Visit the enterprise impact analysis page with an element parameter
-        page.goto(live_server + ENTERPRISE_IMPACT_PAGE + "?element=42", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        # Visit the enterprise impact analysis page with a seeded element
+        page.goto(live_server + ENTERPRISE_IMPACT_PAGE + "?element=%d" % element_id,
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
         # The page should show the prioritised actions (since org has gaps)
         expect(page.get_by_test_id("priority-actions")).to_be_visible()
         assert len(_order(page)) == 10
 
+        # The impact answer should show the target element
+        expect(page.get_by_test_id("impact-answer-row")).to_have_count(1)
+
         # Click "Show all 13 actions"
         page.get_by_role("link", name="Show all 13 actions").click()
-        page.wait_for_url(lambda url: "all_actions=1" in url and "element=42" in url, timeout=PAGE_TIMEOUT)
+        page.wait_for_url(lambda url: "all_actions=1" in url and "element=%d" % element_id in url,
+                          timeout=PAGE_TIMEOUT)
 
-        # The URL should still have element=42
-        assert "element=42" in page.url, "element parameter was dropped: %s" % page.url
+        # The URL should still have the element parameter
+        assert "element=%d" % element_id in page.url, "element parameter was dropped: %s" % page.url
         assert "all_actions=1" in page.url, "all_actions parameter missing: %s" % page.url
 
         # All 13 actions should be shown
         assert len(_order(page)) == 13
+
+        # The impact answer's rows should still be there after show-all
+        expect(page.get_by_test_id("impact-answer-row")).to_have_count(1)
     finally:
         context.close()
 
