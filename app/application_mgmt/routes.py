@@ -14,6 +14,9 @@ from ..models.metrics import ApplicationMetricsSnapshot  # noqa: F401
 import json
 import logging
 import re
+
+from sqlalchemy.exc import ProgrammingError
+from werkzeug.exceptions import NotFound
 from datetime import datetime  # dead-code-ok
 from app.models.archimate_element_types import is_application_kind
 from app.services.cost_visibility import SHARE_FIGURE_KEYS
@@ -1763,10 +1766,16 @@ def _delete_archimate_element(element_id, rel_type="realization"):
             ("values",                               "archimate_element_id"),
         ]
         for table, col in _nullable_refs:
-            db.session.execute(
-                text(f"UPDATE {table} SET {col} = NULL WHERE {col} = :id"),  # noqa: S608
-                {"id": eid},
-            )
+            # A table this installation never created holds nothing that points at the element.
+            try:
+                with db.session.begin_nested():
+                    db.session.execute(
+                        text(f"UPDATE {table} SET {col} = NULL WHERE {col} = :id"),  # noqa: S608
+                        {"id": eid},
+                    )
+            except ProgrammingError as exc:
+                if "does not exist" not in str(exc):
+                    raise
 
         # ------------------------------------------------------------------
         # 6. Finally delete the element itself (CASCADE constraints in DB will
@@ -1780,6 +1789,9 @@ def _delete_archimate_element(element_id, rel_type="realization"):
 
         return jsonify({"success": True})
 
+    except NotFound:
+        db.session.rollback()
+        return jsonify({"success": False, "error": "That element was not found."}), 404
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting ArchiMate element: {str(e)}")
