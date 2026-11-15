@@ -4893,9 +4893,13 @@ def download_zip(solution_id):
     if not gen or not gen.generated_files:
         return jsonify({"error": "Generate code first"}), 400
 
-    # GAP-09: Increment download counter
-    gen.download_count = (gen.download_count or 0) + 1
-    db.session.commit()
+    # GAP-09: Increment download counter. Only a member who may write adds to it, so a read-only
+    # member's download stores nothing.
+    from app.core.auth.permissions import may_write
+
+    if may_write(current_user):
+        gen.download_count = (gen.download_count or 0) + 1
+        db.session.commit()
 
     config = gen.config or {}
     repo_name = config.get("repo_name", f"solution-{solution_id}")

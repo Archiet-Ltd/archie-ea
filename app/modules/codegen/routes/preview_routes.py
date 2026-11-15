@@ -17,7 +17,7 @@ from html import escape
 import secrets
 
 from flask import abort, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.modules.codegen.models import CodegenGeneration, CodegenGenerationHistory
@@ -377,11 +377,14 @@ def preview_status(solution_id):
             started = datetime.fromisoformat(started_at_str)
             elapsed = (datetime.now(timezone.utc) - started).total_seconds()
             if elapsed >= _PREVIEW_TTL_SECONDS:
-                # Auto-expire
-                config = dict(gen.config or {})
-                config["_preview"]["active"] = False
-                gen.config = config
-                db.session.commit()
+                # Auto-expire. Reading reports it expired; only a member who may write stores the change.
+                from app.core.auth.permissions import may_write
+
+                if may_write(current_user):
+                    config = dict(gen.config or {})
+                    config["_preview"] = {**preview, "active": False}
+                    gen.config = config
+                    db.session.commit()
                 return jsonify({"active": False, "expired": True, "has_uml": True})
             minutes_remaining = max(0, int((_PREVIEW_TTL_SECONDS - elapsed) / 60))
         except Exception as _ttl_exc:

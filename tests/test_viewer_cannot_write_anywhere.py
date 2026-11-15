@@ -117,6 +117,7 @@ def test_a_viewer_cannot_bulk_delete_quick_update_or_add_a_requirement(client, d
     viewer = _member(db_session, org_a, "viewer")
     mine = ApplicationComponent.query.filter_by(organization_id=org_a.id).first()
     theirs = ApplicationComponent.query.filter_by(organization_id=org_b.id).first()
+    db_session.commit()
     mine_id, theirs_id = mine.id, theirs.id
     before = _table_counts(db_session)
 
@@ -635,9 +636,17 @@ def test_the_connector_reads_for_every_role_and_hides_every_write_tool(
     db_session.expire_all()
     assert Solution.query.filter_by(name="Should never exist").count() == 0
 
+    from app.modules.oauth_provider.models import OAuthToken
+
+    def active_tokens():
+        db_session.expire_all()
+        return OAuthToken.query.filter_by(user_id=person.id, revoked_at=None).count()
+
+    assert active_tokens() > 0
     login_as(client, person)
     revoked = client.post("/account/manage/connected-assistants/revoke-all")
     assert revoked.status_code in (200, 302), revoked.status_code
+    assert active_tokens() == 0
 
 
 # -- GET routes that used to store tenant data for a viewer ----------------------------------------
@@ -773,3 +782,125 @@ def test_a_viewer_reading_the_phase_h_review_stores_nothing(
     assert read.status_code == 200, read.get_data(as_text=True)[:300]
     db_session.expire_all()
     assert MotivationOutcome.query.count() == 1
+
+
+def test_a_viewer_reading_the_preview_status_and_downloading_the_code_changes_no_row(
+    client, db_session, login_as, two_orgs
+):
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.solution_models import Solution
+    from app.modules.codegen.models import CodegenGeneration
+    from app.modules.codegen.routes.preview_routes import _PREVIEW_TTL_SECONDS
+
+    org_a, _ = two_orgs
+    viewer = _member(db_session, org_a, "viewer")
+    editor = _member(db_session, org_a, "architect")
+    solution = Solution(
+        name="Preview read", organization_id=org_a.id,
+        created_by_id=editor.id, solution_owner=viewer.email,
+    )
+    db_session.add(solution)
+    db_session.commit()
+    started = datetime.now(timezone.utc) - timedelta(seconds=_PREVIEW_TTL_SECONDS + 60)
+    generation = CodegenGeneration(
+        solution_id=solution.id, version=1,
+        config={"_preview": {"active": True, "started_at": started.isoformat()}},
+        generated_files={"app.py": "print('hi')"},
+    )
+    db_session.add(generation)
+    db_session.commit()
+    solution_id, generation_id = solution.id, generation.id
+
+    def stored():
+        db_session.expire_all()
+        row = db_session.get(CodegenGeneration, generation_id)
+        return row.download_count, (row.config or {}).get("_preview", {}).get("active")
+
+    before_counts = _all_table_counts(db_session)
+    before = stored()
+    login_as(client, viewer)
+    status = client.get(f"/solutions/{solution_id}/codegen/preview/status")
+    assert status.status_code == 200, status.get_data(as_text=True)[:300]
+    assert status.get_json()["expired"] is True
+    download = client.get(f"/solutions/{solution_id}/codegen/download")
+    assert download.status_code == 200, download.get_data(as_text=True)[:300]
+    assert download.data[:2] == b"PK"
+    assert stored() == before
+    assert _all_table_counts(db_session) == before_counts
+
+    # A member who may write still stores both.
+    login_as(client, editor)
+    assert client.get(f"/solutions/{solution_id}/codegen/preview/status").get_json()["expired"] is True
+    assert client.get(f"/solutions/{solution_id}/codegen/download").status_code == 200
+    assert stored() == (before[0] + 1, False)
+
+
+def test_a_viewer_reading_the_copilot_insights_stores_nothing_and_an_editor_marks_them_seen(
+    client, db_session, login_as, two_orgs
+):
+    from app.models.copilot_insight import CopilotInsight
+    from app.models.solution_models import Solution
+
+    org_a, _ = two_orgs
+    viewer = _member(db_session, org_a, "viewer")
+    editor = _member(db_session, org_a, "architect")
+    solution = Solution(name="Insights read", organization_id=org_a.id, created_by_id=editor.id)
+    db_session.add(solution)
+    db_session.commit()
+    insight = CopilotInsight(
+        solution_id=solution.id, insight_type="gap", title="Missing owner", body="No owner is named."
+    )
+    db_session.add(insight)
+    db_session.commit()
+    solution_id, insight_id = solution.id, insight.id
+    before = _all_table_counts(db_session)
+
+    login_as(client, viewer)
+    read = client.get(f"/solutions/{solution_id}/copilot-insights")
+    assert read.status_code == 200, read.get_data(as_text=True)[:300]
+    assert [i["title"] for i in read.get_json()["insights"]] == ["Missing owner"]
+    assert _all_table_counts(db_session) == before
+    assert db_session.get(CopilotInsight, insight_id).seen is False
+
+    login_as(client, editor)
+    assert client.get(f"/solutions/{solution_id}/copilot-insights").status_code == 200
+    db_session.expire_all()
+    assert db_session.get(CopilotInsight, insight_id).seen is True
+
+
+def test_a_viewer_of_one_organisation_reads_nothing_of_another_through_the_connector(
+    client, db_session, login_as, two_orgs, app
+):
+    import json as _json
+
+    from app.modules.mcp.tests.test_tools import (
+        _clear_cached_identity,
+        _make_element,
+        _mcp_call,
+        _mint_oauth_token,
+    )
+
+    app.config["MCP_ENABLED"] = True
+    app.config["PUBLIC_BASE_URL"] = "https://test.example.com"
+    org_a, org_b = two_orgs
+    viewer = _member(db_session, org_a, "viewer")
+    mine = _make_element(db_session, org_a.id, "connector-own-marker")
+    theirs = _make_element(db_session, org_b.id, "connector-other-marker")
+    db_session.commit()
+    mine_id, theirs_id = mine.id, theirs.id
+    token = _mint_oauth_token(client, db_session, org_a, viewer, login_as, app=app)
+
+    _clear_cached_identity()
+    own = _mcp_call(client, token, "search_elements", {"query": "connector-own-marker", "limit": 10})
+    assert [row["name"] for row in _json.loads(own["result"]["content"][0]["text"])["data"]] == [
+        "E-connector-own-marker"
+    ]
+    other = _mcp_call(client, token, "search_elements", {"query": "connector-other-marker", "limit": 10})
+    assert _json.loads(other["result"]["content"][0]["text"])["data"] == []
+    assert "connector-other-marker" not in _json.dumps(other)
+
+    own_detail = _mcp_call(client, token, "get_element", {"element_id": mine_id})
+    assert _json.loads(own_detail["result"]["content"][0]["text"])["name"] == "E-connector-own-marker"
+    foreign_detail = _mcp_call(client, token, "get_element", {"element_id": theirs_id})
+    assert "connector-other-marker" not in _json.dumps(foreign_detail)
