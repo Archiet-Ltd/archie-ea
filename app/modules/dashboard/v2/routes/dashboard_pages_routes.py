@@ -64,7 +64,8 @@ def api_capability_heatmap():
         heatmap_data = heatmap_service.get_maturity_heatmap()
         if not costs_visible(current_user):
             # No investment is worked out for a person the one cost rule withholds from.
-            heatmap_data["costs_withheld"] = COSTS_WITHHELD
+            heatmap_data["costs_withheld"] = True
+            heatmap_data["costs_withheld_sentence"] = COSTS_WITHHELD
 
         if request.args.get("group_by", "") == "domain" and costs_visible(current_user):
             investment_by_domain = _aggregate_investment_by_domain()
@@ -191,7 +192,7 @@ def capability_heatmap_page():
         "dashboard/capability_heatmap.html",
         currency_symbol=currency_symbol,
         costs_withheld=not costs_visible(current_user),
-        costs_withheld_text=COSTS_WITHHELD,
+        costs_withheld_sentence=COSTS_WITHHELD,
     )
 
 
@@ -272,12 +273,24 @@ def rationalization_dashboard():
         except Exception:
             stats["roadmap_count"] = 0
 
+        # The one cost rule decides; the page prints what it is given.
+        from flask_login import current_user
+
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        costs_withheld = not costs_visible(current_user)
+        if costs_withheld:
+            stats = withhold_costs(stats)
+            groups = withhold_costs(groups)
+
         return render_template(
             "applications/rationalization.html",
             stats=stats,
             groups=groups,
             runs=runs[:10] if runs else [],
             currency_symbol=currency_symbol,
+            costs_withheld=costs_withheld,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception as e:
         from app import db
@@ -681,7 +694,9 @@ def get_blast_radius(app_id):
         if "error" in blast_radius:
             return jsonify({"success": False, "error": blast_radius["error"]}), 404
 
-        return jsonify({"success": True, "data": blast_radius})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "data": blast_radius}))
     except Exception as e:
         logger.error(
             f"Error calculating blast radius for app {app_id}: {e}", exc_info=True
@@ -922,6 +937,18 @@ def submit_rationalization_assessment():
 def get_tco_cost_tiers():
     """Get TCO cost range tiers for executive reporting."""
     try:
+        # The tiers are bands of what applications cost, so a person the one cost rule withholds from gets none.
+        from flask_login import current_user
+
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        if not costs_visible(current_user):
+            return jsonify({
+                "success": True,
+                "data": [],
+                "summary": withhold_costs({"total_tco": None}),
+                "costs_withheld_sentence": COSTS_WITHHELD,
+            })
         from app.models import ApplicationComponent
         from app.extensions import db
         from sqlalchemy import func

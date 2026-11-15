@@ -1,11 +1,12 @@
 {# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
-{% block title %}Billing & plan{% endblock %}
+{% block title %}Plan and billing{% endblock %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/alert.html' import alert %}
+{% from 'components/fact_list.html' import fact_list %}
 {% from 'components/input.html' import input %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/form_field.html' import form_group %}
@@ -16,9 +17,9 @@
 {% block content %}
 <div class="space-y-6" data-testid="billing-page">
     {{ page_header(
-        title='Billing & plan',
+        title='Plan and billing',
         description=('Your organisation\'s plan, its limits, payment and invoices.' if payment_ready else 'Your organisation\'s plan and its limits.'),
-        breadcrumbs=[{'label': 'Admin', 'href': url_for('admin.index')}, {'label': 'Billing'}]
+        breadcrumbs=[{'label': 'Admin', 'href': url_for('admin.index')}, {'label': 'Plan and billing'}]
     ) }}
 
     {% if error %}
@@ -47,6 +48,9 @@
             {% call card(class='min-w-0') %}{% call card_content(class='p-4') %}
                 <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Plan</p>
                 <p class="text-sm font-semibold" data-testid="billing-current-plan">{{ plan.name }}</p>
+                {% if education %}
+                <p class="text-xs text-muted-foreground mt-1" data-testid="billing-education">{{ education.text }}</p>
+                {% endif %}
                 {% if subscription.billing_interval %}
                 <p class="text-xs text-muted-foreground mt-1">Billed {{ 'annually' if subscription.billing_interval == 'year' else 'monthly' }}</p>
                 {% endif %}
@@ -54,12 +58,12 @@
             {% call card(class='min-w-0') %}{% call card_content(class='p-4') %}
                 <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Status</p>
                 <p class="text-sm font-semibold
-                    {%- if plan.key == 'free' %}text-foreground
+                    {%- if plan.key in ('free', 'education') %}text-foreground
                     {%- elif status_val == 'active' %}text-success-emphasis
                     {%- elif status_val == 'past_due' %}text-warning-emphasis
                     {%- elif status_val == 'cancelled' %}text-destructive-emphasis
                     {%- else %}text-foreground{% endif %}">
-                    {%- if plan.key == 'free' %}Free plan
+                    {%- if plan.key in ('free', 'education') %}Free plan
                     {%- elif status_val == 'past_due' %}Payment overdue
                     {%- elif status_val == 'trialing' and credit and credit.state == 'active' %}Free for 90 days
                     {%- elif status_val == 'trialing' %}Trial
@@ -85,6 +89,18 @@
                 <p class="text-xs text-muted-foreground mt-1">{{ renewal.note }}</p>
                 {% endif %}
             {% endcall %}{% endcall %}
+        </div>
+
+        <div class="mt-4" data-testid="billing-ai-usage">
+            {% call(f) fact_list(items=[
+                {'label': 'AI questions this month', 'key': 'ai-used'},
+                {'label': 'AI allowance', 'key': 'ai-allowance'},
+                {'label': 'AI answers from', 'key': 'ai-provider'}], testid='billing-ai-facts') %}
+                {%- if f.key == 'ai-used' %}{{ ai.used }}
+                {%- elif f.key == 'ai-allowance' %}{% if ai.limit is none %}No limit on your plan{% else %}{{ ai.limit }} a month{% endif %}
+                {%- else %}{% if ai.provider %}Your own {{ ai.provider }} key. {{ ai.provider }} bills your organisation for the questions.{% else %}The built-in AI. Add your own key in <a href="{{ url_for('admin.api_settings') }}" class="text-primary underline">AI settings</a>.{% endif %}
+                {%- endif %}
+            {% endcall %}
         </div>
 
         {% if limits.limit_reached %}

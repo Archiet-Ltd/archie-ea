@@ -55,13 +55,16 @@ def _radar_roles_required(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
         try:
-            role_gate()
+            refusal = role_gate()
+            if refusal is not None:
+                return refusal
         except Forbidden as exc:
             if exc.description == Forbidden.description:
                 raise Forbidden(description=_PERMISSION_DENIED_MESSAGE) from exc
             raise
         return view(*args, **kwargs)
 
+    wrapper.role_guard = getattr(role_gate, "role_guard", None)
     return wrapper
 
 
