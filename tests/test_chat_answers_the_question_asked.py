@@ -126,11 +126,11 @@ def test_a_lookup_that_failed_never_backs_a_claim():
 
 
 def test_a_lookup_about_something_else_does_not_back_a_claim():
-    from app.modules.ai_chat.services.turn_honesty import PARTIAL_SEARCH_NOTE, remove_unbacked_search_claims
+    from app.modules.ai_chat.services.turn_honesty import NO_SEARCH_NOTE, PARTIAL_SEARCH_NOTE, remove_unbacked_search_claims
 
     text = "I searched and found no such element. Nothing is missing from this answer."
     out = remove_unbacked_search_claims(text, [_lookup("payroll", NOTHING)], "who owns the billing ledger")
-    assert "searched" not in out and "Nothing is missing" not in out and NO_SEARCH_NOTE in out
+    assert "searched" not in out and "Nothing is missing" not in out and PARTIAL_SEARCH_NOTE in out and NO_SEARCH_NOTE not in out
 
 
 def test_a_matching_lookup_that_succeeded_keeps_the_claim():
