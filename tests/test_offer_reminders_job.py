@@ -132,9 +132,17 @@ def test_the_reminder_goes_to_the_organisation_whose_credit_ends_then(
     _app, scheduler, _added = _start_scheduler(monkeypatch, app)
     run = scheduler.jobs[REMINDER_JOB]["func"]
 
+    # Another organisation on a shared database may also be near the end of its credit: only this test's own
+    # organisations are looked at.
+    _bystander, owner_c = _organisation_with_credit(db_session, make_org, "alsoending", timedelta(days=days) - timedelta(hours=1))
+    ours = {owner_a.email, owner_b.email}
+
+    def mine():
+        return [m for m in mailbox if ours & set(m[1])]
+
     run()
-    assert len(mailbox) == 1
-    subject, recipients, body = mailbox[0]
+    assert len(mine()) == 1
+    subject, recipients, body = mine()[0]
     assert recipients == [owner_a.email]
     assert owner_b.email not in recipients
     ends = (datetime.utcnow() + timedelta(days=days) - timedelta(hours=1)).strftime("%d %b %Y").lstrip("0")
@@ -146,5 +154,5 @@ def test_the_reminder_goes_to_the_organisation_whose_credit_ends_then(
     assert Notification.query.filter_by(user_id=owner_b.id, event_type="startup_credit_ending").count() == 0
 
     run()
-    assert len(mailbox) == 1
+    assert len(mine()) == 1
     assert Notification.query.filter_by(user_id=owner_a.id, event_type="startup_credit_ending").count() == 1
