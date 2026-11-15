@@ -206,3 +206,44 @@ def test_a_cto_sees_the_cost_lines_and_a_business_architect_is_told_why_not(brow
                 assert "48,000" not in text and "48000" not in text and "Billing ledger" not in text
         finally:
             context.close()
+
+
+WITHHELD = "Cost figures are withheld for your role."
+
+
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
+def test_the_canvas_page_shows_cost_lines_to_a_cto_and_the_reason_to_a_business_architect(
+        browser, live_server, seeded, width, scheme):
+    ids = seed_cost_canvas(seeded["ids"]["org"], "Costed page model")
+    for persona, sees in (("cto", True), ("business_architect", False)):
+        context = browser.new_context(viewport={"width": width, "height": 900}, color_scheme=scheme,
+                                      ignore_https_errors=True)
+        context.set_default_timeout(PAGE_TIMEOUT)
+        context.set_default_navigation_timeout(PAGE_TIMEOUT)
+        page = context.new_page()
+        try:
+            sign_in_as(page, live_server, seeded, persona)
+            page.goto("%s/business-model/%d" % (live_server, ids["canvas"]))
+            box = page.locator("#box-cost-structure + *")
+            expect(box).to_be_visible()
+            box.scroll_into_view_if_needed()
+            text = box.inner_text()
+            shot(page, "cost-page-" + persona, width, scheme)
+            if sees:
+                assert "Billing ledger: 48,000" in text
+                assert "Billing ledger, technology share: 9,000" in text
+                assert "Order portal: 12,000" in text
+                assert WITHHELD not in text
+            else:
+                assert WITHHELD in text
+                assert box.locator("[data-canvas-withheld]").count() == 1
+                assert "48,000" not in text and "12,000" not in text and "9,000" not in text
+                assert "Billing ledger" not in text and "No application costs" not in text
+                assert "48,000" not in page.content()
+            card = ask(page, live_server, COST_QUESTION)
+            shot(page, "cost-chat-" + persona, width, scheme)
+            chat = card.inner_text()
+            assert ("Billing ledger" in chat) is sees
+            assert (WITHHELD in chat) is (not sees)
+        finally:
+            context.close()

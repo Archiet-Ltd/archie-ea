@@ -99,6 +99,8 @@ def _canvas_boxes(canvas):
     """The notes of every box, formatted from the one canvas reader the JSON route and the chat also read."""
     editable = _can_edit()
     contents = model_service.canvas_contents(canvas.organization_id, canvas.id)
+    if not costs_visible(current_user):
+        contents = model_service.withhold_cost_lines(contents)
     boxes = {}
     cost_line_count = 0
     for box in contents["boxes"]:
@@ -111,6 +113,9 @@ def _canvas_boxes(canvas):
                 }
                 for plan in box["prices"]
             ]
+        elif box["costs"] is not None and box["costs"].get("withheld"):
+            boxes[key] = []
+            boxes[key + ":withheld"] = box["empty_reason"]
         elif box["costs"] is not None:
             cost_line_count = box["costs"]["count"]
             boxes[key] = [{"text": line["text"], "href": line["url"]} for line in box["costs"]["lines"]]
