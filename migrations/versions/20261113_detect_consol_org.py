@@ -350,7 +350,7 @@ def upgrade():
 
     if "unified_detection_runs" in present and _present(bind, "users"):
         cross_org = _backfill_detection_runs(bind)
-        print(f"detection org fence: {cross_org} run(s) link applications of more than one organisation; deleted below")
+        print(f"detection org fence: {cross_org} run(s) link applications of more than one organisation; split by organisation")
 
     if "consolidation_list_entries" in present and _present(bind, "application_components"):
         _backfill_consolidation_entries(bind)
