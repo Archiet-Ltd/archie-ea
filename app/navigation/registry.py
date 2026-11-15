@@ -160,6 +160,8 @@ WORK: tuple = (
        children=(
            _l("costs", "Costs", "procurement.spend_analytics", job="3", requires="spend_pages",
               aliases=("Cost", "Spend analytics", "Spend", "Procurement overview", "Vendor spend")),
+           _l("money", "Money", "procurement.money", job="3", requires="spend_pages",
+              aliases=("Cash", "Runway", "Burn", "Revenue", "Money facts")),
            _l("vendors", "Vendors", "unified_applications.vendors", job="3", requires="spend_pages",
               aliases=("Suppliers", "Vendor list")),
            _l("vendor_catalogue", "Vendor catalogue", "unified_applications.vendor_catalogue", job="3",
