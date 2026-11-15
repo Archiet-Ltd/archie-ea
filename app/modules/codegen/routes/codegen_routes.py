@@ -4893,7 +4893,7 @@ def download_zip(solution_id):
     if not gen or not gen.generated_files:
         return jsonify({"error": "Generate code first"}), 400
 
-    # GAP-09: Increment download counter. Only a member who may write adds to it, so a read-only
+    # Increment the download counter. Only a member who may write adds to it, so a read-only
     # member's download stores nothing.
     from app.core.auth.permissions import may_write
 
