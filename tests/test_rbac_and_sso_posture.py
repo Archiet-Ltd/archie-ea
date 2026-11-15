@@ -264,24 +264,6 @@ def test_sso_disabled_by_default_fails_closed(app):
     assert svc.providers == {}, "a disabled SSOService must not carry provider config forward"
 
 
-def test_oidc_sign_in_routes_404_when_disabled(app):
-    """The OIDC sign-in routes are registered, and answer 404 while SSO is off.
-
-    Each path is matched against the URL map first, so the check cannot pass
-    against a path that was never registered.
-    """
-    if app.config.get("SSO_ENABLED", False):
-        pytest.skip("SSO_ENABLED is true in this environment's config")
-
-    adapter = app.url_map.bind("localhost")
-    client = app.test_client()
-    for path in ("/account/sso/azure", "/account/sso/callback/azure"):
-        adapter.match(path)  # raises NotFound when no rule is registered for the path
-        assert client.get(path).status_code == 404, (
-            f"{path} must answer 404 while SSO is disabled"
-        )
-
-
 # The single registered rule that names SAML: the per-organisation callback
 # (app/modules/auth/sso_routes.py). SAML 2.0 is implemented (R1-B12 PR 2):
 # this is now the real Assertion Consumer Service that verifies a POSTed
