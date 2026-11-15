@@ -2,6 +2,8 @@
 console stays free of errors, and nothing the page asks for is missing."""
 import uuid
 
+import os
+
 import pytest
 from playwright.sync_api import expect
 
@@ -75,6 +77,10 @@ def test_journey_page_opens_with_a_clean_console(browser, live_server, seeded, j
         page.wait_for_timeout(1500)
         drawn = page.locator("#journey-arch-diagram")
         expect(drawn).to_contain_text("Calibration Service", timeout=PAGE_TIMEOUT)
+        _frames = os.environ.get("SMALL_FIX_FRAMES_DIR")
+        if _frames:
+            os.makedirs(_frames, exist_ok=True)
+            page.screenshot(path="%s/%s-%d.png" % (_frames, "journey-page", page.viewport_size["width"]), full_page=True)
         assert not problems, problems
     finally:
         context.close()

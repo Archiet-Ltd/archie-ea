@@ -1,5 +1,7 @@
 """A platform administrator presses Discover Apps before saving any Power Platform credentials. The page says, in
 words, that the credentials are missing and to save them first, and the browser console stays quiet."""
+import os
+
 import pytest
 from playwright.sync_api import expect
 
@@ -29,6 +31,10 @@ def test_discover_without_credentials_says_so_on_the_page(browser, live_server, 
         notice = page.locator("#pp-alert")
         expect(notice).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(notice).to_contain_text(SENTENCE)
+        _frames = os.environ.get("SMALL_FIX_FRAMES_DIR")
+        if _frames:
+            os.makedirs(_frames, exist_ok=True)
+            page.screenshot(path="%s/%s-%d.png" % (_frames, "power-platform", page.viewport_size["width"]), full_page=True)
         form_box = page.locator("#tenant_id").bounding_box()
         notice_box = notice.bounding_box()
         assert notice_box["y"] < form_box["y"], "the sentence is not next to the credentials form"

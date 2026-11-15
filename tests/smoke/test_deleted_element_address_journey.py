@@ -3,6 +3,8 @@ on, and the address they were on now answers "not found" with a plain page, at b
 import re
 import uuid
 
+import os
+
 import pytest
 from playwright.sync_api import expect
 
@@ -67,6 +69,10 @@ def test_the_address_of_a_deleted_element_answers_not_found_straight_away(browse
             assert response.status == 404, "%s answered %s after the delete" % (old, response.status)
             body = page.locator("body").inner_text()
             assert body.strip() and not body.lstrip().startswith("{"), "not a plain page: %r" % body[:120]
+        _frames = os.environ.get("SMALL_FIX_FRAMES_DIR")
+        if _frames:
+            os.makedirs(_frames, exist_ok=True)
+            page.screenshot(path="%s/%s-%d.png" % (_frames, "deleted-address", page.viewport_size["width"]), full_page=True)
             assert name not in body and "Neighbour" not in body
     finally:
         _remove_element(ids["record"])

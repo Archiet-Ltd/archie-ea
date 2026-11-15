@@ -1,5 +1,7 @@
 """An architect in an organisation with no elements opens Scenarios. The page says there is nothing to run a scenario on,
 does not run one, and the browser console stays free of errors."""
+import os
+
 import pytest
 from playwright.sync_api import expect
 
@@ -33,6 +35,10 @@ def test_scenarios_in_an_empty_organisation_asks_for_nothing_that_is_missing(bro
         page.wait_for_timeout(2500)
         expect(page.locator("main")).to_contain_text("Your model has no elements yet")
         expect(page.locator("main")).to_contain_text("There is nothing to try a change on")
+        _frames = os.environ.get("SMALL_FIX_FRAMES_DIR")
+        if _frames:
+            os.makedirs(_frames, exist_ok=True)
+            page.screenshot(path="%s/%s-%d.png" % (_frames, "scenarios-empty", page.viewport_size["width"]), full_page=True)
         assert not problems, problems
     finally:
         context.close()
