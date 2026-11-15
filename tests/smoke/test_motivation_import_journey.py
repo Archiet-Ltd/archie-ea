@@ -84,6 +84,8 @@ def test_imported_motivation_relationships_keep_their_modelled_type(
 
         outcome = page.locator("div.rounded-md", has_text="Outcome " + tag)
         constraint = page.locator("div.rounded-md", has_text="Constraint " + tag)
+        expect(outcome.last).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(constraint.last).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(outcome.last).to_contain_text("realization", ignore_case=True, timeout=PAGE_TIMEOUT)
         expect(constraint.last).to_contain_text("influence", ignore_case=True, timeout=PAGE_TIMEOUT)
         panel = page.locator("div.space-y-2", has_text="Outcome " + tag).last
