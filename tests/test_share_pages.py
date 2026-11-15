@@ -89,7 +89,7 @@ def test_a_module_without_a_recording_has_no_share_page_and_no_video_tags(app):
 
 def test_the_sitemap_lists_every_share_page(app):
     with app.test_client() as client:
-        sitemap = client.get("/sitemap.xml").get_data(as_text=True)
+        sitemap = client.get("/sitemap-en.xml").get_data(as_text=True)
     for slug in SLUGS:
         assert "<loc>%s/see/%s</loc>" % (canonical_origin(), slug) in sitemap
 
