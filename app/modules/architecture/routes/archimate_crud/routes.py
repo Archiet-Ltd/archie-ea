@@ -1055,6 +1055,19 @@ def api_layer_counts():
     return jsonify({"counts": counts, "not_on_model_map": not_on_model_map})
 
 
+def _add_part_of(elements):
+    """Say, for each listed element, what it is part of: the application or component that composes or
+    aggregates it, with the page to open when that is an application record."""
+    from app.services.application_kind import wholes_of
+
+    wholes = wholes_of(g.current_org_id, [el.get("archimate_element_id") for el in elements], applications_only=False)
+    for el in elements:
+        el["part_of"] = [
+            {"name": name, "url": url_for("unified_applications.application_detail", id=app_id) if app_id else None}
+            for app_id, name in wholes.get(el.get("archimate_element_id"), [])
+        ]
+
+
 @archimate_crud.route("/api/layer/<layer>/elements")
 @login_required
 def api_layer_elements(layer):
@@ -1189,6 +1202,7 @@ def api_layer_elements(layer):
                     elem_dict = {
                         "id": elem.id,
                         "record_id": elem.id,
+                        "archimate_element_id": ae_id,
                         "name": name,
                         "description": getattr(elem, "description", "")
                         or "",  # model-safety-ok: polymorphic ArchiMate elements
@@ -1243,6 +1257,7 @@ def api_layer_elements(layer):
                 ).count()
                 ae_dict = {
                     "id": ae.id,
+                    "archimate_element_id": ae.id,
                     "name": ae.name or "",
                     "description": ae.description or "",
                     "element_type": ae.type,
@@ -1308,6 +1323,8 @@ def api_layer_elements(layer):
     start = (page - 1) * per_page
     end = start + per_page
     page_elements = all_elements[start:end]
+    if layer == "application":
+        _add_part_of(page_elements)
 
     # Enrich WorkPackage elements with their framework profile (kind, WSJF).
     try:

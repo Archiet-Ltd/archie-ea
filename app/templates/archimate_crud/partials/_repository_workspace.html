@@ -267,6 +267,7 @@
                     <th class="min-w-[150px] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground" :aria-sort="sortBy === 'element_type' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'">
                         <button type="button" @click="toggleSort('element_type')" class="inline-flex h-8 items-center gap-1 rounded-md px-1 hover:text-foreground disabled:pointer-events-none disabled:opacity-50" aria-label="Sort architecture elements by type">Type<i data-lucide="arrow-up-down" class="h-3 w-3" aria-hidden="true"></i></button>
                     </th>
+                    <th x-cloak x-show="activeTab === 'application'" class="min-w-[170px] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Part of</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Source</th>
                     <th class="min-w-[230px] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Documentation</th>
                     <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Relationships</th>
@@ -279,7 +280,7 @@
             <template x-for="group in elementGroups" :key="'group-' + group.type">
                 <tbody class="divide-y divide-border">
                     <tr x-cloak x-show="groupByType" class="bg-muted/20">
-                        <td :colspan="bulkMode ? 8 : 7" class="px-4 py-2">
+                        <td :colspan="(bulkMode ? 8 : 7) + (activeTab === 'application' ? 1 : 0)" class="px-4 py-2">
                             <button type="button" @click="toggleTypeGroup(group.type)" class="inline-flex h-8 items-center gap-2 rounded-md px-1 text-sm font-semibold hover:text-primary disabled:pointer-events-none disabled:opacity-50" :aria-label="(collapsedTypes[group.type] ? 'Expand ' : 'Collapse ') + formatTypeName(group.type) + ' group'">
                                 <i :data-lucide="collapsedTypes[group.type] ? 'chevron-right' : 'chevron-down'" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
                                 <span x-text="formatTypeName(group.type)"></span><span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground" x-text="group.count"></span>
@@ -291,6 +292,12 @@
                             <td x-cloak x-show="bulkMode" class="px-4 py-3"><input type="checkbox" :value="selectionKey(el)" x-model="selectedIds" class="h-4 w-4 rounded border-input" :aria-label="'Select ' + el.name"></td>
                             <td class="px-4 py-3" data-field="element-name"><button type="button" @click="openDetailPanel(el)" class="h-8 max-w-[240px] truncate rounded-md text-left text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50" x-text="el.name" :title="el.name" :aria-label="'Open details for ' + el.name"></button></td>
                             <td class="px-4 py-3" data-field="element-type"><span class="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground" x-text="formatTypeName(el.element_type)"></span></td>
+                            <td x-cloak x-show="activeTab === 'application'" class="px-4 py-3" data-field="element-part-of">
+                                <template x-if="el.part_of && el.part_of.length">
+                                    <span class="text-sm"><template x-for="(whole, index) in el.part_of" :key="index"><span><template x-if="index > 0"><span>, </span></template><template x-if="whole.url"><a :href="whole.url" class="text-primary hover:underline" x-text="whole.name"></a></template><template x-if="!whole.url"><span x-text="whole.name"></span></template></span></template></span>
+                                </template>
+                                <template x-if="!el.part_of || !el.part_of.length"><span class="text-sm text-muted-foreground">Not part of an application</span></template>
+                            </td>
                             <td class="px-4 py-3" data-field="element-source"><span class="text-sm capitalize text-muted-foreground" x-text="el.source || '—'"></span></td>
                             <td class="px-4 py-3" data-field="element-documentation"><p class="max-w-[300px] truncate text-sm text-muted-foreground" :title="el.description || ''" x-text="el.description ? truncate(el.description, 100) : 'No description'"></p></td>
                             <td class="px-4 py-3 text-center" data-field="element-relationships"><span class="text-sm tabular-nums text-muted-foreground" x-text="el.rel_count === null || el.rel_count === undefined ? '—' : el.rel_count"></span></td>

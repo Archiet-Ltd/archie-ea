@@ -81,29 +81,40 @@ def is_application_expression(model=None):
     return kind_expression(model) == APPLICATION
 
 
-def wholes_of(organization_id, element_ids) -> dict:
-    """``{element id: [(application id, name), ...]}``: the applications that compose or aggregate each
-    element. One query for a whole page. The one reading of composition for application parts."""
+def wholes_of(organization_id, element_ids, applications_only=True) -> dict:
+    """``{element id: [(application id or None, name), ...]}``: what composes or aggregates each element,
+    by name. One query for a whole page. The one reading of composition for application parts.
+
+    With ``applications_only`` a whole must be an application record (the rule for a part); without it any
+    model element counts, and ``None`` stands for a whole that has no application record."""
     from app.models.application_portfolio import ApplicationComponent as A
+    from app.models.archimate_core import ArchiMateElement as E
     from app.models.models import ArchiMateRelationship as R
 
     element_ids = [i for i in element_ids if i]
     if not element_ids:
         return {}
-    rows = db.session.execute(
-        db.select(R.target_id, A.id, A.name)
-        .join(A, db.and_(A.archimate_element_id == R.source_id, A.organization_id == organization_id))
+    query = (
+        db.select(R.target_id, A.id, E.name)
+        .select_from(R)
+        .join(E, db.and_(E.id == R.source_id, E.organization_id == organization_id, E.deleted_at.is_(None)))
+        .join(
+            A,
+            db.and_(A.archimate_element_id == R.source_id, A.organization_id == organization_id),
+            isouter=not applications_only,
+        )
         .where(
             R.organization_id == organization_id,
             R.target_id.in_(element_ids),
             func.lower(R.type).in_(PARENT_RELATIONSHIPS),
             R.source_id != R.target_id,
         )
-        .order_by(A.name)
-    ).all()
+        .order_by(E.name)
+    )
     found: dict = {}
-    for target_id, app_id, name in rows:
-        found.setdefault(target_id, []).append((app_id, name))
+    for target_id, app_id, name in db.session.execute(query).all():
+        if (app_id, name) not in found.setdefault(target_id, []):
+            found[target_id].append((app_id, name))
     return found
 
 

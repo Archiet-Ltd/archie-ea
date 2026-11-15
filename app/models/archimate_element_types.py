@@ -1892,7 +1892,7 @@ PLAIN_LANGUAGE_NAMES: dict[str, str] = {
     "Product": "Product",
     # Application layer
     "Application": "Application",
-    "ApplicationComponent": "Application",
+    "ApplicationComponent": "Application component",
     "ApplicationCollaboration": "Application collaboration",
     "ApplicationInterface": "Application interface",
     "ApplicationFunction": "Application function",
