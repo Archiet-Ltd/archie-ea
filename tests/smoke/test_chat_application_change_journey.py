@@ -209,3 +209,41 @@ def test_a_viewer_asking_for_the_same_change_is_refused_in_words(page, live_serv
     assert _description(mine["app_id"]) == "Old description"
     page.goto("%s/applications/%d" % (live_server, mine["app_id"]), wait_until="networkidle", timeout=PAGE_TIMEOUT)
     expect(page.locator("main")).to_contain_text("Old description")
+
+
+def _make_viewer(email):
+    from app import create_app, db
+    from app.models.user import Role, User
+
+    app = create_app("testing")
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        user.role = Role.query.filter_by(name="Viewer").one()
+        user.enterprise_role = None
+        db.session.commit()
+        db.session.remove()
+
+
+@pytest.mark.parametrize("size", [(1440, 900), (390, 844)], ids=["1440", "390"])
+def test_pressing_save_after_losing_the_right_to_edit_says_so_and_changes_nothing(page, live_server, orgs, size):
+    mine, _theirs = orgs
+    page.set_viewport_size({"width": size[0], "height": size[1]})
+    sign_in(page, live_server, mine["emails"][ARCHITECT])
+    open_chat(page, live_server)
+    preview = _send(page, "set %s's description to %s" % (mine["name"], NEW_DESCRIPTION))
+    expect(preview).to_contain_text("Nothing is saved until you press Save")
+
+    # The person's role is changed to read-only while the card is open.
+    _make_viewer(mine["emails"][ARCHITECT])
+    preview.get_by_test_id("application-change-save").click()
+
+    expect(preview).to_contain_text("I have not changed anything", timeout=PAGE_TIMEOUT)
+    expect(preview).to_contain_text("can look at applications but not edit them")
+    expect(preview).not_to_contain_text("could not be saved just now")
+    for text in ("refused", "READ_ONLY", "403"):
+        assert text not in preview.inner_text()
+    assert preview.get_by_test_id("application-change-save").count() == 0
+    _shot(page, "chat-change-save-after-role-lost-%d" % size[0])
+    assert _description(mine["app_id"]) == "Old description"
+    page.goto("%s/applications/%d" % (live_server, mine["app_id"]), wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    expect(page.locator("main")).to_contain_text("Old description")
