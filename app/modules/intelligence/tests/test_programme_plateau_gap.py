@@ -45,6 +45,23 @@ def _relationship(db_session, org_id, source, target, type_="Serving"):
     return rel
 
 
+def _legacy_crossing_relationship(db_session, org_id, source_id, target_id, type_="Serving"):
+    """A relationship row that predates the same-organisation guard.
+
+    The guard refuses to save a crossing row through the model, so a stored row that points
+    at another organisation's element is written with plain SQL: the fences under test exist
+    for rows already in the table.
+    """
+    db_session.execute(
+        db.text(
+            "INSERT INTO archimate_relationships (source_id, target_id, type, organization_id) "
+            "VALUES (:source_id, :target_id, :type, :org_id)"
+        ),
+        {"source_id": source_id, "target_id": target_id, "type": type_, "org_id": org_id},
+    )
+    db_session.flush()
+
+
 def _work_package(
     db_session,
     element,
@@ -99,7 +116,6 @@ def _link(db_session, wp, plateau_id, gap_id):
     """A work package's plateau and gap are ArchiMate relationships from its element
     (realization to the plateau's, association to the gap's). Written directly, so a
     plateau or gap of another organisation can be pointed at for the tenancy tests."""
-    from app.models import ArchiMateRelationship
     from app.models.implementation_migration import Gap, Plateau
     from app.services.archimate_backbone import sync_archimate_element
 
@@ -109,9 +125,8 @@ def _link(db_session, wp, plateau_id, gap_id):
         target = db_session.get(model, row_id)
         sync_archimate_element(target)
         db_session.flush()
-        db_session.add(ArchiMateRelationship(
-            source_id=wp.archimate_element_id, target_id=target.archimate_element_id,
-            type=kind, organization_id=wp.organization_id))
+        _legacy_crossing_relationship(
+            db_session, wp.organization_id, wp.archimate_element_id, target.archimate_element_id, kind)
     db_session.flush()
 
 
@@ -379,7 +394,7 @@ def test_foreign_tenant_elements_are_never_asked_for_a_plateau(
     own = _element(db_session, org_a.id, "OrgAElement", togaf_plateau="Baseline")
     # Org A's own relationship happens to point at org B's element (the
     # dangling cross-tenant pointer the identity map's own fence exists for).
-    _relationship(db_session, org_a.id, app_a, foreign)
+    _legacy_crossing_relationship(db_session, org_a.id, app_a.id, foreign.id)
     _relationship(db_session, org_a.id, app_a, own)
     _work_package(db_session, app_a, name="WP")
     # Read every id before the commit expires the instances, so the test's own reads are not counted.
@@ -406,6 +421,48 @@ def test_foreign_tenant_elements_are_never_asked_for_a_plateau(
     # Nothing the service sent to the database, in any statement, carries the other organisation's element id.
     for statement, parameters in statement_counter.statements:
         assert foreign_id not in _param_values(parameters), statement
+
+
+def test_a_derived_row_naming_a_foreign_element_shows_no_plateau_and_never_asks_for_it(
+    app, db_session, make_org, statement_counter
+):
+    """A derived fact is not liveness-joined, so a row can name an element of another
+    organisation; the identity map leaves it out and its row says no plateau is recorded."""
+    from flask import g
+
+    from app.modules.intelligence.models.derived_relationship import DerivedRelationship
+
+    org_a = make_org("plategap-foreign-derived-a")
+    org_b = make_org("plategap-foreign-derived-b")
+    app_a = _element(db_session, org_a.id, "AppA")
+    foreign = _element(db_session, org_b.id, "OrgBElement", togaf_plateau="Baseline")
+    own = _element(db_session, org_a.id, "OrgAElement", togaf_plateau="Baseline")
+    _relationship(db_session, org_a.id, app_a, own)
+    now = _dt.datetime.utcnow()
+    db_session.add(DerivedRelationship(
+        organization_id=org_a.id, source_element_id=app_a.id, target_element_id=foreign.id,
+        derived_type="Serving", rule_id="R-07", chain=[1, 2],
+        chain_element_ids=[app_a.id, own.id, foreign.id], depth=2, confidence=0.8,
+        provenance="derivation", engine_version="1.2.0", computed_at=now, stale=False))
+    _work_package(db_session, app_a, name="WP")
+    app_a_id, foreign_id, own_id, org_a_id = app_a.id, foreign.id, own.id, org_a.id
+    db_session.commit()
+
+    statement_counter.statements.clear()
+    with app.test_request_context("/"):
+        g.current_org_id = org_a_id
+        result = IntelligenceQueryService.programme_for_element(app_a_id)
+
+    rows = result["work_packages"][0]["affected_rows"]
+    foreign_row = next((r for r in rows if r["element_id"] == foreign_id), None)
+    assert foreign_row is not None  # not vacuous -- the derived row does name the foreign element
+    assert foreign_row["plateau"] is None
+    assert foreign_row["plateau_reason"] == "no_plateau_recorded"
+    own_row = next(r for r in rows if r["element_id"] == own_id)
+    assert own_row["plateau"] == "Baseline"
+    for statement, parameters in statement_counter.statements:
+        if "FROM archimate_elements" in statement and "is_baseline" in statement:
+            assert foreign_id not in _param_values(parameters), statement
 
 
 # --- (4) cross-tenant element id is an honest not-found, not a leak --------
