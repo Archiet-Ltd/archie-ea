@@ -29,7 +29,7 @@ def _commits(*pairs):
     return out
 
 
-def _import(org, name, repository, commits):
+def _import(org, name, repository, commits, summary=None):
     from app import create_app, db
     from app.connectors import github
     from app.models.application_portfolio import ApplicationComponent
@@ -38,7 +38,8 @@ def _import(org, name, repository, commits):
         row = ApplicationComponent(name=name, organization_id=org["org_id"], lifecycle_status="planning")
         db.session.add(row)
         db.session.commit()
-        summary = github.summarise_commits(org["org_id"], repository, commits)
+        if summary is None:
+            summary = github.summarise_commits(org["org_id"], repository, commits)
         github._finish_application(
             org["org_id"], row.id,
             {"repository": repository, "commit": "abc123def456", "evidence_file": "Dockerfile",
@@ -77,7 +78,13 @@ def estate(live_server):
                      _commits((ada, 10), (sam, 10), (stranger, 30)))
     nobody = _import(org, "Billing Hub %s" % tag, "acme/billing-hub-%s" % tag, _commits(("dev@vendor.example", 8)))
     leader = _import(org, "Ledger Core %s" % tag, "acme/ledger-core-%s" % tag, _commits((ada, 15), (sam, 5)))
-    return {"email": org["emails"]["enterprise_architect"], "shared": shared, "nobody": nobody,
+    busy_repo = "acme/monorepo-%s" % tag
+    busy = _import(org, "Monorepo %s" % tag, busy_repo, [], summary={
+        "repository": busy_repo, "days": 90, "oldest": None, "newest": None, "member_commits": 0, "candidates": [],
+        "unavailable": "No owner was suggested: monorepo-%s has too many commits in the last 90 days to name one person from them." % tag})
+    stale = _import(org, "Pay Gateway %s" % tag, "acme/pay-gateway-%s" % tag, _commits((ada, 10), (sam, 10)))
+    return {"busy": busy, "stale": stale, "stale_repo": "acme/pay-gateway-%s" % tag,
+            "email": org["emails"]["enterprise_architect"], "shared": shared, "nobody": nobody,
             "leader": leader, "leader_repo": "acme/ledger-core-%s" % tag, "tag": tag, "names": names, "repo": "acme/archie-ea-%s" % tag}
 
 
@@ -156,3 +163,53 @@ def test_one_clear_leader_is_the_owner_and_the_page_says_where_that_came_from(ar
     architect.reload(wait_until="domcontentloaded")
     expect(architect.get_by_test_id("application-owner")).to_contain_text(ada, timeout=PAGE_TIMEOUT)
     expect(architect.get_by_test_id("owner-source")).to_contain_text("15 of 20 commits")
+
+
+def test_a_repository_with_too_many_commits_keeps_its_application_and_says_why_no_owner_was_named(
+        architect, live_server, estate):
+    reason = ("No owner was suggested: monorepo-%s has too many commits in the last 90 days "
+              "to name one person from them." % estate["tag"])
+    architect.goto("%s/applications/%s" % (live_server, estate["busy"]), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(architect.get_by_test_id("need-owner-reason")).to_have_text(reason, timeout=PAGE_TIMEOUT)
+    assert architect.get_by_test_id("owner-candidates").count() == 0
+    expect(architect.locator("main")).to_contain_text("Monorepo %s" % estate["tag"])
+    _walk(architect, "too-many-commits")
+    architect.reload(wait_until="domcontentloaded")
+    expect(architect.get_by_test_id("need-owner-reason")).to_have_text(reason, timeout=PAGE_TIMEOUT)
+
+
+def test_pressing_make_owner_after_someone_else_became_owner_changes_nothing_and_says_so(
+        architect, live_server, estate):
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.architecture_assistant.property_service import PropertyService
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.user import User
+    from app.services.element_ownership_service import set_application_owner
+
+    ada, sam = estate["names"]["application_manager"], estate["names"]["solution_architect"]
+    architect.goto("%s/applications/%s" % (live_server, estate["stale"]), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(architect.get_by_test_id("owner-candidates")).to_be_visible(timeout=PAGE_TIMEOUT)
+    # While this page is open, a colleague makes Sam the primary owner, with a recorded source.
+    sentence = "From commit history: 10 of 20 commits in the last 90 days (%s)" % estate["stale_repo"]
+    with create_app("testing").app_context():
+        component = db.session.get(ApplicationComponent, estate["stale"])
+        sam_user = User.query.filter(User.first_name == "Sam", User.organization_id == component.organization_id).first()
+        set_application_owner(component, sam_user.id, "primary", organization_id=component.organization_id)
+        element = db.session.get(ArchiMateElement, component.archimate_element_id)
+        PropertyService().merge_element_properties(
+            element, {"github_owner_source": {"user_id": sam_user.id, "text": sentence}}, source="github")
+        db.session.commit()
+        db.session.remove()
+    architect.get_by_role("button", name="Make owner: %s" % ada).click()
+    notice = architect.get_by_text("This application already has a primary owner, %s. Nothing was changed." % sam)
+    expect(notice).to_be_visible(timeout=PAGE_TIMEOUT)
+    owner = architect.get_by_test_id("application-owner")
+    expect(owner).to_contain_text(sam)
+    assert ada not in owner.inner_text()
+    expect(architect.get_by_test_id("owner-source")).to_contain_text(sentence)
+    _walk(architect, "already-has-owner")
+    architect.reload(wait_until="domcontentloaded")
+    expect(architect.get_by_test_id("application-owner")).to_contain_text(sam, timeout=PAGE_TIMEOUT)
+    assert ada not in architect.get_by_test_id("application-owner").inner_text()
+    expect(architect.get_by_test_id("owner-source")).to_contain_text(sentence)
