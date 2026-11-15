@@ -459,9 +459,15 @@ def application_list():
         from app.services import result_footer_service
 
         origins = result_footer_service.application_origins(g.current_org_id, pagination.items)
+        from app.connectors.github_gaps import owner_sources
+
+        # The same recorded source the application's own page reads for "From commit history".
+        owner_origin = owner_sources(pagination.items, owners_by_app)
         footers_by_app = {
             listed.id: result_footer_service.application_footer(
-                listed, owner_names_by_app.get(listed.id), origins=origins)
+                listed, owner_names_by_app.get(listed.id), origins=origins,
+                owner_from_commits=listed.id in owner_origin,
+                owner_picked=bool(owner_origin.get(listed.id, {}).get("picked")))
             for listed in pagination.items
         }
 
