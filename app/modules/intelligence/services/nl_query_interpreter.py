@@ -206,6 +206,29 @@ def _extract_application_for_capabilities(question: str, organization_id: Option
     return None
 
 
+_INSTRUCTION_LEAD = re.compile(
+    r"^\W*(?:please\s+)?(?:run|search|simulate|model|answer|suppose|assume|imagine|consider|pretend|act)\b", re.I)
+_QUESTION_WORD = re.compile(r"\b(?:what|which|who|when|where|how|why)\b", re.I)
+_MOST_WORDS = 24
+
+
+def asks_one_thing(question: str) -> bool:
+    """True for a short, plain question that asks a single thing.
+
+    A catalogue entry or a one-element card answers one thing. A longer message, an
+    instruction ("run a scenario ...", "search the model and ..."), or one that asks
+    three or more things is not that question even when it contains the entry's
+    words, and goes on to be answered as asked, every part of it.
+    """
+    text = (question or "").strip()
+    return not (
+        len(text.split()) > _MOST_WORDS
+        or _INSTRUCTION_LEAD.search(text)
+        or re.search(r"\bscenario\b", text, re.I)
+        or len(_QUESTION_WORD.findall(text)) >= 3
+    )
+
+
 def _top_count(lowered: str) -> int:
     """How many risks a "top five risks" question asks for (five when it gives no number)."""
     found = re.search(r"\btop\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b", lowered)
@@ -218,12 +241,17 @@ def _top_count(lowered: str) -> int:
 
 def _keyword_match(question: str, organization_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
     lowered = question.lower()
+    if not asks_one_thing(question):
+        return None
     application = _extract_application_for_capabilities(question, organization_id)
     if application:
         return {"entry_id": "capabilities_of_application", "params": {"service": application},
                 "confidence": 0.9, "method": "keyword"}
     for keywords, entry_id, params in _KEYWORD_RULES:
         if any(kw in lowered for kw in keywords):
+            if entry_id != "risk_cost" and re.search(r"\brisks?\b", lowered):
+                # A question about risks is not a list of applications or a blast radius.
+                return None
             resolved = dict(params)
             if entry_id == "company_profile":
                 resolved["topic"] = _profile_topic(lowered)
@@ -385,7 +413,7 @@ def interpret(question: str, organization_id: Optional[int] = None, time_limit: 
     at the limit, after which the question maps to nothing. Without it the lookup is unbounded as before.
     """
     match = _keyword_match(question, organization_id)
-    if match is None and _model_configured():
+    if match is None and asks_one_thing(question) and _model_configured():
         match = _llm_match(question, time_limit)
     if match is None:
         return {"entry_id": None, "params": {}, "confidence": 0.0, "method": "none", "title": None}
