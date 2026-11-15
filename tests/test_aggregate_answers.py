@@ -849,6 +849,17 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
                 type="Serving", source_id=caller.id, target_id=foreign.id, organization_id=other.id,
             ))
         db.session.flush()
+        # The day Order Service was added is 24 Oct; it was edited afterwards, which
+        # moves the element's own last-recorded time to now but not the day added.
+        db.session.execute(
+            db.text(
+                "UPDATE entity_history SET valid_from = :day, recorded_at = :day "
+                "WHERE table_name = 'archimate_elements' AND record_id = :id"
+            ),
+            {"day": datetime(2026, 10, 24, 8, 0), "id": small.id},
+        )
+        small.description = "Takes customer orders"
+        db.session.flush()
         db.session.expire_all()
 
         result = run_entry("what_breaks_if_fails", org.id)
@@ -863,6 +874,13 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
 
         undated = SimpleNamespace(source_label=None, source_recorded_at=None, recorded_at=None)
         assert _source_line(undated) == "added by hand"
+
+        # History given by backfill with no known start carries year 1: no day is named.
+        unknown_start = SimpleNamespace(
+            source_label=None, source_recorded_at=None, recorded_at=datetime(2026, 11, 12, 15, 0)
+        )
+        assert _source_line(unknown_start, datetime(1, 1, 1)) == "added by hand"
+        assert _source_line(unknown_start, datetime(2026, 10, 24, 8, 0)) == "added by hand on 24 Oct 2026"
 
     def test_org_a_service_name_never_resolves_to_org_b_element(self, app, db_session, make_org):
         from app.modules.intelligence.services.query_catalogue import run_entry

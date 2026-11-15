@@ -127,3 +127,63 @@ def test_choosing_from_stale_commits_leaves_an_owned_application_with_its_one_ow
     assert response.status_code == 200
     assert "already has a primary owner, Sam Lee" in response.get_data(as_text=True)
     assert [r.user_id for r in primaries(db_session, component)] == [sam.id]
+
+
+def test_a_repository_with_too_many_commits_still_gets_its_application_and_says_why_no_owner(db_session, make_org):
+    from app.connectors import github
+    from app.connectors.github_gaps import _commit_hint, _fact, owner_source_note
+    from app.models.application_portfolio import ApplicationComponent
+
+    org = make_org("win-busy")
+    ada = make_user(db_session, org, "Ada", "Obi")
+    element, component = make_application(db_session, org)
+    now = datetime.utcnow()
+    items = [record(n, ada.email, now - timedelta(seconds=n)) for n in range(5001)]
+
+    summary = read(org, FakeCommitsApi(items))
+    github._finish_application(
+        org.id, component.id,
+        {"repository": REPOSITORY, "commit": "abc123def456", "evidence_file": "Dockerfile",
+         "owners": [], "commit_owners": summary},
+        ada.id)
+
+    reason = "No owner was suggested: %s has too many commits in the last 90 days to name one person from them." % (
+        REPOSITORY.rsplit("/", 1)[-1])
+    assert db_session.get(ApplicationComponent, component.id) is not None
+    assert primaries(db_session, component) == []
+    assert summary["unavailable"] == reason
+    assert _fact(element, "github_owner_source")["text"] == reason
+    assert _fact(element, "github_commit_owners")["repository"] == REPOSITORY
+    assert _commit_hint(element, org.id)["note"] == reason
+    assert owner_source_note(component, []) is None
+
+
+def test_a_person_who_is_already_the_primary_owner_keeps_the_recorded_source(
+    db_session, make_org, client, login_as, monkeypatch
+):
+    from app.connectors import github
+    from app.connectors.github_gaps import _fact
+    from app.modules.applications.routes import owner_routes
+    from app.services.element_ownership_service import DuplicateElementOwner
+    from tests.test_github_owner_from_commits import commits
+
+    org = make_org("win-dup")
+    ada, sam = make_user(db_session, org, "Ada", "Obi"), make_user(db_session, org, "Sam", "Lee")
+    element, component = make_application(db_session, org)
+    github.apply_commit_history(
+        org.id, element, component, github.summarise_commits(org.id, REPOSITORY, commits((ada.email, 6), (sam.email, 6))))
+    from app.modules.architecture_assistant.property_service import PropertyService
+    before = {"user_id": sam.id, "text": "Recorded by a person: Sam Lee owns it."}
+    PropertyService().merge_element_properties(element, {"github_owner_source": before}, source="github")
+    db_session.commit()
+
+    def refuse(**_kwargs):
+        raise DuplicateElementOwner("User already assigned as primary owner")
+
+    monkeypatch.setattr(owner_routes, "set_element_owner", refuse)
+    login_as(client, ada)
+    response = client.post(
+        f"/applications/{component.id}/owners/from-commits", data={"user_id": sam.id}, follow_redirects=True)
+
+    assert response.status_code == 200
+    assert _fact(element, "github_owner_source") == before

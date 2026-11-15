@@ -103,14 +103,19 @@
 
 {# The owner cell: the names the summary counted, or the plain reason there are none. #}
 {% macro owner_cell(app, owner_names, sfx='') %}
+  {%- set entry = imported_gaps.get(app.id) if imported_gaps else none -%}
+  {%- set owner_gaps = (entry.gaps | selectattr('key', 'equalto', 'owner') | list) if entry else [] -%}
+  {%- set reason = owner_gaps[0].note if owner_gaps and owner_gaps[0].note else '' -%}
   {%- if owner_names -%}
     {%- for owner_name in owner_names -%}
     <span class="block text-sm text-foreground" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ owner_name }}</span>
     {%- endfor -%}
   {%- elif can('edit', 'application') -%}
     <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}#owner" class="text-xs text-muted-foreground hover:underline" data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner', 'Assign owner') }}</a>
+    {%- if reason %}<span class="mt-1 block text-xs text-muted-foreground" data-testid="app-owner-reason{{ sfx }}-{{ app.id }}">{{ reason }}</span>{% endif -%}
   {%- else -%}
     <span data-testid="app-owner{{ sfx }}-{{ app.id }}">{{ explained_value('No owner') }}</span>
+    {%- if reason %}<span class="mt-1 block text-xs text-muted-foreground" data-testid="app-owner-reason{{ sfx }}-{{ app.id }}">{{ reason }}</span>{% endif -%}
   {%- endif -%}
 {% endmacro %}
 
