@@ -59,7 +59,14 @@ def estate(db_session, make_org):
     theirs = [_element(db, org_b, "Theirs B %s %02d" % (tag, i)) for i in range(10)]
     for target in theirs:
         _relate(db, org_b, other_hub, target)
-    crossing = _relate(db, org_a, hub, other_hub)
+    # A row that joins two organisations is refused by the model, so it is written with plain SQL, as legacy data holds it.
+    crossing_id = db.session.execute(
+        db.text("INSERT INTO archimate_relationships (organization_id, source_id, target_id, type) "
+                "VALUES (:org, :src, :tgt, 'Serving') RETURNING id"),
+        {"org": org_a.id, "src": hub.id, "tgt": other_hub.id},
+    ).scalar_one()
+    db.session.flush()
+    crossing = SimpleNamespace(id=crossing_id)
     admin = _person(db, org_a, "Administrator")
     db.session.commit()
     return SimpleNamespace(org_a=org_a, org_b=org_b, hub=hub, mine=mine, other_hub=other_hub, theirs=theirs,
