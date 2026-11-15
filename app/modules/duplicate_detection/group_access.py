@@ -4,11 +4,11 @@ The group tables carry no organisation column, so a group belongs to the
 organisation(s) of its member applications. Shared by the v1 and v2 routes.
 """
 
-from flask import g
 from flask_login import current_user
 from sqlalchemy import select
 
 from app import db
+from app.middleware.tenant_context import current_org_id
 from app.middleware.tenant_decorators import is_platform_admin
 from app.models.application_duplicate_detection import duplicate_group_members
 from app.models.application_portfolio import ApplicationComponent
@@ -21,7 +21,7 @@ def group_visible_to_caller(group):
     cannot be shown to be the caller's, so it is refused."""
     if is_platform_admin(current_user):
         return True
-    org_id = getattr(g, "current_org_id", None)
+    org_id = current_org_id()
     if org_id is None:
         return False
     if isinstance(group, UnifiedDuplicateGroup):

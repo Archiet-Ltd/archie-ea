@@ -40,6 +40,8 @@ from app.models.unified_duplicate_detection import (
 from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
     UnifiedDuplicateDetectionService,
     count_organisation_groups,
+    organisation_groups_query,
+    organisation_runs_query,
     describe_group_similarity,
 )
 from app.utils.pagination import safe_int_arg
@@ -219,7 +221,7 @@ def get_simple_runs():
     try:
         limit = min(safe_int_arg('limit', 10, minimum=1, maximum=500), 100)
         runs = (
-            UnifiedDetectionRun.query.filter(UnifiedDetectionRun.organization_id == g.current_org_id)
+            organisation_runs_query()
             .order_by(UnifiedDetectionRun.created_at.desc())
             .limit(limit)
             .all()
@@ -350,16 +352,12 @@ def get_group_savings(group_id):
 def get_simple_statistics():
     """Get application consolidation statistics (simple mode)"""
     try:
-        latest_runs = UnifiedDetectionRun.query.filter(
+        # Runs carry their organisation; the model is not tenant-filtered by the
+        # mixin, so the predicate is explicit.
+        latest_runs = organisation_runs_query().filter(
             UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
             UnifiedDetectionRun.status == "completed",
         )
-        # Runs carry their organisation; the model is not tenant-filtered by the
-        # mixin, so the predicate is explicit.
-        if getattr(g, "current_org_id", None) is not None:
-            latest_runs = latest_runs.filter(
-                UnifiedDetectionRun.organization_id == g.current_org_id
-            )
         latest_run = (
             latest_runs.order_by(UnifiedDetectionRun.created_at.desc())
             .first()
@@ -740,10 +738,8 @@ def get_unified_stats():
     try:
         enterprise_runs = DuplicateDetectionRun.query.count()
         enterprise_groups = DuplicateGroup.query.count()
-        simple_runs = UnifiedDetectionRun.query.filter(
-            UnifiedDetectionRun.organization_id == g.current_org_id
-        ).count()
-        simple_groups = UnifiedDuplicateGroup.query.count()
+        simple_runs = organisation_runs_query().count()
+        simple_groups = organisation_groups_query().count()
         stats = {
             "enterprise": {"total_runs": enterprise_runs, "total_groups": enterprise_groups},
             "simple": {"total_runs": simple_runs, "total_groups": simple_groups},

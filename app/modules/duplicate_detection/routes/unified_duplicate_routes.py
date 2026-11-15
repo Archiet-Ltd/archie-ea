@@ -48,6 +48,8 @@ from ..models.unified_duplicate_detection import (
 from ..services.unified_duplicate_detection_service import (
     UnifiedDuplicateDetectionService,
     count_organisation_groups,
+    organisation_groups_query,
+    organisation_runs_query,
     describe_group_similarity,
 )
 from ..services.unified_duplicate_service import UnifiedDuplicateService
@@ -286,7 +288,7 @@ def get_simple_runs():
     try:
         limit = min(safe_int_arg('limit', 10, minimum=1, maximum=500), 100)
         runs = (
-            UnifiedDetectionRun.query.order_by(UnifiedDetectionRun.created_at.desc())  # tenant-scoping-ok: unserved legacy copy of the v2 route; the served route filters by organisation
+            organisation_runs_query().order_by(UnifiedDetectionRun.created_at.desc())
             .limit(limit)
             .all()
         )
@@ -459,7 +461,7 @@ def get_simple_statistics():
     try:
         # Latest run for simple/fast strategies
         latest_run = (
-            UnifiedDetectionRun.query.filter(  # tenant-scoping-ok: unserved legacy copy of the v2 route; the served route filters by organisation
+            organisation_runs_query().filter(
                 UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
                 UnifiedDetectionRun.status == "completed",
             )
@@ -1066,8 +1068,8 @@ def get_unified_stats():
         enterprise_groups = DuplicateGroup.query.count()
 
         # Get simple stats
-        simple_runs = UnifiedDetectionRun.query.count()  # tenant-scoping-ok: unserved legacy copy of the v2 route; the served route filters by organisation
-        simple_groups = UnifiedDuplicateGroup.query.count()
+        simple_runs = organisation_runs_query().count()
+        simple_groups = organisation_groups_query().count()
 
         stats = {
             "enterprise": {
@@ -1252,7 +1254,7 @@ def ai_analyze():
 def ai_insights(run_id):
     """View AI insights for a specific detection run"""
     try:
-        run = UnifiedDetectionRun.query.get(run_id)  # tenant-scoping-ok: unserved legacy copy of the v2 route; the served route filters by organisation
+        run = organisation_runs_query().filter(UnifiedDetectionRun.id == run_id).first()
         if run is None:
             return render_plain_error(404)
 

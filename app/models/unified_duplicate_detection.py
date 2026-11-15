@@ -16,6 +16,7 @@ from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship, validates
 
 from .. import db
+from ..middleware.tenant_context import current_org_id
 
 
 class DetectionStrategy(str, Enum):
@@ -78,13 +79,6 @@ unified_group_members = db.Table(
 )
 
 
-def signed_in_organisation_id():
-    """The organisation of the request that creates a run (None on the command line)."""
-    from flask import g, has_request_context
-
-    return getattr(g, "current_org_id", None) if has_request_context() else None
-
-
 class UnifiedDetectionRun(db.Model):
     """
     Tracks individual detection run executions.
@@ -132,7 +126,7 @@ class UnifiedDetectionRun(db.Model):
         ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
-        default=signed_in_organisation_id,
+        default=current_org_id,
     )
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

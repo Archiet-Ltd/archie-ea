@@ -54,33 +54,52 @@ def describe_group_similarity(duplicate_type, match_details):
     return f"Average of {pairs} {'pair' if pairs == 1 else 'pairs'}"
 
 
-def count_organisation_groups(high_priority_at=0.85):
-    """(all groups, high-priority groups) of the signed-in organisation.
+def organisation_runs_query():
+    """Detection runs of the signed-in organisation; nothing without one.
+
+    Runs made before the column existed have no organisation and match no one."""
+    from app.middleware.tenant_context import current_org_id
+
+    org_id = current_org_id()
+    if org_id is None:
+        return UnifiedDetectionRun.query.filter(db.false())
+    return UnifiedDetectionRun.query.filter(UnifiedDetectionRun.organization_id == org_id)
+
+
+def organisation_groups_query():
+    """Duplicate groups of the signed-in organisation.
 
     The group tables carry no organisation column, so a group belongs to the
     organisation of its member applications; only groups with two or more of
-    that organisation's live applications count. With no organisation in
-    context (command line) every group is counted."""
-    from flask import g
+    that organisation's live applications count. With no active organisation
+    the query matches nothing."""
     from sqlalchemy import func as sa_func
 
+    from app.middleware.tenant_context import current_org_id
     from app.models.unified_duplicate_detection import unified_group_members
 
-    org_id = getattr(g, "current_org_id", None)
-    members = db.session.query(unified_group_members.c.group_id).join(
-        ApplicationComponent,
-        ApplicationComponent.id == unified_group_members.c.application_id,
-    )
-    if org_id is not None:
-        members = members.filter(ApplicationComponent.organization_id == org_id)
+    org_id = current_org_id()
+    if org_id is None:
+        return UnifiedDuplicateGroup.query.filter(db.false())
     active = (
-        members.group_by(unified_group_members.c.group_id)
+        db.session.query(unified_group_members.c.group_id)
+        .join(
+            ApplicationComponent,
+            ApplicationComponent.id == unified_group_members.c.application_id,
+        )
+        .filter(ApplicationComponent.organization_id == org_id)
+        .group_by(unified_group_members.c.group_id)
         .having(sa_func.count(unified_group_members.c.application_id) >= 2)
         .subquery()
     )
-    groups = UnifiedDuplicateGroup.query.filter(
+    return UnifiedDuplicateGroup.query.filter(
         UnifiedDuplicateGroup.id.in_(db.session.query(active.c.group_id))
     )
+
+
+def count_organisation_groups(high_priority_at=0.85):
+    """(all groups, high-priority groups) of the signed-in organisation."""
+    groups = organisation_groups_query()
     high = groups.filter(
         db.or_(
             UnifiedDuplicateGroup.similarity_score >= high_priority_at,
@@ -597,9 +616,9 @@ class UnifiedDuplicateDetectionService:
         the organisation of its member applications. With no organisation in
         context (command line) every group is cleared, as before.
         """
-        from flask import g
+        from app.middleware.tenant_context import current_org_id
 
-        org_id = getattr(g, "current_org_id", None)
+        org_id = current_org_id()
         if org_id is None:
             db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: no organisation in context (command line)
             UnifiedDuplicateGroup.query.delete()
@@ -1433,11 +1452,7 @@ class UnifiedDuplicateDetectionService:
                 enterprise_data = []
 
             if mode == "simple" or mode == "all":
-                from flask import g
-
-                run_query = UnifiedDetectionRun.query
-                if getattr(g, "current_org_id", None) is not None:
-                    run_query = run_query.filter(UnifiedDetectionRun.organization_id == g.current_org_id)
+                run_query = organisation_runs_query()
                 simple_runs = run_query.all()
                 simple_data = [
                     {

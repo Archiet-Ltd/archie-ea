@@ -324,3 +324,60 @@ def test_an_organisation_that_never_ran_detection_has_no_last_detection(
     login_as(client, quiet_user)
     body = client.get("/duplicate-detection/simple/api/statistics").get_json()
     assert body["latest_run"] is None
+
+
+def _two_organisations_with_runs(db_session, tenant_ctx, world):
+    _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
+    _apps(db_session, world["other"], "Payroll Hub", "Payroll Hub Copy")
+    _run_detection(tenant_ctx, world["own"], 0.50, score=0.53)
+    _run_detection(tenant_ctx, world["other"], 0.50, score=0.90)
+    db_session.commit()
+
+
+def test_reads_with_no_active_organisation_return_nothing(db_session, tenant_ctx, world):
+    from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
+        count_organisation_groups,
+    )
+    from app.modules.duplicate_detection.services.unified_duplicate_service import (
+        UnifiedDuplicateService,
+    )
+
+    _two_organisations_with_runs(db_session, tenant_ctx, world)
+    with tenant_ctx(None):
+        assert UnifiedDuplicateService.get_runs() == []
+        stats = UnifiedDuplicateService.get_statistics()
+        assert stats["latest_run"] is None
+        assert stats["total_runs"] == 0
+        assert (stats["total_groups"], stats["pending_groups"]) == (0, 0)
+        assert (stats["resolved_groups"], stats["ignored_groups"]) == (0, 0)
+        assert stats["total_potential_savings"] == 0
+        assert count_organisation_groups() == (0, 0)
+    with tenant_ctx(world["own"].id):
+        run_id = UnifiedDuplicateService.get_runs()[0]["id"]
+    with tenant_ctx(None):
+        assert UnifiedDuplicateService.get_run(run_id) is None
+
+
+def test_statistics_count_only_the_organisations_own_groups_and_agree_with_the_list(
+    db_session, tenant_ctx, login_as, client, world
+):
+    from app.modules.duplicate_detection.services.unified_duplicate_service import (
+        UnifiedDuplicateService,
+    )
+
+    _two_organisations_with_runs(db_session, tenant_ctx, world)
+    for org in (world["own"], world["other"]):
+        with tenant_ctx(org.id):
+            stats = UnifiedDuplicateService.get_statistics()
+            assert stats["total_groups"] == len(_groups_of(org)) == 1
+            assert stats["pending_groups"] == 1
+            assert stats["resolved_groups"] == 0
+            assert stats["total_runs"] == 1
+            assert stats["latest_run"]["id"] == UnifiedDuplicateService.get_runs()[0]["id"]
+
+    own_user = _user(db_session, world["own"])
+    db_session.commit()
+    login_as(client, own_user)
+    body = client.get("/duplicate-detection/simple/api/statistics").get_json()
+    listing = client.get("/duplicate-detection/simple/groups").get_json()
+    assert body["total_groups"] == len(listing["groups"]) == 1

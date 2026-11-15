@@ -18,11 +18,14 @@ from sqlalchemy.exc import OperationalError
 from app import db
 from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_duplicate_detection import (
-    signed_in_organisation_id,
     GroupStatus,
     UnifiedDetectionRun,
     UnifiedDuplicateGroup,
     unified_group_members,
+)
+from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
+    organisation_groups_query,
+    organisation_runs_query,
 )
 from app.services.detection_strategies import (
     DetectionStrategy,
@@ -371,10 +374,7 @@ class UnifiedDuplicateService:
         cls, status: Optional[str] = None, strategy: Optional[str] = None, limit: int = 10
     ) -> List[Dict[str, Any]]:
         """Get recent detection runs"""
-        query = UnifiedDetectionRun.query
-        org_id = signed_in_organisation_id()
-        if org_id is not None:
-            query = query.filter(UnifiedDetectionRun.organization_id == org_id)
+        query = organisation_runs_query()
 
         if status:
             query = query.filter_by(status=status)
@@ -387,11 +387,7 @@ class UnifiedDuplicateService:
     @classmethod
     def get_run(cls, run_id: int) -> Optional[Dict[str, Any]]:
         """Get a single detection run by ID"""
-        run = UnifiedDetectionRun.query.filter(UnifiedDetectionRun.id == run_id)
-        org_id = signed_in_organisation_id()
-        if org_id is not None:
-            run = run.filter(UnifiedDetectionRun.organization_id == org_id)
-        run = run.first()
+        run = organisation_runs_query().filter(UnifiedDetectionRun.id == run_id).first()
         if run:
             result = run.to_dict()
             result["groups"] = [g.to_dict() for g in run.groups]
@@ -403,25 +399,25 @@ class UnifiedDuplicateService:
     @classmethod
     def get_statistics(cls) -> Dict[str, Any]:
         """Get overall duplicate detection statistics"""
-        total_groups = UnifiedDuplicateGroup.query.count()
-        pending_groups = UnifiedDuplicateGroup.query.filter_by(
-            status=GroupStatus.PENDING.value
+        groups = organisation_groups_query()
+        total_groups = groups.count()
+        pending_groups = groups.filter(
+            UnifiedDuplicateGroup.status == GroupStatus.PENDING.value
         ).count()
-        resolved_groups = UnifiedDuplicateGroup.query.filter_by(
-            status=GroupStatus.RESOLVED.value
+        resolved_groups = groups.filter(
+            UnifiedDuplicateGroup.status == GroupStatus.RESOLVED.value
+        ).count()
+        ignored_groups = groups.filter(
+            UnifiedDuplicateGroup.status == GroupStatus.IGNORED.value
         ).count()
 
-        # Get latest run
-        org_id = signed_in_organisation_id()
-        runs = UnifiedDetectionRun.query
-        if org_id is not None:
-            runs = runs.filter(UnifiedDetectionRun.organization_id == org_id)
+        runs = organisation_runs_query()
         latest_run = runs.order_by(UnifiedDetectionRun.created_at.desc()).first()
 
-        # Calculate total potential savings
+        # Potential savings of this organisation's groups still waiting for a decision
         total_savings = (
-            db.session.query(db.func.sum(UnifiedDuplicateGroup.estimated_savings))
-            .filter(UnifiedDuplicateGroup.status == GroupStatus.PENDING.value)
+            groups.filter(UnifiedDuplicateGroup.status == GroupStatus.PENDING.value)
+            .with_entities(db.func.sum(UnifiedDuplicateGroup.estimated_savings))
             .scalar()
             or 0
         )
@@ -430,9 +426,7 @@ class UnifiedDuplicateService:
             "total_groups": total_groups,
             "pending_groups": pending_groups,
             "resolved_groups": resolved_groups,
-            "ignored_groups": UnifiedDuplicateGroup.query.filter_by(
-                status=GroupStatus.IGNORED.value
-            ).count(),
+            "ignored_groups": ignored_groups,
             "total_potential_savings": float(total_savings),
             "latest_run": latest_run.to_dict() if latest_run else None,
             "total_runs": runs.count(),
