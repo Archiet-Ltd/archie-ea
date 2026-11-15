@@ -227,3 +227,15 @@ def test_the_enterprise_address_pages_and_sorts_the_same_relationships(page, liv
     _sort_by(page, "Target", "Descending")
     assert "Mine %s 45" % tag in _row_texts(page)[0]
     assert "Theirs %s" % tag not in page.content()
+
+
+def test_the_sorted_column_header_is_fully_readable_without_sideways_scrolling(page, live_server, estate):
+    page.goto(live_server + "/architecture/relationships", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    _sort_by(page, "Target", "Descending")
+    header = page.get_by_role("columnheader", name="Target")
+    label = header.locator("span", has_text="Target").first.bounding_box()
+    box = page.locator("[data-slot=table-container]").bounding_box()
+    assert label["x"] >= box["x"] - 1 and label["x"] + label["width"] <= box["x"] + box["width"] + 1, (
+        "the Target header is cut off by its container: label %r, container %r" % (label, box))
+    assert header.evaluate("el => el.scrollWidth <= el.clientWidth + 1"), "the Target header text is clipped"
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "the page scrolls sideways"

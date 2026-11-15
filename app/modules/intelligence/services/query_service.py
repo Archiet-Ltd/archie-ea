@@ -663,6 +663,7 @@ def relationship_fence_clause(org_id: Optional[int], *, direction: str = "both")
 
 
 RELATIONSHIP_SORTS = ("source", "type", "target")
+RELATIONSHIP_PAGE_SIZES = (10, 20, 25, 30, 40, 50)
 
 
 def relationship_sort_args(args) -> tuple:

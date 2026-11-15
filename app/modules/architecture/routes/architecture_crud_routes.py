@@ -28,6 +28,7 @@ from app.models.archimate_core import (
     ArchiMateRelationship as Relationship,
 )
 from app.modules.intelligence.services.query_service import (
+    RELATIONSHIP_PAGE_SIZES,
     filter_relationships_by_org,
     relationship_sort_args,
     relationships_page,
@@ -323,7 +324,7 @@ def list_relationships():
     """
     page = safe_int_arg('page', 1, minimum=1)
     per_page = request.args.get("per_page", 20, type=int)
-    if per_page not in (10, 20, 25, 30, 40, 50):
+    if per_page not in RELATIONSHIP_PAGE_SIZES:
         per_page = 20
 
     # An address that names one relationship ("Open relationship record" in an
@@ -337,6 +338,7 @@ def list_relationships():
 
     return render_template(
         "architecture/relationships.html",
+        relationship_page_sizes=RELATIONSHIP_PAGE_SIZES,
         relationships=relationships,
         total=total,
         page=page,

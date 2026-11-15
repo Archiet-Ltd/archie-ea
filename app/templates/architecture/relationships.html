@@ -18,7 +18,7 @@
       {{ ui.label(text='Rows per page', attrs={'for': 'relationships-per-page'}) }}
       {% call native_select_wrapper(class='w-[72px]') %}
         {% call native_select(size='sm', name='per_page', id='relationships-per-page') %}
-          {% for opt in [10, 20, 25, 30, 40, 50] %}{{ native_select_option(text=opt|string, value=opt|string, selected=(opt == per_page)) }}{% endfor %}
+          {% for opt in relationship_page_sizes %}{{ native_select_option(text=opt|string, value=opt|string, selected=(opt == per_page)) }}{% endfor %}
         {% endcall %}
       {% endcall %}
       {{ ui.button(text='Apply', type='submit', variant='outline', size='sm') }}
@@ -51,13 +51,13 @@
         <a class="text-foreground underline underline-offset-4" href="{{ url_for(request.endpoint) }}">Show all relationships</a>
     </p>
     {% endif %}
-    {% call(rel) list_table(rows=relationships, columns=[{'label': 'Source', 'sorted': (sort_dir if sort == 'source' else none), 'sort_hrefs': {'asc': _sort_to('source', 'asc'), 'desc': _sort_to('source', 'desc')}}, {'label': 'Relationship', 'sorted': (sort_dir if sort == 'type' else none), 'sort_hrefs': {'asc': _sort_to('type', 'asc'), 'desc': _sort_to('type', 'desc')}}, {'label': 'Target', 'sorted': (sort_dir if sort == 'target' else none), 'sort_hrefs': {'asc': _sort_to('target', 'asc'), 'desc': _sort_to('target', 'desc')}}],
+    {% call(rel) list_table(rows=relationships, columns=[{'label': 'Source', 'class': 'px-2 sm:px-4 whitespace-normal', 'sorted': (sort_dir if sort == 'source' else none), 'sort_hrefs': {'asc': _sort_to('source', 'asc'), 'desc': _sort_to('source', 'desc')}}, {'label': 'Relationship', 'class': 'px-2 sm:px-4 whitespace-normal', 'sorted': (sort_dir if sort == 'type' else none), 'sort_hrefs': {'asc': _sort_to('type', 'asc'), 'desc': _sort_to('type', 'desc')}}, {'label': 'Target', 'class': 'px-2 sm:px-4 whitespace-normal', 'sorted': (sort_dir if sort == 'target' else none), 'sort_hrefs': {'asc': _sort_to('target', 'asc'), 'desc': _sort_to('target', 'desc')}}],
                             caption='Relationships between architecture elements', testid='relationships-table', row_testid='relationship-row',
                             toolbar=false, page_size=per_page, server_pagination=_pager, row_id_prefix='relationship-',
                             empty_message='No relationships found.') %}
-      {% call table_cell(class='font-medium') %}{{ rel.source_name or ('#' ~ rel.source_id) }}{% endcall %}
-      {% call table_cell(class='text-muted-foreground') %}{{ rel.type|default('—') }}{% endcall %}
-      {% call table_cell(class='font-medium') %}{{ rel.target_name or ('#' ~ rel.target_id) }}{% endcall %}
+      {% call table_cell(class='px-2 sm:px-4 whitespace-normal break-words font-medium') %}{{ rel.source_name or ('#' ~ rel.source_id) }}{% endcall %}
+      {% call table_cell(class='px-2 sm:px-4 whitespace-normal break-words text-muted-foreground') %}{{ rel.type|default('—') }}{% endcall %}
+      {% call table_cell(class='px-2 sm:px-4 whitespace-normal break-words font-medium') %}{{ rel.target_name or ('#' ~ rel.target_id) }}{% endcall %}
     {% endcall %}
 </div>
 {% endblock %}
