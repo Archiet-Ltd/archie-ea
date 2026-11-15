@@ -1218,17 +1218,29 @@ class CommandParserService:
 
         if target_domain in ("general", "gap_analysis"):
             try:
-                from app.models.capability_gap_analysis import CapabilityGapDetail
+                from app.models.implementation_migration import Gap
+                from app.services.gap_register_service import gap_register_query
+                from flask import g
 
-                metrics["Identified Gaps"] = CapabilityGapDetail.query.count()
+                org_id = getattr(g, 'current_org_id', None)
+                if org_id:
+                    metrics["Identified Gaps"] = gap_register_query(org_id).count()
+                else:
+                    metrics["Identified Gaps"] = Gap.query.count()
             except Exception:
                 metrics["Identified Gaps"] = "unavailable"
 
         if target_domain == "compliance":
             try:
-                from app.models.compliance_models import ComplianceGap
+                from app.models.implementation_migration import Gap
+                from app.services.gap_register_service import gap_register_query
+                from flask import g
 
-                metrics["Compliance Gaps"] = ComplianceGap.query.count()
+                org_id = getattr(g, 'current_org_id', None)
+                if org_id:
+                    metrics["Compliance Gaps"] = gap_register_query(org_id).filter(Gap.gap_type == 'compliance').count()
+                else:
+                    metrics["Compliance Gaps"] = Gap.query.filter(Gap.gap_type == 'compliance').count()
             except Exception:
                 metrics["Compliance Gaps"] = "unavailable"
 

@@ -13,11 +13,12 @@ from sqlalchemy import text  # dead-code-ok
 
 from app import db
 from app.models.roadmap_models import (  # dead-code-ok
-    ImplementationGap,
     PlanningDeliverable,
     RoadmapAudit,
     RoadmapWorkPackage,
 )
+from app.models.implementation_migration import Gap
+from app.services.gap_register_service import gap_register_query
 
 # Aliases for backwards compatibility
 Deliverable = PlanningDeliverable
@@ -145,7 +146,7 @@ class RoadmapDataSync:
             logger.error(f"Error in application sync: {e}")
             raise
 
-    def sync_gaps_to_initiatives(self) -> Dict[str, Any]:
+    def sync_gaps_to_initiatives(self, org_id: int = None) -> Dict[str, Any]:
         """
         Synchronize implementation gaps with work package initiatives
 
@@ -157,9 +158,10 @@ class RoadmapDataSync:
 
             sync_results = {"created": 0, "updated": 0, "resolved": 0, "errors": []}
 
-            # Get unresolved gaps
-            unresolved_gaps = ImplementationGap.query.filter(
-                ImplementationGap.resolution_status.in_(["open", "in_progress"])
+            # Get unresolved gaps from gap register
+            query = gap_register_query(org_id) if org_id else Gap.query
+            unresolved_gaps = query.filter(
+                Gap.resolution_status.in_(["open", "in_progress"])
             ).all()
 
             for gap in unresolved_gaps:
@@ -185,7 +187,7 @@ class RoadmapDataSync:
                     sync_results["errors"].append(error_msg)
 
             # Mark resolved gaps as completed
-            resolved = self._sync_resolved_gaps()
+            resolved = self._sync_resolved_gaps(org_id)
             sync_results["resolved"] = resolved
 
             logger.info(f"Gap sync completed: {sync_results}")
@@ -333,7 +335,7 @@ class RoadmapDataSync:
             logger.error(f"Error in work package deleted sync: {e}")
             raise
 
-    def perform_full_sync(self) -> Dict[str, Any]:
+    def perform_full_sync(self, org_id: int = None) -> Dict[str, Any]:
         """Perform complete synchronization across all entities"""
         try:
             self.start_sync_batch(1, "Full synchronization")
@@ -359,7 +361,7 @@ class RoadmapDataSync:
             full_sync_results["applications"] = self.sync_applications_to_deliverables()
 
             # Sync gaps
-            full_sync_results["gaps"] = self.sync_gaps_to_initiatives()
+            full_sync_results["gaps"] = self.sync_gaps_to_initiatives(org_id)
 
             # Sync vendor roadmaps
             full_sync_results["vendor_roadmaps"] = self.sync_vendor_roadmaps()
@@ -490,7 +492,7 @@ class RoadmapDataSync:
 
         return updated
 
-    def _create_gap_work_package(self, gap: ImplementationGap):
+    def _create_gap_work_package(self, gap: Gap):
         """Create work package from gap"""
         wp = ImplementationWorkPackage(
             name=f"Resolve {gap.gap_type} Gap: {gap.name}",
@@ -513,7 +515,7 @@ class RoadmapDataSync:
         db.session.commit()
 
     def _update_gap_work_package(
-        self, wp: ImplementationWorkPackage, gap: ImplementationGap
+        self, wp: ImplementationWorkPackage, gap: Gap
     ) -> bool:
         """Update work package from gap"""
         updated = False
@@ -594,11 +596,12 @@ class RoadmapDataSync:
 
         return archived
 
-    def _sync_resolved_gaps(self) -> int:
+    def _sync_resolved_gaps(self, org_id: int = None) -> int:
         """Mark work packages as completed when gaps are resolved"""
         resolved = 0
 
-        resolved_gaps = ImplementationGap.query.filter(ImplementationGap.resolution_status == "resolved").all()
+        query = gap_register_query(org_id) if org_id else Gap.query
+        resolved_gaps = query.filter(Gap.resolution_status == "resolved").all()
 
         for gap in resolved_gaps:
             wp = ImplementationWorkPackage.query.filter_by(
@@ -797,7 +800,7 @@ class RoadmapDataSync:
         mapping = {"critical": "critical", "high": "high", "medium": "medium", "low": "low"}
         return mapping.get(importance, "medium")
 
-    def _infer_capability_from_gap(self, gap: ImplementationGap) -> str:
+    def _infer_capability_from_gap(self, gap: Gap) -> str:
         """Infer capability from gap"""
         if gap.source_capability_id:
             capability = UnifiedCapability.query.get(gap.source_capability_id)
