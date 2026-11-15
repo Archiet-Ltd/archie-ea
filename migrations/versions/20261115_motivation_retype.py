@@ -9,6 +9,11 @@ allowed goes back to that type. The note stays, as the history of what happened.
 
 Only rows whose two elements are motivation elements of the pair, in the same
 organisation as the relationship, are changed; nothing moves across organisations.
+Realization stored in the backwards direction (from a goal to an outcome, principle,
+requirement or constraint, or from a principle to a requirement or constraint) is no
+longer in the matrix; those rows become associations carrying the "As modelled:
+Realization." note, the form an import gives them today.
+
 Running it twice changes nothing the second time.
 
 The downgrade turns the same rows (type and note agree, motivation pair) back into
@@ -33,6 +38,10 @@ _REALIZING = (
     ("Outcome", "Goal"), ("Principle", "Goal"), ("Principle", "Outcome"),
     ("Requirement", "Goal"), ("Requirement", "Outcome"), ("Requirement", "Principle"),
     ("Constraint", "Goal"), ("Constraint", "Outcome"), ("Constraint", "Principle"),
+)
+_BACKWARDS = (
+    ("Goal", "Outcome"), ("Goal", "Principle"), ("Goal", "Requirement"),
+    ("Goal", "Constraint"), ("Principle", "Requirement"), ("Principle", "Constraint"),
 )
 
 
@@ -60,8 +69,29 @@ def _move(bind, from_type, to_type, note_type):
     )
 
 
+def _soften_backwards(bind):
+    pair_sql = ", ".join(f"('{a}', '{b}')" for a, b in _BACKWARDS)
+    bind.exec_driver_sql(
+        f"""
+        UPDATE archimate_relationships r
+           SET type = 'association',
+               description = CASE
+                   WHEN r.description LIKE '%%As modelled: Realization.%%' THEN r.description
+                   ELSE TRIM(COALESCE(r.description, '') || ' As modelled: Realization.')
+               END
+          FROM archimate_elements s, archimate_elements t
+         WHERE s.id = r.source_id AND t.id = r.target_id
+           AND r.type = 'realization'
+           AND (s.type, t.type) IN ({pair_sql})
+           AND s.organization_id IS NOT DISTINCT FROM r.organization_id
+           AND t.organization_id IS NOT DISTINCT FROM r.organization_id
+        """
+    )
+
+
 def upgrade():
     bind = op.get_bind()
+    _soften_backwards(bind)
     for note_type in ("realization", "influence"):
         _move(bind, "association", note_type, note_type)
 

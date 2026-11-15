@@ -104,3 +104,40 @@ def test_downgrade_restores_the_association(db_session, seeded):
     for org in orgs:
         assert rows[org.id]["motivation"].type == "association"
         assert rows[org.id]["influence"].type == "association"
+
+
+def _realization(db_session, org, source, target):
+    rel = ArchiMateRelationship(
+        type="realization",
+        source_id=source.id,
+        target_id=target.id,
+        description="Agreed in workshop.",
+        organization_id=org.id,
+    )
+    db_session.add(rel)
+    db_session.flush()
+    return rel
+
+
+def test_realization_stored_backwards_becomes_an_association_with_its_note_once(db_session, make_org):
+    orgs = [make_org("backwards"), make_org("backwards")]
+    rows = {}
+    for org in orgs:
+        goal = _element(db_session, org, "Goal", f"Goal {org.id}")
+        outcome = _element(db_session, org, "Outcome", f"Outcome {org.id}")
+        principle = _element(db_session, org, "Principle", f"Principle {org.id}")
+        req = _element(db_session, org, "Requirement", f"Req {org.id}")
+        rows[org.id] = {
+            "goal_outcome": _realization(db_session, org, goal, outcome),
+            "principle_req": _realization(db_session, org, principle, req),
+            "forwards": _realization(db_session, org, outcome, goal),
+        }
+    _run(db_session, "upgrade")
+    _run(db_session, "upgrade")
+    for org in orgs:
+        mine = rows[org.id]
+        for key in ("goal_outcome", "principle_req"):
+            assert mine[key].type == "association"
+            assert mine[key].description == "Agreed in workshop. As modelled: Realization."
+            assert mine[key].organization_id == org.id
+        assert mine["forwards"].type == "realization"
