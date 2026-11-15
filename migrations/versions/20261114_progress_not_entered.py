@@ -13,7 +13,7 @@ from alembic import op
 from sqlalchemy import inspect, text
 
 revision = "20261114_progress_not_entered"
-down_revision = "20261114_subscription_offer"
+down_revision = "20261114_plan_education"
 branch_labels = None
 depends_on = None
 
