@@ -258,7 +258,7 @@ def disconnect(provider):
         SignInIdentity.user_id == current_user.id, SignInIdentity.provider != provider
     ).count()
     if current_user.password_hash is None and others == 0:
-        flash("Set a password first: use Forgot password on the sign-in page.", "error")
+        flash("{} is your only way to sign in, so it cannot be disconnected yet. Set a password first: use Forgot password on the sign-in page.".format(label), "error")
         return redirect(url_for("account.manage"))
     db.session.delete(row)
     db.session.commit()

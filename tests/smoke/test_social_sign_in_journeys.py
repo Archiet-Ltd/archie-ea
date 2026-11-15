@@ -225,3 +225,146 @@ def test_an_unverified_google_email_is_refused_in_plain_words(browser, server, p
 
     with create_app("testing").app_context():
         assert User.find_by_email(email) is None
+
+
+def _person_with_google(org_id):
+    """A member of ``org_id`` who signs in with a password and has connected Google. Returns the email."""
+    from datetime import datetime, timezone
+
+    from app import create_app, db
+    from app.models.sign_in_identity import SignInIdentity
+    from app.models.user import Role, User
+
+    email = "connected.%s@example.com" % uuid.uuid4().hex[:8]
+    with create_app("testing").app_context():
+        user = User(email=email, first_name="Chris", last_name="Linked", organization_id=org_id,
+                    enterprise_role="enterprise_architect", confirmed=True)
+        user.role = Role.query.filter_by(name="Administrator").one()
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.flush()
+        now = datetime.now(timezone.utc)
+        db.session.add(SignInIdentity(user_id=user.id, provider="google", issuer="https://accounts.google.com",
+                                      subject="g-" + uuid.uuid4().hex, email_at_link=email, created_at=now, last_used_at=now))
+        db.session.commit()
+    return email
+
+
+def _google_rows(email):
+    from app import create_app
+    from app.models.sign_in_identity import SignInIdentity
+    from app.models.user import User
+
+    with create_app("testing").app_context():
+        person = User.find_by_email(email)
+        return SignInIdentity.query.filter_by(user_id=person.id, provider="google").count()
+
+
+def test_a_person_with_a_password_disconnects_google_and_it_stays_gone(browser, server, providers, organisation):
+    """Cancel keeps Google connected; confirm removes it, and after a reload the card and the database agree."""
+    email = _person_with_google(organisation["org_id"])
+    context, page = _page(browser, FOLD)
+    try:
+        page.goto(server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.fill("#email", email)
+        page.fill("#password", PASSWORD)
+        page.locator("#submit").click()
+        page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
+
+        page.goto(server + "/account/manage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.get_by_test_id("sign-in-method-google")
+        expect(row).to_contain_text(email)
+        _shoot(page, "disconnect-before", 1440)
+
+        row.get_by_role("button", name="Disconnect Google").click()
+        dialog = page.locator("[role='dialog']:visible").first
+        expect(dialog).to_contain_text("Disconnect Google from your account?")
+        dialog.get_by_role("button", name="Cancel").click()
+        expect(page.locator("[role='dialog']:visible")).to_have_count(0)
+        assert _google_rows(email) == 1
+
+        row.get_by_role("button", name="Disconnect Google").click()
+        _shoot(page, "disconnect-confirm", 1440)
+        page.locator("[role='dialog']:visible").first.get_by_role("button", name="Confirm").click()
+        _arrive(page, "**/account/manage**")
+        expect(page.get_by_text("Google sign-in was disconnected from your account.")).to_be_visible()
+
+        page.reload(wait_until="domcontentloaded")
+        card = page.get_by_test_id("sign-in-methods-card")
+        expect(card).to_be_visible()
+        expect(page.get_by_test_id("sign-in-method-google")).to_have_count(0)
+        expect(card).to_contain_text("No Google or Microsoft sign-in is connected")
+        assert _google_rows(email) == 0
+        _shoot(page, "disconnect-after", 1440)
+    finally:
+        context.close()
+
+
+def test_a_person_whose_only_way_in_is_google_is_refused_in_plain_words(browser, server, providers, organisation):
+    """No password and no other provider: Disconnect is refused with a sentence, and Google is still listed after a reload."""
+    from app import create_app
+    from app.models.user import User
+
+    email = "only.%s@example.com" % uuid.uuid4().hex[:8]
+    providers["google"].queue(providers["google"].google_claims("g-" + uuid.uuid4().hex, email, given_name="Sam", family_name="Solo"))
+    context, page = _page(browser, FOLD)
+    try:
+        page.goto(server + "/account/register", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("social-sign-in-google").click()
+        _arrive(page, "**/account/welcome**")
+        with create_app("testing").app_context():
+            assert User.find_by_email(email).password_hash is None
+
+        page.goto(server + "/account/manage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.get_by_test_id("sign-in-method-google")
+        expect(row).to_contain_text(email)
+        row.get_by_role("button", name="Disconnect Google").click()
+        page.locator("[role='dialog']:visible").first.get_by_role("button", name="Confirm").click()
+        _arrive(page, "**/account/manage**")
+        refusal = ("Google is your only way to sign in, so it cannot be disconnected yet. "
+                   "Set a password first: use Forgot password on the sign-in page.")
+        expect(page.get_by_text(refusal)).to_be_visible()
+        page.wait_for_timeout(800)  # the notice slides in; photograph it at rest
+        box = page.get_by_text(refusal).bounding_box()
+        assert box["x"] >= 0 and box["x"] + box["width"] <= FOLD["width"], box
+        _shoot(page, "disconnect-refused", 1440)
+
+        page.reload(wait_until="domcontentloaded")
+        expect(page.get_by_test_id("sign-in-method-google")).to_contain_text(email)
+        assert _google_rows(email) == 1
+    finally:
+        context.close()
+
+
+def test_phone_width_dark_sign_in_methods_card_and_confirmation_fit_the_screen(browser, server, providers, organisation):
+    """At 390 wide in the dark theme the card, its Disconnect button and the confirmation all sit inside the screen."""
+    email = _person_with_google(organisation["org_id"])
+    context, page = _page(browser, PHONE)
+    try:
+        page.goto(server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.evaluate("() => document.documentElement.classList.add('dark')")
+        page.fill("#email", email)
+        page.fill("#password", PASSWORD)
+        page.locator("#submit").click()
+        page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
+        page.goto(server + "/account/manage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.evaluate("() => document.documentElement.classList.add('dark')")
+
+        row = page.get_by_test_id("sign-in-method-google")
+        expect(row).to_contain_text(email)
+        button = row.get_by_role("button", name="Disconnect Google")
+        box = button.bounding_box()
+        assert box["x"] >= 0 and box["x"] + box["width"] <= PHONE["width"], box
+        assert page.evaluate("document.documentElement.scrollWidth") <= PHONE["width"]
+        _shoot(page, "disconnect-card-dark", 390)
+
+        button.click()
+        dialog = page.locator("[role='dialog']:visible").first
+        expect(dialog).to_contain_text("Disconnect Google from your account?")
+        dbox = dialog.bounding_box()
+        assert dbox["x"] >= 0 and dbox["x"] + dbox["width"] <= PHONE["width"], dbox
+        _shoot(page, "disconnect-confirm-dark", 390)
+        dialog.get_by_role("button", name="Cancel").click()
+        assert _google_rows(email) == 1
+    finally:
+        context.close()

@@ -288,7 +288,7 @@
                         <p class="text-sm font-medium">{{ method.label }}</p>
                         <p class="text-xs text-muted-foreground">{{ method.email }} &middot; connected {{ method.connected_at.strftime('%d %b %Y') }}</p>
                     </div>
-                    <form method="POST" action="{{ url_for('account_oauth.disconnect', provider=method.key) }}">
+                    <form method="POST" action="{{ url_for('account_oauth.disconnect', provider=method.key) }}" data-confirm="Disconnect {{ method.label }} from your account? You can connect it again by choosing Continue with {{ method.label }} and confirming your password.">
                         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
                         {{ button(type='submit', variant='outline', size='sm', text='Disconnect', aria_label='Disconnect ' ~ method.label) }}
                     </form>
