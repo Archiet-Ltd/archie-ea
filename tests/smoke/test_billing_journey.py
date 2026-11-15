@@ -61,7 +61,7 @@ def test_administrator_sees_plan_limits_and_can_choose_a_plan(browser, live_serv
                              timeout=PAGE_TIMEOUT)
         assert response.status == 200
 
-        expect(page.get_by_role("heading", name="Billing & plan", level=1)).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="Plan and billing", level=1)).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("billing-not-configured")).to_be_visible()
         plan_name = page.get_by_test_id("billing-current-plan").inner_text().strip()
         assert plan_name in {"Community", "Startup", "Team", "Enterprise"}
@@ -285,6 +285,7 @@ def test_administrator_finds_plan_people_and_ai_from_the_account_menu(browser, l
         # The AI settings link lands on a page with content.
         page.get_by_test_id("property-ai-provider").get_by_role("link", name="AI settings").click()
         page.wait_for_url(lambda url: "/admin/billing" not in url, timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="AI settings", level=1)).to_be_visible(timeout=PAGE_TIMEOUT)
         assert len(page.locator("main").first.inner_text().strip()) > 40
     finally:
         context.close()

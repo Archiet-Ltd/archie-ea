@@ -35,12 +35,12 @@ def _user(db_session, org, *, admin=False, role_name="User"):
     return user
 
 
-def _ask(db_session, user, questions, answers=1):
+def _ask(db_session, user, questions, answers=1, org=None):
     from app.models.conversation import ConversationMessageRecord, ConversationThreadRecord
 
     now = datetime.utcnow()
     thread = ConversationThreadRecord(id=str(uuid.uuid4()), user_id=user.id, title="t", model="m",
-                                      created_at=now, updated_at=now)
+                                      organization_id=org.id if org is not None else user.organization_id, created_at=now, updated_at=now)
     db_session.add(thread)
     db_session.flush()
     for i in range(questions):
@@ -137,3 +137,12 @@ def test_settings_is_not_found_for_an_organisation_administrator(app, db_session
         response = client.get("/settings")
     assert response.status_code == 404
     assert "Ask an administrator" not in response.get_data(as_text=True)
+
+
+def test_a_viewer_is_refused_the_billing_pages(app, db_session, client, login_as):
+    org = _org(db_session, "viewer")
+    viewer = _user(db_session, org, role_name="Viewer")
+    db_session.commit()
+    with app.app_context():
+        login_as(client, viewer)
+        assert client.get("/admin/billing/").status_code == 403

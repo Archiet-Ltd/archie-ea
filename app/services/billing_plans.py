@@ -531,22 +531,20 @@ def ai_usage_status(org_id: int, now=None) -> Dict:
     """The AI questions *org_id*'s people asked this calendar month, and whose AI answered.
 
     ``limit`` is None because no plan sets an allowance on AI questions. Reads only: the count is
-    the questions kept in the organisation's conversations (one per question a person typed).
+    the questions kept in conversations made in the organisation (one per question a person typed),
+    whichever organisation the person belongs to at home.
     """
     from datetime import datetime
 
     from app import db
     from app.models.conversation import ConversationMessageRecord, ConversationThreadRecord
-    from app.models.user import User
-
     now = now or datetime.utcnow()
     start = datetime(now.year, now.month, 1)
     used = (
         db.session.query(db.func.count(ConversationMessageRecord.id))
         .join(ConversationThreadRecord, ConversationThreadRecord.id == ConversationMessageRecord.thread_id)
-        .join(User, User.id == ConversationThreadRecord.user_id)
         .filter(
-            User.organization_id == org_id,
+            ConversationThreadRecord.organization_id == org_id,
             ConversationMessageRecord.role == "user",
             ConversationMessageRecord.created_at >= start,
         )
