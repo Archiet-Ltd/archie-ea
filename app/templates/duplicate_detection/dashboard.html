@@ -352,8 +352,8 @@
                   <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[60px] cursor-pointer select-none" @click="sortBy('application_count')">
                     <span class="inline-flex items-center gap-1">Apps <span x-show="sortColumn === 'application_count'" x-cloak x-text="sortDirection === 'asc' ? '\u2191' : '\u2193'"></span></span>
                   </th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[90px] cursor-pointer select-none" @click="sortBy('similarity_threshold')">
-                    <span class="inline-flex items-center gap-1">Similarity <span x-show="sortColumn === 'similarity_threshold'" x-cloak x-text="sortDirection === 'asc' ? '\u2191' : '\u2193'"></span></span>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[90px] cursor-pointer select-none" @click="sortBy('overall_similarity')">
+                    <span class="inline-flex items-center gap-1">Similarity <span x-show="sortColumn === 'overall_similarity'" x-cloak x-text="sortDirection === 'asc' ? '\u2191' : '\u2193'"></span></span>
                   </th>
                   <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[90px] cursor-pointer select-none" @click="sortBy('status')">
                     <span class="inline-flex items-center gap-1">Status <span x-show="sortColumn === 'status'" x-cloak x-text="sortDirection === 'asc' ? '\u2191' : '\u2193'"></span></span>
@@ -391,7 +391,7 @@
                       <span class="text-sm font-medium text-foreground" x-text="group.application_count || 0"></span>
                     </td>
                     <td class="px-4 py-3">
-                      <span class="text-sm text-foreground" x-text="formatPercent(group.similarity_threshold || 0.6)"></span>
+                      <span class="text-sm text-foreground" x-text="(group.overall_similarity == null ? '—' : formatPercent(group.overall_similarity))"></span>
                     </td>
                     <td class="px-4 py-3">
                       <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium"
@@ -471,7 +471,7 @@
                   {% endif %}
                   <div>
                     <p class="text-xs text-muted-foreground mb-1">Similarity</p>
-                    <p class="font-medium text-foreground" x-text="formatPercent(group.similarity_threshold || 0.6)"></p>
+                    <p class="font-medium text-foreground" x-text="(group.overall_similarity == null ? '—' : formatPercent(group.overall_similarity))"></p>
                   </div>
                   <div>
                     <p class="text-xs text-muted-foreground mb-1">Risk</p>

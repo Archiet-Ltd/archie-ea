@@ -47,6 +47,7 @@ from ..models.unified_duplicate_detection import (
 )
 from ..services.unified_duplicate_detection_service import (
     UnifiedDuplicateDetectionService,
+    describe_group_similarity,
 )
 from ..services.unified_duplicate_service import UnifiedDuplicateService
 from app.utils.api_response import error_response
@@ -842,6 +843,7 @@ def simple_group_detail(group_id):
             "description": group.description,
             "duplicate_type": group.duplicate_type or "fuzzy",
             "overall_similarity_score": group.similarity_score,
+            "similarity_basis": describe_group_similarity(group.duplicate_type, group.match_details),
             "estimated_savings": group.estimated_savings if not costs_withheld else None,
             "consolidation_priority": group.risk_level or "medium",
             "functional_similarity": _similarity("functional_similarity"),

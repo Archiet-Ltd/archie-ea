@@ -33,6 +33,27 @@ logger = logging.getLogger(__name__)
 ESTIMATED_SAVINGS_PER_REDUNDANT_APP = 10000  # fabricated-ok: declared estimation constant for ROI projection, not a measured value
 
 
+def group_similarity(pair_scores):
+    """The one figure a duplicate group shows: the mean of its pair scores.
+
+    A group of one pair shows that pair's score. Every screen reads the value
+    stored from this, so the list and the group page cannot disagree."""
+    scores = list(pair_scores)
+    if not scores:
+        raise ValueError("a duplicate group needs at least one pair")
+    return sum(scores) / len(scores)
+
+
+def describe_group_similarity(duplicate_type, match_details):
+    """Plain words saying how a group's stored similarity was worked out."""
+    if duplicate_type == "exact":
+        return "Names match exactly"
+    pairs = (match_details or {}).get("pair_count") if isinstance(match_details, dict) else None
+    if not isinstance(pairs, int) or pairs < 1:
+        return "Worked out before pair counts were recorded"
+    return f"Average of {pairs} {'pair' if pairs == 1 else 'pairs'}"
+
+
 @dataclass
 class SimilarityWeights:
     """Weights for different similarity criteria"""
@@ -533,6 +554,41 @@ class UnifiedDuplicateDetectionService:
             db.session.rollback()
             return {"success": False, "error": f"Cleanup failed: {str(e)}"}
 
+    def _clear_previous_groups(self) -> None:
+        """Remove the earlier groups of the caller's organisation only.
+
+        The group tables carry no organisation column, so a group belongs to
+        the organisation of its member applications. With no organisation in
+        context (command line) every group is cleared, as before.
+        """
+        from flask import g
+
+        org_id = getattr(g, "current_org_id", None)
+        if org_id is None:
+            db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: no organisation in context (command line)
+            UnifiedDuplicateGroup.query.delete()
+            return
+        group_ids = [
+            row[0]
+            for row in db.session.execute(
+                db.text(
+                    "SELECT DISTINCT m.group_id FROM unified_group_members m "
+                    "JOIN application_components ac ON ac.id = m.application_id "
+                    "WHERE ac.organization_id = :org"
+                ),
+                {"org": org_id},
+            )
+        ]
+        if not group_ids:
+            return
+        db.session.execute(
+            db.text("DELETE FROM unified_group_members WHERE group_id = ANY(:ids)"),  # tenant-filtered: scoped via parent FK (group ids come from this organisation's applications)
+            {"ids": group_ids},
+        )
+        UnifiedDuplicateGroup.query.filter(UnifiedDuplicateGroup.id.in_(group_ids)).delete(
+            synchronize_session=False
+        )
+
     def run_detection(self, similarity_threshold: float = 0.60, strategy: str = "fast") -> Dict[str, Any]:
         """Run simple duplicate detection based on name/description similarity
 
@@ -548,8 +604,7 @@ class UnifiedDuplicateDetectionService:
             # Use a SAVEPOINT so failure doesn't poison the outer transaction
             try:
                 with db.session.begin_nested():
-                    db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: system table (detection engine cleanup)
-                    UnifiedDuplicateGroup.query.delete()
+                    self._clear_previous_groups()
                 self.logger.info("Cleaned up previous detection groups")
             except Exception as cleanup_err:
                 self.logger.warning(f"Stale group cleanup failed (will create alongside old): {cleanup_err}")
@@ -639,16 +694,18 @@ class UnifiedDuplicateDetectionService:
                     if other_app.id not in processed_apps:
                         similarity = self._calculate_name_description_similarity(app, other_app)
                         if similarity >= similarity_threshold:
-                            similar_apps.append(other_app)
+                            similar_apps.append((other_app, similarity))
 
                 if similar_apps:
+                    group_score = group_similarity([s for _, s in similar_apps])
                     group = UnifiedDuplicateGroup(
                         name=f"Fuzzy: {app.name[:50]}..."
                         if len(app.name or "") > 50
                         else f"Fuzzy: {app.name}",
                         detection_run_id=run.id,
                         similarity_threshold=similarity_threshold,
-                        similarity_score=similarity_threshold,
+                        similarity_score=group_score,
+                        match_details={"pair_count": len(similar_apps)},
                         duplicate_type="fuzzy",
                     )
                     db.session.add(group)
@@ -656,7 +713,7 @@ class UnifiedDuplicateDetectionService:
 
                     group.applications.append(app)
                     processed_apps.add(app.id)
-                    for similar_app in similar_apps:
+                    for similar_app, _ in similar_apps:
                         group.applications.append(similar_app)
                         processed_apps.add(similar_app.id)
 
@@ -713,8 +770,7 @@ class UnifiedDuplicateDetectionService:
             # Use a SAVEPOINT so failure doesn't poison the outer transaction
             try:
                 with db.session.begin_nested():
-                    db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: system table (detection engine cleanup)
-                    UnifiedDuplicateGroup.query.delete()
+                    self._clear_previous_groups()
                 self.logger.info("Cleaned up previous detection groups")
             except Exception as cleanup_err:
                 self.logger.warning(f"Stale group cleanup failed (will create alongside old): {cleanup_err}")
@@ -760,6 +816,7 @@ class UnifiedDuplicateDetectionService:
                         else f"Exact: {apps_in_hash[0].name}",
                         detection_run_id=run.id,
                         similarity_threshold=1.0,
+                        similarity_score=1.0,
                         duplicate_type="exact",
                     )
                     db.session.add(group)
@@ -801,7 +858,7 @@ class UnifiedDuplicateDetectionService:
                                 similar_apps.append((other_app, similarity))
 
                     if similar_apps:
-                        avg_sim = sum(s for _, s in similar_apps) / len(similar_apps)
+                        avg_sim = group_similarity([s for _, s in similar_apps])
                         group = UnifiedDuplicateGroup(
                             name=f"Fuzzy: {app.name[:50]}..."
                             if len(app.name or "") > 50
@@ -809,6 +866,7 @@ class UnifiedDuplicateDetectionService:
                             detection_run_id=run.id,
                             similarity_threshold=similarity_threshold,
                             similarity_score=avg_sim,
+                            match_details={"pair_count": len(similar_apps)},
                             duplicate_type="fuzzy",
                         )
                         db.session.add(group)
@@ -1406,7 +1464,8 @@ class UnifiedDuplicateDetectionService:
                         "name": group.name,
                         "description": group.description,
                         "mode": "simple",
-                        "overall_similarity": group.similarity_score or 0,
+                        "overall_similarity": group.similarity_score,
+                        "similarity_basis": describe_group_similarity(group.duplicate_type, group.match_details),
                         "similarity_threshold": group.similarity_threshold,
                         "detection_method": group.duplicate_type or "unknown",
                         "duplicate_type": group.duplicate_type or "fuzzy",

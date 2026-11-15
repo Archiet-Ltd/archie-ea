@@ -80,7 +80,7 @@
                 <div class="flex-1 min-w-0">
                     {% call card.card_description() %}Overall Similarity{% endcall %}
                     <p class="text-2xl font-bold tracking-tight mt-1">{{ (((group.overall_similarity_score * 100) | round | int) ~ '%') if group.overall_similarity_score is not none else 'Not scored' }}</p>
-                    {% call card.card_description() %}Aggregate match score{% endcall %}
+                    {% call card.card_description() %}<span data-testid="similarity-basis">{{ group.similarity_basis }}</span>{% endcall %}
                 </div>
             {% endcall %}
         {% endcall %}
