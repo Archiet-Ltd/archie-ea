@@ -79,18 +79,29 @@ def test_empty_portfolio_has_no_measured_health_components(monkeypatch):
     assert result["unavailable_components"] == ["capability_coverage", "governance", "phase_maturity", "risk_posture"]
 
 
-def test_executive_summary_formats_missing_value_without_hiding_measured_zero():
-    from playwright.sync_api import sync_playwright
-    source = (Path(__file__).resolve().parents[1] / "app/templates/dashboards/overview.html").read_text(encoding="utf-8")
-    expression = re.search(r'x-text="(typeof val ===[^"\n]+)"', source).group(1)
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
-        page = browser.new_page()
-        try:
-            values = page.evaluate("expression => [null, 0, 42.9].map(val => new Function('val', 'return ' + expression)(val))", expression)
-            assert values == ["—", "0", "42.9"]
-        finally:
-            browser.close()
+def test_executive_summary_formats_missing_value_without_hiding_measured_zero(client, login_as, make_org):
+    """On the signed-in overview, a figure that cannot be worked out is explained and
+    a figure measured as exactly 0 is shown as 0."""
+    from tests.test_overview_after_sample_removed import _own_record
+    from tests.test_sample_company_working_data import _architect
+
+    org = make_org()
+    user = _architect(org, "summary-zero@example.com")
+    _own_record(org, user)  # one model element, no application and no contract
+    login_as(client, user)
+    response = client.get("/dashboard/overview")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+
+    # Missing: no contract states a cost, so the card has no number, says why, and shows no dash or zero.
+    cost = re.search(r'data-testid="card-run-cost"(.*?)data-testid="card-relationships"', page, re.S).group(1)
+    assert 'data-testid="card-run-cost-value"' not in cost
+    assert re.search(r'data-testid="card-run-cost-sentence">\s*Appears here once a contract states its annual cost\.', cost)
+    assert "\u2014" not in cost and "$0" not in cost
+
+    # Measured: the organisation holds zero applications, and the welcome figure says 0.
+    applications = re.search(r'data-testid="welcome-applications">(.*?)</a>', page, re.S).group(1)
+    assert re.sub(r"<[^>]+>", " ", applications).split() == ["0", "Applications"]
 
 
 @pytest.mark.parametrize("phases,want", [
