@@ -46,10 +46,11 @@ _ORIGIN_TEXT = {
     "derived": "Worked out by the product",
     "sample": "Sample data",
     "manual": "Entered by the team",
+    "picked": "Chosen by a person",
     "unknown": "No recorded origin",
 }
 NOT_IN_MODEL = "A linked element is not in this organisation's model"
-_RECORDED_ORIGINS = ("import", "connector", "derived")
+_RECORDED_ORIGINS = ("import", "connector", "derived", "picked")
 
 
 def _naive_utc(value: Optional[datetime]) -> Optional[datetime]:
@@ -76,7 +77,7 @@ def _origin_text(item: Dict[str, Any]) -> str:
     label = item["source_label"]
     if label and label.strip().lower() == text.lower():
         label = None  # the label only says the origin again
-    if label and item["source_kind"] in ("import", "connector"):
+    if label and item["source_kind"] in ("import", "connector", "picked"):
         text = "%s from %s" % (text, label)
     elif label and item["source_kind"] == "manual":
         text = "%s (%s)" % (text, label)
@@ -335,14 +336,14 @@ def application_fact(row, subject: str = "Application",
 
 def application_footer(app, owner_names: Optional[List[str]], now: Optional[datetime] = None,
                        origins: Optional[Dict[int, Dict[str, Any]]] = None,
-                       owner_from_commits: bool = False) -> Dict[str, Any]:
+                       owner_from_commits: bool = False, owner_picked: bool = False) -> Dict[str, Any]:
     """Footer for one listed application: the record itself, then who owns it. An owner set from
     GitHub's commit history says so, as the application's own page does."""
     facts = [application_fact(app, "Record", origins)]
     if owner_names:
         facts.append(fact("Owner: %s" % ", ".join(owner_names),
                           href=page_link("unified_applications.application_detail", id=app.id),
-                          source_kind="connector" if owner_from_commits else "manual",
+                          source_kind=("picked" if owner_picked else "connector") if owner_from_commits else "manual",
                           source_label="GitHub commit history" if owner_from_commits else None,
                           subject="Owner", as_of=app.updated_at or app.created_at))
     else:

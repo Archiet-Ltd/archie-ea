@@ -177,7 +177,8 @@ def make_owner_from_commits(app_id: int):
     summary = _fact(element, "github_commit_owners")
     PropertyService().merge_element_properties(
         element,
-        {"github_owner_source": {"user_id": user_id, "text": commit_provenance(summary, candidates[user_id])}},
+        {"github_owner_source": {"user_id": user_id, "text": commit_provenance(summary, candidates[user_id]),
+                                 "picked": True}},
         source="github",
     )
     db.session.commit()

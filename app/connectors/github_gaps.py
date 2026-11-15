@@ -209,17 +209,39 @@ def application_gaps(org_id, applications: Iterable[Any], skip_ids: Iterable[int
     return out
 
 
-def owner_source_note(application, owner_rows) -> Optional[str]:
-    """Where a primary owner recorded from the commit history came from, while that person is still the owner."""
+def owner_source(application, owner_rows, element=None) -> Optional[dict]:
+    """The recorded source of a primary owner taken from the commit history, while that person is still the
+    owner. ``element`` is the application's element when the caller has already loaded it."""
     from app.models.archimate_core import ArchiMateElement
 
     if not application.archimate_element_id:
         return None
-    element = db.session.get(ArchiMateElement, application.archimate_element_id)
+    if element is None:
+        element = db.session.get(ArchiMateElement, application.archimate_element_id)
     if element is None or element.organization_id != application.organization_id:
         return None
     source = _fact(element, "github_owner_source")
     if not isinstance(source, dict) or not source.get("text"):
         return None
     primary = {r.get("user_id") for r in owner_rows if r.get("ownership_type") == "primary"}
-    return source["text"] if source.get("user_id") in primary else None
+    return source if source.get("user_id") in primary else None
+
+
+def owner_source_note(application, owner_rows, element=None) -> Optional[str]:
+    """Where a primary owner recorded from the commit history came from, while that person is still the owner."""
+    source = owner_source(application, owner_rows, element)
+    return source["text"] if source else None
+
+
+def owner_sources(applications, owners_by_app) -> dict:
+    """``owner_source`` for each listed application, loading their elements in one query."""
+    from app.models.archimate_core import ArchiMateElement
+
+    ids = {a.archimate_element_id for a in applications if a.archimate_element_id}
+    elements = {e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(ids)).all()} if ids else {}
+    found = {}
+    for a in applications:
+        source = owner_source(a, owners_by_app.get(a.id, []), elements.get(a.archimate_element_id))
+        if source:
+            found[a.id] = source
+    return found

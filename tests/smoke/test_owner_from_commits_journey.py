@@ -155,6 +155,8 @@ def test_two_members_share_the_commits_and_the_architect_picks_one(architect, li
         "(b, id) => Array.from(b.querySelectorAll('[data-footer-for=\"' + id + '\"]')).map(e => e.textContent).join(' ')",
         str(estate["shared"]))
     assert "GitHub commit history" in footer_text, footer_text
+    assert "Owner: chosen by a person from GitHub commit history" in footer_text, footer_text
+    assert "Owner: synced by a connector" not in footer_text, footer_text
     assert "Owner was entered by hand" not in footer_text and "entered by the team" not in footer_text, footer_text
 
 
@@ -259,6 +261,8 @@ def test_a_code_owner_account_is_the_member_its_commits_show_on_the_page_and_the
         "(b, id) => Array.from(b.querySelectorAll('[data-footer-for=\"' + id + '\"]')).map(e => e.textContent).join(' ')",
         str(estate["by_account"]))
     assert "GitHub commit history" in footer_text, footer_text
+    assert "Owner: synced by a connector from GitHub commit history" in footer_text, footer_text
+    assert "chosen by a person" not in footer_text, footer_text
     assert "Owner was entered by hand" not in footer_text and "entered by the team" not in footer_text, footer_text
 
 
