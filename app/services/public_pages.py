@@ -518,6 +518,7 @@ FAMILY_URL_PREFIX = {
 # at the language's prefix followed by the English address, and the English address never changes.
 DEFAULT_LANGUAGE = "en"
 TRANSLATION_PREFIXES: dict[str, str] = {"pt-BR": "/pt-br", "es": "/es", "fr": "/fr"}
+LANGUAGE_NAMES: dict[str, str] = {"en": "English", "pt-BR": "Português", "es": "Español", "fr": "Français"}
 LANGUAGE_BY_PREFIX: dict[str, str] = {prefix.lstrip("/"): code for code, prefix in TRANSLATION_PREFIXES.items()}
 
 
@@ -619,6 +620,18 @@ class PublicPage:
         found = [(DEFAULT_LANGUAGE, f"{origin}{english_url}")]
         found += [(code, f"{origin}{translations[code].url}") for code in TRANSLATION_PREFIXES if code in translations]
         found.append(("x-default", f"{origin}{english_url}"))
+        return found
+
+    @property
+    def language_links(self) -> list[tuple[str, str, str]]:
+        """Each language this page is published in as (code, the language's own name, site address), English
+        first. Empty when the page has no published translation, so the reader sees no language list."""
+        if not self.alternates:
+            return []
+        english_url = _english_url_of(self)
+        translations = _published_translations_by_english_url().get(english_url, {})
+        found = [(DEFAULT_LANGUAGE, LANGUAGE_NAMES[DEFAULT_LANGUAGE], english_url)]
+        found += [(code, LANGUAGE_NAMES[code], translations[code].url) for code in TRANSLATION_PREFIXES if code in translations]
         return found
 
     @property

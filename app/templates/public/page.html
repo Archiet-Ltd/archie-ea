@@ -54,6 +54,18 @@
   {% if jsonld %}
   <script type="application/ld+json">{{ jsonld }}</script>
   {% endif %}
+  {% if page.language_links %}
+  <nav aria-label="Languages" data-testid="language-list" class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+    <span>Read this page in:</span>
+    {% for code, name, address in page.language_links %}
+    {% if code == page.lang %}
+    <span lang="{{ code }}" aria-current="page" class="font-medium text-foreground">{{ name }}</span>
+    {% else %}
+    <a lang="{{ code }}" hreflang="{{ code }}" href="{{ address }}" class="underline underline-offset-4">{{ name }}</a>
+    {% endif %}
+    {% endfor %}
+  </nav>
+  {% endif %}
 
   <article class="public-page-content public-prose prose max-w-none">
     {{ page.body_html }}

@@ -110,12 +110,30 @@ def test_each_language_page_declares_itself_and_every_link_lands(browser, transl
             if PAGES[other][1]:
                 assert PAGES[other][1] in reply.text(), (other, address)
 
+        # the reader sees the other languages by their own names and each one opens that language's page
+        names = {"en": "English", "pt-BR": "Português", "es": "Español", "fr": "Français"}
+        language_list = page.locator('[data-testid="language-list"]')
+        expect(language_list).to_be_visible()
+        for other, name in names.items():
+            if other == code:
+                expect(language_list.locator("[aria-current]")).to_have_text(name)
+                continue
+            link = language_list.get_by_role("link", name=name)
+            expect(link).to_have_attribute("hreflang", other)
+            assert link.get_attribute("href") == PAGES[other][0], (code, other)
+        _shot(page, f"language-list-{code}-{size}")
+
         links = page.eval_on_selector_all("a[href]", "els => els.map(e => e.getAttribute('href'))")
         internal = sorted({href.split("#")[0] for href in links if href.startswith("/") and not href.startswith("//")} - {""})
         assert internal, "the page links nowhere"
         for href in internal:
             reply = page.request.get(local + href)
-            assert reply.status < 400 or reply.status in (401, 403), (code, href, reply.status)
-            assert len(reply.body()) > 0, (code, href)
+            assert reply.status == 200, (code, href, reply.status)
+            text = reply.text()
+            heading = re.search(r"<h1[^>]*>(.*?)</h1>", text, re.S)
+            title = re.search(r"<title[^>]*>(.*?)</title>", text, re.S)
+            has_heading = bool(heading and re.sub(r"<[^>]+>", "", heading.group(1)).strip())
+            has_title = bool(title and title.group(1).strip())
+            assert has_heading or has_title, (code, href, "the page has neither a heading nor a title")
     finally:
         context.close()
