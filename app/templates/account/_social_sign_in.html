@@ -9,7 +9,7 @@
         {{ hidden_input('csrf_token', csrf_token()) }}
         {% if request.args.get('next') %}{{ hidden_input('next', request.args.get('next')) }}{% endif %}
         {% call button(variant='outline', type='submit', class='w-full gap-2', testid='social-sign-in-' ~ provider.key) %}
-            <img src="{{ url_for('static', filename='img/sign-in/' ~ provider.key ~ '.svg') }}" alt="" class="h-[18px] w-[18px]" width="18" height="18">
+            <img src="{{ url_for('static', filename='img/sign-in/' ~ provider.key ~ '.svg') }}" alt="" class="size-5" width="20" height="20">
             <span>Continue with {{ provider.label }}</span>
         {% endcall %}
     </form>

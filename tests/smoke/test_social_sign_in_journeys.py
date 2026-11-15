@@ -3,13 +3,13 @@
 A stand-in provider plays Google and Microsoft. The application runs as a real server and a real browser
 clicks the real buttons.
 
-J-1: a new CTO on the register page clicks Continue with Google and lands on the welcome steps signed in,
-     in an organisation of their own, never seeing a "check your email" page; the team page lists only them,
-     as administrator, and none of the other organisation's records show.
-J-2: someone with a password account clicks Continue with Microsoft on the sign-in page, is asked to prove
-     the account first, and afterwards Continue with Microsoft signs them straight in; the dashboard's
-     application count equals the applications list.
-J-3: a Google account whose email Google has not verified is told so, in plain words, and no account exists.
+- A new CTO on the register page clicks Continue with Google and lands on the welcome steps signed in,
+  in an organisation of their own, never seeing a "check your email" page; the team page lists only them,
+  as administrator, and none of the other organisation's records show.
+- Someone with a password account clicks Continue with Microsoft on the sign-in page, is asked to prove
+  the account first, and afterwards Continue with Microsoft signs them straight in; the dashboard's
+  application count equals the applications list.
+- A Google account whose email Google has not verified is told so, in plain words, and no account exists.
 """
 import os
 import uuid
@@ -90,8 +90,8 @@ def _count(text):
     return int("".join(ch for ch in text if ch.isdigit()))
 
 
-def test_j1_a_new_cto_signs_up_with_google_and_lands_on_the_welcome_steps(browser, server, providers, organisation):
-    """J-1: register, Continue with Google, welcome steps, signed in, alone in an organisation of their own."""
+def test_a_new_cto_signs_up_with_google_and_lands_on_the_welcome_steps(browser, server, providers, organisation):
+    """Register, Continue with Google, welcome steps, signed in, alone in an organisation of their own."""
     email = "cto.%s@example.com" % uuid.uuid4().hex[:8]
     providers["google"].queue(providers["google"].google_claims("g-" + uuid.uuid4().hex, email, given_name="Ada", family_name="Okafor"))
     context, page = _page(browser, FOLD)
@@ -137,8 +137,8 @@ def test_j1_a_new_cto_signs_up_with_google_and_lands_on_the_welcome_steps(browse
         assert [i.provider for i in SignInIdentity.query.filter_by(user_id=person.id).all()] == ["google"]
 
 
-def test_j2_a_password_user_connects_microsoft_and_then_signs_in_with_it(browser, server, providers, organisation):
-    """J-2: Continue with Microsoft asks for the password once; afterwards it signs straight in to the same company."""
+def test_a_password_user_connects_microsoft_and_then_signs_in_with_it(browser, server, providers, organisation):
+    """Continue with Microsoft asks for the password once; afterwards it signs straight in to the same company."""
     email = organisation["emails"]["owner"]
     claims = providers["microsoft"].microsoft_claims(uuid.uuid4().hex, email=email, tid=PERSONAL_TENANT)
     context, page = _page(browser, FOLD)
@@ -187,8 +187,8 @@ def test_j2_a_password_user_connects_microsoft_and_then_signs_in_with_it(browser
         context.close()
 
 
-def test_j2_phone_width_buttons_are_usable(browser, server, providers):
-    """J-2 (phone): at 390 wide both buttons are on screen, full width, and the page does not scroll sideways."""
+def test_phone_width_buttons_are_usable(browser, server, providers):
+    """Phone: at 390 wide both buttons are on screen, full width, and the page does not scroll sideways."""
     context, page = _page(browser, PHONE)
     try:
         page.goto(server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -204,8 +204,8 @@ def test_j2_phone_width_buttons_are_usable(browser, server, providers):
         context.close()
 
 
-def test_j3_an_unverified_google_email_is_refused_in_plain_words(browser, server, providers):
-    """J-3: back on sign-in with the message and the email form; no account exists for that address."""
+def test_an_unverified_google_email_is_refused_in_plain_words(browser, server, providers):
+    """Back on sign-in with the message and the email form; no account exists for that address."""
     email = "unverified.%s@example.com" % uuid.uuid4().hex[:8]
     providers["google"].queue(providers["google"].google_claims("g-" + uuid.uuid4().hex, email, verified=False))
     context, page = _page(browser, FOLD)

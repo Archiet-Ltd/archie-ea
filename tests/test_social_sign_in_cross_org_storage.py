@@ -1,4 +1,4 @@
-"""Continue with Google / Microsoft: what is stored, disconnecting, and the old route pair (M-43 to M-48, M-51)."""
+"""Continue with Google / Microsoft: what is stored, disconnecting, and the old route pair."""
 import importlib
 import importlib.util
 import logging
@@ -24,7 +24,7 @@ def browser(app, social_config, db_session):
 
 
 def test_m43_same_provider_and_subject_twice_is_refused(db_session):
-    """M-43: a second row with the same provider and subject raises an integrity error."""
+    """A second row with the same provider and subject raises an integrity error."""
     one = _account(db_session, "one")
     two = _account(db_session, "two")
     _connect(db_session, one, subject="g-same")
@@ -34,7 +34,7 @@ def test_m43_same_provider_and_subject_twice_is_refused(db_session):
 
 
 def test_m44_same_user_and_provider_twice_is_refused(db_session):
-    """M-44: a second row with the same user and provider raises an integrity error."""
+    """A second row with the same user and provider raises an integrity error."""
     user = _account(db_session)
     _connect(db_session, user, subject="g-first")
     with pytest.raises(IntegrityError):
@@ -44,7 +44,7 @@ def test_m44_same_user_and_provider_twice_is_refused(db_session):
 
 
 def test_m45_no_token_is_stored_or_logged(browser, db_session, caplog):
-    """M-45: the access token and id_token strings appear in no users or sign_in_identities column and in no log line."""
+    """The access token and id_token strings appear in no users or sign_in_identities column and in no log line."""
     caplog.set_level(logging.DEBUG)
     email = "tokens-%s@example.com" % uuid.uuid4().hex[:8]
     browser.sign_in_with("google", _google(browser, email))
@@ -63,7 +63,7 @@ def test_m45_no_token_is_stored_or_logged(browser, db_session, caplog):
 
 
 def test_m46_migration_cycles_and_there_is_one_head(app):
-    """M-46: the revision upgrades, downgrades and upgrades again, and the chain has one head."""
+    """The revision upgrades, downgrades and upgrades again, and the chain has one head."""
     from alembic.config import Config
     from alembic.migration import MigrationContext
     from alembic.operations import Operations
@@ -103,7 +103,7 @@ def test_m46_migration_cycles_and_there_is_one_head(app):
 
 
 def test_m47_disconnect_removes_the_row_and_the_next_sign_in_asks_for_the_password(browser, db_session):
-    """M-47: a person with a password disconnects Google; the next Google sign-in for that subject goes to the connect step."""
+    """A person with a password disconnects Google; the next Google sign-in for that subject goes to the connect step."""
     user = _account(db_session)
     claims = _google(browser, user.email, "g-gone")
     _connect(db_session, user, subject="g-gone")
@@ -120,7 +120,7 @@ def test_m47_disconnect_removes_the_row_and_the_next_sign_in_asks_for_the_passwo
 
 
 def test_m48_google_only_person_cannot_disconnect(browser, db_session):
-    """M-48: a person with Google only (no password, no other provider) is refused and the row remains."""
+    """A person with Google only (no password, no other provider) is refused and the row remains."""
     from app.models.user import User
 
     email = "only-%s@example.com" % uuid.uuid4().hex[:8]
@@ -133,7 +133,7 @@ def test_m48_google_only_person_cannot_disconnect(browser, db_session):
 
 
 def test_m48_second_provider_lets_google_be_disconnected(browser, db_session):
-    """M-48 (other side): with Microsoft also connected and no password, Google can be disconnected."""
+    """Other side: with Microsoft also connected and no password, Google can be disconnected."""
     from app.models.user import User
 
     email = "both-%s@example.com" % uuid.uuid4().hex[:8]
@@ -165,7 +165,7 @@ def test_sign_in_methods_card_empty_state(browser, db_session):
 
 
 def test_m51_the_old_platform_route_pair_is_gone(app, browser):
-    """M-51: /account/sso/azure is 404 and neither account blueprint registers a /sso/ route."""
+    """/account/sso/azure is 404 and neither account blueprint registers a /sso/ route."""
     from flask import Flask
 
     assert browser.get("/account/sso/azure").status_code == 404

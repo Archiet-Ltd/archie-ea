@@ -1,4 +1,4 @@
-"""Continue with Google / Microsoft: the two-factor step still applies (M-33, M-38, M-39)."""
+"""Continue with Google / Microsoft: the two-factor step still applies."""
 import uuid
 
 import pyotp
@@ -24,7 +24,7 @@ def _enrolled(db_session):
 
 
 def test_m33_identity_is_connected_only_after_the_code(browser, db_session):
-    """M-33: for an account with two-factor on, no identity row after the password step, one after the code."""
+    """For an account with two-factor on, no identity row after the password step, one after the code."""
     user = _enrolled(db_session)
     browser.sign_in_with("google", _google(browser, user.email))
     browser.password_sign_in(user.email, PASSWORD)
@@ -37,7 +37,7 @@ def test_m33_identity_is_connected_only_after_the_code(browser, db_session):
 
 
 def test_m38_linked_identity_ends_on_the_challenge(browser, db_session):
-    """M-38: a linked identity for a two-factor user ends on the challenge, and signed-in pages wait for the code."""
+    """A linked identity for a two-factor user ends on the challenge, and signed-in pages wait for the code."""
     user = _enrolled(db_session)
     _connect(db_session, user, subject="g-mfa")
     response = browser.sign_in_with("google", _google(browser, user.email, "g-mfa"))
@@ -50,7 +50,7 @@ def test_m38_linked_identity_ends_on_the_challenge(browser, db_session):
 
 
 def test_m39_audit_row_names_the_provider(browser, db_session):
-    """M-39: after the code that follows a Google sign-in, the login audit row's method is oauth:google."""
+    """After the code that follows a Google sign-in, the login audit row's method is oauth:google."""
     from app.models.audit_log import AuditLog
 
     user = _enrolled(db_session)
@@ -63,7 +63,7 @@ def test_m39_audit_row_names_the_provider(browser, db_session):
 
 
 def test_m39_password_sign_in_still_says_password(browser, db_session):
-    """M-39 (other side): a password sign-in records the method password."""
+    """Other side: a password sign-in records the method password."""
     from app.models.audit_log import AuditLog
 
     user = _account(db_session)
