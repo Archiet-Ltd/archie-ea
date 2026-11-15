@@ -139,7 +139,8 @@ def test_proposals_each_cite_a_source_and_only_real_elements_keep_their_id(clien
     assert [p["name"] for p in proposals] == [spare.name, "Payment provider"]
     assert [p["element_id"] for p in proposals] == [spare.id, None]
     assert all(p["source"] for p in proposals)
-    assert "AI" in body["notice"]
+    assert body["notice"] == ai_service.SUGGESTION_NOTICE == "Suggested by AI from this canvas and your model"
+    assert "Answer written" not in body["notice"]
 
 
 def test_the_context_for_a_person_without_cost_visibility_has_no_cost_line(db_session, make_org, app, tenant_ctx):
@@ -178,3 +179,16 @@ def test_the_pages_name_the_control_as_the_canvas_labels_it(client, login_as, wo
         text = page.read_text(encoding="utf-8")
         assert "“Suggest for" in text or '"Suggest for' in text, page.name
         assert "Draft Revenue Streams with AI" not in text, page.name
+
+
+def test_the_prompt_holds_none_of_another_organisations_names(app, world, monkeypatch):
+    """Built with no request organisation, so only the context reader's own organisation filter keeps names apart."""
+    prompts = []
+    _stub_model(monkeypatch, json.dumps({"proposals": []}), calls=prompts)
+    with app.test_request_context():
+        ai_service.generate_block_draft(world["mine"], "key_partners")
+        seen = json.dumps(ms.canvas_contents(world["one"].id, world["mine"].id), default=str)
+    assert len(prompts) == 1
+    assert "Ours logistics firms" in prompts[0] and "Ours cloud host" in prompts[0]
+    assert "Theirs" not in prompts[0]
+    assert "Theirs" not in seen

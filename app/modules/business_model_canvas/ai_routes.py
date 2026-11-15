@@ -15,6 +15,7 @@ from flask import jsonify, request
 from flask_login import current_user, login_required
 
 from app.modules.business_model_canvas.ai_service import (
+    SUGGESTION_NOTICE,
     BusinessModelAIDraftError,
     generate_block_draft,
 )
@@ -68,6 +69,4 @@ def ai_draft_block(canvas_id):
         logger.exception("BMC block draft generation failed for canvas %s", canvas_id)
         return jsonify({"error": DRAFT_FAILED}), 502
 
-    from app.modules.ai_chat.tools.executor import GENOME_NOTICE
-
-    return jsonify({"draft": draft, "notice": GENOME_NOTICE})
+    return jsonify({"draft": draft, "notice": SUGGESTION_NOTICE})

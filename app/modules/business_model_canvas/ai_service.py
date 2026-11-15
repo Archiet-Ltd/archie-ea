@@ -17,6 +17,9 @@ from app.modules.ai_chat.services.llm_service_impl import LLMService
 
 logger = logging.getLogger(__name__)
 
+# Marks a proposal as AI-written. A suggestion answers no question, so it does not use the chat answer's wording.
+SUGGESTION_NOTICE = "Suggested by AI from this canvas and your model"
+
 BLOCK_LABELS = {
     "key_partners": "Key Partners",
     "key_activities": "Key Activities",
