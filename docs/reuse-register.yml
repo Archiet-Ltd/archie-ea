@@ -319,6 +319,29 @@ entries:
       - path: app/models/ai_chat_crud_approval.py
         reason: defines the model methods the service calls; the service is the only intended caller
 
+  - id: goal-store
+    concept: Creating and changing an organisation's goal (its row, target date, status and element)
+    status: active
+    canonical:
+      path: app/services/goal_store.py
+      symbols:
+        - create_goal
+        - update_goal
+        - goal_for_element
+    reuse: >
+      A goal is written by goal_store.create_goal and goal_store.update_goal, which write the goals row and its
+      ArchiMate Goal element together with the organisation in every statement. The chat's create_goal and
+      update_goal tools, the solution-goal promotion and the date backfill all call it. A goal element with no
+      row gets one on its first write. No second place constructs Goal.
+    must_not_create:
+      - id: goal-construction
+        regex: '(^|[^A-Za-z_.])Goal\('
+    known_exceptions:
+      - path: app/commands/seed_demo_company.py
+        reason: seeds a demonstration organisation outside any request
+      - path: app/models/motivation.py
+        reason: the model's own definition and its self-referencing relationship
+
   - id: current-org-id
     concept: The caller's active organisation id
     status: active

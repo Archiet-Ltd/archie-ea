@@ -353,6 +353,14 @@ def init_cli(app):
         app.logger.warning(f"⚠️  Failed to register vendor link backfill CLI: {e}")
 
     try:
+        from app.commands.chat_records_report import init_app as init_chat_records_report
+        init_chat_records_report(app)
+        from app.commands.backfill_goal_dates import init_app as init_backfill_goal_dates
+        init_backfill_goal_dates(app)
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register chat record commands: {e}")
+
+    try:
         from app.commands.backfill_outcome_org import init_app as init_outcome_org
         init_outcome_org(app)
         app.logger.info("✅ Outcome tenancy backfill CLI command registered")

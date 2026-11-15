@@ -1931,7 +1931,7 @@ class AgentRunner:
         """The one short question a goal or risk request needs answered first, or None."""
         from app.modules.ai_chat.services.ai_chat_approval_service import _load_acting_user
 
-        org_id = self._active_organization_id(_load_acting_user(self.user_id))
+        org_id = self._active_workspace(_load_acting_user(self.user_id))
         if org_id is None or change_review.record_schema(tc.name) is None:
             return None
         return change_review.preflight(tc.name, tc.arguments, org_id)
@@ -1946,7 +1946,7 @@ class AgentRunner:
         return text
 
     @staticmethod
-    def _active_organization_id(actor) -> Optional[int]:
+    def _active_workspace(actor) -> Optional[int]:
         """The workspace the person is working in now; their home workspace only when none is active."""
         from app.middleware.tenant_context import current_org_id
 
@@ -1976,7 +1976,7 @@ class AgentRunner:
         provider, model, request_text = getattr(self, "_drafter", None) or (None, None, None)
         actor = _load_acting_user(self.user_id)
         approval = create_approval_record(
-            organization_id=self._active_organization_id(actor),
+            organization_id=self._active_workspace(actor),
             operation_type="tool_use",
             entity_type=tc.name,
             original_command=(request_text or tc.name)[:4000],
