@@ -222,6 +222,82 @@ def can_change_model(user, organization_id: Optional[int] = None) -> bool:
     )
 
 
+READ_ONLY_CODE = "READ_ONLY_ROLE"
+
+# Actions that only read; granting one of them is not a route admitting a change.
+_READ_ACTIONS = frozenset({"read", "view_all"})
+
+# Every cell of the matrix that changes something about the model. A person granted any one of
+# these, by their role or by an administrator's override, is a person who writes.
+_WRITE_CELLS = tuple(
+    (action, object_type)
+    for object_type in OBJECT_TYPES
+    for action in ("create", "edit", "delete", "bulk_delete")
+)
+_GOVERNANCE_WRITE_CELLS = tuple(
+    (action, object_type)
+    for object_type, actions in GOVERNANCE_ACTIONS.items()
+    for action in actions
+    if action not in _READ_ACTIONS
+)
+
+
+def is_read_only_member(user, organization_id: Optional[int] = None) -> bool:
+    """Whether the person's role in the organisation is viewer, so they change nothing in it.
+
+    The organisation role is the ceiling: a platform role or a persona can narrow what a member
+    may do, never widen it past this. An administrator is never read-only.
+    """
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    org_id = _matrix_org(user, organization_id)
+    if _is_administrator(user, org_id):
+        return False
+    return role_key(user, org_id) == "viewer"
+
+
+def holds_governance_write(user, organization_id: Optional[int] = None) -> bool:
+    """Whether ``user`` holds a governance persona that permits some change (a vote, a portfolio role).
+
+    Such a person is not a model writer (``may_write``); the routes their persona is meant for
+    still grant what it permits, through ``can``.
+    """
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    return any(_decide(user, action, object_type, organization_id) for action, object_type in _GOVERNANCE_WRITE_CELLS)
+
+
+def may_write(
+    user,
+    organization_id: Optional[int] = None,
+    object_type: Optional[str] = None,
+    action: str = "edit",
+) -> bool:
+    """Whether ``user`` may change the model; the one answer for the write guard and the AI chat.
+
+    The rule: a person may change the model when the permission matrix grants them a create, edit
+    or delete on a model record, or when their platform role
+    carries write permission and their organisation role is not viewer; a governance persona (a
+    board vote, a portfolio role, a solution, editing the model on a read-only account) is not a
+    model writer, and the route that persona is meant for grants what it permits. Naming ``object_type`` asks the same
+    question of one kind of record, as the form for that record does.
+    """
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    if object_type is not None:
+        return _decide(user, action, object_type, organization_id)
+    for cell_action, cell_object in _WRITE_CELLS:
+        if _decide(user, cell_action, cell_object, organization_id):
+            return True
+    from app.models.user import Permission
+
+    try:
+        general = bool(user.can(Permission.GENERAL))
+    except Exception:  # fabricated-ok: an unreadable permission is no write permission
+        return False
+    return general and role_key(user, organization_id) != "viewer"
+
+
 def default_allowed(role: str, action: str, object_type: str) -> bool:
     if object_type in GOVERNANCE_ACTIONS:
         return str(role).lower() in _GOVERNANCE_DEFAULTS[object_type].get(action, frozenset())
@@ -243,6 +319,28 @@ def _grant(org_id, subject_type, subject_key, object_type, action):
 
 def can(user, action: str, object_type: str, organization_id: Optional[int] = None) -> bool:
     """Whether ``user`` may ``action`` an ``object_type`` in the organisation."""
+    allowed = _decide(user, action, object_type, organization_id)
+    if allowed and action not in _READ_ACTIONS:
+        note_route_granted_write()
+    return allowed
+
+
+def note_route_granted_write() -> None:
+    """Record, for this request, that a route-level check let the person make a change.
+
+    A person whose only write grant is a governance persona is admitted by the write guard only as
+    far as the route itself grants; this note is how the guard learns the route asked and said yes.
+    """
+    try:
+        from flask import g, has_request_context
+
+        if has_request_context():
+            g.route_granted_write = True
+    except Exception:  # fabricated-ok: outside a request there is nothing to record
+        pass
+
+
+def _decide(user, action: str, object_type: str, organization_id: Optional[int] = None) -> bool:
     if user is None or not getattr(user, "is_authenticated", False):
         return False
     governance = object_type in GOVERNANCE_ACTIONS
