@@ -82,13 +82,11 @@ def test_the_new_owner_reaches_their_organisation_not_the_platforms_settings(
         assert page.locator("main").inner_text().strip(), "the organisation page is empty"
         _shot(page, "organisation-page", size)
 
-        # The platform's Settings, opened by address, is refused with a page and a way back.
-        assert page.goto(live_server + "/settings", wait_until="domcontentloaded").status == 403
-        expect(page.get_by_role("heading", name="You don't have access to this page")).to_be_visible()
+        # Settings opened by address leads the owner to the same organisation page, never the platform's.
+        page.goto(live_server + "/settings", wait_until="domcontentloaded")
+        page.wait_for_url("**/admin/")
         assert "System Settings" not in page.content()
-        _shot(page, "settings-refused", size)
-        page.get_by_role("link", name="Go to the dashboard").click()
-        page.wait_for_url("**/dashboard/**")
-        assert page.locator("main").inner_text().strip()
+        assert page.locator("main").inner_text().strip(), "the organisation page is empty"
+        _shot(page, "settings-by-address", size)
     finally:
         context.close()

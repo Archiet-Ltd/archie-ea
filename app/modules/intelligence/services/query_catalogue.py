@@ -981,22 +981,31 @@ def _capabilities_of_application(organization_id: int, service: Optional[str] = 
 
     rows, citations = [], []
     for mapping, capability in application_capability_links(application.id, organization_id):
-        # A unified capability points at its business capability by source_id.
-        raw_id = capability.source_id if capability.__class__.__name__ == "UnifiedCapability" else capability.id
-        try:
-            capability_id = int(raw_id)
-        except (TypeError, ValueError):
-            continue
+        # A unified capability points at its business capability by source_id; one made from a model
+        # element alone has none, and is cited to its element.
+        element_cited = False
+        if capability.__class__.__name__ == "UnifiedCapability":
+            try:
+                capability_id = int(capability.source_id)
+            except (TypeError, ValueError):
+                capability_id = capability.id
+                element_cited = bool(capability.archimate_element_id)
+        else:
+            capability_id = capability.id
         support = (getattr(mapping, "support_level", None) or "").replace("_", " ").capitalize()
         coverage = getattr(mapping, "coverage_percentage", None)
+        kind_word = getattr(mapping, "kind_word", None)
         line = " · ".join(part for part in (
-            f"{support} support" if support else "", f"Coverage: {coverage_text(coverage)}") if part) or None
+            kind_word or "", f"{support} support" if support else "", f"Coverage: {coverage_text(coverage)}") if part) or None
         rows.append({
             "id": capability_id, "name": capability.name, "support_level": support or None,
+            "how": kind_word,
             "coverage_percentage": coverage, "source_table": "application_capability_mapping",
             "truth_class": TRUTH_CLASS_DRAWN,
         })
-        citations.append(capability_citation(capability_id, capability.name, line))
+        citations.append(
+            element_citation(capability.archimate_element_id, capability.name) if element_cited
+            else capability_citation(capability_id, capability.name, line))
 
     result = {
         "answer": f"the capabilities {application.name} supports",
@@ -1108,6 +1117,69 @@ def _company_profile(organization_id: int, topic: Optional[str] = None, **_: Any
         "reason": reason,
         "next_step": next_step, "next_url": next_url, "next_label": next_label,
     }
+
+
+def _capability_cite(capability) -> Dict[str, Any]:
+    """A citation to a capability record: its fact sheet when it came from a business capability,
+    otherwise its element."""
+    try:
+        return capability_citation(int(capability.source_id), capability.name)
+    except (TypeError, ValueError):
+        if capability.archimate_element_id:
+            return element_citation(capability.archimate_element_id, capability.name)
+        return {"type": "capability", "id": None, "name": capability.name}
+
+
+def _unsupported_capabilities(organization_id: int, **_: Any) -> Dict[str, Any]:
+    """"Which capabilities have no supporting application?" -- read through the one support reader the
+    coverage page reads, so the two cannot disagree."""
+    from app.services.capability_support import unsupported_capabilities
+
+    capabilities = unsupported_capabilities(organization_id)
+    rows = [{"id": c.id, "name": c.name, "truth_class": TRUTH_CLASS_DRAWN} for c in capabilities]
+    result = {
+        "answer": "the capabilities no application is recorded as supporting",
+        "rows": rows, "total": len(rows), "citations": [_capability_cite(c) for c in capabilities],
+        "reason": None if rows else "every capability has an application recorded as supporting it",
+    }
+    if not rows:
+        result["next_step"] = "Add capabilities to your model, or generate the coverage matrix to see what supports them."
+    return result
+
+
+def _applications_of_capability(organization_id: int, capability: Optional[str] = None, **_: Any) -> Dict[str, Any]:
+    """"What supports <capability>?" -- the applications recorded as supporting the capability a name means."""
+    from app.services import capability_support as support
+
+    elements = support._elements_named(organization_id, capability or "", "capability") if capability else []
+    if not elements:
+        return {
+            "answer": f"what supports '{capability}'" if capability else "what supports a capability",
+            "matched": False, "rows": [], "total": 0, "citations": [],
+            "reason": ("no capability named '%s' exists in this workspace" % capability) if capability
+            else "no capability was named",
+            "next_step": "Ask again with the name of a capability in your model.",
+        }
+    rows, citations = [], []
+    for element in elements:
+        # A lookup only: asking what supports a capability never makes the capability's record.
+        record = support.existing_capability_record(organization_id, element)
+        for r in (support.applications_of_capability(organization_id, record.id) if record is not None else []):
+            rows.append({
+                "id": r["application_id"], "name": r["application_name"], "how": r["kind_word"],
+                "support_level": (r["support_level"] or "").capitalize() or None,
+                "truth_class": TRUTH_CLASS_DRAWN,
+            })
+            citations.append(application_citation(r["application_id"], r["application_name"]))
+    name = elements[0].name
+    result = {
+        "answer": f"the applications recorded as supporting {name}",
+        "rows": rows, "total": len(rows), "citations": citations,
+        "reason": None if rows else f"no application is recorded as supporting {name} yet",
+    }
+    if not rows:
+        result["next_step"] = "Record it on an application's Capabilities tab, or with Add relationship on an element page."
+    return result
 
 
 # What each plain question about a canvas box asks: the box, in the words a person asks it.
@@ -1276,6 +1348,20 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         description="The business capabilities mapped to a named application, read from the same mapping the application page shows, each cited to its fact sheet.",
         params=["service"],
         run=_capabilities_of_application,
+    ),
+    "unsupported_capabilities": CatalogueEntry(
+        id="unsupported_capabilities",
+        title="Which capabilities have no supporting application?",
+        description="The capabilities no application is recorded as realizing or serving, read from the same support the coverage page shows.",
+        params=[],
+        run=_unsupported_capabilities,
+    ),
+    "applications_of_capability": CatalogueEntry(
+        id="applications_of_capability",
+        title="What supports a capability?",
+        description="The applications recorded as realizing or serving a named capability, read from the same support the coverage page shows.",
+        params=["capability"],
+        run=_applications_of_capability,
     ),
     "canvas_box_entries": CatalogueEntry(
         id="canvas_box_entries",

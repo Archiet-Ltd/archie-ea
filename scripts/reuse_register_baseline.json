@@ -146,6 +146,28 @@
    "app/services/investment_prioritization_service.py": 1,
    "app/services/process_optimization_service.py": 1
   },
+  "capability-support/capability-application-row": {
+   "app/api/v1/mappings.py": 1,
+   "app/modules/vendors/services/capability_vendor_app_mapping_seeder.py": 1
+  },
+  "capability-support/coverage-row": {
+   "app/modules/capabilities/routes/mapping_routes.py": 2,
+   "app/modules/capabilities/services/capability_mapping_service.py": 1
+  },
+  "capability-support/legacy-mapping-row": {
+   "app/commands/seed_demo_company.py": 1,
+   "app/commands/seed_demo_mappings.py": 1,
+   "app/modules/ai_chat/services/ai_data_interaction_service.py": 1,
+   "app/modules/applications/routes/crud_routes.py": 1,
+   "app/modules/applications/routes/document_routes.py": 1,
+   "app/modules/applications/services/application_capability_seeder.py": 1,
+   "app/modules/architecture/routes/archimate_routes.py": 1,
+   "app/modules/capabilities/routes/mapping_routes.py": 1,
+   "app/modules/capabilities/services/business_capability_mapper.py": 1,
+   "app/modules/import_batch/services/abacus_import_service.py": 1,
+   "app/services/sample_company_service.py": 1,
+   "app/services/semantic_linking_service.py": 1
+  },
   "capability-visibility/visibility-helper": {
    "app/modules/portfolio/services/demand_triage.py": 2
   },

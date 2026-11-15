@@ -18,12 +18,17 @@ from sqlalchemy import (
     String,
     Text,
 )
+from sqlalchemy import event, select, table, column
 from sqlalchemy.orm import relationship
 
 from app import db
+from app.models.mixins import TenantMixin
 
 
-class UnifiedApplicationCapabilityMapping(db.Model):
+application_components = table("application_components", column("id"), column("organization_id"))
+
+
+class UnifiedApplicationCapabilityMapping(TenantMixin, db.Model):
     """
     Unified Application-Capability Mapping
 
@@ -34,6 +39,16 @@ class UnifiedApplicationCapabilityMapping(db.Model):
     __tablename__ = "unified_application_capability_mapping"
 
     id = Column(db.Integer, primary_key=True)
+
+    # The support relationship this row projects. The relationship is the fact; this row
+    # holds what the relationship cannot (level, coverage, maturity, notes). The row goes
+    # when the relationship goes.
+    archimate_relationship_id = Column(
+        db.Integer,
+        db.ForeignKey("archimate_relationships.id", ondelete="CASCADE"),
+        nullable=True,
+        unique=True,
+    )
 
     # Link entities
     unified_capability_id = Column(
@@ -101,6 +116,7 @@ class UnifiedApplicationCapabilityMapping(db.Model):
     # Relationships
     unified_capability = relationship("UnifiedCapability")
     application = relationship("ApplicationComponent")
+    archimate_relationship = relationship("ArchiMateRelationship", foreign_keys=[archimate_relationship_id])
 
     def __repr__(self):
         return f"<UnifiedAppCapMapping app={self.application_component_id} -> cap={self.unified_capability_id}>"
@@ -143,3 +159,16 @@ class UnifiedApplicationCapabilityMapping(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+@event.listens_for(UnifiedApplicationCapabilityMapping, "before_insert")
+def _take_the_applications_organisation(mapper, connection, target):
+    """A row written by a path that has not moved to ``capability_support`` yet belongs to the
+    organisation of its application, whatever the request context says (a command, a worker)."""
+    if target.organization_id is not None or target.application_component_id is None:
+        return
+    target.organization_id = connection.execute(
+        select(application_components.c.organization_id).where(
+            application_components.c.id == target.application_component_id
+        )
+    ).scalar()

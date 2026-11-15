@@ -45,14 +45,14 @@ def _role_of(live_server, email):
 
 
 def _load_sample(page, base):
-    page.goto(base + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.get_by_test_id("first-action-sample").click()
+    page.goto(base + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.get_by_test_id("chat-first-sample").click()
     expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
 
 def _open_chat_from_sidebar(page, base):
     page.goto(base + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.get_by_role("link", name="Ask a question").first.click()
+    page.get_by_role("link", name="AI chat").first.click()
     page.wait_for_url(re.compile(r"/ai-chat"), timeout=PAGE_TIMEOUT)
     expect(page.locator("#user-input")).to_be_visible(timeout=PAGE_TIMEOUT)
 

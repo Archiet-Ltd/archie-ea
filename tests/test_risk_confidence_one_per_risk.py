@@ -1,4 +1,4 @@
-"""A risk's confidence is the same on the simulations page and on the risk register.
+"""A risk's confidence is the same on the ranked action list and on the risk register.
 
 The register works out a ranked risk's confidence from its score and the elements it reaches; the
 prioritised action list beside the simulation screen worked out its own from the score and the level
@@ -42,7 +42,7 @@ def _confidence_after(html, marker, title):
     return found.group(1), " ".join(shown.group(2).split())
 
 
-def test_the_register_and_the_simulations_page_show_one_confidence(app, client, login_as, seeded, monkeypatch):
+def test_the_register_and_the_ranked_action_list_show_one_confidence(app, client, login_as, seeded, monkeypatch):
     (org, user, risk), (_, _, their_risk) = seeded
 
     login_as(client, user)
@@ -55,12 +55,22 @@ def test_the_register_and_the_simulations_page_show_one_confidence(app, client, 
     assert simulations.status_code == 200
     page = simulations.get_data(as_text=True)
 
+    # The ranked list is not repeated on the Scenarios page: it links to it. Follow that link.
+    link = re.search(r'<a href="([^"]+)"[^>]*data-testid="priority-actions-link"', page)
+    assert link, "the Scenarios page does not link to the ranked actions"
+    target, _, fragment = link.group(1).partition("#")
+    assert fragment == "priority-actions"
+    listing = client.get(target)
+    assert listing.status_code == 200
+    list_page = listing.get_data(as_text=True)
+    assert 'id="priority-actions"' in list_page
+
     on_register = _confidence_after(register, 'id="ranked-risks"', risk.title)
-    on_simulations = _confidence_after(page, 'data-testid="priority-actions"', risk.title)
-    assert on_register == on_simulations
+    on_list = _confidence_after(list_page, 'data-testid="priority-actions"', risk.title)
+    assert on_register == on_list
     assert on_register[0] == "low"
     assert "Linked elements: none recorded" in on_register[1]
-    assert their_risk.title not in page and their_risk.title not in register
+    assert their_risk.title not in page and their_risk.title not in list_page and their_risk.title not in register
 
 
 def test_every_screen_listing_actions_takes_the_registers_footer(app, db_session, tenant_ctx, seeded):
