@@ -150,6 +150,13 @@ def test_two_members_share_the_commits_and_the_architect_picks_one(architect, li
     expect(architect.get_by_test_id("owner-source")).to_contain_text("10 of 20 commits")
     assert ada not in architect.get_by_test_id("application-owner").inner_text()
 
+    architect.goto("%s/applications/" % live_server, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    footer_text = architect.locator("body").evaluate(
+        "(b, id) => Array.from(b.querySelectorAll('[data-footer-for=\"' + id + '\"]')).map(e => e.textContent).join(' ')",
+        str(estate["shared"]))
+    assert "GitHub commit history" in footer_text, footer_text
+    assert "Owner was entered by hand" not in footer_text and "entered by the team" not in footer_text, footer_text
+
 
 def test_no_committer_is_a_member_and_the_page_says_so(architect, live_server, estate):
     architect.goto("%s/applications/%s" % (live_server, estate["nobody"]), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)

@@ -459,19 +459,14 @@ def application_list():
         from app.services import result_footer_service
 
         origins = result_footer_service.application_origins(g.current_org_id, pagination.items)
-        from app.connectors.github import PROPOSAL_SOURCE as GITHUB_SOURCE
+        from app.connectors.github_gaps import owner_source_note
 
-        from_commits = set()
-        if application_ids:
-            from_commits = {
-                row[0]
-                for row in db.session.query(ApplicationOwner.application_id)
-                .filter(ApplicationOwner.application_id.in_(application_ids),
-                        ApplicationOwner.organization_id == g.current_org_id,
-                        ApplicationOwner.ownership_type == "primary",
-                        ApplicationOwner.source_table == GITHUB_SOURCE)
-                .all()
-            }
+        # The same recorded source the application's own page reads for "From commit history".
+        from_commits = {
+            listed.id
+            for listed in pagination.items
+            if owner_source_note(listed, owners_by_app.get(listed.id, []))
+        }
         footers_by_app = {
             listed.id: result_footer_service.application_footer(
                 listed, owner_names_by_app.get(listed.id), origins=origins,

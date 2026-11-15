@@ -409,3 +409,31 @@ def test_the_list_footer_says_an_owner_set_from_commit_history_came_from_it(
 
     assert "GitHub commit history" in page
     assert "Owner was entered by hand" not in page
+
+
+def test_another_organisations_list_footer_never_shows_the_commit_history_label(
+    db_session, make_org, tenant_ctx, github, client, login_as
+):
+    from app.services.element_ownership_service import set_element_owner
+
+    org_a, org_b = make_org("rr-footer-a"), make_org("rr-footer-b")
+    ada = make_user(db_session, org_a, "Ada", "Obi")
+    bo = make_user(db_session, org_b, "Bo", "Lin")
+    element, component = imported_application(db_session, org_a)
+    _, other_component = imported_application(db_session, org_b)
+    set_element_owner(element_type="application", element_id=other_component.id, user_id=bo.id,
+                      organization_id=org_b.id, ownership_type="primary", assigned_by=bo.id)
+    cfg = connect(db_session, tenant_ctx, org_a)
+    github.codeowners = "* @Anioko\n"
+    github.commits = account_commits("anioko", (ada.email, 6))
+    read(db_session, tenant_ctx, org_a, cfg)
+    assert [r.user_id for r in primaries(db_session, component)] == [ada.id]
+    db_session.commit()
+
+    login_as(client, ada)
+    assert "GitHub commit history" in client.get("/applications/").get_data(as_text=True)
+    login_as(client, bo)
+    page = client.get("/applications/").get_data(as_text=True)
+
+    assert "Bo Lin" in page
+    assert "GitHub commit history" not in page
