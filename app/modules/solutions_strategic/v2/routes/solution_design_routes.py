@@ -24,6 +24,7 @@ Routes:
 """
 
 from app.services.archimate_backbone import sync_archimate_element
+from app.services.cost_visibility import ROLLUP_FIGURE_KEYS
 import json
 import logging
 import os
@@ -3060,6 +3061,20 @@ def _run_proactive_analysis(app, solution_id: int, organization_id):
             logger.debug("Proactive analysis failed for sol %s: %s", solution_id, _e)
 
 
+def _for_cost_rule(ctx):
+    """A solution page's context for the signed-in person: for one the cost rule withholds from, no cost
+    figure and no amount written into the solution's text, and the page told to say why once."""
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, without_amounts, withhold_costs
+
+    if costs_visible(current_user):
+        return {**ctx, "costs_withheld": False, "costs_withheld_sentence": COSTS_WITHHELD}
+    out = {**withhold_costs(ctx), "costs_withheld": True}
+    solution = ctx.get("solution")
+    if solution is not None:
+        out["solution_description"] = without_amounts(solution.description or "")
+    return out
+
+
 @solution_design_bp.route("/<int:solution_id>", methods=["GET"])
 @login_required
 def view_solution(solution_id: int):
@@ -3079,7 +3094,7 @@ def view_solution(solution_id: int):
             solution, tab=request.args.get("tab"), user=current_user,
         )
         ctx["show_created_banner"] = request.args.get("created") == "1"
-        return render_template("solutions/record.html", **ctx)
+        return render_template("solutions/record.html", **_for_cost_rule(ctx))
 
     # AIC-312: Check for active workbench workspace linked to this solution
     active_workspace_id = None
@@ -3111,7 +3126,7 @@ def view_solution(solution_id: int):
         ctx = _build_solution_detail_context_fallback(solution)
     ctx["show_created_banner"] = request.args.get("created") == "1"
     ctx["active_workspace_id"] = active_workspace_id
-    return render_template("solutions/detail.html", **ctx)
+    return render_template("solutions/detail.html", **_for_cost_rule(ctx))
 
 
 # =============================================================================
@@ -3123,12 +3138,14 @@ def view_solution(solution_id: int):
 @login_required
 def get_copilot_insights(solution_id: int):
     """Return unseen, undismissed CopilotInsights for the blueprint page."""
+    from app.core.auth.permissions import is_read_only_member
     Solution.query.get_or_404(solution_id)
     from app.models.copilot_insight import CopilotInsight
     insights = CopilotInsight.get_unseen_for_solution(solution_id)
-    for i in insights:
-        i.seen = True
-    db.session.commit()
+    if not is_read_only_member(current_user):
+        for i in insights:
+            i.seen = True
+        db.session.commit()
     return jsonify({"insights": [i.to_dict() for i in insights]})
 
 
@@ -11922,6 +11939,11 @@ def api_raci_matrix(solution_id):
 def api_set_raci(solution_id):
     """FRAG-030: Set RACI assignment."""
     require_entity(Solution, solution_id, description="Solution not found")
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
     try:
         from app.services.raci_service import set_raci_assignment
         data = request.get_json()
@@ -11985,7 +12007,9 @@ def api_outcomes(solution_id):
         from app.services.outcome_tracking_service import OutcomeTrackingService
         service = OutcomeTrackingService()
         summary = service.get_solution_realization_summary(solution_id)
-        return jsonify({"success": True, "data": summary})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "data": summary}, keys=ROLLUP_FIGURE_KEYS))
     except HTTPException:
         raise
     except Exception as e:

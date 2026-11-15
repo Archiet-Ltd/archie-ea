@@ -197,7 +197,7 @@ def investment_matrix():
             portfolio_metrics=analysis["portfolio_metrics"],
             recommendations=analysis["recommendations"],
             currency_symbol=currency_symbol(),
-            costs_withheld_text=COSTS_WITHHELD,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception:
         current_app.logger.exception("Investment matrix scores could not be loaded")
