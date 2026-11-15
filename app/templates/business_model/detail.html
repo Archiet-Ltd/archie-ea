@@ -90,6 +90,36 @@
 </div>
 
 {% if can_edit %}
+{% call modal(id='bmc-suggest', title='Suggestions', description='Written by AI from the rest of this canvas and your model. Nothing is added until you accept it.', size='lg') %}
+<div class="flex flex-col gap-4" data-testid="bmc-suggest-panel" data-draft-url="{{ url_for('business_model.ai_draft_block', canvas_id=canvas.id) }}" data-add-url="{{ url_for('business_model.add_entry', canvas_id=canvas.id) }}">
+  <p class="text-sm text-muted-foreground" data-suggest-status role="status" aria-live="polite"></p>
+  <p class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" data-suggest-error role="alert" hidden></p>
+  <ul class="flex flex-col gap-3" data-suggest-list aria-label="Suggested entries"></ul>
+  <div class="flex justify-end gap-3">
+    {{ button(text='Close', variant='ghost', attrs_dict={'data-modal-close': 'bmc-suggest'}) }}
+  </div>
+</div>
+{% endcall %}
+<template id="bmc-suggest-row">
+  <li class="rounded-md border p-3" data-suggest-item>
+    <form method="post" action="{{ url_for('business_model.add_entry', canvas_id=canvas.id) }}" class="flex flex-col gap-2">
+      {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+      {{ input(type='hidden', name='box', value='') }}
+      {{ input(type='hidden', name='element_id', value='') }}
+      <div class="flex flex-col gap-1.5">
+        {% call label(for='') %}Entry{% endcall %}
+        {{ input(name='name', maxlength=name_limit, attrs_dict={'autocomplete': 'off', 'data-suggest-name': ''}) }}
+      </div>
+      <p class="text-sm text-muted-foreground"><span data-suggest-notice></span>. From: <span data-suggest-source></span></p>
+      <div class="flex justify-end gap-3">
+        {{ button(text='Dismiss', variant='ghost', attrs_dict={'data-suggest-dismiss': ''}) }}
+        {{ button(text='Accept', type='submit', attrs_dict={'data-suggest-accept': ''}) }}
+      </div>
+    </form>
+  </li>
+</template>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/business_model/suggest.js') }}"></script>
+
 {% for key, zone in zones.items() if zone.membership != 'attribute' %}
 {% set slug = key | replace('_', '-') %}
 {% call modal(id='add-' ~ slug, title='Add to ' ~ zone.label, description='Pick an element you already have, or name a new one.', size='sm') %}

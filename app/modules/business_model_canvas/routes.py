@@ -125,6 +125,8 @@ def _canvas_boxes(canvas):
             boxes[key] = [
                 _note_entry(canvas, box["key"], entry, editable) for entry in box["entries"]
             ]
+            if editable:
+                boxes[key + ":suggest"] = True
     return boxes, cost_line_count
 
 

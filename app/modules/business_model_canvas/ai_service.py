@@ -13,7 +13,6 @@ import json
 import logging
 from typing import Any, Dict
 
-from app.models.business_model import CANVAS_BLOCKS
 from app.modules.ai_chat.services.llm_service_impl import LLMService
 
 logger = logging.getLogger(__name__)
@@ -40,23 +39,39 @@ class BusinessModelAIDraftError(Exception):
     """
 
 
-def _build_context(canvas, block_key: str) -> Dict[str, Any]:
-    """Assemble only the context this function actually queries: the
-    canvas's other filled-in blocks, plus cheap org-wide app/capability
-    counts. Nothing is inferred or invented.
+CANDIDATE_LIMIT = 40
+
+
+def _build_context(canvas, block_key: str, show_costs: bool = True) -> Dict[str, Any]:
+    """Assemble the context from the one canvas reader and the organisation's own model: what the other
+    boxes already hold, the existing elements that could go in this box, and the application count.
+    A person the cost rule withholds from gets no cost line. Nothing is inferred or invented.
     """
+    from app.modules.business_model_canvas import model_service
+
+    contents = model_service.canvas_contents(canvas.organization_id, canvas.id)
+    if not show_costs:
+        contents = model_service.withhold_cost_lines(contents)
     context: Dict[str, Any] = {
         "canvas_name": canvas.name,
         "operating_model_type": canvas.operating_model_type or None,
         "target_block": block_key,
         "other_blocks": {},
     }
-    for key in CANVAS_BLOCKS:
-        if key == block_key:
+    for box in contents["boxes"]:
+        if box["key"] == block_key:
             continue
-        value = getattr(canvas, key)
-        if value:
-            context["other_blocks"][key] = value
+        names = [entry["name"] for entry in box["entries"]]
+        names += [price["text"] for price in box["prices"]]
+        if show_costs and box["costs"]:
+            names += [line["text"] for line in box["costs"]["lines"]]
+        if names:
+            context["other_blocks"][box["key"]] = names
+
+    context["existing_elements"] = [
+        {"id": el.id, "name": el.name, "type": el.type}
+        for el in model_service.candidates(canvas, block_key)[:CANDIDATE_LIMIT]
+    ]
 
     try:
         from app.models.application_portfolio import ApplicationComponent
@@ -66,13 +81,6 @@ def _build_context(canvas, block_key: str) -> Dict[str, Any]:
         context["application_count"] = ApplicationComponent.query.count()
     except Exception:
         logger.exception("Failed to count applications for BMC draft context")
-
-    # No capability count here: UnifiedCapability has no organization_id
-    # column at all, so a bare .count() would be the *global* cross-org
-    # catalog size, not this org's — and there's no cheap org-scoped
-    # derivation for a plain count the way there is for named capabilities
-    # (see value_stream_ai_service._org_scoped_capability_names). Omitted
-    # rather than sent mislabelled as the org's own count.
 
     return context
 
@@ -84,11 +92,12 @@ def _build_prompt(context: Dict[str, Any], block_key: str) -> str:
         "Canvas (Osterwalder/Pigneur). Below is the real, verified context "
         "for this canvas — do not invent facts not present in it.\n\n"
         f"Canvas context (JSON):\n{json.dumps(context, indent=2, default=str)}\n\n"
-        f'Draft content for the "{label}" block only. Respond ONLY with a '
+        f'Propose entries for the "{label}" block only. Respond ONLY with a '
         "single JSON object with exactly these keys:\n"
-        '- "content": string, the drafted block content (one idea per line)\n'
-        '- "based_on": array of strings, which pieces of context this draft '
-        "leans on (e.g. names of other filled blocks it is consistent with)\n\n"
+        '- "proposals": array of objects, each with "name" (a short entry name), '
+        '"source" (the part of the context it comes from, in plain words) and '
+        '"element_id" (the id of one of existing_elements when the entry is that '
+        "element, otherwise null)\n\n"
         "Respond with raw JSON only, no markdown fences, no extra prose."
     )
 
@@ -101,7 +110,7 @@ def _strip_fences(raw: str) -> str:
     return raw.strip()
 
 
-def _parse_draft(raw: str, block_key: str) -> Dict[str, Any]:
+def _parse_draft(raw: str, block_key: str, allowed_ids=frozenset()) -> Dict[str, Any]:
     try:
         data = json.loads(_strip_fences(raw))
     except json.JSONDecodeError as exc:
@@ -111,6 +120,9 @@ def _parse_draft(raw: str, block_key: str) -> Dict[str, Any]:
 
     if not isinstance(data, dict):
         raise BusinessModelAIDraftError("LLM response was not a JSON object")
+
+    if "proposals" in data:
+        return _parse_proposals(data["proposals"], block_key, allowed_ids)
 
     required_keys = {"content", "based_on"}
     missing = required_keys - data.keys()
@@ -124,26 +136,54 @@ def _parse_draft(raw: str, block_key: str) -> Dict[str, Any]:
     if not isinstance(data["based_on"], list):
         raise BusinessModelAIDraftError("LLM response field 'based_on' was not a list")
 
+    sources = [str(x) for x in data["based_on"]]
+    proposals = [
+        {"name": line.strip(), "source": ", ".join(sources), "element_id": None}
+        for line in data["content"].splitlines()
+        if line.strip()
+    ]
+    return {"block": block_key, "content": data["content"], "based_on": sources, "proposals": proposals}
+
+
+def _parse_proposals(items, block_key, allowed_ids):
+    if not isinstance(items, list):
+        raise BusinessModelAIDraftError("LLM response field 'proposals' was not a list")
+    proposals = []
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("name"), str) or not item["name"].strip():
+            continue
+        source = str(item.get("source") or "").strip()
+        if not source:
+            # A proposal that cannot say where it came from is not shown.
+            continue
+        element_id = item.get("element_id")
+        proposals.append({
+            "name": " ".join(item["name"].split()),
+            "source": source,
+            "element_id": element_id if element_id in allowed_ids else None,
+        })
     return {
         "block": block_key,
-        "content": data["content"],
-        "based_on": [str(x) for x in data["based_on"]],
+        "content": "\n".join(p["name"] for p in proposals),
+        "based_on": sorted({p["source"] for p in proposals}),
+        "proposals": proposals,
     }
 
 
-def generate_block_draft(canvas, block_key: str) -> Dict[str, Any]:
-    """Generate an AI draft for one Business Model Canvas block.
+def generate_block_draft(canvas, block_key: str, show_costs: bool = True) -> Dict[str, Any]:
+    """Propose entries for one box of a canvas.
 
-    Advisory only — the caller must not persist this directly; the UI feeds
-    it into the block's existing inline editor and the user saves it via
-    the existing save-block path. Raises ValueError for an unknown block
-    key (caller maps this to 400), BusinessModelAIDraftError (or lets an
-    LLMService exception propagate) rather than fabricating a fallback.
+    Advisory only: the caller must not persist this; the person accepts a proposal and the canvas's own
+    add-entry writer stores it. Raises ValueError for a box that takes no entries (caller maps this to
+    400), BusinessModelAIDraftError (or lets an LLMService exception propagate) rather than fabricating
+    a fallback.
     """
-    if block_key not in CANVAS_BLOCKS:
+    from app.modules.business_model_canvas import model_service
+
+    if block_key not in model_service.element_boxes(canvas):
         raise ValueError(f"Unknown canvas block: {block_key}")
 
-    context = _build_context(canvas, block_key)
+    context = _build_context(canvas, block_key, show_costs)
     prompt = _build_prompt(context, block_key)
     raw = LLMService.generate_from_prompt(prompt, use_cache=False)
-    return _parse_draft(raw, block_key)
+    return _parse_draft(raw, block_key, {e["id"] for e in context["existing_elements"]})
