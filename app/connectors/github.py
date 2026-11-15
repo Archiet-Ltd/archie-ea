@@ -1935,6 +1935,8 @@ def run_first_sync(org_id, connector_id, scope=None) -> Dict[str, Any]:
             # What the read proposed is checked, reviewed and applied, linked or declined here, in the read's
             # own job: nobody approves it.
             settled = settle_read_proposals(org_id)
+            if scope and scope.get("product_id"):
+                join_settled_to_product(org_id, scope["product_id"], scope.get("repositories") or [])
     except CredentialUnreadable as exc:  # the sentence says what failed and who can fix it
         db.session.rollback()
         return {"success": False, "repositories": 0, "proposals": pending_total(org_id), "error": str(exc)}
@@ -1948,6 +1950,38 @@ def run_first_sync(org_id, connector_id, scope=None) -> Dict[str, Any]:
         "failed": result.get("records_failed", 0),
         "error": (result.get("error") or result.get("error_message") or None) if not result.get("success") else None,
     }
+
+
+def join_settled_to_product(org_id, product_id, repositories) -> int:
+    """Join to the Product every element a proposal about one of its chosen repositories landed. A pass that
+    settles an earlier read's proposals can apply one a moment before this read claims it, and the claim then
+    comes too late to carry the Product with it; this pass, run once everything is settled, closes that gap.
+    A join already made is left as it is. Returns how many joins it checked."""
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    chosen = set(repositories)
+    checked = 0
+    rows = AIChatCRUDApproval.query.filter_by(
+        organization_id=org_id, source_table=PROPOSAL_SOURCE, status=ApprovalStatus.APPROVED).order_by(
+        AIChatCRUDApproval.id).all()
+    for approval in rows:
+        try:
+            payload = json.loads(approval.operation_payload or "{}")
+        except (TypeError, ValueError):
+            continue
+        repository = payload.get("repository") or payload.get("from")
+        if repository not in chosen:
+            continue
+        if approval.operation_type == OP_TECHNOLOGY and payload.get("technology"):
+            element = _find_technology_element(org_id, payload["technology"])
+        else:
+            element = _element_for_repository(org_id, repository, payload.get("path"))
+        if element is not None:
+            _join_to_product(org_id, {"product_id": product_id}, element, repository=repository,
+                             commit=payload.get("commit"), file=payload.get("file") or payload.get("evidence_file"))
+            checked += 1
+    db.session.commit()
+    return checked
 
 
 def read_summary(repositories: int, settled: Dict[str, int], waiting: int) -> str:
