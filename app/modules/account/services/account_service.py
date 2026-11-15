@@ -314,7 +314,9 @@ class AccountService:
         if not mail_available():
             return "mail_unavailable"
         user = User.find_by_email(email)
-        if user is not None and user.password_hash is not None:
+        # A confirmed account that signs in only with Google or Microsoft has no
+        # password yet; the reset link is how it sets its first one.
+        if user is not None and (user.password_hash is not None or user.confirmed):
             # No one is signed in, so there is no session organisation: the token
             # row belongs to the account's own organisation (account_tokens is
             # fenced by row-level security), hence the platform scope.

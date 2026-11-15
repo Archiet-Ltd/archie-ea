@@ -108,8 +108,16 @@ def test_another_organisations_elements_never_appear(app, db_session, make_org, 
     mine, theirs = make_org("mine"), make_org("theirs")
     one = _estate(db_session, mine, "c")
     other = _estate(db_session, theirs, "d")
-    # A relationship row that crosses the boundary: the foreign element must still not be listed.
-    _rel(db_session, mine, one["product"], other["service"], "Association")
+    # A relationship row that crosses the boundary, seeded with plain SQL
+    # (the model guard now rejects cross-org relationships through the ORM,
+    # but rows written before the guard may still exist). The product page
+    # filters by organisation_id so foreign elements never appear.
+    from sqlalchemy import text
+    db_session.execute(text(
+        "INSERT INTO archimate_relationships (organization_id, source_id, target_id, type, source_kind, created_at, updated_at) "
+        "VALUES (:org_id, :source_id, :target_id, 'Association', 'manual', now(), now())"
+    ), {"org_id": mine.id, "source_id": one["product"].id, "target_id": other["service"].id})
+    db_session.flush()
     user = _user(db_session, mine)
     html = _get(client, login_as, user, _product_url(one["product"])).get_data(as_text=True)
     assert "Orders c" in html
@@ -129,8 +137,14 @@ def test_element_page_relationship_list_excludes_another_organisations_element(
     # Same-org related element (should appear in 'Also connected to')
     local_related = _el(db_session, mine, "Local related", "BusinessService", "Business")
     _rel(db_session, mine, service, local_related, "Serving")
-    # Cross-org relationship (should NOT appear)
-    _rel(db_session, mine, service, foreign, "Serving")
+    # Cross-org relationship (should NOT appear), stored with plain SQL because the
+    # model guard refuses to write one through the ORM; rows from before the guard persist.
+    from sqlalchemy import text
+    db_session.execute(text(
+        "INSERT INTO archimate_relationships (organization_id, source_id, target_id, type, source_kind, created_at, updated_at) "
+        "VALUES (:org_id, :source_id, :target_id, 'Serving', 'manual', now(), now())"
+    ), {"org_id": mine.id, "source_id": service.id, "target_id": foreign.id})
+    db_session.flush()
     user = _user(db_session, mine)
     html = _get(client, login_as, user,
                 f"/architecture/business/BusinessService/{service.id}?ae=1").get_data(as_text=True)

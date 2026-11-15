@@ -46,7 +46,14 @@ except Exception:  # registry import failure must not take the turn with it
 
 # Agent-mode system prompt prefix injected before domain context.
 _AGENT_PREFIX = """You are an Enterprise Architecture Copilot with DIRECT WRITE ACCESS
-to the architecture repository. You do not give advice for humans to act on — you act.
+to the customer's architecture model. You do not give advice for humans to act on — you act.
+
+WORDS YOU USE WITH THE CUSTOMER: write as you would to a CTO. Say "a proposed change to your
+model", never the internal name of a tool, a field or a record type; say "not supported" or
+"in progress", never `supported: false` or `in_progress`; say "Architecture Review Board" before
+you say ARB; name a page and link it ("the Solutions page"), never write a path in backticks.
+If a lookup or a save fails, say in one plain sentence what was not changed and why; never show
+the name of a tool, a table, a column or any database text.
 
 WHAT YOU CAN DO (the main tools; the list offered to you in this conversation is authoritative):
 Phase A — Motivation: create_driver, create_goal, create_constraint
@@ -444,6 +451,8 @@ class AgentRunner:
         # Tokens of the model call in flight, held back until the gate has
         # judged the text so a refused answer is never partly shown.
         self._held_tokens: Optional[list] = None
+        self._streaming_words = None
+        self._write_failed = False
         self._withheld_claims: list = []   # sentences refused (enforce mode)
         self._would_withhold: list = []    # sentences logged only (log mode)
         # The verdict on each change this runner recorded, by record id, and the model drafting now
@@ -489,13 +498,31 @@ class AgentRunner:
         if self._held_tokens is not None:
             self._held_tokens.append(text)
         else:
-            self._emit({"type": "token", "text": text})
+            self._emit_in_customer_words(text)
+
+    def _emit_in_customer_words(self, text: str) -> None:
+        """Stream *text* the way the finished answer will read: a name only the
+        product uses is never on screen, not even for the length of the stream."""
+        from app.modules.ai_chat.services.customer_words import StreamingWords
+
+        words = getattr(self, "_streaming_words", None)
+        if words is None:
+            words = self._streaming_words = StreamingWords(lambda: bool(getattr(self, "_write_failed", False)))
+        said = words.feed(text)
+        if said:
+            self._emit({"type": "token", "text": said})
+
+    def _flush_customer_words(self) -> None:
+        words = getattr(self, "_streaming_words", None)
+        rest = words.finish() if words is not None else ""
+        if rest:
+            self._emit({"type": "token", "text": rest})
 
     def _release_held_tokens(self, release: bool) -> None:
         held, self._held_tokens = self._held_tokens, None
         if release:
             for text in held or []:
-                self._emit({"type": "token", "text": text})
+                self._emit_in_customer_words(text)
 
     @staticmethod
     def _inject_trusted_tool_context(
@@ -654,6 +681,22 @@ class AgentRunner:
             self._collect_answer_sources(result, sources)
             return
         entity_type = self._TOOL_ENTITY.get(tool_name)
+        if tool_name == "explain_element":
+            # The element read is the citation: its name links to its own record page.
+            body = result.get("result") if isinstance(result, dict) and result.get("success") else None
+            if isinstance(body, dict) and body.get("element_id") is not None:
+                key = ("archimate_element", body["element_id"])
+                if not any((s["type"], s["id"]) == key for s in sources) and len(sources) < self.MAX_SOURCES:
+                    sources.append({
+                        "type": "archimate_element",
+                        "id": body["element_id"],
+                        "name": body["element_name"],
+                        "url": self._source_url("archimate_element", {
+                            "id": body["element_id"], "layer": body.get("element_layer"),
+                            "type": body.get("element_type"),
+                        }),
+                    })
+            return
         if tool_name == "get_application_capabilities":
             # Each capability is cited to its own fact sheet, as the keyword answer cites it.
             for row in (result.get("result") if isinstance(result, dict) and result.get("success") else None) or []:
@@ -1245,6 +1288,8 @@ class AgentRunner:
                     )
                     self._emit({"type": "tool_result", "tool": tc.name, "result": result})
 
+                    if result.get("success") is False and tc.name in _MUTATING_TOOLS:
+                        self._write_failed = True
                     if result.get("success"):
                         actions_taken.append({
                             "tool": tc.name,
@@ -2448,6 +2493,18 @@ class AgentRunner:
                 "genome_post_check removed %d citation(s) outside the turn ledger", built["removed"],
             )
 
+    def _rewrite_customer_terms(self, result: dict) -> None:
+        """Say the final answer in the customer's words (see customer_words)."""
+        text = result.get("response")
+        if isinstance(text, str) and text.strip():
+            from app.modules.ai_chat.services.customer_words import in_customer_words
+
+            said = in_customer_words(text, bool(getattr(self, "_write_failed", False)))
+            if said != text:
+                # The streamed words were already shown; the client swaps them for these.
+                result["reworded"] = True
+            result["response"] = said
+
     def _log_would_refuse(self, uncited: list) -> None:
         """One structured WARNING per answer the gate would have refused. The
         unverified record names are logged; the answer text is not."""
@@ -2493,6 +2550,8 @@ class AgentRunner:
         self._apply_honesty_rules(result)
         self._apply_genome_post_check(result, provider_used)
         self._apply_citation_gate(result)
+        self._flush_customer_words()
+        self._rewrite_customer_terms(result)
         if (result.get("citation_gate") or {}).get("refused"):
             result.pop("genome_answer", None)
         if model_used and not result.get("error"):

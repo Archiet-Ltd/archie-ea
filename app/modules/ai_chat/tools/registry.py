@@ -1429,14 +1429,14 @@ TOOL_SCHEMAS = [
         "mutates": False,
         "record_types_written": [],
         "description": (
-            "Propose a change to the enterprise genome (the ArchiMate model) as a "
-            "structured, provenance-bearing PATCH. Use when the user asks to propose "
-            "a missing capability, a control, a driver, a requirement, or any "
-            "motivation/architecture element. Do NOT create elements directly — emit "
-            "a patch object and this tool validates it and queues it for human "
-            "approval. The patch MUST include target.organization_id, target.domain, "
-            "operation (add|modify), element (archimate_type, layer, name), and "
-            "provenance (proposed_by, rationale, archimate_anchor)."
+            "Propose a change to your model as a structured, provenance-bearing "
+            "proposal. Use when the user asks to propose a missing capability, a "
+            "control, a driver, a requirement, or any motivation/architecture "
+            "element. Do NOT create elements directly — emit a proposal object and "
+            "this tool validates it and queues it for human approval. The proposal "
+            "MUST include target.organization_id, target.domain, operation (add|modify), "
+            "element (archimate_type, layer, name), and provenance "
+            "(proposed_by, rationale, archimate_anchor)."
         ),
         "parameters": {
             "type": "object",
@@ -1448,7 +1448,7 @@ TOOL_SCHEMAS = [
                 "patch": {
                     "type": "object",
                     "description": (
-                        "The genome patch object conforming to GENOME_PATCH_SCHEMA: "
+                        "The proposal object conforming to GENOME_PATCH_SCHEMA: "
                         "{target:{organization_id,domain}, operation, "
                         "element:{archimate_type,layer,name,description?}, "
                         "provenance:{proposed_by,rationale,archimate_anchor}}."

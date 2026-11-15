@@ -136,9 +136,14 @@
 {% call ui.tooltip('Add to ' ~ title) %}{% call ui.button(variant='ghost', size='icon-xs', class='text-muted-foreground', attrs={'@click': "Platform.modal.open('add-" ~ key ~ "')", 'aria-label': 'Add to ' ~ title}) %}{{ ui.lucide('plus') }}{% endcall %}{% endcall %}
 {%- endmacro %}
 
+{#- The Suggest button of a box, with its tooltip: it opens the suggestions panel for that box. -#}
+{% macro suggest_button(key, title) -%}
+{% call ui.tooltip('Suggest for ' ~ title) %}{% call ui.button(variant='ghost', size='icon-xs', class='text-muted-foreground', attrs={'data-bmc-suggest': key, 'data-box-title': title, 'aria-label': 'Suggest for ' ~ title}) %}{{ ui.lucide('sparkles') }}{% endcall %}{% endcall %}
+{%- endmacro %}
+
 {#- The header band of a box: the zone tint with its label, the entry count, the "i" popover and the add button, then the icon,
     title and the framework's question in the foreground colour at 70 percent (4.5:1 or better on every tint). b needs key, title, question, icon, number. -#}
-{% macro band(canvas_id, b, m, items, add=false, compact=false, count=true) -%}
+{% macro band(canvas_id, b, m, items, add=false, compact=false, count=true, suggest=false) -%}
   {% if compact %}
   {#- Inside a fixed shape the band keeps to one short row: the title, then the count, the "i" popover and the add button; the question stays for a screen reader and in the popover. -#}
   <div class="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-t-lg border-b px-3 py-2 {{ ZONES[m.zone] }}" data-canvas-band="{{ m.zone }}">
@@ -149,6 +154,7 @@
     <span class="flex shrink-0 items-center gap-1">
       {% if count %}{{ ui.badge(text=items|length, variant='secondary') }}{% endif %}
       {{ info(b.title, m.guidance, m.example) }}
+      {% if suggest %}{{ suggest_button(b.key, b.title) }}{% endif %}
       {% if add %}{{ add_button(b.key, b.title) }}{% endif %}
     </span>
     <span class="sr-only">{{ b.question }}</span>
@@ -160,7 +166,8 @@
       <span class="flex shrink-0 items-center gap-1">
         {% if count %}{{ ui.badge(text=items|length, variant='secondary') }}{% endif %}
         {{ info(b.title, m.guidance, m.example) }}
-        {% if add %}{{ add_button(b.key, b.title) }}{% endif %}
+        {% if suggest %}{{ suggest_button(b.key, b.title) }}{% endif %}
+      {% if add %}{{ add_button(b.key, b.title) }}{% endif %}
       </span>
     </div>
     {% call ui.card_title(class='flex items-center gap-2 text-foreground') %}
@@ -183,7 +190,7 @@
 <div id="box-{{ b.key }}" class="contents"></div>
 {% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' relative gap-0 py-0' ~ (' flex min-h-0 flex-col overflow-hidden' if scroll else '')) %}
   {%- set withheld = boxes.get(b.key ~ ':withheld') -%}
-  {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add, compact=scroll, count=not withheld) }}
+  {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add, compact=scroll, count=not withheld, suggest=add and boxes.get(b.key ~ ':suggest')) }}
   {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3' ~ (' overflow-y-auto' if scroll else '')) %}
     {% if withheld %}<p class="text-sm text-foreground/70" data-canvas-withheld="{{ b.key }}">{{ withheld }}</p>
     {% else %}
