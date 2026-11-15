@@ -177,7 +177,13 @@ def init_session_policy(app):
                 own = _idle_seconds_admin(app)
         except Exception as exc:
             logger.debug("session policy: idle limit for template unavailable: %s", exc)
-        return {"session_idle_timeout_seconds": own}
+        admin_secs = _idle_seconds_admin(app)
+        if admin_secs % 60 == 0:
+            n = admin_secs // 60
+            admin_text = "%d minute%s" % (n, "" if n == 1 else "s")
+        else:
+            admin_text = "%d second%s" % (admin_secs, "" if admin_secs == 1 else "s")
+        return {"session_idle_timeout_seconds": own, "admin_idle_limit_text": admin_text}
 
     @app.before_request
     def _enforce_session_policy():

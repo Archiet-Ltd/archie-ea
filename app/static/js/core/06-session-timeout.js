@@ -135,7 +135,21 @@
         }
     }
 
-    function autoLogout() { showSignedOut('idle'); }
+    // The clock in this tab can run out while the person works in another tab
+    // of the same session. Ask the server before saying anything.
+    async function autoLogout() {
+        try {
+            // raw-fetch-ok: this IS the session probe; Platform.fetch would treat its 401 as an error to toast
+            const r = await nativeFetch(KEEPALIVE_URL, {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', [BACKGROUND_HEADER]: '1' }
+            });
+            if (r.ok && !(r.redirected && /\/account\/login/.test(r.url))) { resetTimer(); return; }
+        } catch (e) {
+            log.debug('session check failed (network)');
+        }
+        showSignedOut('idle');
+    }
 
     function resetTimer() {
         if (endedShown) return;

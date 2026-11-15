@@ -82,6 +82,23 @@ def test_warning_comes_before_the_sign_out_and_stay_signed_in_keeps_the_session(
     page.close()
 
 
+def test_idle_tab_says_nothing_false_while_the_person_works_in_another_tab(browser, short_limit_server):
+    org = _administrator()
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    idle_tab = context.new_page()
+    sign_in(idle_tab, short_limit_server, org["emails"]["platform_admin"])
+    assert _signed_in(idle_tab, short_limit_server)
+    working_tab = context.new_page()
+    started = time.time()
+    # The person keeps working in the second tab for longer than the limit; the first tab's own clock runs out.
+    while time.time() - started < LIMIT + 20:
+        assert _signed_in(working_tab, short_limit_server, "/dashboard/overview")
+        working_tab.wait_for_timeout(10000)
+    expect(idle_tab.locator("#session-ended-dialog")).to_be_hidden()
+    assert _signed_in(idle_tab, short_limit_server), "the session is alive, so the idle tab must still be signed in"
+    context.close()
+
+
 def test_open_chat_page_says_at_once_when_the_session_ended_and_signs_back_in_with_the_question(browser, short_limit_server):
     org = _administrator()
     email = org["emails"]["platform_admin"]
@@ -161,7 +178,7 @@ def test_keep_me_logged_in_holds_for_a_non_administrator_and_is_not_promised_to_
     page3 = browser.new_page()
     page3.goto(short_limit_server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page3.locator("#remember-admin-note")).to_have_text(
-        "Administrators are always signed out after 15 minutes without activity, to protect the organisation's data.")
+        "Administrators are always signed out after %d seconds without activity, to protect the organisation's data." % LIMIT)
     ctx2 = browser.new_context()
     page4 = ctx2.new_page()
     _login_remembering(page4, short_limit_server, admin["emails"]["platform_admin"])
