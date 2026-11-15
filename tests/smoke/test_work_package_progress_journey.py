@@ -138,6 +138,8 @@ def test_a_cancelled_package_says_it_was_cancelled(browser, live_server, seeded,
         expect(page.locator("[data-testid='wp-progress']")).to_contain_text("Cancelled")
         expect(page.locator("[data-testid='wp-progress-source']")).to_have_text("Cancelled")
         expect(page.locator("[data-testid='wp-progress']")).not_to_contain_text("Edit")
+        expect(page.locator("[data-testid='result-footer-evidence']")).to_contain_text("Progress: cancelled")
+        expect(page.locator("[data-testid='result-footer-evidence']")).not_to_contain_text("Progress: not recorded")
         _shot(page, tmp_path, "390 dark", "cancelled")
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
     finally:

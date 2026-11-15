@@ -480,7 +480,9 @@ def work_package_facts(wp, link_self: bool = True, name_shown: bool = False) -> 
 
     basis = progress_basis(wp)
     progress = basis["percent"]
-    if progress is None:
+    if progress is None and basis["label"] == "Cancelled":
+        facts.append(fact("Progress: cancelled", source_kind="manual", subject="Progress", as_of=when))
+    elif progress is None:
         facts.append(fact("Progress: not recorded", missing=True))
     else:
         facts.append(fact("Progress: %d%%" % progress if basis["source"] == "entered"
