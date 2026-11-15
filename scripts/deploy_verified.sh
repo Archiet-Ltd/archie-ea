@@ -265,6 +265,12 @@ fi
 cd "$BUILD_TREE"
 docker compose build server schema-deploy </dev/null
 docker compose run --rm --no-deps -T database-bootstrap </dev/null
+# database-acl runs twice. Before the migration it hands every existing public type to
+# the deploy role, because a migration such as ALTER TYPE needs to own the type; this run
+# uses the new configure_roles.py because the service bind-mounts the checkout (./:/app).
+# After it, database-acl runs again to grant on the tables the migration created.
+# `run` returns the container's exit code, so a failure stops the script (set -e).
+docker compose run --rm --no-deps -T database-acl </dev/null
 docker compose run --rm --no-deps -T -e ALLOW_DOWNTIME_MIGRATIONS="${ALLOW_DOWNTIME_MIGRATIONS:-0}" -e FORCE_FULL_SCHEMA_PASS="${FORCE_FULL_SCHEMA_PASS:-0}" schema-deploy </dev/null
 docker compose run --rm --no-deps -T database-acl </dev/null
 cd "$LIVE_DIR"

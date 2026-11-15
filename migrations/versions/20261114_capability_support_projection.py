@@ -15,7 +15,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261114_capsupport_projection"
-down_revision = "20261114_plan_education"
+down_revision = "20261114_sign_in_identities"
 branch_labels = None
 depends_on = None
 

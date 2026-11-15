@@ -89,6 +89,7 @@ def _begin_sso(config, email, *, test_mode: bool):
             result = _svc.initiate_oidc_flow(config, redirect_uri)
             session["sso_state"] = result["state"]
             session["sso_nonce"] = result["nonce"]
+            session["sso_code_verifier"] = result["code_verifier"]
             session["sso_org_id"] = config.organization_id
             session["sso_email"] = email
             session["sso_test_mode"] = test_mode
@@ -129,6 +130,7 @@ def sso_callback_oidc():
         return render_template("errors/400.html"), 400
 
     expected_nonce = session.pop("sso_nonce", None)
+    code_verifier = session.pop("sso_code_verifier", None)
     org_id = session.pop("sso_org_id", None)
     session.pop("sso_email", None)
     test_mode = session.pop("sso_test_mode", False)
@@ -148,7 +150,8 @@ def sso_callback_oidc():
 
         redirect_uri = url_for("sso.sso_callback_oidc", _external=True)
         userinfo = _svc.handle_oidc_callback(
-            config, code, state, redirect_uri, expected_nonce=expected_nonce
+            config, code, state, redirect_uri, expected_nonce=expected_nonce,
+            code_verifier=code_verifier,
         )
         return _finish_sso(config, org, userinfo, test_mode=test_mode)
 

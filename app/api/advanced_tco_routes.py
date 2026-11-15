@@ -292,7 +292,9 @@ def get_industry_benchmarks():
                     }
                 )
 
-        return jsonify({"success": True, "data": {"benchmarks": benchmarks}})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "data": {"benchmarks": benchmarks}}))
 
     except Exception as e:
         logger.error(f"Get benchmarks error: {e}")
@@ -752,7 +754,9 @@ def health_check():
             "service_version": "1.0.0",
         }
 
-        return jsonify({"success": True, "data": health_status})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "data": health_status}))
 
     except Exception as e:
         logger.error(f"Health check error: {e}")
