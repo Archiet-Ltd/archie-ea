@@ -47,13 +47,9 @@ def org(request):
     return _seed_standard_org(request, None)
 
 
-def _sitemap_paths(app, xml):
-    """The paths of the pages a sitemap lists, on the site's configured address."""
-    from app.services.origin import canonical_origin
-
-    with app.app_context():
-        origin = canonical_origin()
-    return re.findall(r"<loc>%s([^<]*)</loc>" % re.escape(origin), xml)
+def _sitemap_paths(origin, xml):
+    """The paths of the pages a sitemap lists. The live server's configured public address is its own address."""
+    return re.findall(r"<loc>%s([^<]*)</loc>" % re.escape(origin.rstrip("/")), xml)
 
 
 def _hrefs(page, selector):
@@ -138,7 +134,7 @@ def test_an_early_access_page_in_the_sitemap_passes():
     assert _sitemap_problem("/early-access/x", 200, True, "X", "/early-access/x") is None
 
 
-def test_visitor_navbar_footer_and_sitemap_lead_only_to_pages_with_content(browser, wave_server, org, app):
+def test_visitor_navbar_footer_and_sitemap_lead_only_to_pages_with_content(browser, wave_server, org):
     page = browser.new_page()
     try:
         page.goto(wave_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -160,7 +156,7 @@ def test_visitor_navbar_footer_and_sitemap_lead_only_to_pages_with_content(brows
         assert not problems, "\n".join(problems)
 
         xml = page.request.get(wave_server + "/sitemap-en.xml").text()
-        paths = _sitemap_paths(app, xml)
+        paths = _sitemap_paths(wave_server, xml)
         assert paths
         for path in paths:
             status, early, heading = _lands_with_content(page, wave_server, path)
@@ -392,7 +388,7 @@ def test_a_visitor_reads_each_kind_of_early_access_page_with_its_own_name_and_ea
         page.close()
 
 
-def test_a_visitor_with_an_old_link_and_one_from_the_hub_each_read_the_capability_by_name_and_description(browser, wave_server, org, app):
+def test_a_visitor_with_an_old_link_and_one_from_the_hub_each_read_the_capability_by_name_and_description(browser, wave_server, org):
     """A visitor holding a shared link from an earlier release lands on that capability's page, headed with its name and
     describing it in words no other page uses; every page the hub lists says what the hub says; a closed address of
     plumbing leads to the hub, which lists what is coming."""
@@ -429,7 +425,7 @@ def test_a_visitor_with_an_old_link_and_one_from_the_hub_each_read_the_capabilit
             "els => els.map(e => [e.querySelector('a').getAttribute('href'), e.querySelector('a').innerText.trim(), e.innerText.trim()])")
         assert len(listed) >= 10
         sitemap_xml = page.request.get(wave_server + "/sitemap-en.xml").text()
-        sitemap_paths = _sitemap_paths(app, sitemap_xml)
+        sitemap_paths = _sitemap_paths(wave_server, sitemap_xml)
         blurbs = set()
         for href, title, line in listed:
             blurb = line[len(title):].lstrip(": ").strip()
