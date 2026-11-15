@@ -569,6 +569,62 @@ def _element_ids_in_rows(rows: List[Dict[str, Any]]) -> List[int]:
     return ids
 
 
+def filter_relationships_by_org(
+    relationships: List[Any], org_id: Optional[int], *, direction: str = "both"
+) -> List[Any]:
+    """Return only relationships whose far end belongs to ``org_id``.
+
+    This is the single shared fence for every screen that lists relationships.
+    The element drawer, the relationships list, the element relationships
+    endpoint, the enterprise relationships list and the drawer's solutions
+    list all use it, so a far end that belongs to another organisation is
+    left out everywhere.
+
+    Elements carry no shared-reference rows (the element table refuses a row with
+    no organisation), so there is no unowned far end to allow; ``org_id`` of
+    ``None`` sees nothing.
+
+    Args:
+        relationships: List of ArchiMateRelationship objects (or objects with
+            ``source_id`` and ``target_id`` attributes).
+        org_id: The organisation to fence on. If ``None``, returns an empty list
+            (no tenant context means nothing is shown).
+        direction: "incoming" keeps relationships where the source is in the org;
+            "outgoing" keeps relationships where the target is in the org;
+            "both" (default) keeps relationships where both ends are in the org.
+
+    Returns:
+        Filtered list of the same relationship objects, in the same order.
+    """
+
+    if org_id is None:
+        return []
+
+    # Collect all far-end element IDs we need to check
+    far_end_ids: List[int] = []
+    for rel in relationships:
+        if direction in ("incoming", "both"):
+            far_end_ids.append(rel.source_id)
+        if direction in ("outgoing", "both"):
+            far_end_ids.append(rel.target_id)
+
+    # Resolve in one batched query: only elements inside org_id are returned
+    resolved = _resolve_elements_batch(far_end_ids, org_id)
+    allowed_ids = set(resolved.keys())
+
+    # Filter relationships
+    kept = []
+    for rel in relationships:
+        if direction in ("incoming", "both"):
+            if str(rel.source_id) not in allowed_ids:
+                continue
+        if direction in ("outgoing", "both"):
+            if str(rel.target_id) not in allowed_ids:
+                continue
+        kept.append(rel)
+    return kept
+
+
 def _name_in(elements: Dict[str, Dict[str, Any]], element_id: Optional[int]) -> Optional[str]:
     entry = elements.get(str(element_id))
     return entry["name"] if entry is not None else None
@@ -1576,14 +1632,10 @@ class IntelligenceQueryService:
         algorithm, per the platform convention against parallel scoring
         logic.
 
-        Scope note, not silently dropped: ``RiskEntityLink`` (a risk
-        threatening an Application/Solution/Programme with no direct
-        ``archimate_element_id`` of its own on this element) is not resolved
-        here -- none of those three models carry an ArchiMate mirror id
-        today, so there is no element to seed a traversal from. Only
-        directly-mirrored risks are answered; an indirect risk is invisible
-        to this query, not wrongly reported as "none". Tracked as a
-        follow-up, not implemented speculatively.
+        A risk is also found when a link points at the record this element mirrors (an
+        application, capability or programme) or at the element itself, read through
+        ``risk_service.risk_ids_touching_elements``. The legacy pointer branch stays for an
+        element that is not the risk's own mirror.
 
         Score is a **display** label, not a stored fact (per
         ``intelligence-lenses-v1.md`` L6): each risk's own
@@ -1618,13 +1670,21 @@ class IntelligenceQueryService:
                     "elements": {},
                 }
 
+            from app.services import risk_service
+
+            touching = risk_service.risk_ids_touching_elements(org_id, [element_id])
             seed_risks = (
                 db.session.execute(
-                    db.select(Risk).where(Risk.archimate_element_id == element_id)
+                    db.select(Risk).where(
+                        Risk.organization_id == org_id,
+                        db.or_(Risk.archimate_element_id == element_id,
+                               Risk.id.in_(list(touching) or [-1])),
+                    ).order_by(Risk.id)
                 )
                 .scalars()
                 .all()
             )
+            ranked = {row["risk_id"]: row for row in risk_service.ranked_risks(org_id)["rows"]}
 
             if not seed_risks:
                 return {
@@ -1635,14 +1695,15 @@ class IntelligenceQueryService:
 
             all_elements: Dict[str, Dict[str, Any]] = {}
             risk_payloads: List[Dict[str, Any]] = []
+            blast = IntelligenceQueryService.cross_layer_impact(
+                element_id,
+                include_derived=include_derived,
+                max_depth=max_depth,
+                with_owner=True,
+            )
+            all_elements.update(blast.get("elements") or {})
             for risk in seed_risks:
-                blast = IntelligenceQueryService.cross_layer_impact(
-                    element_id,
-                    include_derived=include_derived,
-                    max_depth=max_depth,
-                    with_owner=True,
-                )
-                all_elements.update(blast.get("elements") or {})
+                row = ranked.get(risk.id) or {}
                 risk_payloads.append(
                     {
                         "risk_id": risk.id,
@@ -1655,6 +1716,8 @@ class IntelligenceQueryService:
                         "risk_level": risk.risk_level,
                         "owner": risk.owner,
                         "mitigation_plan": risk.mitigation_plan,
+                        "touches": row.get("touches") or [],
+                        "url": "/risks/%d" % risk.id,
                         "affected_rows": blast.get("rows", []),
                         "affected_summary": blast.get("summary", {}),
                     }

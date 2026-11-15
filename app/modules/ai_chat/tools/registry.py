@@ -461,7 +461,7 @@ TOOL_SCHEMAS = [
         "mutates": True,
         "record_types_written": ["RiskRegisterEntry"],
         "description": (
-            "Add a risk to a solution risk register. "
+            "Add a risk to the risk register, linked to the solution. "
             "Use when the user identifies a threat, concern, or uncertainty for the solution."
         ),
         "parameters": {

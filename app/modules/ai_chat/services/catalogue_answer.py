@@ -28,6 +28,7 @@ NEXT_STEPS = {
     "applications_and_owners": "Add your applications to the portfolio, with an owner and an annual cost for each.",
     "duplicate_tooling_by_capability": "Map each application to the capabilities it covers.",
     "github_sourced_records": "Connect a GitHub repository so its records come into the model.",
+    "top_risks": "Record a risk in the risk register, with its likelihood and impact.",
     "risk_cost": "Open a risk in the register and enter the four Open FAIR factors to work out what it could cost each year.",
     "capabilities_of_application": "Name an application in your model, or map capabilities to it on its Capabilities tab.",
     "canvas_box_entries": "Open your canvas and add the first entry to that box.",
