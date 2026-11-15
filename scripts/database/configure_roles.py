@@ -576,6 +576,7 @@ def _transfer_public_objects(
         "r": "ALTER TYPE {}.{} OWNER TO {}",
         "c": "ALTER TYPE {}.{} OWNER TO {}",
         "d": "ALTER DOMAIN {}.{} OWNER TO {}",
+        "m": "ALTER TYPE {}.{} OWNER TO {}",
     }
     for name, kind in _public_user_types(cursor):
         cursor.execute(
@@ -625,12 +626,12 @@ def _transfer_public_objects(
 
 
 def _public_user_types(cursor) -> tuple[tuple[str, str], ...]:
-    """Enum, domain, range and standalone composite types made in public.
+    """Enum, domain, range, multirange and standalone composite types made in public.
 
     Array types follow their element type, table row types follow their table,
-    and extension types belong to the extension. Multirange types are not listed
-    here: the type kinds selected below leave them out, and PostgreSQL gives a
-    range's multirange the same owner when the range changes hands.
+    and extension types belong to the extension. A range's multirange does not
+    follow the range to a new owner, so multirange types are listed and handed
+    over on their own.
     """
     cursor.execute(
         """
@@ -640,7 +641,7 @@ def _public_user_types(cursor) -> tuple[tuple[str, str], ...]:
         LEFT JOIN pg_class c ON c.oid = t.typrelid
         WHERE n.nspname = 'public'
           AND (
-              t.typtype IN ('e', 'd', 'r')
+              t.typtype IN ('e', 'd', 'r', 'm')
               OR (t.typtype = 'c' AND c.relkind = 'c')
           )
           AND NOT EXISTS (

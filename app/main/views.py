@@ -1509,17 +1509,55 @@ def integrations():
     return redirect(url_for("connectors.dashboard"))
 
 
+def _organisation_administrator_names(org_id):
+    """Display names of the people who administer this organisation, from its own members only."""
+    from app.models.org_role import OrgRole
+    from app.models.user import User
+    from app.services.rbac_service import rbac_service
+
+    granted = [r.user_id for r in OrgRole.query.filter_by(organization_id=org_id, role="org_admin").all()]
+    candidates = User.query.filter(
+        db.or_(User.organization_id == org_id, User.id.in_(granted or [-1]))
+    ).order_by(User.first_name, User.last_name).all()
+    names = []
+    for person in candidates:
+        if getattr(person, "is_active", True) is False:
+            continue
+        if rbac_service.is_org_admin(person, org_id):
+            label = ("%s %s" % (person.first_name or "", person.last_name or "")).strip() or person.email
+            names.append(label)
+    return names
+
+
 @main.route("/settings")
 @login_required
-@platform_admin_required(hide=True)
-@admin_required
 def settings():
-    """System Settings - Application configuration and user preferences.
+    """Settings: the platform page for a platform administrator, the organisation page for its administrator.
 
-    Admin-only: the page reads and writes the global system_settings table, and
-    it is linked only from the Administration section of the sidebar.
+    The page reads and writes the global system_settings table, so only a
+    platform administrator sees it. An organisation's own administrator is sent
+    to their organisation's settings; anyone else is refused in plain words
+    naming the people in their organisation who can help.
     """
-    return render_template("settings/index.html")
+    from flask import g
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    if is_platform_admin(current_user):
+        return render_template("settings/index.html")
+    org_id = getattr(g, "current_org_id", None) or current_user.organization_id
+    if rbac_service.is_org_admin(current_user, org_id):
+        return redirect(url_for("admin.index"))
+    admins = _organisation_administrator_names(org_id)
+    if admins:
+        who = "Ask %s to give you access." % (admins[0] if len(admins) == 1 else ", ".join(admins[:-1]) + " or " + admins[-1])
+    else:
+        who = "Your organisation has no administrator who can give you access yet."
+    return render_plain_error(
+        403,
+        message="Settings are managed by your organisation's administrators. " + who,
+    )
 
 
 @main.route("/api/system-settings", methods=["GET"])

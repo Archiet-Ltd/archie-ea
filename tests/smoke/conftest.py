@@ -1151,3 +1151,17 @@ ARCHETYPES = [
     # R1-B36 (TB-0146): promoted from unassignable to assignable.
     "finance", "compliance", "risk", "operations", "non_technical_owner",
 ]
+
+
+def pytest_collection_modifyitems(config, items):
+    """Leave the ``load`` tests out of every run that does not ask for them with ``-m load``."""
+    import re
+
+    if re.search(r"(?<!not )\bload\b", config.getoption("markexpr") or ""):
+        return
+    kept, dropped = [], []
+    for item in items:
+        (dropped if item.get_closest_marker("load") else kept).append(item)
+    if dropped:
+        config.hook.pytest_deselected(items=dropped)
+        items[:] = kept

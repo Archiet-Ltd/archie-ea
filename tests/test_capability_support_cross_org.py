@@ -80,13 +80,33 @@ def test_a_relationship_across_two_organisations_is_never_projected(db_session, 
         db_session.flush()
     db_session.rollback()
     (org_a, app_a, cap_a), (org_b, app_b, cap_b) = _two_orgs(db_session, make_org)
-    # A row written before the organisation fence existed: plain SQL, no ORM event.
-    db_session.execute(
-        text("INSERT INTO archimate_relationships (type, source_id, target_id, organization_id) "
-             "VALUES ('realization', :s, :t, :o)"),
-        {"s": app_a.archimate_element_id, "t": cap_b.archimate_element_id, "o": org_a.id})
+    insert = text(
+        "INSERT INTO archimate_relationships (type, source_id, target_id, organization_id) "
+        "VALUES ('realization', :s, :t, :o) RETURNING id")
+    # Rows written before the organisation fence existed: plain SQL, no ORM event.
+    across_id = db_session.execute(
+        insert, {"s": app_a.archimate_element_id, "t": cap_b.archimate_element_id, "o": org_a.id}).scalar()
     db_session.flush()
+    across = db_session.get(ArchiMateRelationship, across_id)
+    cs.project_relationships(db_session, [across])
     assert cs.support_rows(org_a.id) == [] and cs.support_rows(org_b.id) == []
+
+
+def test_a_plain_sql_relationship_inside_one_organisation_is_projected(db_session, make_org):
+    from sqlalchemy import text
+
+    from app.models.archimate_core import ArchiMateRelationship
+    from app.services import capability_support as cs
+
+    (org_a, app_a, cap_a), (org_b, app_b, cap_b) = _two_orgs(db_session, make_org)
+    row_id = db_session.execute(
+        text("INSERT INTO archimate_relationships (type, source_id, target_id, organization_id) "
+             "VALUES ('realization', :s, :t, :o) RETURNING id"),
+        {"s": app_a.archimate_element_id, "t": cap_a.archimate_element_id, "o": org_a.id}).scalar()
+    db_session.flush()
+    cs.project_relationships(db_session, [db_session.get(ArchiMateRelationship, row_id)])
+    assert [r["application_name"] for r in cs.support_rows(org_a.id)] == [app_a.name]
+    assert cs.support_rows(org_b.id) == []
 
 
 def test_the_two_organisations_application_pages_list_only_their_own(db_session, make_org):
