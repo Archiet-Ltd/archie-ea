@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import expect
 
-from app.services.public_pages import MODULE_RECORDINGS, SITE_URL
+from app.services.public_pages import MODULE_RECORDINGS
 
 from .chat_ask import sign_in_as
 from .conftest import PAGE_TIMEOUT
@@ -56,13 +56,13 @@ def test_a_visitor_watches_the_shared_recording_and_follows_the_call_to_action(p
     # the preview tags read what the page says and name files that answer
     assert _meta(page, "og:title") == entry["title"]
     assert _meta(page, "og:description") == entry["promise"]
-    assert _meta(page, "og:url") == "%s/see/%s" % (SITE_URL, slug)
+    assert _meta(page, "og:url") == "%s/see/%s" % (live_server, slug)
     assert _meta(page, "og:type") == "video.other"
     assert _meta(page, "twitter:card") == "summary_large_image"
     for tag, kind in (("og:image", "image/jpeg"), ("og:video", "video/mp4")):
         url = _meta(page, tag)
-        assert url.startswith(SITE_URL + "/static/video/share/"), url
-        response = page.request.get(live_server + url[len(SITE_URL):], headers={"Range": "bytes=0-1023"})
+        assert url.startswith(live_server + "/static/video/share/"), url
+        response = page.request.get(live_server + url[len(live_server):], headers={"Range": "bytes=0-1023"})
         assert response.status in (200, 206) and response.headers["content-type"] == kind, (tag, url)
         assert len(response.body()) > 500
 
