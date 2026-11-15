@@ -235,7 +235,7 @@ def _ask_questions(app, email, questions):
     with app.app_context():
         user = User.query.filter_by(email=email).one()
         now = datetime.utcnow()
-        thread = ConversationThreadRecord(id=str(uuid.uuid4()), user_id=user.id, title="Plan usage", model="m",
+        thread = ConversationThreadRecord(id=str(uuid.uuid4()), user_id=user.id, organization_id=user.organization_id, title="Plan usage", model="m",
                                           created_at=now, updated_at=now)
         db.session.add(thread)
         db.session.flush()
