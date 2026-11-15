@@ -312,6 +312,31 @@
         return parts.join(' · ');
     }
 
+    var _CHANGE_WHERE = { goal: 'the goals of your organisation', risk: 'the risk register of your organisation' };
+
+    function _changeWhere(tool) {
+        var t = String(tool || '');
+        if (/goal/.test(t)) return _CHANGE_WHERE.goal;
+        if (/risk/.test(t)) return _CHANGE_WHERE.risk;
+        return 'your organisation\'s records';
+    }
+
+    /* The footer for a turn that wrote: what was written and where it is recorded. */
+    function _changeFooter(changes) {
+        if (!Array.isArray(changes) || changes.length === 0) return null;
+        var applied = changes.filter(function (c) { return c.state === 'applied'; });
+        var declined = changes.filter(function (c) { return c.state === 'declined'; });
+        var waiting = changes.filter(function (c) { return c.state === 'in_review'; });
+        var parts = [];
+        applied.forEach(function (c) {
+            var m = String(c.message || '').replace(/^Done: /, '').replace(/\.$/, '');
+            parts.push('Written: ' + (m || c.summary || 'a change') + '. Recorded in ' + _changeWhere(c.tool) + '.');
+        });
+        if (declined.length) parts.push('Not written: ' + declined.length + (declined.length === 1 ? ' change was' : ' changes were') + ' declined.');
+        if (waiting.length) parts.push(waiting.length + (waiting.length === 1 ? ' change is' : ' changes are') + ' still being checked; nothing is written yet.');
+        return { state: applied.length ? 'wrote' : (declined.length ? 'declined' : 'checking'), text: parts.join(' ') };
+    }
+
     /* trail: [{tool, args, result}] in execution order, collected from the
        tool_start / tool_result stream events the server has always emitted. */
     function renderEvidence(trail, sources, opts) {
@@ -336,6 +361,13 @@
             state = 'retrieved';
             summary = trail.length + (trail.length === 1 ? ' lookup' : ' lookups')
                     + (cited ? ', ' + sources.length + ' record' + (sources.length === 1 ? '' : 's') + ' cited' : '');
+            /* A turn that also wrote says so first: the lookups alone would hide the change. */
+            if (_changeFooter(o.changes)) summary = _changeFooter(o.changes).text + ' ' + summary.charAt(0).toUpperCase() + summary.slice(1) + '.';
+        } else if (_changeFooter(o.changes)) {
+            /* A turn that made, declined or queued a change: say what the server did, not that nothing was read. */
+            var said = _changeFooter(o.changes);
+            state = said.state;
+            summary = said.text;
         } else if (o.contextUsed) {
             state = 'context';
             summary = 'No lookup ran. Answered from the ' +
@@ -366,8 +398,8 @@
            Unretrieved states have to reach a screen-reader user with the same
            prominence as Retrieved, because those are the ones that change
            whether an answer can be taken to an ARB. */
-        var icon = (state === 'retrieved' || state === 'records') ? 'database' : (state === 'context' ? 'layers' : (state === 'paused' ? 'pause' : 'help-circle'));
-        if (!ran && !cited && state === 'records') {
+        var icon = (state === 'retrieved' || state === 'records') ? 'database' : (state === 'context' ? 'layers' : (state === 'paused' ? 'pause' : (state === 'wrote' || state === 'declined' || state === 'checking' ? 'pen-line' : 'help-circle')));
+        if (!ran && !cited && (state === 'records' || state === 'wrote' || state === 'declined' || state === 'checking')) {
             /* Nothing was stored to show, so the line is a statement and not a control. */
             return '<div class="mt-3 pt-2 border-t border-border text-xs text-muted-foreground">' +
                      '<span class="inline-flex items-center gap-1.5">' +
@@ -501,7 +533,7 @@
        to the record that shows the checks, the rounds, both models and every reason. A change that
        could not be reviewed yet reads "In review" and is settled without anyone being asked to approve
        it. */
-    function renderPendingApprovals(changes) {
+    function renderPendingApprovals(changes, replyText) {
         if (!Array.isArray(changes) || changes.length === 0) return '';
         var tones = {
             applied: { box: 'border-success/30 bg-success/10', icon: 'check', color: 'text-success', word: 'Applied' },
@@ -528,6 +560,11 @@
             if (said) {
                 word = said[1];
                 detail = String(c.message).slice(said[0].length);
+                /* The reply above already says it, with its link to the record: the card adds the checks. */
+                if (replyText && String(replyText).indexOf(String(c.message)) !== -1) {
+                    detail = c.state === 'applied' ? 'Checked and recorded.' : 'Checked.';
+                    if (c.record_url && c.review_url && c.record_url !== c.review_url) c = Object.assign({}, c, { record_url: c.review_url });
+                }
             }
             /* The record the change made is opened by the first link; the record of its checks by the second. */
             var link = '';
@@ -593,10 +630,11 @@
                    paused: m.paused,
                    restored: m.restored,
                    fromRecords: m.fromRecords,
+                   changes: m.pendingApprovals,
                    domainLabel: m.domain
                }) +
                renderReceipts(m.actions) +
-               renderPendingApprovals(m.pendingApprovals) +
+               renderPendingApprovals(m.pendingApprovals, m.replyText) +
                renderNextArtifact(m.actions);
     }
 

@@ -639,6 +639,7 @@
                         return { tool: a.tool, args: a.arguments, result: { success: true, result: a.result, message: a.message } };
                     }),
                     contextUsed: !(data.actions_taken || []).length,
+                    replyText: data.response || data.message || '',
                     actions: data.actions_taken || [],
                     pendingApprovals: data.pending_approvals || [],
                     /* agent_result.error survives internally even when the
@@ -821,6 +822,7 @@
                         // No tool ran, but the domain snapshot was in the prompt:
                         // that is "context only", not "ungrounded".
                         contextUsed: _trail.length === 0,
+                        replyText: result.text,
                         // The platform's pause is built from nothing; the footer says so.
                         paused: !!result.paused,
                         // The server's own "couldn't be completed" text,

@@ -203,6 +203,20 @@ def _shows(page, label, value):
     return re.search(r"%s\s+%d of 5" % (label, value), page.locator("body").inner_text(), re.I) is not None
 
 
+def _check_write_turn(page, reply, sentence, where):
+    """A turn that wrote says what was written and where, says it once, and never claims nothing was read."""
+    footer = page.locator("#messages-container").inner_text()
+    assert "No lookup ran" not in footer and "snapshot in context" not in footer, footer
+    assert "Written: " + sentence.split(": ", 1)[1] in footer, footer
+    assert "Recorded in " + where in footer, footer
+    card = page.get_by_test_id("change-verdicts").last
+    assert reply.inner_text().count(sentence) == 1 and card.inner_text().count(sentence.split(": ", 1)[1]) == 0, (
+        "the answer is repeated: %r / %r" % (reply.inner_text(), card.inner_text()))
+    assert reply.get_by_role("link", name="Open it").count() == 1
+    assert card.get_by_role("link", name="Open it").count() == 0
+    assert card.get_by_role("link", name="See how it was checked").count() == 1
+
+
 def _back_to_chat(page, base):
     page.goto(base + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
@@ -228,6 +242,7 @@ def test_a_contributor_keeps_a_goal_and_a_risk_current_and_a_viewer_is_told_they
         assert reply.inner_text().strip().startswith('Done: created Goal "%s"' % goal_name), reply.inner_text()
         assert "Applied:" not in reply.inner_text()
         _shot(page, shots, "step1-reply")
+        _check_write_turn(page, reply, 'Done: created Goal "%s"' % goal_name, "the goals of your organisation")
         made = _goals(world["org_a"], goal_name)
         assert len(made) == 1 and made[0][2] == "2027-06-30", made
         _open_link(page, reply, "Open it", r"/architecture/motivation/Goal/%d" % made[0][1])
@@ -254,6 +269,7 @@ def test_a_contributor_keeps_a_goal_and_a_risk_current_and_a_viewer_is_told_they
                      "Record a risk that our payments vendor may exit, likelihood 4, impact 5")
         assert reply.inner_text().strip().startswith('Done: created Risk "%s"' % risk_title), reply.inner_text()
         _shot(page, shots, "step3-reply")
+        _check_write_turn(page, reply, 'Done: created Risk "%s"' % risk_title, "the risk register of your organisation")
         _open_link(page, reply, "Open it", r"/risks/\d+")
         risk_url = page.url
         expect(page.locator("body")).to_contain_text(risk_title)
