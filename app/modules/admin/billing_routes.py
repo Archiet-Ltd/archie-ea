@@ -25,9 +25,7 @@ from app.modules.account.mfa_flow import enrol_first
 
 from app import db
 from app.extensions import csrf
-from functools import wraps
 
-from flask_login import current_user
 
 from app.middleware.tenant_decorators import org_admin_required
 
