@@ -26,6 +26,7 @@ ImplementationWorkPackage = RoadmapWorkPackage
 from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_capability import UnifiedCapability
 from app.models.vendor.vendor_organization import VendorProduct
+from app.utils.tenant import current_organization_id
 
 logger = logging.getLogger(__name__)
 
@@ -856,8 +857,10 @@ class RoadmapDataSync:
         from app.models.application_capability import ApplicationCapabilityMapping
         from app.models.unified_capability import UnifiedCapability
 
+        org_id = current_organization_id()
         mapping = (
             ApplicationCapabilityMapping.query.filter(
+                ApplicationCapabilityMapping.organization_id == org_id,
                 ApplicationCapabilityMapping.application_component_id == application_id,
                 ApplicationCapabilityMapping.is_primary_enabler == True,
             )
@@ -871,6 +874,7 @@ class RoadmapDataSync:
         # Fallback: get any capability for this application
         mapping = (
             ApplicationCapabilityMapping.query.filter(
+                ApplicationCapabilityMapping.organization_id == org_id,
                 ApplicationCapabilityMapping.application_component_id == application_id,
             )
             .join(UnifiedCapability, UnifiedCapability.id == ApplicationCapabilityMapping.business_capability_id)
