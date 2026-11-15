@@ -105,3 +105,32 @@ def test_gap_signals_name_only_the_unsupported_capability_and_agree_with_the_mat
     page.evaluate("try { localStorage.setItem('theme', 'dark'); } catch (e) {} document.documentElement.classList.add('dark');")
     expect(page.get_by_test_id("gap-signals-table")).to_be_visible(timeout=PAGE_TIMEOUT)
     _shot(page, "gap-signals-390-dark")
+
+
+def test_each_gap_signal_link_opens_a_fact_sheet_listing_the_same_applications(page, live_server, org):
+    page.set_viewport_size({"width": 1440, "height": 900})
+    fresh_org.sign_in(page, live_server, org["emails"][PERSONA])
+    for name, count in ((TWO, 2), (ONE, 1), (NONE, 0)):
+        page.goto(live_server + "/capability-roadmap", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("gap-signals-table")).to_be_visible(timeout=PAGE_TIMEOUT)
+        _row(page, name).get_by_role("link", name=name).click()
+        page.wait_for_load_state("networkidle")
+        main = page.locator("main")
+        expect(main).to_contain_text(name)
+        listed = main.locator("a[href*='/applications/']").filter(has_text=re.compile("Orders|Field kit"))
+        expect(listed).to_have_count(count)
+        if count == 0:
+            expect(main).to_contain_text("No applications mapped")
+        else:
+            for i in range(count):
+                href = listed.nth(i).get_attribute("href")
+                listed.nth(i).click()
+                page.wait_for_load_state("networkidle")
+                expect(page.locator("main")).not_to_be_empty()
+                page.go_back()
+                page.wait_for_load_state("networkidle")
+                assert href
+        _shot(page, "fact-sheet-%s-1440-light" % name.split()[0].lower())
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.evaluate("try { localStorage.setItem('theme', 'dark'); } catch (e) {} document.documentElement.classList.add('dark');")
+    _shot(page, "fact-sheet-390-dark")

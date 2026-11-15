@@ -164,7 +164,7 @@ def capability_fact_sheet(capability_id):
     from app.utils.role_access import can_edit_capabilities  # noqa: PLC0415
 
     cap = BusinessCapability.query.get(capability_id)
-    if not cap:
+    if not cap or cap.organization_id != current_org_id():
         abort(404)
     return render_template("capabilities/capability_fact_sheet.html",
                            type_labels=CAPABILITY_TYPE_LABELS,
