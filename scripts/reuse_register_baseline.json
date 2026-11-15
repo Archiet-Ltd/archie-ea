@@ -247,7 +247,6 @@
    "app/static/css/app.css": 18,
    "app/static/css/data-table.css": 6,
    "app/static/css/toast-notifications.css": 3,
-   "app/templates/ai_chat/entity_matching_chat_interface.html": 10,
    "app/templates/application_mgmt/portfolio_gap_analysis.html": 4,
    "app/templates/architecture_assistant/archimate_model_viewer.html": 1,
    "app/templates/errors/400.html": 4,
@@ -279,6 +278,31 @@
    "app/templates/archimate_crud/partials/_repository_workspace.html": 1,
    "app/templates/solutions/export_executive.html": 7,
    "app/templates/solutions/sad_document.html": 4
+  },
+  "risk-link-picker/second-link-search": {
+   "app/templates/solutions/programme_cockpit.html": 2
+  },
+  "risk-store/risk-element-pointer-read": {
+   "app/modules/architecture/routes/archimate_crud/product_page.py": 1,
+   "app/modules/intelligence/services/query_service.py": 2,
+   "app/modules/solutions_strategic/v2/services/simulation_service.py": 1,
+   "app/modules/solutions_strategic/v2/services/solution_record_service.py": 1
+  },
+  "risk-store/risk-solution-pointer-read": {
+   "app/commands/solution_maturity_commands.py": 1,
+   "app/modules/solutions_strategic/v2/routes/solution_design_routes.py": 3,
+   "app/modules/solutions_strategic/v2/services/chief_architect_service.py": 1,
+   "app/modules/solutions_strategic/v2/services/governance_gate_service.py": 1,
+   "app/modules/transformation_room/arb_submission_adapter.py": 1,
+   "app/services/rationalization_scoring_service.py": 1
+  },
+  "risk-store/second-risk-assessment-row": {
+   "app/modules/architecture/services/risk_service.py": 1,
+   "app/modules/architecture_assistant/variant_generator.py": 1,
+   "app/modules/solutions_strategic/v2/routes/strategic_risks_hardened.py": 1,
+   "app/modules/solutions_strategic/v2/services/risk_mitigation_service.py": 1,
+   "app/modules/vendors/api/api_vendors.py": 1,
+   "app/services/risk_mitigation_service.py": 1
   }
  }
 }
