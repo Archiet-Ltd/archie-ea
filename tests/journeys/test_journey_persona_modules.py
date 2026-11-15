@@ -173,7 +173,7 @@ def test_the_wrong_archetype_is_refused(app, client):
         assert theirs_name not in body, "another user's application is shown on My Applications"
 
         # The refusal that remains: procurement contracts are not an application manager's section.
-        client.get("/account/logout")
+        client.post("/account/logout")
         login(client, owner_id)
         resp = client.get("/procurement/contracts", follow_redirects=False)
         assert resp.status_code in (302, 401, 403, 404), (

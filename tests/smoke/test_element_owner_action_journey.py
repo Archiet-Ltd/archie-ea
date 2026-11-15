@@ -163,6 +163,8 @@ def test_assign_owner_action_shows_on_application_and_element_pages(page, live_s
     # Isolation: the other organisation never shows this owner.
     page.goto(live_server + "/account/logout", wait_until="networkidle",
               timeout=PAGE_TIMEOUT)
+    page.locator('[data-testid="logout-confirm"]').click()
+    page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
     fresh_org.sign_in(page, live_server, org_b["emails"][ASSIGNER])
     page.goto(_application_url(live_server, org_b["elements"]), wait_until="networkidle",
               timeout=PAGE_TIMEOUT)
@@ -349,6 +351,8 @@ def test_architect_assigns_owner_on_application_and_element_pages(
     # Nothing leaks into the other organisation, and its own elements still
     # show the empty state with the step.
     page.goto(live_server + "/account/logout", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.locator('[data-testid="logout-confirm"]').click()
+    page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
     fresh_org.sign_in(page, live_server, org_b["emails"][ARCHITECT])
     page.goto("%s/architecture/application/ApplicationComponent/%d" % (
         live_server, org_b["ids"]["element_id"]),
@@ -444,6 +448,8 @@ def test_architect_without_write_role_saves_owner_on_application(
 
     # The other organisation's application still has no owner.
     page.goto(live_server + "/account/logout", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.locator('[data-testid="logout-confirm"]').click()
+    page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
     fresh_org.sign_in(page, live_server, org_b["emails"][ARCHITECT])
     page.goto("%s/applications/%d" % (live_server, org_b["ids"]["application_id"]),
               wait_until="networkidle", timeout=PAGE_TIMEOUT)
@@ -472,6 +478,8 @@ def test_pages_of_types_with_no_owner_field_claim_no_missing_owner(
     for org in (org_a, org_b):
         if org is org_b:
             page.goto(live_server + "/account/logout", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+            page.locator('[data-testid="logout-confirm"]').click()
+            page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
             fresh_org.sign_in(page, live_server, org["emails"][ARCHITECT])
         page.goto("%s/applications/%d" % (live_server, org["ids"]["application_id"]),
                   wait_until="networkidle", timeout=PAGE_TIMEOUT)

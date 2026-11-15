@@ -85,7 +85,7 @@ class TestExploitReproduction:
         resp = client.get("/dashboard/overview")
         assert resp.status_code == 200, "sanity: session must authenticate before logout"
 
-        logout_resp = client.get("/account/logout", follow_redirects=False)
+        logout_resp = client.post("/account/logout", follow_redirects=False)
         assert logout_resp.status_code in (302, 303)
         _clear_g_cache()
 

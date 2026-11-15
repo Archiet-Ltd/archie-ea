@@ -74,6 +74,8 @@ def test_overview_greets_a_first_visit_and_a_return_differently(browser, live_se
 
         # sign out, sign back in: the same account now reads "Welcome back, Sam"
         page.goto(live_server + "/account/logout", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.locator('[data-testid="logout-confirm"]').click()
+        page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
         _login(page, live_server, email)
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         page.evaluate("t => document.documentElement.classList.toggle('dark', t === 'dark')", theme)

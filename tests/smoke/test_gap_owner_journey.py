@@ -94,6 +94,8 @@ def test_a_gap_is_given_an_owner_through_the_picker(page, live_server, two_orgs)
 
     # The other organisation's gap is untouched.
     page.goto(live_server + "/account/logout", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.locator('[data-testid="logout-confirm"]').click()
+    page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
     fresh_org.sign_in(page, live_server, org_b["emails"][ASSIGNER])
     page.goto(_gap_url(live_server, org_b["gap"]), wait_until="networkidle", timeout=PAGE_TIMEOUT)
     text = page.locator("[data-testid='element-owner']").inner_text()

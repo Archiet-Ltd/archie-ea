@@ -259,7 +259,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
     {% set _ = menu_items.append({'divider': true}) %}
     {% set _ = menu_items.append({'checkbox': true, 'text': 'Dark theme', 'icon': 'moon', 'checked': '$store.theme.dark', 'onclick': '$store.theme.toggle()', 'testid': 'user-menu-theme'}) %}
     {% set _ = menu_items.append({'divider': true}) %}
-    {% set _ = menu_items.append({'text': 'Sign out', 'icon': 'log-out', 'href': url_for('account.logout'), 'variant': 'destructive', 'testid': 'user-menu-sign-out'}) %}
+    {% set _ = menu_items.append({'text': 'Sign out', 'icon': 'log-out', 'post': url_for('account.logout'), 'variant': 'destructive', 'testid': 'user-menu-sign-out'}) %}
     {% set _display = (current_user.first_name or current_user.full_name() or current_user.email or 'A') %}
     {% call dropdown_menu(
         id='user-menu',

@@ -137,6 +137,8 @@ def test_onboarding_company_kind_journey(page: Page, live_server, db_session, ma
 
     # === Verify organization 2 cannot see organization 1's choice ===
     page.goto(f"{live_server.url()}/account/logout")
+    page.locator('[data-testid="logout-confirm"]').click()
+    page.wait_for_url('**/account/login**')
     page.wait_for_load_state("networkidle")
 
     # Log in as user 2

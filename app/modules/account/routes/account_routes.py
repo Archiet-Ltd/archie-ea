@@ -277,10 +277,14 @@ from app.modules.account.routes import onboarding_views  # noqa: E402
 onboarding_views.add_routes(account_bp, _connections_access)
 
 
-@account_bp.route("/logout")
+@account_bp.route("/logout", methods=["GET", "POST"])
 @login_required
 def logout():
     """Log out the current user."""
+    if request.method == "GET":
+        # A link, prefetch or crawler fetching this URL must not end a session:
+        # signing out is a POST with the form's token.
+        return render_template("account/logout_confirm.html")
     try:
         audit_logger.log_logout()
     except Exception as _exc:
@@ -291,8 +295,7 @@ def logout():
 
     auth_audit.record_logout(current_user if current_user.is_authenticated else None)
     _svc.logout()
-    flash("You have been logged out.", "info")
-    return redirect(url_for("main.index"))
+    return redirect(url_for("account.login", timeout="signed_out"))
 
 
 @account_bp.route("/manage", methods=["GET", "POST"])

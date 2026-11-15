@@ -108,6 +108,8 @@ def test_add_approve_and_see_connector_with_masked_credential(browser, live_serv
             db.session.remove()
 
         page.goto(live_server + "/account/logout", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.locator('[data-testid="logout-confirm"]').click()
+        page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
 
         # A second administrator approves it, through the product's own
         # approval endpoint (the same call the approval-inbox UI makes).

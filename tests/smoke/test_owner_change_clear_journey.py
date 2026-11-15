@@ -150,6 +150,8 @@ def test_architect_changes_then_clears_owner_and_every_page_follows(page, live_s
 
     # The other organisation's pages never saw any of it.
     page.goto(live_server + "/account/logout", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.locator('[data-testid="logout-confirm"]').click()
+    page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
     fresh_org.sign_in(page, live_server, org_b["emails"][ARCHITECT])
     _open(page, "%s/applications/%d" % (live_server, org_b["ids"]["application_id"]))
     assert first not in page.inner_text("main") and second not in page.inner_text("main")

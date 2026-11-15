@@ -180,9 +180,9 @@ def test_public_page_flash_appears_at_most_once(app, db_session, make_org):
     dual-flash defect Wave 1 Task 4 fixed on admin_base.html -- it included
     BOTH partials/_flashes.html (an inline banner) AND
     components/toast-container.html (a Platform.toast), both reading the
-    same flashed-messages queue. /account/logout flashes "You have been
-    logged out." and redirects to main.index, which an unauthenticated
-    visitor renders via layouts/public_base.html."""
+    same flashed-messages queue. Signing out now lands on the sign-in page
+    with one sentence saying why, which an unauthenticated visitor renders
+    via layouts/public_base.html."""
     user, password = _make_user(db_session, make_org, "logout")
     client = app.test_client()
 
@@ -193,11 +193,11 @@ def test_public_page_flash_appears_at_most_once(app, db_session, make_org):
     )
     assert login_resp.status_code == 200, login_resp.get_data(as_text=True)[:2000]
 
-    resp = client.get("/account/logout", follow_redirects=True)
+    resp = client.post("/account/logout", follow_redirects=True)
     assert resp.status_code == 200, resp.get_data(as_text=True)[:2000]
     html = resp.get_data(as_text=True)
 
-    assert html.count("You have been logged out.") <= 1, (
+    assert html.count("You were signed out.") == 1, (
         "logout confirmation rendered more than once on a public page -- "
         "an inline banner and a toast both show the same flash"
     )

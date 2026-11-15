@@ -162,6 +162,8 @@ def test_viewer_cannot_edit_kind(browser, live_server):
 
         # Log out and sign in as viewer.
         page.goto(live_server + "/account/logout", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.locator('[data-testid="logout-confirm"]').click()
+        page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
         sign_in(page, live_server, org["emails"]["viewer"])
 
         status, data = api(page, "POST", f"/architecture/api/elements/{wp_id}/profile", {
@@ -201,6 +203,8 @@ def test_organisation_b_cannot_see_kind(browser, live_server):
 
         # Log out and sign in as org B.
         page.goto(live_server + "/account/logout", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.locator('[data-testid="logout-confirm"]').click()
+        page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
         sign_in(page, live_server, org_b["emails"]["enterprise_architect"])
         status, data = api(page, "GET", f"/architecture/api/elements/{wp_id}/profile")
         # Org B should not see org A's element at all (tenant isolation).

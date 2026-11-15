@@ -120,6 +120,8 @@ def test_change_password_and_relogin_with_new_password(browser, live_server, see
 
         # ---- Log out, then prove the NEW password (not the old one) works ----
         page.goto(live_server + '/account/logout', timeout=PAGE_TIMEOUT)
+        page.locator('[data-testid="logout-confirm"]').click()
+        page.wait_for_url('**/account/login**', timeout=PAGE_TIMEOUT)
         page.goto(live_server + '/account/login', wait_until='domcontentloaded', timeout=PAGE_TIMEOUT)
         page.fill('#email', email)
         page.fill('#password', new_password)

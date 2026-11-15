@@ -1,0 +1,25 @@
+{# design-block: onboarding #}
+{% extends 'layouts/public_base.html' %}
+{% block title %}Sign out{% endblock %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content with context %}
+
+{% block content %}
+<div class="flex min-h-screen items-center justify-center px-4 py-12">
+    <div class="w-full max-w-md">
+        {% call card(class='rounded-xl') %}
+            {% call card_header(class='pb-2') %}
+                {% call card_title(tag='h1') %}Sign out{% endcall %}
+                {% call card_description() %}Sign out of your workspace on this device?{% endcall %}
+            {% endcall %}
+            {% call card_content(class='pt-4') %}
+                <form method="post" action="{{ url_for('account.logout') }}" class="flex gap-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {{ button(type='submit', variant='destructive', class='flex-1', text='Sign out', testid='logout-confirm') }}
+                    {{ button(href=url_for('dashboard.overview'), variant='outline', class='flex-1', text='Stay signed in') }}
+                </form>
+            {% endcall %}
+        {% endcall %}
+    </div>
+</div>
+{% endblock %}
