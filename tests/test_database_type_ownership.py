@@ -142,3 +142,38 @@ def test_extension_and_array_types_are_left_with_their_owner(scratch):
         assert listed == {"subscriptionplan", "positive_amount", "price_range", "money_pair"}
         cur.execute("SELECT pg_get_userbyid(typowner) FROM pg_type WHERE typname = 'citext'")
         assert cur.fetchone()[0] == "postgres"
+
+
+def test_verification_reports_a_type_dropped_during_the_check_as_a_clear_failure(monkeypatch):
+    from scripts.database import configure_roles as roles
+
+    class Cursor:
+        def execute(self, *_args, **_kwargs):
+            pass
+
+        def fetchone(self):
+            return None
+
+    monkeypatch.setattr(roles, "_public_user_types", lambda _cursor: (("vanished", "e"),))
+    with pytest.raises(RuntimeError, match="vanished"):
+        roles._verify_type_owners(Cursor(), database_name="x", deploy_role="archie_deploy")
+
+
+def test_an_extension_owned_type_keeps_its_owner_after_the_transfer(scratch):
+    from scripts.database import configure_roles as roles
+
+    with psycopg2.connect(scratch["super"]) as conn, conn.cursor() as cur:
+        roles._transfer_public_objects(cur, deploy_role="archie_deploy", runtime_role="archie_runtime")
+        cur.execute("SELECT pg_get_userbyid(typowner) FROM pg_type WHERE typname = 'citext'")
+        assert cur.fetchone()[0] == "postgres"
+        conn.rollback()
+
+
+def test_the_deploy_script_runs_database_acl_before_and_after_schema_deploy():
+    lines = [
+        line
+        for line in (REPO / "scripts" / "deploy_verified.sh").read_text().splitlines()
+        if line.startswith("docker compose run --rm --no-deps")
+    ]
+    order = [next(n for n in ("database-bootstrap", "schema-deploy", "database-acl") if n in line) for line in lines]
+    assert order == ["database-bootstrap", "database-acl", "schema-deploy", "database-acl"]

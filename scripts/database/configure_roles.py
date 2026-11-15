@@ -627,8 +627,10 @@ def _transfer_public_objects(
 def _public_user_types(cursor) -> tuple[tuple[str, str], ...]:
     """Enum, domain, range and standalone composite types made in public.
 
-    Array types follow their element type, multirange types follow their range,
-    table row types follow their table, and extension types belong to the extension.
+    Array types follow their element type, table row types follow their table,
+    and extension types belong to the extension. Multirange types are not listed
+    here: the type kinds selected below leave them out, and PostgreSQL gives a
+    range's multirange the same owner when the range changes hands.
     """
     cursor.execute(
         """
@@ -664,7 +666,15 @@ def _verify_type_owners(cursor, *, database_name: str, deploy_role: str) -> None
             """,
             (name,),
         )
-        owner = cursor.fetchone()[0]
+        row = cursor.fetchone()
+        if row is None:
+            raise _acl_verification_failure(
+                database_name=database_name,
+                object_kind="type",
+                object_name=f"public.{name}",
+                detail="disappeared while owners were being checked",
+            )
+        owner = row[0]
         if owner != deploy_role:
             raise _acl_verification_failure(
                 database_name=database_name,
