@@ -1616,14 +1616,79 @@ class ToolExecutor:
         elem_r = self._resolver.resolve_archimate_element(args["element_name"])
         if not elem_r["resolved"]:
             return self._clarify("ArchiMate element", elem_r)
+
+        # Load the ArchiMateElement to get description and custom_properties
+        try:
+            from app.models.archimate_core import ArchiMateElement
+        except ImportError:
+            from app.models.models import ArchiMateElement
+
+        ae = ArchiMateElement.query.filter_by(id=elem_r["id"]).first()
+        if not ae:
+            return {"success": False, "error": "Element not found"}
+
+        # Get the provenance chain
         from app.modules.architecture.services.inference_engine_service import ArchiMateInferenceEngine
+        from app.services.model_map import origin_sentence
         engine = ArchiMateInferenceEngine(architecture_id=0)
-        result = engine.explain(elem_r["id"])
-        return {
-            "success": True,
-            "result": result,
-            "message": f"Provenance chain for '{elem_r['name']}' traced.",
+        provenance = engine.explain(ae.id)
+
+        # The description comes first and the properties beside it: a property can
+        # outlive what the description now says (a price card withdrawn, a date moved).
+        # The properties carry their source when the element records one.
+        properties = ae.custom_properties or {}
+        origin = origin_sentence(ae.source_kind, ae.source_label, ae.source_ref) if ae.source_kind else None
+        result = {
+            "element_id": ae.id,
+            "element_name": ae.name,
+            "element_type": ae.type,
+            "element_layer": ae.layer,
+            "description": ae.description or "",
+            "custom_properties": properties,
+            "properties_source": origin,
+            "provenance": {
+                "steps": provenance.steps,
+                "source_element_ids": provenance.source_elements,
+                "rules_applied": provenance.rules_applied,
+                "confidence": provenance.confidence,
+            },
         }
+
+        # If this element mirrors a motivation entity, include its typed fields
+        typed_record = self._get_typed_record(ae)
+        if typed_record:
+            result["typed_record"] = {"model": type(typed_record).__name__, **typed_record.to_dict()}
+
+        said = [f"Element '{ae.name}' ({ae.type})."]
+        said.append(f"Description: {ae.description.strip().rstrip('.')}." if ae.description else "No description is recorded.")
+        if properties:
+            suffix = f" ({origin})" if origin else ""
+            said.append("Properties: " + "; ".join(f"{k}: {v}{suffix}" for k, v in properties.items()) + ".")
+        else:
+            said.append("No properties are recorded.")
+        return {"success": True, "result": result, "message": " ".join(said)}
+
+    def _get_typed_record(self, ae):
+        """Find the motivation entity that mirrors this ArchiMateElement."""
+        from app.middleware.tenant_context import current_org_id
+        org_id = current_org_id()
+        if not org_id:
+            return None
+
+        # Check each motivation model that has archimate_element_id
+        from app.models.solution_architect_models import (
+            SolutionConstraint, SolutionDriver, SolutionGoal, SolutionRequirement,
+        )
+        from app.models.solution_lifecycle_models import SolutionRisk
+
+        for model_class in [SolutionDriver, SolutionGoal, SolutionConstraint, SolutionRequirement, SolutionRisk]:
+            record = model_class.query.filter_by(
+                archimate_element_id=ae.id,
+                organization_id=org_id
+            ).first()
+            if record:
+                return record
+        return None
 
     # ------------------------------------------------------------------ #
     # Tool: simulate_impact (read-only)                                  #
@@ -1791,9 +1856,9 @@ class ToolExecutor:
         )
         base = ""
         try:
-            from flask import current_app
+            from app.services.origin import canonical_origin
 
-            base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+            base = canonical_origin()
         except Exception:
             base = ""
         for node in result["nodes"]:

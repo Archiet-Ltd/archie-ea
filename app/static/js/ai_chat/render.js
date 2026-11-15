@@ -112,7 +112,9 @@
         var out = '';
         var pos = 0;
         var m;
+        var closing = '';
         while ((m = marker.exec(text))) {
+            closing = '';
             out += text.slice(pos, m.index);
             pos = m.index + m[0].length;
             var links = [];
@@ -126,13 +128,30 @@
                 var name = found && found.name ? String(found.name).replace(/[\[\]]/g, '') : '';
                 if (name && links.length === 0) {
                     var trimmed = out.replace(/[\s*_`"'\u201d]+$/, '');
-                    if (trimmed.toLowerCase().slice(-name.length) === name.toLowerCase() && trimmed.length >= name.length) {
-                        out = trimmed.slice(0, trimmed.length - name.length).replace(/[*_`"'\u201c]+$/, '');
+                    var tail = out.slice(trimmed.length);
+                    var cut = trimmed.length - name.length;
+                    // The name counts only as a whole word: "ApplePay" is not the record "Pay".
+                    if (cut >= 0 && trimmed.toLowerCase().slice(cut) === name.toLowerCase()
+                        && !/[\p{L}\p{N}_]$/u.test(trimmed.slice(0, cut))) {
+                        var before = trimmed.slice(0, cut);
+                        var opener = before.match(/[*_`"'\u201c]+$/);
+                        if (opener) {
+                            // The marks wrapped the name alone: they go with the name, as a pair.
+                            out = before.slice(0, before.length - opener[0].length);
+                        } else {
+                            // The bold covers more than the name: keep it whole, close it after the link.
+                            out = before;
+                            var closer = tail.match(/(\*\*|__|\*|_)/);
+                            if (closer) {
+                                var line = before.slice(before.lastIndexOf('\n') + 1);
+                                if (line.split(closer[1]).length % 2 === 0) closing = closer[1];
+                            }
+                        }
                     }
                 }
                 links.push('[' + (name || 'View the record') + '](' + url + ')');
             });
-            if (links.length) out += links.join(', ');
+            if (links.length) out += links.join(', ') + closing;
             else if (/^[.,;:!?]/.test(text.slice(pos))) out = out.replace(/\s+$/, '');
         }
         return out + text.slice(pos);

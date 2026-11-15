@@ -297,27 +297,53 @@ def disallowed_patterns() -> list[str]:
 def _sitemap_url(path: str) -> str:
     from html import escape
 
-    from app.services.public_pages import SITE_URL
+    from app.services.origin import canonical_origin
 
+    base = canonical_origin()
     priority = "<priority>1.0</priority>" if path == "/" else ""
-    return f"  <url><loc>{SITE_URL}{escape(path)}</loc>{priority}</url>"
+    return f"  <url><loc>{base}{escape(path)}</loc>{priority}</url>"
 
 
 def _build_robots() -> str:
-    from app.services.public_pages import SITE_URL
+    from app.services.origin import canonical_origin
 
+    base = canonical_origin()
     lines = ["User-agent: *", "Allow: /"]
     lines += [f"Disallow: {pattern}" for pattern in disallowed_patterns()]
-    lines += ["", f"Sitemap: {SITE_URL}/sitemap.xml", ""]
+    lines += ["", f"Sitemap: {base}/sitemap.xml", ""]
     return "\n".join(lines)
 
 
+def sitemap_name(code: str) -> str:
+    """The file name of one language's sitemap, e.g. ``sitemap-pt-br.xml``."""
+    return f"sitemap-{code.lower()}.xml"
+
+
+def _build_sitemap_index() -> str:
+    from html import escape
+
+    from app.services.origin import canonical_origin
+    from app.services.public_pages import sitemap_languages
+
+    base = canonical_origin()
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(f"  <sitemap><loc>{base}/{escape(sitemap_name(code))}</loc></sitemap>" for code in sitemap_languages())
+        + "\n</sitemapindex>"
+    )
+
+
 def _build_sitemap() -> str:
-    from app.services.public_pages import feed_page_paths
+    """The English sitemap: the pages that keep their present addresses."""
+    return _build_language_sitemap("en")
+
+
+def _build_language_sitemap(code: str) -> str:
+    from app.services.public_pages import language_page_paths
 
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        + "\n".join(_sitemap_url(path) for path in feed_page_paths())
+        + "\n".join(_sitemap_url(path) for path in language_page_paths(code))
         + "\n</urlset>"
     )
 
@@ -352,8 +378,35 @@ def robots_text() -> str:
     return _cached("robots", _build_robots)
 
 
+def _sitemaps() -> dict[str, str]:
+    """The sitemap index (key ``index``) and each language's sitemap (key its code), built together and held as one file set."""
+    from app.services.public_pages import DEFAULT_LANGUAGE, sitemap_languages
+
+    files = {"index": _build_sitemap_index()}
+    for code in sitemap_languages():
+        files[code] = _build_sitemap() if code == DEFAULT_LANGUAGE else _build_language_sitemap(code)
+    return files
+
+
+def _sitemap_files() -> dict[str, str]:
+    return _cached("sitemap", _sitemaps)
+
+
 def sitemap_text() -> str:
-    return _cached("sitemap", _build_sitemap)
+    """The sitemap index at /sitemap.xml: one sitemap per language that has pages."""
+    return _sitemap_files()["index"]
+
+
+def language_sitemap_text(code: str) -> str | None:
+    """One language's sitemap, or None when that language has no pages (its address then answers 404)."""
+    return _sitemap_files().get(code)
+
+
+def language_for_sitemap(file_name: str) -> str | None:
+    """The language code a sitemap file name belongs to (``sitemap-pt-br.xml`` -> ``pt-BR``), or None."""
+    from app.services.public_pages import DEFAULT_LANGUAGE, TRANSLATION_PREFIXES
+
+    return next((code for code in (DEFAULT_LANGUAGE, *TRANSLATION_PREFIXES) if sitemap_name(code) == file_name), None)
 
 
 def warm(application) -> None:
@@ -362,3 +415,4 @@ def warm(application) -> None:
     with application.test_request_context("/robots.txt"):
         robots_text()
         sitemap_text()
+

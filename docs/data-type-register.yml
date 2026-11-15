@@ -114,7 +114,7 @@ types:
     data: editable fields, settings forms, and filter controls
     show_with: single-column form (max-w-2xl space-y-6) with field wrappers, basecoat input/select/textarea/switch,
       and a submit button (type="submit")
-    components: [components/input.html, components/select.html, components/form_field.html, basecoat/field.html, basecoat/input.html, basecoat/select.html, basecoat/index.html, basecoat/macros.html]
+    components: [components/input.html, components/select.html, components/checkbox.html, components/form_field.html, basecoat/field.html, basecoat/input.html, basecoat/select.html, basecoat/index.html, basecoat/macros.html]
     pages: forms, account settings, organisation settings, prompt configuration, feature flags
     signals: []
     retired: []

@@ -6558,6 +6558,10 @@ def api_solution_work_packages(solution_id, wp_id=None):
     """CRUD for solution work packages (used by Gantt component)."""
     from app.models.roadmap_models import RoadmapWorkPackage
 
+    action = {"POST": "create", "PUT": "edit", "DELETE": "delete"}[request.method]
+    if not _matrix_can(current_user, action, "work_package"):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
+
     solution = Solution.query.get_or_404(solution_id)
 
     if solution.created_by_id != current_user.id and not is_active_org_admin():

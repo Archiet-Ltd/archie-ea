@@ -12,13 +12,12 @@ import json
 
 import pytest
 
+from app.services.origin import canonical_origin
 from app.services.public_pages import MERGED_PAGES, load_all_pages
 
 _JSONLD_SCRIPT_RE_SOURCE = (
     r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>'
 )
-
-SITE_URL = "https://entelim.org"
 
 
 def _iter_jsonld_blocks(html: str) -> list[str]:
@@ -110,7 +109,7 @@ def test_sitewide_jsonld_schema_and_url_consistency(app):
 
                 assert "@context" in ld, f"{page.url}: JSON-LD missing @context"
 
-                expected_url = f"{SITE_URL}{page.url}"
+                expected_url = f"{canonical_origin()}{page.url}"
                 saw_a_typed_node = False
 
                 for node in _jsonld_nodes(ld):
