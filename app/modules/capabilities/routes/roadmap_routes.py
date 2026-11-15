@@ -1356,6 +1356,8 @@ def api_roadmap_work_packages():
         include_children = request.args.get("include_children", "true").lower() == "true"
 
         query = work_package_service.query_for(org_id)
+        # Every package of the organisation (parts included), whatever gap or rows this answer lists.
+        all_count = query.count()
         if gap_id:
             # The one reader of a work package's gap links (the relationships).
             query = query.filter(UWP.id.in_(
@@ -1393,6 +1395,7 @@ def api_roadmap_work_packages():
                     "success": True,
                     "work_packages": serialized,
                     "total_count": len(serialized),
+                    "all_count": all_count,
                     "figures": figures,
                 },
             )

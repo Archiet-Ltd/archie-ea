@@ -99,3 +99,14 @@ def test_a_work_package_row_carries_its_evidence_line_only_when_asked(db_session
     assert len(plain) == len(asked) == 2
     assert all("footer_html" not in row for row in plain)
     assert all(row.get("footer_html") for row in asked)
+
+
+def test_the_package_total_is_the_organisations_whatever_gap_is_asked_for(db_session, make_org, client, login_as):
+    org_a, org_b = make_org("cost-g"), make_org("cost-h")
+    user_a = _user(db_session, org_a, "a")
+    _seed(db_session, org_a, packages=2)
+    _seed(db_session, org_b, packages=4)
+    login_as(client, user_a)
+
+    body = client.get("/capability-map/api/roadmap/work-packages?gap_id=999999999").get_json()
+    assert body["work_packages"] == [] and body["all_count"] == 2, body
