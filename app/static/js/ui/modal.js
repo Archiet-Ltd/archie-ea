@@ -116,9 +116,14 @@
         if (_registry[id]) {
             _registry[id].prevFocus = _focusOrigin(returnFocus);
         }
-        const focusable = _focusableIn(el);
-        if (!focusable.length) return;
-        setTimeout(function () { focusable[0].focus(); }, 50);
+        const autofocusEl = el.querySelector('[autofocus]');
+        if (autofocusEl) {
+            setTimeout(function () { autofocusEl.focus(); }, 50);
+        } else {
+            const focusable = _focusableIn(el);
+            if (!focusable.length) return;
+            setTimeout(function () { focusable[0].focus(); }, 50);
+        }
 
         function onKeyDown(e) {
             if (e.key !== 'Tab') return;
