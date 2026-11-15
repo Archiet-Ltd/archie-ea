@@ -12,6 +12,7 @@ from app.middleware.tenant_context import current_org_id
 from app.modules.ai_chat.services import model_defaults
 from app.modules.ai_chat.services import application_change
 from app.modules.ai_chat.services.catalogue_answer import answer_catalogue_question
+from app.modules.ai_chat.services import product_answer
 from app.modules.ai_chat.services.estate_answer import (
     answer_estate_question,
     explanations_for,
@@ -351,6 +352,31 @@ def _parts_response(message, thread_id, keep, cards):
     return jsonify(body)
 
 
+def _product_response(message, thread_id, keep):
+    """The cited answer about what one of the organisation's own products can do, or ``None``
+    when the question names no such product."""
+    from app.services.model_map import element_href
+
+    answer = product_answer.answer_product_question(message[:MAX_QUESTION_CHARS], current_org_id())
+    if answer is None:
+        return None
+
+    def link(element):
+        return element_href(element.id, "application", element.type)
+
+    source = answer.get("element") or answer["product"]
+    html = render_template(
+        "ai_chat/_product_answer.html", answer=answer, page_url=link(source),
+        links={item["element"].id: link(item["element"]) for item in answer.get("listed", [])})
+    return jsonify({
+        "success": True,
+        "found": True,
+        "thread_id": _remember(thread_id, message, product_answer.answer_line(answer), keep=keep),
+        "product_answer": answer["kind"],
+        "html": html,
+    })
+
+
 @unified_ai_chat_bp.route("/estate-answer", methods=["POST"])
 @login_required
 def estate_answer():
@@ -368,6 +394,10 @@ def estate_answer():
     keep = body.get("remember") is not False
     posted_element = body.get("element_id") if isinstance(body.get("element_id"), int) else None
     card_element = owned_element_id(posted_element, current_org_id())
+    if not card_element:
+        response = _product_response(message, thread_id, keep)
+        if response is not None:
+            return response
     # A card names its element: the question is about that element, not about a change request,
     # the parts or the lens its wording sounds like, so all three are skipped for it.
     change = None

@@ -1,0 +1,50 @@
+{# design-block: chat #}
+{% from 'components/card.html' import card, card_header, card_title, card_description %}
+{% from 'components/badge.html' import badge %}
+{# What the model records about one capability of one of the organisation's own products: its
+   shipped status, what it does and its known limits, citing the element. When nothing is
+   recorded it says so and offers the product's own page. Nothing is guessed. #}
+<div class="space-y-3" data-product-answer data-kind="{{ answer.kind }}">
+{% if answer.kind == 'capability' %}
+    {% set shipped = answer.status in ['shipped', 'narrow'] %}
+    {% call card(class='p-4') %}
+        <div class="flex flex-wrap items-start justify-between gap-2">
+            <h3 class="min-w-0 break-words text-base font-semibold text-foreground">{{ answer.element.name }}</h3>
+            {% call badge('success' if shipped else ('neutral' if answer.status == 'withdrawn' else 'warning')) %}<span data-testid="product-status">{{ answer.status_word }}</span>{% endcall %}
+        </div>
+        <p class="mt-2 text-sm text-foreground" data-testid="product-sentence">
+            {%- if answer.status == 'shipped' %}{{ answer.product.name }} does this.
+            {%- elif answer.status == 'narrow' %}{{ answer.product.name }} does this in a narrow form.
+            {%- elif answer.status == 'withdrawn' %}This is no longer recorded for {{ answer.product.name }}.
+            {%- else %}{{ answer.product.name }} does not do this yet.{% if answer.status_detail and answer.status_detail != 'not shipped' %} Recorded as {{ answer.status_detail }}.{% endif %}
+            {%- endif %}</p>
+        {% if answer.does %}<p class="mt-2 text-sm text-muted-foreground" data-testid="product-does">{{ answer.does }}</p>{% endif %}
+        {% if answer.limits %}
+        <div class="mt-3 text-sm" data-testid="product-limits">
+            <p class="font-medium text-foreground">Known limits (not covered)</p>
+            <ul class="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                {% for limit in answer.limits %}<li>{{ limit }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% else %}
+        <p class="mt-3 text-sm text-muted-foreground" data-testid="product-limits">No limits are recorded for this.</p>
+        {% endif %}
+        <p class="mt-3 text-xs text-muted-foreground">Recorded on <a class="font-medium text-primary underline underline-offset-4" href="{{ page_url }}" data-testid="product-source">{{ answer.element.name }}</a>.</p>
+    {% endcall %}
+{% elif answer.kind == 'not_recorded' %}
+    {% call card(class='p-4') %}
+        <h3 class="text-base font-semibold text-foreground">Not recorded in your model</h3>
+        <p class="mt-2 text-sm text-foreground" data-testid="product-sentence">Your model records {{ answer.recorded }} capabilit{{ 'y' if answer.recorded == 1 else 'ies' }} for {{ answer.product.name }}, and none of them is about that. Nothing is claimed either way.</p>
+        <p class="mt-3 text-xs text-muted-foreground">Checked against <a class="font-medium text-primary underline underline-offset-4" href="{{ page_url }}" data-testid="product-source">{{ answer.product.name }}</a>.</p>
+    {% endcall %}
+{% else %}
+    {% call card(class='p-4') %}
+        <h3 class="text-base font-semibold text-foreground">What {{ answer.product.name }} does</h3>
+        <p class="mt-2 text-sm text-foreground" data-testid="product-sentence">{{ answer.shipped }} of {{ answer.recorded }} recorded capabilities are shipped.</p>
+        <ul class="mt-2 list-disc space-y-1 pl-5 text-sm">
+            {% for item in answer.listed[:10] %}<li><a class="text-primary underline underline-offset-4" href="{{ links[item.element.id] }}">{{ item.element.name }}</a></li>{% endfor %}
+        </ul>
+        <p class="mt-3 text-xs text-muted-foreground">Recorded on <a class="font-medium text-primary underline underline-offset-4" href="{{ page_url }}" data-testid="product-source">{{ answer.product.name }}</a>.</p>
+    {% endcall %}
+{% endif %}
+</div>
