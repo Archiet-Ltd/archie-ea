@@ -340,15 +340,11 @@ def test_names_come_only_from_the_impact_answers_element_map():
     for name, source in _everything().items():
         assert "/detail" not in source, name
         assert "localStorage" not in source and "sessionStorage" not in source, name
-    # This allowlist drifted out of sync with reality some time before this
-    # fix -- the L3/L5/L6 briefs each added a fetch URL to core.js (risk,
-    # portfolio, programme) without updating it. Found while adding the L2
-    # brief's own strategy URL; corrected to the real, current set rather
-    # than bumped by one on top of a stale base. L7 (Data lens) adds its
-    # own endpoint which now returns an elements map for name lookups.
-    # Compliance (under L6) adds its own endpoint the same way.
+    # The allowlist is the real, current set of endpoints core.js fetches: the risk, portfolio,
+    # programme, strategy, data and compliance views each add one, and the data view's endpoint
+    # returns an elements map for name lookups.
     urls = set(re.findall(r"'(/[a-z0-9_/.-]*)'", _scripts()["core.js"]))
-    # The source link on an answer row (first-answer brief) is built from two pieces of a page address,
+    # The source link on an answer row is built from two pieces of a page address,
     # '/archimate/elements/' + id + '/impact'. That is a link a person follows, not a call the page
     # makes, so the two pieces are pinned together and kept out of the set of endpoints it fetches.
     link_pieces = {"/archimate/elements/", "/impact"}
@@ -431,7 +427,7 @@ def test_the_composer_lists_the_connections_it_draws_in_a_table():
     source = (REPO_ROOT / "app" / "templates" / "archimate" / "composer.html").read_text(encoding="utf-8")
     assert "id=\"composer-focus-list\"" in source
     assert "data-focus-row" in source
-    # The table is drawn by the shared dense table component (design-system landing), which writes the
+    # The table is drawn by the shared dense table component, which writes the
     # caption and the header row; the composer names the caption it passes and the four columns.
     assert "caption='Connections of the chosen element'" in source
     assert "columns=[('From', ''), ('Relationship', ''), ('To', ''), ('Kind', '')]" in source
