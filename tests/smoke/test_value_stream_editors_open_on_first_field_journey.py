@@ -15,7 +15,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import login, make_org, make_user
+from journeys.conftest import app, client, login, make_org, make_user  # noqa: F401
 
 pytestmark = pytest.mark.journey
 
