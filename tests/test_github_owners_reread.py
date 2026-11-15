@@ -306,12 +306,52 @@ def test_a_team_is_never_turned_into_a_person(db_session, make_org, tenant_ctx, 
     element, component = imported_application(db_session, org)
     cfg = connect(db_session, tenant_ctx, org)
     github.codeowners = "* @acme/platform\n"
-    github.commits = account_commits("platform", (ada.email, 2)) + account_commits("acme", (ada.email, 2))
+    # Ada's address is on the commits of an account called "platform" and one called "acme", but the
+    # members' commits are split evenly with Sam, so no one leads and only the team name could pick Ada.
+    sam = make_user(db_session, org, "Sam", "Lee")
+    github.commits = (account_commits("platform", (ada.email, 4)) + account_commits("acme", (ada.email, 4))
+                      + account_commits("sam-l", (sam.email, 8)))
 
     read(db_session, tenant_ctx, org, cfg)
 
-    # Ada made 4 of 4 member commits, so she leads them; the owner is the commit leader, never a named "team".
-    assert fact(db_session, element, "github_owner_source")["text"].startswith("From commit history: 4 of 4 commits")
+    assert primaries(db_session, component) == []
+    assert (fact(db_session, element, "github_owner_source") or {}).get("user_id") is None
+    from app.connectors.github import code_owner_handles, handle_owner
+
+    reloaded = type(element).query.get(element.id)
+    assert code_owner_handles(reloaded) == []  # a team is not an account
+    # Even if a team name were looked up as an account, Ada's address on it must not make her the owner.
+    summary = {"days": 90, "logins": {"acme/platform": {"commits": 4, "members": {str(ada.id): 4}}}}
+    assert handle_owner(org.id, summary, code_owner_handles(reloaded))[0] is None
+
+
+def test_a_named_owner_with_nobody_to_pick_gives_a_reason_and_no_prompt(db_session, make_org, tenant_ctx, github, app):
+    from app.connectors.github_gaps import application_gaps
+
+    org = make_org("rr-nopick")
+    make_user(db_session, org, "Ada", "Obi")
+    team_el, team_comp = imported_application(db_session, org)
+    cfg = connect(db_session, tenant_ctx, org)
+    github.codeowners = "* @acme/platform\n"
+    github.commits = account_commits("platform", ("a@vendor.example", 3))
+    read(db_session, tenant_ctx, org, cfg)
+    with app.test_request_context():
+        note = [g for g in application_gaps(org.id, [team_comp])[team_comp.id]["gaps"] if g["key"] == "owner"][0]["note"]
+    assert note.startswith("No owner was set: GitHub names @acme/platform as code owner")
+    assert "Pick the person" not in note
+
+    org2 = make_org("rr-nopick-b")
+    make_user(db_session, org2, "Bo", "Ray")
+    element, component = imported_application(db_session, org2)
+    cfg2 = connect(db_session, tenant_ctx, org2)
+    github.codeowners = "* @Anioko\n"
+    github.commit_status = 403
+    read(db_session, tenant_ctx, org2, cfg2)
+    with app.test_request_context():
+        note = [g for g in application_gaps(org2.id, [component])[component.id]["gaps"] if g["key"] == "owner"][0]["note"]
+    assert note.startswith("No owner was set: GitHub names @Anioko as code owner")
+    assert "could not be read" in note
+    assert "Pick the person" not in note
 
 
 def test_two_accounts_pointing_at_different_members_name_nobody(db_session, make_org, tenant_ctx, github):
@@ -349,3 +389,23 @@ def test_the_command_applies_the_account_rule_and_the_second_run_changes_nothing
     assert "already owned." in second.output and "Nothing changed." in second.output
     element, component = reload(db_session, keys)
     assert [r.user_id for r in primaries(db_session, component)] == [ada_id]
+
+
+def test_the_list_footer_says_an_owner_set_from_commit_history_came_from_it(
+    db_session, make_org, tenant_ctx, github, client, login_as
+):
+    org = make_org("rr-footer")
+    ada = make_user(db_session, org, "Ada", "Obi")
+    element, component = imported_application(db_session, org)
+    cfg = connect(db_session, tenant_ctx, org)
+    github.codeowners = "* @Anioko\n"
+    github.commits = account_commits("anioko", (ada.email, 6))
+    read(db_session, tenant_ctx, org, cfg)
+    assert [r.user_id for r in primaries(db_session, component)] == [ada.id]
+    db_session.commit()
+    login_as(client, ada)
+
+    page = client.get("/applications/").get_data(as_text=True)
+
+    assert "GitHub commit history" in page
+    assert "Owner was entered by hand" not in page

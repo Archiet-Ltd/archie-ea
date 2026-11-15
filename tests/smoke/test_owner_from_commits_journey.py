@@ -57,6 +57,7 @@ def _import(org, name, repository, commits, summary=None, owners=()):
 @pytest.fixture(scope="module")
 def estate(live_server):
     from app import create_app, db
+    from app.connectors import github
     from app.models.user import User
 
     tag = uuid.uuid4().hex[:6]
@@ -91,7 +92,12 @@ def estate(live_server):
                          + _commits((sam, 4), login="sam-l"), owners=["@Anioko"])
     no_account = _import(org, "Quiet Hub %s" % tag, "acme/quiet-%s" % tag,
                          _commits((stranger, 5), login="anioko"), owners=["@Anioko"])
-    return {"by_account": by_account, "no_account": no_account, "handle_repo": handle_repo, "busy": busy, "stale": stale, "stale_repo": "acme/pay-gateway-%s" % tag,
+    closed_repo = "acme/closed-%s" % tag
+    closed = _import(org, "Closed Hub %s" % tag, closed_repo, [],
+                     summary=github._unreadable_summary(closed_repo, "HTTP 403"), owners=["@Anioko"])
+    team = _import(org, "Team Hub %s" % tag, "acme/team-%s" % tag, _commits((stranger, 5), login="platform"),
+                   owners=["@acme/platform"])
+    return {"closed": closed, "team": team, "by_account": by_account, "no_account": no_account, "handle_repo": handle_repo, "busy": busy, "stale": stale, "stale_repo": "acme/pay-gateway-%s" % tag,
             "email": org["emails"]["enterprise_architect"], "shared": shared, "nobody": nobody,
             "leader": leader, "leader_repo": "acme/ledger-core-%s" % tag, "tag": tag, "names": names, "repo": "acme/archie-ea-%s" % tag}
 
@@ -242,6 +248,29 @@ def test_a_code_owner_account_is_the_member_its_commits_show_on_the_page_and_the
     expect(cell).to_contain_text(ada, timeout=PAGE_TIMEOUT)
     cell.scroll_into_view_if_needed()
     _walk(architect, "account-is-owner-list")
+    footer_text = architect.locator("body").evaluate(
+        "(b, id) => Array.from(b.querySelectorAll('[data-footer-for=\"' + id + '\"]')).map(e => e.textContent).join(' ')",
+        str(estate["by_account"]))
+    assert "GitHub commit history" in footer_text, footer_text
+    assert "Owner was entered by hand" not in footer_text and "entered by the team" not in footer_text, footer_text
+
+
+@pytest.mark.parametrize("key,start", [
+    ("closed", "No owner was set: GitHub names @Anioko as code owner"),
+    ("team", "No owner was set: GitHub names @acme/platform as code owner"),
+])
+def test_a_named_owner_with_nobody_to_pick_gives_a_reason_and_no_prompt(architect, live_server, estate, key, start):
+    architect.goto("%s/applications/%s" % (live_server, estate[key]), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    reason = architect.get_by_test_id("need-owner-reason")
+    expect(reason).to_contain_text(start, timeout=PAGE_TIMEOUT)
+    assert "Pick the person" not in reason.inner_text()
+    reason.scroll_into_view_if_needed()
+    _walk(architect, "nobody-to-pick-%s" % key)
+    architect.goto("%s/applications/" % live_server, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    row_reason = architect.locator('[data-testid="app-owner-reason-%s"], [data-testid="app-owner-reason-mobile-%s"]' % (
+        estate[key], estate[key])).locator("visible=true").first
+    expect(row_reason).to_contain_text(start, timeout=PAGE_TIMEOUT)
+    assert "Pick the person" not in row_reason.inner_text()
 
 
 def test_a_code_owner_account_with_no_member_email_gives_the_reason_on_the_page_and_the_list(architect, live_server, estate):

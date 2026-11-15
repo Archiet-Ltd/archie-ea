@@ -334,13 +334,17 @@ def application_fact(row, subject: str = "Application",
 
 
 def application_footer(app, owner_names: Optional[List[str]], now: Optional[datetime] = None,
-                       origins: Optional[Dict[int, Dict[str, Any]]] = None) -> Dict[str, Any]:
-    """Footer for one listed application: the record itself, then who owns it."""
+                       origins: Optional[Dict[int, Dict[str, Any]]] = None,
+                       owner_from_commits: bool = False) -> Dict[str, Any]:
+    """Footer for one listed application: the record itself, then who owns it. An owner set from
+    GitHub's commit history says so, as the application's own page does."""
     facts = [application_fact(app, "Record", origins)]
     if owner_names:
         facts.append(fact("Owner: %s" % ", ".join(owner_names),
                           href=page_link("unified_applications.application_detail", id=app.id),
-                          source_kind="manual", subject="Owner", as_of=app.updated_at or app.created_at))
+                          source_kind="connector" if owner_from_commits else "manual",
+                          source_label="GitHub commit history" if owner_from_commits else None,
+                          subject="Owner", as_of=app.updated_at or app.created_at))
     else:
         facts.append(fact("Owner: none recorded", missing=True))
     return build_footer(facts, now)

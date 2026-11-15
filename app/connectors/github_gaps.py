@@ -111,13 +111,12 @@ def _owner_hint(element, org_id) -> Dict[str, Any]:
             hint["candidates"] = history["candidates"]
         return hint
     named = ", ".join(owners)
-    hint = {"note": f"GitHub names {named} as code owner in {where}. Pick the person here who is that owner."}
     history = _commit_hint(element, org_id)
-    if history:
-        hint["note"] += " " + history["note"]
-        if history.get("candidates"):
-            hint["candidates"] = history["candidates"]
-    return hint
+    if history.get("candidates"):
+        return {"note": f"GitHub names {named} as code owner in {where}. Pick the person here who is that owner. "
+                        + history["note"], "candidates": history["candidates"]}
+    # Nobody to pick from: say why no owner was set, and ask for nothing.
+    return {"note": f"No owner was set: GitHub names {named} as code owner in {where}. " + history.get("note", "")}
 
 
 def _capability_hint(element, org_id) -> Dict[str, Any]:

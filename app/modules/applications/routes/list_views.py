@@ -459,9 +459,23 @@ def application_list():
         from app.services import result_footer_service
 
         origins = result_footer_service.application_origins(g.current_org_id, pagination.items)
+        from app.connectors.github import PROPOSAL_SOURCE as GITHUB_SOURCE
+
+        from_commits = set()
+        if application_ids:
+            from_commits = {
+                row[0]
+                for row in db.session.query(ApplicationOwner.application_id)
+                .filter(ApplicationOwner.application_id.in_(application_ids),
+                        ApplicationOwner.organization_id == g.current_org_id,
+                        ApplicationOwner.ownership_type == "primary",
+                        ApplicationOwner.source_table == GITHUB_SOURCE)
+                .all()
+            }
         footers_by_app = {
             listed.id: result_footer_service.application_footer(
-                listed, owner_names_by_app.get(listed.id), origins=origins)
+                listed, owner_names_by_app.get(listed.id), origins=origins,
+                owner_from_commits=listed.id in from_commits)
             for listed in pagination.items
         }
 
