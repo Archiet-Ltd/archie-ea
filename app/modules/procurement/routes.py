@@ -405,14 +405,21 @@ def _money_page(org_id, *, form=None, error=None, status=200):
         "currency": form.get("currency") or (replaces.currency if replaces and replaces.currency else get_reporting_currency(org_id)),
         "as_of": form.get("as_of") or finance_fact_store.today().isoformat(),
         "source_ref": form.get("source_ref", ""),
-        "subject_element_id": form.get("subject_element_id") or "",
+        # a correction stays about the product of the figure it replaces unless the person changes it
+        "subject_element_id": (
+            form.get("subject_element_id") or ""
+            if "subject_element_id" in form or replaces is None or replaces.subject_element_id is None
+            else str(replaces.subject_element_id)
+        ),
     }
+    products = finance_fact_store.products(org_id)
     return render_template(
         "procurement/money.html",
         withheld=False, figures=figures, rows=rows, total=total, page=page,
         pages=max(1, -(-total // 20)), replacement_dates=replacement_dates,
         measure_labels=finance_fact_store.MEASURE_LABELS, form=form_values, error=error, replaces=replaces,
-        products=finance_fact_store.products(org_id), day=_day, amount_text=_amount_text,
+        products=products, product_names={p.id: p.name for p in products},
+        latest_figures=finance_fact_store.latest_figures(org_id), day=_day, amount_text=_amount_text,
         saved=bool(request.args.get("saved")), today=finance_fact_store.today(),
     ), status
 
@@ -442,6 +449,8 @@ def money():
     subject = (form.get("subject_element_id") or "").strip()
     replaces = (form.get("replaces_id") or "").strip()
     try:
+        if replaces.isdigit() and "subject_element_id" not in form:
+            subject = str(finance_fact_store.replaceable_fact(org_id, int(replaces)).subject_element_id or "")
         finance_fact_store.record_fact(
             org_id, (form.get("measure") or "").strip(), form.get("amount"), as_of, form.get("source_ref"),
             currency=form.get("currency"), stated_by_user_id=current_user.id, recorded_by_id=current_user.id,

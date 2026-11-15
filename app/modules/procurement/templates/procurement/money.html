@@ -70,10 +70,10 @@
     {%- endif -%}
     {%- if f.revenue -%}
       {%- set _ = cards.append({'label': 'Monthly revenue', 'value': amount_text(f.revenue.amount, f.revenue.currency), 'icon': 'trending-up', 'testid': 'money-revenue',
-          'sentence': 'As of ' ~ day(f.revenue.as_of) ~ ', from ' ~ f.revenue.source_ref}) -%}
+          'sentence': 'Whole organisation, as of ' ~ day(f.revenue.as_of) ~ ', from ' ~ f.revenue.source_ref ~ '. Revenue recorded for a product is listed in the history below.'}) -%}
     {%- else -%}
       {%- set _ = cards.append({'label': 'Monthly revenue: not recorded', 'value': none, 'icon': 'trending-up', 'testid': 'money-revenue',
-          'sentence': 'Record what you earn each month', 'href': url_for('procurement.money', measure='revenue') ~ '#record-fact'}) -%}
+          'sentence': 'Record what the whole organisation earns each month. Revenue recorded for a product is listed in the history below.', 'href': url_for('procurement.money', measure='revenue') ~ '#record-fact'}) -%}
     {%- endif -%}
     {%- if f.months_of_cash -%}
       {%- set m = f.months_of_cash -%}
@@ -91,7 +91,7 @@
         {%- set _ = latest_items.append({'label': label, 'key': key}) -%}
       {%- endfor -%}
       {% call(p) fact_list(items=latest_items, testid='money-latest-facts') %}
-        {%- set fact = {'cash_balance': f.cash, 'spend': f.spend, 'revenue': f.revenue}.get(p.key) -%}
+        {%- set fact = latest_figures.get(p.key) -%}
         {%- if fact -%}{{ amount_text(fact.amount, fact.currency) }}<span class="block text-xs text-muted-foreground">As of {{ day(fact.as_of) }}, from {{ fact.source_ref }}</span>
         {%- else -%}<span class="text-muted-foreground">Not recorded</span>{%- endif -%}
       {% endcall %}
@@ -158,13 +158,13 @@
                            caption='Every money figure recorded, newest first', testid='money-history', row_testid='money-history-row',
                            toolbar=false, page_size=25, server_pagination=_pager,
                            empty_title='Nothing recorded yet', empty_message='Figures you record appear here with their date, source and who stated them.') %}
-    {% call table_cell(class='font-medium whitespace-nowrap') %}{{ measure_labels[fact.measure] }}{% endcall %}
+    {% call table_cell(class='font-medium whitespace-nowrap') %}{{ measure_labels[fact.measure] }}{% if fact.subject_element_id %}<span class="block text-xs font-normal text-muted-foreground" data-testid="money-history-subject">{{ product_names.get(fact.subject_element_id, 'A product') }}</span>{% endif %}{% endcall %}
     {% call table_cell(class='whitespace-nowrap tabular-nums') %}{{ amount_text(fact.amount, fact.currency) if fact.amount is not none else 'Not available' }}{% endcall %}
     {% call table_cell(class='whitespace-nowrap') %}{{ day(fact.as_of) }}{% endcall %}
     {% call table_cell(class='hidden md:table-cell') %}{{ fact.source_ref }}{% endcall %}
-    {% call table_cell(class='hidden md:table-cell') %}{{ fact.stated_by.full_name if fact.stated_by else 'Not recorded' }}{% endcall %}
+    {% call table_cell(class='hidden md:table-cell') %}{{ fact.stated_by.full_name() if fact.stated_by else 'Not recorded' }}{% endcall %}
     {% call table_cell(class='whitespace-nowrap text-muted-foreground') %}{% if fact.superseded_by_id %}replaced {{ replacement_dates[fact.id] }}{% else %}Current{% endif %}{% endcall %}
-    {% call table_cell(class='text-right') %}{% if not fact.superseded_by_id %}{{ ui.button(text='Correct', href=url_for('procurement.money', replaces=fact.id) ~ '#record-fact', variant='outline', size='sm', attrs={'data-testid': 'money-correct', 'aria-label': 'Correct ' ~ measure_labels[fact.measure] ~ ' as of ' ~ day(fact.as_of)}) }}{% endif %}{% endcall %}
+    {% call table_cell(class='text-right') %}{% if not fact.superseded_by_id %}{{ ui.button(text='Correct', href=url_for('procurement.money', replaces=fact.id) ~ '#record-fact', variant='outline', size='sm', attrs={'data-testid': 'money-correct', 'aria-label': 'Correct ' ~ measure_labels[fact.measure] ~ (' for ' ~ product_names.get(fact.subject_element_id, 'a product') if fact.subject_element_id else '') ~ ' as of ' ~ day(fact.as_of)}) }}{% endif %}{% endcall %}
   {% endcall %}
 {% endif %}
 </div>

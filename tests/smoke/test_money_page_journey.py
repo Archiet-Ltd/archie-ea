@@ -66,11 +66,16 @@ def _workspace():
             db.session.add(user)
             db.session.flush()
             people[key] = user.email
+        from app.models.archimate_core import ArchiMateElement
+
+        product = ArchiMateElement(organization_id=orgs[0].id, name="Starter plan %s" % suffix, type="Product", layer="business")
+        db.session.add(product)
+        db.session.flush()
         ben = User.query.filter_by(email=people["ben"]).one()
         finance_fact_store.record_fact(orgs[1].id, "cash_balance", "50000", date(2026, 11, 14), "neighbour bank statement",
                                        currency="USD", stated_by_user_id=ben.id, recorded_by_id=ben.id)
         db.session.commit()
-        out = dict(people, org_id=orgs[0].id)
+        out = dict(people, org_id=orgs[0].id, product=product.name)
         db.session.remove()
         return out
 
@@ -180,8 +185,13 @@ def test_ada_records_the_money_and_reads_months_of_cash_and_vic_sees_a_sentence(
         rows = page.get_by_test_id("money-history-row")
         expect(rows).to_have_count(2)
         history = page.get_by_test_id("money-history")
-        for text in ("Cash in bank", "bank statement", "Monthly outgoings", "founder's figure", "Ada Tester", "14 Nov 2026", "6 Aug 2026"):
+        for text in ("Cash in bank", "bank statement", "Monthly outgoings", "founder's figure", "14 Nov 2026", "6 Aug 2026"):
             expect(history).to_contain_text(text)
+        stated_by = page.get_by_test_id("money-history-row").filter(has_text="Cash in bank").locator("td").nth(4)
+        assert stated_by.inner_text().strip() == "Ada Tester" or width < 768, stated_by.inner_text()
+        expect(history).to_contain_text("Ada Tester")
+        text_now = page.locator("body").inner_text()
+        assert "bound method" not in text_now and "<User" not in text_now, "the page prints a program object"
 
         # correct the outgoings to 2,700 USD as of 14 Nov 2026
         page.get_by_role("button", name="Correct Monthly outgoings as of 6 Aug 2026").or_(
@@ -207,6 +217,43 @@ def test_ada_records_the_money_and_reads_months_of_cash_and_vic_sees_a_sentence(
         page.reload(wait_until="domcontentloaded")
         expect(page.get_by_test_id("money-spend-value")).to_have_text("2,700 USD")
         expect(page.get_by_test_id("money-cash-value")).to_have_text("0 USD")
+
+        # funding and paying customers read back in Latest figures
+        page.goto(server_in_november + "/procurement/spend/money?measure=funding_in#record-fact", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _record(page, "funding_in", "250000", "2026-11-10", "seed round")
+        page.select_option("#money-measure", value="paying_customers")
+        page.fill("#money-amount", "12")
+        page.fill("#money-as-of", "2026-11-12")
+        page.fill("#money-source", "billing export")
+        page.get_by_test_id("money-save").click()
+        expect(page.get_by_test_id("money-saved")).to_be_visible()
+        latest = page.get_by_test_id("money-latest")
+        expect(latest).to_contain_text("250,000 USD")
+        expect(latest).to_contain_text("seed round")
+        expect(latest).to_contain_text("12")
+        expect(latest).to_contain_text("billing export")
+        assert page.get_by_test_id("money-latest-facts").inner_text().count("Not recorded") == 1, "only monthly revenue is still unrecorded"
+
+        # revenue for a product: named in the history, the revenue card says it is organisation-level,
+        # and a correction stays on the product
+        product = ws["product"]
+        page.goto(server_in_november + "/procurement/spend/money?measure=revenue#record-fact", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.select_option("#money-subject", label=product)
+        _record(page, "revenue", "3000", "2026-11-13", "plan invoices")
+        expect(page.get_by_test_id("money-revenue")).to_contain_text("Revenue recorded for a product is listed in the history")
+        row = page.get_by_test_id("money-history-row").filter(has_text="plan invoices")
+        expect(row).to_contain_text(product)
+        row.get_by_test_id("money-correct").click()
+        expect(page.get_by_test_id("money-form-card")).to_contain_text("Correct a figure")
+        assert page.locator("#money-subject option:checked").inner_text() == product, "the correction opens on the product"
+        page.fill("#money-amount", "3500")
+        page.fill("#money-source", "revised invoices")
+        page.get_by_test_id("money-save").click()
+        expect(page.get_by_test_id("money-saved")).to_be_visible()
+        new_row = page.get_by_test_id("money-history-row").filter(has_text="revised invoices")
+        expect(new_row).to_contain_text(product)
+        expect(new_row).to_contain_text("Current")
+        expect(page.get_by_test_id("money-history-row").filter(has_text="plan invoices")).to_contain_text("replaced")
 
         # read on 1 Mar 2027: the same figures, and the cash is flagged as old
         late = _context(browser, width, dark)

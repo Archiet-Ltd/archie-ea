@@ -80,3 +80,43 @@ def test_the_store_refuses_a_blank_source_and_a_negative_amount(db_session, make
         store.record_fact(org.id, "cash_balance", "10", date(2026, 11, 14), "  ", currency="USD")
     with pytest.raises(store.FinanceFactError, match="not negative"):
         store.record_fact(org.id, "cash_balance", "-10", date(2026, 11, 14), "bank", currency="USD")
+
+
+def test_a_second_replacement_of_the_same_figure_is_refused_even_when_the_first_is_not_yet_loaded(db_session, make_org):
+    org = make_org()
+    old = _fact(org)
+    store.record_fact(org.id, "cash_balance", "90", date(2026, 11, 15), "bank statement", currency="USD", replaces_id=old.id)
+    # a second request that read the figure before the first replaced it still holds it as current
+    db.session.expire(old, ["superseded_by_id"])
+    db.session.execute(db.text("SELECT 1"))
+    with pytest.raises(store.FinanceFactError, match="already been replaced"):
+        store.record_fact(org.id, "cash_balance", "80", date(2026, 11, 16), "bank statement", currency="USD", replaces_id=old.id)
+    assert FinanceFact.query.filter_by(organization_id=org.id).count() == 2
+
+
+def test_a_stale_copy_of_a_figure_cannot_be_replaced_again(db_session, make_org):
+    org = make_org()
+    old = _fact(org)
+    newer = _fact(org, amount=Decimal("90"))
+    stale_id = old.id
+    db.session.execute(db.text("UPDATE finance_facts SET superseded_by_id = :n WHERE id = :o"), {"n": newer.id, "o": stale_id})
+    assert old.superseded_by_id is None  # the loaded copy has not seen the update
+    with pytest.raises(store.FinanceFactError, match="already been replaced"):
+        store.record_fact(org.id, "cash_balance", "80", date(2026, 11, 16), "bank statement", currency="USD", replaces_id=stale_id)
+
+
+def test_supersede_cannot_make_a_cycle(db_session, make_org):
+    org = make_org()
+    older, newer = _fact(org), _fact(org, amount=Decimal("90"))
+    store.supersede_fact(org.id, older.id, newer.id)
+    with pytest.raises(store.FinanceFactError):
+        store.supersede_fact(org.id, newer.id, older.id)
+    assert newer.superseded_by_id is None
+
+
+def test_supersede_refuses_a_replacement_that_is_itself_replaced(db_session, make_org):
+    org = make_org()
+    a, b, c = _fact(org), _fact(org, amount=Decimal("90")), _fact(org, amount=Decimal("80"))
+    store.supersede_fact(org.id, b.id, c.id)
+    with pytest.raises(store.FinanceFactError):
+        store.supersede_fact(org.id, a.id, b.id)

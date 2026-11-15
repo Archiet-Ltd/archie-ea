@@ -18,7 +18,7 @@ from app.models.finance_fact import COUNT_MEASURES, KINDS, MEASURES, SOURCE_KIND
 
 __all__ = [
     "FinanceFactError", "MEASURE_LABELS", "STALE_AFTER_DAYS", "today", "record_fact", "supersede_fact",
-    "latest", "series", "history", "derived_figures", "products", "replaceable_fact",
+    "latest", "latest_figures", "series", "history", "derived_figures", "products", "replaceable_fact",
 ]
 
 MEASURE_LABELS = {
@@ -138,9 +138,14 @@ def record_fact(
 
 
 def replaceable_fact(organization_id: int, fact_id, measure: str | None = None) -> FinanceFact:
-    fact = FinanceFact.query.filter(
-        FinanceFact.id == fact_id, FinanceFact.organization_id == organization_id
-    ).first()
+    # The row is locked and re-read inside the transaction, so two requests replacing the same figure
+    # at once cannot both see it as current: the second waits, then finds it already replaced.
+    fact = (
+        FinanceFact.query.filter(FinanceFact.id == fact_id, FinanceFact.organization_id == organization_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if fact is None:
         raise FinanceFactError("That figure is not one of your organisation's.")
     if fact.superseded_by_id is not None:
@@ -153,10 +158,14 @@ def replaceable_fact(organization_id: int, fact_id, measure: str | None = None) 
 def supersede_fact(organization_id: int, fact_id: int, replacement_id: int) -> FinanceFact:
     """Point an existing fact of this organisation at the fact that replaces it."""
     old = replaceable_fact(organization_id, fact_id)
-    new = FinanceFact.query.filter(
-        FinanceFact.id == replacement_id, FinanceFact.organization_id == organization_id
-    ).first()
-    if new is None or new.measure != old.measure or new.id == old.id:
+    new = (
+        FinanceFact.query.filter(FinanceFact.id == replacement_id, FinanceFact.organization_id == organization_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+    # A replacement is newer than what it replaces and is itself current, so replacements never loop.
+    if new is None or new.measure != old.measure or new.id <= old.id or new.superseded_by_id is not None:
         raise FinanceFactError("That figure cannot replace this one.")
     old.superseded_by_id = new.id
     db.session.commit()
@@ -182,6 +191,11 @@ def latest(organization_id: int, measure: str, subject_element_id=None, kind: st
         .order_by(FinanceFact.as_of.desc(), FinanceFact.id.desc())
         .first()
     )
+
+
+def latest_figures(organization_id: int) -> dict:
+    """The newest organisation-level figure of every kind that can be recorded, None where there is none."""
+    return {measure: _figure(latest(organization_id, measure)) for measure in MEASURE_LABELS}
 
 
 def series(organization_id: int, measure: str, subject_element_id=None, kind: str = "actual", months: int = 12):
