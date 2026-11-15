@@ -90,6 +90,9 @@ def _realizing_apps(cap: Any) -> List[Dict[str, Any]]:
     } for r in applications_of_capability(cap.organization_id, unified.id)[:60]]
 
 
+realizing_apps = _realizing_apps
+
+
 def _sub_capabilities(cap_id: int) -> List[Dict[str, Any]]:
     from app.models.business_capabilities import BusinessCapability  # noqa: PLC0415
     kids = (BusinessCapability.query

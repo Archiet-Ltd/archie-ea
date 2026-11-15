@@ -124,9 +124,10 @@ def test_each_gap_signal_link_opens_a_fact_sheet_listing_the_same_applications(p
         else:
             for i in range(count):
                 href = listed.nth(i).get_attribute("href")
+                app_name = listed.nth(i).inner_text().strip().splitlines()[0].strip()
                 listed.nth(i).click()
                 page.wait_for_load_state("networkidle")
-                expect(page.locator("main")).not_to_be_empty()
+                expect(page.locator("main")).to_contain_text(app_name)
                 page.go_back()
                 page.wait_for_load_state("networkidle")
                 assert href
