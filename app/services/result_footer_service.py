@@ -474,7 +474,7 @@ def work_package_facts(wp, link_self: bool = True, name_shown: bool = False) -> 
     # The package's own page never links to itself.
     href = page_link("implementation_planning.work_package_detail", work_package_id=wp.id) if link_self and not name_shown else None
     facts = [fact("Work package record" if name_shown else wp.name, href=href, source_kind=origin["source_kind"], source_label=origin["source_label"],
-                  as_of=when, subject="Work package")]
+                  as_of=when, subject="Record")]
     # The figure every screen shows: the one work_package_service computes from status, dates and the recorded value.
     from app.services.work_package_service import progress_basis
 

@@ -81,24 +81,64 @@ def test_recording_progress_shows_it_with_its_source(
         expect(progress).to_contain_text("Not recorded")
         expect(progress).not_to_contain_text("%")
         expect(page.locator("[data-testid='wp-days-gone']")).to_contain_text("25 of 30 days gone")
+        # the figure and its evidence line say the same thing: nothing was recorded
+        expect(page.locator("[data-testid='wp-progress-source']")).to_have_text("Not recorded")
+        footer = page.locator("[data-testid='result-footer']")
+        expect(footer.locator("[data-testid='result-footer-evidence']")).to_contain_text("Progress: not recorded")
+        expect(footer.locator("[data-testid='result-footer-source']")).not_to_contain_text("Progress: entered by the team")
         _shot(page, tmp_path, label, "before")
 
         page.get_by_role("link", name=re.compile("^\\s*Edit")).first.click()
         page.wait_for_url("**/work-packages/%d/edit" % package, timeout=PAGE_TIMEOUT)
-        page.fill("#progress_percentage", "35")
+        page.fill("#progress_percentage", "40")
         page.get_by_role("button", name="Edit Work Package").click()
 
         # back on the record, with the notice and the figure and where it came from
         page.wait_for_url(re.compile(r"/work-packages/%d$" % package), timeout=PAGE_TIMEOUT)
         expect(page.get_by_text("Saved.").first).to_be_attached()
         progress = page.locator("[data-testid='wp-progress']")
-        expect(progress).to_contain_text("35%")
+        expect(progress).to_contain_text("40%")
         expect(page.locator("[data-testid='wp-progress-source']")).to_have_text("Entered by the team")
-        expect(page.locator("[data-testid='wp-facts']")).to_contain_text("Progress: 35%".replace("Progress: ", ""))
+        expect(page.locator("[data-testid='wp-facts']")).to_contain_text("40%")
+        expect(page.locator("[data-testid='result-footer-source']")).to_contain_text("Progress: entered by the team")
+        expect(page.locator("[data-testid='result-footer-evidence']")).not_to_contain_text("not recorded")
         _shot(page, tmp_path, label, "after")
 
         page.reload(wait_until="domcontentloaded")
-        expect(page.locator("[data-testid='wp-progress']")).to_contain_text("35%")
+        expect(page.locator("[data-testid='wp-progress']")).to_contain_text("40%")
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    finally:
+        ctx.close()
+
+
+def test_a_cancelled_package_says_it_was_cancelled(browser, live_server, seeded, tmp_path):
+    from app import create_app, db
+    from app.services import work_package_service
+
+    app = create_app("testing")
+    with app.app_context():
+        wp = work_package_service.create_work_package(
+            organization_id=seeded["ids"]["org"], name="Progress journey cancelled", status="cancelled",
+        )
+        db.session.commit()
+        wp_id = wp.id
+        db.session.remove()
+
+    ctx = browser.new_context(viewport={"width": 390, "height": 800})
+    ctx.add_init_script("document.documentElement.classList.add('dark');")
+    page = ctx.new_page()
+    try:
+        page.goto(live_server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.fill("#email", seeded["emails"]["enterprise_architect"])
+        page.fill("#password", PASSWORD)
+        page.locator("#submit").click()
+        page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
+        page.goto(live_server + "/implementation/work-packages/%d" % wp_id,
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.locator("[data-testid='wp-progress']")).to_contain_text("Cancelled")
+        expect(page.locator("[data-testid='wp-progress-source']")).to_have_text("Cancelled")
+        expect(page.locator("[data-testid='wp-progress']")).not_to_contain_text("Edit")
+        _shot(page, tmp_path, "390 dark", "cancelled")
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
     finally:
         ctx.close()
