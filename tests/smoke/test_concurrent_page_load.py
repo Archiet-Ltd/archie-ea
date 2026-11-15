@@ -5,7 +5,7 @@ sidebar page at the same moment. Whatever the load, each answer is either the wh
 5xx that the browser and the uptime check can see; a status 200 page that says "Something went
 wrong", or prints a lone None where a value belongs, hides a failure.
 
-Marked ``load`` and left out of the normal run; run it with ``pytest -m load``. Set
+Marked ``load`` and deselected from every run that does not pass ``-m load`` (the smoke-other CI job runs it). Set
 LOAD_REQUESTS to change the number of simultaneous requests (95 by default).
 """
 
@@ -23,6 +23,13 @@ pytestmark = [pytest.mark.smoke, pytest.mark.load]
 
 REQUESTS_AT_ONCE = int(os.environ.get("LOAD_REQUESTS", "95"))
 LONE_NONE = re.compile(r">\s*None\s*<")
+# A paragraph that is only "None" is a value printed in place of a sentence; a "None" option or legend
+# label is a word the page means.
+BARE_NONE_PARAGRAPH = re.compile(r"<p[^>]*>\s*None\s*</p>")
+# Ceilings that do not move with how a page behaves alone: no page may print a paragraph that is only None, answer a
+# server error or take longer than this, whether it is asked for alone or in the crowd.
+ALONE_SECONDS_CEILING = float(os.environ.get("LOAD_ALONE_CEILING", "15"))
+CROWD_SECONDS_CEILING = float(os.environ.get("LOAD_CROWD_CEILING", "90"))
 
 
 class _Links(HTMLParser):
@@ -98,9 +105,16 @@ def test_every_answer_under_load_is_a_whole_page_or_a_server_error(seeded, poole
     # Some pages carry the words in fixed text (a hidden "try again" panel, a "None" column
     # heading), so each page is first read on its own and the count there is its normal count.
     quiet = {}
+    broken_alone = []
     for path in dict.fromkeys(pages):
         reply = session.get(base + path, timeout=300)
         quiet[path] = _marks(reply.text) if reply.status_code == 200 else 0
+        seconds = reply.elapsed.total_seconds()
+        if reply.status_code >= 500 or BARE_NONE_PARAGRAPH.search(reply.text) or seconds > ALONE_SECONDS_CEILING:
+            broken_alone.append((path, reply.status_code, bool(BARE_NONE_PARAGRAPH.search(reply.text)), round(seconds, 1)))
+    assert not broken_alone, "pages already degraded when asked for alone (path, status, bare None paragraph, seconds): %s" % (
+        broken_alone[:10],
+    )
 
     def fetch(path):
         reply = session.get(base + path, timeout=300, allow_redirects=True)
@@ -117,8 +131,9 @@ def test_every_answer_under_load_is_a_whole_page_or_a_server_error(seeded, poole
 
     degraded = [
         (path, _marks(body), quiet[path])
-        for path, status, body, _ in answers
-        if status == 200 and _marks(body) > quiet[path]
+        for path, status, body, seconds in answers
+        if status == 200
+        and (_marks(body) > quiet[path] or BARE_NONE_PARAGRAPH.search(body) or seconds > CROWD_SECONDS_CEILING)
     ]
     print("degraded_200=%d" % len(degraded))
     assert not degraded, "pages answered 200 while degraded (path, now, alone): %s\nserver log:\n%s" % (
