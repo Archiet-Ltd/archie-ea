@@ -621,9 +621,11 @@ def _element_owner_remove_urls(element, element_type, organization_id, owner_row
 @login_required
 def process_element_set_owner(element_id):
     """Record the first owner of a process that so far exists only as an element."""
-    from app.core.auth.permissions import can
+    from app.core.auth.permissions import can, is_read_only_member
 
     org_id = g.current_org_id
+    if is_read_only_member(current_user):
+        return jsonify({"message": "Your role can read but not change this organisation's records."}), 403
     if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
         return jsonify({"message": "You cannot assign owners"}), 403
     element = ArchiMateElement.query.filter_by(
@@ -642,10 +644,12 @@ def process_element_set_owner(element_id):
 @login_required
 def process_set_owner(process_id):
     """Record an owner for a business process (a new primary replaces the old)."""
-    from app.core.auth.permissions import can
+    from app.core.auth.permissions import can, is_read_only_member
     from app.services.element_ownership_service import set_element_owner
 
     org_id = g.current_org_id
+    if is_read_only_member(current_user):
+        return jsonify({"message": "Your role can read but not change this organisation's records."}), 403
     if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
         return jsonify({"message": "You cannot assign owners"}), 403
     data = request.get_json(silent=True) or {}
@@ -674,10 +678,12 @@ def process_set_owner(process_id):
 @login_required
 def process_delete_owner(process_id, owner_id):
     """Clear one owner of a business process."""
-    from app.core.auth.permissions import can
+    from app.core.auth.permissions import can, is_read_only_member
     from app.models.application_owner import ApplicationOwner
 
     org_id = g.current_org_id
+    if is_read_only_member(current_user):
+        return jsonify({"message": "Your role can read but not change this organisation's records."}), 403
     if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
         return jsonify({"message": "You cannot assign owners"}), 403
     record = ApplicationOwner.query.filter_by(
@@ -696,10 +702,12 @@ def process_delete_owner(process_id, owner_id):
 @login_required
 def gap_set_owner(gap_id):
     """Record an owner for a gap (a new primary replaces the old)."""
-    from app.core.auth.permissions import can
+    from app.core.auth.permissions import can, is_read_only_member
     from app.services.element_ownership_service import set_element_owner
 
     org_id = g.current_org_id
+    if is_read_only_member(current_user):
+        return jsonify({"message": "Your role can read but not change this organisation's records."}), 403
     if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
         return jsonify({"message": "You cannot assign owners"}), 403
     data = request.get_json(silent=True) or {}
@@ -725,10 +733,12 @@ def gap_set_owner(gap_id):
 @login_required
 def gap_delete_owner(gap_id, owner_id):
     """Clear one owner of a gap."""
-    from app.core.auth.permissions import can
+    from app.core.auth.permissions import can, is_read_only_member
     from app.models.application_owner import ApplicationOwner
 
     org_id = g.current_org_id
+    if is_read_only_member(current_user):
+        return jsonify({"message": "Your role can read but not change this organisation's records."}), 403
     if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
         return jsonify({"message": "You cannot assign owners"}), 403
     record = ApplicationOwner.query.filter_by(
