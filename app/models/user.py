@@ -189,8 +189,16 @@ class Role(db.Model):
 class User(UserMixin, db.Model):
     __tablename__ = "users"
     __table_args__ = {"extend_existing": True}
+
+    def get_id(self):
+        gen = self.session_generation or 0
+        return "%s:%s" % (self.id, gen) if gen else str(self.id)
     id = db.Column(db.Integer, primary_key=True)
     confirmed = db.Column(db.Boolean, default=False)
+    # Counts every "end all sign-ins" (password change or reset, sign out
+    # everywhere, administrator action). It is part of get_id(), so a remember
+    # cookie issued before the count moved no longer names this account.
+    session_generation = db.Column(db.Integer, nullable=True, default=0)
     first_name = db.Column(db.String(64), index=True)
     last_name = db.Column(db.String(64), index=True)
     email = db.Column(db.String(64), unique=True, index=True)
@@ -645,7 +653,11 @@ def load_user(user_id):
     from sqlalchemy.exc import OperationalError
 
     try:
-        return db.session.get(User, int(user_id))
+        raw_id, _, raw_gen = str(user_id).partition(":")
+        user = db.session.get(User, int(raw_id))
+        if user is not None and (user.session_generation or 0) != int(raw_gen or 0):
+            return None
+        return user
     except (TypeError, ValueError):
         return None
     except OperationalError:

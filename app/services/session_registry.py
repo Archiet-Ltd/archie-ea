@@ -183,6 +183,16 @@ def revoke(sid, reason):
         raise
 
 
+def _follow_generation(user, except_sid):
+    """Keep the one session that was kept signed in, if it is this request's."""
+    if user is None or not except_sid:
+        return
+    from flask import has_request_context, session
+
+    if has_request_context() and session.get("_sid") == except_sid:
+        session["_user_id"] = user.get_id()
+
+
 def revoke_all_for_user(user_id, reason, except_sid=None):
     """Revoke every currently-active session for ``user_id`` except
     ``except_sid``. Returns the number of sessions revoked.
@@ -209,7 +219,15 @@ def revoke_all_for_user(user_id, reason, except_sid=None):
         for row in rows:
             row.revoked_at = now
             row.revoked_reason = reason
+        # A remember cookie names the account by its generation, so moving the
+        # count ends every remembered browser as well as the live sessions.
+        from app.models.user import User
+
+        user = db.session.get(User, user_id)
+        if user is not None:
+            user.session_generation = (user.session_generation or 0) + 1
         db.session.commit()
+        _follow_generation(user, except_sid)
         # An assistant connected through OAuth is a session in every way that
         # matters here (it acts as this person), so it ends with the rest --
         # whatever device is kept via except_sid. Same transaction boundary,

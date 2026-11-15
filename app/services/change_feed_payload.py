@@ -209,8 +209,8 @@ def _signed_in_user_id() -> Optional[int]:
         if getattr(resolved, "is_authenticated", False):
             return getattr(resolved, "id", None)
         return None
-    raw = http_session.get("_user_id")
-    return int(raw) if str(raw).isdigit() else None
+    raw = str(http_session.get("_user_id")).partition(":")[0]
+    return int(raw) if raw.isdigit() else None
 
 
 def source_of(session: Any, target: object) -> dict:

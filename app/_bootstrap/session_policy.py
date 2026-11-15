@@ -236,8 +236,10 @@ def init_session_policy(app):
         # "Keep me logged in": a browser that was closed and reopened comes
         # back with the remember cookie but no session. A remembered
         # non-administrator gets a fresh session record, as long as the
-        # account still has a live sign-in (a password change or reset
-        # revokes them all and so ends the remembered one too).
+        # account still has a live sign-in. The cookie itself names the
+        # account by its session generation (User.get_id), which every
+        # password change, reset and sign-out-everywhere moves, so a cookie
+        # copied before one of those is no longer accepted by the user loader.
         if (
             not sid
             and not _is_admin(current_user)

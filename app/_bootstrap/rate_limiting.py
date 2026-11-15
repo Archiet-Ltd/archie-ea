@@ -125,7 +125,7 @@ def _session_user_id():
 
     raw = session.get("_user_id")
     try:
-        return int(raw) if raw is not None else None
+        return int(str(raw).partition(":")[0]) if raw is not None else None
     except (TypeError, ValueError):
         return None
 
