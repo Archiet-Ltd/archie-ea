@@ -61,7 +61,12 @@ def _commit_hint(element, org_id) -> Dict[str, Any]:
 
     summary = _fact(element, "github_commit_owners")
     if not isinstance(summary, dict):
-        return {}
+        where = _where(element)
+        if not where:
+            return {}
+        short = where.split(",")[0].split(" at ")[0].rsplit("/", 1)[-1]
+        return {"note": f"No owner has been worked out yet: the recent commits of {short} have not been read. "
+                        "They are read the next time GitHub is read."}
     if summary.get("unavailable"):
         return {"note": str(summary["unavailable"])}
     repository = str(summary.get("repository") or "")

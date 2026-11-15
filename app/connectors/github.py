@@ -369,6 +369,102 @@ def apply_commit_history(org_id, element, component, summary: Dict[str, Any], as
     return written
 
 
+def commit_unreadable_reason(repository: str, cause: Optional[str] = None) -> str:
+    """The words that say why no owner could be suggested because the commits could not be read."""
+    short = repository.rsplit("/", 1)[-1] or "this repository"
+    status = re.search(r"HTTP (\d+)", cause or "")
+    if cause is None:
+        why = "GitHub is not connected for this organisation"
+    elif status and status.group(1) in ("401", "403", "404"):
+        why = "the GitHub connection has no access to it"
+    elif status and status.group(1) == "429":
+        why = "GitHub's request limit was reached"
+    else:
+        why = "GitHub did not answer"
+    return f"No owner was suggested: the commits of {short} could not be read because {why}."
+
+
+def _unreadable_summary(repository: str, cause: Optional[str] = None) -> Dict[str, Any]:
+    return {
+        "repository": repository,
+        "days": COMMIT_WINDOW_DAYS,
+        "oldest": None,
+        "newest": None,
+        "member_commits": 0,
+        "candidates": [],
+        "unavailable": commit_unreadable_reason(repository, cause),
+    }
+
+
+def application_repository(element) -> Optional[str]:
+    """The repository an imported application was read from, else None."""
+    try:
+        ref = json.loads(element.source_ref or "")
+    except (TypeError, ValueError):
+        return None
+    repository = ref.get("repository") if isinstance(ref, dict) else None
+    return repository if isinstance(repository, str) and _REPO_RE.match(repository) else None
+
+
+def owners_from_commits(org_id) -> List[Dict[str, Any]]:
+    """Work out the owner of every connector-imported application of one organisation that has no
+    primary owner, from its recent commits, or record the one sentence that says why not. The
+    same step the connector's read runs (``apply_commit_history``), so a run changes nothing that
+    a read would not, and an application that has an owner is only reported. One entry per
+    application: ``{"application", "repository", "outcome", "text"}`` where outcome is
+    ``owner set``, ``reason recorded``, ``already owned`` or ``unchanged``."""
+    from app.models.application_owner import ApplicationOwner
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.connector_framework import _load_org_connector, build_connector
+
+    rows = db.session.execute(
+        db.select(ApplicationComponent, ArchiMateElement)
+        .join(ArchiMateElement, ArchiMateElement.id == ApplicationComponent.archimate_element_id)
+        .where(ApplicationComponent.organization_id == org_id)
+        .where(ArchiMateElement.organization_id == org_id)
+        .order_by(ApplicationComponent.id)
+    ).all()
+    cfg = _load_org_connector(org_id, connector_type="github")
+    evidence = None
+    cause: Optional[str] = None
+    if cfg is not None:
+        try:
+            connector = build_connector(cfg, org_id)
+            evidence = _RepositoryEvidence(connector, connector._client(), org_id, connector._organization(), {})
+        except Exception as exc:  # no token, a token this server cannot open: the commits cannot be read
+            cause = str(exc) or "no access"
+            cause = cause if "HTTP" in cause else "no access (HTTP 403)"
+    lines: List[Dict[str, Any]] = []
+    for component, element in rows:
+        repository = application_repository(element)
+        if repository is None:
+            continue
+        line = {"application": component.name, "repository": repository}
+        owned = ApplicationOwner.query.filter_by(
+            application_id=component.id, organization_id=org_id, ownership_type="primary").first()
+        if owned is not None:
+            lines.append({**line, "outcome": "already owned", "text": "Owner already recorded"})
+            continue
+        before = ((element.acm_properties or {}).get("github_commit_owners") or {}).get("value")
+        if evidence is not None:
+            try:
+                summary = evidence._commit_history(repository)
+            except GitHubConnectorError as exc:
+                summary = _unreadable_summary(repository, str(exc))
+        else:
+            summary = _unreadable_summary(repository, cause if cfg is not None else None)
+        if apply_commit_history(org_id, element, component, summary):
+            source = (element.acm_properties or {}).get("github_owner_source", {}).get("value") or {}
+            lines.append({**line, "outcome": "owner set", "text": source.get("text", "")})
+            continue
+        after = ((element.acm_properties or {}).get("github_commit_owners") or {}).get("value")
+        text = summary.get("unavailable") or "No single member leads the recent commits"
+        outcome = "unchanged" if before == after and before is not None else "reason recorded"
+        lines.append({**line, "outcome": outcome, "text": text})
+    return lines
+
+
 def execute_github_proposal(approval, data_service=None) -> Dict[str, Any]:
     """Apply one approved proposal of this connector (called by the approval service)."""
     try:
@@ -1441,7 +1537,11 @@ class _RepositoryEvidence:
         ).first()
         if component is None:
             return False
-        return apply_commit_history(self.org_id, element, component, self._commit_history(full_name))
+        try:
+            summary = self._commit_history(full_name)
+        except GitHubConnectorError as exc:  # the application and its facts are still written, with the reason
+            summary = _unreadable_summary(full_name, str(exc))
+        return apply_commit_history(self.org_id, element, component, summary)
 
     def _person_for(self, owners: List[str]):
         """The one user of the organisation named by an e-mail code owner, else None."""

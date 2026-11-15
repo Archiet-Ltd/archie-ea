@@ -589,6 +589,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register application owners backfill CLI: {e}")
 
+# Owners of connector-imported applications worked out from their commits
+    try:
+        from app.commands import owners_from_commits
+        owners_from_commits.init_app(app)
+        app.logger.info("Owners from commits CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register owners from commits CLI: {e}")
+
 # Backlog requirements projected onto the requirements prioritisation ranks
     try:
         from app.commands import backfill_backlog_requirements
