@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import pytest
+
 from app.modules.mcp.tests.test_rate_limit_org_budget import (  # noqa: F401  (fixtures)
     forget_counters,
-    limiting_on,
-    quick_tools,
+    limiting_on,  # noqa: F401
+    quick_tools,  # noqa: F401
     post,
     run_session,
 )
@@ -13,8 +15,9 @@ from app.modules.mcp.tests.test_scope_enforcement import _mint_token_with_scope
 from app.modules.mcp.tests.test_tools import _make_element, _make_user
 
 
+@pytest.mark.usefixtures("limiting_on", "quick_tools")
 def test_one_organisation_over_budget_does_not_refuse_another_at_the_same_moment(
-    app, db_session, make_org, limiting_on, quick_tools
+    app, db_session, make_org
 ):
     first, second = make_org("mcp-cross-a"), make_org("mcp-cross-b")
     tokens, elements = {}, {}
