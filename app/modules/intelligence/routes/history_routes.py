@@ -175,12 +175,16 @@ def history_changes_page():
 
         chain = AuditLog.verify_chain(organization_id)
 
+    from app.services.cost_visibility import withhold_change_rows
+
     return render_template(
         "intelligence/history_changes.html",
         from_date=from_date,
         to_date=to_date,
         changes=changes,
-        rows=[change_row(c, people, repositories, repository_applications) for c in shown],
+        rows=withhold_change_rows(
+            [change_row(c, people, repositories, repository_applications) for c in shown]
+        ),
         total_changes=len(changes),
         recorded_total=len(result.changes),
         shown_limit=CHANGE_ROWS_SHOWN,

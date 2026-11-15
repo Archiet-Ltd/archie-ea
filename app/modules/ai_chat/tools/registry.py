@@ -461,7 +461,7 @@ TOOL_SCHEMAS = [
         "mutates": True,
         "record_types_written": ["RiskRegisterEntry"],
         "description": (
-            "Add a risk to a solution risk register. "
+            "Add a risk to the risk register, linked to the solution. "
             "Use when the user identifies a threat, concern, or uncertainty for the solution."
         ),
         "parameters": {
@@ -2152,7 +2152,8 @@ TOOL_SCHEMAS.extend([
     _route_read_tool(
         "get_canvas",
         "GET /business-model/api/<canvas_id> | GET /business-case/api/<canvas_id>",
-        "Get the full detail of one Business Model Canvas or Business Case.",
+        "One canvas with every box's entries, prices and costs, as the canvas page shows them; "
+        "without canvas_id, the organisation's Business Model Canvas. Also gets one Business Case.",
         {
             "type": "object",
             "properties": {
@@ -2163,10 +2164,10 @@ TOOL_SCHEMAS.extend([
                 },
                 "canvas_id": {
                     "type": "integer",
-                    "description": "The canvas or business case id",
+                    "description": "The canvas or business case id; optional for a business_model canvas",
                 },
             },
-            "required": ["canvas_type", "canvas_id"],
+            "required": ["canvas_type"],
         },
     ),
 ])
@@ -2263,6 +2264,11 @@ def _archimate_element_schemas() -> list:
 
 
 TOOL_SCHEMAS.extend(_archimate_element_schemas())
+
+# Refresh the lookup in place now that every schema is in the list, so a tool
+# the chat is offered is always one the review loop and risk classifier can find.
+TOOL_SCHEMA_BY_NAME.clear()
+TOOL_SCHEMA_BY_NAME.update({s["name"]: s for s in TOOL_SCHEMAS})
 
 
 def mutating_tool_names() -> set:

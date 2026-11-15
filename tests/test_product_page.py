@@ -118,6 +118,56 @@ def test_another_organisations_elements_never_appear(app, db_session, make_org, 
     assert _get(client, login_as, foreign, _product_url(one["product"])).status_code == 404
 
 
+def test_element_page_relationship_list_excludes_another_organisations_element(
+        app, db_session, make_org, client, login_as):
+    """An element page's 'Also connected to' list must not name an element from another
+    organisation, even when a relationship row crosses the boundary.
+    Also verifies that a same-organisation related element IS listed (positive control)."""
+    mine, theirs = make_org("el-mine"), make_org("el-theirs")
+    service = _el(db_session, mine, "Orders mine", "BusinessService", "Business")
+    foreign = _el(db_session, theirs, "Orders theirs", "BusinessService", "Business")
+    # Same-org related element (should appear in 'Also connected to')
+    local_related = _el(db_session, mine, "Local related", "BusinessService", "Business")
+    _rel(db_session, mine, service, local_related, "Serving")
+    # Cross-org relationship (should NOT appear)
+    _rel(db_session, mine, service, foreign, "Serving")
+    user = _user(db_session, mine)
+    html = _get(client, login_as, user,
+                f"/architecture/business/BusinessService/{service.id}?ae=1").get_data(as_text=True)
+    # Centre element name appears as page title
+    assert "Orders mine" in html
+    # Same-org related element must be listed
+    assert "Local related" in html
+    # Cross-org element must NOT be listed
+    assert "Orders theirs" not in html
+
+    # The reader itself returns the same-organisation neighbour and not the foreign one.
+    from app.modules.architecture.routes.archimate_crud import routes as crud_routes
+    with app.test_request_context():
+        supplied = crud_routes._get_element_relationships(service, service.id)
+    names = {r["target"]["name"] for r in supplied}
+    assert names == {"Local related"}
+
+
+def test_element_page_lists_what_the_relationship_reader_supplies(
+        app, db_session, make_org, client, login_as, monkeypatch):
+    """The element page renders the rows `_get_element_relationships` returns: a row that only
+    the reader supplies (no relationship exists for it in the database) appears on the page."""
+    from app.modules.architecture.routes.archimate_crud import routes as crud_routes
+    org = make_org("el-reader")
+    service = _el(db_session, org, "Orders reader", "BusinessService", "Business")
+    user = _user(db_session, org)
+    url = f"/architecture/business/BusinessService/{service.id}?ae=1"
+    before = _get(client, login_as, user, url).get_data(as_text=True)
+    assert "Supplied by reader only" not in before
+    monkeypatch.setattr(crud_routes, "_get_element_relationships", lambda element, element_id: [{
+        "type": "Serving", "direction": "outgoing",
+        "target": {"id": 999999, "name": "Supplied by reader only", "type": "BusinessService", "layer": "Business"},
+    }])
+    after = _get(client, login_as, user, url).get_data(as_text=True)
+    assert "Supplied by reader only" in after
+
+
 def test_linked_material_and_cost_are_read_from_their_stores(app, db_session, make_org, client, login_as):
     from app.models.application_portfolio import ApplicationComponent
     from app.models.architecture_decision import ArchitectureDecision
