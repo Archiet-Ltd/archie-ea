@@ -7,8 +7,7 @@ under the same row-level security as the other organisation tables.
 
 The downgrade drops the policies, the indexes and the two columns.
 
-Revision ID: 20261114_capsupport_projection
-Revises: 20261114_subscription_offer
+Revises: 20261114_blank_none_desc
 Create Date: 2026-11-14
 """
 from alembic import op
@@ -56,7 +55,7 @@ def upgrade():
         )
     )
     # An application with no organisation of its own is placed by its capability. A row that neither
-    # names is the only kind removed, and its count and ids are printed first.
+    # names is left out of the projection, not deleted: its count is printed and it stays in the table.
     bind.execute(
         text(
             f"UPDATE {_TABLE} AS m SET organization_id = c.organization_id "  # nosec B608 - literal table name
@@ -70,10 +69,9 @@ def upgrade():
             text(f"SELECT id FROM {_TABLE} WHERE organization_id IS NULL ORDER BY id")  # nosec B608 - literal table name
         )
     ]
-    print(f"capability support: {len(unplaced)} row(s) with no application or capability organisation removed: {unplaced}")
-    if unplaced:
-        bind.execute(text(f"DELETE FROM {_TABLE} WHERE organization_id IS NULL"))  # nosec B608 - literal table name
-    bind.execute(text(f"ALTER TABLE {_TABLE} ALTER COLUMN organization_id SET NOT NULL"))
+    print(f"capability support: {len(unplaced)} row(s) name no organisation and are left out of the projection: {unplaced}")
+    if not unplaced:
+        bind.execute(text(f"ALTER TABLE {_TABLE} ALTER COLUMN organization_id SET NOT NULL"))
     bind.execute(
         text(
             f"ALTER TABLE {_TABLE} ADD COLUMN IF NOT EXISTS archimate_relationship_id INTEGER "
