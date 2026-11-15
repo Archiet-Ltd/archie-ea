@@ -19,10 +19,17 @@
 {% from 'components/provenance.html' import result_footer %}
 {% from 'components/button.html' import button %}
 {% from 'components/checkbox.html' import checkbox %}
+{% from 'intelligence/_entity_picker.html' import entity_picker with context %}
 {% from 'components/input.html' import input %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {% block title %}{{ element_type | plain_name(current_user) }}: {{ element.name if element.name else (element.title if element.title else 'Unnamed') }}{% endblock %}
+
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/archimate_crud/product_add.js') }}"></script>
+{% endblock %}
 
 {% block content %}
 {% set elem_name = element.name if element.name else (element.title if element.title else 'Unnamed') %}
@@ -328,13 +335,28 @@
             </div>
             {% if sec.add %}
             {% call dialog(title='Add to ' ~ sec.label, description='The new element is joined to ' ~ elem_name ~ ' by ' ~ sec.add.relationship | lower ~ '.', open_expr='addOpen', close_expr='addOpen = false', start_hidden=false) %}
-            <form method="post" action="{{ sec.add.url }}" class="space-y-4" data-testid="product-add-form-{{ sec.key }}">
+            <form method="post" action="{{ sec.add.url }}" class="space-y-4" data-testid="product-add-form-{{ sec.key }}"
+                  x-data="productAdd({{ sec.add.types | map(attribute=0) | list | tojson | forceescape }}, {{ dict(sec.add.types) | tojson | forceescape }})" x-ref="addForm"
+                  @keydown.enter="if ($event.target.tagName === 'INPUT') $event.preventDefault()">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="section" value="{{ sec.key }}">
-                <label for="add-{{ sec.key }}-type" class="block text-sm font-medium text-muted-foreground">Type</label>
-                {{ native_select(id='add-' ~ sec.key ~ '-type', name='element_type', options=sec.add.types, aria_label='Type') }}
-                {{ form_field(id='add-' ~ sec.key ~ '-name', name='name', label='Name', required=true, placeholder='What is it called?') }}
-                {{ form_footer(submit_text='Add to ' ~ sec.label | lower, cancel_attrs={'@click': 'addOpen = false'}, submit_attrs={'data-testid': 'product-add-submit-' ~ sec.key}) }}
+                <input type="hidden" name="existing_id" value="" x-ref="existing">
+                <input type="hidden" name="name" value="" x-ref="newName">
+                <p class="text-sm font-medium text-muted-foreground">Find one your organisation already has</p>
+                {{ entity_picker('add-' ~ sec.key, 'Type a few letters of its name') }}
+                <div x-show="canCreate" x-cloak class="space-y-3" data-testid="product-add-create-{{ sec.key }}">
+                    <div x-show="similar.length" x-cloak class="space-y-2" data-testid="product-add-near-{{ sec.key }}">
+                        <template x-for="near in similar" :key="near.id">
+                            {% call button(variant='outline', testid='product-add-near-option', attrs_dict={'@click': 'join(near.id)'}) %}Did you mean <span x-text="near.name" class="ml-1"></span>?{% endcall %}
+                        </template>
+                    </div>
+                    <label for="add-{{ sec.key }}-type" class="block text-sm font-medium text-muted-foreground">Nothing matches exactly. Type of the new element</label>
+                    {{ native_select(id='add-' ~ sec.key ~ '-type', name='element_type', options=sec.add.types, aria_label='Type', attrs_dict={'x-model': 'chosenType'}) }}
+                    {% call button(variant='default', testid='product-add-create-' ~ sec.key ~ '-submit', attrs_dict={'@click': 'create()', 'x-text': 'createLabel'}) %}{% endcall %}
+                </div>
+                <div class="flex justify-end pt-2">
+                    {% call button(variant='ghost', attrs_dict={'@click': 'addOpen = false'}) %}Cancel{% endcall %}
+                </div>
             </form>
             {% endcall %}
             {% endif %}
