@@ -1,10 +1,11 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/modal.html' import modal %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'basecoat/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from 'components/input.html' import input, label, textarea %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
@@ -148,7 +149,8 @@
 
         {# --- List view --- #}
         {% call tabs_content(value='list') %}
-          {% call table() %}
+          <div class="relative w-full overflow-auto" tabindex="0" role="region" aria-label="Work packages">
+          {% call table(attrs={'aria-label': 'Work packages'}) %}
             {% call table_header() %}
               <tr>
                 {% call table_head() %}Name{% endcall %}
@@ -159,8 +161,10 @@
                 {% call table_head(class='text-right') %}Actions{% endcall %}
               </tr>
             {% endcall %}
-            {% call table_body(attrs_dict={'x-show': 'filteredItems.length === 0'}) %}
-              {{ table_empty_state(message='No work packages for this filter.', icon='inbox') }}
+            {% call table_body(attrs={'x-show': 'filteredItems.length === 0'}) %}
+              {% call table_row() %}
+                {% call table_cell(class='py-12 text-center text-muted-foreground', attrs={'colspan': '6'}) %}No work packages for this filter. Choose another status or add a work package.{% endcall %}
+              {% endcall %}
             {% endcall %}
             {% call table_body() %}
               <template x-for="item in filteredItems" :key="item.id">
@@ -202,6 +206,7 @@
               </template>
             {% endcall %}
           {% endcall %}
+          </div>
         {% endcall %}
       {% endcall %}
     {% endcall %}

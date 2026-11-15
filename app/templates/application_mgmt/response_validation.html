@@ -1,6 +1,7 @@
+{# design-block: form #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/figures.html' import stat_cards %}
 
 {% block title %}Data Validation - Response Comparison{% endblock %}
 
@@ -25,13 +26,13 @@
   <div class="mb-8">
     {% macro _ps_actions() %}
 <div class="flex gap-3">
-        <select id="app-selector" class="px-3 py-2 border rounded-md" @change="loadComparison()" aria-label="Select Application...">
+        <select id="app-selector" class="px-3 py-2 border rounded-md" aria-label="Select Application...">
           <option value="">Select Application...</option>
           {% for app in applications %}
           <option value="{{ app.id }}">{{ app.name }}</option>
           {% endfor %}
         </select>
-        <button type="button" @click="resolveAllConflicts()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90" id="resolve-all-btn" disabled>
+        <button type="button" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90" id="resolve-all-btn" disabled>
           Resolve All
         </button>
       </div>
@@ -40,11 +41,13 @@
   </div>
 
   <!-- Summary Stats -->
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-    {{ metrics_card(title='Total Fields', value='-', value_id='total-fields', icon='list', description='Compared fields') }}
-    {{ metrics_card(title='Matched', value='-', value_id='matched-fields', icon='check-circle', value_class='text-success', description='Values in agreement') }}
-    {{ metrics_card(title='Conflicts', value='-', value_id='conflict-fields', icon='alert-triangle', value_class='text-warning', description='Requires resolution') }}
-    {{ metrics_card(title='Missing Data', value='-', value_id='missing-fields', icon='database', value_class='text-primary', description='Incomplete values') }}
+  <div class="mb-6">
+    {{ stat_cards([
+      {'label': 'Total fields', 'value': '—', 'sentence': 'Compared fields', 'icon': 'list', 'testid': 'total-fields'},
+      {'label': 'Matched', 'value': '—', 'sentence': 'Values in agreement', 'icon': 'circle-check', 'testid': 'matched-fields'},
+      {'label': 'Conflicts', 'value': '—', 'sentence': 'Requires resolution', 'icon': 'triangle-alert', 'testid': 'conflict-fields'},
+      {'label': 'Missing data', 'value': '—', 'sentence': 'Incomplete values', 'icon': 'database', 'testid': 'missing-fields'},
+    ]) }}
   </div>
 
   <!-- Data Sources Legend -->
@@ -215,10 +218,10 @@ function renderComparison(comparisons) {
 }
 
 function updateStats(stats) {
-  document.getElementById('total-fields').textContent = stats.total;
-  document.getElementById('matched-fields').textContent = stats.matched;
-  document.getElementById('conflict-fields').textContent = stats.conflicts;
-  document.getElementById('missing-fields').textContent = stats.missing;
+  document.querySelector('[data-testid="total-fields-value"]').textContent = stats.total;
+  document.querySelector('[data-testid="matched-fields-value"]').textContent = stats.matched;
+  document.querySelector('[data-testid="conflict-fields-value"]').textContent = stats.conflicts;
+  document.querySelector('[data-testid="missing-fields-value"]').textContent = stats.missing;
 }
 
 function openResolutionModal(idx) {
@@ -342,6 +345,9 @@ async function resolveAllConflicts() {
 document.getElementById('resolution-modal').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) closeResolutionModal();
 });
+
+document.getElementById('app-selector').addEventListener('change', loadComparison);
+document.getElementById('resolve-all-btn').addEventListener('click', resolveAllConflicts);
 
 // Initialize
 lucide.createIcons();
