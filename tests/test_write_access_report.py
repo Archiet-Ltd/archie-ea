@@ -179,3 +179,22 @@ def test_a_raw_statement_with_no_check_is_named_for_a_viewer_of_either_organisat
     lines = _lines(caplog)
     assert len(lines) == 1 and "table=application_components" in lines[0], lines
     db_session.rollback()
+
+
+def test_a_refusal_says_read_only_only_to_a_read_only_role(app, db_session, two_orgs):
+    from app._bootstrap.write_access import GENERAL_REASON, NOT_INCLUDED_REASON, _reason_for
+
+    org_a, _ = two_orgs
+    viewer = _member(db_session, org_a, "viewer")
+    editor = _member(db_session, org_a, "architect")
+    with app.test_request_context("/x", method="POST"):
+        g._login_user = viewer
+        g.current_org_id = org_a.id
+        assert _reason_for("some.endpoint") == "Your role is read-only, so it cannot make this change."
+    with app.test_request_context("/x", method="POST"):
+        g._login_user = editor
+        g.current_org_id = org_a.id
+        reason = _reason_for("some.endpoint")
+    assert reason == "Your role does not allow this. Ask your administrator for access."
+    assert "read-only" not in reason
+    assert GENERAL_REASON != NOT_INCLUDED_REASON

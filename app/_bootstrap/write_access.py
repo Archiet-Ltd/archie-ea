@@ -132,13 +132,19 @@ READ_ONLY_REASONS = (
 )
 
 GENERAL_REASON = "Your role is read-only, so it cannot make this change."
+NOT_INCLUDED_REASON = "Your role does not allow this. Ask your administrator for access."
 
 
 def _reason_for(endpoint):
+    from flask_login import current_user
+
+    from app.core.auth.permissions import is_read_only_member
+
     for prefix, reason in READ_ONLY_REASONS:
         if (endpoint or "").startswith(prefix):
             return reason
-    return GENERAL_REASON
+    # Only a read-only role is told it is read-only; any other member simply lacks the permission.
+    return GENERAL_REASON if is_read_only_member(current_user) else NOT_INCLUDED_REASON
 
 
 def _refusal(reason):
