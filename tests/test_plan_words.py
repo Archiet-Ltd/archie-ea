@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from app.services.billing_plans import PLANS
+from app.services.billing_plans import PLANS, listed_plans
 
 WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
          "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "fifteen": 15, "twenty": 20, "fifty": 50}
@@ -99,7 +99,7 @@ def test_structured_data_states_each_plans_audience_from_the_plan_record(client)
 
         for b in blocks:
             walk(json.loads(b))
-        assert {p.audience for p in PLANS} <= found.get("audiences", set()), path
+        assert {p.audience for p in listed_plans()} <= found.get("audiences", set()), path
 
 
 def _org_with_people(db_session, label, plan_key, count):
