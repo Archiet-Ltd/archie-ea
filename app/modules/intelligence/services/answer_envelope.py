@@ -317,7 +317,9 @@ def _jsonable(value: Any) -> Any:
 
 
 def _relations_of(kind: str, row: Dict[str, Any]) -> List[Dict[str, Any]]:
-    if kind in (KIND_IMPACT, KIND_DATA_FLOW):
+    if kind == KIND_IMPACT:
+        return list(row.get("relations") or [row["relation"]])
+    if kind == KIND_DATA_FLOW:
         return [row["relation"]]
     if kind == KIND_SET_IMPACT:
         return list(row["relations"])
@@ -571,6 +573,7 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
             max_depth=params["max_depth"],
             direction=params["direction"],
             with_owner=True,
+            with_relations=True,
             page_size=SET_IMPACT_MAX_ROWS,
         )
         if ELEMENT_NOT_FOUND_REASON in result.get("reasons", []):

@@ -86,9 +86,6 @@ def build_coverage_slice(org_id: int) -> dict:
             on either the capability or the application end.
     """
     from app.models.application_portfolio import ApplicationComponent
-    from app.models.unified_application_capability_mapping import (
-        UnifiedApplicationCapabilityMapping,
-    )
     from app.models.unified_capability import UnifiedCapability
 
     # --- Read the three stores, org-scoped and deterministically ordered. ---
@@ -107,19 +104,11 @@ def build_coverage_slice(org_id: int) -> dict:
         .order_by(ApplicationComponent.id.asc())
         .all()
     )
-    # The mapping table carries no organisation column: it is fenced through
-    # its application, which must be this organisation's.
-    mappings = (
-        db.session.query(UnifiedApplicationCapabilityMapping)
-        .join(
-            ApplicationComponent,
-            ApplicationComponent.id
-            == UnifiedApplicationCapabilityMapping.application_component_id,
-        )
-        .filter(ApplicationComponent.organization_id == org_id)
-        .order_by(UnifiedApplicationCapabilityMapping.id.asc())
-        .all()
-    )
+    # Support is read through the one reader: a Realization or Serving relationship from an
+    # application to a capability, in this organisation only.
+    from app.services.capability_support import support_rows
+
+    mappings = support_rows(org_id)
 
     cap_by_id = {c.id: c for c in caps}
     app_by_id = {a.id: a for a in apps}
@@ -147,8 +136,8 @@ def build_coverage_slice(org_id: int) -> dict:
     cells = []
     seen = set()
     for m in mappings:
-        cap = cap_by_id.get(m.unified_capability_id)
-        app = app_by_id.get(m.application_component_id)
+        cap = cap_by_id.get(m["capability_id"])
+        app = app_by_id.get(m["application_id"])
         # A mapping whose endpoints are not in this org's caps/apps is out of
         # scope for the slice (defence against cross-store drift).
         if cap is None or app is None:
@@ -183,10 +172,10 @@ def build_coverage_slice(org_id: int) -> dict:
                 "capability_id": cap.id,
                 "application_id": app.id,
                 "mapping": {
-                    "support_level": m.support_level,
-                    "coverage_percentage": m.coverage_percentage,
-                    "relationship_type": m.relationship_type,
-                    "is_strategic": bool(m.is_strategic),
+                    "support_level": m["support_level"],
+                    "coverage_percentage": m["coverage_percentage"],
+                    "kind": m["kind"],
+                    "is_strategic": bool(m["is_strategic"]),
                 },
                 "provenance": {
                     "capability_archimate_element_id": cap_elem,

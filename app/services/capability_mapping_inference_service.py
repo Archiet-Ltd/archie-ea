@@ -5,12 +5,12 @@ and 273 UnifiedCapabilities using keyword similarity matching.
 """
 import re
 from typing import Dict
-from datetime import datetime
 
 from app import db
 from app.models.unified_capability import UnifiedCapability
 from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+from app.services.capability_support import CapabilitySupportRefused, record_support_for_records
 
 # Column availability flags (graceful degradation if DB lacks columns)
 _HAS_CONFIDENCE_SCORE = hasattr(UnifiedApplicationCapabilityMapping, "confidence_score")
@@ -93,23 +93,22 @@ class CapabilityMappingInferenceService:
                     skipped += 1
                     continue
                 if not dry_run:
-                    mapping = UnifiedApplicationCapabilityMapping(
-                        application_component_id=app.id,
-                        unified_capability_id=cap_id,
-                        support_level="partial",
-                        is_active=True,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
-                    )
+                    try:
+                        recorded = record_support_for_records(
+                            app.organization_id,
+                            app.id,
+                            cap_id,
+                            facts={"support_level": "partial", "notes": reasoning[:500]},
+                        )
+                    except CapabilitySupportRefused:
+                        skipped += 1
+                        continue
                     # Graceful degradation: set inference columns only if model has them
+                    mapping = db.session.get(UnifiedApplicationCapabilityMapping, recorded.row_id)
                     if _HAS_CONFIDENCE_SCORE:
                         mapping.confidence_score = round(score, 4)
                     if _HAS_INFERENCE_REASONING:
                         mapping.inference_reasoning = reasoning
-                    else:
-                        # Fall back to notes column (always present)
-                        mapping.notes = reasoning[:500]
-                    db.session.add(mapping)
                     existing.add(key)
                 inserted += 1
 

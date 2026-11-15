@@ -57,10 +57,9 @@ def _map_unified(db_session, org, application, capability):
     unified = UnifiedCapability.query.filter_by(
         organization_id=org.id, source_table="business_capability", source_id=str(capability.id),
     ).one()
-    db_session.add(UnifiedApplicationCapabilityMapping(
-        application_component_id=application.id, unified_capability_id=unified.id,
-    ))
-    db_session.flush()
+    from app.services.capability_support import record_capability_support
+
+    record_capability_support(org.id, application.archimate_element_id, unified.archimate_element_id)
 
 
 @pytest.fixture

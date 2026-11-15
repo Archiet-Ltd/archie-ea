@@ -4,12 +4,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/alert.html' import alert %}
-{% from 'components/button.html' import button %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
-{% from 'components/select.html' import native_select %}
-{% from 'components/metrics_card.html' import metrics_card %}
-{% from 'components/badge.html' import badge %}
-{% from 'components/card.html' import card, card_header, card_title, card_content, card_description %}
+{% import 'basecoat/index.html' as ui %}
 
 {% block title %}Flow Analytics — Throughput &amp; Cycle Time{% endblock %}
 
@@ -21,13 +16,12 @@
 
     {% macro _ps_actions() %}
     {% if boards %}
-    {% call native_select(id='board-selector', size='sm', aria_label='Select Board', attrs_dict={'x-model': 'boardId', '@change': 'loadAll()'}) %}
+    {% call ui.native_select_wrapper() %}
+    {% call ui.native_select(id='board-selector', attrs={'x-model': 'boardId', '@change': 'loadAll()', 'aria-label': 'Select Board'}) %}
         {% for board in boards %}
-        <option value="{{ board.id }}"
-                {% if selected_board_id is not none and board.id|string == selected_board_id|string %}selected{% endif %}>
-            {{ board.name }}
-        </option>
+        {{ ui.native_select_option(label=board.name, attrs={'value': board.id}, selected=(selected_board_id is not none and board.id|string == selected_board_id|string)) }}
         {% endfor %}
+    {% endcall %}
     {% endcall %}
     {% else %}
     <span class="text-sm text-muted-foreground">No boards found</span>
@@ -35,36 +29,25 @@
     {% endmacro %}
     {{ page_shell(title='Flow Analytics', breadcrumb=[('Home', '/'), ('Flow Analytics', none)], subtitle='Throughput, cycle time, and WIP metrics from Kanban card flow.', actions_caller=_ps_actions) }}
 
+    {% macro _kpi(title, value_alpine, description_alpine, icon, tone) %}
+    {% call ui.card(class='gap-2 py-4') %}
+        {% call ui.card_header() %}
+            {% call ui.card_description(class='flex items-center justify-between gap-2') %}
+                <span class="min-w-0">{{ title }}</span>
+                <i data-lucide="{{ icon }}" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
+            {% endcall %}
+            {% call ui.card_title(class='text-2xl font-bold tabular-nums ' ~ tone) %}<span x-text="{{ value_alpine }}">—</span>{% endcall %}
+        {% endcall %}
+        {% call ui.card_content(class='text-sm text-muted-foreground') %}<span x-text="{{ description_alpine }}"></span>{% endcall %}
+    {% endcall %}
+    {% endmacro %}
+
     <!-- Metric Summary Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 px-4 lg:px-6">
-        {{ metrics_card(
-            title='Avg Cycle Time',
-            value_alpine="cycleData ? cycleData.average_cycle_time_days + 'd' : '\u2014'",
-            value_class='text-primary',
-            description_alpine="'P85: ' + (cycleData ? cycleData.percentile_85 + 'd' : '\u2014')",
-            icon='clock'
-        ) }}
-        {{ metrics_card(
-            title='Avg Throughput / Week',
-            value_alpine="throughputData ? throughputData.average_throughput : '\u2014'",
-            value_class='text-success-emphasis',
-            description='cards / period',
-            icon='trending-up'
-        ) }}
-        {{ metrics_card(
-            title='Avg Lead Time',
-            value_alpine="leadData ? leadData.average_lead_time_days + 'd' : '\u2014'",
-            value_class='text-warning-emphasis',
-            description='creation to done',
-            icon='calendar-clock'
-        ) }}
-        {{ metrics_card(
-            title='Flow Efficiency',
-            value_alpine="flowEfficiency !== null ? flowEfficiency + '%' : '\u2014'",
-            value_class='text-primary',
-            description='active / total lead time',
-            icon='gauge'
-        ) }}
+        {{ _kpi('Avg Cycle Time', "cycleData ? cycleData.average_cycle_time_days + 'd' : '\u2014'", "'P85: ' + (cycleData ? cycleData.percentile_85 + 'd' : '\u2014')", 'clock', 'text-primary') }}
+        {{ _kpi('Avg Throughput / Week', "throughputData ? throughputData.average_throughput : '\u2014'", "'cards / period'", 'trending-up', 'text-success-emphasis') }}
+        {{ _kpi('Avg Lead Time', "leadData ? leadData.average_lead_time_days + 'd' : '\u2014'", "'creation to done'", 'calendar-clock', 'text-warning-emphasis') }}
+        {{ _kpi('Flow Efficiency', "flowEfficiency !== null ? flowEfficiency + '%' : '\u2014'", "'active / total lead time'", 'gauge', 'text-primary') }}
     </div>
 
     <!-- Empty State -->
@@ -79,12 +62,12 @@
     <!-- Error State -->
     <template x-if="loadError">
         <div class="px-4 lg:px-6">
-            {% call card() %}
-                {% call card_header() %}
-                    {% call card_description() %}Flow metrics could not be loaded{% endcall %}
+            {% call ui.card() %}
+                {% call ui.card_header() %}
+                    {% call ui.card_description() %}Flow metrics could not be loaded{% endcall %}
                     <div class="mt-1 text-sm text-muted-foreground" x-text="loadError"></div>
                     <div class="mt-4">
-                        {{ button(text='Retry', variant='outline', on_click='loadAll()') }}
+                        {{ ui.button(text='Retry', variant='outline', attrs={'type': 'button', '@click': 'loadAll()'}) }}
                     </div>
                 {% endcall %}
             {% endcall %}
@@ -96,11 +79,11 @@
         <div>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 px-4 lg:px-6">
                 <!-- Cycle Time Chart -->
-                {% call card() %}
-                    {% call card_header() %}
-                        {% call card_title() %}Cycle Time Distribution{% endcall %}
+                {% call ui.card() %}
+                    {% call ui.card_header() %}
+                        {% call ui.card_title(attrs={'role': 'heading', 'aria-level': '3'}) %}Cycle Time Distribution{% endcall %}
                     {% endcall %}
-                    {% call card_content() %}
+                    {% call ui.card_content() %}
                         <div class="relative h-64">
                             <canvas id="cycleTimeChart"></canvas>
                         </div>
@@ -111,11 +94,11 @@
                 {% endcall %}
 
                 <!-- Throughput Chart -->
-                {% call card() %}
-                    {% call card_header() %}
-                        {% call card_title() %}Throughput per Period{% endcall %}
+                {% call ui.card() %}
+                    {% call ui.card_header() %}
+                        {% call ui.card_title(attrs={'role': 'heading', 'aria-level': '3'}) %}Throughput per Period{% endcall %}
                     {% endcall %}
-                    {% call card_content() %}
+                    {% call ui.card_content() %}
                         <div class="relative h-64">
                             <canvas id="throughputChart"></canvas>
                         </div>
@@ -129,30 +112,30 @@
             <!-- WIP Table -->
             <div class="mt-6 px-4 lg:px-6">
                 <template x-if="wipData && wipData.columns && wipData.columns.length > 0">
-                    {% call card() %}
-                        {% call card_header() %}
-                            {% call card_title() %}
+                    {% call ui.card() %}
+                        {% call ui.card_header() %}
+                            {% call ui.card_title(attrs={'role': 'heading', 'aria-level': '3'}) %}
                                 WIP Snapshot
                                 <span class="text-sm font-normal text-muted-foreground ml-2">
                                     (total: <span x-text="wipData.total_wip"></span>)
                                 </span>
                             {% endcall %}
                         {% endcall %}
-                        {% call card_content() %}
-                            {% call table() %}
-                                {% call table_header() %}
-                                    {% call table_row() %}
-                                        {% call table_head() %}Board column{% endcall %}
-                                        {% call table_head(class='text-right') %}Cards{% endcall %}
+                        {% call ui.card_content() %}
+                            {% call ui.table() %}
+                                {% call ui.table_header() %}
+                                    {% call ui.table_row() %}
+                                        {% call ui.table_head() %}Board column{% endcall %}
+                                        {% call ui.table_head(class='text-right') %}Cards{% endcall %}
                                     {% endcall %}
                                 {% endcall %}
-                                {% call table_body(attrs_dict={'x-data': ''}) %}
+                                {% call ui.table_body() %}
                                     <template x-for="col in wipData.columns" :key="col.column">
-                                        {% call table_row() %}
-                                            {% call table_cell() %}
+                                        {% call ui.table_row() %}
+                                            {% call ui.table_cell() %}
                                                 <span x-text="columnLabel(col.column)"></span>
                                             {% endcall %}
-                                            {% call table_cell(class='text-right font-semibold') %}
+                                            {% call ui.table_cell(class='text-right font-semibold') %}
                                                 <span x-text="col.card_count"></span>
                                             {% endcall %}
                                         {% endcall %}
