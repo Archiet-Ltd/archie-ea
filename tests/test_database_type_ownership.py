@@ -29,6 +29,8 @@ CREATE TYPE public.subscriptionplan AS ENUM ('free', 'pro');
 CREATE DOMAIN public.positive_amount AS integer CHECK (VALUE > 0);
 CREATE TYPE public.price_range AS RANGE (subtype = integer);
 CREATE TYPE public.money_pair AS (amount integer, currency text);
+CREATE TYPE public.extension_mood AS ENUM ('calm', 'busy');
+ALTER EXTENSION citext ADD TYPE public.extension_mood;
 CREATE TABLE public.subscriptions (id serial PRIMARY KEY, plan public.subscriptionplan, plans public.subscriptionplan[]);
 """
 
@@ -77,7 +79,7 @@ def _owners(url):
         cur.execute(
             "SELECT t.typname, pg_get_userbyid(t.typowner) FROM pg_type t "
             "JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' "
-            "AND t.typname IN ('subscriptionplan','positive_amount','price_range','money_pair')"
+            "AND t.typname IN ('subscriptionplan','positive_amount','price_range','price_multirange','money_pair')"
         )
         return dict(cur.fetchall())
 
@@ -139,7 +141,7 @@ def test_extension_and_array_types_are_left_with_their_owner(scratch):
 
     with psycopg2.connect(scratch["super"]) as conn, conn.cursor() as cur:
         listed = {name for name, _ in roles._public_user_types(cur)}
-        assert listed == {"subscriptionplan", "positive_amount", "price_range", "money_pair"}
+        assert listed == {"subscriptionplan", "positive_amount", "price_range", "price_multirange", "money_pair"}
         cur.execute("SELECT pg_get_userbyid(typowner) FROM pg_type WHERE typname = 'citext'")
         assert cur.fetchone()[0] == "postgres"
 
@@ -159,21 +161,39 @@ def test_verification_reports_a_type_dropped_during_the_check_as_a_clear_failure
         roles._verify_type_owners(Cursor(), database_name="x", deploy_role="archie_deploy")
 
 
-def test_an_extension_owned_type_keeps_its_owner_after_the_transfer(scratch):
+def test_an_extension_owned_enum_keeps_its_owner_after_the_transfer(scratch):
     from scripts.database import configure_roles as roles
 
     with psycopg2.connect(scratch["super"]) as conn, conn.cursor() as cur:
         roles._transfer_public_objects(cur, deploy_role="archie_deploy", runtime_role="archie_runtime")
-        cur.execute("SELECT pg_get_userbyid(typowner) FROM pg_type WHERE typname = 'citext'")
+        cur.execute("SELECT pg_get_userbyid(typowner) FROM pg_type WHERE typname = 'extension_mood'")
         assert cur.fetchone()[0] == "postgres"
         conn.rollback()
 
 
-def test_the_deploy_script_runs_database_acl_before_and_after_schema_deploy():
+def test_a_range_and_its_multirange_are_both_handed_to_the_deploy_role(scratch):
+    owners = _owners(scratch["super"])
+    assert owners["price_range"] == "archie_deploy"
+    assert owners["price_multirange"] == "archie_deploy"
+
+
+def test_verification_fails_when_a_multirange_is_left_with_another_role(scratch):
+    from scripts.database import configure_roles as roles
+
+    with psycopg2.connect(scratch["super"]) as conn, conn.cursor() as cur:
+        cur.execute("ALTER TYPE public.price_multirange OWNER TO postgres")
+        with pytest.raises(RuntimeError, match="price_multirange"):
+            roles._verify_database_acl(
+                cur, database_name=scratch["name"], deploy_role="archie_deploy", runtime_role="archie_runtime",
+            )
+        conn.rollback()
+
+
+def test_the_deploy_script_runs_bootstrap_then_schema_deploy_then_database_acl():
     lines = [
         line
         for line in (REPO / "scripts" / "deploy_verified.sh").read_text().splitlines()
         if line.startswith("docker compose run --rm --no-deps")
     ]
     order = [next(n for n in ("database-bootstrap", "schema-deploy", "database-acl") if n in line) for line in lines]
-    assert order == ["database-bootstrap", "database-acl", "schema-deploy", "database-acl"]
+    assert order == ["database-bootstrap", "schema-deploy", "database-acl"]

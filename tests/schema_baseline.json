@@ -47448,6 +47448,10 @@
     "has_default": false,
     "nullable": false
    },
+   "archimate_relationship_id": {
+    "has_default": false,
+    "nullable": true
+   },
    "assessment_methodology": {
     "has_default": false,
     "nullable": true
@@ -47531,6 +47535,10 @@
    "operational_efficiency_gain": {
     "has_default": false,
     "nullable": true
+   },
+   "organization_id": {
+    "has_default": true,
+    "nullable": false
    },
    "payback_period_months": {
     "has_default": false,

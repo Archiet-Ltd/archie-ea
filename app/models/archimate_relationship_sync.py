@@ -131,9 +131,19 @@ def _remove_relationship(session, rel_type, source_id, target_id):
 
     from app.models.archimate_core import ArchiMateRelationship
 
+    from app.models.archimate_core import ArchiMateElement
+
+    # Only the organisation that owns the source element: two organisations never share an element, but
+    # the filter keeps this delete from ever reaching a relationship another organisation owns.
+    owner = session.execute(
+        select(ArchiMateElement.__table__.c.organization_id).where(
+            ArchiMateElement.__table__.c.id == source_id
+        )
+    ).scalar()
     existing = (
         session.query(ArchiMateRelationship)
         .filter_by(type=rel_type, source_id=source_id, target_id=target_id)
+        .filter(ArchiMateRelationship.organization_id == owner)
         .all()
     )
     for rel in existing:

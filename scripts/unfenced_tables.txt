@@ -405,7 +405,6 @@ uml_attributes
 uml_elements
 uml_methods
 uml_models
-unified_application_capability_mapping
 unified_capability_application_mappings
 unified_capability_process_mapping
 unified_capability_technology_mapping

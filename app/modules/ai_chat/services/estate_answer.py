@@ -123,10 +123,11 @@ def explanations_for(answer: Dict[str, Any], limit: int) -> Dict[int, Dict[str, 
     organization_id = current_org_id()
     found: Dict[int, Dict[str, Any]] = {}
     for row in answer["rows"][:limit]:
-        derived_id = (row.get("relation") or {}).get("derived_id")
-        if organization_id is None or not isinstance(derived_id, int) or derived_id in found:
-            continue
-        fact = get_derived_fact(organization_id, derived_id, include_stale=True)
-        if fact is not None:
-            found[derived_id] = explain_fact(organization_id, fact)
+        for relation in row.get("relations") or [row.get("relation") or {}]:
+            derived_id = relation.get("derived_id")
+            if organization_id is None or not isinstance(derived_id, int) or derived_id in found:
+                continue
+            fact = get_derived_fact(organization_id, derived_id, include_stale=True)
+            if fact is not None:
+                found[derived_id] = explain_fact(organization_id, fact)
     return found

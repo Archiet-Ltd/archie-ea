@@ -135,8 +135,8 @@ def test_settings_is_not_found_for_an_organisation_administrator(app, db_session
     with app.app_context():
         login_as(client, admin)
         response = client.get("/settings")
-    assert response.status_code == 404
-    assert "Ask an administrator" not in response.get_data(as_text=True)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/admin/")
 
 
 def test_a_viewer_is_refused_the_billing_pages(app, db_session, client, login_as):

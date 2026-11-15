@@ -29,6 +29,12 @@ from app.modules.intelligence.services.answer_envelope import (
     classify_estate_question,
 )
 from app.utils.tracing import traced
+from app.modules.ai_chat.services.failure_messages import (
+    AI_CREDIT_EXHAUSTED,
+    FEATURE_INTROS,
+    failure_sentence,
+    reason_code_for_text,
+)
 from app.modules.ai_chat.services.llm_service_impl import _CALLER, _PROVIDER_LABELS
 
 logger = logging.getLogger(__name__)
@@ -146,14 +152,13 @@ def sanitize_agent_error(reason) -> "Optional[str]":
         return "Answers are paused: every provider in the order is at its ceiling."
     if any(t in lowered for t in ("no api key", "not configured", "no provider", "no keys")):
         return "No LLM provider is configured."
-    if any(
-        t in lowered
-        for t in (
-            "quota", "insufficient", "rate limit", "429", "billing",
-            "exceeded", "credit", "402",
-        )
-    ):
-        return f"The LLM provider rejected the request: rate limit or quota{status}."
+
+    kind = classify_provider_error(text)
+    if kind == CREDIT_EXHAUSTED:
+        return f"{AI_CREDIT_EXHAUSTED}{status}"
+    if kind == RATE_LIMITED:
+        return f"AI service rate limit exceeded. Please wait a moment and try again.{status}"
+
     if any(t in lowered for t in ("timeout", "timed out")):
         return f"The LLM provider did not respond in time{status}."
     if any(t in lowered for t in ("unauthorized", "401", "invalid api key", "forbidden", "403")):
@@ -162,7 +167,40 @@ def sanitize_agent_error(reason) -> "Optional[str]":
 
 
 # Words in a provider's refusal that mean "this one is spent, ask another".
-_QUOTA_PHRASES = ("quota", "insufficient", "rate limit", "429", "billing", "exceeded")
+# What a provider's refusal means. The one place that decides it; the chat
+# routes, the agent's reply and the failover decision all call it.
+CREDIT_EXHAUSTED = "credit_exhausted"
+RATE_LIMITED = "rate_limit"
+
+# Wording that only a spent balance produces. Checked first because OpenAI
+# answers a spent balance with HTTP 429 and the code "insufficient_quota".
+_CREDIT_PHRASES = (
+    "credit balance",
+    "insufficient credit",
+    "insufficient_quota",
+    "insufficient funds",
+    "out of credit",
+    "no credit",
+    "payment required",
+    "billing",
+    "exceeded your current quota",
+    "usage limit",
+)
+# A window that resets: waiting is the fix.
+_RATE_LIMIT_PHRASES = (
+    "rate limit",
+    "rate_limit",
+    "too many requests",
+    "per minute",
+    "per hour",
+    "per day",
+    "per-day",
+    "daily limit",
+    "monthly limit",
+    "requests per",
+    "tokens per",
+)
+
 
 _PROVIDER_BASE_URLS = {
     "openrouter": "https://openrouter.ai/api/v1",
@@ -182,6 +220,34 @@ def _error_status(exc) -> Optional[int]:
     return status if isinstance(status, int) else None
 
 
+def _status_of(error) -> Optional[int]:
+    """The provider's HTTP status: from the exception, else from "Error code: 402" style text."""
+    import re as _re
+
+    status = _error_status(error) if isinstance(error, BaseException) else None
+    if status is None:
+        m = _re.search(r"(?:error code|http|status(?: code)?)\D{0,3}(\d{3})\b", str(error), _re.I)
+        status = int(m.group(1)) if m else None
+    return status
+
+
+def classify_provider_error(error) -> Optional[str]:
+    """CREDIT_EXHAUSTED, RATE_LIMITED or None for a provider's refusal (exception or text).
+
+    Decided by the provider's status and wording, never by a bare number inside
+    the text: "context length 140200 tokens" is neither.
+    """
+    text = str(error or "").lower()
+    status = _status_of(error)
+    if status == 402 or any(p in text for p in _CREDIT_PHRASES):
+        return CREDIT_EXHAUSTED
+    if status == 429 or any(p in text for p in _RATE_LIMIT_PHRASES):
+        return RATE_LIMITED
+    if "quota" in text and "exceeded" in text:
+        return CREDIT_EXHAUSTED  # a quota with no window named is the balance
+    return None
+
+
 class EmptyModelReply(Exception):
     """A model answered with no words and no tool call: a failure of that model, as a timeout is."""
 
@@ -189,9 +255,10 @@ class EmptyModelReply(Exception):
 def is_retryable_llm_error(exc) -> bool:
     """True when another provider or model may answer what this one refused.
 
-    Rate limits, quota, any server error, timeouts, dropped connections and a
-    model or function the provider does not have. Anything else (a malformed
-    request, a rejected key) would fail the same way elsewhere.
+    Rate limits, a spent balance (another key or provider may still have
+    credit), any server error, timeouts, dropped connections and a model or
+    function the provider does not have. Anything else (a malformed request, a
+    rejected key) would fail the same way elsewhere.
     """
     if isinstance(exc, EmptyModelReply):
         return True
@@ -199,19 +266,21 @@ def is_retryable_llm_error(exc) -> bool:
     text = str(exc).lower()
     if "answers are paused" in text:
         return True  # this provider is at its ceiling; the next in the chain may still answer
+    if classify_provider_error(exc):
+        return True
     if status is not None:
-        if status == 429 or status >= 500:
+        if status >= 500:
             return True
         if status == 404:
             return "not found" in text or "model" in text
         if status in (400, 401, 403, 422):
-            return any(t in text for t in _QUOTA_PHRASES[:-1])
+            return False
     names = {c.__name__.lower() for c in type(exc).__mro__}
     if any("timeout" in n or "connection" in n for n in names):
         return True
     if isinstance(exc, (TimeoutError, ConnectionError)):
         return True
-    return any(t in text for t in _QUOTA_PHRASES) or "timed out" in text
+    return "timed out" in text
 
 
 def _base_url_of(provider: str) -> Optional[str]:
@@ -1070,6 +1139,7 @@ class AgentRunner:
             messages[-1] = {"role": "user", "content": user_message + found_text}
 
         chain_pos = 0
+        credit_only = True  # every refusal so far was a spent balance
         for iteration in range(MAX_ITERATIONS):
             # Call LLM
             self._held_tokens = []
@@ -1100,6 +1170,7 @@ class AgentRunner:
 
                     # The pause is final for platform money: no failover to another key or provider.
                     if is_retryable_llm_error(e) and not isinstance(e, AnswersPaused):
+                        credit_only = credit_only and classify_provider_error(e) == CREDIT_EXHAUSTED
                         logger.warning(
                             "AgentRunner: %s/%s refused (%s)", provider, model,
                             sanitize_agent_error(e),
@@ -1111,8 +1182,9 @@ class AgentRunner:
                             self._held_tokens = []
                             continue
                         return self._finalize(
+                            # Only when every key and provider ran out does the person read the credit sentence.
                             self._stopped(
-                                f"LLM call failed: {e}", True,
+                                f"LLM call failed: {e}", not credit_only,
                                 actions_taken, required_actions, pending_approvals, sources,
                             ),
                             user_message=user_message, domain=domain, context=context,
@@ -2166,19 +2238,17 @@ class AgentRunner:
             msg = (
                 "The assistant is busy right now. Wait a minute, then press Retry."
             )
+        elif classify_provider_error(reason_l) == CREDIT_EXHAUSTED:
+            reason_code = "credit_exhausted"  # waiting cannot restore credit, so no Retry
+            msg = failure_sentence(reason_code)
+        elif classify_provider_error(reason_l) == RATE_LIMITED:
+            reason_code = "rate_limited"
+            msg = failure_sentence(reason_code)
+            busy = True
         elif any(t in reason_l for t in ("no api key", "not configured", "no provider", "no keys")):
-            from app.modules.ai_chat.services.failure_messages import FEATURE_INTROS
-
             msg = FEATURE_INTROS["chat"]
             not_set_up = True
-        elif any(t in reason_l for t in _QUOTA_PHRASES):
-            msg = (
-                "The AI service is busy right now (its free usage limit was reached). "
-                "Wait a minute, then press Retry."
-            )
         else:
-            from app.modules.ai_chat.services.failure_messages import failure_sentence, reason_code_for_text
-
             reason_code = reason_code_for_text(reason)
             msg = failure_sentence(reason_code)
         result = {
