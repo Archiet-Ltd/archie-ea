@@ -22,6 +22,7 @@ import re
 import time
 
 from scripts.capture.clip_kit import FORBIDDEN_IN_FRAME, ClipRefused, ffprobe_duration_seconds, record_clip
+from app.services.origin import site_host
 from app.services.public_pages import MODULE_RECORDINGS
 from scripts.capture.help_clips import Check, Seen, _click, _open, run_checks, scan_for_leaks
 
@@ -29,7 +30,7 @@ MIN_SECONDS = 31.0
 MAX_SECONDS = 90.0
 MAX_BYTES = 2 * 1024 * 1024
 MANIFEST = "recordings.json"
-SIGN_UP = "Start free at entelim.org"
+SIGN_UP = "Start free at %s" % site_host()
 CAPTION_HOLD = 4.4
 CLOSING_HOLD = 5.0
 MIN_CAPTIONS = 2

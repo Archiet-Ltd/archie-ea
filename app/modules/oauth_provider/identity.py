@@ -45,7 +45,7 @@ from app.modules.oauth_provider.scopes import (
     MCP_SCOPE_PREFIX,
     carries_family_scope,
 )
-from app.services.origin import _allowed_origins
+from app.services.origin import allowed_origins
 
 
 def _is_mcp_scoped_request() -> bool:
@@ -135,8 +135,8 @@ def load_user_from_bearer_token(req):
     if _token_is_refused_for_namespace(token.scope, required_family):
         return None
 
-    allowed_origins = _allowed_origins()
-    expected_resources = [f"{origin}{resource_suffix}" for origin in allowed_origins]
+    origins = allowed_origins()
+    expected_resources = [f"{origin}{resource_suffix}" for origin in origins]
     if not expected_resources or token.resource not in expected_resources:
         return None
 
