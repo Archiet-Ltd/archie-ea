@@ -1217,7 +1217,10 @@ function composerApp() {
                     });
                     if (elements.length === 0) return;
                     let chosen = null;
-                    if (self._lastSelectedElementId) {
+                    /* The view may already have an element selected (a focus view opens on the one it is about). */
+                    let current = self._selectedCells && self._selectedCells.length === 1 ? self._selectedCells[0] : null;
+                    if (current && elements.includes(current)) chosen = current;
+                    if (!chosen && self._lastSelectedElementId) {
                         chosen = self.graph.getCell(self._lastSelectedElementId);
                         if (!chosen || !elements.includes(chosen)) chosen = null;
                     }
