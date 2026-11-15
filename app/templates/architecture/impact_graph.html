@@ -123,7 +123,7 @@
         {% set undrawn = map_counts | rejectattr('not_drawn', 'none') | selectattr('not_drawn') | list %}
         {% if undrawn %}
         <div class="mt-3 text-xs text-muted-foreground" data-testid="model-map-not-drawn">
-          <p>{% set undrawn_n = undrawn | sum(attribute='not_drawn') %}{{ undrawn_n }} {{ 'element' if undrawn_n == 1 else 'elements' }} entered in a register are not drawn on the map, by layer:</p>
+          <p>{% set undrawn_n = undrawn | sum(attribute='not_drawn') %}{{ undrawn_n }} {{ 'element entered in a register is' if undrawn_n == 1 else 'elements entered in a register are' }} not drawn on the map, by layer:</p>
           <ul class="mt-1 space-y-0.5">
             {% for c in undrawn %}
             <li data-testid="model-map-not-drawn-{{ c.layer }}">{% if c.layer != 'other' %}<a class="underline underline-offset-2 hover:text-foreground" href="{{ url_for('archimate_crud.dashboard', layer=c.layer) }}">{{ c.label }}</a>{% else %}{{ c.label }}{% endif %}: {{ c.not_drawn }}</li>

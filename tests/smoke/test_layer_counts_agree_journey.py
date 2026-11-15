@@ -217,7 +217,16 @@ def test_dashboard_tabs_and_composer_cards_show_one_count_per_layer(browser, liv
                 has=page.locator("span", has_text=title))
             card.first.click()
             held = count - REGISTER_ONLY.get(title, 0)
-            word = "element" if held == 1 else "elements"
-            expect(page.locator("body")).to_contain_text(re.compile(r"— %d %s, " % (held, word)))
+            body = page.locator("body")
+            if held != count:
+                # A record entered only in a register cannot be drawn: the status line says so in words and
+                # gives the card's figure as the layer's total, so no two figures on screen differ unexplained.
+                expect(body).to_contain_text(re.compile(
+                    r"%d of %d shown; %d (is|are) recorded in a register only" % (held, count, count - held)))
+            else:
+                word = "element" if held == 1 else "elements"
+                expect(body).to_contain_text(re.compile(r"— %d %s, " % (held, word)))
+            # Whatever the status line says the model holds is the overview line's figure: the sum of the cards.
+            expect(body).to_contain_text(re.compile(r"of %d in your model" % sum(cards.values())))
     finally:
         context.close()

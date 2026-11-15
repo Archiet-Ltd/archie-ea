@@ -395,9 +395,9 @@ def _type_key_column():
     return _db.func.replace(_db.func.replace(lowered, " ", ""), "_", "")
 
 
-def _filter_to_layer(query, layer, layer_type_names=None):
+def _filter_to_layer(query, layer):
     """Narrow an element query to one layer by the rule count_layers counts it with (layer_criterion), so the
-    layer that opens holds exactly the elements its card counts."""
+    layer that opens holds the model elements its card counts."""
     return query.filter(layer_criterion(layer))
 
 
@@ -673,12 +673,8 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
 
     # `layer` narrows by the stored-layer rule count_layers counts with (layer_criterion).
     # Callers (the API route) are responsible for 400ing an unknown value
-    # before reaching here; an unrecognised value falls through to
-    # `layer_type_names = []`, which -- to fail closed rather than silently
-    # showing everything -- is treated as "match nothing", not "no filter".
-    layer_type_names = None
-    if layer:
-        layer_type_names = [t.lower() for t in _types_for_layer(layer)]
+    # before reaching here; an unrecognised layer matches no element, it does not
+    # fall back to showing everything.
 
     # ── Invariant 1: Scope required ──
     if not solution_id and not enterprise_scope:
@@ -697,6 +693,8 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
     relationships_out = []
     store_total = None
     layer_total = None
+    layer_card_total = None
+    layer_register_only = 0
 
     try:
         from app.models.archimate_core import ArchiMateElement
@@ -729,8 +727,8 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             query = ArchiMateElement.query
             if allowed_types:
                 query = query.filter(ArchiMateElement.type.in_(allowed_types))
-            if layer_type_names is not None:
-                query = _filter_to_layer(query, layer, layer_type_names)
+            if layer:
+                query = _filter_to_layer(query, layer)
             matching = query.count()
             if layer is None and matching > VIEWPOINT_OPENING_LIMIT:
                 return _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, _current_org_id())
@@ -743,6 +741,16 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             # dashboard's element figure reads the same rows), so a viewpoint
             # that shows fewer can say how many it left out and why.
             store_total = ArchiMateElement.query.count()
+            if layer is not None:
+                # The card, the overview line and this status line read one count (count_layers), so the
+                # layer that opens, its total and "of N in your model" agree with the card that opened it.
+                counted = count_layers(_current_org_id(), allowed_types)
+                if all(row["count"] is not None for row in counted):
+                    store_total = sum(row["count"] for row in counted)
+                    row = next((r for r in counted if r["layer"] == layer), None)
+                    if row is not None:
+                        layer_card_total = row["count"]
+                        layer_register_only = row["register_only"]
         else:
             # Get solution's element IDs (junction + fallback)
             from app.models.solution_models import SolutionArchiMateElement
@@ -772,8 +780,8 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             query = ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids))
             if allowed_types:
                 query = query.filter(ArchiMateElement.type.in_(allowed_types))
-            if layer_type_names is not None:
-                query = _filter_to_layer(query, layer, layer_type_names)
+            if layer:
+                query = _filter_to_layer(query, layer)
             elements = query.limit(500).all()
         elif not is_enterprise_wide:
             elements = []
@@ -901,6 +909,16 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
         # With a layer open, "other layers" counts only the other layers: this
         # layer's own capped elements are said once, in layer_omitted_note.
         shown_or_in_layer = layer_total if (layer is not None and layer_total is not None) else len(serialised)
+        if layer_card_total is not None:
+            shown_or_in_layer = layer_card_total
+            if layer_register_only:
+                verb = "is" if layer_register_only == 1 else "are"
+                if layer_total is not None and layer_total <= len(serialised):
+                    result['register_only_note'] = "%d of %d shown; %d %s recorded in a register only" % (
+                        len(serialised), layer_card_total, layer_register_only, verb)
+                else:
+                    result['register_only_note'] = "%d of the %d in this layer %s recorded in a register only" % (
+                        layer_register_only, layer_card_total, verb)
         result['omitted'] = store_total - shown_or_in_layer
         result['omitted_note'] = _omitted_note(
             store_total - shown_or_in_layer, layer, bool(allowed_types)

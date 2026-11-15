@@ -1313,7 +1313,7 @@ entries:
     status: active
     canonical:
       path: app/services/archimate_viewpoint_service.py
-      symbols: [count_layers, layer_model_query, element_layer, LAYER_TYPES]
+      symbols: [count_layers, layer_model_query, layer_criterion, element_layer, LAYER_TYPES]
     reuse: >
       count_layers is the one count of every layer, element_layer the one rule and layer_model_query the one
       reader of a layer's elements: an element counts in the layer it is stored in, whatever its type (Physical

@@ -75,42 +75,28 @@ def layer_counts() -> List[Dict[str, Any]]:
     from app.utils.tenant_sql import current_org_id
 
     org_id = current_org_id()
+    rows = {row["layer"]: row for row in counting.count_layers(org_id)}
+
+    # The kinds breakdown only: how many of each type sit in each layer. The counts are count_layers'.
     type_column = db.func.coalesce(ArchiMateElement.type, "Unspecified")
     stored = counting._stored_layer_column()
-
-    # One grouped read carries every layer's model count and its kinds breakdown: stored layer
-    # and type together, then the canonical element_layer rule places each element in its true
-    # layer. One query instead of count_layers' model-count read plus a separate kinds read.
-    query = (
+    kinds_query = (
         db.select(stored, type_column, db.func.count(ArchiMateElement.id))
         .group_by(stored, type_column)
         .where(ArchiMateElement.organization_id == org_id)
     )
-    model = {}
     kinds_by_layer = {key: {} for key in LAYERS}
-    for stored_layer, type_name, n in db.session.execute(query).all():
+    for stored_layer, type_name, n in db.session.execute(kinds_query).all():
         layer = counting.element_layer(stored_layer, type_name)
         key = "other" if layer == counting.COMPOSITE_LAYER else layer
-        model[key] = model.get(key, 0) + n
         if key in kinds_by_layer:
-            label = type_name or "Unspecified"
-            kinds_by_layer[key][label] = kinds_by_layer[key].get(label, 0) + n
-
-    # Register-only counts: records the layer lists that the model does not hold.
-    register_only = {}
-    for layer in counting.LAYER_TITLES:
-        try:
-            records = 0 if layer == counting.COMPOSITE_LAYER else counting._register_only_count(layer, org_id)
-        except Exception:
-            db.session.rollback()
-            records = None
-        register_only[layer] = records
+            kinds_by_layer[key][type_name] = kinds_by_layer[key].get(type_name, 0) + n
 
     out = []
     for key in LAYERS:
-        drawn = model.get(key, 0)
-        records = register_only.get(_counting_layer(key))
-        total = drawn + records if records is not None else None  # not known, never the drawn figure
+        row = rows[_counting_layer(key)]
+        drawn = row["model"]
+        total = row["count"]  # None when the register could not be counted: not known, never the drawn figure
         kinds = sorted(kinds_by_layer[key].items(), key=lambda kv: (-kv[1], kv[0]))
         out.append({
             "layer": key, "label": LAYER_LABELS[key], "count": drawn, "total": total, "not_drawn": None if total is None else total - drawn,

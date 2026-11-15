@@ -322,3 +322,33 @@ def test_register_only_count_matches_per_type_total(db_session, make_org, tenant
                         query = query.filter(model_class.archimate_element_id.is_(None))
                     old_count += query.count()
             assert new_count == old_count, f"layer {layer}: new={new_count}, old={old_count}"
+
+
+def _header_phrase(drawn, total):
+    """Run the page script's ofTotal in node and return what the header says for these figures."""
+    import json
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    script = (_ROOT / "app/static/js/impact_graph.js").read_text()
+    start = script.index("function ofTotal(")
+    body = script[start:script.index("// The figure the dashboard gives", start)]
+    code = body + "\nconsole.log(JSON.stringify(ofTotal(%s, %s)));" % (json.dumps(drawn), json.dumps(total))
+    out = subprocess.run([node, "-e", code], capture_output=True, text=True, timeout=60, check=True)
+    return json.loads(out.stdout)
+
+
+def test_header_says_the_total_is_not_known_when_the_register_cannot_be_counted():
+    assert _header_phrase(1547, None) == "1547 elements drawn, total not known"
+    assert _header_phrase(1, None) == "1 element drawn, total not known"
+    assert _header_phrase(1547, 1562) == "1547 of 1562 elements"
+    assert _header_phrase(1, 1) == "1 element"
+    assert _header_phrase(12, 12) == "12 elements"
+
+
+def test_the_not_drawn_sentence_agrees_with_one_and_with_many():
+    html = (_ROOT / "app/templates/architecture/impact_graph.html").read_text()
+    assert "element entered in a register is' if undrawn_n == 1 else 'elements entered in a register are'" in html

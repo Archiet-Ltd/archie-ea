@@ -154,6 +154,7 @@ let ComposerSearch = (function() {
                 self.viewpointLoading = false;
                 self.statusText = self.activeViewpointName + ' — ' + elements.length + ' elements, ' + relationships.length + ' relationships';
                 if (data.omitted_note) self.statusText += ' (' + data.omitted_note + ' of ' + data.store_total + ' in your model)';
+                if (data.register_only_note) self.statusText += ' (' + data.register_only_note + ')';
                 if (data.layer_omitted_note) self.statusText += ' (' + data.layer_omitted_note + ')';
 
                 UndoStack.resume();
