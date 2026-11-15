@@ -9,7 +9,7 @@
 {% macro _pager() -%}
 {%- set _keep = {'relationship': focus_id} if focus_id is not none else {} -%}
 <div class="flex flex-wrap items-center justify-between gap-2 px-2" data-slot="data-table-pagination" data-testid="relationships-pages">
-  <p class="flex-1 text-sm text-muted-foreground tabular-nums" data-table-count>{% if total %}Rows {{ (page - 1) * per_page + 1 }} to {{ [page * per_page, total]|min }} of {{ total }}{% else %}0 rows{% endif %}</p>
+  <p class="flex-1 text-sm text-muted-foreground tabular-nums">{% if total %}Rows {{ (page - 1) * per_page + 1 }} to {{ [page * per_page, total]|min }} of {{ total }}{% else %}0 rows{% endif %}</p>
   <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
     <form method="get" action="{{ url_for('architecture_crud.list_relationships') }}" class="flex items-center gap-2">
       {% if focus_id is not none %}{{ ui.input(name='relationship', value=focus_id, type='hidden') }}{% endif %}
@@ -21,7 +21,7 @@
       {% endcall %}
       {{ ui.button(text='Apply', type='submit', variant='outline', size='sm') }}
     </form>
-    <div class="flex items-center justify-center text-sm font-medium tabular-nums" data-table-page>Page {{ page }} of {{ pages }}</div>
+    <div class="flex items-center justify-center text-sm font-medium tabular-nums">Page {{ page }} of {{ pages }}</div>
     <div class="flex items-center gap-2">
       {% set _go = [('First page', 1, 'chevrons-left', page > 1), ('Previous page', page - 1, 'chevron-left', page > 1), ('Next page', page + 1, 'chevron-right', page < pages), ('Last page', pages, 'chevrons-right', page < pages)] %}
       {% for label, target, icon, enabled in _go %}
@@ -45,12 +45,12 @@
         <a class="text-foreground underline underline-offset-4" href="{{ url_for('architecture_crud.list_relationships') }}">Show all relationships</a>
     </p>
     {% endif %}
-    {% call(rel) list_table(rows=relationships, columns=[('Source', ''), ('Relationship', ''), ('Target', '')],
+    {% call(rel) list_table(rows=relationships, columns=[('Source', ''), {'label': 'Relationship', 'class': 'hidden sm:table-cell'}, ('Target', '')],
                             caption='Relationships between architecture elements', testid='relationships-table', row_testid='relationship-row',
                             toolbar=false, page_size=per_page, server_pagination=_pager, row_id_prefix='relationship-',
                             empty_message='No relationships found.') %}
-      {% call table_cell(class='font-medium') %}{{ rel.source_name or ('#' ~ rel.source_id) }}{% endcall %}
-      {% call table_cell(class='text-muted-foreground') %}{{ rel.type|default('—') }}{% endcall %}
+      {% call table_cell(class='font-medium') %}{{ rel.source_name or ('#' ~ rel.source_id) }}<span class="block text-xs font-normal text-muted-foreground sm:hidden">{{ rel.type|default('—') }}</span>{% endcall %}
+      {% call table_cell(class='hidden text-muted-foreground sm:table-cell') %}{{ rel.type|default('—') }}{% endcall %}
       {% call table_cell(class='font-medium') %}{{ rel.target_name or ('#' ~ rel.target_id) }}{% endcall %}
     {% endcall %}
 </div>
