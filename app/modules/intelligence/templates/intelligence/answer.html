@@ -187,7 +187,7 @@
                         <td class="py-2 pr-4 text-foreground">{% if kind == 'set_impact' %}{{ row.depth }}{% else %}{{ row.relation.depth }}{% endif %}</td>
                         <td class="py-2 pr-4 text-foreground">{{ owner_text(row) }}</td>
                         <td class="py-2 pr-4">{{ basis_badge(row.truth_class, row | row_source(answer.question_kind)) }}</td>
-                        <td class="py-2 text-xs">{{ origins_text(row.relations if kind == 'set_impact' else [row.relation], row | row_source(answer.question_kind)) }}</td>
+                        <td class="py-2 text-xs">{{ origins_text(row.relations or [row.relation], row | row_source(answer.question_kind)) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

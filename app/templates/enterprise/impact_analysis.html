@@ -103,6 +103,7 @@
                 'href': '%s?element=%d&from=answer' % (url_for('archimate.composer_page'), row.element_id),
                 'type': element.type,
                 'relation': row.relation,
+                'relations': row.relations or [row.relation],
                 'owner_text': owner_names | join(', ') or 'No owner recorded',
                 'health': row.health,
             }) %}
@@ -110,13 +111,13 @@
         {% call(e) element_table(rows=element_rows, columns=[('Type', ''), ('Steps away', ''), ('Basis', ''), ('Owner', ''), ('Health', ''), ('Source', '')], caption='Everything that depends on the chosen element', testid='impact-answer-table', row_testid='impact-answer-row', link_testid='impact-answer-element-link', empty_message='Nothing is recorded as depending on this yet.') %}
             {% call table_cell() %}{{ e.type or '—' }}{% endcall %}
             {% call table_cell() %}{{ e.relation.depth }}{% endcall %}
-            {% call table_cell() %}{% if e.relation.kind == 'derived' %}{% call badge('warning') %}Worked out{% endcall %}{% else %}{% call badge('success') %}Recorded by people{% endcall %}{% endif %}{% endcall %}
+            {% call table_cell() %}{% for rel in e.relations %}{% if rel.kind == 'derived' %}{% call badge('warning') %}Worked out{% endcall %}{% else %}{% call badge('success') %}Recorded by people{% endcall %}{% endif %}{% endfor %}{% endcall %}
             {% call table_cell() %}{{ e.owner_text }}{% endcall %}
             {% call table_cell() %}
                 {% if e.health %}{% call badge('success' if e.health == 'Healthy' else ('warning' if e.health == 'Warning' else 'danger')) %}{{ e.health }}{% endcall %}
                 {% else %}{% call badge('neutral') %}Health not recorded{% endcall %}{% endif %}
             {% endcall %}
-            {% call table_cell(class='text-xs text-muted-foreground') %}{{ source_text(e.relation) }}{% endcall %}
+            {% call table_cell(class='text-xs text-muted-foreground') %}{% for rel in e.relations %}{% if not loop.first %}; {% endif %}{{ source_text(rel) }}{% endfor %}{% endcall %}
         {% endcall %}
     {% endcall %}
     {% endif %}
