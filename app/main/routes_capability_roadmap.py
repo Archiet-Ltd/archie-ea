@@ -13,6 +13,7 @@ from app import db
 from app.utils.recorded_figures import as_figure
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.main.views import main
+from app.core.auth.permissions import can_change_model
 from app.models.roadmap import RoadmapTask
 from app.models.implementation_migration import Deliverable
 from app.models.unified_capability import BusinessDomain, UnifiedCapability
@@ -31,6 +32,15 @@ def _require_wp(wp_id):
     return work_package
 
 logger = logging.getLogger(__name__)
+
+_READ_ONLY_REFUSAL = "Your role may read the roadmap but not change it."
+
+
+def _refuse_unless_may_change():
+    """The plain refusal for a role that may read the roadmap but not change it."""
+    if not can_change_model(current_user):
+        return jsonify({"error": _READ_ONLY_REFUSAL}), 403
+    return None
 
 # ============================================================================
 # CAPABILITY MANAGEMENT API - Grouped Selection and User-Driven Addition
@@ -238,6 +248,9 @@ def list_capabilities():
 @login_required
 def create_capability():
     """Create a new capability with duplicate prevention"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         data = request.get_json()
 
@@ -315,13 +328,14 @@ def create_capability():
             try:
                 parent_capability_id = int(parent_capability_id)
                 # Verify parent exists
-                parent_cap = UnifiedCapability.query.get(parent_capability_id)
+                parent_cap = UnifiedCapability.visible_to_organization(
+                    parent_capability_id, current_organization_id())
                 if not parent_cap:
                     return (
                         jsonify(
                             {"error": f"Parent capability with ID {parent_capability_id} not found"}
                         ),
-                        400,
+                        404,
                     )
                 # Validate hierarchy: L2 can only have L1 parent, L3 can have L1 or L2 parent
                 if level == 2 and parent_cap.level != 1:
@@ -366,7 +380,7 @@ def create_capability():
         # Get domain name directly to avoid lazy loading issues
         domain_name = None
         if domain_id:
-            domain = BusinessDomain.query.get(domain_id)
+            domain = BusinessDomain.query.filter_by(id=domain_id).first()
             domain_name = domain.name if domain else None
 
         return (
@@ -417,25 +431,42 @@ def capability_roadmap():
 
     Most data is loaded client-side via the API endpoints below.
     Server-side: capability_count, domain_count for stat cards (FAR-011 fix).
+    Server-side: plateau_count, work_package_count for initial tile values so tiles
+    never show a figure that disagrees with the evidence line while loading.
     """
-    capability_count = UnifiedCapability.query.count()
-    # the domains Capability Health groups the capabilities by, so the two screens count the same ones
-    from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
-
-    domain_count = len(CapabilityHealthService().get_capability_health_metrics()["health_by_domain"]) or None
+    org_id = current_organization_id()
+    figures = result_footer_service.roadmap_figures(org_id)
+    capability_count = figures["capability_count"]
+    domain_count = figures["domain_count"]
+    plateau_count = figures["plateau_count"]
+    work_package_count = figures["work_package_count"]
     domain_basis = None
     if domain_count is None:
         domain_basis = (
             "No capability has a health score yet, so no domain is listed. Assess a capability to list its domain." if capability_count
             else "No capabilities are recorded yet, so no domain is listed. Add a capability to list its domain."
         )
+    # The signals the "Gap signals" figure counts, listed from the one computation that counts them.
+    from app.modules.capabilities.routes.roadmap_routes import compute_gap_signals
+
+    try:
+        gap_signals = compute_gap_signals()
+        gap_signals_error = False
+    except Exception as exc:
+        current_app.logger.warning("Gap signals unavailable: %s", exc)
+        gap_signals, gap_signals_error = [], True
     return render_template(
         "capability_roadmap/capability_roadmap.html",
         capability_count=capability_count,
         domain_count=domain_count,
         domain_basis=domain_basis,
-        summary_footer=result_footer_service.roadmap_summary_footer(
-            current_organization_id(), capability_count, domain_count),
+        plateau_count=plateau_count,
+        work_package_count=work_package_count,
+        gap_signals=gap_signals,
+        gap_signals_error=gap_signals_error,
+        recorded_gaps=figures["recorded_gaps"],
+        ai_generated=figures["ai_generated"],
+        evidence_line_html=figures["footer_html"],
     )
 
 
@@ -610,7 +641,9 @@ def get_capability_work_packages():
                 }
             )
 
-        return jsonify({"work_packages": work_packages_list})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"work_packages": work_packages_list}))
     except HTTPException:
         raise
     except Exception:
@@ -621,6 +654,9 @@ def get_capability_work_packages():
 @login_required
 def create_capability_work_package():
     """Create new capability work package with multi-capability support"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         data = request.get_json()
 
@@ -708,6 +744,9 @@ def create_capability_work_package():
 @login_required
 def update_capability_work_package(wp_id):
     """Update capability work package"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         data = request.get_json()
 
@@ -779,6 +818,9 @@ def update_capability_work_package(wp_id):
 @login_required
 def delete_capability_work_package(wp_id):
     """Delete capability work package"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         work_package_service.delete_work_package(
             wp_id, organization_id=current_organization_id()
@@ -846,6 +888,9 @@ def get_work_package_tasks(wp_id):
 @login_required
 def create_work_package_task(wp_id):
     """Create a new task for a work package"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package exists
         _require_wp(wp_id)
@@ -895,6 +940,9 @@ def create_work_package_task(wp_id):
 @login_required
 def update_work_package_task(wp_id, task_id):
     """Update a task"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package and task exist
         _require_wp(wp_id)
@@ -948,6 +996,9 @@ def update_work_package_task(wp_id, task_id):
 @login_required
 def delete_work_package_task(wp_id, task_id):
     """Delete a task"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package and task exist
         _require_wp(wp_id)
@@ -1009,6 +1060,9 @@ def get_work_package_deliverables(wp_id):
 @login_required
 def create_work_package_deliverable(wp_id):
     """Create a new deliverable for a work package"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package exists
         _require_wp(wp_id)
@@ -1054,6 +1108,9 @@ def create_work_package_deliverable(wp_id):
 @login_required
 def update_work_package_deliverable(wp_id, deliverable_id):
     """Update a deliverable"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package and deliverable exist
         _require_wp(wp_id)
@@ -1091,6 +1148,9 @@ def update_work_package_deliverable(wp_id, deliverable_id):
 @login_required
 def delete_work_package_deliverable(wp_id, deliverable_id):
     """Delete a deliverable"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         # Verify work package and deliverable exist
         _require_wp(wp_id)
@@ -1157,7 +1217,10 @@ def get_work_package_details(wp_id):
         delivered_count = len([d for d in deliverables if d.delivery_status == "delivered"])
         approved_count = len([d for d in deliverables if d.approval_status == "approved"])
 
+        from app.services.cost_visibility import withhold_reply
+
         return jsonify(
+            withhold_reply(
             {
                 "success": True,
                 "work_package": {
@@ -1216,7 +1279,8 @@ def get_work_package_details(wp_id):
                     if total_deliverables > 0
                     else 0,
                 },
-            }
+            },
+            )
         )
 
     except HTTPException:

@@ -15,6 +15,7 @@ from flask_login import current_user, login_required
 from .. import db
 from . import application_mgmt
 from app.middleware.tenant_decorators import is_active_org_admin
+from app.services.cost_visibility import VENDOR_ANALYSIS_MONEY_KEYS, costs_visible, vendor_analysis_reply, withhold_costs
 from app.utils.pagination import safe_int_arg
 
 
@@ -43,6 +44,12 @@ def _resolve_vendor_name(vendor_option):
             f" - {vendor_option.vendor_product.name}"
         )
     return vendor_option.vendor_name or "Unknown"
+
+
+def _for_person(reply):
+    """A vendor analysis reply for the signed-in person: money left out and the one sentence said, when the
+    cost rule withholds it from them. The one place every reply of this module's analysis routes passes."""
+    return vendor_analysis_reply(reply, current_user)
 
 
 def _serialize_vendor_option(vo, include_extended=False):
@@ -311,7 +318,7 @@ def api_get_vendor_analysis_detail(analysis_id):
         ]
 
         winner = analysis.get_winner()
-        return jsonify(
+        return jsonify(_for_person(
             {
                 "id": analysis.id,
                 "name": analysis.name,
@@ -347,7 +354,7 @@ def api_get_vendor_analysis_detail(analysis_id):
                     else None
                 ),
             }
-        )
+        ))
     except HTTPException:
         raise
     except Exception as e:
@@ -968,9 +975,9 @@ def api_get_vendor_comparison(analysis_id):
             for vo in analysis.vendor_options
         ]
 
-        return jsonify(
+        return jsonify(_for_person(
             {"vendors": vendors, "analysis_id": analysis.id, "analysis_name": analysis.name}
-        )
+        ))
 
     except HTTPException:
 
@@ -1344,7 +1351,7 @@ def api_get_vendor_results(analysis_id):
             else 0
         )
 
-        return jsonify(
+        return jsonify(_for_person(
             {
                 "vendors": vendors,
                 "total_vendors": len(vendors),
@@ -1356,7 +1363,7 @@ def api_get_vendor_results(analysis_id):
                 "analysis_id": analysis.id,
                 "analysis_name": analysis.name,
             }
-        )
+        ))
 
     except HTTPException:
 
@@ -1391,7 +1398,8 @@ def api_export_vendor_analysis(analysis_id):
             output = io.StringIO()
             writer = csv.writer(output)
 
-            # Write header
+            # Write header; the three money columns are left out for a person the cost rule withholds from
+            money_columns = costs_visible(current_user)
             writer.writerow(
                 [
                     "Rank",
@@ -1402,10 +1410,8 @@ def api_export_vendor_analysis(analysis_id):
                     "Risk Score",
                     "Strategic Fit",
                     "Implementation",
-                    "TCO (5yr)",
-                    "License Cost (Annual)",
-                    "Support Cost (Annual)",
                 ]
+                + (["TCO (5yr)", "License Cost (Annual)", "Support Cost (Annual)"] if money_columns else [])
             )
 
             # Write vendor data
@@ -1421,10 +1427,16 @@ def api_export_vendor_analysis(analysis_id):
                         vendor_option.risk_score or "",
                         vendor_option.strategic_fit_score or "",
                         vendor_option.implementation_score or "",
-                        vendor_option.tco_total or "",
-                        vendor_option.license_cost_annual or "",
-                        vendor_option.support_cost_annual or "",
                     ]
+                    + (
+                        [
+                            vendor_option.tco_total or "",
+                            vendor_option.license_cost_annual or "",
+                            vendor_option.support_cost_annual or "",
+                        ]
+                        if money_columns
+                        else []
+                    )
                 )
 
             output.seek(0)
@@ -2087,14 +2099,14 @@ def api_get_vendor_provenance(analysis_id):
                 "tco_total": float(vo.tco_total) if vo.tco_total else None,
             })
 
-        return jsonify({
+        return jsonify(_for_person({
             "success": True,
             "data": {
                 "analysis_id": analysis.id,
                 "analysis_name": analysis.name,
                 "results": results,
             },
-        })
+        }))
 
     except HTTPException:
 
@@ -2141,7 +2153,7 @@ def _compute_scenario_rankings(vendor_options, weights):
 
 def _serialize_scenario(scenario):
     """Serialize an AnalysisScenario to a JSON-safe dict."""
-    return {
+    data = {
         "id": scenario.id,
         "scenario_name": scenario.scenario_name,
         "description": scenario.description,
@@ -2155,6 +2167,7 @@ def _serialize_scenario(scenario):
         "cost_delta": float(scenario.cost_delta) if scenario.cost_delta else None,
         "created_at": scenario.created_at.isoformat() if scenario.created_at else None,
     }
+    return data if costs_visible(current_user) else withhold_costs(data, keys=VENDOR_ANALYSIS_MONEY_KEYS)
 
 
 @application_mgmt.route(

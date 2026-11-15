@@ -18,15 +18,14 @@ the order is a recorded amount, or a recorded severity, and nothing else.
 """
 from __future__ import annotations
 
-from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
 from app.services import result_footer_service as footers
+from app.services.cost_visibility import COSTS_WITHHELD
 from app.services.result_footer_service import fact
 
 TOP = 50
-COST_WITHHELD = "Cost figures are not shown for your role."
 _SEVERITY = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 _RETIRING = ("3.", "5.")
 
@@ -138,14 +137,13 @@ def _candidate_pairs(org_id, apps_by_id, run_costs, covered_pairs, origins) -> L
 def _contract_items(org_id, apps_by_id, origins) -> List[Dict[str, Any]]:
     from app.models.application_portfolio import VendorContract
     from app.services.application_cost_accessor import get_reporting_currency
+    from app.services.vendor_register import active_condition
 
     currency = get_reporting_currency(org_id)
-    today = date.today()
     contracts = db.session.execute(
-        db.select(VendorContract).where(VendorContract.organization_id == org_id, VendorContract.status == "active",
+        db.select(VendorContract).where(VendorContract.organization_id == org_id, active_condition(),
                                         VendorContract.application_id.isnot(None)).order_by(VendorContract.id)
     ).scalars().all()
-    contracts = [c for c in contracts if c.end_date is None or c.end_date >= today]
 
     def amount(contract):
         if contract.annual_cost is None:
@@ -243,7 +241,7 @@ def ranked_opportunities(org_id: int, limit: int = TOP, with_cost: bool = True) 
     items += _unstarted_gaps(org_id)
     if not with_cost:
         for item in items:
-            item["cost"], item["cost_note"] = None, COST_WITHHELD
+            item["cost"], item["cost_note"] = None, COSTS_WITHHELD
     items.sort(key=lambda i: (i["cost"] is None, -(i["cost"] or 0), _SEVERITY.get(i["severity"], 4),
                               i["kind_label"], i["title"].lower()))
     for rank, item in enumerate(items, 1):

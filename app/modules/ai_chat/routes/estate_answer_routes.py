@@ -9,6 +9,7 @@ from flask_login import current_user, login_required
 from app import db
 from app.decorators import audit_log
 from app.middleware.tenant_context import current_org_id
+from app.modules.ai_chat.services import model_defaults
 from app.modules.ai_chat.services import application_change
 from app.modules.ai_chat.services.catalogue_answer import answer_catalogue_question
 from app.modules.ai_chat.services.estate_answer import (
@@ -17,7 +18,12 @@ from app.modules.ai_chat.services.estate_answer import (
     owned_element_id,
     recorded_text,
 )
-from app.modules.ai_chat.services.lens_answer import answer_for_lens, answer_lens_question
+from app.modules.ai_chat.services.lens_answer import (
+    answer_for_lens,
+    answer_lens_question,
+    asks_for_capacity,
+    owner_of_element,
+)
 from app.modules.intelligence.services import answer_envelope as envelope
 
 from app.services.conversation_history import persist_turn
@@ -72,6 +78,8 @@ def _lens_line(lens):
     name = lens["element"].name
     data = lens["data"] or {}
     if lens["lens"] == "portfolio":
+        if data.get("part_of"):
+            return "Answer from your records: %s Rationalization planning tracks the application." % data["part_of"]
         tracked = "is tracked" if data.get("application_component_id") else "is not tracked"
         return "Answer from your records: %s %s by rationalization planning." % (name, tracked)
     key, noun = _LENS_RECORDS[lens["lens"]]
@@ -117,7 +125,9 @@ def _empty_steps(answer, organization_id):
 def _catalogue_response(message, thread_id, keep):
     """The catalogue's cited answer to a plain startup question, or ``found: false``."""
     organization_id = current_org_id()
-    answer = answer_catalogue_question(message[:MAX_QUESTION_CHARS], int(organization_id)) if organization_id else None
+    answer = answer_catalogue_question(
+        message[:MAX_QUESTION_CHARS], int(organization_id), time_limit=float(model_defaults.PROVIDER_FIRST_TOKEN_SECONDS)
+    ) if organization_id else None
     if answer is None:
         return jsonify({"success": True, "found": False})
     count = len(answer["records"])
@@ -213,9 +223,15 @@ def _recorded_links(answer):
     return relationship_split(int(current_org_id()), int(element_id))
 
 
-def _lens_card(lens):
+def _lens_card(lens, message=""):
+    owned = owner_of_element(lens["element"]) if lens["lens"] == "accountability" and lens["data"] is not None else None
     component_id = ((lens["data"] or {}).get("application_component_id")) if lens["lens"] == "portfolio" else None
     owners = ((lens["data"] or {}).get("owners")) if lens["lens"] == "accountability" else None
+    if owned and owners:
+        # The reader also returns the owners of everything downstream; the sentence, the dates and the
+        # footer speak only of the element asked about.
+        owners = [o for o in owners if o.get("element_id") == lens["element"].id]
+        lens["data"] = dict(lens["data"], owners=owners)
     for owner in owners or []:
         # The day the ownership record was made, as people read a date ("12 Nov 2026").
         day = datetime.strptime(owner["since"], "%Y-%m-%d") if owner.get("since") else None
@@ -225,6 +241,8 @@ def _lens_card(lens):
         lens=lens["lens"],
         element=lens["element"],
         data=lens["data"],
+        owned=owned,
+        asked_capacity=asks_for_capacity(message),
         footer=ownership_footer(current_org_id(), owners) if owners else None,
         planning_url=(
             url_for("unified_applications.rationalization_planning", app_id=component_id) if component_id else None
@@ -307,7 +325,7 @@ def _parts_response(message, thread_id, keep, cards):
             lens = answer_for_lens("accountability", message[:MAX_QUESTION_CHARS])
             if lens is None:
                 return None
-            drawn.append(_lens_card(lens))
+            drawn.append(_lens_card(lens, message))
             lines.append(_lens_line(lens))
             continue
         direction = "upstream" if card == "upstream" else "downstream"
@@ -381,7 +399,7 @@ def estate_answer():
                 "found": True,
                 "thread_id": kept,
                 "lens": lens["lens"],
-                "html": _lens_card(lens),
+                "html": _lens_card(lens, message),
             }
         )
     try:

@@ -297,18 +297,20 @@ def disallowed_patterns() -> list[str]:
 def _sitemap_url(path: str) -> str:
     from html import escape
 
-    from app.services.public_pages import SITE_URL
+    from app.services.origin import canonical_origin
 
+    base = canonical_origin()
     priority = "<priority>1.0</priority>" if path == "/" else ""
-    return f"  <url><loc>{SITE_URL}{escape(path)}</loc>{priority}</url>"
+    return f"  <url><loc>{base}{escape(path)}</loc>{priority}</url>"
 
 
 def _build_robots() -> str:
-    from app.services.public_pages import SITE_URL
+    from app.services.origin import canonical_origin
 
+    base = canonical_origin()
     lines = ["User-agent: *", "Allow: /"]
     lines += [f"Disallow: {pattern}" for pattern in disallowed_patterns()]
-    lines += ["", f"Sitemap: {SITE_URL}/sitemap.xml", ""]
+    lines += ["", f"Sitemap: {base}/sitemap.xml", ""]
     return "\n".join(lines)
 
 

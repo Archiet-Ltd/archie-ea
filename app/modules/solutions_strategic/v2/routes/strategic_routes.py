@@ -197,7 +197,7 @@ def investment_matrix():
             portfolio_metrics=analysis["portfolio_metrics"],
             recommendations=analysis["recommendations"],
             currency_symbol=currency_symbol(),
-            costs_withheld_text=COSTS_WITHHELD,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception:
         current_app.logger.exception("Investment matrix scores could not be loaded")
@@ -241,9 +241,12 @@ def risk_assessment():
         from app.services import risk_service
 
         assessment = risk_service.risk_assessment()
+        # The cards count open risks, so the rows are the open risks too: the page lists what it counts.
+        open_rows = [row for row in assessment["rows"] if row["status"] == "open"]
         return render_template(
             "strategic/risk_assessment.html",
-            risk_rows=assessment["rows"],
+            risk_rows=open_rows,
+            closed_count=len(assessment["rows"]) - len(open_rows),
             counts=assessment["counts"],
         )
     except Exception:

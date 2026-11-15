@@ -3,17 +3,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/provenance.html' import result_footer %}
 
-{% block title %}Portfolio{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Portfolio', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Portfolio{% endblock %}{% block content %}
 <div class="p-6 space-y-6 mx-auto">
 
   {{ page_shell(title='Portfolio', subtitle='Transformation initiatives — budget, health and benefits') }}
@@ -27,7 +17,7 @@
     {% if costs_withheld %}
     <div class="rounded-lg border border-border bg-card p-6 md:col-span-2" data-testid="portfolio-costs-withheld">
       <p class="text-sm font-medium text-muted-foreground">Budget and spend</p>
-      <p class="text-sm mt-3 text-muted-foreground">{{ costs_withheld_text }}</p>
+      <p class="text-sm mt-3 text-muted-foreground">{{ costs_withheld_sentence }}</p>
     </div>
     {% else %}
     <div class="rounded-lg border border-border bg-card p-6">
@@ -70,8 +60,8 @@
     <a href="{{ url_for('portfolio.index') }}" class="text-primary underline underline-offset-2">Show all initiatives</a>
     {% elif summary.no_objective %}
     <a href="{{ url_for('portfolio.index', filter='no-objective') }}" class="text-primary underline underline-offset-2">{{ summary.no_objective }} initiative{{ '' if summary.no_objective == 1 else 's' }} serving no objective</a>
-    {% else %}
-    <span class="text-muted-foreground">0 initiatives serving no objective</span>
+    {% elif summary.count %}
+    <span class="text-muted-foreground" data-testid="every-initiative-has-objective">Every initiative serves an objective</span>
     {% endif %}
   </div>
 
@@ -88,7 +78,7 @@
           <th class="px-4 py-3 font-medium">Phase</th>
           <th class="px-4 py-3 font-medium">Health</th>
           {% if not costs_withheld %}<th class="px-4 py-3 font-medium text-right">Budget</th>{% endif %}
-          {% if not costs_withheld %}<th class="px-4 py-3 font-medium text-right">Spent</th>{% endif %}
+          {% if not costs_withheld %}<th class="px-4 py-3 font-medium text-right">Spent so far</th>{% endif %}
           {% if not costs_withheld %}<th class="px-4 py-3 font-medium text-right">Variance</th>{% endif %}
           <th class="px-4 py-3 font-medium text-right">Complete</th>
           <th class="px-4 py-3 font-medium text-right">Benefits</th>
@@ -120,7 +110,7 @@
           </td>
           <td class="px-4 py-3 text-right tabular-nums">
             {% if i.variance_pct is not none %}
-              <span class="{% if i.variance_pct > 10 %}text-destructive{% elif i.variance_pct > 0 %}text-warning{% else %}text-success{% endif %} font-medium">
+              <span class="{% if i.variance_pct > 0 %}text-destructive{% elif i.variance_pct < 0 %}text-success{% else %}text-foreground{% endif %} font-medium">
                 {{ '%+.1f' | format(i.variance_pct) }}%
               </span>
             {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}

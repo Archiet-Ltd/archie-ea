@@ -14,6 +14,7 @@ from flask import Blueprint, abort, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
+from app.services.cost_visibility import ROLLUP_FIGURE_KEYS
 from app.middleware.tenant_context import current_org_id
 from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
 
@@ -32,15 +33,16 @@ def _money(value):
 
 
 def _variance(initiative):
-    """Spend against approved budget, as a percentage.
+    """Forecast against approved budget, as a percentage.
 
     Returns None when either side is missing rather than implying 0% variance
-    against a budget nobody set.
+    against a budget nobody set. A positive figure means the forecast overruns
+    the budget; a negative figure means it comes in under.
     """
-    budget, spent = initiative.approved_budget, initiative.spent_to_date
-    if budget is None or spent is None or float(budget) == 0:
+    budget, forecast = initiative.approved_budget, initiative.forecast_cost
+    if budget is None or forecast is None or float(budget) == 0:
         return None
-    return round((float(spent) - float(budget)) / float(budget) * 100, 1)
+    return round((float(forecast) - float(budget)) / float(budget) * 100, 1)
 
 
 # What a financial benefit is measured by: its three amounts, and the percentage
@@ -118,13 +120,13 @@ def index():
 
     withheld = not costs_visible(current_user)
     if withheld:
-        rows = withhold_costs(rows, keys=("approved_budget", "spent_to_date", "forecast_cost", "variance_pct"))
-        summary = withhold_costs(summary, keys=("total_budget", "total_spent"))
+        rows = withhold_costs(rows, keys=ROLLUP_FIGURE_KEYS)
+        summary = withhold_costs(summary)
 
     return render_template(
         "portfolio/index.html",
         costs_withheld=withheld,
-        costs_withheld_text=COSTS_WITHHELD,
+        costs_withheld_sentence=COSTS_WITHHELD,
         initiatives=rows,
         summary=summary,
         only_unlinked=only_unlinked,
@@ -245,7 +247,7 @@ def detail(initiative_id):
     return render_template(
         "portfolio/detail.html",
         costs_withheld=withheld,
-        costs_withheld_text=COSTS_WITHHELD,
+        costs_withheld_sentence=COSTS_WITHHELD,
         initiative=initiative,
         variance_pct=money["variance_pct"],
         approved_budget=money["approved_budget"],

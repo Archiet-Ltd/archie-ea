@@ -7,41 +7,12 @@ and renewal tracking.
 ADR Reference: docs/adr/0010-procurement-persona.md
 """
 
-from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import or_
 
 from app.models.application_portfolio import VendorContract
-
-
-def get_days_until_renewal(contract: VendorContract) -> Optional[int]:
-    """Calculate days until contract renewal/expiration."""
-    target_date = contract.renewal_date or contract.end_date
-    if not target_date:
-        return None
-    return (target_date - date.today()).days
-
-
-def get_renewal_urgency(contract: VendorContract) -> str:
-    """
-    Determine renewal urgency level based on days remaining.
-
-    Returns: 'critical' (<30 days), 'warning' (<90 days),
-             'upcoming' (<180 days), 'ok' (>180 days), 'expired', 'unknown'
-    """
-    days = get_days_until_renewal(contract)
-    if days is None:
-        return "unknown"
-    if days < 0:
-        return "expired"
-    if days < 30:
-        return "critical"
-    if days < 90:
-        return "warning"
-    if days < 180:
-        return "upcoming"
-    return "ok"
+from app.services.vendor_register import get_renewal_urgency
 
 
 def get_contracts_list(
@@ -89,35 +60,6 @@ def get_contracts_list(
     return contracts, total
 
 
-def get_expiring_contracts(days: int = 90) -> List[VendorContract]:
-    """Get contracts expiring within the specified number of days."""
-    from app.services.vendor_register import active_condition
-
-    cutoff = date.today() + timedelta(days=days)
-
-    return (
-        VendorContract.query
-        .filter(active_condition())
-        .filter(
-            or_(
-                and_(
-                    VendorContract.renewal_date.isnot(None),
-                    VendorContract.renewal_date <= cutoff,
-                ),
-                and_(
-                    VendorContract.renewal_date.is_(None),
-                    VendorContract.end_date.isnot(None),
-                    VendorContract.end_date <= cutoff,
-                ),
-            )
-        )
-        .order_by(
-            func.coalesce(VendorContract.renewal_date, VendorContract.end_date).asc()
-        )
-        .all()
-    )
-
-
 def get_renewal_summary(organization_id: int) -> Dict[str, int]:
     """Summary counts by renewal urgency, for one organisation's active contracts (the contract ledger's one
     definition). A contract still marked active whose end date has passed is not active: it is counted under
@@ -135,11 +77,17 @@ def get_renewal_summary(organization_id: int) -> Dict[str, int]:
         "ok": 0,        # >180 days
         "expired": len(contracts) - len(active),
         "unknown": 0,
+        "overdue": 0,
         "total": len(active),
     }
 
     for contract in active:
         urgency = get_renewal_urgency(contract)
+        if urgency == "expired":
+            # an active contract whose recorded renewal date has passed and has no end date: a decision is
+            # overdue, so it counts with those due within 30 days and the list opens it in that window
+            summary["overdue"] += 1
+            urgency = "critical"
         summary[urgency] = summary.get(urgency, 0) + 1
 
     return summary

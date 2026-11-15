@@ -20,7 +20,7 @@
   {% endmacro %}
   {{ page_shell(title='Capability Heatmap', breadcrumb=[('Home', '/'), ('Capability Heatmap', none)], subtitle=('Maturity levels by domain' if costs_withheld else 'Maturity levels by domain, with an investment view'), actions_caller=_ps_actions) }}
 
-  {% if costs_withheld %}<p class="text-sm text-muted-foreground" data-testid="heatmap-costs-withheld">{{ costs_withheld_text }}</p>{% endif %}
+  {% if costs_withheld %}<p class="text-sm text-muted-foreground" data-testid="heatmap-costs-withheld">{{ costs_withheld_sentence }}</p>{% endif %}
 
   {# Loading state #}
   <div x-show="loading" x-cloak class="flex items-center justify-center py-16">
@@ -45,6 +45,7 @@
       <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Capabilities</p>
       <p class="text-2xl font-bold text-foreground mt-1" x-text="data.total_capabilities || 0"></p>
     </div>
+{% if not costs_withheld %}
     <div x-show="viewMode === 'investment'" x-cloak class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Investment</p>
       <p class="text-2xl font-bold text-foreground mt-1"
@@ -57,6 +58,7 @@
       <p class="text-2xl font-bold text-foreground mt-1"
          x-text="data.investment_summary?.domains_with_investment || 0"></p>
     </div>
+{% endif %}
   </div>
 
   {# Legend #}
@@ -88,7 +90,9 @@
           <th class="text-center py-2 px-2 font-semibold text-foreground w-20">Not assessed</th>
           <th class="text-center py-2 px-3 font-semibold text-foreground">Health</th>
           <th class="text-center py-2 px-3 font-semibold text-foreground">Caps</th>
+{% if not costs_withheld %}
           <th x-show="viewMode === 'investment'" x-cloak class="text-right py-2 px-3 font-semibold text-foreground">Investment</th>
+{% endif %}
         </tr>
       </thead>
       <tbody>
@@ -135,6 +139,7 @@
               </span>
             </td>
             <td class="text-center py-2 px-3 text-muted-foreground" x-text="domain.total_capabilities"></td>
+{% if not costs_withheld %}
             <td x-show="viewMode === 'investment'" x-cloak class="text-right py-2 px-3 font-medium text-foreground">
               <span x-show="domain.total_investment !== undefined" x-cloak
                     x-text="domain.total_investment !== undefined ? ('{{ currency_symbol }}' + formatNumber(domain.total_investment)) : ''"></span>
@@ -145,6 +150,7 @@
                 <span class="sr-only">Investment not available for this group</span>
               </span>
             </td>
+{% endif %}
           </tr>
         </template>
       </tbody>
@@ -201,6 +207,7 @@
           <span class="sr-only">Health not available: needs a recorded current and a recorded target maturity</span>
         </p>
       </div>
+{% if not costs_withheld %}
       <div x-show="viewMode === 'investment'" x-cloak>
         <p class="text-xs text-muted-foreground">Investment</p>
         <p class="text-lg font-bold text-foreground" x-show="selectedDomain?.total_investment !== undefined" x-cloak
@@ -211,9 +218,11 @@
           <span class="sr-only">Investment not available for this group</span>
         </p>
       </div>
+{% endif %}
     </div>
 
     {# Cost breakdown table (investment mode) #}
+{% if not costs_withheld %}
     <div x-show="viewMode === 'investment' && selectedDomain?.cost_breakdown && Object.keys(selectedDomain.cost_breakdown).length > 0" x-cloak
          class="mt-4">
       <h3 class="text-sm font-medium text-foreground mb-2">Cost Breakdown</h3>
@@ -227,6 +236,7 @@
         </template>
       </div>
     </div>
+{% endif %}
 
     {# Capabilities by maturity level #}
     <div class="mt-4">

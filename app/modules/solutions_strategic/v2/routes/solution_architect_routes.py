@@ -32,6 +32,19 @@ from app.models.solution_architect_models import SolutionAnalysisSession, Soluti
 solution_architect_bp = Blueprint("solution_architect", __name__, url_prefix="/solutions/architect")
 
 
+def _render_session(session):
+    """The session page; a person the cost rule withholds from sees no budget and no estimated cost on it."""
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
+    return render_template(
+        "solutions/session_detail.html",
+        session=session,
+        problem=session.problem_definition,
+        costs_withheld=not costs_visible(current_user),
+        costs_withheld_sentence=COSTS_WITHHELD,
+    )
+
+
 @solution_architect_bp.route("/")
 @login_required
 def index():
@@ -62,11 +75,7 @@ def workspace(session_id=None):
         current_app.logger.error(f"Error loading workspace session: {e}")
         return redirect(url_for("solution_design.list_solutions"))
 
-    return render_template(
-        "solutions/session_detail.html",
-        session=session,
-        problem=session.problem_definition,
-    )
+    return _render_session(session)
 
 
 # sessions() listing route removed — dev artifact, access sessions from /solutions/
@@ -83,11 +92,7 @@ def session_detail(session_id):
         flash("You don't have access to this session.", "error")
         return redirect(url_for("solution_design.list_solutions"))
 
-    return render_template(
-        "solutions/session_detail.html",
-        session=session,
-        problem=session.problem_definition,
-    )
+    return _render_session(session)
 
 
 @solution_architect_bp.route("/sessions/create", methods=["GET", "POST"])
@@ -185,6 +190,7 @@ def analyze():
         from app.modules.solutions_strategic.v2.services.solution_architect_orchestrator import (
             SolutionArchitectOrchestrator,
         )
+        from app.services.cost_visibility import costs_visible
 
         data = request.get_json()
 
@@ -193,6 +199,7 @@ def analyze():
 
         orchestrator = SolutionArchitectOrchestrator()
 
+        # The one cost rule decides inside the orchestrator, the one place both analyse callers share.
         result = orchestrator.analyze_problem(
             problem_description=data.get("problem_description"),
             capability_id=data.get("capability_id"),
@@ -205,6 +212,7 @@ def analyze():
             industry_vertical=data.get("industry_vertical"),
             existing_constraints=data.get("constraints", []),
             compliance_requirements=data.get("compliance_requirements", []),
+            show_costs=costs_visible(current_user),
         )
 
         return jsonify({"success": True, "analysis": result})
@@ -360,6 +368,7 @@ def run_session_analysis(session_id):
         from app.modules.solutions_strategic.v2.services.solution_architect_orchestrator import (
             SolutionArchitectOrchestrator,
         )
+        from app.services.cost_visibility import costs_visible, withhold_costs
 
         session = SolutionAnalysisSession.query.get_or_404(session_id)
 
@@ -380,6 +389,9 @@ def run_session_analysis(session_id):
 
         orchestrator = SolutionArchitectOrchestrator()
 
+        # The session keeps the full estimate whoever ran the analysis; the cost rule is applied to
+        # what is returned to the person, here and when the saved results are read back.
+        keep_full_estimate = True
         result = orchestrator.analyze_problem(
             problem_description=problem.problem_description,
             capability_id=None,
@@ -394,6 +406,7 @@ def run_session_analysis(session_id):
             if problem.constraints
             else [],
             compliance_requirements=problem.compliance_requirements or [],
+            show_costs=keep_full_estimate,
         )
 
         if not result.get("success"):
@@ -444,8 +457,7 @@ def run_session_analysis(session_id):
         session.status = SolutionSessionStatus.IN_PROGRESS
         db.session.commit()
 
-        return jsonify(
-            {
+        reply = {
                 "success": True,
                 "recommendations": [
                     {
@@ -464,8 +476,10 @@ def run_session_analysis(session_id):
                 "existing_applications": result.get("existing_applications"),
                 "vendor_options": result.get("vendor_options"),
                 "gap_analysis": result.get("gap_analysis"),
-            }
-        )
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
 
     except Exception as e:
         current_app.logger.error(f"Error running session analysis: {e}")
@@ -495,8 +509,7 @@ def get_session_analysis_results(session_id):
             .all()
         )
 
-        return jsonify(
-            {
+        reply = {
                 "success": True,
                 "has_results": len(recommendations) > 0,
                 "recommendations": [
@@ -521,8 +534,12 @@ def get_session_analysis_results(session_id):
                     }
                     for rec in recommendations
                 ],
-            }
-        )
+        }
+        from app.services.cost_visibility import costs_visible, withhold_costs
+
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
 
     except HTTPException:
         raise
