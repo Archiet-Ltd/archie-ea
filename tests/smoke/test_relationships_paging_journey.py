@@ -79,7 +79,8 @@ def test_an_architect_reaches_every_relationship_and_none_of_another_organisatio
     assert response.status == 200
     seen = []
     assert page.get_by_text("Page 1 of 3").is_visible()
-    assert page.get_by_role("button", name="Go to first page").count() == 0
+    assert page.get_by_role("button", name="First page").is_disabled()
+    assert page.get_by_role("button", name="Previous page").is_disabled()
     first = _row_texts(page)
     assert len(first) == 20
     seen += first
@@ -127,3 +128,51 @@ def test_rows_per_page_changes_the_number_of_pages(page, live_server, estate):
     assert page.get_by_text("Page 1 of 1").is_visible()
     assert len(_row_texts(page)) == 45
     _shot(page, "fifty-per-page")
+
+
+def _sort_by(page, column, direction):
+    page.get_by_role("button", name=column).click()
+    page.get_by_role("menuitem", name=direction).click()
+    page.wait_for_load_state("domcontentloaded")
+
+
+def test_sorting_by_target_descending_orders_every_page_not_only_the_first(page, live_server, estate):
+    tag = estate["tag"]
+    page.goto(live_server + "/architecture/relationships", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    _sort_by(page, "Target", "Descending")
+    assert page.get_by_text("Page 1 of 3").is_visible()
+    first = _row_texts(page)
+    assert "Mine %s 45" % tag in first[0], "the highest target across all pages is not first: %r" % first[0]
+    assert "Mine %s 26" % tag in first[-1]
+    _shot(page, "sorted-target-desc")
+
+    page.get_by_role("link", name="Next page").click()
+    page.wait_for_load_state("domcontentloaded")
+    assert "sort=target" in page.url and "dir=desc" in page.url
+    second = _row_texts(page)
+    assert "Mine %s 25" % tag in second[0]
+    page.get_by_role("link", name="Last page").click()
+    page.wait_for_load_state("domcontentloaded")
+    last = _row_texts(page)
+    assert "Mine %s 01" % tag in last[-1]
+    assert "Theirs %s" % tag not in page.content()
+
+
+def test_the_enterprise_address_pages_and_sorts_the_same_relationships(page, live_server, estate):
+    tag = estate["tag"]
+    response = page.goto(live_server + "/enterprise/architecture/relationships", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert response.status == 200
+    assert page.get_by_text("Page 1 of 3").is_visible()
+    assert len(_row_texts(page)) == 20
+    page.get_by_role("link", name="Next page").click()
+    page.wait_for_load_state("domcontentloaded")
+    assert page.get_by_text("Page 2 of 3").is_visible()
+    page.get_by_role("link", name="Last page").click()
+    page.wait_for_load_state("domcontentloaded")
+    assert page.get_by_text("Rows 41 to 45 of 45").is_visible()
+    assert len(_row_texts(page)) == 5
+    page.get_by_role("link", name="First page").click()
+    page.wait_for_load_state("domcontentloaded")
+    _sort_by(page, "Target", "Descending")
+    assert "Mine %s 45" % tag in _row_texts(page)[0]
+    assert "Theirs %s" % tag not in page.content()

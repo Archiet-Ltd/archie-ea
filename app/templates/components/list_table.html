@@ -14,7 +14,7 @@
    {% endcall %}
 
    rows             the records; the call block renders one row's cells (table_cell from basecoat/table.html)
-   columns          (label, header classes) pairs or {'label', 'class', 'align': 'right', 'sortable': true} mappings
+   columns          (label, header classes) pairs or {'label', 'class', 'align': 'right', 'sortable': true, 'sort_hrefs': {'asc': url, 'desc': url}} mappings (sort_hrefs: the server sorts, so each choice is a link to the same read, not a client sort of one page)
    caption          what the table lists, read by screen readers
    testid           the table's test id; the wrapper is <testid>-pager
    row_testid       each row's test id
@@ -102,8 +102,13 @@
                     <span>{{ m.label }}</span><span class="contents" data-sort-icon="none">{{ lucide('chevrons-up-down') }}</span><span class="contents" data-sort-icon="asc" hidden>{{ lucide('arrow-up') }}</span><span class="contents" data-sort-icon="desc" hidden>{{ lucide('arrow-down') }}</span>
                   {% endcall %}
                   {% call dropdown_menu_content(align=('end' if right else 'start')) %}
+                    {%- if m.get('sort_hrefs') %}
+                    {% call dropdown_menu_item(href=m.sort_hrefs.asc) %}{{ lucide('arrow-up') }}Ascending{% endcall %}
+                    {% call dropdown_menu_item(href=m.sort_hrefs.desc) %}{{ lucide('arrow-down') }}Descending{% endcall %}
+                    {%- else %}
                     {% call dropdown_menu_item(attrs={'data-table-sort': loop.index0, 'data-dir': 'asc', 'data-table-owner': testid}) %}{{ lucide('arrow-up') }}Ascending{% endcall %}
                     {% call dropdown_menu_item(attrs={'data-table-sort': loop.index0, 'data-dir': 'desc', 'data-table-owner': testid}) %}{{ lucide('arrow-down') }}Descending{% endcall %}
+                    {%- endif %}
                   {% endcall %}
                 {% endcall %}
               {%- else -%}

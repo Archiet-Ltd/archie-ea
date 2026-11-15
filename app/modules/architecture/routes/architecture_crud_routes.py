@@ -29,6 +29,7 @@ from app.models.archimate_core import (
 )
 from app.modules.intelligence.services.query_service import (
     filter_relationships_by_org,
+    relationship_sort_args,
     relationships_page,
 )
 from app.services.architecture_validation_service import ArchitectureValidator
@@ -328,7 +329,8 @@ def list_relationships():
     # An address that names one relationship ("Open relationship record" in an
     # answer) shows that relationship, so the row it points at is on the page.
     focus_id = request.args.get("relationship", type=int)
-    listing = relationships_page(current_org_id(), page, per_page, focus_id)
+    sort, direction = relationship_sort_args(request.args)
+    listing = relationships_page(current_org_id(), page, per_page, focus_id, sort, direction)
     relationships, total, pages, page = (
         listing["relationships"], listing["total"], listing["pages"], listing["page"]
     )
@@ -341,6 +343,8 @@ def list_relationships():
         per_page=per_page,
         pages=pages,
         focus_id=focus_id,
+        sort=sort,
+        sort_dir=direction,
     )
 
 

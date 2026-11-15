@@ -130,17 +130,22 @@ def architecture_relationships():
     """
     try:
         from app.middleware.tenant_context import current_org_id
-        from app.modules.intelligence.services.query_service import relationships_page
+        from app.modules.intelligence.services.query_service import (
+            relationship_sort_args, relationships_page,
+        )
 
         page = request.args.get("page", 1, type=int)
         per_page = request.args.get("per_page", 20, type=int)
         if per_page not in (10, 20, 25, 30, 40, 50):
             per_page = 20
-        listing = relationships_page(current_org_id(), max(page, 1), per_page)
+        sort, direction = relationship_sort_args(request.args)
+        listing = relationships_page(current_org_id(), max(page, 1), per_page, None, sort, direction)
         return render_template(
             "architecture/relationships.html",
             per_page=per_page,
             focus_id=None,
+            sort=sort,
+            sort_dir=direction,
             **listing,
         )
     except Exception as e:

@@ -121,8 +121,8 @@ def _dependency_chain(element_id: int, depth: int, want: str, org_id: Optional[i
     return hops
 
 
-def _layer_of(el) -> str:
-    return (getattr(el, "layer", None) or "other").lower()
+def _layer_of(el: Dict[str, Any]) -> str:
+    return (el.get("layer") or "other").lower()
 
 
 def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, Any]]:
@@ -168,7 +168,7 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
                 "id": el_id,
                 "name": el.get("name") or f"Element {el_id}",
                 "type": el.get("type"),
-                "layer": (el.get("layer") or "other").lower(),
+                "layer": _layer_of(el),
                 "distance": distance,
                 "direction": direction,
                 "is_center": el_id == element_id,
@@ -229,7 +229,7 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
             if el is None:
                 continue
             out.append({"id": el_id, "name": el["name"] or f"Element {el_id}",
-                        "type": el["type"], "layer": (el["layer"] or "other").lower(), "hops": n_hops})
+                        "type": el["type"], "layer": _layer_of(el), "hops": n_hops})
         return sorted(out, key=lambda item: (item["hops"], item["name"].lower()))
 
     consumers = _listed(consumer_hops)

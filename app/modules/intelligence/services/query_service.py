@@ -658,24 +658,48 @@ def relationship_fence_clause(org_id: Optional[int], *, direction: str = "both")
     return and_(*clauses)
 
 
+RELATIONSHIP_SORTS = ("source", "type", "target")
+
+
+def relationship_sort_args(args) -> tuple:
+    """The ``sort`` / ``dir`` of a relationships address, or ``(None, "asc")`` when absent or unknown."""
+    sort = args.get("sort")
+    if sort not in RELATIONSHIP_SORTS:
+        return None, "asc"
+    return sort, ("desc" if args.get("dir") == "desc" else "asc")
+
+
 def relationships_page(
-    org_id: Optional[int], page: int, per_page: int, focus_id: Optional[int] = None
+    org_id: Optional[int], page: int, per_page: int, focus_id: Optional[int] = None,
+    sort: Optional[str] = None, direction: str = "asc",
 ) -> Dict[str, Any]:
     """One page of an organisation's relationships, fenced and paged in the query.
 
     Returns ``{relationships, total, pages, page}``; each relationship carries
     its id, type, both ends' ids and their names. The database reads one page
     plus a count, never the whole organisation. ``focus_id`` narrows the list to
-    one relationship (still fenced). A ``page`` past the last one gives the last.
+    one relationship (still fenced). ``sort`` ("source", "type" or "target") with
+    ``direction`` orders the whole list before it is paged. A ``page`` past the last one gives the last.
     """
+    from sqlalchemy import func  # noqa: PLC0415
+    from sqlalchemy.orm import aliased  # noqa: PLC0415
+
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
     listing = ArchiMateRelationship.query
     if focus_id is not None:
         listing = listing.filter(ArchiMateRelationship.id == focus_id)
-    ordered = listing.filter(relationship_fence_clause(org_id, direction="both")).order_by(
-        ArchiMateRelationship.type, ArchiMateRelationship.id
-    )
+    ordered = listing.filter(relationship_fence_clause(org_id, direction="both"))
+    # The sort is part of the read, so every page follows it: by an end's name
+    # (joined) or by type, ties broken by id.
+    if sort in ("source", "target"):
+        end = aliased(ArchiMateElement)
+        end_id = ArchiMateRelationship.source_id if sort == "source" else ArchiMateRelationship.target_id
+        key = func.lower(func.coalesce(end.name, ""))
+        ordered = ordered.outerjoin(end, end.id == end_id)
+    else:
+        key = ArchiMateRelationship.type
+    ordered = ordered.order_by(key.desc() if direction == "desc" else key.asc(), ArchiMateRelationship.id)
     pagination = ordered.paginate(page=page, per_page=per_page, error_out=False)
     if page > 1 and not pagination.items and pagination.pages:
         page = pagination.pages

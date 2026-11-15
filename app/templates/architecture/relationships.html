@@ -8,11 +8,13 @@
 
 {% macro _pager() -%}
 {%- set _keep = {'relationship': focus_id} if focus_id is not none else {} -%}
+{%- if sort %}{% set _ = _keep.update({'sort': sort, 'dir': sort_dir}) %}{% endif -%}
 <div class="flex flex-wrap items-center justify-between gap-2 px-2" data-slot="data-table-pagination" data-testid="relationships-pages">
   <p class="flex-1 text-sm text-muted-foreground tabular-nums">{% if total %}Rows {{ (page - 1) * per_page + 1 }} to {{ [page * per_page, total]|min }} of {{ total }}{% else %}0 rows{% endif %}</p>
   <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
     <form method="get" action="{{ url_for(request.endpoint) }}" class="flex items-center gap-2">
       {% if focus_id is not none %}{{ ui.input(name='relationship', value=focus_id, type='hidden') }}{% endif %}
+      {% if sort %}{{ ui.input(name='sort', value=sort, type='hidden') }}{{ ui.input(name='dir', value=sort_dir, type='hidden') }}{% endif %}
       {{ ui.label(text='Rows per page', attrs={'for': 'relationships-per-page'}) }}
       {% call native_select_wrapper(class='w-[72px]') %}
         {% call native_select(size='sm', name='per_page', id='relationships-per-page') %}
@@ -33,6 +35,10 @@
 </div>
 {%- endmacro %}
 
+{% macro _sort_to(key, direction) -%}
+{{ url_for(request.endpoint, sort=key, dir=direction, per_page=(per_page if per_page != 20 else none), **({'relationship': focus_id} if focus_id is not none else {})) }}
+{%- endmacro %}
+
 {% block title %}Architecture Relationships{% endblock %}
 
 {% block content %}
@@ -45,7 +51,7 @@
         <a class="text-foreground underline underline-offset-4" href="{{ url_for(request.endpoint) }}">Show all relationships</a>
     </p>
     {% endif %}
-    {% call(rel) list_table(rows=relationships, columns=[('Source', ''), {'label': 'Relationship', 'class': 'hidden sm:table-cell'}, ('Target', '')],
+    {% call(rel) list_table(rows=relationships, columns=[{'label': 'Source', 'sort_hrefs': {'asc': _sort_to('source', 'asc'), 'desc': _sort_to('source', 'desc')}}, {'label': 'Relationship', 'class': 'hidden sm:table-cell', 'sort_hrefs': {'asc': _sort_to('type', 'asc'), 'desc': _sort_to('type', 'desc')}}, {'label': 'Target', 'sort_hrefs': {'asc': _sort_to('target', 'asc'), 'desc': _sort_to('target', 'desc')}}],
                             caption='Relationships between architecture elements', testid='relationships-table', row_testid='relationship-row',
                             toolbar=false, page_size=per_page, server_pagination=_pager, row_id_prefix='relationship-',
                             empty_message='No relationships found.') %}
