@@ -100,19 +100,47 @@
         return escapeForHtml(text);
     }
 
-    /* The model marks each record it relied on as [ref:<id>]. A reader sees a link, not the marker:
-       to the record's page when the turn's sources name it, otherwise to the stored answer (an
-       address) or the answer about that element (a number). */
+    /* The model marks each record it relied on as [ref:<id>], and sometimes writes a space after
+       the colon or lists several ids in one marker. A reader sees a link, not the marker: to the
+       record's page when the turn's sources name it, otherwise to the stored answer (an address) or
+       the answer about that element (a number). An id that reaches no record is dropped, never shown
+       as text. When the sentence already says the record's name just before the marker, the name
+       becomes the link instead of being written twice. */
     function referencesAsLinks(text, sources) {
-        return text.replace(/\[ref:([^\]\s]+)\]/gi, function (_all, id) {
-            var found = (Array.isArray(sources) ? sources : []).filter(function (s) { return s && String(s.id) === id && s.url; })[0];
-            var url = found ? found.url
-                : /^[0-9a-f]{16,}$/i.test(id) ? '/intelligence/answers/' + id
-                : /^\d+$/.test(id) ? '/intelligence/answers/element/' + id
-                : '';
-            if (!url) return '';
-            return '[' + (found && found.name ? String(found.name).replace(/[\[\]]/g, '') : 'View the record') + '](' + url + ')';
-        });
+        var list = Array.isArray(sources) ? sources : [];
+        var marker = /\[ref:([^\]]*)\]/gi;
+        var out = '';
+        var pos = 0;
+        var m;
+        while ((m = marker.exec(text))) {
+            out += text.slice(pos, m.index);
+            pos = m.index + m[0].length;
+            var links = [];
+            m[1].split(/[\s,;]+/).filter(Boolean).forEach(function (id) {
+                var found = list.filter(function (s) { return s && String(s.id) === id && s.url; })[0];
+                var url = found ? found.url
+                    : /^[0-9a-f]{16,}$/i.test(id) ? '/intelligence/answers/' + id
+                    : /^\d+$/.test(id) ? '/intelligence/answers/element/' + id
+                    : '';
+                if (!url) return;
+                var name = found && found.name ? String(found.name).replace(/[\[\]]/g, '') : '';
+                if (name && links.length === 0) {
+                    var trimmed = out.replace(/[\s*_`"'\u201d]+$/, '');
+                    if (trimmed.toLowerCase().slice(-name.length) === name.toLowerCase() && trimmed.length >= name.length) {
+                        out = trimmed.slice(0, trimmed.length - name.length).replace(/[*_`"'\u201c]+$/, '');
+                    }
+                }
+                links.push('[' + (name || 'View the record') + '](' + url + ')');
+            });
+            if (links.length) out += links.join(', ');
+            else if (/^[.,;:!?]/.test(text.slice(pos))) out = out.replace(/\s+$/, '');
+        }
+        return out + text.slice(pos);
+    }
+
+    /* While an answer is still arriving, a marker that has not closed yet is not text for the reader. */
+    function withoutOpenMarker(text) {
+        return text.replace(/\[(?:r(?:e(?:f(?::[^\]]*)?)?)?)?$/i, '');
     }
 
     /* Names and addresses the model wrote between backticks are code, not text with backticks in it:
@@ -833,7 +861,7 @@
     function updateStreamedMessage(el, text) {
         if (!el) return;
         var body = el.querySelector('.message-content');
-        if (body) body.innerHTML = renderMarkdown(text);
+        if (body) body.innerHTML = renderMarkdown(withoutOpenMarker(text == null ? '' : String(text)));
         scrollToBottom();
     }
 

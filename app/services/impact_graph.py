@@ -71,13 +71,18 @@ def dependency_ends(rel_type: Optional[str], source_id: int, target_id: int) -> 
     return None
 
 
-def _dependency_chain(element_id: int, depth: int, want: str) -> Dict[int, int]:
+def _dependency_chain(element_id: int, depth: int, want: str, org_id: Optional[int] = None) -> Dict[int, int]:
     """Elements that depend on ``element_id`` (want='consumers') or that it
     depends on (want='providers'), following only consistent dependency
     edges, with the fewest hops to each. A sibling that merely shares a
     provider is not a consumer of the centre and is not returned.
+
+    Only elements in ``org_id`` are walked: a dependency edge into another
+    organisation stops at the boundary.
     """
-    from app.models.archimate_core import ArchiMateRelationship  # noqa: PLC0415
+    from app.models.archimate_core import (  # noqa: PLC0415
+        ArchiMateElement, ArchiMateRelationship,
+    )
 
     hops: Dict[int, int] = {}
     frontier: deque = deque([(element_id, 0)])
@@ -102,6 +107,10 @@ def _dependency_chain(element_id: int, depth: int, want: str) -> Dict[int, int]:
                 continue
             if nxt == element_id or nxt in hops:
                 continue
+            if org_id is not None:
+                nxt_el = db.session.get(ArchiMateElement, nxt)
+                if nxt_el is None or getattr(nxt_el, "organization_id", None) != org_id:
+                    continue
             hops[nxt] = dist + 1
             frontier.append((nxt, dist + 1))
     return hops
@@ -136,6 +145,8 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
     center = db.session.get(ArchiMateElement, element_id)
     if center is None:
         return None
+
+    center_org_id = getattr(center, "organization_id", None)
 
     nodes: Dict[int, Dict[str, Any]] = {}
     edges: Dict[tuple, Dict[str, Any]] = {}
@@ -177,6 +188,8 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
             other = db.session.get(ArchiMateElement, r.target_id)
             if other is None:
                 continue
+            if center_org_id is not None and getattr(other, "organization_id", None) != center_org_id:
+                continue
             _add_node(other, dist + 1, "downstream")
             edges.setdefault((r.source_id, r.target_id, r.type),
                              {"source": r.source_id, "target": r.target_id,
@@ -192,6 +205,8 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
             other = db.session.get(ArchiMateElement, r.source_id)
             if other is None:
                 continue
+            if center_org_id is not None and getattr(other, "organization_id", None) != center_org_id:
+                continue
             _add_node(other, dist + 1, "upstream")
             edges.setdefault((r.source_id, r.target_id, r.type),
                              {"source": r.source_id, "target": r.target_id,
@@ -203,8 +218,8 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
                 seen.add(other.id)
                 frontier.append((other.id, dist + 1))
 
-    consumer_hops = _dependency_chain(element_id, depth, "consumers")
-    provider_hops = _dependency_chain(element_id, depth, "providers")
+    consumer_hops = _dependency_chain(element_id, depth, "consumers", center_org_id)
+    provider_hops = _dependency_chain(element_id, depth, "providers", center_org_id)
     for node_id, node in nodes.items():
         if node["is_center"]:
             continue
