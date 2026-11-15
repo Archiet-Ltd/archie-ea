@@ -1425,8 +1425,28 @@ _CORE_ACTIVE_ELEMENTS = frozenset(
     + PHYSICAL_ACTIVE_ELEMENTS
 )
 
+# The exception is the implementation and migration layer. ArchiMate 3.2 (section on
+# implementation and migration elements relating to core elements, and Appendix B)
+# lets a work package realize deliverables and other elements, and a deliverable
+# realize core elements, and an artifact realize an application component. These
+# sources are added to the table here, then left alone by the sweep below.
+_REALIZING_SOURCES = ("WorkPackage", "Deliverable")
+_REALIZED_COMPONENTS = ("ApplicationComponent",)
+for _src in _REALIZING_SOURCES:
+    for _core in _REALIZED_COMPONENTS:
+        _types = VALID_RELATIONSHIPS.setdefault((_src, _core), [])
+        if "realization" not in _types:
+            _types.append("realization")
+_types = VALID_RELATIONSHIPS.setdefault(("Artifact", "ApplicationComponent"), [])
+if "realization" not in _types:
+    _types.append("realization")
+_REALIZATION_EXEMPT = frozenset(
+    [(_s, _c) for _s in _REALIZING_SOURCES for _c in _REALIZED_COMPONENTS]
+    + [("Artifact", "ApplicationComponent")]
+)
+
 for _pair, _types in VALID_RELATIONSHIPS.items():
-    if "realization" not in _types:
+    if "realization" not in _types or _pair in _REALIZATION_EXEMPT:
         continue
     _tgt = _pair[1]
     if _tgt in OTHER_ELEMENTS or _tgt in CONNECTOR_ELEMENTS:
@@ -1437,7 +1457,7 @@ for _pair, _types in VALID_RELATIONSHIPS.items():
     if _tgt in _CORE_ACTIVE_ELEMENTS:
         _types.remove("realization")
 
-del _pair, _types, _tgt
+del _pair, _types, _tgt, _src, _core
 
 # Association may connect any two concepts (ArchiMate 3.2 section 5.4.3 and
 # Appendix B). Applied last, over the finished table, and only ever added: no
