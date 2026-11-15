@@ -175,6 +175,7 @@ def mapping_modal_partial(variant):
     ttl=300,
     key_prefix="capability_map:hierarchy",
     key_func=lambda: getattr(g, "current_org_id", None),
+    skip_store=lambda result: bool(result.get("load_error")),
 )
 def _hierarchy_context():
     """Build the hierarchy page's template context (the query results only).
@@ -194,13 +195,9 @@ def _hierarchy_context():
         count_capabilities,
     )
 
+    total_capabilities = None
     try:
         total_capabilities = count_capabilities()
-    except Exception:
-        current_app.logger.exception("Could not count capabilities")
-        total_capabilities = None
-
-    try:
         from app.models.unified_capability import UnifiedCapability
 
         capabilities = UnifiedCapability.query.order_by(
@@ -452,7 +449,7 @@ def dashboard():
         return render_template(
             "capability_map/error.html",
             error="An unexpected error occurred. Please try again.",
-        )
+        ), 500
     return render_template(
         "capability_map/index.html",
         catalog=context["catalog"],
@@ -551,13 +548,9 @@ def _api_hierarchy_context():
     from app.models.application_layer import ApplicationComponent
     from sqlalchemy import func
 
+    total_capabilities = None
     try:
         total_capabilities = count_capabilities()
-    except Exception:
-        current_app.logger.exception("Could not count capabilities")
-        total_capabilities = None
-
-    try:
         org_id = getattr(g, "current_org_id", None)
 
         from app import db
@@ -588,24 +581,22 @@ def _api_hierarchy_context():
 
         # Get application mapping counts
         mapping_counts = {}
+        # A failed count is a failed load (the outer handler answers with an error), never a 0.
         if org_id is not None:
-            try:
-                rows = (
-                    db.session.query(
-                        UnifiedApplicationCapabilityMapping.unified_capability_id,
-                        func.count(UnifiedApplicationCapabilityMapping.id),
-                    )
-                    .join(
-                        UnifiedCapability,
-                        UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
-                    )
-                    .filter(UnifiedCapability.organization_id == org_id)
-                    .group_by(UnifiedApplicationCapabilityMapping.unified_capability_id)
-                    .all()
+            rows = (
+                db.session.query(
+                    UnifiedApplicationCapabilityMapping.unified_capability_id,
+                    func.count(UnifiedApplicationCapabilityMapping.id),
                 )
-                mapping_counts = dict(rows)
-            except Exception:
-                current_app.logger.exception("Could not compute capability mapping counts")
+                .join(
+                    UnifiedCapability,
+                    UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
+                )
+                .filter(UnifiedCapability.organization_id == org_id)
+                .group_by(UnifiedApplicationCapabilityMapping.unified_capability_id)
+                .all()
+            )
+            mapping_counts = dict(rows)
 
         # Get application details for each capability
         app_details = {}
