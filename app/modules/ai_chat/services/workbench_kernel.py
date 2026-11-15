@@ -1538,7 +1538,9 @@ class GreenfieldWorkflow:
         try:
             from app.modules.ai_chat.services.structured_deliverable_service import StructuredDeliverableService
             sds = StructuredDeliverableService(user_id=self.user_id)
-            analysis = sds.generate_solution_analysis(problem_description=brief)
+            # Only the count is read here, and the person's own visibility is not at hand in the
+            # kernel, so the analysis is asked for as a person who may not see cost.
+            analysis = sds.generate_solution_analysis(problem_description=brief, show_costs=False)
             if analysis.get("success") and analysis.get("recommendations"):
                 rec_count = len(analysis["recommendations"])
                 logger.info("AIC-313: StructuredDeliverableService produced %d recommendations", rec_count)

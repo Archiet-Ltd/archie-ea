@@ -1,18 +1,7 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 
-{% block title %}Capability Maturity Heatmap{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Capabilities', 'href': url_for('capability_map.index')},
-    {'text': 'Maturity Heatmap', 'current': true}
-]) }}
-{% endblock %}
-
-{#
+{% block title %}Capability Maturity Heatmap{% endblock %}{#
   Colour is carried by literal classes below so the committed tailwind-output.css
   contains them. Unassessed capabilities are deliberately NOT on the 1-5 colour
   ramp: they are a dashed, muted cell rendering an em dash.

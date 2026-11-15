@@ -1232,7 +1232,11 @@ def extract_brief(solution_id):
     The browser gets the brief text in < 1 s; proposals appear on the Blueprint
     page by the time the user reaches Step 4.
     """
+    from app.core.auth.permissions import is_read_only_member
     from flask import current_app
+
+    if is_read_only_member(current_user):
+        return api_error("Your role can read but not change this organisation's records.", 403)
 
     files = request.files.getlist("file")
     if not files or not any(f.filename for f in files):
@@ -3113,6 +3117,10 @@ def generate_architecture(solution_id):
     The LLM call can take 3-8 minutes. Poll GET /generate-architecture/status for progress.
     If a job is already running, returns its current status without starting a new one.
     """
+    from app.core.auth.permissions import is_read_only_member
+    if is_read_only_member(current_user):
+        return api_error("Your role can read but not change this organisation's records.", 403)
+
     try:
         from flask import current_app
         data = request.get_json() or {}

@@ -331,10 +331,15 @@ def is_finished(org) -> bool:
 
 
 def on_paying_plan(org) -> bool:
-    """True when the organisation is on a plan other than Community."""
+    """True when the organisation pays: a live provider subscription, or a contract plan
+    that is not a free offer. An organisation on the startup credit does not pay yet."""
     from app.services.billing_plans import current_subscription, effective_plan
+    from app.services.billing_service import BillingService
 
-    return effective_plan(current_subscription(org)).key != "free"
+    sub = current_subscription(org)
+    if BillingService.has_live_subscription(sub):
+        return True
+    return effective_plan(sub).key != "free" and not sub.offer
 
 
 # --------------------------------------------------------------------------------------------- #
@@ -489,6 +494,11 @@ def website_instead() -> List[Dict[str, str]]:
         {"label": "Connect Jira", "url": url_for("account.welcome") + "#signup-jira"},
         {"label": "See the sample company", "url": url_for("unified_ai_chat.index")},
     ]
+
+
+def website_url(org) -> Optional[str]:
+    """The company website given at sign-up, or None when none was given."""
+    return (_onboarding(org).get("website") or {}).get("url") or None
 
 
 def website_state(org) -> Dict[str, Any]:
@@ -900,14 +910,17 @@ def _remember_loaded(org, key: str) -> None:
 
 def _fill_boxes(canvas) -> None:
     """Put the organisation's elements in the boxes that suit them. An element sits in one box of a canvas,
-    so a box that takes a single type is filled first (the actors are the customer segments, not the
-    alternatives), then the rest in canvas order, and a type feeds only the first box that takes it."""
+    so the customer boxes are filled first (the actors are the customer segments, not the partners or the
+    alternatives), then a box that takes a single type, then the rest in canvas order, and a type feeds only
+    the first box that takes it."""
     from app.modules.business_model_canvas import model_service
 
     zones = model_service.zones(canvas)
     boxes = model_service.element_boxes(canvas)
-    ordered = [b for b in boxes if len(zones[b]["element_types"]) == 1] + [
-        b for b in boxes if len(zones[b]["element_types"]) != 1
+    customers = [b for b in boxes if b in ("customer_segments", "early_adopters")]
+    rest = [b for b in boxes if b not in customers]
+    ordered = customers + [b for b in rest if len(zones[b]["element_types"]) == 1] + [
+        b for b in rest if len(zones[b]["element_types"]) != 1
     ]
     used: set = set()
     for box in ordered:
