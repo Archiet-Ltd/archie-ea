@@ -654,7 +654,7 @@ def application_list():
             applications=pagination.items,
             chip_remove_urls=chip_remove_urls,
             total_count=total_count,
-            portfolio_total=portfolio_total,
+            portfolio_total=None if not_counted else portfolio_total,
             current_page=page,
             total_pages=total_pages,
             page_size=page_size,

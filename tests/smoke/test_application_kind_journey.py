@@ -1,11 +1,11 @@
 """Journey, in a browser: the Applications list and every count show applications only.
 
 An architect's organisation holds "Alerts gateway and consumers" (composed of "Alerts Gateway" and
-"Alerts Consumers"), "Billing", and a code repository "billing-repo" recorded as not software. The Applications
-list and the Overview's Applications table show exactly the two applications, the Overview counts 2 and the
-owner coverage counts out of 2; the page of the first lists its two parts; the architect changes "Billing"
-to not software on its page and the list and the counts drop to 1. A viewer reads the kind and the reason
-and has no control. The other organisation's records are never touched.
+"Alerts Consumers"), "Billing", a code repository "billing-repo" recorded as not software and a repository
+"launch-repo" the architect recorded as an application. The Applications list, the Overview and the owner
+coverage all count the same three. The architect changes "Billing" to not software and every count drops to
+two; from the coverage note she finds the records left out, each with its reason, and sets "Billing" back.
+A viewer reads the kind and the reason and has no control. At phone width in the dark the Overview reads.
 """
 import os
 import re
@@ -61,12 +61,13 @@ def seed_kind_org(with_viewer=False):
         consumers = add("Alerts Consumers", legacy_application_owner="Dana Reed")
         billing = add("Billing")
         repo = add("billing-repo", repository_type="GitHub", application_kind="not_software")
+        launch = add("launch-repo", repository_type="GitHub", application_kind="application")
         for part in (gateway, consumers):
             db.session.add(ArchiMateRelationship(
                 type="composition", source_id=whole.archimate_element_id, target_id=part.archimate_element_id,
                 organization_id=org_id))
         db.session.commit()
-        info["ids"] = {r.name: r.id for r in (whole, gateway, consumers, billing, repo)}
+        info["ids"] = {r.name: r.id for r in (whole, gateway, consumers, billing, repo, launch)}
         if with_viewer:
             viewer = User(email="viewer.%s@example.com" % uuid.uuid4().hex[:8], first_name="Vera", last_name="Viewer",
                           organization_id=org_id, confirmed=True, enterprise_role="non_technical_owner")
@@ -79,9 +80,9 @@ def seed_kind_org(with_viewer=False):
     return info
 
 
-def _listed_names(page, live_server):
+def _listed_names(page, live_server, path="/applications/"):
     """The names the Applications list shows, read from its rows."""
-    page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     labels = page.locator("[data-testid^='btn-actions-']").evaluate_all("els => els.map(e => e.getAttribute('aria-label'))")
     names = [label[len("Actions for "):] for label in labels if label and label.startswith("Actions for ")]
     return sorted(set(names))
@@ -108,14 +109,14 @@ def test_the_list_and_every_count_show_applications_and_a_change_of_kind_moves_t
     # owner coverage is a portfolio manager's page: read it before and after the architect's change
     sign_in(page, live_server, org["emails"]["portfolio_manager"])
     coverage = _coverage_total(page, live_server)
-    assert "Total applications\n\n2" in coverage and "With named owner\n\n1" in coverage, coverage
+    assert "Total applications\n\n3" in coverage and "With named owner\n\n1" in coverage, coverage
     sign_in(page, live_server, org["emails"][ARCHITECT])
 
-    both = ["Alerts gateway and consumers", "Billing"]
+    both = ["Alerts gateway and consumers", "Billing", "launch-repo"]
     assert _listed_names(page, live_server) == both
     names, count = _overview(page, live_server)
     assert names == both, names
-    assert count == 2
+    assert count == 3
     _shot(page, "1440-light-overview")
 
     # the first application lists its two parts; each part's page says it is part of it
@@ -139,18 +140,58 @@ def test_the_list_and_every_count_show_applications_and_a_change_of_kind_moves_t
     expect(page.get_by_test_id("application-kind-label")).to_have_text("Not software")
     _shot(page, "1440-light-billing-not-software")
 
-    assert _listed_names(page, live_server) == ["Alerts gateway and consumers"]
+    after = ["Alerts gateway and consumers", "launch-repo"]
+    assert _listed_names(page, live_server) == after
     names, count = _overview(page, live_server)
-    assert names == ["Alerts gateway and consumers"] and count == 1, (names, count)
+    assert names == after and count == 2, (names, count)
 
     sign_in(page, live_server, org["emails"]["portfolio_manager"])
     coverage = _coverage_total(page, live_server)
-    assert "Total applications\n\n1" in coverage and "With named owner\n\n1" in coverage, coverage
-    assert "Leaves out 4 that are parts of an application or not software" in coverage, coverage
+    assert "Total applications\n\n2" in coverage and "With named owner\n\n1" in coverage, coverage
+    assert "Leaves out 2 not software, 2 parts of an application, as the Overview does." in coverage, coverage
 
-    page.set_viewport_size({"width": 390, "height": 844})
-    page.evaluate("document.documentElement.classList.add('dark')")
-    _shot(page, "390-dark-overview")
+    # the records left out can be found again from the note, each with its reason and a way to change it
+    page.get_by_test_id("left-out-link").click()
+    expect(page.get_by_test_id("not-counted-alert")).to_be_visible(timeout=PAGE_TIMEOUT)
+    for name, reason in (("Billing", "Set by"), ("billing-repo", "Set by"), ("Alerts Gateway", "Part of Alerts gateway")):
+        row_id = ids[name]
+        expect(page.get_by_test_id("kind-note-%d" % row_id)).to_contain_text(reason)
+    _shot(page, "1440-light-not-counted")
+    assert _listed_names(page, live_server, "/applications/?not_counted=true") == [
+        "Alerts Consumers", "Alerts Gateway", "Billing", "billing-repo"]
+
+    # setting Billing back to an application brings it back on the list and the Overview
+    page.goto("%s/applications/?not_counted=true" % live_server, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.get_by_test_id("kind-change-%d" % ids["Billing"]).click()
+    expect(page.get_by_test_id("application-kind-label")).to_have_text("Not software", timeout=PAGE_TIMEOUT)
+    page.locator("#application-kind-select").select_option("application")
+    page.get_by_test_id("application-kind-form").get_by_role("button", name="Save").click()
+    expect(page.get_by_test_id("application-kind-label")).to_have_text("Application", timeout=PAGE_TIMEOUT)
+    assert _listed_names(page, live_server) == both
+    assert _listed_names(page, live_server, "/applications/?not_counted=true") == [
+        "Alerts Consumers", "Alerts Gateway", "billing-repo"]
+    names, count = _overview(page, live_server)
+    assert names == both and count == 3, (names, count)
+
+
+def test_the_overview_reads_at_phone_width_in_the_dark(browser, live_server):
+    org = seed_kind_org()
+    context = browser.new_context(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"][ARCHITECT])
+        names, count = _overview(page, live_server)
+        assert names == ["Alerts gateway and consumers", "Billing", "launch-repo"] and count == 3, (names, count)
+        assert page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth") <= 1
+        assert page.evaluate("getComputedStyle(document.body).backgroundColor") != "rgb(255, 255, 255)"
+        _shot(page, "390-dark-overview")
+        found = _listed_names(page, live_server, "/applications/?not_counted=true")
+        assert found == ["Alerts Consumers", "Alerts Gateway", "billing-repo"], found
+        assert page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth") <= 1
+        _shot(page, "390-dark-not-counted")
+    finally:
+        context.close()
 
 
 def test_a_viewer_reads_the_kind_and_the_reason_but_cannot_change_it(page, live_server):

@@ -172,7 +172,7 @@
   {% endif %}
 
   {# What is missing, said once, with a link to exactly those applications. #}
-  {% if stats.summary_total %}
+  {% if stats.summary_total and not not_counted %}
   {%- set total_n = stats.summary_total -%}
   {%- set keep_decom = 'true' if include_decom else none -%}
   {% call quiet_alert('warning' if (stats.no_owner or stats.no_capability or stats.no_vendor) else 'success', title='Data quality', testid='data-quality-alert',
