@@ -4,6 +4,7 @@ The list and the group page read the one stored figure, the threshold is
 applied to that same pair score, and a run only clears its own organisation's
 earlier groups."""
 
+import contextlib
 import uuid
 from unittest import mock
 
@@ -47,8 +48,11 @@ def _apps(db_session, org, *names):
     return rows
 
 
-def _detect(tenant_ctx, org, threshold, score=None, scores=None, strategy="fast"):
-    """Run detection in the organisation, with the pair measure fixed."""
+def _run_detection(tenant_ctx, org, threshold, score=None, scores=None, strategy="fast"):
+    """Run detection in the organisation, with the pair measure fixed.
+
+    strategy="fast" calls run_detection (with its hybrid strategy);
+    strategy="hybrid" calls run_detection_hybrid."""
     from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
         UnifiedDuplicateDetectionService,
     )
@@ -60,7 +64,7 @@ def _detect(tenant_ctx, org, threshold, score=None, scores=None, strategy="fast"
         elif score is not None:
             patch = mock.patch(SERVICE, return_value=score)
         else:
-            patch = mock.patch.object(type(service), "__module__", type(service).__module__)
+            patch = contextlib.nullcontext()
         with patch:
             if strategy == "hybrid":
                 return service.run_detection_hybrid(similarity_threshold=threshold)
@@ -96,7 +100,7 @@ def world(db_session, make_org):
 
 def test_group_keeps_the_score_its_pair_measured_not_the_run_threshold(db_session, tenant_ctx, world):
     _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
-    result = _detect(tenant_ctx, world["own"], 0.50, score=0.53)
+    result = _run_detection(tenant_ctx, world["own"], 0.50, score=0.53)
     assert result["success"], result
     groups = _groups_of(world["own"])
     assert len(groups) == 1
@@ -107,7 +111,7 @@ def test_group_keeps_the_score_its_pair_measured_not_the_run_threshold(db_sessio
 
 def test_pair_below_the_threshold_forms_no_group(db_session, tenant_ctx, world):
     _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
-    result = _detect(tenant_ctx, world["own"], 0.55, score=0.53)
+    result = _run_detection(tenant_ctx, world["own"], 0.55, score=0.53)
     assert result["success"], result
     assert result["groups_found"] == 0
     assert _groups_of(world["own"]) == []
@@ -116,7 +120,7 @@ def test_pair_below_the_threshold_forms_no_group(db_session, tenant_ctx, world):
 def test_group_of_several_pairs_stores_their_mean(db_session, tenant_ctx, world):
     _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy", "Ledger Core Two")
     # first app against the second and third; the second against the third is never asked
-    _detect(tenant_ctx, world["own"], 0.50, scores=[0.60, 0.70])
+    _run_detection(tenant_ctx, world["own"], 0.50, scores=[0.60, 0.70])
     (group,) = _groups_of(world["own"])
     assert group.similarity_score == pytest.approx(0.65)
     assert group.match_details == {"pair_count": 2}
@@ -124,11 +128,11 @@ def test_group_of_several_pairs_stores_their_mean(db_session, tenant_ctx, world)
 
 def test_hybrid_run_stores_the_pair_mean_and_exact_groups_score_one(db_session, tenant_ctx, world):
     _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
-    _detect(tenant_ctx, world["own"], 0.50, score=0.53, strategy="hybrid")
+    _run_detection(tenant_ctx, world["own"], 0.50, score=0.53, strategy="hybrid")
     (group,) = _groups_of(world["own"])
     assert group.similarity_score == pytest.approx(0.53)
     _apps(db_session, world["own"], "Twin", "Twin")
-    _detect(tenant_ctx, world["own"], 0.99, score=0.0, strategy="hybrid")
+    _run_detection(tenant_ctx, world["own"], 0.99, score=0.0, strategy="hybrid")
     exact = [g for g in _groups_of(world["own"]) if g.duplicate_type == "exact"]
     assert exact and all(g.similarity_score == pytest.approx(1.0) for g in exact)
 
@@ -136,12 +140,12 @@ def test_hybrid_run_stores_the_pair_mean_and_exact_groups_score_one(db_session, 
 def test_a_run_leaves_another_organisations_groups_alone(db_session, tenant_ctx, world):
     _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
     _apps(db_session, world["other"], "Payroll Hub", "Payroll Hub Copy")
-    _detect(tenant_ctx, world["other"], 0.50, score=0.62)
+    _run_detection(tenant_ctx, world["other"], 0.50, score=0.62)
     (before,) = _groups_of(world["other"])
     before_id, before_score = before.id, before.similarity_score
 
-    _detect(tenant_ctx, world["own"], 0.50, score=0.53)
-    _detect(tenant_ctx, world["own"], 0.50, score=0.58)
+    _run_detection(tenant_ctx, world["own"], 0.50, score=0.53)
+    _run_detection(tenant_ctx, world["own"], 0.50, score=0.58)
 
     (after,) = _groups_of(world["other"])
     assert (after.id, after.similarity_score) == (before_id, before_score)
@@ -154,7 +158,7 @@ def test_list_and_group_page_show_the_same_figure_and_say_how_it_was_worked_out(
 ):
     _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
     user = _user(db_session, world["own"])
-    _detect(tenant_ctx, world["own"], 0.50, score=0.53)
+    _run_detection(tenant_ctx, world["own"], 0.50, score=0.53)
     (group,) = _groups_of(world["own"])
     db_session.commit()
 
@@ -198,3 +202,61 @@ def test_measured_similarity_of_near_duplicate_names(app, first, second, thresho
         _Named(first), _Named(second)
     )
     assert (score >= threshold) is groups, score
+
+
+def _dashboard(client, login_as, user):
+    login_as(client, user)
+    body = client.get("/duplicate-detection/simple/api/statistics").get_json()
+    return body["total_groups"], body["high_priority_groups"]
+
+
+def test_dashboard_figures_count_only_the_signed_in_organisations_groups(
+    app, db_session, tenant_ctx, login_as, client, world
+):
+    _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
+    _apps(db_session, world["other"], "Payroll Hub", "Payroll Hub Copy")
+    own_user = _user(db_session, world["own"])
+    other_user = _user(db_session, world["other"])
+    _run_detection(tenant_ctx, world["own"], 0.50, score=0.53)
+    _run_detection(tenant_ctx, world["other"], 0.50, score=0.90)
+    db_session.commit()
+
+    assert len(_groups_of(world["other"])) == 1
+    assert _dashboard(client, login_as, own_user) == (1, 0)
+    assert _dashboard(client, login_as, other_user) == (1, 1)
+
+    login_as(client, own_user)
+    listing = client.get("/duplicate-detection/simple/groups").get_json()
+    shown = {g["id"] for g in listing["groups"]}
+    assert shown == {g.id for g in _groups_of(world["own"])}
+
+
+def test_a_run_clears_groups_left_with_no_live_members_and_spares_other_organisations(
+    app, db_session, tenant_ctx, world
+):
+    from app import db
+    from app.models.unified_duplicate_detection import UnifiedDuplicateGroup
+
+    own_apps = _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
+    _apps(db_session, world["other"], "Payroll Hub", "Payroll Hub Copy")
+    _run_detection(tenant_ctx, world["own"], 0.50, score=0.53)
+    _run_detection(tenant_ctx, world["other"], 0.50, score=0.62)
+    (other_group,) = _groups_of(world["other"])
+    (own_group,) = _groups_of(world["own"])
+    other_id, own_id = other_group.id, own_group.id
+
+    # both of the group's applications are deleted: the group has no live member
+    for row in own_apps:
+        db_session.delete(row)
+    db_session.flush()
+    assert db.session.execute(
+        db.text("SELECT COUNT(*) FROM unified_group_members WHERE group_id = :g"), {"g": own_id}
+    ).scalar() == 0
+
+    _apps(db_session, world["own"], "Rota Tool", "Rota Tool Copy")
+    _run_detection(tenant_ctx, world["own"], 0.50, score=0.58)
+
+    assert UnifiedDuplicateGroup.query.filter_by(id=own_id).count() == 0
+    assert UnifiedDuplicateGroup.query.filter_by(id=other_id).count() == 1
+    assert [g.similarity_score for g in _groups_of(world["own"])] == [pytest.approx(0.58)]
+

@@ -54,6 +54,36 @@ def describe_group_similarity(duplicate_type, match_details):
     return f"Average of {pairs} {'pair' if pairs == 1 else 'pairs'}"
 
 
+def count_organisation_groups(high_priority_at=0.85):
+    """(all groups, high-priority groups) of the signed-in organisation.
+
+    The group tables carry no organisation column, so a group belongs to the
+    organisation of its member applications; only groups with two or more of
+    that organisation's live applications count. With no organisation in
+    context (command line) every group is counted."""
+    from flask import g
+    from sqlalchemy import func as sa_func
+
+    from app.models.unified_duplicate_detection import unified_group_members
+
+    org_id = getattr(g, "current_org_id", None)
+    members = db.session.query(unified_group_members.c.group_id).join(
+        ApplicationComponent,
+        ApplicationComponent.id == unified_group_members.c.application_id,
+    )
+    if org_id is not None:
+        members = members.filter(ApplicationComponent.organization_id == org_id)
+    active = (
+        members.group_by(unified_group_members.c.group_id)
+        .having(sa_func.count(unified_group_members.c.application_id) >= 2)
+        .subquery()
+    )
+    groups = UnifiedDuplicateGroup.query.filter(
+        UnifiedDuplicateGroup.id.in_(db.session.query(active.c.group_id))
+    )
+    return groups.count(), groups.filter(UnifiedDuplicateGroup.similarity_score >= high_priority_at).count()
+
+
 @dataclass
 class SimilarityWeights:
     """Weights for different similarity criteria"""
@@ -578,6 +608,18 @@ class UnifiedDuplicateDetectionService:
                 ),
                 {"org": org_id},
             )
+        ]
+        # A group whose member applications were all deleted belongs to no
+        # organisation any more and no page shows it; clear it so it does not
+        # build up run after run.
+        group_ids += [
+            row[0]
+            for row in db.session.execute(
+                db.text(
+                    "SELECT g.id FROM unified_duplicate_groups g "
+                    "WHERE NOT EXISTS (SELECT 1 FROM unified_group_members m WHERE m.group_id = g.id)"
+                )
+            )  # tenant-exempt: groups with no member application have no organisation
         ]
         if not group_ids:
             return

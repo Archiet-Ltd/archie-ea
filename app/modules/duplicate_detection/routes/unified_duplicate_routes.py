@@ -47,6 +47,7 @@ from ..models.unified_duplicate_detection import (
 )
 from ..services.unified_duplicate_detection_service import (
     UnifiedDuplicateDetectionService,
+    count_organisation_groups,
     describe_group_similarity,
 )
 from ..services.unified_duplicate_service import UnifiedDuplicateService
@@ -466,22 +467,7 @@ def get_simple_statistics():
             .first()
         )
 
-        # Count only groups that still have 2+ members (exclude orphaned groups)
-        from app.models.unified_duplicate_detection import unified_group_members
-        from sqlalchemy import func as sa_func
-        active_group_ids = (
-            db.session.query(unified_group_members.c.group_id)
-            .group_by(unified_group_members.c.group_id)
-            .having(sa_func.count(unified_group_members.c.application_id) >= 2)
-            .subquery()
-        )
-        total_groups = UnifiedDuplicateGroup.query.filter(
-            UnifiedDuplicateGroup.id.in_(db.session.query(active_group_ids.c.group_id))
-        ).count()
-        high_priority_groups = UnifiedDuplicateGroup.query.filter(
-            UnifiedDuplicateGroup.id.in_(db.session.query(active_group_ids.c.group_id)),
-            UnifiedDuplicateGroup.similarity_score >= 0.85,
-        ).count()
+        total_groups, high_priority_groups = count_organisation_groups()
         # The column defaults to 0.0, so a run whose savings were never estimated reads 0:
         # that is "no figure", not a measured nil, and the page says so in words.
         total_estimated_savings = (
