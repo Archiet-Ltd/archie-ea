@@ -3,6 +3,41 @@
 
     const API_BASE = '/architecture-journey';
 
+    /* Draws the layered viewpoint diagram of the generated architecture into the step 3 panel and reports
+     * on that panel whether it is drawn or could not be. Named here, not written inline in the page, so
+     * `$watch('architectureResult', renderJourneyDiagram)` is handed a real function. */
+    global.renderJourneyDiagram = function (val) {
+        if (!val || !val.elements_by_layer) return;
+        Alpine.nextTick(function () {
+            const container = document.getElementById('journey-arch-diagram');
+            if (!container) return;
+            const panel = Alpine.$data(container);
+            if (typeof ComposerRenderer === 'undefined') { panel.diagramError = true; return; }
+            const els = [], rels = [], nameToId = {};
+            let idCounter = 1;
+            Object.keys(val.elements_by_layer).forEach(function (layer) {
+                (val.elements_by_layer[layer] || []).forEach(function (el) {
+                    const eid = el.id || ('gen-' + idCounter++);
+                    nameToId[el.name] = eid;
+                    els.push({ id: eid, name: el.name, type: el.type, layer: layer });
+                });
+            });
+            (val.relationships || []).forEach(function (r) {
+                const sid = nameToId[r.source_name], tid = nameToId[r.target_name];
+                if (sid && tid) rels.push({ id: 'r-' + sid + '-' + tid, source_id: sid, target_id: tid, type: r.type });
+            });
+            if (els.length === 0) return;
+            try {
+                const renderer = ComposerRenderer.create(container, { mode: 'view', width: '100%', height: 280 });
+                renderer.loadElements(els, rels);
+                renderer.fitToContent();
+                panel.diagramReady = true;
+            } catch (e) {
+                panel.diagramError = true;
+            }
+        });
+    };
+
     /**
      * Safe fetch wrapper.
      * - Auto-injects CSRF token from <meta name="csrf-token">
@@ -342,7 +377,7 @@
                 // ever ran — so every freshly created solution opened its journey
                 // behind two error toasts describing a state that is not an error.
                 // The genuine failures are still reported, by the .catch().
-                _fetch(API_BASE + '/' + self.solutionId + '/codegen/file-list', { silent: true })
+                _fetch('/solutions/' + self.solutionId + '/codegen/file-list', { silent: true })
                     .then(function (data) {
                         if (data && data.files && data.files.length > 0) {
                             self.hasGeneratedFiles = true;

@@ -53,10 +53,9 @@ def get_file_list(solution_id):
         return jsonify({"error": "Access denied"}), 403
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
-    if not gen or not gen.generated_files:
-        return jsonify({"error": "No generated files"}), 404
-
-    return jsonify({"success": True, "files": sorted(gen.generated_files.keys())})
+    # Nothing generated yet is a real answer to "which files exist", not a missing page: an empty list.
+    files = sorted(gen.generated_files.keys()) if gen and gen.generated_files else []
+    return jsonify({"success": True, "files": files})
 
 
 @codegen_bp.route("/solutions/<int:solution_id>/codegen/files-content")

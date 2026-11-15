@@ -526,41 +526,7 @@
                 {# Auto-generated layered viewpoint diagram #}
                 <div class="border-b border-border"
                      x-data="{ diagramReady: false, diagramError: false }"
-                     x-init="(function(){
-                         function renderDiagram(val) {
-                             if (!val || !val.elements_by_layer) return;
-                             $nextTick(function() {
-                                 var container = document.getElementById('journey-arch-diagram');
-                                 if (!container) return;
-                                 if (typeof ComposerRenderer === 'undefined') { diagramError = true; return; }
-                                 var els = [], rels = [];
-                                 var idCounter = 1;
-                                 var nameToId = {};
-                                 Object.keys(val.elements_by_layer).forEach(function(layer) {
-                                     (val.elements_by_layer[layer] || []).forEach(function(el) {
-                                         var eid = el.id || ('gen-' + idCounter++);
-                                         nameToId[el.name] = eid;
-                                         els.push({id: eid, name: el.name, type: el.type, layer: layer});
-                                     });
-                                 });
-                                 (val.relationships || []).forEach(function(r) {
-                                     var sid = nameToId[r.source_name], tid = nameToId[r.target_name];
-                                     if (sid && tid) rels.push({id: 'r-' + sid + '-' + tid, source_id: sid, target_id: tid, type: r.type});
-                                 });
-                                 if (els.length === 0) return;
-                                 try {
-                                     var renderer = ComposerRenderer.create(container, {mode: 'view', width: '100%', height: 280});
-                                     renderer.loadElements(els, rels);
-                                     renderer.fitToContent();
-                                     diagramReady = true;
-                                 } catch(e) {
-                                     diagramError = true;
-                                 }
-                             });
-                         }
-                         $watch('architectureResult', renderDiagram);
-                         if (architectureResult && architectureResult.elements_by_layer) renderDiagram(architectureResult);
-                     })()">
+                     x-init="$watch('architectureResult', renderJourneyDiagram); renderJourneyDiagram(architectureResult)">
                     <div class="px-5 py-3">
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Architecture Diagram</span>
