@@ -214,6 +214,46 @@ def _move_last_run_back_an_hour(org_id):
     db.session.commit()
 
 
+def _add_relationship_after_the_run(org_id):
+    """A relationship written now, stamped by the database in this session's own time zone."""
+    from app.models import ArchiMateElement, ArchiMateRelationship
+
+    ids = [e.id for e in ArchiMateElement.query.filter_by(organization_id=org_id).limit(2).all()]
+    rel = ArchiMateRelationship(source_id=ids[0], target_id=ids[1], type="Association", organization_id=org_id)
+    db.session.add(rel)
+    db.session.flush()
+    # The fixture holds one outer transaction, which pins now() to the test's start; in service each write
+    # is its own, later, transaction. clock_timestamp() gives the stamp such a write would carry, in this session's zone.
+    db.session.execute(
+        db.text("UPDATE archimate_relationships SET created_at = clock_timestamp(), updated_at = clock_timestamp() WHERE id = :i"),
+        {"i": rel.id},
+    )
+    db.session.commit()
+
+
+def test_a_relationship_added_after_the_run_is_counted_by_the_panel_and_the_answer_in_a_non_utc_session(
+    client, login_as, make_org
+):
+    org = make_org()
+    user = _architect(org, "chat-ask-realchange@example.com")
+    org_id = org.id
+    # A zone behind UTC: read as UTC, a stamp written after the run would look earlier than it.
+    db.session.execute(db.text("SET TIME ZONE 'America/Los_Angeles'"))
+    try:
+        _load(client, login_as, user)
+        html = _ask(client, QUESTION).get_json()["html"]
+        assert _panel_count(html) == 0
+        assert "been added or changed since" not in html
+
+        _add_relationship_after_the_run(org_id)
+        html = _ask(client, QUESTION).get_json()["html"]
+        assert _panel_count(html) == 1
+        assert re.search(r"1 relationship has been added or changed since", html)
+    finally:
+        db.session.execute(db.text("RESET TIME ZONE"))
+        db.session.commit()
+
+
 def _panel_count(html):  # relationships changed since the last run
     return int(re.search(r"data-derivation-changed>(\d+)<", html).group(1))
 

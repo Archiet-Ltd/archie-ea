@@ -86,19 +86,30 @@ def changed_since_last_run_organization_ids() -> list[int]:
     relationship timestamps do. Same no-tenant-context discipline as
     ``stale_carrying_organization_ids``.
     """
+    from app.models import ArchiMateRelationship
+    from app.modules.intelligence.models.derivation_run import DerivationRun
+    from app.modules.intelligence.services.derived_facts import utc_naive
+
     with platform_scope("derived facts sweep: which organisations changed since their last run"):
-        rows = db.session.execute(
-            db.text(
-                "SELECT r.organization_id FROM archimate_relationships r "
-                "LEFT JOIN (SELECT organization_id, MAX(COALESCE(started_at, finished_at)) AS ran_at "
-                "           FROM intelligence_derivation_runs GROUP BY organization_id) d "
-                "  ON d.organization_id = r.organization_id "
-                "WHERE r.organization_id IS NOT NULL "
-                "GROUP BY r.organization_id, d.ran_at "
-                "HAVING d.ran_at IS NULL OR MAX(timezone('UTC', timezone(current_setting('TimeZone'), COALESCE(r.updated_at, r.created_at)))) > d.ran_at "
-                "ORDER BY r.organization_id"
+        last_run = (
+            db.select(
+                DerivationRun.organization_id.label("organization_id"),
+                db.func.max(db.func.coalesce(DerivationRun.started_at, DerivationRun.finished_at)).label("ran_at"),
             )
-        ).all()
+            .group_by(DerivationRun.organization_id)
+            .subquery()
+        )
+        rel = ArchiMateRelationship
+        changed_at = utc_naive(db.func.coalesce(rel.updated_at, rel.created_at))
+        stmt = (
+            db.select(rel.organization_id)
+            .outerjoin(last_run, last_run.c.organization_id == rel.organization_id)
+            .where(rel.organization_id.is_not(None))
+            .group_by(rel.organization_id, last_run.c.ran_at)
+            .having(db.or_(last_run.c.ran_at.is_(None), db.func.max(changed_at) > last_run.c.ran_at))
+            .order_by(rel.organization_id)
+        )
+        rows = db.session.execute(stmt).all()
     return [int(row[0]) for row in rows]
 
 
