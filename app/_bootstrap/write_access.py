@@ -7,6 +7,7 @@ any state-changing request (POST, PUT, PATCH or DELETE, inside or outside ``/api
 view, so a new route is covered the day it is registered.
 """
 
+import logging
 import re
 
 WRITE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
@@ -163,9 +164,12 @@ def refuse_read_only(user=None):
 
     person = user or current_user
     if may_write(person):
+        note_write_admitted()
         return None
     if is_read_only_member(person):
         return _refusal(_reason_for(request.endpoint))
+    # Admitted, but not as a model writer (a governance persona): the route must grant what it permits.
+    note_write_admitted(persona_only=True)
     return None
 
 
@@ -227,6 +231,133 @@ def _route_answers_for_itself(app, endpoint):
 BOOKKEEPING_TABLES = frozenset({"user_sessions", "soc2_audit_log", "error_events"})
 
 
+# Tables a request writes for the system's own bookkeeping or for the signed-in person's own record,
+# whoever the person is. A write to any other table that carries an organisation is a change to the
+# model, and the report below names it when no check admitted it.
+REPORT_SYSTEM_TABLES = {
+    **{name: "Request bookkeeping written for everyone." for name in BOOKKEEPING_TABLES},
+    "users": "The person's own sign-in stamp and preferences.",
+    "usage_events": "The activity log of what the person opened.",
+    "notifications": "The person's own notifications.",
+    "oauth_tokens": "The person's own connector tokens.",
+    "transformation_outbox_events": "Event queue entries written beside the change that caused them.",
+}
+
+logger = logging.getLogger("app.write_access")
+
+
+def note_write_admitted(persona_only=False):
+    """Record, for this request, that a route-level check admitted a write.
+
+    The backstop below reports a change no check admitted. A person admitted only for a governance
+    persona is further held to what the route grants (``note_route_granted_write``).
+    """
+    from flask import g, has_request_context
+
+    if has_request_context():
+        g.write_admitted_by_check = True
+        if persona_only:
+            g.write_admitted_for_route_check = True
+
+
+def report_only():
+    """Whether the backstop reports what it would refuse instead of refusing it.
+
+    Production reports; the test configuration enforces. ``WRITE_ACCESS_REPORT_ONLY`` overrides either.
+    """
+    from flask import current_app
+
+    configured = current_app.config.get("WRITE_ACCESS_REPORT_ONLY")
+    if configured is not None:
+        return bool(configured)
+    return not current_app.testing
+
+
+def _tenant_tables(tables):
+    """The tables among ``tables`` that hold an organisation's records and are not system bookkeeping."""
+    from app import db
+
+    found = set()
+    for name in tables:
+        if not name or name in REPORT_SYSTEM_TABLES:
+            continue
+        table = db.metadata.tables.get(name)
+        if table is not None and "organization_id" in table.c:
+            found.add(name)
+    return found
+
+
+def _hold_unadmitted_write(tables):
+    """Hold, for this request, a tenant change that no check admitted, until it is stored.
+
+    Only a person who may not change the model is held: a writer's change needs no admission. The
+    line is logged when the change is committed (``_report_stored_change``), not when it is flushed,
+    because a read that computes a figure and then rolls it back (``commit_unless_read_only``) stores
+    nothing and has nothing to report.
+    """
+    from flask import g, has_request_context
+    from flask_login import current_user
+
+    if not has_request_context() or getattr(g, "write_admitted_by_check", False):
+        return
+    if getattr(g, "write_access_reporting", False):
+        return
+    tenant = _tenant_tables(tables)
+    if not tenant:
+        return
+    g.write_access_reporting = True
+    try:
+        from app.core.auth.permissions import may_write
+
+        if not current_user.is_authenticated or may_write(current_user):
+            return
+        held = getattr(g, "write_access_held", None) or {"kind": "no check admitted it", "tables": set()}
+        held["tables"] |= tenant
+        g.write_access_held = held
+    except Exception:  # fabricated-ok: a report must never break the request it describes
+        logger.debug("write-access report failed", exc_info=True)
+    finally:
+        g.write_access_reporting = False
+
+
+def _hold_ungranted_write(tables):
+    from flask import g
+
+    held = getattr(g, "write_access_held", None) or {
+        "kind": "admitted for a persona but no route granted the change",
+        "tables": set(),
+    }
+    held["tables"] |= {t for t in tables if t}
+    g.write_access_held = held
+
+
+def _report_stored_change(_session):
+    """Log one line for a request whose held change was committed. Refuses nothing."""
+    from flask import g, has_request_context, request
+
+    if not has_request_context():
+        return
+    held = getattr(g, "write_access_held", None)
+    if not held or getattr(g, "write_access_reported", False):
+        return
+    g.write_access_reported = True
+    g.write_access_held = None
+    logger.warning(
+        "write-access report: route=%s method=%s table=%s stored a change; %s",
+        request.endpoint,
+        request.method,
+        ",".join(sorted(held["tables"])),
+        held["kind"],
+    )
+
+
+def _forget_rolled_back_change(_session, _previous_transaction):
+    from flask import g, has_request_context
+
+    if has_request_context():
+        g.write_access_held = None
+
+
 class ChangeNotGrantedByRoute(Exception):
     """A person admitted only for their governance persona tried to store a change no route granted."""
 
@@ -242,16 +373,23 @@ def _model_changes(session):
 def _refuse_ungranted_change(session, _flush_context, _instances):
     from flask import g, has_request_context
 
-    if not has_request_context() or not getattr(g, "write_admitted_for_route_check", False):
+    if not has_request_context():
         return
-    if getattr(g, "route_granted_write", False):
-        return
-    for obj in _model_changes(session):
-        table = getattr(obj, "__tablename__", None)
-        if table not in BOOKKEEPING_TABLES:
-            # Noted as well as raised: a route that catches every error still answers with the refusal.
-            g.ungranted_change_refused = True
-            raise ChangeNotGrantedByRoute(GENERAL_REASON)
+    with session.no_autoflush:
+        if not getattr(g, "write_admitted_for_route_check", False):
+            _hold_unadmitted_write({getattr(obj, "__tablename__", None) for obj in _model_changes(session)})
+            return
+        if getattr(g, "route_granted_write", False):
+            return
+        for obj in _model_changes(session):
+            table = getattr(obj, "__tablename__", None)
+            if table not in BOOKKEEPING_TABLES:
+                if report_only():
+                    _hold_ungranted_write({table})
+                    return
+                # Noted as well as raised: a route that catches every error still answers with the refusal.
+                g.ungranted_change_refused = True
+                raise ChangeNotGrantedByRoute(GENERAL_REASON)
 
 
 _STORES_TO = re.compile(
@@ -274,12 +412,20 @@ def _refuse_ungranted_statement(_conn, _cursor, statement, _parameters, _context
     """
     from flask import g, has_request_context
 
-    if not has_request_context() or not getattr(g, "write_admitted_for_route_check", False):
+    if not has_request_context():
+        return
+    table = _table_stored_to(statement)
+    if table is None:
+        return
+    if not getattr(g, "write_admitted_for_route_check", False):
+        _hold_unadmitted_write({table})
         return
     if getattr(g, "route_granted_write", False):
         return
-    table = _table_stored_to(statement)
-    if table is not None and table not in BOOKKEEPING_TABLES:
+    if table not in BOOKKEEPING_TABLES:
+        if report_only():
+            _hold_ungranted_write({table})
+            return
         g.ungranted_change_refused = True
         raise ChangeNotGrantedByRoute(GENERAL_REASON)
 
@@ -295,6 +441,9 @@ def init_write_access(app):
     # came through.
     if not event.contains(Session, "before_flush", _refuse_ungranted_change):
         event.listen(Session, "before_flush", _refuse_ungranted_change)
+    if not event.contains(Session, "after_commit", _report_stored_change):
+        event.listen(Session, "after_commit", _report_stored_change)
+        event.listen(Session, "after_soft_rollback", _forget_rolled_back_change)
     from sqlalchemy.engine import Engine
 
     if not event.contains(Engine, "before_cursor_execute", _refuse_ungranted_statement):
@@ -326,6 +475,9 @@ def init_write_access(app):
     def _forget_write_admission(_error=None):
         # The notes belong to one request; work done after it in the same context is not admitted.
         g.write_admitted_for_route_check = False
+        g.write_admitted_by_check = False
+        g.write_access_reported = False
+        g.write_access_held = None
         g.route_granted_write = False
         g.ungranted_change_refused = False
 
@@ -337,6 +489,9 @@ def init_write_access(app):
             app, request.endpoint
         )
         g.write_admitted_for_route_check = False
+        g.write_admitted_by_check = False
+        g.write_access_reported = False
+        g.write_access_held = None
         g.route_granted_write = False
         g.ungranted_change_refused = False
         return None

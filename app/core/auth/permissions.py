@@ -327,6 +327,7 @@ def note_route_granted_write() -> None:
 
         if has_request_context():
             g.route_granted_write = True
+            g.write_admitted_by_check = True
     except Exception:  # fabricated-ok: outside a request there is nothing to record
         pass
 
