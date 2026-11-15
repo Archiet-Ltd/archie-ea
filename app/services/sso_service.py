@@ -14,7 +14,10 @@ Usage::
         # redirect to result['redirect_url']
 """
 
+import base64
+import hashlib
 import logging
+import re
 import secrets
 from typing import Optional
 from urllib.parse import urlencode
@@ -123,6 +126,42 @@ def check_idp_url(url) -> str:
     if internal_ok:
         return validate_user_supplied_url(url)
     return validate_outbound_url(url, allowed_host_suffixes=(), require_https=True)
+
+
+_TENANT_PLACEHOLDER = "{tenantid}"
+_TENANT_GUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+_METADATA_SUFFIX = "/.well-known/openid-configuration"
+# Request parameters the provider object may never replace.
+_FIXED_AUTHORIZE_PARAMS = frozenset({
+    "response_type", "client_id", "redirect_uri", "scope", "state", "nonce",
+    "code_challenge", "code_challenge_method",
+})
+
+
+def _discovery_issuer(config, discovery, required: bool = True) -> str:
+    """The issuer a discovery document names, after the rules for this provider.
+
+    A template issuer (one holding ``{tenantid}``) is honoured only for a
+    provider object that says ``tenant_issuer`` (the built-in Microsoft
+    provider), and only when the template with ``common`` put in its place is
+    the metadata address minus its well-known suffix. A saved organisation
+    configuration never sets ``tenant_issuer``, so its template issuers stay
+    refused.
+    """
+    issuer = discovery.get("issuer", "")
+    if not issuer:
+        if required:
+            raise SSONotConfiguredError("OIDC discovery document missing 'issuer'")
+        return ""
+    if "{" not in issuer and "}" not in issuer:
+        return issuer
+    if not getattr(config, "tenant_issuer", False):
+        raise SSONotConfiguredError("The identity provider's issuer is a template, which is not accepted")
+    metadata_url = getattr(config, "idp_metadata_url", "") or ""
+    base = metadata_url[: -len(_METADATA_SUFFIX)] if metadata_url.endswith(_METADATA_SUFFIX) else metadata_url
+    if issuer.count(_TENANT_PLACEHOLDER) != 1 or issuer.replace(_TENANT_PLACEHOLDER, "common") != base:
+        raise SSONotConfiguredError("The identity provider's issuer does not match its metadata address")
+    return issuer
 
 
 class SSOService:
@@ -426,11 +465,7 @@ class SSOService:
                 "OIDC discovery document missing 'jwks_uri'"
             )
 
-        issuer = discovery.get("issuer", "")
-        if not issuer:
-            raise SSONotConfiguredError(
-                "OIDC discovery document missing 'issuer'"
-            )
+        issuer = _discovery_issuer(config, discovery)
 
         advertised_algorithms = (
             discovery.get("id_token_signing_alg_values_supported") or ["RS256"]
@@ -464,7 +499,15 @@ class SSOService:
             key_set = KeySet.import_key_set(jwks)
             registry = JWSRegistry(algorithms=allowed_algorithms, strict_check_header=False)
             token = jwt.decode(id_token, key_set, registry=registry)
-            claims = CodeIDToken(token.claims, token.header, claims_options, claims_params)
+            options = dict(claims_options)
+            if getattr(config, "tenant_issuer", False):
+                tid = token.claims.get("tid")
+                if not isinstance(tid, str) or not _TENANT_GUID.fullmatch(tid):
+                    raise SSONotConfiguredError("id_token has no valid tenant")
+                options["iss"] = {"essential": True, "value": issuer.replace(_TENANT_PLACEHOLDER, tid)}
+            elif getattr(config, "issuer_aliases", None):
+                options["iss"] = {"essential": True, "values": [issuer, *config.issuer_aliases]}
+            claims = CodeIDToken(token.claims, token.header, options, claims_params)
             claims.validate(leeway=_ID_TOKEN_LEEWAY_SECONDS)
             return dict(claims)
 
@@ -503,9 +546,10 @@ class SSOService:
             redirect_uri: The callback URL registered with the IdP.
 
         Returns:
-            Dict with keys ``redirect_url``, ``state`` and ``nonce`` (str). The
-            caller must keep ``state`` and ``nonce`` in the login session and
-            hand the nonce back to :meth:`handle_oidc_callback`.
+            Dict with keys ``redirect_url``, ``state``, ``nonce`` and
+            ``code_verifier`` (str). The caller must keep them in the login
+            session and hand the nonce and the verifier back to
+            :meth:`handle_oidc_callback`.
 
         Raises:
             :class:`SSONotConfiguredError` if config is None or setup is incomplete.
@@ -518,6 +562,7 @@ class SSOService:
             raise SSONotConfiguredError("SSO config has no idp_metadata_url")
 
         discovery = self._fetch_oidc_discovery(config.idp_metadata_url)
+        _discovery_issuer(config, discovery, required=False)
         auth_endpoint = discovery.get("authorization_endpoint")
         if not auth_endpoint:
             raise SSONotConfiguredError(
@@ -526,6 +571,12 @@ class SSOService:
 
         state = secrets.token_urlsafe(32)
         nonce = secrets.token_urlsafe(32)
+        code_verifier = secrets.token_urlsafe(64)
+        code_challenge = (
+            base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode("ascii")).digest())
+            .rstrip(b"=")
+            .decode("ascii")
+        )
         params = {
             "response_type": "code",
             "client_id": config.client_id,
@@ -533,9 +584,14 @@ class SSOService:
             "scope": "openid email profile",
             "state": state,
             "nonce": nonce,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
         }
+        for name, value in (getattr(config, "authorize_params", None) or {}).items():
+            if name not in _FIXED_AUTHORIZE_PARAMS:
+                params[name] = value
         redirect_url = f"{auth_endpoint}?{urlencode(params)}"
-        return {"redirect_url": redirect_url, "state": state, "nonce": nonce}
+        return {"redirect_url": redirect_url, "state": state, "nonce": nonce, "code_verifier": code_verifier}
 
     def handle_oidc_callback(
         self,
@@ -544,6 +600,7 @@ class SSOService:
         state: str,
         redirect_uri: str,
         expected_nonce: Optional[str] = None,
+        code_verifier: Optional[str] = None,
     ) -> dict:
         """Exchange the authorization code for tokens and return user info.
 
@@ -558,6 +615,8 @@ class SSOService:
             expected_nonce: The nonce :meth:`initiate_oidc_flow` returned for
                 this login. Needed whenever claims come from the id_token
                 (the userinfo endpoint does not use it).
+            code_verifier: The PKCE verifier :meth:`initiate_oidc_flow`
+                returned, sent with the code.
 
         Returns:
             Dict of user-info claims (``email``, ``sub``, ``name``, etc.).
@@ -575,6 +634,7 @@ class SSOService:
         import requests
 
         discovery = self._fetch_oidc_discovery(config.idp_metadata_url)
+        _discovery_issuer(config, discovery, required=False)
         token_endpoint = discovery.get("token_endpoint")
         userinfo_endpoint = discovery.get("userinfo_endpoint", "")
         if not token_endpoint:
@@ -591,16 +651,19 @@ class SSOService:
             raise SSONotConfiguredError("Token exchange failed") from exc
 
         client_secret = config.client_secret
+        token_request = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "client_id": config.client_id,
+            "client_secret": client_secret or "",
+        }
+        if code_verifier:
+            token_request["code_verifier"] = code_verifier
         try:
             resp = requests.post(
                 token_endpoint,
-                data={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "redirect_uri": redirect_uri,
-                    "client_id": config.client_id,
-                    "client_secret": client_secret or "",
-                },
+                data=token_request,
                 timeout=15,
                 allow_redirects=False,
             )
@@ -613,7 +676,8 @@ class SSOService:
         # Prefer userinfo endpoint for claims; fall back to id_token payload
         userinfo: dict = {}
         access_token = token_data.get("access_token", "")
-        if userinfo_endpoint and access_token:
+        # A built-in provider takes its claims from the verified id_token alone.
+        if userinfo_endpoint and access_token and not getattr(config, "id_token_only", False):
             try:
                 check_idp_url(userinfo_endpoint)
                 uinfo_resp = requests.get(
