@@ -19,6 +19,7 @@ class SubscriptionPlan(enum.Enum):
     enterprise = "enterprise"
     startup = "startup"
     team = "team"
+    education = "education"
 
 
 class SubscriptionStatus(enum.Enum):

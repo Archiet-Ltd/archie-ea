@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import pathlib
+import re
 import sys
 
 from jinja2 import Environment, nodes
@@ -56,18 +57,40 @@ def _rel(path: pathlib.Path, root: pathlib.Path) -> str:
     return str(path.relative_to(root)).replace("\\", "/")
 
 
+_SCRIPT_TAG = re.compile(r"<script\b([^>]*)(?:>|$)", re.IGNORECASE)
+_TYPE_ATTR = re.compile(r"""\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))""", re.IGNORECASE)
+_EXECUTABLE_TYPES = {
+    "module", "text/javascript", "application/javascript", "application/x-javascript",
+    "text/ecmascript", "application/ecmascript", "text/jscript", "text/livescript",
+}
+
+
+def _runs_in_browser(attrs: str) -> bool:
+    """A script runs only when its type is absent, empty, ``module`` or a JavaScript
+    MIME type. A data block (``application/json``, ``importmap``, templates) is never
+    executed, so the CSP nonce is irrelevant to it. A type that cannot be read
+    (for example one built by a Jinja expression) counts as running."""
+    found = _TYPE_ATTR.search(attrs)
+    if not found:
+        return True
+    kind = next(g for g in found.groups() if g is not None).strip().lower()
+    return kind == "" or kind in _EXECUTABLE_TYPES
+
+
 def _has_script_in_macro(tree) -> bool:
-    """True when a <script> appears in template text inside a macro body.
+    """True when a script a browser runs appears in template text inside a macro body.
 
     Checked against the parsed tree rather than the raw source so that a
     ``<script`` mentioned in a ``{# … #}`` comment does not count — Jinja strips
     comments before this point. components/modal.html is exactly that case: its
     only ``<script`` is a usage example in a doc comment and never renders.
+    A JSON data block is not counted: it is never executed.
     """
     for macro in tree.find_all(nodes.Macro):
         for data in macro.find_all(nodes.TemplateData):
-            if "<script" in data.data.lower():
-                return True
+            for tag in _SCRIPT_TAG.finditer(data.data):
+                if _runs_in_browser(tag.group(1)):
+                    return True
     return False
 
 
