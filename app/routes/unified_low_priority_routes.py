@@ -128,7 +128,13 @@ def architecture_relationships():
     template.
     """
     try:
+        from app.middleware.tenant_context import current_org_id
+        from app.modules.intelligence.services.query_service import filter_relationships_by_org
+
+        org_id = current_org_id()
         rels = ArchiMateRelationship.query.order_by(ArchiMateRelationship.type).all()
+        rels = filter_relationships_by_org(rels, org_id, direction="both")
+
         element_ids = {
             eid for rel in rels for eid in (rel.source_id, rel.target_id) if eid is not None
         }

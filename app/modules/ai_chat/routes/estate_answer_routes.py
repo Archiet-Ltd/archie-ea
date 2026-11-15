@@ -78,6 +78,8 @@ def _lens_line(lens):
     name = lens["element"].name
     data = lens["data"] or {}
     if lens["lens"] == "portfolio":
+        if data.get("part_of"):
+            return "Answer from your records: %s Rationalization planning tracks the application." % data["part_of"]
         tracked = "is tracked" if data.get("application_component_id") else "is not tracked"
         return "Answer from your records: %s %s by rationalization planning." % (name, tracked)
     key, noun = _LENS_RECORDS[lens["lens"]]
@@ -225,6 +227,11 @@ def _lens_card(lens, message=""):
     owned = owner_of_element(lens["element"]) if lens["lens"] == "accountability" and lens["data"] is not None else None
     component_id = ((lens["data"] or {}).get("application_component_id")) if lens["lens"] == "portfolio" else None
     owners = ((lens["data"] or {}).get("owners")) if lens["lens"] == "accountability" else None
+    if owned and owners:
+        # The reader also returns the owners of everything downstream; the sentence, the dates and the
+        # footer speak only of the element asked about.
+        owners = [o for o in owners if o.get("element_id") == lens["element"].id]
+        lens["data"] = dict(lens["data"], owners=owners)
     for owner in owners or []:
         # The day the ownership record was made, as people read a date ("12 Nov 2026").
         day = datetime.strptime(owner["since"], "%Y-%m-%d") if owner.get("since") else None

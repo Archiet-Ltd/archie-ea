@@ -52,6 +52,7 @@ diff shapes and checking `find_unverified()`'s return value directly, since
 the real function reads live git state that a unit test cannot control.
 """
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -69,11 +70,27 @@ def _run(cmd: list[str]) -> str:
     return proc.stdout.strip()
 
 
+INTEGRATION_LINE_REFS = ("anioko/ui/shadcn-rebuild", "origin/ui/shadcn-rebuild")
+
+
 def _base_ref() -> str:
-    """The ref to diff against. Prefers the merge-base with origin/main (so a
-    long-lived branch isn't blamed for files main already changed elsewhere),
-    falls back to origin/main directly, then HEAD~1 for a repo with no
-    fetched origin (a fresh clone, or an offline sandbox)."""
+    """The ref to diff against, so a branch is judged only on what it changed.
+
+    In order: an explicit ``VERIFY_BASE_REF``; ``origin/$GITHUB_BASE_REF`` in a
+    pull-request run; the merge-base with the integration line when HEAD
+    already contains that line (otherwise every file the line changed since
+    main would be blamed on the branch); the merge-base with origin/main;
+    origin/main itself; then HEAD~1 for a repo with no fetched origin."""
+    explicit = os.environ.get("VERIFY_BASE_REF", "").strip()
+    if explicit:
+        return explicit
+    pr_base = os.environ.get("GITHUB_BASE_REF", "").strip()
+    if pr_base and _run(["git", "rev-parse", "--verify", f"origin/{pr_base}"]):
+        return f"origin/{pr_base}"
+    for line in INTEGRATION_LINE_REFS:
+        tip = _run(["git", "rev-parse", "--verify", line])
+        if tip and _run(["git", "merge-base", "HEAD", line]) == tip:
+            return tip
     merge_base = _run(["git", "merge-base", "HEAD", "origin/main"])
     if merge_base:
         return merge_base

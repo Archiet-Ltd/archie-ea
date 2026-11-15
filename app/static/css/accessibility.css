@@ -28,6 +28,13 @@
     white-space: normal;
 }
 
+/* A link inside a sentence is underlined at rest, so colour is never the only cue — WCAG 1.4.1.
+   Stand-alone links (block rows, buttons, cards) keep their own look. */
+#main-content :where(p, dd, figcaption, small, span.text-muted-foreground) a[href]:not(.block):not([class*="bg-"]):not([class*="border"]):not([class*="no-underline"]) {
+    text-decoration-line: underline;
+    text-underline-offset: 4px;
+}
+
 /* Focus Visible Improvements — WCAG 2.4.7 Focus Visible (Level AA) */
 *:focus-visible {
     outline: 2px solid hsl(var(--ring));
