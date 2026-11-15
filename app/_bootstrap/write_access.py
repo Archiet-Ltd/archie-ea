@@ -53,6 +53,7 @@ READ_ONLY_ALLOWED = {
 # The same, for pages and forms outside ``/api/``.
 READ_ONLY_ALLOWED_PAGES = {
     # The person's own session, sign-in and account.
+    "account.logout": "Ends the person's own session.",
     "account.login": "Starts a session; it changes nothing in the model.",
     "account.register": "Creates the person's own account before sign-in.",
     "account.reset_password_request": "Sends the person a link to reset their own password.",

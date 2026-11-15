@@ -87,6 +87,7 @@ def test_post_logout_without_the_token_is_refused(app, db_session, make_org):
         ("revoked", "You were signed out."),
         ("signed_out", "You were signed out."),
         ("idle", "Your session ended after a period of inactivity. Sign in again to carry on."),
+        ("admin_absolute", "Administrator sessions end after a fixed time. Sign in again to carry on."),
     ],
 )
 def test_sign_in_page_gives_the_reason_it_was_sent_for(app, reason, sentence):
@@ -99,3 +100,33 @@ def test_sign_in_page_invents_no_reason(app):
     for url in ("/account/login", "/account/login?timeout=nonsense"):
         html = client.get(url).get_data(as_text=True)
         assert 'data-testid="login-why"' not in html
+
+
+def test_a_viewer_can_sign_out_with_a_post(app, db_session, make_org):
+    from app.models.org_role import OrgRole
+    from app.models.user import Role
+
+    org = make_org("viewerout")
+    Role.insert_roles()
+    user = User(
+        email=f"viewerout-{uuid.uuid4().hex[:8]}@example.com",
+        confirmed=True,
+        organization_id=org.id,
+        role=Role.query.filter_by(name="Viewer").first(),
+    )
+    user.password = _PASSWORD
+    db_session.add(user)
+    db_session.flush()
+    db_session.add(OrgRole(user_id=user.id, organization_id=org.id, role="viewer"))
+    db_session.flush()
+    client = app.test_client()
+    resp = client.post("/account/login", data={"email": user.email, "password": _PASSWORD})
+    assert resp.status_code in (302, 303)
+    _forget_cached_user()
+    resp = client.post("/account/logout", follow_redirects=True)
+    html = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert "You were signed out." in html
+    assert "You can view this, but not change it" not in html
+    _forget_cached_user()
+    assert client.get("/dashboard/overview").status_code in (302, 401)

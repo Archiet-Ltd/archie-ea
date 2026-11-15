@@ -14,7 +14,7 @@
                 {% call card_description() %}Sign out of your workspace on this device?{% endcall %}
             {% endcall %}
             {% call card_content(class='pt-4') %}
-                {{ begin_form(form, {}, action=url_for('account.logout'), extra_classes='flex gap-3') }}
+                {{ begin_form(form, {}, action=url_for('account.logout'), extra_classes='flex flex-row gap-3 space-y-0') }}
                     {{ button(type='submit', variant='destructive', class='flex-1', text='Sign out', testid='logout-confirm') }}
                     {{ button(href=url_for('dashboard.overview'), variant='outline', class='flex-1', text='Stay signed in') }}
                 {{ end_form(form) }}
