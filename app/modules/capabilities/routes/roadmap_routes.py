@@ -286,8 +286,13 @@ def compute_gap_signals(capability_type_filter="business", gap_type_filter=None)
             return unified.source_table == "business_capability" and str(unified.source_id or "").isdigit()
 
         def _gap_capability_id(unified):
-            # Recorded gaps are keyed by the business capability a capability was projected from.
+            # Recorded gaps are keyed by the store the id comes from: the business capability a
+            # capability was projected from, or else the capability's own id in the unified store.
             return int(unified.source_id) if _from_business(unified) else unified.id
+
+        def _gap_capability_type(unified):
+            # The two id sequences overlap, so the type must say which store the id belongs to.
+            return "business" if _from_business(unified) else "unified"
 
         for cap in biz_caps:
             apps = [apps_by_id[aid] for aid in support_by_cap.get(cap.id, []) if aid in apps_by_id]
@@ -371,17 +376,19 @@ def compute_gap_signals(capability_type_filter="business", gap_type_filter=None)
                 parent_gap_id = _gap_capability_id(parent_cap) if parent_cap else parent_id
 
                 # Build hierarchy path for filtering descendants
-                hierarchy_path = f"business-{gap_cap_id}"
+                gap_cap_type = _gap_capability_type(cap)
+                hierarchy_path = f"{gap_cap_type}-{gap_cap_id}"
                 if parent_id:
-                    hierarchy_path = f"business-{parent_gap_id}," + hierarchy_path
+                    parent_gap_type = _gap_capability_type(parent_cap) if parent_cap else "business"
+                    hierarchy_path = f"{parent_gap_type}-{parent_gap_id}," + hierarchy_path
 
                 gaps.append(
                     {
-                        "id": f"business-{gap_cap_id}",
+                        "id": f"{gap_cap_type}-{gap_cap_id}",
                         "capability_id": gap_cap_id,
                         "unified_capability_id": cap.id,
                         "has_fact_sheet": _from_business(cap),
-                        "capability_type": "business",
+                        "capability_type": gap_cap_type,
                         "name": cap.name,
                         "domain": (cap.domain.name if cap.domain else None) or "Unknown",
                         "level": cap.level or 1,
@@ -731,6 +738,7 @@ def api_roadmap_gaps():
             "high_priority": len([g for g in gaps if g["priority"] == "high"]),
             "by_capability_type": {
                 "business": len([g for g in gaps if g["capability_type"] == "business"]),
+                "unified": len([g for g in gaps if g["capability_type"] == "unified"]),
                 "technical": len([g for g in gaps if g["capability_type"] == "technical"]),
                 "process": len([g for g in gaps if g["capability_type"] == "process"]),
             },
