@@ -91,3 +91,39 @@ def test_cookie_of_one_organisation_does_not_open_another_account(app, db_sessio
     _end(app, "sign_out_everywhere", second, owner)
 
     assert _open_with_only(app, cookie).status_code == 200
+
+
+def _set_count(db_session, user, value):
+    user.session_generation = value
+    db_session.flush()
+    db_session.commit()
+
+
+@pytest.mark.parametrize("kind", ["password_change", "reset", "sign_out_everywhere"])
+def test_person_with_no_count_keeps_cookie_then_loses_it_on_change(app, db_session, make_org, kind):
+    """A person who existed before the count was added holds NULL, read as 0."""
+    org = make_org("remembernull" + kind.replace("_", "")[:6])
+    user = _make_user(db_session, org)
+    _set_count(db_session, user, None)
+    owner, cookie = _remember_cookie(app, user.email, _PASSWORD)
+
+    assert _open_with_only(app, cookie).status_code == 200, "a cookie issued before the count existed must keep working"
+
+    _end(app, kind, user, owner)
+
+    resp = _open_with_only(app, cookie)
+    assert resp.status_code in (302, 401), "cookie of a person with no count still signed in after %s" % kind
+    if resp.status_code == 302:
+        assert "/account/login" in resp.headers["Location"]
+    db_session.refresh(user)
+    assert user.session_generation == 1
+
+
+def test_cookie_issued_before_the_column_existed_keeps_working(app, db_session, make_org):
+    """Before the count, the cookie named the account by its bare id."""
+    org = make_org("rememberlegacy")
+    user = _make_user(db_session, org)
+    _set_count(db_session, user, None)
+    _client, cookie = _remember_cookie(app, user.email, _PASSWORD)
+    assert cookie.split("|")[0] == str(user.id)
+    assert _open_with_only(app, cookie).status_code == 200
