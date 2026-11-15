@@ -259,6 +259,16 @@ def default_code_owners(text: str) -> List[str]:
     return []
 
 
+def _made_since(commit: Any, start: datetime) -> bool:
+    """Whether a commit record was authored inside the window (a record with no readable date counts)."""
+    detail = commit.get("commit") if isinstance(commit, dict) else None
+    stamp = str(((detail or {}).get("author") or {}).get("date") or "")
+    try:
+        return datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ") >= start
+    except ValueError:
+        return True
+
+
 def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str, Any]:
     """Who of this organisation made the recent commits of a repository.
 
@@ -1379,16 +1389,27 @@ class _RepositoryEvidence:
     def _commit_history(self, full_name: str) -> Dict[str, Any]:
         """The commits of the last 90 days, counted by member (read once per repository)."""
         if full_name not in self._histories:
-            since = (datetime.utcnow() - timedelta(days=COMMIT_WINDOW_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
-            response = self.client.get(
-                f"repos/{full_name}/commits", params={"since": since, "per_page": PAGE_SIZE}, use_cache=False
-            )
-            if response.success:
-                commits = response.data if isinstance(response.data, list) else []
-            elif getattr(response, "status_code", None) in (404, 409):
-                commits = []  # no such history (an empty repository answers 409)
+            start = datetime.utcnow() - timedelta(days=COMMIT_WINDOW_DAYS)
+            since = start.strftime("%Y-%m-%dT%H:%M:%SZ")
+            commits: List[dict] = []
+            for page in range(1, MAX_PAGES + 1):
+                response = self.client.get(
+                    f"repos/{full_name}/commits",
+                    params={"since": since, "per_page": PAGE_SIZE, "page": page},
+                    use_cache=False,
+                )
+                if not response.success:
+                    if getattr(response, "status_code", None) in (404, 409):
+                        break  # no such history (an empty repository answers 409)
+                    raise self.connector._failure(response)
+                data = response.data if isinstance(response.data, list) else []
+                inside = [c for c in data if _made_since(c, start)]
+                commits.extend(inside)
+                if len(data) < PAGE_SIZE or len(inside) < len(data):
+                    break
             else:
-                raise self.connector._failure(response)
+                raise GitHubConnectorError(
+                    f"More than {MAX_PAGES * PAGE_SIZE} commits were listed; the read was stopped")
             self._histories[full_name] = summarise_commits(self.org_id, full_name, commits)
         return self._histories[full_name]
 

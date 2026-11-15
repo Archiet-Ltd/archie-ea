@@ -23,6 +23,7 @@ from app.models.application_owner import ApplicationOwner
 from app.services.element_ownership_service import (
     CrossOrganisationElementOwner,
     DuplicateElementOwner,
+    owner_label,
     set_element_owner,
     set_named_person_owner,
 )
@@ -148,6 +149,15 @@ def make_owner_from_commits(app_id: int):
     element = db.session.get(ArchiMateElement, app.archimate_element_id) if app.archimate_element_id else None
     if element is None or element.organization_id != org_id:
         abort(404)
+    current = ApplicationOwner.query.filter_by(
+        application_id=app_id, organization_id=org_id, ownership_type="primary").first()
+    if current is not None:
+        from app.models.user import User
+
+        holder = db.session.get(User, current.user_id)
+        who = owner_label(holder.first_name, holder.last_name, holder.email) if holder else "Someone"
+        flash("This application already has a primary owner, %s. Nothing was changed." % who, "info")
+        return redirect(url_for("unified_applications.application_detail", id=app_id) + "#ownership")
     candidates = {c["user_id"]: c for c in _commit_hint(element, org_id).get("candidates") or []}
     user_id = request.form.get("user_id", type=int)
     if user_id not in candidates:
