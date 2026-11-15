@@ -641,7 +641,9 @@ def get_capability_work_packages():
                 }
             )
 
-        return jsonify({"work_packages": work_packages_list})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"work_packages": work_packages_list}))
     except HTTPException:
         raise
     except Exception:
@@ -1215,7 +1217,10 @@ def get_work_package_details(wp_id):
         delivered_count = len([d for d in deliverables if d.delivery_status == "delivered"])
         approved_count = len([d for d in deliverables if d.approval_status == "approved"])
 
+        from app.services.cost_visibility import withhold_reply
+
         return jsonify(
+            withhold_reply(
             {
                 "success": True,
                 "work_package": {
@@ -1274,7 +1279,8 @@ def get_work_package_details(wp_id):
                     if total_deliverables > 0
                     else 0,
                 },
-            }
+            },
+            )
         )
 
     except HTTPException:

@@ -22,10 +22,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
 from app.services import result_footer_service as footers
+from app.services.cost_visibility import COSTS_WITHHELD
 from app.services.result_footer_service import fact
 
 TOP = 50
-COST_WITHHELD = "Cost figures are not shown for your role."
 _SEVERITY = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 _RETIRING = ("3.", "5.")
 
@@ -241,7 +241,7 @@ def ranked_opportunities(org_id: int, limit: int = TOP, with_cost: bool = True) 
     items += _unstarted_gaps(org_id)
     if not with_cost:
         for item in items:
-            item["cost"], item["cost_note"] = None, COST_WITHHELD
+            item["cost"], item["cost_note"] = None, COSTS_WITHHELD
     items.sort(key=lambda i: (i["cost"] is None, -(i["cost"] or 0), _SEVERITY.get(i["severity"], 4),
                               i["kind_label"], i["title"].lower()))
     for rank, item in enumerate(items, 1):
