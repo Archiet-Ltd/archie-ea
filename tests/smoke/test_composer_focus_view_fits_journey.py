@@ -339,6 +339,26 @@ CHOSEN_AT = """(other) => {
 
 
 @pytest.mark.parametrize("scheme,width,height", [("light", 1440, 900), ("dark", 390, 844)])
+def test_tab_into_a_view_only_drawing_chooses_the_element_the_arrows_walk_from(
+        browser, live_server, hub, scheme, width, height):
+    context, page = _open(browser, live_server, hub, width, height, scheme)
+    try:
+        where = "%dx%d %s" % (width, height, scheme)
+        page.evaluate("""(sel) => { const a = Alpine.$data(document.querySelector(sel));
+            a.mode = 'view'; a._clearSelection(); a._selectedCells = []; a._currentSelectedCell = null; }""", APP)
+        assert page.evaluate(FOCUS_STATE)["selected"] is None
+        page.get_by_test_id("zoom-fit").focus()
+        assert _tab_until_in_drawing(page, "Tab"), "%s: Tab never reached the drawing" % where
+        chosen = page.evaluate(FOCUS_STATE)["selected"]
+        assert chosen, "%s: Tab chose nothing" % where
+        page.keyboard.press("ArrowDown")
+        walked = page.evaluate(FOCUS_STATE)["selected"]
+        assert walked and walked != chosen, "%s: the arrow did not walk from the chosen element" % where
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("scheme,width,height", [("light", 1440, 900), ("dark", 390, 844)])
 def test_keyboard_alone_reaches_walks_opens_leaves_and_moves_in_the_drawing(
         browser, live_server, hub, scheme, width, height):
     """A person who works without a mouse: Tab reaches the drawing, the arrows walk what is connected,
@@ -364,6 +384,11 @@ def test_keyboard_alone_reaches_walks_opens_leaves_and_moves_in_the_drawing(
 
         # The arrows walk the elements connected to the one the view is about, and say where they are.
         walked = []
+        page.evaluate("""() => { window.__said = [];
+            const live = document.querySelector('body > div[role="status"][aria-live="polite"]');
+            new MutationObserver(() => { if (live.textContent) window.__said.push(live.textContent); })
+                .observe(live, {childList: true, characterData: true, subtree: true}); }""")
+        assert page.evaluate("() => document.querySelectorAll('#composer-a11y-live').length") == 0
         for step in range(3):
             page.keyboard.press("ArrowDown")
             state = page.evaluate(FOCUS_STATE)
@@ -372,6 +397,9 @@ def test_keyboard_alone_reaches_walks_opens_leaves_and_moves_in_the_drawing(
             expect(page.get_by_test_id("diagram-status-line").get_by_role("status", include_hidden=True)).to_contain_text(
                 "%s, %d of 12 connected" % (state["selected"], step + 1))
         assert len(set(walked)) == 3 and set(walked) <= connected, "%s: the arrows reached %r" % (where, walked)
+        said = page.evaluate("() => window.__said")
+        assert len(said) == 3 and [m.split(",")[0] for m in said] == walked, "%s: three steps made announcements %r" % (where, said)
+        assert page.evaluate("() => document.querySelectorAll('#composer-a11y-live').length") == 0
         page.keyboard.press("ArrowUp")
         assert page.evaluate(FOCUS_STATE)["selected"] == walked[1]
         page.screenshot(path="%s/composer-keyboard-walk-%d-%s.png" % (_walk_dir(), width, scheme))
@@ -381,6 +409,8 @@ def test_keyboard_alone_reaches_walks_opens_leaves_and_moves_in_the_drawing(
         panel = page.locator(".detail-panel")
         expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(panel.locator('input[aria-label="Element name"]')).to_have_value(walked[1])
+        box = panel.bounding_box()
+        assert box["x"] >= 0 and box["x"] + box["width"] <= width, "%s: the details run off the screen: %r" % (where, box)
         page.screenshot(path="%s/composer-keyboard-details-%d-%s.png" % (_walk_dir(), width, scheme))
         page.keyboard.press("Escape")
 

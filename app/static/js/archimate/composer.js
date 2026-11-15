@@ -1211,7 +1211,6 @@ function composerApp() {
             let canvasEl = document.getElementById('composer-canvas');
             if (canvasEl) {
                 canvasEl.addEventListener('focus', function() {
-                    if (self.mode === 'view') return;
                     let elements = self.graph.getElements().filter(function(c) {
                         return !c.get('isLayerZone') && !c.get('isAnnotation');
                     });
@@ -3464,7 +3463,6 @@ function composerApp() {
                 self.paper.translate(Math.round(canvasEl.clientWidth / 2 - (pos.x + size.width / 2) * scale.sx),
                                      Math.round(canvasEl.clientHeight / 2 - (pos.y + size.height / 2) * scale.sy));
             }
-            let neighborCount = neighbors.length > 0 ? neighbors.length : self.graph.getElements().filter(function(c) { return c.isElement && c.isElement() && !c.get('isLayerZone') && !c.get('isAnnotation'); }).length;
             self.statusText = (nextCell.get('elName') || 'Element') + ', ' + (neighbors.length > 0 ? (self._tabCycleIndex + 1) + ' of ' + neighbors.length + ' connected' : 'no connections');
             self._announceSelection(nextCell);
         },
@@ -4622,16 +4620,7 @@ function composerApp() {
             let type = cell.get('elType') || '';
             let connections = this.graph.getConnectedLinks(cell).length;
             let msg = name + ', ' + type + ', ' + connections + ' connection' + (connections === 1 ? '' : 's');
-            let live = document.getElementById('composer-a11y-live');
-            if (!live) {
-                live = document.createElement('div');
-                live.id = 'composer-a11y-live';
-                live.setAttribute('aria-live', 'polite');
-                live.setAttribute('aria-atomic', 'true');
-                live.className = 'sr-only';
-                document.body.appendChild(live);
-            }
-            live.textContent = msg;
+            if (window.Alpine && window.Alpine.store('announcer')) window.Alpine.store('announcer').announce(msg);
         },
 
         /* ── Open relationship picker for two cells (used by R shortcut and connect mode) ── */
