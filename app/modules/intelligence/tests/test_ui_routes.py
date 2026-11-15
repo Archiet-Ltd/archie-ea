@@ -348,6 +348,13 @@ def test_names_come_only_from_the_impact_answers_element_map():
     # own endpoint which now returns an elements map for name lookups.
     # Compliance (under L6) adds its own endpoint the same way.
     urls = set(re.findall(r"'(/[a-z0-9_/.-]*)'", _scripts()["core.js"]))
+    # The source link on an answer row (first-answer brief) is built from two pieces of a page address,
+    # '/archimate/elements/' + id + '/impact'. That is a link a person follows, not a call the page
+    # makes, so the two pieces are pinned together and kept out of the set of endpoints it fetches.
+    link_pieces = {"/archimate/elements/", "/impact"}
+    assert link_pieces <= urls
+    assert "'/archimate/elements/' + row.element_id + '/impact'" in _scripts()["core.js"]
+    urls -= link_pieces
     assert urls == {
         "/archimate/api/elements/search",
         "/api/v1/intelligence/impact/",
@@ -423,7 +430,13 @@ def test_the_composer_lists_the_connections_it_draws_in_a_table():
     """The text alternative to the drawing now lives in the Composer's focus view."""
     source = (REPO_ROOT / "app" / "templates" / "archimate" / "composer.html").read_text(encoding="utf-8")
     assert "id=\"composer-focus-list\"" in source
-    assert "<caption" in source and "<thead" in source and "data-focus-row" in source
+    assert "data-focus-row" in source
+    # The table is drawn by the shared dense table component (design-system landing), which writes the
+    # caption and the header row; the composer names the caption it passes and the four columns.
+    assert "caption='Connections of the chosen element'" in source
+    assert "columns=[('From', ''), ('Relationship', ''), ('To', ''), ('Kind', '')]" in source
+    component = (REPO_ROOT / "app" / "templates" / "components" / "dense_table.html").read_text(encoding="utf-8")
+    assert "<caption" in component and "<thead" in component
 
 
 def test_level_three_terms_appear_only_inside_full_detail():
@@ -601,7 +614,11 @@ def test_the_accessibility_audit_this_work_extends_checks_wcag_22_and_fails_rath
     assert not re.search(r"^(?!\s*#).*importorskip\(", source, re.M)
     assert re.search(r"def axe_module\(browser\):.*?pytest\.fail\(", source, re.S)
     assert '"target-size": "wcag22aa"' in source
-    assert '("solution_architect", "/intelligence/ask")' in source
+    # The Ask page was retired into the chat, so the audit lists the chat page and the chat's answer states.
+    assert '("enterprise_architect", "/ai-chat")' in source
+    assert '("solution_architect", "Chat, with an answer", "ask")' in source
+    assert '("solution_architect", "Chat, out-of-date model", "ask-stale")' in source
+    assert '"/intelligence/ask")' not in source
     assert '("enterprise_architect", "/intelligence/twin-map")' not in source
     baseline = (REPO_ROOT / "tests" / "smoke" / "a11y_baseline.json").read_text(encoding="utf-8")
     assert "/intelligence/" not in baseline
