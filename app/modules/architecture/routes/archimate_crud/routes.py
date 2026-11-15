@@ -1726,7 +1726,9 @@ def detail_element(layer, element_type, element_id):
         abort(404)
     model_class = MODEL_REGISTRY.get(element_type)
 
-    element, _from_ae = _resolve_element(model_class, element_type, element_id, any_type=True)
+    # Only an address that names no kind of record (a search hit) may mean an element of any type; a record's own
+    # address whose row is gone must not turn into whichever other element carries that number.
+    element, _from_ae = _resolve_element(model_class, element_type, element_id, any_type=model_class is None)
     if element is None:
         abort(404)
     if _from_ae:
