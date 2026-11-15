@@ -28,7 +28,7 @@ def _indexable(response):
 
 def test_the_sysml_page_is_indexed_and_in_the_sitemap_and_the_two_briefed_pages_are_not(app, switch):
     client = app.test_client()
-    sitemap = client.get("/sitemap.xml").get_data(as_text=True)
+    sitemap = client.get("/sitemap-en.xml").get_data(as_text=True)
     page = client.get(PAGE)
     assert _indexable(page)
     assert "Bring your SysML models" in page.get_data(as_text=True)

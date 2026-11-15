@@ -19,6 +19,7 @@ Directory layout maps to URL families:
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import json
 import re
@@ -349,7 +350,7 @@ MODULE_RECORDINGS_MANIFEST = "recordings.json"
 
 def module_recording_slugs() -> list[str]:
     """Every module page that has a content file, in name order."""
-    return sorted(path.stem for path in (CONTENT_ROOT / "modules").glob("*.md"))
+    return sorted(path.stem for path in (CONTENT_ROOT / "modules").glob("*.md") if not is_translation_file(path))
 
 
 # ── "See how" clips on the first empty screens ──────────────────────────────
@@ -512,6 +513,20 @@ FAMILY_URL_PREFIX = {
     "connector": "/connectors",
 }
 
+# Languages the public site is published in besides English. A translation is a Markdown file beside the English one,
+# named <slug>.<code>.md, with front matter ``lang`` and ``translation_of`` (the English page's slug). It is served
+# at the language's prefix followed by the English address, and the English address never changes.
+DEFAULT_LANGUAGE = "en"
+TRANSLATION_PREFIXES: dict[str, str] = {"pt-BR": "/pt-br", "es": "/es", "fr": "/fr"}
+LANGUAGE_NAMES: dict[str, str] = {"en": "English", "pt-BR": "Português", "es": "Español", "fr": "Français"}
+LANGUAGE_BY_PREFIX: dict[str, str] = {prefix.lstrip("/"): code for code, prefix in TRANSLATION_PREFIXES.items()}
+
+
+def is_translation_file(path: Path) -> bool:
+    """Whether a content file is a translation (<slug>.<code>.md) rather than an English page."""
+    return "." in path.stem
+
+
 _md_local = threading.local()
 
 
@@ -586,6 +601,38 @@ class PublicPage:
     @property
     def cta(self) -> str | None:
         return self.front_matter.get("cta")
+
+    @property
+    def lang(self) -> str:
+        """The language the page is written in: ``en`` unless its front matter names a published translation language."""
+        declared = self.front_matter.get("lang")
+        return declared if declared in TRANSLATION_PREFIXES else DEFAULT_LANGUAGE
+
+    @property
+    def alternates(self) -> list[tuple[str, str]]:
+        """Every published translation of this page as (hreflang, absolute address), with the English page and
+        x-default. Empty when the page has no published translation, so a page nobody has translated shows none."""
+        english_url = _english_url_of(self)
+        translations = _published_translations_by_english_url().get(english_url, {})
+        if not translations:
+            return []
+        origin = canonical_origin()
+        found = [(DEFAULT_LANGUAGE, f"{origin}{english_url}")]
+        found += [(code, f"{origin}{translations[code].url}") for code in TRANSLATION_PREFIXES if code in translations]
+        found.append(("x-default", f"{origin}{english_url}"))
+        return found
+
+    @property
+    def language_links(self) -> list[tuple[str, str, str]]:
+        """Each language this page is published in as (code, the language's own name, site address), English
+        first. Empty when the page has no published translation, so the reader sees no language list."""
+        if not self.alternates:
+            return []
+        english_url = _english_url_of(self)
+        translations = _published_translations_by_english_url().get(english_url, {})
+        found = [(DEFAULT_LANGUAGE, LANGUAGE_NAMES[DEFAULT_LANGUAGE], english_url)]
+        found += [(code, LANGUAGE_NAMES[code], translations[code].url) for code in TRANSLATION_PREFIXES if code in translations]
+        return found
 
     @property
     def page_family(self) -> str:
@@ -1247,6 +1294,8 @@ def load_all_pages() -> list[PublicPage]:
         if not family_dir.is_dir():
             continue
         for md_file in sorted(family_dir.glob("*.md")):
+            if is_translation_file(md_file):
+                continue
             slug = _slug_from_filename(md_file.name)
             if family == "dogfood":
                 url = FAMILY_URL_PREFIX[family]
@@ -1339,6 +1388,73 @@ def feed_page_paths() -> list[str]:
     return list(dict.fromkeys(paths))
 
 
+def load_translations() -> list[PublicPage]:
+    """Every translated page under content/pages/, at its language's address. A translation whose English page does
+    not exist is left out: it would name a page nobody can reach."""
+    english = {(page.family, page.slug): page for page in _pages_by_url().values()}
+    translations: list[PublicPage] = []
+    for family, dir_name in FAMILY_DIR_MAP.items():
+        family_dir = CONTENT_ROOT / dir_name
+        if not family_dir.is_dir():
+            continue
+        for md_file in sorted(family_dir.glob("*.md")):
+            if not is_translation_file(md_file):
+                continue
+            page = _load_page(md_file, family, _slug_from_filename(md_file.name), "")
+            source = english.get((family, str(page.front_matter.get("translation_of") or "")))
+            if page.lang == DEFAULT_LANGUAGE or source is None:
+                continue
+            translations.append(dataclasses.replace(page, slug=source.slug, url=TRANSLATION_PREFIXES[page.lang] + source.url))
+    return translations
+
+
+@functools.lru_cache(maxsize=1)
+def _translations_for_fingerprint(fingerprint: tuple[tuple[str, int], ...]) -> dict[str, PublicPage]:
+    return {page.url: page for page in load_translations()}
+
+
+def _translations_by_url() -> dict[str, PublicPage]:
+    """Address-to-page map of every translation, cached like ``_pages_by_url`` and rebuilt when a content file changes."""
+    return _translations_for_fingerprint(_content_fingerprint())
+
+
+def _english_url_of(page: PublicPage) -> str:
+    return page.url[len(TRANSLATION_PREFIXES[page.lang]):] if page.lang != DEFAULT_LANGUAGE else page.url
+
+
+def published_translations() -> list[PublicPage]:
+    """The translations that belong in a sitemap: those not held back, whose English page is itself published."""
+    feed = {page.url for page in load_feed_pages()}
+    return [
+        page for page in _translations_by_url().values()
+        if not page.is_held and _english_url_of(page) in feed
+    ]
+
+
+def _published_translations_by_english_url() -> dict[str, dict[str, PublicPage]]:
+    grouped: dict[str, dict[str, PublicPage]] = {}
+    for page in published_translations():
+        grouped.setdefault(_english_url_of(page), {})[page.lang] = page
+    return grouped
+
+
+def translation_page(path: str) -> PublicPage | None:
+    """The translated page served at this address, or None."""
+    return _translations_by_url().get(path)
+
+
+def language_page_paths(code: str) -> list[str]:
+    """The addresses in one language's sitemap: the feed for English, the published translations otherwise."""
+    if code == DEFAULT_LANGUAGE:
+        return feed_page_paths()
+    return [page.url for page in published_translations() if page.lang == code]
+
+
+def sitemap_languages() -> list[str]:
+    """Every language that has pages to list, English first."""
+    return [DEFAULT_LANGUAGE] + [code for code in TRANSLATION_PREFIXES if language_page_paths(code)]
+
+
 def load_page(family: str, slug: str | None = None) -> PublicPage | None:
     """Load a single page by family and optional slug."""
     if family not in FAMILY_DIR_MAP:
@@ -1369,6 +1485,8 @@ def load_page(family: str, slug: str | None = None) -> PublicPage | None:
         # the internal uc-sN-NN-* filename -- find the file whose public
         # slug (see _use_case_slug_and_url) matches the one requested.
         for md_file in sorted(family_dir.glob("*.md")):
+            if is_translation_file(md_file):
+                continue
             filename_slug = _slug_from_filename(md_file.name)
             front_matter, _ = _parse_front_matter(md_file.read_text(encoding="utf-8"))
             public_slug, public_url = _use_case_slug_and_url(front_matter, filename_slug)
