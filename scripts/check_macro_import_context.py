@@ -94,14 +94,6 @@ def _has_script_in_macro(tree) -> bool:
     return False
 
 
-# Protected files that are allowed to import script-bearing macros without context.
-# These are the founder's protected golden reference files that must never be edited.
-PROTECTED_IMPORTERS = {
-    "app/templates/dashboards/overview.html",
-    "app/templates/dashboards/_overview_parts.html",
-}
-
-
 def scan() -> list[str]:
     env = Environment(extensions=[])
     roots = _template_roots()
@@ -122,21 +114,18 @@ def scan() -> list[str]:
 
     failures: list[str] = []
     for (root, name), tree in parsed.items():
-        importer = _rel(root / name, ROOT)
-        if importer in PROTECTED_IMPORTERS:
-            continue
         for node in tree.find_all((nodes.Import, nodes.FromImport)):
             target = getattr(node.template, "value", None)
             if target in script_macros and not node.with_context:
                 failures.append(
-                    f"{importer}:{node.lineno}: imports {target} "
+                    f"{_rel(root / name, ROOT)}:{node.lineno}: imports {target} "
                     f"without `with context` -> its <script> renders nonce=\"\" and is CSP-refused"
                 )
         for node in tree.find_all(nodes.Include):
             target = getattr(node.template, "value", None)
             if target in script_macros and node.with_context is False:
                 failures.append(
-                    f"{importer}:{node.lineno}: includes {target} "
+                    f"{_rel(root / name, ROOT)}:{node.lineno}: includes {target} "
                     f"`without context` -> its <script> renders nonce=\"\" and is CSP-refused"
                 )
     return sorted(failures)
