@@ -14,6 +14,7 @@ from sqlalchemy.orm import joinedload
 from app import db
 from app.decorators import audit_log
 from app.models.application_portfolio import ApplicationComponent
+from app.services.cost_visibility import vendor_analysis_reply
 from app.utils.import_rate_limiter import add_rate_limit_headers
 
 from . import unified_applications_bp
@@ -364,7 +365,7 @@ def api_get_vendor_results(analysis_id):
 
         analysis = OptionsAnalysis.query.get_or_404(analysis_id)
 
-        return jsonify(
+        return jsonify(vendor_analysis_reply(
             {
                 "success": True,
                 "analysis": {
@@ -379,8 +380,7 @@ def api_get_vendor_results(analysis_id):
                     if analysis.completed_at
                     else None,
                 },
-            }
-        )
+            }, current_user))
 
     except HTTPException:
 
