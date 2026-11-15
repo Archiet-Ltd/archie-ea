@@ -2551,7 +2551,7 @@ Output clean, executable test code."""
     @staticmethod
     def _call_mistral(prompt, model, api_key, max_tokens=None, timeout=None):
         """Mistral's own chat completions endpoint."""
-        response = requests.post(
+        response = requests.post(  # nosec B113 - timeout is passed below: the caller's value, or 60 seconds when none is given
             MISTRAL_CHAT_URL,
             headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
             json={"model": model, "messages": [{"role": "user", "content": prompt}],
