@@ -1,0 +1,23 @@
+{# Continue with Google / Continue with Microsoft. Draws nothing unless a provider is switched on for this host. #}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import hidden_input %}
+{% set social_providers = social_sign_in_buttons() if social_sign_in_buttons is defined else [] %}
+{% if social_providers %}
+<div class="space-y-3" data-testid="social-sign-in">
+    {% for provider in social_providers %}
+    <form method="post" action="{{ url_for('account_oauth.start', provider=provider.key) }}">
+        {{ hidden_input('csrf_token', csrf_token()) }}
+        {% if request.args.get('next') %}{{ hidden_input('next', request.args.get('next')) }}{% endif %}
+        {% call button(variant='outline', type='submit', class='w-full gap-2', testid='social-sign-in-' ~ provider.key) %}
+            <img src="{{ url_for('static', filename='img/sign-in/' ~ provider.key ~ '.svg') }}" alt="" class="size-5" width="20" height="20">
+            <span>Continue with {{ provider.label }}</span>
+        {% endcall %}
+    </form>
+    {% endfor %}
+    <p class="text-center text-xs text-muted-foreground">By continuing, you agree to the <a href="/terms" class="underline hover:text-foreground">Terms</a> and the <a href="/privacy" class="underline hover:text-foreground">Privacy Policy</a>.</p>
+    <div class="relative py-1">
+        <div class="absolute inset-0 flex items-center"><span class="w-full border-t border-border"></span></div>
+        <div class="relative flex justify-center text-xs uppercase"><span class="bg-card px-2 text-muted-foreground">or</span></div>
+    </div>
+</div>
+{% endif %}
