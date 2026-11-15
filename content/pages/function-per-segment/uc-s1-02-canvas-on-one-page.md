@@ -14,7 +14,7 @@ icon: layout-template
 
 **For startup founders and early operators.**
 
-Open Canvases, click New Canvas and Entelim gives you the nine boxes of the Business Model Canvas on one page. Each box saves on its own when you click out of it, so changing one box never means redoing the others. A sparkle button on each box drafts text for you to edit.
+Open Canvases, click New Canvas and Entelim gives you the nine boxes of the Business Model Canvas on one page. Each box saves on its own when you click out of it, so changing one box never means redoing the others. A sparkle button on each box, “Suggest for” followed by the box name, proposes entries for you to accept.
 
 ## The question
 
@@ -28,7 +28,7 @@ The **Canvases** page lists each canvas in your organisation as a card: the name
 
 The canvas page shows nine boxes in the classic layout: Customer Segments, Value Propositions, Channels, Customer Relationships, Revenue Streams, Key Activities, Key Resources, Key Partnerships and Cost Structure. Each box has the prompt "One idea per line…". When you click out of a box it saves, and a small "Saved" appears under it. Changing the archetype saves straight away and confirms with "Operating model updated".
 
-Each box also has a sparkle button, named for example "Draft Revenue Streams with AI". It puts a draft into that box. The draft is built from the other boxes you have already filled in, the canvas name, the archetype, and the number of applications recorded in your workspace. It is a starting point to edit, not a record of anything.
+Each box that takes entries also has a sparkle button, named for example “Suggest for Key Partners”. It opens a panel of proposed entries written by AI from the other boxes you have already filled in and the elements already in your model. Each proposal says where it came from. You can accept it, change its name first, or dismiss it; an accepted entry is added to the box as an element of your model.
 
 An **Export & share** panel offers **Export as image**, and **Download file** in Mermaid, Lucidchart or Archi format. Once the canvas has a saved diagram, a **Share** link appears that opens it for people inside your organisation.
 
@@ -41,7 +41,7 @@ A founder or head of operations who has to show the business model at a board me
 1. Open **Canvases** from the sidebar.
 2. Click **New Canvas**, enter a name, pick an archetype if you know yours, and click **Create Canvas**.
 3. Start with Customer Segments and Value Propositions. Type one idea per line and click out of the box. Wait for "Saved".
-4. For a box you are stuck on, click its sparkle button, edit the draft and click out of the box to save it.
+4. For a box you are stuck on, click “Suggest for” that box, change a proposal’s name if you want, and click Accept.
 5. When the board or an investor asks, use **Export as image**, which shows the completed canvas.
 6. Return when something changes. Edit only the box that moved.
 
@@ -51,7 +51,7 @@ Most teams use a slide, a Miro board or a Notion page. They work on the day they
 
 ## Limits
 
-- Drafts need AI suggestions switched on for your workspace; with them off, the box is left as it was.
+- Suggestions need AI switched on for your workspace; with it off, the panel says so and the box is left as it was.
 - Creating, editing and deleting a canvas is limited to administrators, architects and business architects. Other roles can open and read canvases.
 - Deleting a canvas cannot be undone. Entelim asks you to confirm first.
 
@@ -61,9 +61,9 @@ Most teams use a slide, a Miro board or a Notion page. They work on the day they
 
 Type or paste each box. Pasting a list of lines works, because each line is one idea.
 
-### Do the AI drafts change my canvas on their own?
+### Do the AI suggestions change my canvas on their own?
 
-No. A draft appears in the box for you to read and edit. Nothing else on the canvas changes.
+No. Proposals appear in a panel for you to read. Nothing is added until you click Accept.
 
 ## Related questions and modules
 

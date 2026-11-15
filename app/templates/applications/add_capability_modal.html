@@ -1,10 +1,17 @@
-{% from 'components/form_field.html' import form_group, form_footer %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/modal_form.html' import modal_form %}
+
+{% macro _select(id, name, options, placeholder=none, required=false, selected=none) %}
+{% call ui.native_select_wrapper(class='relative w-full') %}{% call ui.native_select(id=id, class='h-9 w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm', attrs={'name': name, 'required': required}) %}
+{% if placeholder %}{{ ui.native_select_option(text=placeholder, value='') }}{% endif %}
+{% for value, label, disabled in options %}{{ ui.native_select_option(text=label, value=value, attrs={'disabled': disabled, 'selected': value == selected}) }}{% endfor %}
+{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+{% endmacro %}
 
 {% call modal_form(
     id='add-capability-modal',
     title='Map Capability to Application',
-    description='Link an enterprise capability to this application',
+    description='Record that this application supports a capability',
     submit_text='Add Mapping',
     size='md',
     form_action=url_for('application_mgmt.application_capability_mapping_create', id=app.id),
@@ -13,54 +20,40 @@
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
 <div class="space-y-4">
-    <div>
-        <label for="cap-select" class="block text-sm font-medium mb-1.5">Capability <span class="text-destructive-emphasis">*</span></label>
-        <select id="cap-select" name="capability_id" required
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-            <option value="">Select a capability...</option>
-            {% for opt in capability_form_config.capability_options %}
-            <option value="{{ opt.id }}"{% if opt.disabled %} disabled{% endif %}>{{ opt.label }}</option>
-            {% endfor %}
-        </select>
-    </div>
+  {% call ui.field() %}
+    {% call ui.field_label(attrs={'for': 'cap-select'}) %}Capability{% endcall %}
+    {{ _select('cap-select', 'capability_id', capability_form_config.capability_choices, placeholder='Select a capability...', required=true) }}
+  {% endcall %}
 
-    <div>
-        <label for="cap-support" class="block text-sm font-medium mb-1.5">Support Level</label>
-        <select id="cap-support" name="support_level"
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-            <option value="">Select...</option>
-            {% for val, label in capability_form_config.support_levels %}
-            <option value="{{ val }}">{{ label }}</option>
-            {% endfor %}
-        </select>
-    </div>
+  {% call ui.field() %}
+    {% call ui.field_label(attrs={'for': 'cap-kind'}) %}How it supports{% endcall %}
+    {{ _select('cap-kind', 'kind', capability_form_config.kind_choices, selected='realization') }}
+  {% endcall %}
 
-    <div class="grid grid-cols-2 gap-4">
-        {% call form_group(id='cap-coverage', label='Coverage %') %}
-            <input type="number" id="cap-coverage" name="coverage_percentage" min="0" max="100" placeholder="0-100"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-        {% endcall %}
-        <div>
-            <label for="cap-maturity" class="block text-sm font-medium mb-1.5">Maturity Level</label>
-            <select id="cap-maturity" name="maturity_level"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                <option value="">Select...</option>
-                {% for val, label in capability_form_config.maturity_levels %}
-                <option value="{{ val }}">{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-    </div>
+  {% call ui.field() %}
+    {% call ui.field_label(attrs={'for': 'cap-support'}) %}Support{% endcall %}
+    {{ _select('cap-support', 'support_level', capability_form_config.level_choices, placeholder='Select...') }}
+  {% endcall %}
 
-    <div class="flex items-center gap-2">
-        <input type="checkbox" id="cap-strategic" name="is_strategic" value="on"
-               class="h-4 w-4 rounded border-input text-primary focus:ring-ring">
-        <label for="cap-strategic" class="text-sm font-medium">Strategic capability</label>
-    </div>
-
-    {% call form_group(id='cap-notes', label='Notes') %}
-        <textarea id="cap-notes" name="notes" rows="2" placeholder="Optional notes about this mapping..."
-                  class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+  <div class="grid grid-cols-2 gap-4">
+    {% call ui.field() %}
+      {% call ui.field_label(attrs={'for': 'cap-coverage'}) %}Coverage %{% endcall %}
+      {{ ui.input(id='cap-coverage', attrs={'type': 'number', 'name': 'coverage_percentage', 'min': 0, 'max': 100, 'placeholder': '0-100'}) }}
     {% endcall %}
+    {% call ui.field() %}
+      {% call ui.field_label(attrs={'for': 'cap-maturity'}) %}Maturity Level{% endcall %}
+      {{ _select('cap-maturity', 'maturity_level', capability_form_config.maturity_choices, placeholder='Select...') }}
+    {% endcall %}
+  </div>
+
+  {% call ui.field(attrs={'data-orientation': 'horizontal'}) %}
+    {{ ui.checkbox(id='cap-strategic', attrs={'name': 'is_strategic', 'value': 'on'}) }}
+    {% call ui.field_label(attrs={'for': 'cap-strategic'}) %}Strategic capability{% endcall %}
+  {% endcall %}
+
+  {% call ui.field() %}
+    {% call ui.field_label(attrs={'for': 'cap-notes'}) %}Notes{% endcall %}
+    {{ ui.textarea(id='cap-notes', attrs={'name': 'notes', 'rows': 2, 'placeholder': 'Optional notes about this mapping...'}) }}
+  {% endcall %}
 </div>
 {% endcall %}

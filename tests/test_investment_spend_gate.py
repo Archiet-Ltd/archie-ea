@@ -66,7 +66,7 @@ def _support(db_session, org, cap):
     db_session.add(app_row)
     db_session.flush()
     db_session.add(UnifiedApplicationCapabilityMapping(application_component_id=app_row.id,
-                                                       unified_capability_id=cap.id))
+                                                       unified_capability_id=cap.id, organization_id=org.id))
     db_session.flush()
 
 

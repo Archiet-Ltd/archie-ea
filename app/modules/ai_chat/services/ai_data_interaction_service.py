@@ -522,18 +522,37 @@ class AIDataInteractionService:
                 }
 
             # Create mapping
-            mapping = UnifiedApplicationCapabilityMapping(
-                unified_capability_id=mapping_data["unified_capability_id"],
-                application_component_id=mapping_data["application_component_id"],
-                support_level=mapping_data.get("support_level", "partial"),
-                coverage_percentage=mapping_data.get("coverage_percentage", 0),
-                relationship_type=mapping_data.get("relationship_type", "enables"),
-                gap_status=mapping_data.get("gap_status", "unknown"),
-                priority=mapping_data.get("priority", "medium"),
-                assessor=str(self.user_id) if self.user_id else "AI_Assistant",
+            from app.middleware.tenant_context import current_org_id
+            from app.services.capability_support import (
+                CapabilitySupportRefused,
+                record_support_for_records,
             )
 
-            db.session.add(mapping)
+            org_id = current_org_id()
+            if org_id is None:
+                return {
+                    "success": False,
+                    "error": "No active organization context",
+                    "operation": "create_capability_mapping",
+                }
+            try:
+                recorded = record_support_for_records(
+                    org_id,
+                    mapping_data["application_component_id"],
+                    mapping_data["unified_capability_id"],
+                    facts={
+                        "support_level": mapping_data.get("support_level", "partial"),
+                        "coverage_percentage": mapping_data.get("coverage_percentage", 0),
+                    },
+                )
+            except CapabilitySupportRefused as refusal:
+                db.session.rollback()
+                return {"success": False, "error": str(refusal), "operation": "create_capability_mapping"}
+            mapping = db.session.get(UnifiedApplicationCapabilityMapping, recorded.row_id)
+            mapping.relationship_type = mapping_data.get("relationship_type", "enables")
+            mapping.gap_status = mapping_data.get("gap_status", "unknown")
+            mapping.priority = mapping_data.get("priority", "medium")
+            mapping.assessor = str(self.user_id) if self.user_id else "AI_Assistant"
             db.session.commit()
 
             # Log operation

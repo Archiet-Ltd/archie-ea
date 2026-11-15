@@ -23,6 +23,7 @@ from app.datetime_helpers import utcnow
 from app.models.application_component_fast import ApplicationComponent
 from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 from app.models.unified_capability import UnifiedCapability
+from app.services.capability_support import record_support_for_records
 from app.services.llm_service import LLMService
 
 # from app.services.decorators import transactional  # Temporarily disabled
@@ -195,29 +196,31 @@ RESPOND WITH VALID JSON ONLY (no markdown):
             return existing
 
         # Create new mapping
-        mapping = UnifiedApplicationCapabilityMapping(
-            unified_capability_id=capability_id,
-            application_component_id=application_id,
-            support_level=suggestion.get("support_level", "partial"),
-            coverage_percentage=75,  # Default coverage
-            support_quality=suggestion.get("suggested_maturity", 3),
-            relationship_type="enables",
-            relationship_strength=4,
-            gap_status="partially_covered"
-            if suggestion.get("support_level") == "partial"
-            else "fully_covered",
-            assessment_notes=json.dumps(
-                {
-                    "ai_generated": True,
-                    "confidence_score": suggestion.get("confidence_score"),
-                    "reasoning": suggestion.get("reasoning"),
-                    "created_by": created_by or "AI Auto-Mapper",
-                    "created_at": utcnow().isoformat(),
-                }
-            ),
+        recorded = record_support_for_records(
+            app.organization_id,
+            application_id,
+            capability_id,
+            facts={
+                "support_level": suggestion.get("support_level", "partial"),
+                "coverage_percentage": 75,  # Default coverage
+            },
+        )
+        mapping = db.session.get(UnifiedApplicationCapabilityMapping, recorded.row_id)
+        mapping.support_quality = suggestion.get("suggested_maturity", 3)
+        mapping.relationship_strength = 4
+        mapping.gap_status = (
+            "partially_covered" if suggestion.get("support_level") == "partial" else "fully_covered"
+        )
+        mapping.assessment_notes = json.dumps(
+            {
+                "ai_generated": True,
+                "confidence_score": suggestion.get("confidence_score"),
+                "reasoning": suggestion.get("reasoning"),
+                "created_by": created_by or "AI Auto-Mapper",
+                "created_at": utcnow().isoformat(),
+            }
         )
 
-        db.session.add(mapping)
         db.session.commit()
 
         logger.info(
