@@ -395,14 +395,10 @@ def _type_key_column():
     return _db.func.replace(_db.func.replace(lowered, " ", ""), "_", "")
 
 
-def _filter_to_layer(query, layer, layer_type_names):
-    """Narrow an element query to one layer; the composite view takes every type no layer holds."""
-    from app import db as _db
-
-    key = _type_key_column()
-    if layer == COMPOSITE_LAYER:
-        return query.filter(_db.not_(key.in_(list(LAYER_TYPE_TO_LAYER))))
-    return query.filter(key.in_(layer_type_names))
+def _filter_to_layer(query, layer, layer_type_names=None):
+    """Narrow an element query to one layer by the rule count_layers counts it with (layer_criterion), so the
+    layer that opens holds exactly the elements its card counts."""
+    return query.filter(layer_criterion(layer))
 
 
 # The most elements one viewpoint answer carries.
@@ -462,23 +458,26 @@ def _most_connected(query, org_id):
 PHYSICAL_TYPES = frozenset({"equipment", "facility", "distributionnetwork", "material"})
 
 
-def _register_only_count(dashboard_layer: str, org_id=None) -> int:
+def _register_only_count(dashboard_layer: str, org_id=None, allowed_types=None) -> int:
     """Records of the layer's own tables that have no model element (a gap entered in the gap register).
 
     The layer lists them and counts them, the model map does not draw them. A type held in a table that
     mirrors into the model is counted once, as its model element. Raises when a table cannot be read.
 
     One UNION ALL query per layer across all of the layer's model tables, instead of one count query
-    per type."""
+    per type. ``allowed_types`` narrows the records to those types, as it narrows the model elements."""
     from app.modules.architecture.routes.archimate_crud.routes import LAYER_CONFIG, MODEL_REGISTRY
     from app import db as _db
     from sqlalchemy import union_all, select, literal, func
 
     keys = [dashboard_layer] + (["physical"] if dashboard_layer == "technology" else [])
 
+    allowed = {_type_key(t) for t in allowed_types} if allowed_types else None
     parts = []
     for key in keys:
         for type_name in LAYER_CONFIG.get(key, {}).get("elements", []):
+            if allowed is not None and _type_key(type_name) not in allowed:
+                continue
             model_class = MODEL_REGISTRY.get(type_name)
             if not model_class:
                 continue
@@ -532,6 +531,23 @@ def _stored_layer_column():
     return _db.func.replace(_db.func.replace(spelled, " ", ""), "_", "")
 
 
+def layer_criterion(layer: str):
+    """The condition that places an element in one layer: stored in the layer, whatever its type, or naming no
+    layer and typed for it (element_layer is the same rule in Python). Physical answers with the Physical
+    types alone; the composite row takes the unplaced elements whose type no layer holds."""
+    from app import db as _db
+
+    if layer == "physical":
+        return _type_key_column().in_(list(PHYSICAL_TYPES))
+    stored = _stored_layer_column()
+    unplaced = _db.not_(stored.in_(list(STORED_LAYER_KEYS)))
+    if layer == COMPOSITE_LAYER:
+        return _db.and_(unplaced, _db.not_(_type_key_column().in_(list(LAYER_TYPE_TO_LAYER))))
+    names = [name for name, key in STORED_LAYER_KEYS.items() if key == layer]
+    typed = [t.lower() for t in _types_for_layer(layer)]
+    return _db.or_(stored.in_(names), _db.and_(unplaced, _type_key_column().in_(typed)))
+
+
 def layer_model_query(layer: str, org_id):
     """The model elements of one layer, the rows count_layers counts for it: every element stored in the layer,
     whatever its type (element_layer is the rule). Physical, which is no layer of its own, answers with the
@@ -543,17 +559,7 @@ def layer_model_query(layer: str, org_id):
     from app import db as _db
     from app.models.archimate_core import ArchiMateElement
 
-    base = ArchiMateElement.query
-    base = base.filter(ArchiMateElement.organization_id == org_id)
-    if layer == "physical":
-        return base.filter(_type_key_column().in_(list(PHYSICAL_TYPES)))
-    stored = _stored_layer_column()
-    unplaced = _db.not_(stored.in_(list(STORED_LAYER_KEYS)))
-    if layer == COMPOSITE_LAYER:
-        return base.filter(unplaced, _db.not_(_type_key_column().in_(list(LAYER_TYPE_TO_LAYER))))
-    names = [name for name, key in STORED_LAYER_KEYS.items() if key == layer]
-    typed = [t.lower() for t in _types_for_layer(layer)]
-    return base.filter(_db.or_(stored.in_(names), _db.and_(unplaced, _type_key_column().in_(typed))))
+    return ArchiMateElement.query.filter(ArchiMateElement.organization_id == org_id, layer_criterion(layer))
 
 
 def count_layers(org_id, allowed_types=None) -> list:
@@ -584,7 +590,7 @@ def count_layers(org_id, allowed_types=None) -> list:
     rows = []
     for layer, title in LAYER_TITLES.items():
         try:
-            records = 0 if layer == COMPOSITE_LAYER else _register_only_count(layer, org_id)
+            records = 0 if layer == COMPOSITE_LAYER else _register_only_count(layer, org_id, allowed_types)
         except Exception as exc:  # a table that cannot be read leaves the layer uncounted, not under-counted
             logger.warning("count_layers: records of %s could not be counted: %s", layer, exc)
             _db.session.rollback()
@@ -665,8 +671,7 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
     allowed_rels = set(vp.get('allowed_relationships', []))
     enterprise_scope = bool(vp.get('enterprise_scope'))
 
-    # `layer` narrows by ArchiMateElement.type via the shared LAYER_TYPES map
-    # (not the unreliable .layer column -- see module docstring above).
+    # `layer` narrows by the stored-layer rule count_layers counts with (layer_criterion).
     # Callers (the API route) are responsible for 400ing an unknown value
     # before reaching here; an unrecognised value falls through to
     # `layer_type_names = []`, which -- to fail closed rather than silently

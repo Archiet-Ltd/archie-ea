@@ -110,10 +110,10 @@ def layer_counts() -> List[Dict[str, Any]]:
     for key in LAYERS:
         drawn = model.get(key, 0)
         records = register_only.get(_counting_layer(key))
-        total = drawn + records if records is not None else drawn
+        total = drawn + records if records is not None else None  # not known, never the drawn figure
         kinds = sorted(kinds_by_layer[key].items(), key=lambda kv: (-kv[1], kv[0]))
         out.append({
-            "layer": key, "label": LAYER_LABELS[key], "count": drawn, "total": total, "not_drawn": total - drawn,
+            "layer": key, "label": LAYER_LABELS[key], "count": drawn, "total": total, "not_drawn": None if total is None else total - drawn,
             "kinds": [{"type": t, "count": c} for t, c in kinds],
         })
     return out
@@ -129,7 +129,7 @@ def build_model_map(layer: Optional[str] = None) -> Dict[str, Any]:
 
     counts = layer_counts()
     total = sum(c["count"] for c in counts)
-    store_total = sum(c["total"] for c in counts)
+    store_total = None if any(c["total"] is None for c in counts) else sum(c["total"] for c in counts)
     wanted = layer if layer in LAYERS else None
     base = {"counts": counts, "total": total, "store_total": store_total, "layer": wanted, "max_nodes": MAX_NODES}
 
