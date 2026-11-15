@@ -3186,8 +3186,10 @@ def _compliance_check_for(solution) -> dict:
 @solution_design_bp.route("/<int:solution_id>/api/compliance-gap", methods=["GET"])
 @login_required
 def api_compliance_gap(solution_id: int):
-    """The compliance check behind a solution's Run Analysis button."""
-    solution = Solution.query.get_or_404(solution_id)
+    """The compliance check behind a solution's Run Analysis button. A solution of another organisation
+    answers 404, whether or not its row is already held in the session."""
+    solution = Solution.query.filter_by(
+        id=solution_id, organization_id=current_user.organization_id).first_or_404()
     if not _check_solution_access(solution):
         abort(403)
     return jsonify({"success": True, "gap": _compliance_check_for(solution)})
