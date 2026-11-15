@@ -1211,14 +1211,15 @@ def verdict(approval: AIChatCRUDApproval, state: str, summary: str, reasons: Lis
             record_url: Optional[str] = None) -> Dict[str, Any]:
     """The one answer settling returns: what the assistant tells the person in the same turn.
 
-    A change to a goal or a risk is worded "Done: ..." or "Not applied: ..." and links the record it made or
-    changed; every other change keeps its words and links the record of the review."""
+    A change to a goal or a risk is worded "Done: ..." or "Not applied: ..."; every other change keeps its
+    words. A tool that returns the address of the record it made or changed is linked to that record; any
+    other change links the record of its review."""
     saved = _state(approval)
     review_url = record_path(approval.id)
     if record_schema(approval.entity_type) is not None:
         applied_word, declined_word = "Done", "Not applied"
     else:
-        applied_word, declined_word, record_url = "Applied", "Declined", None
+        applied_word, declined_word = "Applied", "Declined"
     if state == "applied":
         message = "%s: %s" % (applied_word, summary)
     elif state == "declined":

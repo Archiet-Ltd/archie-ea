@@ -137,6 +137,26 @@ def _row(item, direction, *, user, plain_name, plain_layer, layer_aliases, href_
     }
 
 
+def goal_facts(element_type, ae_row):
+    """The facts a Goal element holds in its goals row: target date and status, as words.
+
+    A Goal element with no row yet reads "No target date recorded". None for any other element type."""
+    if element_type != "Goal" or ae_row is None or getattr(ae_row, "organization_id", None) is None:
+        return {"goal": None}
+    from app.services import goal_store
+
+    row = goal_store.goal_for_element(ae_row.organization_id, ae_row.id)
+    target = getattr(row, "target_date", None)
+    status = getattr(row, "status", None)
+    return {"goal": [
+        {"key": "target-date", "label": "Target date",
+         "value": "%d %s %d" % (target.day, target.strftime("%b"), target.year) if target
+         else goal_store.NO_TARGET_DATE},
+        {"key": "goal-status", "label": "Goal status",
+         "value": status.replace("_", " ").capitalize() if status else "Not recorded"},
+    ]}
+
+
 def plateau_facts(element, element_type, ae_row, *, href_for):
     """The state badge and the stage facts, as words. Never the plateau object itself.
 

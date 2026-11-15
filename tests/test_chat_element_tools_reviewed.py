@@ -34,6 +34,22 @@ def test_every_tool_offered_to_the_chat_is_in_the_lookup():
     assert "create_stakeholder" in TOOL_SCHEMA_BY_NAME
 
 
+def test_the_lookup_is_built_once_and_holds_every_generated_tool():
+    import inspect
+
+    from app.modules.ai_chat.tools import registry
+    from app.modules.ai_chat.tools.archimate_specs import ELEMENT_SPECS
+
+    source = inspect.getsource(registry)
+    assert source.count("TOOL_SCHEMA_BY_NAME = ") == 1
+    assert "TOOL_SCHEMA_BY_NAME.clear()" not in source and "TOOL_SCHEMA_BY_NAME.update(" not in source
+    assert source.index("TOOL_SCHEMAS.extend(_archimate_element_schemas())") < source.index("TOOL_SCHEMA_BY_NAME = ")
+    generated = {s["name"] for s in registry.TOOL_SCHEMAS if s.get("route") == "ArchiMateElement"
+                 and s["name"] != "create_archimate_element"}
+    assert len(generated) == len(ELEMENT_SPECS)
+    assert generated <= set(registry.TOOL_SCHEMA_BY_NAME)
+
+
 def test_the_risk_classifier_sees_the_element_tools():
     from app.modules.ai_chat.services import tool_risk_classifier
     from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME
@@ -63,7 +79,8 @@ def test_a_requested_assessment_is_reviewed_and_applied_in_the_same_turn(db_sess
     with tenant_ctx(org.id):
         approval_id, verdict = _ask_for_element(user, "create_assessment", name)
         assert verdict["state"] == "applied", verdict
-        assert verdict["record_url"].endswith("approval=%d" % approval_id)
+        assert verdict["review_url"].endswith("approval=%d" % approval_id)
+        assert "/architecture/" in verdict["record_url"] and verdict["record_url"].endswith("ae=1")
         found = _elements_named(name)
         assert len(found) == 1
         assert found[0].organization_id == org.id and found[0].type == "assessment"

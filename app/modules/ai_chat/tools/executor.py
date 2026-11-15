@@ -55,13 +55,18 @@ _FIELD_WORDS = {"name": "name", "title": "title", "description": "description", 
                 "mitigation_plan": "mitigation plan"}
 
 
-def _element_url(element_id) -> str:
-    """The page of a Goal element, the one place a goal's facts are shown (``ae=1``: the id is the element's)."""
+def _element_page_url(layer, element_type, element_id) -> str:
+    """The page of one ArchiMate element (``ae=1``: the id is the element's, not a dedicated table's). Built
+    without a request too, as the review runs on the chat's worker."""
     from app.services.result_footer_service import page_link
 
-    return (page_link("archimate_crud.detail_element", layer="motivation", element_type="Goal",
+    return (page_link("archimate_crud.detail_element", layer=layer, element_type=element_type,
                       element_id=element_id, ae=1)
-            or "/architecture/motivation/Goal/%s?ae=1" % element_id)
+            or "/architecture/%s/%s/%s?ae=1" % (layer, element_type, element_id))
+
+
+def _element_url(element_id) -> str:
+    return _element_page_url("motivation", "Goal", element_id) if element_id else ""
 
 
 def _on_date(value) -> str:
@@ -3820,6 +3825,7 @@ def _install_archimate_element_tools() -> int:
             logger.info(
                 "Agent created %s id=%s layer=%s", element_type, element.id, spec["layer"]
             )
+            url = _element_page_url(spec["layer"], element_type, element.id)
             return {
                 "success": True,
                 "result": {
@@ -3827,9 +3833,11 @@ def _install_archimate_element_tools() -> int:
                     "name": element.name,
                     "entity_type": element_type,
                     "layer": spec["layer"],
+                    "record_url": url,
                 },
                 "message": "Added %s '%s' to the %s layer."
                            % (element_type.replace("_", " "), element.name, spec["layer"]),
+                "record_url": url,
             }
 
         _create.__name__ = "_tool_create_%s" % element_type

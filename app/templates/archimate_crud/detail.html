@@ -529,6 +529,14 @@
             {% endif %}
         </section>
 
+        {% if page.goal %}
+        {% from 'components/fact_list.html' import fact_list %}
+        <section class="space-y-4 rounded-lg border border-border bg-card p-6" aria-labelledby="goal-heading" data-testid="goal-card">
+            <h2 id="goal-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Goal</h2>
+            {% call(p) fact_list(items=page.goal, testid='goal-facts') %}{{ p.value }}{% endcall %}
+        </section>
+        {% endif %}
+
         <section class="space-y-4 rounded-lg border border-border bg-card p-6" aria-labelledby="record-heading" data-testid="record-card">
             <h2 id="record-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Record</h2>
             <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2.5 text-sm">

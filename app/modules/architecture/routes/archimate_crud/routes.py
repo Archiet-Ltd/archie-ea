@@ -2168,6 +2168,7 @@ def _element_page(element, element_type, ae_id, relationships):
         "connections": connections,
         "lines": element_page.answer_lines(element_type, connections, **common),
         **element_page.plateau_facts(element, element_type, ae_row, href_for=href_for),
+        **element_page.goal_facts(element_type, ae_row),
     }
 
 

@@ -1200,7 +1200,9 @@ class AgentRunner:
                         "record_url": verdict.get("record_url"),
                     })
                     result = self._verdict_result(approval_id, verdict)
-                    if change_review.record_schema(tc.name) is not None and verdict.get("state") != "in_review":
+                    if verdict.get("state") != "in_review" and (
+                            change_review.record_schema(tc.name) is not None
+                            or verdict.get("record_url") != verdict.get("review_url")):
                         record_lines.append(self._record_line(verdict))
                     else:
                         other_tools = True
