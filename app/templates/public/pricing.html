@@ -16,6 +16,9 @@
 {% block meta_description %}
 {% from 'partials/_seo_meta.html' import seo_meta %}
 {{ seo_meta(page.self_canonical_url, page.description, page.is_held) }}
+{% for code, address in page.alternates %}
+<link rel="alternate" hreflang="{{ code }}" href="{{ address }}">
+{% endfor %}
 <meta property="og:title" content="{{ page.title }}">
 <meta name="twitter:title" content="{{ page.title }}">
 {% endblock %}

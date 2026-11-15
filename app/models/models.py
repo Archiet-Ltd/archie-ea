@@ -5,7 +5,7 @@ from datetime import datetime
 
 from flask import current_app  # dead-code-ok
 from flask_login import current_user  # dead-code-ok
-from sqlalchemy import types
+from sqlalchemy import event, types
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import validates
 
@@ -632,6 +632,19 @@ else:
                     val = float(val)
                 out[col.name] = val
             return out
+
+
+from .relationship_guard import (  # noqa: E402,F401
+    _RELATIONSHIP_END_TABLES,
+    CrossOrganisationRelationship,
+    assert_relationship_same_organisation,
+    register_relationship_guard,
+)
+
+if not _FAST_INIT:
+    # Under APP_FAST_INIT=1 the class is the twin in archimate_core, which
+    # registers the guard itself.
+    register_relationship_guard(ArchiMateRelationship)
 
 
 class WorkflowInstanceArchiMateElement(db.Model):

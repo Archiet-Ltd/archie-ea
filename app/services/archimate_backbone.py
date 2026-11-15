@@ -404,16 +404,23 @@ def _on_before_commit(session):
     elements = session.info.pop(_NEW_GAP_ELEMENTS, None)
     if not elements:
         return
-    from app.models.implementation_migration import Gap
+    from app import db
     from app.services.gap_register_service import gap_record_for_element
 
     live = [e for e in elements
             if e.id is not None and e.organization_id and e.superseded_at is None and e in session]
     if not live:
         return
+    # Asked of the table directly, by each element's own organisation: the ORM's tenant filter shows only the
+    # signed-in organisation's rows, and a record this commit cannot see would be written a second time.
     claimed = {
-        row[0] for row in session.query(Gap.archimate_element_id).filter(
-            Gap.archimate_element_id.in_([e.id for e in live]))
+        row[0] for row in session.execute(
+            db.text(
+                "SELECT archimate_element_id FROM gaps "
+                "WHERE archimate_element_id = ANY(:ids) AND organization_id = ANY(:orgs)"
+            ),
+            {"ids": [e.id for e in live], "orgs": sorted({e.organization_id for e in live})},
+        )
     }
     for element in live:
         if element.id not in claimed:

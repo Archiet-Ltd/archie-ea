@@ -234,9 +234,14 @@ def test_the_canvas_page_shows_cost_lines_to_a_cto_and_the_reason_to_a_business_
                 assert "Billing ledger, technology share: 9,000" in text
                 assert "Order portal: 12,000" in text
                 assert WITHHELD not in text
+                assert box.locator("[data-canvas-withheld]").count() == 0
+                listed = box.locator("[data-canvas-notes] > li").count()
+                assert listed >= 3
+                assert box.locator("[data-canvas-band] div.rounded-full").first.inner_text().strip() == str(listed)
             else:
                 assert WITHHELD in text
                 assert box.locator("[data-canvas-withheld]").count() == 1
+                assert box.locator("[data-canvas-band] div.rounded-full").count() == 0
                 assert "48,000" not in text and "12,000" not in text and "9,000" not in text
                 assert "Billing ledger" not in text and "No application costs" not in text
                 assert "48,000" not in page.content()

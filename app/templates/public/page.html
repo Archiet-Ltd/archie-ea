@@ -18,6 +18,7 @@
 {% extends 'layouts/public_base.html' %}
 {% from 'macros/pricing_cta.html' import plan_buy_section %}
 {% block body_theme %}theme-marketing{% endblock %}
+{% block html_lang %}{{ page.lang }}{% endblock %}
 {% block title %}{{ share_view.title if share_view else page.title }}{% endblock %}
 
 {% block meta_description %}
@@ -28,6 +29,9 @@
 <meta name="twitter:title" content="{{ share_view.title }}">
 {% else %}
 {{ seo_meta(page.self_canonical_url, page.description, page.is_held, social) }}
+{% for code, address in page.alternates %}
+<link rel="alternate" hreflang="{{ code }}" href="{{ address }}">
+{% endfor %}
 <meta property="og:title" content="{{ page.title }}">
 <meta name="twitter:title" content="{{ page.title }}">
 {% endif %}
@@ -49,6 +53,18 @@
 <div class="public-container">
   {% if jsonld %}
   <script type="application/ld+json">{{ jsonld }}</script>
+  {% endif %}
+  {% if page.language_links %}
+  <nav aria-label="Languages" data-testid="language-list" class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+    <span>Read this page in:</span>
+    {% for code, name, address in page.language_links %}
+    {% if code == page.lang %}
+    <span lang="{{ code }}" aria-current="page" class="font-medium text-foreground">{{ name }}</span>
+    {% else %}
+    <a lang="{{ code }}" hreflang="{{ code }}" href="{{ address }}" class="underline underline-offset-4">{{ name }}</a>
+    {% endif %}
+    {% endfor %}
+  </nav>
   {% endif %}
 
   <article class="public-page-content public-prose prose max-w-none">

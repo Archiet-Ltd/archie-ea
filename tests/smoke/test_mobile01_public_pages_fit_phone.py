@@ -46,7 +46,7 @@ _AUDIT = """() => {
 
 
 def _sitemap_paths(base):
-    xml = urllib.request.urlopen(base + "/sitemap.xml", timeout=60).read().decode()
+    xml = urllib.request.urlopen(base + "/sitemap-en.xml", timeout=60).read().decode()
     paths = [re.sub(r"^https?://[^/]+", "", u) or "/" for u in re.findall(r"<loc>([^<]+)</loc>", xml)]
     assert paths, "the sitemap lists no pages"
     return paths
