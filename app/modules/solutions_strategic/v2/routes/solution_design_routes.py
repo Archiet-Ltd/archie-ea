@@ -2807,6 +2807,47 @@ def api_phase_summary(solution_id: int):
     })
 
 
+@solution_design_bp.route("/<int:solution_id>/api/compliance-gap", methods=["POST"])
+@login_required
+def api_compliance_gap(solution_id: int):
+    """Run compliance gap analysis for a solution and record any gaps in the
+    one gap register, inside the solution's organisation.
+
+    The front end's ``runComplianceAnalysis()`` calls this endpoint. A gap is
+    written through ``gap_register_service.create_gap`` with the solution's
+    organisation_id, never to the legacy ``compliance_gaps`` table.
+    """
+    solution = Solution.query.get_or_404(solution_id)
+    if not _check_solution_access(solution):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    from app.services.gap_register_service import create_gap
+
+    gap, created = create_gap(
+        organization_id=solution.organization_id,
+        name="Compliance gap: %s" % solution.name,
+        description="Identified by compliance gap analysis for solution %d" % solution_id,
+        gap_type="compliance",
+        priority="medium",
+        severity="medium",
+        resolution_status="identified",
+        generation_source="compliance_gap_api",
+        auto_generated=True,
+    )
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "gap": {
+            "id": gap.id,
+            "name": gap.name,
+            "gap_type": gap.gap_type,
+            "organization_id": gap.organization_id,
+            "created": created,
+        },
+    })
+
+
 def _build_blueprint_context(solution):
     """Build template context for the blueprint page.
 
