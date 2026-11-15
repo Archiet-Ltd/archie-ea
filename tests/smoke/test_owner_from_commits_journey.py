@@ -91,12 +91,13 @@ def estate(live_server):
     by_account = _import(org, "Account Hub %s" % tag, handle_repo, _commits((ada, 6), ("dev@vendor.example", 2), login="anioko")
                          + _commits((sam, 4), login="sam-l"), owners=["@Anioko"])
     no_account = _import(org, "Quiet Hub %s" % tag, "acme/quiet-%s" % tag,
-                         _commits((stranger, 5), login="anioko"), owners=["@Anioko"])
+                         _commits((stranger, 5), login="anioko")
+                         + _commits(("dev@vendor.example", 5), login="bea"), owners=["@Anioko", "@Bea"])
     closed_repo = "acme/closed-%s" % tag
     closed = _import(org, "Closed Hub %s" % tag, closed_repo, [],
-                     summary=github._unreadable_summary(closed_repo, "HTTP 403"), owners=["@Anioko"])
-    team = _import(org, "Team Hub %s" % tag, "acme/team-%s" % tag, _commits((stranger, 5), login="platform"),
-                   owners=["@acme/platform"])
+                     summary=github._unreadable_summary(closed_repo, "HTTP 403"), owners=["@Anioko", "@Bea"])
+    team = _import(org, "Team Hub %s" % tag, "acme/team-%s" % tag, _commits((stranger, 5), login="platform")
+                   + _commits(("dev@vendor.example", 5), login="other"), owners=["@acme/platform"])
     return {"closed": closed, "team": team, "by_account": by_account, "no_account": no_account, "handle_repo": handle_repo, "busy": busy, "stale": stale, "stale_repo": "acme/pay-gateway-%s" % tag,
             "email": org["emails"]["enterprise_architect"], "shared": shared, "nobody": nobody,
             "leader": leader, "leader_repo": "acme/ledger-core-%s" % tag, "tag": tag, "names": names, "repo": "acme/archie-ea-%s" % tag}
@@ -267,7 +268,7 @@ def test_a_code_owner_account_is_the_member_its_commits_show_on_the_page_and_the
 
 
 @pytest.mark.parametrize("key,start", [
-    ("closed", "No owner was set: GitHub names @Anioko as code owner"),
+    ("closed", "No owner was set: GitHub names @Anioko, @Bea as code owner"),
     ("team", "No owner was set: GitHub names @acme/platform as code owner"),
 ])
 def test_a_named_owner_with_nobody_to_pick_gives_a_reason_and_no_prompt(architect, live_server, estate, key, start):
@@ -285,7 +286,7 @@ def test_a_named_owner_with_nobody_to_pick_gives_a_reason_and_no_prompt(architec
 
 
 def test_a_code_owner_account_with_no_member_email_gives_the_reason_on_the_page_and_the_list(architect, live_server, estate):
-    reason = ("No owner was set: GitHub names @Anioko as code owner, and none of that account's commits "
+    reason = ("No owner was set: GitHub names @Anioko, @Bea as code owner, and none of those accounts' commits "
               "in the last 90 days use the e-mail of a member of this organisation.")
     architect.goto("%s/applications/%s" % (live_server, estate["no_account"]), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(architect.get_by_test_id("need-owner-reason")).to_have_text(reason, timeout=PAGE_TIMEOUT)
