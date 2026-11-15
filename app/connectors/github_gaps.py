@@ -102,6 +102,14 @@ def _owner_hint(element, org_id) -> Dict[str, Any]:
         if teams:
             hint["note"] = f"GitHub also names {', '.join(teams)}."
         return hint
+    source = _fact(element, "github_owner_source")
+    if isinstance(source, dict) and source.get("user_id") is None and str(source.get("text") or "").startswith(
+            "No owner was set: GitHub names"):
+        hint = {"note": str(source["text"])}
+        history = _commit_hint(element, org_id)
+        if history.get("candidates"):
+            hint["candidates"] = history["candidates"]
+        return hint
     named = ", ".join(owners)
     hint = {"note": f"GitHub names {named} as code owner in {where}. Pick the person here who is that owner."}
     history = _commit_hint(element, org_id)

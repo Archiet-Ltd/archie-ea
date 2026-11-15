@@ -37,7 +37,7 @@ def github(app, monkeypatch):
     import requests
 
     stamp = (datetime.utcnow() - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    state = SimpleNamespace(commits=[], commit_status=200, calls=[])
+    state = SimpleNamespace(commits=[], commit_status=200, calls=[], codeowners=None)
     repo = {"name": "archie-ea", "full_name": REPOSITORY, "archived": False, "pushed_at": stamp,
             "default_branch": "main", "language": "Python"}
     monkeypatch.setitem(app.config, "ALLOW_EXTERNAL_API_CALLS", True)
@@ -51,7 +51,10 @@ def github(app, monkeypatch):
         if path == "orgs/acme/repos":
             return _Resp(200, [repo] if params.get("page", 1) == 1 else [])
         if path == f"repos/{REPOSITORY}/contents":
-            return _Resp(200, [])
+            return _Resp(200, [{"name": ".github", "type": "dir"}] if state.codeowners else [])
+        if path == f"repos/{REPOSITORY}/contents/.github/CODEOWNERS" and state.codeowners:
+            import base64
+            return _Resp(200, {"encoding": "base64", "content": base64.b64encode(state.codeowners.encode()).decode()})
         if path == f"repos/{REPOSITORY}/commits":
             if state.commit_status != 200:
                 return _Resp(state.commit_status, {"message": "refused"})
@@ -69,6 +72,14 @@ def commit_list(*pairs):
         for _ in range(count):
             when = datetime.utcnow() - timedelta(days=1, hours=len(out))
             out.append({"sha": f"{len(out):07x}cccc", "commit": {"author": {"email": email, "date": when.strftime("%Y-%m-%dT%H:%M:%SZ")}}})
+    return out
+
+
+def account_commits(login, *pairs):
+    """Commits made by one GitHub account: ``(email, n)`` pairs, each commit carrying the account's login."""
+    out = commit_list(*pairs)
+    for item in out:
+        item["author"] = {"login": login}
     return out
 
 
@@ -239,3 +250,102 @@ def test_the_application_list_gives_the_reason_instead_of_a_bare_no_owner(db_ses
     db_session.commit()
     page = client.get("/applications/").get_data(as_text=True)
     assert "the commits of archie-ea could not be read because the GitHub connection has no access to it." in page
+
+
+def test_a_code_owner_account_becomes_the_member_whose_email_its_own_commits_carry(
+    db_session, make_org, tenant_ctx, github
+):
+    org_a, org_b = make_org("rr-acct-a"), make_org("rr-acct-b")
+    ada = make_user(db_session, org_a, "Ada", "Obi")
+    elsewhere = make_user(db_session, org_b, "Cy", "Dee")
+    element, component = imported_application(db_session, org_a)
+    other_element, other_component = imported_application(db_session, org_b)
+    cfg = connect(db_session, tenant_ctx, org_a)
+    github.codeowners = "* @Anioko\n"
+    # @Anioko made 6 commits with Ada's address; two other accounts made more under strangers' addresses.
+    github.commits = (account_commits("anioko", (ada.email, 6)) + account_commits("someone", ("a@vendor.example", 4))
+                      + account_commits("other", ("b@vendor.example", 3)) + account_commits("cy", (elsewhere.email, 9)))
+
+    read(db_session, tenant_ctx, org_a, cfg)
+
+    assert [(r.user_id, r.source_table) for r in primaries(db_session, component)] == [(ada.id, "github_connector")]
+    text = fact(db_session, element, "github_owner_source")["text"]
+    assert text.startswith("From commit history: GitHub names @Anioko as code owner; 6 of that account's 6 commits")
+    assert ada.email in text
+    assert primaries(db_session, other_component) == []
+
+
+def test_a_code_owner_account_whose_commits_use_no_member_email_gives_the_plain_reason(
+    db_session, make_org, tenant_ctx, github, app
+):
+    from app.connectors.github_gaps import application_gaps
+
+    org, other = make_org("rr-acct-none"), make_org("rr-acct-none-b")
+    make_user(db_session, org, "Ada", "Obi")
+    stranger = make_user(db_session, other, "Cy", "Dee")  # a member of another organisation, same e-mail
+    element, component = imported_application(db_session, org)
+    cfg = connect(db_session, tenant_ctx, org)
+    github.codeowners = "* @Anioko\n"
+    github.commits = account_commits("anioko", (stranger.email, 7))
+
+    read(db_session, tenant_ctx, org, cfg)
+
+    reason = ("No owner was set: GitHub names @Anioko as code owner, and none of that account's commits "
+              "in the last 90 days use the e-mail of a member of this organisation.")
+    assert primaries(db_session, component) == []
+    assert fact(db_session, element, "github_owner_source")["text"] == reason
+    with app.test_request_context():
+        owner_gap = [g for g in application_gaps(org.id, [component])[component.id]["gaps"] if g["key"] == "owner"][0]
+    assert owner_gap["note"].startswith(reason)
+    assert "Pick the person here" not in owner_gap["note"]
+
+
+def test_a_team_is_never_turned_into_a_person(db_session, make_org, tenant_ctx, github):
+    org = make_org("rr-team")
+    ada = make_user(db_session, org, "Ada", "Obi")
+    element, component = imported_application(db_session, org)
+    cfg = connect(db_session, tenant_ctx, org)
+    github.codeowners = "* @acme/platform\n"
+    github.commits = account_commits("platform", (ada.email, 2)) + account_commits("acme", (ada.email, 2))
+
+    read(db_session, tenant_ctx, org, cfg)
+
+    # Ada made 4 of 4 member commits, so she leads them; the owner is the commit leader, never a named "team".
+    assert fact(db_session, element, "github_owner_source")["text"].startswith("From commit history: 4 of 4 commits")
+
+
+def test_two_accounts_pointing_at_different_members_name_nobody(db_session, make_org, tenant_ctx, github):
+    org = make_org("rr-two")
+    ada, sam = make_user(db_session, org, "Ada", "Obi"), make_user(db_session, org, "Sam", "Lee")
+    element, component = imported_application(db_session, org)
+    cfg = connect(db_session, tenant_ctx, org)
+    github.codeowners = "* @one @two\n"
+    github.commits = account_commits("one", (ada.email, 5)) + account_commits("two", (sam.email, 5))
+
+    read(db_session, tenant_ctx, org, cfg)
+
+    # The two members share the commits evenly, so there is no leader either.
+    assert primaries(db_session, component) == []
+    assert "point at more than one member" in fact(db_session, element, "github_owner_source")["text"]
+
+
+def test_the_command_applies_the_account_rule_and_the_second_run_changes_nothing(db_session, make_org, tenant_ctx, github):
+    from app.commands.owners_from_commits import owners_from_commits_command
+
+    org = make_org("rr-acct-cmd")
+    ada = make_user(db_session, org, "Ada", "Obi")
+    element, component = imported_application(db_session, org)
+    connect(db_session, tenant_ctx, org)
+    from app.connectors.github import _write_facts
+    _write_facts(element, {"github_code_owners": ["@Anioko"]})  # what an earlier read of CODEOWNERS recorded
+    github.commits = account_commits("anioko", (ada.email, 3), ("dev@vendor.example", 1))
+    db_session.commit()
+    runner, org_id, keys, ada_id = CliRunner(), org.id, (element.id, component.id), ada.id
+
+    first = runner.invoke(owners_from_commits_command, ["--org", str(org_id)])
+    second = runner.invoke(owners_from_commits_command, ["--org", str(org_id)])
+
+    assert "owner set. From commit history: GitHub names @Anioko as code owner; 3 of that account's 4 commits" in first.output
+    assert "already owned." in second.output and "Nothing changed." in second.output
+    element, component = reload(db_session, keys)
+    assert [r.user_id for r in primaries(db_session, component)] == [ada_id]

@@ -281,11 +281,18 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
     from app.models.user import User
 
     by_email: Dict[str, int] = {}
+    by_login: Dict[str, Dict[str, int]] = {}
     stamps: List[Tuple[str, str]] = []
     for item in commits or []:
         detail = item.get("commit") if isinstance(item, dict) else None
         author = (detail or {}).get("author") or {}
         email = str(author.get("email") or "").strip().lower()
+        login = str(((item.get("author") if isinstance(item, dict) else None) or {}).get("login") or "").strip().lower()
+        if login:
+            tally = by_login.setdefault(login, {"": 0})
+            tally[""] += 1
+            if email:
+                tally[email] = tally.get(email, 0) + 1
         if str(item.get("sha") or "") and author.get("date"):
             stamps.append((str(author["date"]), str(item["sha"])[:7]))
         if email:
@@ -305,6 +312,16 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
         key=lambda c: (-c["commits"], c["user_id"]),
     )
     stamps.sort()
+    # What each GitHub account's own commits say about who it is: only members of this organisation are kept.
+    logins: Dict[str, Dict[str, Any]] = {}
+    for login, tally in by_login.items():
+        matched: Dict[str, int] = {}
+        for email, n in tally.items():
+            if email and len(members.get(email, [])) == 1:
+                key = str(members[email][0])
+                matched[key] = matched.get(key, 0) + n
+        if matched:
+            logins[login] = {"commits": tally[""], "members": matched}
     return {
         "repository": repository,
         "days": COMMIT_WINDOW_DAYS,
@@ -312,7 +329,59 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
         "newest": stamps[-1][1] if stamps else None,
         "member_commits": sum(counts.values()),
         "candidates": candidates[:MAX_SUGGESTED_OWNERS],
+        "logins": logins,
     }
+
+
+def code_owner_handles(element) -> List[str]:
+    """The GitHub accounts (not teams, not e-mail addresses) named as code owner of an application."""
+    entry = (getattr(element, "acm_properties", None) or {}).get("github_code_owners")
+    owners = entry.get("value") if isinstance(entry, dict) else None
+    return [o for o in (owners or []) if isinstance(o, str) and o.startswith("@") and "/" not in o and len(o) > 1]
+
+
+def handle_owner(org_id, summary: Dict[str, Any], handles: List[str]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """The member a code-owner account is, shown only by its own commits.
+
+    An account becomes a person when the commits it made in the window carry the e-mail of
+    exactly one member of this organisation. Returns ``(match, reason)``: the match is
+    ``{"user_id", "handle", "commits", "of"}`` when one person is named by the evidence, else the
+    plain reason no owner was set. Two accounts pointing at different people name nobody."""
+    from app.models.user import User
+
+    days = (summary or {}).get("days") or COMMIT_WINDOW_DAYS
+    logins = (summary or {}).get("logins") or {}
+    found: Dict[int, Dict[str, Any]] = {}
+    for handle in handles:
+        entry = logins.get(handle[1:].lower())
+        members = (entry or {}).get("members") or {}
+        if len(members) == 1:
+            user_id, n = next(iter(members.items()))
+            belongs = db.session.execute(
+                db.select(User.id).where(User.id == int(user_id)).where(User.organization_id == org_id)).scalar()
+            if belongs is not None:
+                found.setdefault(int(user_id), {"user_id": int(user_id), "handle": handle, "commits": n, "of": entry["commits"]})
+    if len(found) == 1:
+        return next(iter(found.values())), None
+    if not handles:
+        return None, None
+    named = ", ".join(handles)
+    if found:
+        return None, (f"No owner was set: GitHub names {named} as code owner, and their commits in the last "
+                      f"{days} days point at more than one member of this organisation.")
+    those = "that account's commits" if len(handles) == 1 else "those accounts' commits"
+    return None, (f"No owner was set: GitHub names {named} as code owner, and none of {those} in the last "
+                  f"{days} days use the e-mail of a member of this organisation.")
+
+
+def handle_provenance(summary: Dict[str, Any], match: Dict[str, Any], user) -> str:
+    """The words that say why a code-owner account was taken to be this member."""
+    email = (getattr(user, "email", None) or "").strip()
+    return (
+        f"From commit history: GitHub names {match['handle']} as code owner; {match['commits']} of that account's "
+        f"{match['of']} commits in the last {summary.get('days') or COMMIT_WINDOW_DAYS} days use the e-mail {email} "
+        f"of a member of this organisation ({summary['repository']})"
+    )
 
 
 def commit_leader(summary: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -356,7 +425,18 @@ def apply_commit_history(org_id, element, component, summary: Dict[str, Any], as
     owned = bool(component is not None and ApplicationOwner.query.filter_by(
         application_id=component.id, organization_id=org_id, ownership_type="primary").first())
     written = False
-    if leader is not None and component is not None and not owned:
+    match, handle_reason = (None, None) if owned or component is None else handle_owner(
+        org_id, summary, code_owner_handles(element))
+    if match is not None:
+        from app.models.user import User
+
+        record = set_application_owner(
+            component, match["user_id"], "primary", organization_id=org_id, assigned_by=assigned_by)
+        record.source_table = PROPOSAL_SOURCE
+        facts["github_owner_source"] = {
+            "user_id": match["user_id"], "text": handle_provenance(summary, match, db.session.get(User, match["user_id"]))}
+        written = True
+    elif leader is not None and component is not None and not owned:
         record = set_application_owner(
             component, leader["user_id"], "primary", organization_id=org_id, assigned_by=assigned_by)
         record.source_table = PROPOSAL_SOURCE
@@ -364,6 +444,8 @@ def apply_commit_history(org_id, element, component, summary: Dict[str, Any], as
         written = True
     elif summary.get("unavailable") and not owned:
         facts["github_owner_source"] = {"user_id": None, "text": summary["unavailable"]}
+    elif handle_reason and not owned:
+        facts["github_owner_source"] = {"user_id": None, "text": handle_reason}
     _write_facts(element, facts)
     db.session.flush()
     return written
