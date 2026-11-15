@@ -10,6 +10,62 @@ ASSISTANT_UNAVAILABLE = (
     "Your question is saved; try again in a moment."
 )
 
+# Why a turn could not be answered, in the words a person reads. The server sends the code
+# (``reason_code``) with a failed turn; the chat page is given this table once and shows the
+# sentence for the code, so a reason has one wording on every path. Each sentence says what to do next.
+FAILURE_REASONS = {
+    "timeout": "The AI did not answer in time. Press Retry to ask again.",
+    "provider_unreachable": (
+        "The AI provider refused the request or could not be reached. "
+        "Press Retry; if it keeps happening, tell your administrator."
+    ),
+    "signed_out": "You are signed out. Sign in again, then ask again.",
+    "role_not_allowed": "Your role does not allow this. Ask your administrator for access.",
+    "too_large": "The request was too large. Shorten your question, then press Retry.",
+    "unknown": ASSISTANT_UNAVAILABLE,
+}
+
+# Reasons where asking again cannot help until the person or an administrator acts.
+FAILURE_REASONS_WITHOUT_RETRY = ("role_not_allowed",)
+
+# Sentences earlier turns saved into a conversation as the assistant's reply. A chat opened again
+# recognises a saved reply that is one of these (or one of FAILURE_REASONS) as a failed turn.
+SAVED_FAILURE_SENTENCES = (
+    "The assistant is busy right now. Wait a minute, then press Retry.",
+    "The assistant could not answer this time. Press Retry.",
+    "The AI service is busy right now (its free usage limit was reached). "
+    "Wait a minute, then press Retry.",
+)
+
+
+def reason_code_for_text(reason) -> "str | None":
+    """The reason code a provider or transport failure text points at, or None when it names none."""
+    text = str(reason or "").lower()
+    if any(t in text for t in ("timeout", "timed out", "did not respond", "did not answer")):
+        return "timeout"
+    if any(t in text for t in ("too large", "context length", "context_length", "maximum context", "413")):
+        return "too_large"
+    if any(t in text for t in ("unauthorized", "401", "invalid api key", "forbidden", "403", "refused",
+                               "connection", "unreachable", "502", "503", "bad gateway")):
+        return "provider_unreachable"
+    return None
+
+
+def failure_sentence(code) -> str:
+    """The sentence for a reason code; a code the table does not know reads as the general one."""
+    return FAILURE_REASONS.get(code) or FAILURE_REASONS["unknown"]
+
+
+def failure_table_for_page() -> dict:
+    """What the chat page is given: every reason's sentence, which reasons offer no Retry, and the saved replies
+    that mark a failed turn."""
+    return {
+        "reasons": dict(FAILURE_REASONS),
+        "no_retry": list(FAILURE_REASONS_WITHOUT_RETRY),
+        "saved": list(SAVED_FAILURE_SENTENCES) + list(FAILURE_REASONS.values()),
+    }
+
+
 # The sentence a person reads when an AI control cannot run because no
 # organisation has configured a provider for it yet -- a permanent,
 # administrative gap, not the transient failure ASSISTANT_UNAVAILABLE

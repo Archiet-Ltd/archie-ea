@@ -12,7 +12,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.models.ai_service import AIPromptTemplate
-from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
+from app.modules.ai_chat.services.failure_messages import failure_sentence
 from app.services.feature_flag_service import FeatureFlagService
 from app.services.rate_limiter import rate_limit
 from app.utils.validators import (
@@ -747,6 +747,7 @@ def send_message():
                 # That was reaching the browser verbatim. The full reason is in
                 # the server log line above.
                 "agent_error": agent_error,
+                "reason_code": agent_result.get("reason_code"),
                 # The platform's pause: the reply is the pause itself, built from nothing.
                 "paused": bool(agent_failure) and is_pause(agent_failure),
                 # Was hardcoded True on every response regardless of whether any
@@ -772,7 +773,8 @@ def send_message():
         return (
             jsonify(
                 {
-                    "error": ASSISTANT_UNAVAILABLE,
+                    "error": failure_sentence("provider_unreachable"),
+                    "reason_code": "provider_unreachable",
                     "error_type": "connection",
                 }
             ),
@@ -783,7 +785,8 @@ def send_message():
         return (
             jsonify(
                 {
-                    "error": "AI service request timed out. Please try again or use a shorter message.",
+                    "error": failure_sentence("timeout"),
+                    "reason_code": "timeout",
                     "error_type": "timeout",
                 }
             ),
@@ -800,7 +803,8 @@ def send_message():
             return (
                 jsonify(
                     {
-                        "error": ASSISTANT_UNAVAILABLE,
+                        "error": failure_sentence("provider_unreachable"),
+                        "reason_code": "provider_unreachable",
                         "error_type": "auth",
                     }
                 ),
@@ -1075,6 +1079,7 @@ def send_message_stream():
             from app.modules.ai_chat.services.agent_runner import (
                 sanitize_agent_error as _sanitize,
             )
+
             event_queue.put({
                 "type": "done",
                 "response": "",

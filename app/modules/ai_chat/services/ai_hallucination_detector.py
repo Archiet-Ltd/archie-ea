@@ -310,7 +310,7 @@ _NOT_A_COUNT_BEFORE = frozenset({
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 _NON_WORD = re.compile(r"[^a-z0-9]+")
 _ALNUM = re.compile(r"[A-Za-z0-9]+")
-_MAX_NGRAM = 6
+_MAX_NGRAM = 12
 _MAX_DISTINCT_PHRASES = 20000
 
 
@@ -559,11 +559,15 @@ def _clean_variants(text: str) -> List[str]:
     t = re.sub(_ZERO_WIDTH, "", t)
     t = REF_MARKER.sub(" ", t)
     t = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", t)                 # [text](url) -> text
+    # A name may carry a dash (MarketingIQ — backend), so the text is also read with each dash kept
+    # as a word of its own, beside the reading with dashes removed.
+    kept = re.sub("([\u2014\u2013\u2012\u2015])", r" \1 ", t)
     t = re.sub("[\u2014\u2013\u2012\u2015]|--+", " ", t)           # dashes
     t = t.replace("\u2019", "'").replace("\u2018", "'")              # one apostrophe
+    kept = kept.replace("\u2019", "'").replace("\u2018", "'")
     out: List[str] = []
-    for possessive in (False, True):
-        u = t
+    for possessive, base in [(p, b) for p in (False, True) for b in ((t, kept) if kept != t else (t,))]:
+        u = base
         if possessive:
             u = re.sub("(?<=\\w)'s(?!\\w)", "", u)                 # strip 's
         u = re.sub(_QUOTES, " ", u)                                # typographic quotes
