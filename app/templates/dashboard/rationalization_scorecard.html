@@ -186,7 +186,13 @@ async function loadScorecardData() {
 
     // Load cost tiers
     const tiersData = await Platform.fetch.get('/dashboard/api/tco/cost-tiers', null, { silent: true });
-    if (tiersData.success) {
+    if (tiersData.success && tiersData.costs_withheld_sentence) {
+      const note = document.createElement('p');
+      note.className = 'text-sm text-muted-foreground';
+      note.setAttribute('data-testid', 'costs-withheld');
+      note.textContent = tiersData.costs_withheld_sentence;
+      document.getElementById('cost-tiers-container').replaceChildren(note);
+    } else if (tiersData.success) {
       renderCostTiers(tiersData.data);
     }
 

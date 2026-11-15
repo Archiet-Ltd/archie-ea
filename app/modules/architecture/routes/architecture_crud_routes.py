@@ -22,10 +22,12 @@ from werkzeug.wsgi import ClosingIterator
 
 from app.decorators import audit_log, require_roles
 from app.extensions import db
+from app.middleware.tenant_context import current_org_id
 from app.models.archimate_core import (
     ArchiMateElement as ArchitectureElement,
     ArchiMateRelationship as Relationship,
 )
+from app.modules.intelligence.services.query_service import filter_relationships_by_org
 from app.services.architecture_validation_service import ArchitectureValidator
 from app.services.architecture_search_service import ArchitectureSearchService
 from app.services.architecture_import_export_service import (
@@ -291,11 +293,17 @@ def list_relationships():
     bare id, which is how BOTH routes produced the same "IDs, no names" bug
     from two different causes. Resolve real names/types here explicitly
     instead of relying on attributes that were never declared.
+
+    A relationship row may cross the organisation boundary (its own organization_id
+    is the caller's org while the far element belongs to another). Only relationships
+    where both source and target elements belong to the current organisation are listed.
     """
-    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.archimate_core import ArchiMateRelationship
 
     page = safe_int_arg('page', 1, minimum=1)
     per_page = 20
+
+    org_id = current_org_id()
 
     # An address that names one relationship ("Open relationship record" in an
     # answer) shows that relationship, so the row it points at is on the page.
@@ -303,19 +311,29 @@ def list_relationships():
     listing = ArchiMateRelationship.query
     if focus_id is not None:
         listing = listing.filter(ArchiMateRelationship.id == focus_id)
-    pagination = listing.order_by(
-        ArchiMateRelationship.type, ArchiMateRelationship.id
-    ).paginate(page=page, per_page=per_page)
 
-    element_ids = {
-        eid for rel in pagination.items
-        for eid in (rel.source_id, rel.target_id) if eid is not None
-    }
+    # Apply the shared fence BEFORE paging so each page holds its full 20 rows
+    all_rels = listing.order_by(
+        ArchiMateRelationship.type, ArchiMateRelationship.id
+    ).all()
+    filtered_rels = filter_relationships_by_org(all_rels, org_id, direction="both")
+
+    # Manual pagination on the filtered list
+    total = len(filtered_rels)
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_items = filtered_rels[start:end]
+
+    element_ids = set()
+    for rel in page_items:
+        element_ids.add(rel.source_id)
+        element_ids.add(rel.target_id)
+
     names_by_id = {}
     if element_ids:
         names_by_id = dict(
-            db.session.query(ArchiMateElement.id, ArchiMateElement.name)
-            .filter(ArchiMateElement.id.in_(element_ids))
+            db.session.query(ArchitectureElement.id, ArchitectureElement.name)
+            .filter(ArchitectureElement.id.in_(element_ids))
         )
 
     relationships = [
@@ -327,13 +345,27 @@ def list_relationships():
             "source_name": names_by_id.get(rel.source_id),
             "target_name": names_by_id.get(rel.target_id),
         }
-        for rel in pagination.items
+        for rel in page_items
     ]
+
+    # Pagination data for the template
+    pages = (total + per_page - 1) // per_page if per_page else 0
+    has_prev = page > 1
+    has_next = page < pages
+    prev_num = page - 1 if has_prev else None
+    next_num = page + 1 if has_next else None
 
     return render_template(
         "architecture/relationships.html",
         relationships=relationships,
-        total=pagination.total,
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=pages,
+        has_prev=has_prev,
+        has_next=has_next,
+        prev_num=prev_num,
+        next_num=next_num,
         focus_id=focus_id,
     )
 
@@ -703,17 +735,27 @@ def api_list_relationships():
 )
 @login_required
 def api_element_relationships(element_id):
-    """API: Get relationships for an element."""
-    ArchitectureElement.query.get_or_404(element_id)
+    """API: Get relationships for an element, scoped to the element's organisation.
 
-    incoming = Relationship.query.filter_by(target_id=element_id).all()
-    outgoing = Relationship.query.filter_by(source_id=element_id).all()
+    A relationship row may cross the organisation boundary (its own organization_id
+    is the caller's org while the far element belongs to another). Only relationships
+    where the far element belongs to the same organisation as the centre element
+    are returned.
+    """
+    org_id = current_org_id()
+    ArchitectureElement.query.filter_by(id=element_id, organization_id=org_id).first_or_404()
+
+    incoming_rels = Relationship.query.filter_by(target_id=element_id).all()
+    outgoing_rels = Relationship.query.filter_by(source_id=element_id).all()
+
+    incoming_rels = filter_relationships_by_org(incoming_rels, org_id, direction="incoming")
+    outgoing_rels = filter_relationships_by_org(outgoing_rels, org_id, direction="outgoing")
 
     return jsonify(
         {
             "status": "success",
-            "incoming": [_relationship_to_dict(r) for r in incoming],
-            "outgoing": [_relationship_to_dict(r) for r in outgoing],
+            "incoming": [_relationship_to_dict(r) for r in incoming_rels],
+            "outgoing": [_relationship_to_dict(r) for r in outgoing_rels],
         }
     )
 

@@ -453,7 +453,7 @@ def test_a_person_without_budget_authority_sees_no_savings_figure_on_consolidati
             if page.get_by_test_id("early-access-page").count():
                 expect(page.get_by_test_id("early-access-submit")).to_be_visible()
                 return
-            expect(page.get_by_test_id("opportunities-savings")).to_contain_text("not shown for your role")
+            expect(page.get_by_test_id("opportunities-savings")).to_contain_text("withheld for your role")
             main = page.locator("main").inner_text()
             for sign in ("$", "£", "€"):
                 assert sign not in main, (sign, main)

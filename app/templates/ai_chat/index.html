@@ -473,6 +473,7 @@
     window.csrfToken = '{{ csrf_token() }}';
     window.chatIsAdmin = {{ 'true' if current_user.is_admin() else 'false' }};
     window.chatNotSetUpSentence = {{ (not_set_up_sentence | default('')) | tojson }};
+    window.chatFailureTable = {{ (failure_table | default({'reasons': {}, 'no_retry': [], 'saved': []})) | tojson }};
     window.chatLookupAbortMs = {{ lookup_abort_ms | default(0) | int }};
     window.chatOwnKeyAdmin = {{ 'true' if own_key_admin else 'false' }};
 </script>

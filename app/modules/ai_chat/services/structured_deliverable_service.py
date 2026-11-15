@@ -87,6 +87,8 @@ class StructuredDeliverableService:
         industry_vertical: str = "",
         existing_constraints: Optional[List[str]] = None,
         compliance_requirements: Optional[List[str]] = None,
+        *,
+        show_costs: bool,
     ) -> Dict[str, Any]:
         """Run Buy/Build/Reuse analysis and return ranked recommendations."""
         try:
@@ -107,6 +109,7 @@ class StructuredDeliverableService:
                 industry_vertical=industry_vertical,
                 existing_constraints=existing_constraints or [],
                 compliance_requirements=compliance_requirements or [],
+                show_costs=show_costs,
             )
             result["deliverable_type"] = "solution_analysis"
             return result
@@ -696,6 +699,8 @@ class StructuredDeliverableService:
         industry_vertical: str = "",
         existing_constraints: Optional[List[str]] = None,
         compliance_requirements: Optional[List[str]] = None,
+        *,
+        show_costs: bool,
     ) -> Dict[str, Any]:
         """
         Generate the complete set of structured deliverables for a solution:
@@ -721,6 +726,7 @@ class StructuredDeliverableService:
             industry_vertical=industry_vertical,
             existing_constraints=existing_constraints,
             compliance_requirements=compliance_requirements,
+            show_costs=show_costs,
         )
         results["deliverables"]["solution_analysis"] = analysis
 
