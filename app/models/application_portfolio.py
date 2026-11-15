@@ -402,6 +402,12 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
     repository_type = Column(db.String(50))  # GitHub, GitLab, Bitbucket, Azure DevOps
     main_branch = Column(db.Text, default="main")
 
+    # What the record is: "application", "part" or "not_software". NULL means nobody has said, and
+    # app/services/application_kind.py decides from the record's composition and its repository facts.
+    application_kind = Column(db.String(20), nullable=True)
+    application_kind_set_by_id = Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    application_kind_set_at = Column(db.DateTime, nullable=True)
+
     # Deployment & Infrastructure (from application_layer.py)
     cloud_provider = Column(db.Text)  # AWS, Azure, GCP, On-Prem
     deployment_region = Column(db.Text)

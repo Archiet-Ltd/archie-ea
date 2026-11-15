@@ -258,12 +258,15 @@ def application_list():
                 )
 
         # ── 2. Portfolio total (excluding duplicates) for stats ────────────────
+        from app.services.application_kind import is_application_expression
+
+        _is_application = is_application_expression(ApplicationComponent)
         portfolio_total = ApplicationComponent.query.filter(
-            ~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\")
+            ~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\"), _is_application
         ).count()
 
         # ── 3. Build filtered query ───────────────────────────────────────────
-        query = ApplicationComponent.query
+        query = ApplicationComponent.query.filter(_is_application)
 
         # Exclude duplicate-flagged applications from default view unless
         # the user is explicitly searching for them.
@@ -524,7 +527,7 @@ def application_list():
             "end-of-life",
         }
         _stats_base = ApplicationComponent.query.filter(
-            ~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\")
+            ~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\"), _is_application
         )
 
         def _lifecycle_count(values):

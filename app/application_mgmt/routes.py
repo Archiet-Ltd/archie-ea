@@ -2348,9 +2348,14 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         logger.exception("Could not read the model links for application %s", app_obj.id)
         db.session.rollback()
 
+    from app.services.application_kind import KIND_LABELS, kind_of, parts_of
+
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
+        application_kind=kind_of(app_obj),
+        application_kind_options=list(KIND_LABELS.items()),
+        application_parts=parts_of(app_obj),
         imported_gaps=imported_gaps,
         form_values=form_values or {},
         form_errors=form_errors or {},

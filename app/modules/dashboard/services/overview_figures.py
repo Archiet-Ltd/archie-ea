@@ -151,19 +151,26 @@ def _is_decommissioned(A):
 
 
 def _active_applications():
-    """The applications the Systems list shows by default. A repository a connector brought in and
-    did not classify as an application is not one until a person promotes it by naming its owner."""
+    """The applications the Systems list shows by default, by the one rule of ``is_application_expression``:
+    a part of an application and something that is not software (a code repository) are not applications.
+    A repository a connector brought in and did not classify as an application is not one until a person
+    says so."""
     from app.connectors.github import unpromoted_import_expression
     from app.models.application_portfolio import ApplicationComponent as A
+    from app.services.application_kind import is_application_expression
 
-    return db.select(A).where(~unpromoted_import_expression(A), ~_is_duplicate(A), ~_is_decommissioned(A))
+    return db.select(A).where(
+        is_application_expression(A), ~unpromoted_import_expression(A), ~_is_duplicate(A), ~_is_decommissioned(A)
+    )
 
 
 def left_out_applications(org_id) -> dict:
     """How many of the organisation's application records the count leaves out, by the one reason
-    each has: a duplicate, a decommissioned application, or a repository nobody owns yet."""
+    each has: a duplicate, a decommissioned application, a repository nobody owns yet, or a record that is a
+    part of an application or not software."""
     from app.connectors.github import unpromoted_import_expression
     from app.models.application_portfolio import ApplicationComponent as A
+    from app.services.application_kind import is_application_expression
 
     def count(*conditions):
         return db.session.execute(
@@ -172,8 +179,11 @@ def left_out_applications(org_id) -> dict:
 
     return {
         "duplicate": count(_is_duplicate(A)),
-        "decommissioned": count(~_is_duplicate(A), _is_decommissioned(A)),
-        "repository": count(~_is_duplicate(A), ~_is_decommissioned(A), unpromoted_import_expression(A)),
+        "decommissioned": count(~_is_duplicate(A), _is_decommissioned(A), is_application_expression(A)),
+        "repository": count(
+            ~_is_duplicate(A), ~_is_decommissioned(A), is_application_expression(A), unpromoted_import_expression(A)
+        ),
+        "not_an_application": count(~_is_duplicate(A), ~is_application_expression(A)),
     }
 
 

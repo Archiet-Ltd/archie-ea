@@ -394,6 +394,30 @@ def application_detail(id):
     return render_application_detail(id)
 
 
+_KIND_REFUSAL = "Your role may read what this record is but not change it."
+
+
+@unified_applications_bp.route("/<int:id>/kind", methods=["POST"])
+@login_required
+def set_application_kind(id):
+    """A person who may change the model says what the record is: an application, a part of one, or
+    not software. Another organisation's record answers 404."""
+    from app.core.auth.permissions import can_change_model
+    from app.services.application_kind import KIND_LABELS, set_kind
+
+    if not can_change_model(current_user):
+        return jsonify({"error": _KIND_REFUSAL}), 403
+    app_obj = _verify_app_in_org(id, g.current_org_id, raise_not_found=True)
+    kind = (request.form.get("application_kind") or "").strip()
+    if kind not in KIND_LABELS:
+        flash("Choose what this record is: an application, a part of an application, or not software.", "warning")
+        return redirect(url_for("unified_applications.application_detail", id=id))
+    set_kind(app_obj, kind, current_user)
+    db.session.commit()
+    flash("%s is now recorded as: %s." % (app_obj.name, KIND_LABELS[kind].lower()), "success")
+    return redirect(url_for("unified_applications.application_detail", id=id))
+
+
 _TERMINAL_LIFECYCLE_STATUSES = frozenset({"retired", "decommissioned", "end_of_life", "end of life"})
 
 

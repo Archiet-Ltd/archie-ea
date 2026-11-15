@@ -112,6 +112,40 @@
      actions_caller=_app_detail_actions
 ) }}
 
+{% if application_kind is defined and application_kind %}
+<div class="mb-4" data-testid="application-kind">
+{% call card() %}
+  {% call card_content(class='flex flex-col gap-3 pt-6') %}
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-sm font-medium text-foreground">What this is</span>
+      {% call badge(variant=('neutral' if application_kind.kind == 'application' else 'outline')) %}<span data-testid="application-kind-label">{{ application_kind.label }}</span>{% endcall %}
+    </div>
+    <p class="text-sm text-muted-foreground" data-testid="application-kind-reason">{{ application_kind.reason }}.</p>
+    {% if application_parts %}
+    <div data-testid="application-parts">
+      <p class="text-sm font-medium text-foreground">Parts of {{ app.name }}</p>
+      <ul class="mt-1 flex flex-col gap-1 text-sm">
+        {% for part_id, part_name in application_parts %}
+        <li><a class="text-primary hover:underline" href="{{ url_for('unified_applications.application_detail', id=part_id) }}">{{ part_name }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% if can_change_model() %}
+    <form method="POST" action="{{ url_for('unified_applications.set_application_kind', id=app.id) }}" class="flex flex-wrap items-end gap-2" data-testid="application-kind-form">
+      {{ input(type="hidden", name="csrf_token", value=(csrf_token())) }}
+      <div class="flex flex-col gap-1">
+        <label for="application-kind-select" class="text-sm font-medium text-foreground">Change what this is</label>
+        {% call native_select(id='application-kind-select', name='application_kind', size='sm', selected=application_kind.kind, options=application_kind_options) %}{% endcall %}
+      </div>
+      {% call button(variant='outline', type='submit') %}Save{% endcall %}
+    </form>
+    {% endif %}
+  {% endcall %}
+{% endcall %}
+</div>
+{% endif %}
+
 <div class="-mt-4 mb-4 flex flex-col gap-2">
   <div class="flex flex-wrap items-center gap-2">
     {# ARC-F01: Data freshness badge #}
