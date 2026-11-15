@@ -175,7 +175,8 @@ def test_every_vendor_figure_agrees_across_vendors_vendor_page_spend_and_renewal
         summary = get_spend_summary(mine.id)
     assert rows[a.id]["annual_cost"] == 300.0
     assert rows[b.id]["annual_cost"] == 21000.0
-    assert rows[a.id]["next_renewal"] == (date.today() + timedelta(days=200)).isoformat()
+    # the contract on A's decommissioned system adds no cost but still renews, and it is the earliest
+    assert rows[a.id]["next_renewal"] == (date.today() + timedelta(days=10)).isoformat()
     assert summary["total_contracts"] == 3
     assert summary["total_annual_cost"] == 21300.0
     assert [(n, v["annual_cost"]) for n, v in summary["top_vendors"]] == [
@@ -340,7 +341,8 @@ def test_a_contract_on_a_system_with_no_vendor_says_so(db_session, make_org, ten
     with tenant_ctx(mine.id):
         reasons = {c.contract_name: why for c, why in vendor_register.contracts_with_standing(d.id, mine.id)}
     assert reasons[f"orphan {tag}"] == "Not counted for this vendor: the system it sits on names no vendor"
-    assert "decommissioned" in reasons[f"dead {tag}"]
+    assert reasons[f"dead {tag}"].startswith(vendor_register.RETIRED_SYSTEM_RENEWAL)
+    assert "cost is not counted" in reasons[f"dead {tag}"]
 
 
 def test_the_assistants_procurement_context_reads_the_counted_contracts(app, db_session, make_org, tenant_ctx):
@@ -402,7 +404,7 @@ def test_a_contract_whose_end_date_has_passed_counts_nowhere_even_when_marked_ac
         run_cost = _run_cost(mine.id, datetime.utcnow())
         reasons = {c.contract_name: why for c, why in vendor_register.contracts_with_standing(vendor.id, mine.id)}
     assert row["annual_cost"] == 26000.0
-    assert row["next_renewal"] == (date.today() + timedelta(days=200)).isoformat()
+    assert row["next_renewal"] == (date.today() + timedelta(days=30)).isoformat()  # its renewal date, as the renewals page says
     assert summary["total_annual_cost"] == 26000.0
     assert summary["total_contracts"] == 2
     assert run_cost["stated_contracts"] == 2
@@ -802,3 +804,33 @@ def test_the_contract_analysis_summary_and_the_portfolio_metrics_read_the_ledger
 
     source = inspect.getsource(MetricsService.get_vendor_portfolio_metrics.__wrapped__)
     assert "contract_ledger" in source and "sum(" not in source
+
+
+def test_vendors_with_no_renewal_ahead_come_after_those_that_have_one(db_session, make_org, tenant_ctx):
+    from app.models.application_portfolio import VendorContract
+    from app.models.vendor.vendor_organization import VendorOrganization
+    from app.services import vendor_register
+
+    mine, theirs = make_org("vf-order-a"), make_org("vf-order-b")
+    tag = uuid.uuid4().hex[:6]
+    _estate(db_session, theirs, "t" + tag)
+    names = {}
+    for key, days in (("zeta", 300), ("alpha", None), ("beta", 200)):
+        vendor = VendorOrganization(name=f"{key} {tag}")
+        db_session.add(vendor)
+        db_session.flush()
+        names[key] = vendor.id
+        if not days:
+            from app.models.application_portfolio import ApplicationComponent
+            db_session.add(ApplicationComponent(name=f"{key} sys {tag}", organization_id=mine.id,
+                                                lifecycle_status="operational", vendor_organization_id=vendor.id))
+        if days:
+            db_session.add(VendorContract(contract_name=f"{key} deal {tag}", organization_id=mine.id,
+                                          vendor_id=vendor.id, status="active", annual_cost=10.0,
+                                          start_date=date.today() - timedelta(days=30),
+                                          end_date=date.today() + timedelta(days=days)))
+    db_session.flush()
+    with tenant_ctx(mine.id):
+        order = [r["id"] for r in vendor_register.register(mine.id) if r["id"] in names.values()]
+
+    assert order == [names["beta"], names["zeta"], names["alpha"]]

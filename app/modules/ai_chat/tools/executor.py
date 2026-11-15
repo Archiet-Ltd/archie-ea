@@ -282,20 +282,32 @@ def record_paused_tool_call(user, tool_name: str, arguments, *, paused_by_name: 
         logger.warning("Could not record the paused tool call '%s'", tool_name, exc_info=True)
 
 
-def user_can_write(user_id) -> bool:
-    """Whether the user holds write access (``Permission.GENERAL``).
+# Tools that change one kind of record are held to that record's own permission, the one the
+# form for the same record asks (``can("edit", "application")``), not only to write permission.
+TOOL_RECORD_PERMISSION = {
+    "update_application_status": ("application", "edit"),
+    "bulk_update_application_status": ("application", "edit"),
+}
+
+
+def user_can_write(user_id, tool_name=None) -> bool:
+    """Whether the user may change the model: ``may_write``, the rule the API write guard asks.
 
     The one rule every AI write surface applies: the agent tool executor, the
     slash commands and the natural-language write branches of the chat service.
-    The user is loaded scoped to the current tenant, so a user from another
-    organisation never authorises.
+    A tool that changes one kind of record is also held to that record's own
+    permission. The user is loaded scoped to the current tenant, so a user from
+    another organisation never authorises.
     """
-    from app.models.user import Permission
+    from app.core.auth.permissions import may_write
 
     user = _load_acting_user(user_id)
     if not user:
         return False
-    return bool(user.can(Permission.GENERAL))
+    record = TOOL_RECORD_PERMISSION.get(tool_name)
+    if record is None:
+        return may_write(user)
+    return may_write(user) and may_write(user, object_type=record[0], action=record[1])
 
 
 def refuse_unless_can_write(user_id, action_name: str, arguments=None, *, via: str):
@@ -305,7 +317,7 @@ def refuse_unless_can_write(user_id, action_name: str, arguments=None, *, via: s
     audit log (``via`` says which surface was refused) and returns the same
     permissions-framed refusal the agent path gives, as a result dict.
     """
-    if user_can_write(user_id):
+    if user_can_write(user_id, action_name):
         return None
     user = _load_acting_user(user_id)
     logger.warning(
@@ -456,17 +468,15 @@ class ToolExecutor:
     # Public dispatch                                                      #
     # ------------------------------------------------------------------ #
 
-    def _user_can_write(self) -> bool:
-        """Server-side write-permission check for the invoking user (V-01).
+    def _user_can_write(self, tool_name=None) -> bool:
+        """Server-side write-permission check for the invoking user.
 
-        This — not the prompt, not the LLM's own judgement — is the access
-        control. `Permission.GENERAL` is the same bitfield `user.can()` already
-        checks for every non-AI write route (app/models/user.py); a Viewer role
-        carries permissions=0 and fails it, exactly as it fails the equivalent
-        HTTP routes. Reusing it means the AI surface can never be *more*
-        permissive than the API it wraps.
+        This, not the prompt or the model's own judgement, is the access control. It asks
+        ``may_write``, the rule the API write guard asks, so the assistant can never be more
+        permissive than the screens it wraps; a tool that changes one kind of record is also
+        held to that record's own permission.
         """
-        return user_can_write(self.user_id)
+        return user_can_write(self.user_id, tool_name)
 
     def execute(self, tool_call: ToolCall, *, propagate_errors: bool = False) -> dict:
         """Dispatch one tool call. THE choke point for every agent write.
@@ -578,7 +588,7 @@ class ToolExecutor:
                         "writes_paused": True,
                     }
 
-            if not user or not self._user_can_write():
+            if not user or not self._user_can_write(tool_call.name):
                 logger.warning(
                     "ToolExecutor: refusing mutating tool '%s' for user_id=%s — no write permission",
                     tool_call.name, self.user_id,

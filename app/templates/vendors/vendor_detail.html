@@ -107,7 +107,7 @@
                     {% if supplied_systems %}
                         {{ supplied_systems|length }} of your systems
                         {%- if not cost_visible %} · Not shown for your role{% elif supplied_cost is not none %}, {{ supplied_cost|currency }} a year{% endif %}
-                        {%- if next_renewal %}, next renewal {{ next_renewal.strftime('%d %b %Y') }}{% endif %}
+                        {%- if next_renewal %}, next renewal {{ next_renewal.strftime('%d %b %Y') }}{% if next_renewal_overdue %} ({{ next_renewal_overdue|lower }}){% endif %}{% endif %}
                     {% else %}
                         No system of yours names {{ vendor.name }} as its vendor.
                     {% endif %}

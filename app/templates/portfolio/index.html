@@ -3,17 +3,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/provenance.html' import result_footer %}
 
-{% block title %}Portfolio{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Portfolio', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Portfolio{% endblock %}{% block content %}
 <div class="p-6 space-y-6 mx-auto">
 
   {{ page_shell(title='Portfolio', subtitle='Transformation initiatives — budget, health and benefits') }}
@@ -70,8 +60,8 @@
     <a href="{{ url_for('portfolio.index') }}" class="text-primary underline underline-offset-2">Show all initiatives</a>
     {% elif summary.no_objective %}
     <a href="{{ url_for('portfolio.index', filter='no-objective') }}" class="text-primary underline underline-offset-2">{{ summary.no_objective }} initiative{{ '' if summary.no_objective == 1 else 's' }} serving no objective</a>
-    {% else %}
-    <span class="text-muted-foreground">0 initiatives serving no objective</span>
+    {% elif summary.count %}
+    <span class="text-muted-foreground" data-testid="every-initiative-has-objective">Every initiative serves an objective</span>
     {% endif %}
   </div>
 

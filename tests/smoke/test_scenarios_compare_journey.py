@@ -41,7 +41,7 @@ def test_the_page_opens_on_the_simulation_and_links_to_the_ranked_actions(browse
         link = page.get_by_test_id("priority-actions-link")
         expect(link).to_be_visible()
         link.click()
-        page.wait_for_url(re.compile(r"/strategic/impact-analysis"), timeout=PAGE_TIMEOUT)
+        page.wait_for_url(re.compile(r"/enterprise/analysis/impact-analysis"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("priority-actions-list")).to_be_visible()
         assert page.get_by_test_id("priority-action-row").count() >= 1
     finally:

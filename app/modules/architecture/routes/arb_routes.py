@@ -1330,8 +1330,15 @@ def reviews():
     page = request.args.get("page", 1, type=int)
     status = request.args.get("status", "all")
     review_type = request.args.get("review_type", "all")
+    # The dashboard's "not yet in a review cycle" link: pending reviews that sit in no cycle.
+    outside_queue = request.args.get("cycle") == "none"
 
     query = ARBReviewItem.query
+
+    if outside_queue:
+        from app.services.arb_governance_service import pending_outside_queue_conditions
+
+        query = query.filter(*pending_outside_queue_conditions())
 
     if status != "all":
         query = query.filter_by(status=status)
@@ -1351,6 +1358,7 @@ def reviews():
         reviews=pagination.items,
         status=status,
         review_type=review_type,
+        outside_queue=outside_queue,
         is_reviews_view=True,
         users=_chair_candidates(),
         may_run_board=_viewer_may_run_board(),

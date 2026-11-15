@@ -4,6 +4,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/fact_list.html' import fact_list %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input, textarea %}
 {% from 'components/form_field.html' import form_field, form_group %}
@@ -297,8 +298,9 @@
     {# Contract expiry warning #}
     {% if app.contract_expiry_date %}
     {% set expiry_days = days_until(app.contract_expiry_date) %}
+    {% set expiry_band = renewal_band(expiry_days) %}
     <div class="rounded-lg border px-4 py-3
- {% if expiry_days is not none and expiry_days < 30 %}border-destructive/30 bg-destructive/10{% elif expiry_days is not none and expiry_days < 90 %}border-warning/30 bg-warning/10{% else %}border-border bg-muted/30{% endif %}">
+ {% if expiry_band in ('critical', 'expired') %}border-destructive/30 bg-destructive/10{% elif expiry_band == 'warning' %}border-warning/30 bg-warning/10{% else %}border-border bg-muted/30{% endif %}">
       <div class="flex items-center gap-2 text-sm">
         <i data-lucide="calendar" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
         <span><strong>Contract Expiry:</strong> {{ app.contract_expiry_date.strftime('%d %b %Y') }}</span>
@@ -486,7 +488,6 @@
     </div>
 
     {# Description & Notes #}
-    {% if edit_mode or app.description or app.business_purpose or app.notes or app.assessment_notes %}
     <div class="grid grid-cols-1 gap-6">
       {% if edit_mode %}
       <div data-slot="card" class="rounded-lg border border-border bg-card">
@@ -495,10 +496,16 @@
           {{ form_field(id='edit-description', name='description', label='Description', input_type='textarea', rows=4, value=(form_values['description'] if 'description' in form_values else (app.description or '')), error=form_errors.get('description'), attrs_dict={'maxlength': field_limits['description']}) }}
         </div>
       </div>
-      {% elif app.description %}
-      <div data-slot="card" class="rounded-lg border border-border bg-card">
+      {% else %}
+      <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="application-description">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Description</h3></div>
-        <div class="p-6 pt-0 text-sm text-foreground whitespace-pre-line">{{ app.description }}</div>
+        <div class="p-6 pt-0">
+          <div class="text-sm text-foreground" data-testid="application-description-facts">
+            {% if app.description %}<span class="block whitespace-pre-line text-left" data-testid="property-description">{{ app.description }}</span>
+            {% elif can('edit', 'application') %}No description yet. <a href="{{ url_for('unified_applications.application_detail', id=app.id, edit=1) }}" class="text-primary hover:underline">Add one</a>
+            {% else %}<span class="text-muted-foreground">No description yet</span>{% endif %}
+          </div>
+        </div>
       </div>
       {% endif %}
       {% if app.business_purpose %}
@@ -520,7 +527,6 @@
       </div>
       {% endif %}
     </div>
-    {% endif %}
 
     {# Linked Solutions — cross-link to architecture workflow #}
     {% if linked_solutions is defined and linked_solutions %}

@@ -145,8 +145,8 @@
       {% if vp.vendor_count %}
         {{ vp.vendor_count }} vendor{{ ' supplies' if vp.vendor_count == 1 else 's supply' }}
         {{ vp.supplied_count }} of your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }}.
-        {% if vp.renewals_due %}{{ vp.renewals_due }} renew{{ 's' if vp.renewals_due == 1 else '' }} within 90 days.{% else %}No vendor renews within 90 days.{% endif %}
-        {% if sc.decommissioned %}Decommissioned systems are not counted ({{ sc.decommissioned }}).{% endif %}
+        {% set rc = vp.renewing_contracts %}{% if vp.renewals_due or rc.contracts %}{{ rc.contracts }} contract{{ '' if rc.contracts == 1 else 's' }}{% if vp.renewals_due %} with {{ vp.renewals_due }} vendor{{ '' if vp.renewals_due == 1 else 's' }}{% endif %} renew{{ 's' if rc.contracts == 1 else '' }} within 90 days{% if rc.without_vendor %} ({{ rc.without_vendor }} name{{ 's' if rc.without_vendor == 1 else '' }} no vendor){% endif %}.{% else %}No contract renews within 90 days.{% endif %}
+        {% if sc.decommissioned %}Decommissioned systems are not counted ({{ sc.decommissioned }}).{% if rc.on_retired_system %} An active contract on one still renews: {{ rc.on_retired_system }} of the renewals above.{% endif %}{% endif %}
       {% elif linked_n %}
         No vendor is recorded on your {{ vp.total_systems }} system{{ '' if vp.total_systems == 1 else 's' }} yet, but the model links
         {{ linked_n }} supplier{{ '' if linked_n == 1 else 's' }} to {{ linked.system_count }} of them.
@@ -219,7 +219,7 @@
                           search_placeholder='Filter vendors...', toolbar=true, toolbar_actions=_set_vendors, notice=notice,
                           empty_message=('No vendor is recorded yet. Record one of the suppliers linked above and it is listed here.') if linked_n else ('No vendor is named on your ' ~ sc.total_systems ~ ' systems yet. Set the vendor on each system and it is listed here.') if sc.total_systems else 'No vendors yet. Add a system or a contract that names its vendor and it is listed here.',
                           empty_action=_add_first) %}
-    {% call table_cell(class='max-w-56 whitespace-normal sm:max-w-sm') %}
+    {% call table_cell(class='max-w-56 whitespace-normal break-words sm:max-w-64') %}
       <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}" class="block break-words font-medium sm:truncate text-foreground hover:underline" data-testid="vendor-link">{{ row.name }}</a>
       {% if row.website %}<span class="block truncate text-xs text-muted-foreground">{{ row.website|replace('https://', '')|replace('http://', '') }}</span>{% endif %}
       {% set row_footer = (vendor_footers or {}).get(row.id) %}{% if row_footer %}{{ result_footer(row_footer) }}{% endif %}
@@ -230,7 +230,7 @@
     {% endcall %}
     {% endif %}
     {% if any_contracts %}
-    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.contract_count or 0}) %}{{ row.contract_count or 0 }}{% endcall %}
+    {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.contract_count or 0}) %}{% if row.contract_count %}{{ row.contract_count }}{% else %}<span class="text-muted-foreground">No contract</span>{% endif %}{% endcall %}
     {% endif %}
     {% if cost_col %}
     {% call table_cell(class='text-right tabular-nums whitespace-normal', attrs={'data-sort': row.contract_annual_cost if row.contract_annual_cost is not none else -1}) %}
@@ -242,13 +242,13 @@
     {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.system_count}) %}
       {% if row.system_count %}
       <a href="{{ url_for('unified_applications.vendor_detail', vendor_id=row.id) }}#vendor-systems" class="hover:underline">{{ row.system_count }} system{{ '' if row.system_count == 1 else 's' }}</a>
-      {% else %}<span class="text-muted-foreground">0</span>{% endif %}
+      {% else %}<span class="text-muted-foreground">No system</span>{% endif %}
     {% endcall %}
     {% endif %}
     {% if has_renewal %}
-    {% call table_cell(class='whitespace-nowrap', attrs={'data-sort': row.next_renewal or '9999'}) %}
+    {% call table_cell(class='min-w-40', attrs={'data-sort': row.next_renewal or '9999'}) %}
       {% if row.next_renewal %}
-        <span class="inline-flex items-center gap-2">{{ _date(row.next_renewal) }}{% if row.renewal_due %}{{ state_badge('Due within 90 days', tone='caution') }}{% endif %}</span>
+        <span class="inline-flex flex-wrap items-center gap-x-2 gap-y-1">{{ _date(row.next_renewal) }}{% if row.renewal_text %}{{ state_badge(row.renewal_text, tone='negative') }}{% elif row.renewal_due %}{{ state_badge('Due within 90 days', tone='caution') }}{% endif %}</span>
       {% else %}{{ value_or_unset(none, 'No renewal ahead') }}{% endif %}
     {% endcall %}
     {% endif %}

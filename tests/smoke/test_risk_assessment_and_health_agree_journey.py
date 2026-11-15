@@ -158,7 +158,11 @@ def test_risk_assessment_and_capability_health_agree(live_server, browser):
     assert "Unassigned" not in body
     assert other not in body
     rows = page.locator('[data-testid="risk-assessment-row"]')
-    expect(rows).to_have_count(6)  # every risk in the register, each with the capabilities it reaches
+    # The rows are the open risks the cards count, each with the capabilities it reaches; the mitigated one is
+    # not listed and the page says so.
+    expect(rows).to_have_count(register_open)
+    expect(rows.filter(has_text="%s mitigated critical" % noun)).to_have_count(0)
+    expect(page.locator('[data-testid="assess-closed-note"]')).to_contain_text("1 risk is mitigated")
     direct = rows.filter(has_text="%s direct critical" % noun)
     # The capability's owner is read from the owner record, by name.
     expect(direct).to_contain_text(names["alpha"])

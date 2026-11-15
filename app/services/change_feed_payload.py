@@ -51,7 +51,17 @@ WATCHED_FIELDS: Dict[str, tuple] = {
         "infrastructure_cost",
         "support_cost",
     ),
-    "application_owner": ("user_id", "ownership_type", "application_id", "element_type", "element_id"),
+    # A named person without an account is described by name and role. Their
+    # email is personal data and is never put in the feed.
+    "application_owner": (
+        "user_id",
+        "person_name",
+        "person_role",
+        "ownership_type",
+        "application_id",
+        "element_type",
+        "element_id",
+    ),
     "cost_fact": ("amount", "currency", "kind", "category", "element_type", "element_id"),
     "risk": (
         "title",

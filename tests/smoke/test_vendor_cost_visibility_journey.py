@@ -269,7 +269,7 @@ def test_spend_the_vendor_page_and_vendors_leave_out_a_decommissioned_systems_co
         page.wait_for_url(re.compile(r"/applications/vendors/\d+"), timeout=PAGE_TIMEOUT)
         panel = page.locator("#vendor-systems")
         expect(panel).to_contain_text("Datadog old ledger %s" % tag, timeout=PAGE_TIMEOUT)
-        expect(panel).to_contain_text("Not counted")
+        expect(panel).to_contain_text("Its cost is not counted")
         text = _text(page)
         assert "9,000" not in text, text[:600]
         assert re.search(r"of your systems?,? £2,000\.00 a year", text), text[:800]
