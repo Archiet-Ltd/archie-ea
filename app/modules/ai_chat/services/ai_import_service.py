@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from app.services.capability_support import record_support_for_records
 from app import db
 from app.models.application_portfolio import ApplicationComponent
 from app.models.apqc_process import ProcessApplicationMapping
@@ -1784,9 +1785,7 @@ Provide analysis in JSON format:
                 for mapping in capability_mappings:
                     try:
                         # Check if mapping already exists
-                        from app.services.capability_support import record_support_for_records
-
-                        target_app = ApplicationComponent.query.get(application_id)
+                        target_app = ApplicationComponent.query.filter_by(id=application_id).first()
                         existing = UnifiedApplicationCapabilityMapping.query.filter_by(
                             application_component_id=application_id, unified_capability_id=mapping["capability_id"]
                         ).first()
@@ -2099,8 +2098,6 @@ Provide analysis in JSON format:
                             if not UnifiedApplicationCapabilityMapping.query.filter_by(
                                 application_component_id=app.id, unified_capability_id=m["capability_id"]
                             ).first():
-                                from app.services.capability_support import record_support_for_records
-
                                 record_support_for_records(app.organization_id, app.id, m["capability_id"])
                                 result["mappings_created"]["capabilities"] += 1
                 except Exception as e:

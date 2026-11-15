@@ -11,6 +11,7 @@ Integrates all AI services to provide comprehensive AI-powered import:
 This replaces the basic pattern-matching with sophisticated AI analysis.
 """
 
+from app.services.capability_support import record_support_for_records
 from app.services.change_source import records_changes_as
 import json
 import logging
@@ -1820,9 +1821,7 @@ Provide analysis in JSON format:
                         # - this constructor call raised TypeError on every
                         # invocation, so no capability mapping this wrote ever
                         # actually persisted. Use the columns that exist.
-                        from app.services.capability_support import record_support_for_records
-
-                        target_app = ApplicationComponent.query.get(application_id)
+                        target_app = ApplicationComponent.query.filter_by(id=application_id).first()
                         existing = UnifiedApplicationCapabilityMapping.query.filter_by(
                             application_component_id=application_id,
                             unified_capability_id=mapping["capability_id"],
@@ -2148,8 +2147,6 @@ Provide analysis in JSON format:
                     result["ai_analysis"]["capability_mappings"] = caps
                     for m in caps:
                         if m.get("confidence_score", 0) >= confidence_threshold:
-                            from app.services.capability_support import record_support_for_records
-
                             if not UnifiedApplicationCapabilityMapping.query.filter_by(
                                 application_component_id=app.id, unified_capability_id=m["capability_id"]
                             ).first():
