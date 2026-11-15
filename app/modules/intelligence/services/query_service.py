@@ -1104,6 +1104,13 @@ def _merge_rows_by_element(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return order
 
 
+def without_relations(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Rows as the public impact endpoints return them: the documented key set,
+    without the full list of ways each element was reached (``relations``), which
+    only the answer pages and the set impact walk read."""
+    return [{key: value for key, value in row.items() if key != "relations"} for row in rows]
+
+
 def _derived_row(fact: Dict[str, Any], root_id: int) -> Dict[str, Any]:
     if fact["source_element_id"] == root_id:
         element_id = fact["target_element_id"]
@@ -1898,9 +1905,10 @@ class IntelligenceQueryService:
                     }
                 if seed not in entry["seed_ids"]:
                     entry["seed_ids"].append(seed)
-                relation = dict(row["relation"])
-                relation["from_seed"] = seed
-                entry["relations"].append(relation)
+                for row_relation in row.get("relations") or [row["relation"]]:
+                    relation = dict(row_relation)
+                    relation["from_seed"] = seed
+                    entry["relations"].append(relation)
                 if entry["maturity"] is None and row.get("maturity") is not None:
                     entry["maturity"] = row["maturity"]
                 if entry["health"] is None and row.get("health") is not None:

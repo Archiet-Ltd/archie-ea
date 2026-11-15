@@ -461,7 +461,10 @@ def cross_layer_impact(element_id: int):
             status_code=404,
         )
 
-    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+    from app.modules.intelligence.services.query_service import (
+        IntelligenceQueryService,
+        without_relations,
+    )
 
     result = IntelligenceQueryService.cross_layer_impact(
         element_id,
@@ -480,7 +483,7 @@ def cross_layer_impact(element_id: int):
 
     return success_response(
         {
-            "rows": result["rows"],
+            "rows": without_relations(result["rows"]),
             "summary": result["summary"],
             "reasons": result.get("reasons") or [],
             "elements": result.get("elements") or {},
