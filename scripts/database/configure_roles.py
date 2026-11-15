@@ -571,6 +571,21 @@ def _transfer_public_objects(
             )
         )
 
+    type_statements = {
+        "e": "ALTER TYPE {}.{} OWNER TO {}",
+        "r": "ALTER TYPE {}.{} OWNER TO {}",
+        "c": "ALTER TYPE {}.{} OWNER TO {}",
+        "d": "ALTER DOMAIN {}.{} OWNER TO {}",
+    }
+    for name, kind in _public_user_types(cursor):
+        cursor.execute(
+            sql.SQL(type_statements[kind]).format(
+                sql.Identifier("public"),
+                sql.Identifier(name),
+                sql.Identifier(deploy_role),
+            )
+        )
+
     cursor.execute(
         """
         SELECT p.proname, pg_get_function_identity_arguments(p.oid)
@@ -607,6 +622,56 @@ def _transfer_public_objects(
                 function, sql.Identifier(runtime_role)
             )
         )
+
+
+def _public_user_types(cursor) -> tuple[tuple[str, str], ...]:
+    """Enum, domain, range and standalone composite types made in public.
+
+    Array types follow their element type, multirange types follow their range,
+    table row types follow their table, and extension types belong to the extension.
+    """
+    cursor.execute(
+        """
+        SELECT t.typname, t.typtype
+        FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        LEFT JOIN pg_class c ON c.oid = t.typrelid
+        WHERE n.nspname = 'public'
+          AND (
+              t.typtype IN ('e', 'd', 'r')
+              OR (t.typtype = 'c' AND c.relkind = 'c')
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM pg_depend dependency
+              WHERE dependency.classid = 'pg_type'::regclass
+                AND dependency.objid = t.oid
+                AND dependency.deptype = 'e'
+          )
+        ORDER BY t.typname
+        """
+    )
+    return tuple(cursor.fetchall())
+
+
+def _verify_type_owners(cursor, *, database_name: str, deploy_role: str) -> None:
+    for name, _kind in _public_user_types(cursor):
+        cursor.execute(
+            """
+            SELECT pg_get_userbyid(t.typowner)
+            FROM pg_type t
+            JOIN pg_namespace n ON n.oid = t.typnamespace
+            WHERE n.nspname = 'public' AND t.typname = %s
+            """,
+            (name,),
+        )
+        owner = cursor.fetchone()[0]
+        if owner != deploy_role:
+            raise _acl_verification_failure(
+                database_name=database_name,
+                object_kind="type",
+                object_name=f"public.{name}",
+                detail=f"is owned by {owner!r}, expected {deploy_role!r}",
+            )
 
 
 def _public_relations(cursor) -> tuple[tuple[str, str], ...]:
@@ -1259,6 +1324,7 @@ def _verify_database_acl(
         deploy_role=deploy_role,
         runtime_role=runtime_role,
     )
+    _verify_type_owners(cursor, database_name=database_name, deploy_role=deploy_role)
     _verify_sequence_privileges(
         cursor,
         database_name=database_name,
