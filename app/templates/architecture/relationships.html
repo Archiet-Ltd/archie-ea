@@ -51,12 +51,12 @@
         <a class="text-foreground underline underline-offset-4" href="{{ url_for(request.endpoint) }}">Show all relationships</a>
     </p>
     {% endif %}
-    {% call(rel) list_table(rows=relationships, columns=[{'label': 'Source', 'sort_hrefs': {'asc': _sort_to('source', 'asc'), 'desc': _sort_to('source', 'desc')}}, {'label': 'Relationship', 'class': 'hidden sm:table-cell', 'sort_hrefs': {'asc': _sort_to('type', 'asc'), 'desc': _sort_to('type', 'desc')}}, {'label': 'Target', 'sort_hrefs': {'asc': _sort_to('target', 'asc'), 'desc': _sort_to('target', 'desc')}}],
+    {% call(rel) list_table(rows=relationships, columns=[{'label': 'Source', 'sorted': (sort_dir if sort == 'source' else none), 'sort_hrefs': {'asc': _sort_to('source', 'asc'), 'desc': _sort_to('source', 'desc')}}, {'label': 'Relationship', 'sorted': (sort_dir if sort == 'type' else none), 'sort_hrefs': {'asc': _sort_to('type', 'asc'), 'desc': _sort_to('type', 'desc')}}, {'label': 'Target', 'sorted': (sort_dir if sort == 'target' else none), 'sort_hrefs': {'asc': _sort_to('target', 'asc'), 'desc': _sort_to('target', 'desc')}}],
                             caption='Relationships between architecture elements', testid='relationships-table', row_testid='relationship-row',
                             toolbar=false, page_size=per_page, server_pagination=_pager, row_id_prefix='relationship-',
                             empty_message='No relationships found.') %}
-      {% call table_cell(class='font-medium') %}{{ rel.source_name or ('#' ~ rel.source_id) }}<span class="block text-xs font-normal text-muted-foreground sm:hidden">{{ rel.type|default('—') }}</span>{% endcall %}
-      {% call table_cell(class='hidden text-muted-foreground sm:table-cell') %}{{ rel.type|default('—') }}{% endcall %}
+      {% call table_cell(class='font-medium') %}{{ rel.source_name or ('#' ~ rel.source_id) }}{% endcall %}
+      {% call table_cell(class='text-muted-foreground') %}{{ rel.type|default('—') }}{% endcall %}
       {% call table_cell(class='font-medium') %}{{ rel.target_name or ('#' ~ rel.target_id) }}{% endcall %}
     {% endcall %}
 </div>

@@ -120,6 +120,19 @@ def test_an_architect_reaches_every_relationship_and_none_of_another_organisatio
     assert "Theirs %s" % tag not in page.content()
 
 
+def test_rows_per_page_keeps_the_chosen_sort(page, live_server, estate):
+    tag = estate["tag"]
+    page.goto(live_server + "/architecture/relationships", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    _sort_by(page, "Target", "Descending")
+    page.get_by_label("Rows per page").select_option("50")
+    page.get_by_role("button", name="Apply").click()
+    page.wait_for_load_state("domcontentloaded")
+    assert "sort=target" in page.url and "dir=desc" in page.url
+    assert _sorted_header(page, "Target") == "descending"
+    rows = _row_texts(page)
+    assert len(rows) == 45 and "Mine %s 45" % tag in rows[0] and "Mine %s 01" % tag in rows[-1]
+
+
 def test_rows_per_page_changes_the_number_of_pages(page, live_server, estate):
     page.goto(live_server + "/architecture/relationships", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.get_by_label("Rows per page").select_option("50")
@@ -134,6 +147,44 @@ def _sort_by(page, column, direction):
     page.get_by_role("button", name=column).click()
     page.get_by_role("menuitem", name=direction).click()
     page.wait_for_load_state("domcontentloaded")
+
+
+def _sorted_header(page, column):
+    header = page.get_by_role("columnheader", name=column)
+    return header.get_attribute("aria-sort")
+
+
+def test_the_sorted_column_and_direction_are_announced(page, live_server, estate):
+    page.goto(live_server + "/architecture/relationships", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert _sorted_header(page, "Target") is None
+    _sort_by(page, "Target", "Descending")
+    assert _sorted_header(page, "Target") == "descending"
+    assert _sorted_header(page, "Source") is None
+    assert page.get_by_role("columnheader", name="Target").locator("[data-sort-icon=desc]").is_visible()
+    _sort_by(page, "Target", "Ascending")
+    assert _sorted_header(page, "Target") == "ascending"
+    assert page.get_by_role("columnheader", name="Target").locator("[data-sort-icon=asc]").is_visible()
+
+
+def test_the_relationship_column_is_reachable_and_sorts_at_every_width(page, live_server, estate):
+    page.goto(live_server + "/architecture/relationships", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    header = page.get_by_role("columnheader", name="Relationship")
+    assert header.count() == 1 and header.is_visible()
+    _sort_by(page, "Relationship", "Descending")
+    assert "sort=type" in page.url and "dir=desc" in page.url
+    assert _sorted_header(page, "Relationship") == "descending"
+    assert page.get_by_role("columnheader", name="Relationship").is_visible()
+    assert len(_row_texts(page)) == 20
+    assert all("Serving" in text for text in _row_texts(page))
+
+
+def test_sorting_by_source_orders_every_page(page, live_server, estate):
+    tag = estate["tag"]
+    page.goto(live_server + "/architecture/relationships", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    _sort_by(page, "Source", "Descending")
+    assert "sort=source" in page.url and _sorted_header(page, "Source") == "descending"
+    assert "Hub mine %s" % tag in _row_texts(page)[0]
+    assert "Theirs %s" % tag not in page.content()
 
 
 def test_sorting_by_target_descending_orders_every_page_not_only_the_first(page, live_server, estate):

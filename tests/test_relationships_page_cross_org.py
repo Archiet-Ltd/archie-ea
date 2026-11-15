@@ -101,6 +101,8 @@ def test_the_relationships_view_reads_one_page_of_rows(client, estate):
     assert len(loaded) <= 20, "the view loaded %d relationship rows for one page" % len(loaded)
     assert len(statements) <= 2, "the view ran %d relationship queries" % len(statements)
     assert estate.tag in html and "Theirs B %s" % estate.tag not in html
+    assert "Hub B" not in html, "the crossing row shows organisation B's element on A's page"
+    assert "of 45" in html and "of 46" not in html, "the total counts the crossing row"
 
 
 def test_an_element_with_no_organisation_lists_the_signed_in_organisations_neighbours(app, estate):

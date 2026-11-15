@@ -94,12 +94,13 @@
           {% for col in columns %}
             {%- set m = col if col is mapping else {'label': col[0], 'class': (col[1] if col|length > 1 else '')} -%}
             {%- set cls = ((m.get('class') or '') ~ (' text-right' if m.get('align') == 'right' else ''))|trim -%}
-            {% call table_head(class=cls, attrs={'scope': 'col', 'data-col': loop.index0}) %}
+            {%- set active = m.get('sorted') if m.get('sort_hrefs') and m.get('sorted') in ('asc', 'desc') else none -%}
+            {% call table_head(class=cls, attrs=({'scope': 'col', 'data-col': loop.index0, 'aria-sort': ('ascending' if active == 'asc' else 'descending')} if active else {'scope': 'col', 'data-col': loop.index0})) %}
               {%- if m.get('sortable', (m.label or '')|trim != '') and total > 1 -%}
                 {%- set right = m.get('align') == 'right' -%}
                 {% call dropdown_menu() %}
                   {% call dropdown_menu_trigger(variant='ghost', size='sm', class=('-mr-3 ml-auto flex-row-reverse' if right else '-ml-3') ~ ' h-8 data-[state=open]:bg-accent', attrs={'data-table-sort-trigger': loop.index0}) %}
-                    <span>{{ m.label }}</span><span class="contents" data-sort-icon="none">{{ lucide('chevrons-up-down') }}</span><span class="contents" data-sort-icon="asc" hidden>{{ lucide('arrow-up') }}</span><span class="contents" data-sort-icon="desc" hidden>{{ lucide('arrow-down') }}</span>
+                    <span>{{ m.label }}</span><span class="contents" data-sort-icon="none"{% if active %} hidden{% endif %}>{{ lucide('chevrons-up-down') }}</span><span class="contents" data-sort-icon="asc"{% if active != 'asc' %} hidden{% endif %}>{{ lucide('arrow-up') }}</span><span class="contents" data-sort-icon="desc"{% if active != 'desc' %} hidden{% endif %}>{{ lucide('arrow-down') }}</span>
                   {% endcall %}
                   {% call dropdown_menu_content(align=('end' if right else 'start')) %}
                     {%- if m.get('sort_hrefs') %}
