@@ -137,6 +137,7 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
     ``depth`` hops, each with its ``hops`` along that dependency chain (1 is
     direct).
     """
+    from app.middleware.tenant_context import current_org_id  # noqa: PLC0415
     from app.models.archimate_core import (  # noqa: PLC0415
         ArchiMateElement, ArchiMateRelationship,
     )
@@ -144,6 +145,12 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
     depth = max(1, min(int(depth or 2), 4))
     center = db.session.get(ArchiMateElement, element_id)
     if center is None:
+        return None
+
+    # db.session.get() answers from the identity map without the tenant filter,
+    # so name the active organisation: a foreign element is "not found".
+    active_org_id = current_org_id()
+    if active_org_id is not None and getattr(center, "organization_id", None) != active_org_id:
         return None
 
     center_org_id = getattr(center, "organization_id", None)

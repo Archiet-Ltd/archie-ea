@@ -484,6 +484,13 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"\u26a0\ufe0f  Failed to register codegen drift CLI: {e}")
 
+    # Customer zero: the organisation's own products and what each can do
+    try:
+        from app.commands.customer_zero import init_app as init_customer_zero
+        init_customer_zero(app)
+    except Exception as e:
+        app.logger.warning(f"\u26a0\ufe0f  Failed to register customer-zero CLI: {e}")
+
     # Motivation bridge CLI command (journey Solution* motivation -> enterprise layer)
     try:
         from app.commands.bridge_motivation import init_app as init_bridge_motivation
