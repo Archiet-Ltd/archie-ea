@@ -7,9 +7,8 @@ consumers" reads "Not part of an application".
 import pytest
 from playwright.sync_api import expect
 
-from .chat_ask import sign_in
 from .conftest import PAGE_TIMEOUT
-from .test_application_kind_journey import ARCHITECT, _shot, seed_kind_org
+from .test_application_kind_journey import ARCHITECT, _shot, seed_kind_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 

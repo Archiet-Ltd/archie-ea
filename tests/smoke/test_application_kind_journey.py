@@ -17,13 +17,19 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
-from .chat_ask import sign_in
+from . import fresh_org
 from .fresh_org import create_fresh_org
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 ARCHITECT = "enterprise_architect"
 SHOTS = Path(os.environ.get("SMOKE_SHOT_DIR") or tempfile.mkdtemp(prefix="application-kind-"))
+
+
+def sign_in(page, base, email):
+    """Sign in from a signed-out browser and wait only until the login page is left."""
+    page.context.clear_cookies()
+    fresh_org.sign_in(page, base, email)
 
 
 def _shot(page, name):
@@ -98,6 +104,10 @@ def test_the_list_and_every_count_show_applications_and_a_change_of_kind_moves_t
     org = seed_kind_org()
     ids = org["ids"]
     page.set_viewport_size({"width": 1440, "height": 900})
+    # owner coverage is a portfolio manager's page: read it before and after the architect's change
+    sign_in(page, live_server, org["emails"]["portfolio_manager"])
+    coverage = _coverage_total(page, live_server)
+    assert "Total applications\n\n2" in coverage and "With named owner\n\n1" in coverage, coverage
     sign_in(page, live_server, org["emails"][ARCHITECT])
 
     both = ["Alerts gateway and consumers", "Billing"]
@@ -106,10 +116,6 @@ def test_the_list_and_every_count_show_applications_and_a_change_of_kind_moves_t
     assert names == both, names
     assert count == 2
     _shot(page, "1440-light-overview")
-    sign_in(page, live_server, org["emails"]["portfolio_manager"])
-    coverage = _coverage_total(page, live_server)
-    assert "Total applications\n\n2" in coverage and "With named owner\n\n1" in coverage, coverage
-    sign_in(page, live_server, org["emails"][ARCHITECT])
 
     # the first application lists its two parts; each part's page says it is part of it
     page.goto("%s/applications/%d" % (live_server, ids["Alerts gateway and consumers"]), wait_until="domcontentloaded",
