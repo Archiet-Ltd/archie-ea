@@ -868,6 +868,13 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
         undated = SimpleNamespace(source_label=None, source_recorded_at=None, recorded_at=None)
         assert _source_line(undated) == "added by hand"
 
+        # History given by backfill with no known start carries year 1: no day is named.
+        unknown_start = SimpleNamespace(
+            source_label=None, source_recorded_at=None, recorded_at=datetime(2026, 11, 12, 15, 0)
+        )
+        assert _source_line(unknown_start, datetime(1, 1, 1)) == "added by hand"
+        assert _source_line(unknown_start, datetime(2026, 10, 24, 8, 0)) == "added by hand on 24 Oct 2026"
+
     def test_org_a_service_name_never_resolves_to_org_b_element(self, app, db_session, make_org):
         from app.modules.intelligence.services.query_catalogue import run_entry
 
