@@ -148,6 +148,7 @@ def two_orgs_with_b_data(db_session, make_org, app):
     b_app_map = UnifiedApplicationCapabilityMapping(
         unified_capability_id=b_cap.id,
         application_component_id=b_app.id,
+        organization_id=org_b.id,
         relationship_strength=5,
         coverage_percentage=80,
     )

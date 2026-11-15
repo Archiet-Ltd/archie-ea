@@ -264,6 +264,12 @@ class Config:
     # MCP_ENABLED is true and this is empty, so a misconfigured deploy fails
     # loudly instead of quietly serving relative or wrong-host metadata.
     PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    # Additional origins the OAuth/MCP/connector surfaces also answer on.
+    # Comma-separated list (e.g. "https://entelim.org,https://www.entelim.org").
+    # Each alias must include scheme and host exactly. The request's origin is
+    # used only when it matches the canonical PUBLIC_BASE_URL or one of these
+    # aliases; any other Host value gets the canonical origin.
+    PUBLIC_BASE_URL_ALIASES = os.environ.get("PUBLIC_BASE_URL_ALIASES", "")
     MCP_ENABLED = _env_bool("MCP_ENABLED", False)
 
     # DNS rebinding protection for POST /mcp (app/modules/mcp/blueprint.py):
@@ -592,6 +598,8 @@ class TestingConfig(Config):
     SIGNUP_FORM_TOKEN_REQUIRED = _env_bool("SIGNUP_FORM_TOKEN_REQUIRED", False)
     # Tests use recorded DNS answers, never live lookups.
     VENDOR_DNS_LOOKUPS = False
+    # A test may fix the date the Money page reads as today (an ISO date); production never sets it.
+    FINANCE_FACTS_TODAY = os.environ.get("FINANCE_FACTS_TODAY", "")
     ALLOW_INTERNAL_WEBHOOK_TARGETS = os.environ.get(
         "ALLOW_INTERNAL_WEBHOOK_TARGETS", ""
     ).lower() in ("1", "true", "yes")

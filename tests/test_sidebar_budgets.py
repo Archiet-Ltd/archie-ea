@@ -47,7 +47,7 @@ WORK_CHILDREN = {
     "Systems": ["Applications", "Portfolio", "Data register", "Interfaces", "Technology radar"],
     "Impact": ["Impact analysis", "Traceability"],
     "Changes": ["Gaps", "Solutions", "Options analysis", "Scenarios", "Business cases", "Work packages", "Roadmap", "Programmes"],
-    "Spend": ["Costs", "Vendors", "Vendor catalogue", "Contracts and licences", "Renewals", "Investments"],
+    "Spend": ["Costs", "Money", "Vendors", "Vendor catalogue", "Contracts and licences", "Renewals", "Investments"],
     "Compliance": ["Controls", "Risks", "Decisions", "Review board", "Evidence"],
 }
 LAYER_TYPES = {
@@ -125,7 +125,7 @@ def test_the_groups_hold_the_v31_entries_in_order():
     assert [link.label for link in registry.WORK] == WORK
     assert [link.label for link in registry.MODEL] == MODEL
     assert [link.label for link in registry.SECONDARY] == SECONDARY
-    assert [link.label for link in registry.USER_MENU] == ["Account", "Billing", "Team", "Rate limits", "Settings", "Organisation administration", "Platform admin"]
+    assert [link.label for link in registry.USER_MENU] == ["Account", "Plan and billing", "Team", "Rate limits", "Settings", "Organisation administration", "Platform admin"]
 
 
 def test_each_work_item_holds_its_pages_in_order():
@@ -182,7 +182,7 @@ def test_work_pages_follow_who_may_open_them(ctx, role):
     held = {item.label: _labels(item.children) for item in nav["work"]}
     spend = list(WORK_CHILDREN["Spend"])
     if role == ROLE_FINANCE:
-        spend = ["Costs", "Vendors", "Vendor catalogue", "Licences", "Investments"]
+        spend = ["Costs", "Money", "Vendors", "Vendor catalogue", "Licences", "Investments"]
     elif role not in COST_VIEWERS:
         spend = ["Investments"]
     assert held["Spend"] == spend
@@ -243,7 +243,7 @@ def test_billing_team_and_settings_are_for_administrators(ctx):
     member = _nav(_Person(ROLE_ENTERPRISE_ARCHITECT))
     admin = _nav(_Person(ROLE_PLATFORM_ADMIN, admin=True))
     assert _labels(member["user_menu"]) == ["Account"]
-    assert _labels(admin["user_menu"])[:2] == ["Account", "Billing"]
+    assert _labels(admin["user_menu"])[:2] == ["Account", "Plan and billing"]
     assert "Organisation administration" in _labels(admin["user_menu"])
 
 

@@ -282,6 +282,36 @@ class TestBothPagesRenderEmpty:
             assert soup.find(attrs={"data-testid": f"bmc-textarea-{zone['box_key']}"}) is None
         assert not soup.find_all("textarea")
 
+    @pytest.mark.parametrize("role,sees_costs", [("cto", True), ("business_architect", False)])
+    def test_empty_cost_structure_box_says_why_for_each_kind_of_person(
+        self, app, db_session, make_org, client, login_as, role, sees_costs
+    ):
+        from app.models.business_model import BusinessModelCanvas
+        from app.services.cost_visibility import COSTS_WITHHELD
+
+        org = make_org(f"canvas-cost-empty-{role}")
+        user = _make_user(db_session, org.id, "CostEmptyOwner")
+        user.enterprise_role = role
+        canvas = BusinessModelCanvas(name="Empty Canvas", organization_id=org.id)
+        db_session.add(canvas)
+        db_session.flush()
+        canvas_id = canvas.id
+
+        login_as(client, user)
+        resp = client.get(f"/business-model/{canvas_id}")
+        assert resp.status_code == 200
+        soup = BeautifulSoup(resp.get_data(as_text=True), "html.parser")
+        reason = soup.find(attrs={"data-canvas-empty": "cost-structure"})
+        assert reason is not None
+        text = " ".join(reason.get_text().split())
+        if sees_costs:
+            assert COSTS_WITHHELD not in text
+            assert "cost" in text.lower() and len(text.split()) >= 8, text
+        else:
+            assert COSTS_WITHHELD in text
+            assert not re.search(r"\d", text), text
+            assert "no application" not in text.lower()
+
     def test_business_case_page_shows_the_empty_hint_and_zero_unclassified(
         self, app, db_session, make_org, client, login_as
     ):

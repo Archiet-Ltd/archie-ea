@@ -105,13 +105,13 @@ TOOL_SCHEMAS = [
     {
         "name": "link_application_to_capability",
         "surfaces": ["chat", "blueprint"],
-        "route": "ApplicationCapabilityMapping",
+        "route": "capability_support.record_capability_support",
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
-        "record_types_written": ["ApplicationCapabilityMapping"],
+        "record_types_written": ["ArchiMateRelationship"],
         "description": (
-            "Map an application to a business capability it supports. "
+            "Record that an application supports a capability. "
             "Use when the user wants to record which applications cover a capability."
         ),
         "parameters": {
@@ -125,10 +125,15 @@ TOOL_SCHEMAS = [
                     "type": "string",
                     "description": "Name of the business capability (fuzzy matched)",
                 },
-                "coverage_level": {
+                "how": {
                     "type": "string",
-                    "description": "Degree to which the application covers the capability",
-                    "enum": ["full", "partial", "planned"],
+                    "description": "Whether the application realizes the capability or serves it",
+                    "enum": ["realizes", "serves"],
+                },
+                "support_level": {
+                    "type": "string",
+                    "description": "How well the application supports the capability ('full' means primary)",
+                    "enum": ["primary", "secondary", "partial", "legacy", "planned", "linked", "full"],
                 },
                 "notes": {"type": "string"},
             },
@@ -1351,14 +1356,14 @@ TOOL_SCHEMAS = [
         "mutates": False,
         "record_types_written": [],
         "description": (
-            "Propose a change to the enterprise genome (the ArchiMate model) as a "
-            "structured, provenance-bearing PATCH. Use when the user asks to propose "
-            "a missing capability, a control, a driver, a requirement, or any "
-            "motivation/architecture element. Do NOT create elements directly — emit "
-            "a patch object and this tool validates it and queues it for human "
-            "approval. The patch MUST include target.organization_id, target.domain, "
-            "operation (add|modify), element (archimate_type, layer, name), and "
-            "provenance (proposed_by, rationale, archimate_anchor)."
+            "Propose a change to your model as a structured, provenance-bearing "
+            "proposal. Use when the user asks to propose a missing capability, a "
+            "control, a driver, a requirement, or any motivation/architecture "
+            "element. Do NOT create elements directly — emit a proposal object and "
+            "this tool validates it and queues it for human approval. The proposal "
+            "MUST include target.organization_id, target.domain, operation (add|modify), "
+            "element (archimate_type, layer, name), and provenance "
+            "(proposed_by, rationale, archimate_anchor)."
         ),
         "parameters": {
             "type": "object",
@@ -1370,7 +1375,7 @@ TOOL_SCHEMAS = [
                 "patch": {
                     "type": "object",
                     "description": (
-                        "The genome patch object conforming to GENOME_PATCH_SCHEMA: "
+                        "The proposal object conforming to GENOME_PATCH_SCHEMA: "
                         "{target:{organization_id,domain}, operation, "
                         "element:{archimate_type,layer,name,description?}, "
                         "provenance:{proposed_by,rationale,archimate_anchor}}."

@@ -17,7 +17,14 @@ import openai
 import pytest
 
 from app.modules.ai_chat.services import agent_runner as ar
-from app.modules.ai_chat.services.agent_runner import AgentRunner, is_retryable_llm_error
+from app.modules.ai_chat.services.agent_runner import (
+    CREDIT_EXHAUSTED,
+    RATE_LIMITED,
+    AgentRunner,
+    classify_provider_error,
+    is_retryable_llm_error,
+)
+from app.modules.ai_chat.services.failure_messages import AI_CREDIT_EXHAUSTED
 from app.modules.ai_chat.services.llm_service_impl import LLMService
 
 REAL_CHAIN = ar.build_provider_chain
@@ -111,6 +118,66 @@ def test_a_turn_nobody_answered_names_no_model(runner, monkeypatch):
     assert NVIDIA_MODEL not in result["response"] and "gemma" not in result["response"]
 
 
+def _no_credit():
+    return _status_error(
+        openai.APIStatusError, 402, "Insufficient credits. user_id: user_2abc"
+    )
+
+
+def test_a_key_with_no_credit_hands_the_question_to_the_next_key(runner, monkeypatch):
+    calls = _script(monkeypatch, runner, [_no_credit(), "Three applications are recorded."])
+    result = runner.run("How many applications do we run?")
+    assert result["response"] == "Three applications are recorded."
+    assert not result.get("error")
+    assert [c[0] for c in calls] == ["openrouter", "nvidia"]
+
+
+def test_the_credit_sentence_shows_only_when_every_key_has_run_out(runner, monkeypatch):
+    calls = _script(monkeypatch, runner, [_no_credit(), _no_credit()])
+    result = runner.run("q")
+    assert len(calls) == 2
+    assert result["response"] == AI_CREDIT_EXHAUSTED
+    assert "user_2abc" not in result["response"]
+    assert not result.get("retryable")
+
+
+def test_a_spent_balance_then_a_busy_provider_reads_as_busy(runner, monkeypatch):
+    _script(monkeypatch, runner, [_no_credit(), _rate_limit()])
+    result = runner.run("q")
+    assert "busy" in result["response"].lower()
+    assert result["retryable"]
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Error code: 402 - Insufficient credits. user_id: u_1", CREDIT_EXHAUSTED),
+        ("Your credit balance is too low to access the Anthropic API", CREDIT_EXHAUSTED),
+        ("You exceeded your current quota; code: insufficient_quota", CREDIT_EXHAUSTED),
+        ("insufficient_quota", CREDIT_EXHAUSTED),
+        ("Error code: 429 - Quota exceeded for quota metric 'requests per minute'", RATE_LIMITED),
+        ("429 rate limit exceeded", RATE_LIMITED),
+        ("free-models-per-day-high-balance: 1000 a day, 0 left", RATE_LIMITED),
+        ("context length 140200 tokens exceeds limit", None),
+        ("prompt has 4020 tokens", None),
+        ("messages must not be empty", None),
+    ],
+)
+def test_the_provider_error_is_classified_by_its_status_and_wording(text, expected):
+    assert classify_provider_error(RuntimeError(text)) == expected
+    assert classify_provider_error(text) == expected
+
+
+def test_a_per_minute_quota_is_a_rate_limit_that_can_be_retried():
+    err = RuntimeError("Error code: 429 - Quota exceeded for quota metric 'requests per minute'")
+    assert is_retryable_llm_error(err)
+    assert "credit" not in ar.sanitize_agent_error(err).lower()
+
+
+def test_a_status_on_the_exception_is_what_decides():
+    assert classify_provider_error(_status_error(openai.APIStatusError, 402, "denied")) == CREDIT_EXHAUSTED
+
+
 def test_a_bad_request_is_not_retried(runner, monkeypatch):
     calls = _script(monkeypatch, runner, [_status_error(openai.BadRequestError, 400, "messages must not be empty")])
     result = runner.run("q")
@@ -123,7 +190,12 @@ def test_timeouts_and_dropped_connections_are_retryable():
     request = httpx.Request("POST", "https://example.invalid")
     assert is_retryable_llm_error(openai.APITimeoutError(request=request))
     assert is_retryable_llm_error(openai.APIConnectionError(request=request))
-    assert is_retryable_llm_error(RuntimeError("monthly quota exceeded"))
+    # Rate limit errors (real provider shapes) are retryable
+    assert is_retryable_llm_error(RuntimeError("429 rate limit exceeded"))
+    assert is_retryable_llm_error(RuntimeError("rate limit exceeded: too many requests"))
+    # A spent balance belongs to one key: the next key or provider may still have credit
+    assert is_retryable_llm_error(RuntimeError("quota exceeded"))
+    assert is_retryable_llm_error(RuntimeError("credit balance exhausted"))
     assert not is_retryable_llm_error(ValueError("bad schema"))
 
 

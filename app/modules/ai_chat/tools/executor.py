@@ -602,13 +602,23 @@ class ToolExecutor:
             if tool_call.name == "submit_for_arb_review":
                 tool_call_digest = hashlib.sha256(str(tool_call.id).encode("utf-8")).hexdigest()
                 arguments["_trusted_command_key"] = f"ai-tool-{tool_call_digest}"
-            return handler(arguments)
+            result = handler(arguments)
+            if isinstance(result, dict) and result.get("success") is False and isinstance(result.get("error"), str):
+                from app.modules.ai_chat.services.customer_words import WRITE_FAILED, is_database_error
+
+                if is_database_error(result["error"]):
+                    logger.warning("Tool %s returned a database error: %s", tool_call.name, result["error"])
+                    db.session.rollback()
+                    result = dict(result, error=WRITE_FAILED)
+            return result
         except Exception as e:
             db.session.rollback()
             logger.exception("Tool %s failed", tool_call.name)
             if propagate_errors:
                 raise
-            return {"success": False, "error": str(e)}
+            from app.modules.ai_chat.services.customer_words import WRITE_FAILED, is_database_error
+
+            return {"success": False, "error": WRITE_FAILED if is_database_error(e) else str(e)}
 
     # ------------------------------------------------------------------ #
     # Helpers                                                              #
@@ -779,42 +789,37 @@ class ToolExecutor:
     # ------------------------------------------------------------------ #
 
     def _tool_link_application_to_capability(self, args: dict) -> dict:
-        app_r = self._resolver.resolve_application(args["application_name"])
-        cap_r = self._resolver.resolve_capability(args["capability_name"])
+        from app.services import capability_support as support
 
-        if not app_r["resolved"]:
-            return self._clarify("application", app_r)
-        if not cap_r["resolved"]:
-            return self._clarify("capability", cap_r)
-
-        from app.models.application_capability import ApplicationCapabilityMapping
-
-        # tenant-scoping-ok: FK id already org-scoped (application/capability resolved via a TenantMixin model or the current request's own app/solution).
-        existing = ApplicationCapabilityMapping.query.filter_by(
-            application_component_id=app_r["id"],
-            business_capability_id=cap_r["id"],
-        ).first()
-        if existing:
-            return {
-                "success": True,
-                "message": (
-                    f"'{app_r['name']}' is already mapped to capability '{cap_r['name']}'."
-                ),
-            }
-
-        mapping = ApplicationCapabilityMapping(
-            application_component_id=app_r["id"],
-            business_capability_id=cap_r["id"],
-            support_level=args.get("coverage_level", "partial"),
-        )
-        db.session.add(mapping)
-        db.session.commit()
+        org_id = self._get_organization_id()
+        level = args.get("support_level") or args.get("coverage_level")
+        try:
+            application, capability = support.resolve_support_ends(
+                org_id, args.get("application_name"), args.get("capability_name"))
+            result = support.record_capability_support(
+                org_id, application.id, capability.id,
+                kind=args.get("how") or "realization",
+                facts={"support_level": level, "notes": args.get("notes")},
+                actor_id=self.user_id,
+            )
+            db.session.commit()
+        except support.CapabilitySupportRefused as refusal:
+            db.session.rollback()
+            return {"success": False, "error": str(refusal)}
+        row = next((r for r in support.support_rows(org_id, application_ids=None)
+                    if r["row_id"] == result.row_id), None)
+        level_word = (row or {}).get("support_level") or "linked"
+        page = support.application_page(org_id, application)
+        verb = support.KIND_WORDS[result.kind]
+        lead = "Recorded" if result.created else "Already recorded"
         return {
             "success": True,
-            "result": {"application": app_r["name"], "capability": cap_r["name"]},
+            "result": {"application": result.application_name, "capability": result.capability_name,
+                       "kind": verb, "support_level": level_word, "page": page},
             "message": (
-                f"Mapped application '{app_r['name']}' to capability '{cap_r['name']}' "
-                f"({args.get('coverage_level', 'partial')} coverage)."
+                f"{lead}: {result.application_name} {verb} {result.capability_name} "
+                f"({level_word.capitalize()} support). See it on the application page: "
+                f"[{result.application_name}]({page})."
             ),
         }
 
@@ -1616,14 +1621,79 @@ class ToolExecutor:
         elem_r = self._resolver.resolve_archimate_element(args["element_name"])
         if not elem_r["resolved"]:
             return self._clarify("ArchiMate element", elem_r)
+
+        # Load the ArchiMateElement to get description and custom_properties
+        try:
+            from app.models.archimate_core import ArchiMateElement
+        except ImportError:
+            from app.models.models import ArchiMateElement
+
+        ae = ArchiMateElement.query.filter_by(id=elem_r["id"]).first()
+        if not ae:
+            return {"success": False, "error": "Element not found"}
+
+        # Get the provenance chain
         from app.modules.architecture.services.inference_engine_service import ArchiMateInferenceEngine
+        from app.services.model_map import origin_sentence
         engine = ArchiMateInferenceEngine(architecture_id=0)
-        result = engine.explain(elem_r["id"])
-        return {
-            "success": True,
-            "result": result,
-            "message": f"Provenance chain for '{elem_r['name']}' traced.",
+        provenance = engine.explain(ae.id)
+
+        # The description comes first and the properties beside it: a property can
+        # outlive what the description now says (a price card withdrawn, a date moved).
+        # The properties carry their source when the element records one.
+        properties = ae.custom_properties or {}
+        origin = origin_sentence(ae.source_kind, ae.source_label, ae.source_ref) if ae.source_kind else None
+        result = {
+            "element_id": ae.id,
+            "element_name": ae.name,
+            "element_type": ae.type,
+            "element_layer": ae.layer,
+            "description": ae.description or "",
+            "custom_properties": properties,
+            "properties_source": origin,
+            "provenance": {
+                "steps": provenance.steps,
+                "source_element_ids": provenance.source_elements,
+                "rules_applied": provenance.rules_applied,
+                "confidence": provenance.confidence,
+            },
         }
+
+        # If this element mirrors a motivation entity, include its typed fields
+        typed_record = self._get_typed_record(ae)
+        if typed_record:
+            result["typed_record"] = {"model": type(typed_record).__name__, **typed_record.to_dict()}
+
+        said = [f"Element '{ae.name}' ({ae.type})."]
+        said.append(f"Description: {ae.description.strip().rstrip('.')}." if ae.description else "No description is recorded.")
+        if properties:
+            suffix = f" ({origin})" if origin else ""
+            said.append("Properties: " + "; ".join(f"{k}: {v}{suffix}" for k, v in properties.items()) + ".")
+        else:
+            said.append("No properties are recorded.")
+        return {"success": True, "result": result, "message": " ".join(said)}
+
+    def _get_typed_record(self, ae):
+        """Find the motivation entity that mirrors this ArchiMateElement."""
+        from app.middleware.tenant_context import current_org_id
+        org_id = current_org_id()
+        if not org_id:
+            return None
+
+        # Check each motivation model that has archimate_element_id
+        from app.models.solution_architect_models import (
+            SolutionConstraint, SolutionDriver, SolutionGoal, SolutionRequirement,
+        )
+        from app.models.solution_lifecycle_models import SolutionRisk
+
+        for model_class in [SolutionDriver, SolutionGoal, SolutionConstraint, SolutionRequirement, SolutionRisk]:
+            record = model_class.query.filter_by(
+                archimate_element_id=ae.id,
+                organization_id=org_id
+            ).first()
+            if record:
+                return record
+        return None
 
     # ------------------------------------------------------------------ #
     # Tool: simulate_impact (read-only)                                  #
@@ -1791,9 +1861,9 @@ class ToolExecutor:
         )
         base = ""
         try:
-            from flask import current_app
+            from app.services.origin import canonical_origin
 
-            base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+            base = canonical_origin()
         except Exception:
             base = ""
         for node in result["nodes"]:
@@ -2084,6 +2154,50 @@ class ToolExecutor:
             "message": found.get("reason") or "The capabilities mapped to %s, as its page shows them." % found.get("service"),
         }
 
+    def _applications_supporting(self, capability_name: str):
+        """The applications recorded as supporting the capability a name means, read through the one
+        reader; ``None`` when no capability element carries the name."""
+        from app.models.application_portfolio import ApplicationComponent
+        from app.services import capability_support as support
+
+        org_id = self._get_organization_id()
+        elements = support._elements_named(org_id, capability_name, "capability")
+        if not elements:
+            return None
+        rows = []
+        for element in elements:
+            # A lookup only: asking who supports a capability never makes the capability's record.
+            record = support.existing_capability_record(org_id, element)
+            if record is not None:
+                rows.extend(support.applications_of_capability(org_id, record.id))
+        apps = {
+            a.id: a for a in ApplicationComponent.query.filter(
+                ApplicationComponent.organization_id == org_id,
+                ApplicationComponent.id.in_([r["application_id"] for r in rows] or [0]),
+            )
+        }
+        owner_fields = self._application_owner_fields(list(apps.values()))
+        out = []
+        for r in rows:
+            a = apps.get(r["application_id"])
+            if a is None:
+                continue
+            out.append({
+                "id": a.id, "name": a.name, "deployment_status": a.deployment_status,
+                "how": r["kind_word"], "coverage_level": r["support_level"], **owner_fields[a.id],
+            })
+        name = elements[0].name
+        coverage = self._coverage(out, len(out), f"application(s) mapped to '{name}'")
+        if not out:
+            return {
+                "success": True, "result": [], "count": 0, "capability_name": name,
+                "message": f"No applications are recorded as supporting '{name}'. This is a coverage gap.",
+            }
+        return {
+            "success": True, "result": out, "capability_name": name, **coverage,
+            "message": coverage["message"] + " Use link_application_to_solution to attach relevant ones to your solution.",
+        }
+
     # ------------------------------------------------------------------ #
     # Tool: find_applications_by_capability (read-only)                   #
     # ------------------------------------------------------------------ #
@@ -2099,6 +2213,10 @@ class ToolExecutor:
         cap_name = args.get("capability_name", "")
         if not cap_name.strip():
             return {"success": False, "error": "capability_name is required"}
+
+        supported = self._applications_supporting(cap_name)
+        if supported is not None:
+            return supported
 
         cap_r = self._resolver.resolve_capability(cap_name)
         if not cap_r.get("resolved"):
@@ -2436,20 +2554,20 @@ class ToolExecutor:
         }
 
     def _tool_propose_genome_patch(self, args: dict) -> dict:
-        """Validate an LLM-proposed genome patch and QUEUE it for approval.
+        """Validate an LLM-proposed change to the model and QUEUE it for approval.
 
         Non-mutating with respect to the enterprise model: it only creates a
-        pending approval (or rejects an invalid patch). The actual model write
+        pending approval (or rejects an invalid proposal). The actual model write
         happens later, in `_tool_apply_genome_patch`, once a human approves —
         exactly the existing approve-tier queue/confirm mechanism.
 
-        The LLM supplies the candidate patch as ``args["patch"]`` (or as the
+        The LLM supplies the candidate proposal as ``args["patch"]`` (or as the
         argument object itself). Whatever it emits is validated deterministically
-        before anything is queued, so a hallucinated patch cannot reach the model.
+        before anything is queued, so a hallucinated proposal cannot reach the model.
         """
         from app.modules.genome.patch.proposer import propose_genome_patch
 
-        request_text = args.get("request") or "propose a genome patch"
+        request_text = args.get("request") or "propose a change to your model"
 
         supplied = args.get("patch")
         if isinstance(supplied, dict):

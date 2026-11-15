@@ -1283,10 +1283,10 @@ class AIChatApprovalService:
             # Refusal was already audit-logged and committed above the raise; nothing to roll back.
             self.logger.warning(f"Approval {approval_id} refused: {e}")
             return {"success": False, "error": str(e), "code": "APPROVAL_DENIED"}
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            self.logger.error(f"Failed to approve/execute operation {approval_id}: {e}")
-            return {"success": False, "error": f"Execution failed: {str(e)}"}
+            self.logger.exception("Failed to approve/execute operation %s", approval_id)
+            return {"success": False, "error": "The change could not be saved, so nothing was changed."}
 
     def reject_approval(self, approval_id: int, reason: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -1394,7 +1394,7 @@ class AIChatApprovalService:
         try:
             from html import escape
 
-            from flask import after_this_request, current_app, has_request_context, request
+            from flask import after_this_request, current_app, has_request_context
 
             from app._bootstrap._digest_emails import _safe_send_email
             from app.services.architecture_change_impact_service import (
@@ -1445,11 +1445,10 @@ class AIChatApprovalService:
 
             subject = "A change to something you own needs review"
             # The email link must be absolute: a relative href goes nowhere in
-            # a mail client. The public base URL, else this request's host;
-            # with neither, the link is left out rather than sent relative.
-            base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
-            if not base and has_request_context():
-                base = request.host_url.rstrip("/")
+            # a mail client. The canonical origin is used.
+            from app.services.origin import canonical_origin
+
+            base = canonical_origin()
             link = (
                 f'<p><a href="{escape(base + inbox_path)}">Open the approval inbox</a></p>'
                 if base
