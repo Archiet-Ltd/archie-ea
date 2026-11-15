@@ -138,7 +138,7 @@
 
 {#- The header band of a box: the zone tint with its label, the entry count, the "i" popover and the add button, then the icon,
     title and the framework's question in the foreground colour at 70 percent (4.5:1 or better on every tint). b needs key, title, question, icon, number. -#}
-{% macro band(canvas_id, b, m, items, add=false, compact=false) -%}
+{% macro band(canvas_id, b, m, items, add=false, compact=false, count=true) -%}
   {% if compact %}
   {#- Inside a fixed shape the band keeps to one short row: the title, then the count, the "i" popover and the add button; the question stays for a screen reader and in the popover. -#}
   <div class="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-t-lg border-b px-3 py-2 {{ ZONES[m.zone] }}" data-canvas-band="{{ m.zone }}">
@@ -147,7 +147,7 @@
       <span>{{ b.title }}</span>
     {% endcall %}
     <span class="flex shrink-0 items-center gap-1">
-      {{ ui.badge(text=items|length, variant='secondary') }}
+      {% if count %}{{ ui.badge(text=items|length, variant='secondary') }}{% endif %}
       {{ info(b.title, m.guidance, m.example) }}
       {% if add %}{{ add_button(b.key, b.title) }}{% endif %}
     </span>
@@ -158,7 +158,7 @@
     <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
       <span class="min-w-0 text-xs font-medium text-foreground/70">{{ m.zone_label }}</span>
       <span class="flex shrink-0 items-center gap-1">
-        {{ ui.badge(text=items|length, variant='secondary') }}
+        {% if count %}{{ ui.badge(text=items|length, variant='secondary') }}{% endif %}
         {{ info(b.title, m.guidance, m.example) }}
         {% if add %}{{ add_button(b.key, b.title) }}{% endif %}
       </span>
@@ -182,9 +182,13 @@
 {%- set add = editable and not b.readonly -%}
 <div id="box-{{ b.key }}" class="contents"></div>
 {% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' relative gap-0 py-0' ~ (' flex min-h-0 flex-col overflow-hidden' if scroll else '')) %}
-  {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add, compact=scroll) }}
+  {%- set withheld = boxes.get(b.key ~ ':withheld') -%}
+  {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add, compact=scroll, count=not withheld) }}
   {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3' ~ (' overflow-y-auto' if scroll else '')) %}
+    {% if withheld %}<p class="text-sm text-foreground/70" data-canvas-withheld="{{ b.key }}">{{ withheld }}</p>
+    {% else %}
     {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, empty_text(b), add, scroll) }}
+    {% endif %}
     {#- A box that states a total says it once, below its notes: the total is no entry, so it links nowhere. -#}
     {% if boxes.get(b.key ~ ':total') %}<p class="text-sm font-medium text-foreground" data-canvas-total="{{ b.key }}">{{ boxes.get(b.key ~ ':total') }}</p>{% endif %}
     {% for s in (b.subs or []) %}
@@ -212,7 +216,7 @@
 {%- set boxes = data.boxes or {} -%}
 {%- set rows = [] -%}
 {%- for b in spec.boxes -%}
-  {%- for n in boxes.get(b.key) or [empty_text(b)] %}{% set _ = rows.append([b.key, b.title, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}
+  {%- for n in boxes.get(b.key) or [boxes.get(b.key ~ ':withheld') or empty_text(b)] %}{% set _ = rows.append([b.key, b.title, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}
   {%- if boxes.get(b.key ~ ':total') %}{% set _ = rows.append([b.key, b.title, boxes.get(b.key ~ ':total'), '']) %}{% endif -%}
   {%- for s in b.subs or [] -%}{%- for n in boxes.get(s.key) or [empty_text(s)] %}{% set _ = rows.append([s.key, s.title, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}{%- endfor -%}
 {%- endfor -%}

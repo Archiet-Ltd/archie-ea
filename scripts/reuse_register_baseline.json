@@ -123,6 +123,12 @@
    "app/services/solution_template_service.py": 1,
    "app/services/work_package_service.py": 1
   },
+  "canvas-store/view-row-constructor": {
+   "app/commands/seed_demo_company.py": 1,
+   "app/modules/ai_chat/routes/chat_workflows.py": 1,
+   "app/modules/architecture/routes/archimate_routes.py": 7,
+   "app/services/archimate_composer_service.py": 2
+  },
   "capability-maturity/maturity-accessor": {
    "app/modules/capabilities/services/capability_heatmap_service.py": 2
   },
