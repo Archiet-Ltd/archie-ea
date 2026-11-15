@@ -8,6 +8,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/duplicate-software-spend
 icon: receipt
+description: Run duplicate detection to find applications you're paying for twice. Review overlapping groups and add real duplicates to the consolidation plan.
 ---
 
 # What are we paying for twice?

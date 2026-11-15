@@ -8,6 +8,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/business-model-canvas-on-one-page
 icon: layout-template
+description: Open Canvases and create a new Business Model Canvas on one page. Each box saves independently, with AI drafts to help you fill in the details.
 ---
 
 # Put our business model on one page we can keep current

@@ -91,6 +91,32 @@ def test_every_sitemap_url_is_crawlable_and_tagged(app):
             )
 
 
+def test_every_sitemap_url_has_unique_description(app):
+    """No two sitemap URLs share the same meta description -- every page
+    must carry its own unique description so search results never show
+    duplicate snippets for different addresses."""
+
+    with app.test_client() as client:
+        paths = _sitemap_paths(client)
+        descriptions = {}
+        for path in paths:
+            if path in _NON_CONTENT_PAGE_PATHS:
+                continue
+            rv = client.get(path)
+            assert rv.status_code == 200, f"{path} returned {rv.status_code}"
+            html = rv.data.decode()
+            match = _DESCRIPTION_RE.search(html)
+            assert match is not None, f"{path}: no meta description"
+            desc = match.group(1).strip()
+            assert desc, f"{path}: empty meta description"
+            if desc in descriptions:
+                assert False, (
+                    f"{path}: duplicate meta description {desc!r} "
+                    f"also used by {descriptions[desc]}"
+                )
+            descriptions[desc] = path
+
+
 def test_every_page_canonical_is_self_referencing(app):
     """Every public page -- including a comparison page that also carries
     an archiet.ai external_url for cross-linking only -- is canonical to
