@@ -48,6 +48,8 @@ MCP_TESTS = (
     "tests/test_origin_request.py::test_metadata_on_entelim_org_names_entelim_org",
     "tests/test_origin_request.py::test_metadata_on_forged_host_names_canonical",
     "tests/test_origin_request.py::test_metadata_on_server_ip_names_canonical",
+    "tests/test_origin_request.py::test_the_token_endpoint_accepts_only_listed_addresses_as_the_resource",
+    "tests/test_origin_request.py::test_a_token_for_an_unlisted_address_does_not_open_the_connector",
     "tests/test_viewer_cannot_write_anywhere.py::test_viewer_can_access_mcp_connector_endpoint",
     "tests/test_viewer_cannot_write_anywhere.py::test_viewer_can_access_connected_assistants_page",
     "tests/test_viewer_cannot_write_anywhere.py::test_the_connector_reads_for_every_role_and_hides_every_write_tool",
