@@ -173,7 +173,7 @@ bad_status = []
 leaks = 0; alpha_hits = 0; called = set()
 for name, args, tag in held_back_calls:
     st, body = call(name, args)
-    if st != 404:
+    if not (st == 200 and "not available yet" in body):
         bad_status.append((name, tag, st))
 for name, args, tag in calls:
     st, body = call(name, args); called.add(name)
