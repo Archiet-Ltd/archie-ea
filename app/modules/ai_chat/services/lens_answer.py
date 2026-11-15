@@ -18,6 +18,7 @@ from app.middleware.tenant_context import current_org_id
 from app.models import ArchiMateElement
 from app.modules.ai_chat.services.estate_answer import named_element_ids
 from app.modules.intelligence.services.answer_envelope import OWNER_CUE
+from app.modules.intelligence.services.nl_query_interpreter import asks_one_thing
 
 # key -> (words that ask it, the view that serves it)
 LENSES = {
@@ -48,7 +49,7 @@ LENSES = {
 
 def classify_lens_question(message: Any) -> Optional[str]:
     """The lens a message asks, or None for anything else."""
-    if not isinstance(message, str) or not message.strip():
+    if not isinstance(message, str) or not message.strip() or not asks_one_thing(message):
         return None
     for key, (pattern, _view) in LENSES.items():
         if pattern.search(message):
@@ -104,7 +105,7 @@ def asks_for_capacity(message: Any) -> bool:
 def human_join(owners: List[Dict[str, Optional[str]]]) -> str:
     """Join owner dicts ``{"name": str, "role": str|None}`` into a sentence fragment.
 
-    One owner shows just the name (with its role in parentheses when one is recorded).
+    One owner shows just the name (with its role in parentheses when one is recorded, after a comma when the name already ends in a bracket).
     Two owners are joined by " and ". Three or more use commas with a final " and ".
     An owner with no recorded role shows the name alone.
     """
@@ -114,7 +115,12 @@ def human_join(owners: List[Dict[str, Optional[str]]]) -> str:
         if not name:
             continue
         role = (owner.get("role") or "").strip()
-        parts.append("%s (%s)" % (name, role) if role else name)
+        if not role:
+            parts.append(name)
+        elif name.endswith(")"):
+            parts.append("%s, %s" % (name, role))
+        else:
+            parts.append("%s (%s)" % (name, role))
     if not parts:
         return ""
     if len(parts) == 1:

@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 
 from flask import jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.models.business_case import BusinessCase
 from app.modules.business_case.ai_service import (
@@ -91,7 +91,9 @@ def ai_draft_section(business_case_id):
     section_key = payload.get("section")
 
     try:
-        draft = generate_section_draft(business_case, section_key)
+        from app.services.cost_visibility import costs_visible
+
+        draft = generate_section_draft(business_case, section_key, include_financials=costs_visible(current_user))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except BusinessCaseAIDraftError as e:
