@@ -40,15 +40,9 @@ def _role_of(email):
 def typed_org(seeded):
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
-    from app.models.business_capabilities import (
-        ApplicationCapabilityCoverage,
-        BusinessCapability,
-    )
+    from app.models.business_capabilities import BusinessCapability
     from app.models.organization import Organization
-    from app.models.unified_application_capability_mapping import (
-        UnifiedApplicationCapabilityMapping,
-    )
-    from app.models.unified_capability import UnifiedCapability
+    from app.services.capability_support import record_capability_support
 
     suffix = uuid.uuid4().hex[:6]
     org_id = seeded["ids"]["org"]
@@ -73,16 +67,7 @@ def typed_org(seeded):
         storefront = ApplicationComponent(name=names["app"], organization_id=org_id)
         db.session.add_all([top, deep, foreign, storefront])
         db.session.flush()
-        db.session.add(ApplicationCapabilityCoverage(
-            application_component_id=storefront.id, capability_id=top.id,
-            support_level="full"))
-        db.session.flush()
-        unified = UnifiedCapability.query.filter_by(
-            organization_id=org_id, source_table="business_capability",
-            source_id=str(top.id)).one()
-        db.session.add(UnifiedApplicationCapabilityMapping(
-            unified_capability_id=unified.id, application_component_id=storefront.id,
-            support_level="full", coverage_percentage=80, is_active=True))
+        record_capability_support(org_id, storefront.archimate_element_id, top.archimate_element_id)
         db.session.commit()
         names["top_id"] = top.id
     return names

@@ -270,7 +270,7 @@ def add_dependency(work_package_id: int):
     result = service.add_dependency(work_package_id, data["depends_on_id"])
 
     if not result.get("success"):
-        return jsonify(result), 400
+        return jsonify(result), 404 if result.get("not_found") else 400
 
     return jsonify({"success": True, "data": result})
 
