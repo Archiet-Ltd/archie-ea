@@ -324,12 +324,12 @@ document.addEventListener('alpine:init', () => {
 
         <!-- Matrix table -->
         <div x-cloak x-show="!loading && !error && dataLoaded && capabilities.length > 0"
-             class="overflow-auto max-h-[65vh]">
+             class="overflow-auto max-h-[65vh] matrix-table-container" data-testid="matrix-table-container">
             <table class="dense-table w-full text-xs border-collapse">
                 <thead class="sticky top-0 z-20">
                     <!-- Vendor header row -->
                     <tr>
-                        <th class="sticky left-0 z-30 bg-muted border-r border-b border-border px-4 py-2.5 text-left text-xs font-semibold text-foreground min-w-[200px]"
+                        <th class="sticky left-0 z-30 bg-muted border-r border-b border-border px-4 py-2.5 text-left text-xs font-semibold text-foreground w-40 sm:w-52"
                             rowspan="2">
                             Capability
                         </th>
@@ -342,7 +342,7 @@ document.addEventListener('alpine:init', () => {
                     <!-- Product sub-header row -->
                     <tr>
                         <template x-for="col in vendorProducts" :key="'sub-' + col.vendor + '::' + col.product">
-                            <th class="bg-muted/60 border-r border-b border-border px-2 py-1.5 text-center text-2xs font-medium text-muted-foreground whitespace-nowrap max-w-[96px] overflow-hidden text-ellipsis"
+                            <th class="bg-muted/60 border-r border-b border-border px-2 py-1.5 text-center text-2xs font-medium text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis"
                                 :title="col.product"
                                 x-text="col.product"></th>
                         </template>
@@ -351,9 +351,10 @@ document.addEventListener('alpine:init', () => {
                 <tbody>
                     <template x-for="cap in capabilities" :key="cap">
                         <tr class="group hover:bg-muted/20 transition-colors">
-                            <td class="sticky left-0 z-10 bg-card group-hover:bg-muted/20 border-r border-b border-border px-4 py-2 font-medium text-foreground whitespace-nowrap max-w-[220px] overflow-hidden text-ellipsis transition-colors"
+                            <td class="sticky left-0 z-10 bg-card group-hover:bg-muted/20 border-r border-b border-border px-4 py-2 font-medium text-foreground whitespace-normal sm:break-words sm:overflow-visible focus:whitespace-normal focus:break-words focus:overflow-visible focus:z-20 transition-colors"
                                 :title="cap"
-                                x-text="cap"></td>
+                                x-text="cap"
+                                tabindex="0"></td>
                             <template x-for="col in vendorProducts" :key="cap + '::' + col.vendor + '::' + col.product">
                                     <td class="border-r border-b border-border text-center px-1.5 py-1.5 cursor-pointer transition-all hover:scale-105 hover:z-10 relative font-semibold"
                                         :class="getCellClass(cap, col.vendor, col.product)"
