@@ -89,3 +89,23 @@ def test_organisation_a_gets_its_slice_with_the_notice_and_links_and_nothing_of_
     missing = _mcp_call(client, token_a, "get_genome_slice",
                         {"domain": "business", "focus_ids": ["business:cap:987654321"]})
     assert _payload(foreign) == _payload(missing) == {"success": False, "error": "Not found.", "code": "NOT_FOUND"}
+
+
+def test_support_recorded_for_one_organisation_is_not_visible_to_the_other(client, db_session, login_as, app):
+    """A support recorded in A marks A's capability supported through the token; B's slice of the same
+    capability name stays unsupported and names no application of A."""
+    org_a = _org(db_session, "Acme Support")
+    org_b = _org(db_session, "Acme Suppor")
+    seed_a = seed_cited_model(db_session, org_a.id)
+    seed_b = seed_cited_model(db_session, org_b.id, suffix="s")
+    user_a = _make_user(db_session, org_a, "gm-sa-%s@example.com" % uuid.uuid4().hex[:6])
+    user_b = _make_user(db_session, org_b, "gm-sb-%s@example.com" % uuid.uuid4().hex[:6])
+    token_a = _mint_oauth_token(client, db_session, org_a, user_a, login_as, app)
+    token_b = _mint_oauth_token(client, db_session, org_b, user_b, login_as, app)
+    nodes_a = _payload(_mcp_call(client, token_a, "get_genome_slice", {"domain": "business"}))["result"]["nodes"]
+    nodes_b = _payload(_mcp_call(client, token_b, "get_genome_slice", {"domain": "business"}))["result"]["nodes"]
+    supported_a = [n for n in nodes_a if n["kind"] == "cap" and n["supported"]]
+    assert [n["name"] for n in supported_a] == [seed_a["names"]["supported"]]
+    supported_b = [n for n in nodes_b if n["kind"] == "cap" and n["supported"]]
+    assert [n["name"] for n in supported_b] == [seed_b["names"]["supported"]]
+    assert '"%s"' % seed_a["names"]["app"] not in json.dumps(nodes_b)

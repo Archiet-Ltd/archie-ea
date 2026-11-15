@@ -83,6 +83,7 @@ NO_CAPABILITY_IN_CHAIN_REASON = validate_reason_code("no_capability_in_chain")
 # means no component was resolved at all).
 NO_COST_RECORDED_REASON = validate_reason_code("no_cost_recorded")
 NO_HEALTH_RECORDED_REASON = validate_reason_code("no_health_recorded")
+NOT_ASSESSED_HEALTH = "Not assessed"
 NO_LICENCE_RECORDED_REASON = validate_reason_code("no_licence_recorded")
 # A licence whose usage has never been synced from the source system carries
 # quantity_used at its column default of zero -- comparing that default
@@ -342,7 +343,7 @@ def _resolve_health_batch(
 
     An application carries the ``health_status`` its owner recorded; a capability
     carries the status the capability health score already computes for the
-    dashboard (measured ones only). Every other element has no health anywhere
+    dashboard, or "Not assessed" when it has none. Every other element has no health anywhere
     in the model, so it is left out and the row says so rather than guessing.
     """
     distinct_ids = sorted(set(element_ids))
@@ -361,6 +362,9 @@ def _resolve_health_batch(
             if status:
                 found[element_id] = str(status).replace("_", " ").capitalize()
     if cap_ids:
+        # A capability always answers: the measured status when it has one,
+        # otherwise a plain "Not assessed" so the row never shows a blank.
+        found.update({element_id: NOT_ASSESSED_HEALTH for element_id in cap_ids})
         from app.models.business_capabilities import BusinessCapability
         from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
 
@@ -1144,6 +1148,39 @@ def _filter_explicit_by_layer(rows: List[Dict[str, Any]], layer: str) -> List[Di
     ]
 
 
+def _merge_rows_by_element(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """One row per affected element, however many ways the walk reached it.
+
+    A recorded link and the model's own working-out can both reach the same
+    element; each such pair used to be two rows, so the answer counted the element
+    twice. The first row stays (recorded rows come first in the walk) and carries
+    every way the element was reached in ``relations``, recorded ones first, with
+    ``relation`` the first of them. Every row carries ``relations``."""
+    merged: Dict[Any, Dict[str, Any]] = {}
+    order: List[Dict[str, Any]] = []
+    for row in rows:
+        kept = merged.get(row["element_id"])
+        if kept is None:
+            row["relations"] = [row["relation"]]
+            merged[row["element_id"]] = row
+            order.append(row)
+        else:
+            kept["relations"].append(row["relation"])
+            if not kept.get("reason") and row.get("reason"):
+                kept["reason"] = row["reason"]
+    for row in order:
+        row["relations"].sort(key=lambda rel: rel.get("kind") != "explicit")
+        row["relation"] = row["relations"][0]
+    return order
+
+
+def without_relations(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Rows as the public impact endpoints return them: the documented key set,
+    without the full list of ways each element was reached (``relations``), which
+    only the answer pages and the set impact walk read."""
+    return [{key: value for key, value in row.items() if key != "relations"} for row in rows]
+
+
 def _derived_row(fact: Dict[str, Any], root_id: int) -> Dict[str, Any]:
     if fact["source_element_id"] == root_id:
         element_id = fact["target_element_id"]
@@ -1373,7 +1410,11 @@ class IntelligenceQueryService:
         with_owner: bool = True,
         cursor: Optional[int] = None,
         page_size: Optional[int] = None,
+        with_relations: bool = False,
     ) -> Dict[str, Any]:
+        """``with_relations`` keeps, on every row, the full list of ways the element
+        was reached (``relations``) for the answer pages and the set walk; the public
+        endpoints leave it off so their row shape stays as documented."""
         if direction not in VALID_DIRECTIONS:
             raise ValueError(f"direction must be one of {sorted(VALID_DIRECTIONS)}")
         if not (1 <= max_depth <= 10):
@@ -1514,13 +1555,19 @@ class IntelligenceQueryService:
                         # is stripped.
                         row.pop("_endpoints", None)
 
+                    rows = _merge_rows_by_element(rows)
+
                     explicit_count = sum(1 for r in rows if r["relation"]["kind"] == "explicit")
                     derived_count = sum(1 for r in rows if r["relation"]["kind"] == "derived")
-                    stale_count = sum(1 for r in rows if r["relation"].get("stale"))
+                    stale_count = sum(
+                        1 for r in rows if any(rel.get("stale") for rel in r["relations"])
+                    )
 
                     scope.explicit_rows = explicit_count
                     scope.derived_rows = derived_count
                     scope.stale_rows = stale_count
+                    if not with_relations:
+                        rows = without_relations(rows)
 
                     summary = {
                         "explicit_count": explicit_count,
@@ -1907,6 +1954,7 @@ class IntelligenceQueryService:
         for seed in seeds:
             single = IntelligenceQueryService.cross_layer_impact(
                 seed,
+                with_relations=True,
                 include_derived=include_derived,
                 include_stale=include_stale,
                 max_depth=max_depth,
@@ -1934,9 +1982,10 @@ class IntelligenceQueryService:
                     }
                 if seed not in entry["seed_ids"]:
                     entry["seed_ids"].append(seed)
-                relation = dict(row["relation"])
-                relation["from_seed"] = seed
-                entry["relations"].append(relation)
+                for row_relation in row.get("relations") or [row["relation"]]:
+                    relation = dict(row_relation)
+                    relation["from_seed"] = seed
+                    entry["relations"].append(relation)
                 if entry["maturity"] is None and row.get("maturity") is not None:
                     entry["maturity"] = row["maturity"]
                 if entry["health"] is None and row.get("health") is not None:

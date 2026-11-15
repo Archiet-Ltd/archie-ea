@@ -817,6 +817,13 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
         org = make_org("breaks-systems-only")
         other = make_org("breaks-systems-only-b")
 
+        # Use variables for the seeded dates so the expected source_line text
+        # derives from the same values (test passes on any day).
+        small_source_recorded_at = datetime(2026, 10, 24, 8, 0)
+        big_source_recorded_at = datetime(2026, 10, 25, 9, 0)
+        small_expected = small_source_recorded_at.strftime("%-d %b %Y").replace(" 0", " ")
+        big_expected = big_source_recorded_at.strftime("%-d %b %Y").replace(" 0", " ")
+
         def element(name, kind, org_id, **extra):
             e = ArchiMateElement(name=name, type=kind, layer="application", organization_id=org_id, **extra)
             db.session.add(e)
@@ -824,10 +831,10 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
             return e
 
         process = element("Handle customer checkout", "BusinessProcess", org.id)
-        small = element("Order Service", "ApplicationService", org.id, recorded_at=datetime(2026, 10, 24, 8, 0))
+        small = element("Order Service", "ApplicationService", org.id, source_recorded_at=small_source_recorded_at)
         big = element(
             "Customer Database", "DataObject", org.id,
-            source_label="Application portfolio", source_recorded_at=datetime(2026, 10, 25, 9, 0),
+            source_label="Application portfolio", source_recorded_at=big_source_recorded_at,
         )
         callers = [element("Caller %d" % i, "ApplicationComponent", org.id) for i in range(5)]
         links = [(c, process) for c in callers] + [(c, big) for c in callers[:4]] + [(c, small) for c in callers[:2]]
@@ -848,8 +855,8 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
         names = [r["name"] for r in result["rows"]]
         assert names == ["Customer Database", "Order Service"]
         assert [r["depends_on_count"] for r in result["rows"]] == [4, 2]
-        assert result["rows"][0]["source_line"] == "from Application portfolio, as of 25 Oct 2026"
-        assert result["rows"][1]["source_line"] == "added by hand on 24 Oct 2026"
+        assert result["rows"][0]["source_line"] == f"from Application portfolio, as of {big_expected}"
+        assert result["rows"][1]["source_line"] == f"added by hand on {small_expected}"
         from types import SimpleNamespace
 
         from app.modules.intelligence.services.query_catalogue import _source_line

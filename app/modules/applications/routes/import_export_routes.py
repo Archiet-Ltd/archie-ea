@@ -36,6 +36,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from openpyxl import load_workbook
+from app.services.capability_support import record_support_for_records
 from app import db
 from app.models.application_portfolio import (
     APPLICATION_LIFECYCLE_STAGES,
@@ -1862,23 +1863,11 @@ def application_import():
                                             cap_mapping["capability_id"],
                                         )
                                         if _cap_key not in _existing_cap_mappings:
-                                            db.session.add(
-                                                UnifiedApplicationCapabilityMapping(
-                                                    application_id=app.id,
-                                                    capability_id=cap_mapping[
-                                                        "capability_id"
-                                                    ],
-                                                    confidence_score=cap_mapping.get(
-                                                        "confidence_score", 0.5
-                                                    ),
-                                                    mapping_method="ai_import_integrated",
-                                                    rationale=cap_mapping.get(
-                                                        "rationale", ""
-                                                    ),
-                                                    created_by=current_user.email
-                                                    if current_user.is_authenticated
-                                                    else "ai_import",
-                                                )
+                                            record_support_for_records(
+                                                app.organization_id,
+                                                app.id,
+                                                cap_mapping["capability_id"],
+                                                facts={"notes": cap_mapping.get("rationale", "")},
                                             )
                                             _existing_cap_mappings.add(_cap_key)
                                             ai_results["total_capabilities_mapped"] += 1
@@ -2247,23 +2236,11 @@ def application_import():
                                             _json_cap_key
                                             not in _json_existing_cap_mappings
                                         ):
-                                            db.session.add(
-                                                UnifiedApplicationCapabilityMapping(
-                                                    application_id=app.id,
-                                                    capability_id=cap_mapping[
-                                                        "capability_id"
-                                                    ],
-                                                    confidence_score=cap_mapping.get(
-                                                        "confidence_score", 0.5
-                                                    ),
-                                                    mapping_method="ai_import_integrated",
-                                                    rationale=cap_mapping.get(
-                                                        "rationale", ""
-                                                    ),
-                                                    created_by=current_user.email
-                                                    if current_user.is_authenticated
-                                                    else "ai_import",
-                                                )
+                                            record_support_for_records(
+                                                app.organization_id,
+                                                app.id,
+                                                cap_mapping["capability_id"],
+                                                facts={"notes": cap_mapping.get("rationale", "")},
                                             )
                                             _json_existing_cap_mappings.add(
                                                 _json_cap_key
@@ -3071,21 +3048,11 @@ def import_with_ai_review():
                                                 _review_cap_key
                                                 not in _review_existing_cap_mappings
                                             ):
-                                                db.session.add(
-                                                    UnifiedApplicationCapabilityMapping(
-                                                        application_id=app.id,
-                                                        capability_id=cap_id,
-                                                        confidence_score=cap_mapping.get(
-                                                            "confidence_score", 0.5
-                                                        ),
-                                                        mapping_method="ai_import_review",
-                                                        rationale=cap_mapping.get(
-                                                            "rationale", ""
-                                                        ),
-                                                        created_by=current_user.email
-                                                        if current_user.is_authenticated
-                                                        else "ai_import",
-                                                    )
+                                                record_support_for_records(
+                                                    app.organization_id,
+                                                    app.id,
+                                                    cap_id,
+                                                    facts={"notes": cap_mapping.get("rationale", "")},
                                                 )
                                                 _review_existing_cap_mappings.add(
                                                     _review_cap_key
