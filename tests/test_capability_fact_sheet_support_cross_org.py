@@ -13,7 +13,7 @@ def test_fact_sheet_lists_only_this_organisations_applications(db_session, make_
     from tests.test_capability_support_writer import seed
 
     org_a, org_b = make_org("fsheet-a"), make_org("fsheet-b")
-    user_a, user_b = _user(db_session, org_a, "fa"), _user(db_session, org_b, "fb")
+    user_b = _user(db_session, org_b, "fb")
     app_a, cap_a = seed(db_session, org_a, "FA")
     app_b, cap_b = seed(db_session, org_b, "FB")
     record_capability_support(org_a.id, app_a.archimate_element_id, cap_a.archimate_element_id)

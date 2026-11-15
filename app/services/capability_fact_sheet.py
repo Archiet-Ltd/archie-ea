@@ -15,8 +15,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from app import db
-
 _COMPLETENESS_FIELDS = [
     ("description", "Description", 1),
     ("business_domain", "Business domain", 2),
