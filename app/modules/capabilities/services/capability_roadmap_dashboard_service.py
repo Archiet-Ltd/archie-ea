@@ -22,11 +22,12 @@ from app.models.capability_gap_analysis import (
 )
 from app.models.compliance_models import ComplianceControl, ComplianceRequirement
 from app.models.platform_models import PlatformConfiguration
-from app.models.roadmap_models import RoadmapGap, RoadmapWorkPackage
+from app.models.roadmap_models import RoadmapWorkPackage
 from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 from app.models.unified_capability import BusinessDomain, UnifiedCapability
 from app.modules.capabilities.services.capability_gap_service import CapabilityGapAnalysisService
 from app.services.decorators import transactional
+from app.services.gap_register_service import create_gap
 
 
 class CapabilityRoadmapDashboardService:
@@ -500,8 +501,8 @@ class CapabilityRoadmapDashboardService:
             return {"success": False, "error": "Gap analysis not found"}
 
         gap_details = (
-            CapabilityGapDetail.query.filter_by(gap_analysis_id=gap_analysis_id)
-            .filter(CapabilityGapDetail.severity.in_(["critical", "high"]))
+            CapabilityGapDetail.query.filter_by(analysis_id=gap_analysis_id)
+            .filter(CapabilityGapDetail.gap_severity.in_(["critical", "high"]))
             .order_by(CapabilityGapDetail.priority_score.desc())
             .all()
         )
@@ -513,7 +514,7 @@ class CapabilityRoadmapDashboardService:
             # Get solution options for this gap
             solutions = (
                 GapSolutionOption.query.filter_by(gap_detail_id=gap_detail.id)
-                .order_by(GapSolutionOption.priority_rank.asc())
+                .order_by(GapSolutionOption.recommendation_rank.asc())
                 .first()
             )
 
@@ -521,13 +522,13 @@ class CapabilityRoadmapDashboardService:
             work_package = RoadmapWorkPackage(
                 name=f"Close Gap: {gap_detail.capability.name if gap_detail.capability else 'Unknown'}",
                 description=gap_detail.gap_description or "Address capability gap",
-                business_capability_id=gap_detail.capability_id,
+                business_capability=gap_detail.capability.name if gap_detail.capability else "Unknown",
                 status="draft" if not auto_approve else "approved",
-                priority=self._map_severity_to_priority(gap_detail.severity),
-                risk_level=gap_detail.severity,
+                priority=self._map_severity_to_priority(gap_detail.gap_severity),
+                risk_level=gap_detail.gap_severity,
                 estimated_cost=solutions.estimated_cost
                 if solutions
-                else gap_detail.estimated_effort_cost,
+                else gap_detail.estimated_cost,
                 start_date=datetime.now().date(),
                 end_date=(datetime.now() + timedelta(days=90)).date(),
                 duration_days=90,
@@ -545,19 +546,19 @@ class CapabilityRoadmapDashboardService:
             db.session.add(work_package)
             db.session.flush()
 
-            # Create roadmap gap link
-            roadmap_gap = RoadmapGap(
+            # Create gap in the one gap register (replaces RoadmapGap)
+            org_id = gap_analysis.organization_id
+            create_gap(
+                organization_id=org_id,
+                name=f"Close Gap: {gap_detail.capability.name if gap_detail.capability else 'Unknown'}",
+                description=gap_detail.gap_description or "Address capability gap",
                 gap_type="capability",
-                capability_id=gap_detail.capability_id,
-                description=gap_detail.gap_description,
-                priority=self._map_severity_to_priority(gap_detail.severity),
-                impact_score=gap_detail.business_impact_score,
-                resolution_strategy=solutions.implementation_approach
-                if solutions
-                else "To be determined",
-                created_at=datetime.now(),
+                priority=self._map_severity_to_priority(gap_detail.gap_severity),
+                severity=self._map_severity_to_priority(gap_detail.gap_severity),
+                resolution_status="identified",
+                generation_source="capability_roadmap_dashboard",
+                auto_generated=True,
             )
-            db.session.add(roadmap_gap)
 
             created_packages.append(
                 {
