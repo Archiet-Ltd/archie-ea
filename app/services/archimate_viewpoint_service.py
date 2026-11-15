@@ -44,10 +44,9 @@ STANDARD_VIEWPOINTS = {
     'layered': {
         'name': 'Layered',
         'description': 'All elements organised in horizontal layer bands: strategy, motivation, business, '
-                       'application, technology, physical, implementation',
-        'layers': ['Strategy', 'Motivation', 'Business', 'Application', 'Technology', 'Physical', 'Implementation'],
-        'layer_order': ['strategy', 'motivation', 'business', 'application', 'technology', 'physical',
-                        'implementation'],
+                       'application, technology (physical elements included), implementation',
+        'layers': ['Strategy', 'Motivation', 'Business', 'Application', 'Technology', 'Implementation'],
+        'layer_order': ['strategy', 'motivation', 'business', 'application', 'technology', 'implementation'],
         'element_types': [],  # all types, grouped by layer
         # Whole-portfolio viewpoint (roles: ['Enterprise'] only) -- see
         # enterprise_scope in get_viewpoint_data()'s docstring.
@@ -381,15 +380,25 @@ def _types_for_layer(layer: str) -> list:
     return sorted(LAYER_TYPES.get(layer, set()))
 
 
-def _filter_to_layer(query, layer, layer_type_names):
-    """Narrow an element query to one layer; the composite view takes every type no layer holds."""
+def _type_key(type_name) -> str:
+    """A stored element type as the layer map spells it: lower case, no spaces or underscores, so a
+    model file's "Work Package" is the same type as "WorkPackage"."""
+    return (type_name or "").lower().replace(" ", "").replace("_", "")
+
+
+def _type_key_column():
+    """The same spelling as _type_key, on the stored column."""
     from app import db as _db
     from app.models.archimate_core import ArchiMateElement
 
     lowered = _db.func.lower(_db.func.coalesce(ArchiMateElement.type, ""))
-    if layer == COMPOSITE_LAYER:
-        return query.filter(_db.not_(lowered.in_(list(LAYER_TYPE_TO_LAYER))))
-    return query.filter(lowered.in_(layer_type_names))
+    return _db.func.replace(_db.func.replace(lowered, " ", ""), "_", "")
+
+
+def _filter_to_layer(query, layer):
+    """Narrow an element query to one layer by the rule count_layers counts it with (layer_criterion), so the
+    layer that opens holds the model elements its card counts."""
+    return query.filter(layer_criterion(layer))
 
 
 # The most elements one viewpoint answer carries.
@@ -444,21 +453,167 @@ def _most_connected(query, org_id):
     )
 
 
-def _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, org_id):
-    """The opening for a model too large to draw readably: one count per layer."""
+# The four Physical types. ArchiMate 3.2 folds them into Technology and the layer map above does too, so
+# no screen counts Physical as a layer of its own; the Technology count holds them.
+PHYSICAL_TYPES = frozenset({"equipment", "facility", "distributionnetwork", "material"})
+
+
+def _register_only_count(dashboard_layer: str, org_id=None, allowed_types=None) -> int:
+    """Records of the layer's own tables that have no model element (a gap entered in the gap register).
+
+    The layer lists them and counts them, the model map does not draw them. A type held in a table that
+    mirrors into the model is counted once, as its model element. Raises when a table cannot be read.
+
+    One UNION ALL query per layer across all of the layer's model tables, instead of one count query
+    per type. ``allowed_types`` narrows the records to those types, as it narrows the model elements."""
+    from app.modules.architecture.routes.archimate_crud.routes import LAYER_CONFIG, MODEL_REGISTRY
+    from app import db as _db
+    from sqlalchemy import union_all, select, literal, func
+
+    keys = [dashboard_layer] + (["physical"] if dashboard_layer == "technology" else [])
+
+    allowed = {_type_key(t) for t in allowed_types} if allowed_types else None
+    parts = []
+    for key in keys:
+        for type_name in LAYER_CONFIG.get(key, {}).get("elements", []):
+            if allowed is not None and _type_key(type_name) not in allowed:
+                continue
+            model_class = MODEL_REGISTRY.get(type_name)
+            if not model_class:
+                continue
+            q = select(literal(1)).select_from(model_class)
+            if org_id is not None and hasattr(model_class, "organization_id"):
+                q = q.where(model_class.organization_id == org_id)
+            if hasattr(model_class, "archimate_element_id"):
+                q = q.where(model_class.archimate_element_id.is_(None))
+            parts.append(q)
+
+    if not parts:
+        return 0
+
+    combined = union_all(*parts).subquery("register_only")
+    count = _db.session.execute(select(func.count()).select_from(combined)).scalar()
+    return count or 0
+
+
+# A layer as an element's layer column may spell it (lower case, no spaces or underscores, "&" as "and").
+# Physical is Technology's: its elements are counted and listed there.
+STORED_LAYER_KEYS = {
+    "motivation": "motivation", "strategy": "strategy", "business": "business", "application": "application",
+    "technology": "technology", "physical": "technology", "implementation": "implementation",
+    "implementationmigration": "implementation", "implementationandmigration": "implementation",
+}
+
+
+def _stored_layer_key(raw) -> str:
+    """The stored layer column as the layer map spells it, or "" when it names no layer."""
+    spelled = (raw or "").lower().replace("&", "and").replace(" ", "").replace("_", "")
+    return STORED_LAYER_KEYS.get(spelled, "")
+
+
+def element_layer(stored_layer, element_type) -> str:
+    """The layer one element is counted in, whatever its type: the layer it is stored in. An element that
+    names no layer is placed by its type, and one whose type no layer holds is the composite row.
+
+    The rule itself reads no organisation: it places one element by its own stored layer and type, so it
+    cannot answer for one organisation's rows and not another's. Every reader names its organisation in the
+    query (count_layers, layer_model_query) and applies this rule to the rows that query returns.
+    """
+    return _stored_layer_key(stored_layer) or LAYER_TYPE_TO_LAYER.get(_type_key(element_type), COMPOSITE_LAYER)
+
+
+def _stored_layer_column():
+    """The same spelling as _stored_layer_key, on the stored column."""
     from app import db as _db
     from app.models.archimate_core import ArchiMateElement
 
-    query = _db.select(_db.func.lower(ArchiMateElement.type), _db.func.count()).group_by(
-        _db.func.lower(ArchiMateElement.type)).where(ArchiMateElement.organization_id == org_id)
+    spelled = _db.func.replace(_db.func.coalesce(_db.func.lower(ArchiMateElement.layer), ""), "&", "and")
+    return _db.func.replace(_db.func.replace(spelled, " ", ""), "_", "")
+
+
+def layer_criterion(layer: str):
+    """The condition that places an element in one layer: stored in the layer, whatever its type, or naming no
+    layer and typed for it (element_layer is the same rule in Python). Physical answers with the Physical
+    types alone; the composite row takes the unplaced elements whose type no layer holds."""
+    from app import db as _db
+
+    if layer == "physical":
+        return _type_key_column().in_(list(PHYSICAL_TYPES))
+    stored = _stored_layer_column()
+    unplaced = _db.not_(stored.in_(list(STORED_LAYER_KEYS)))
+    if layer == COMPOSITE_LAYER:
+        return _db.and_(unplaced, _db.not_(_type_key_column().in_(list(LAYER_TYPE_TO_LAYER))))
+    names = [name for name, key in STORED_LAYER_KEYS.items() if key == layer]
+    typed = [t.lower() for t in _types_for_layer(layer)]
+    return _db.or_(stored.in_(names), _db.and_(unplaced, _type_key_column().in_(typed)))
+
+
+def layer_model_query(layer: str, org_id):
+    """The model elements of one layer, the rows count_layers counts for it: every element stored in the layer,
+    whatever its type (element_layer is the rule). Physical, which is no layer of its own, answers with the
+    Physical types alone. The query names that organisation itself, as count_layers does, instead of relying
+    on the tenant filter alone: ``org_id`` is required, with no default, because the tenant filter alone is
+    not enough — the same element id can exist in more than one organisation."""
+    if org_id is None:
+        raise ValueError("layer_model_query requires an org_id; the tenant filter alone is not enough")
+    from app.models.archimate_core import ArchiMateElement
+
+    return ArchiMateElement.query.filter(ArchiMateElement.organization_id == org_id, layer_criterion(layer))
+
+
+def count_layers(org_id, allowed_types=None) -> list:
+    """The one count of every layer, read by the architecture dashboard's tabs and the Composer's layer cards.
+
+    One row per layer in LAYER_TITLES order: ``model`` is the organisation's model elements stored in the
+    layer, whatever their type (one that names no layer is placed by its type; types the map does not know are
+    the composite row), ``register_only`` the records the layer lists that the model does not hold, and ``count`` their sum. ``count`` is None, never
+    a partial figure, when the records could not be counted. Physical is not a row: its types are Technology's.
+
+    ``org_id`` is required, as layer_model_query's is: a count that names no organisation is refused rather
+    than answered from the rows that happen to carry no organisation of their own.
+    """
+    if org_id is None:
+        raise ValueError("count_layers requires an org_id; a count of no organisation is not a count")
+    from app import db as _db
+    from app.models.archimate_core import ArchiMateElement
+
+    stored = _stored_layer_column()
+    query = _db.select(stored, _db.func.lower(ArchiMateElement.type), _db.func.count()).group_by(
+        stored, _db.func.lower(ArchiMateElement.type)).where(ArchiMateElement.organization_id == org_id)
     if allowed_types:
         query = query.where(ArchiMateElement.type.in_(allowed_types))
-    counts = {}
-    for type_name, n in _db.session.execute(query).all():
-        key = LAYER_TYPE_TO_LAYER.get(type_name or "", COMPOSITE_LAYER)
-        counts[key] = counts.get(key, 0) + n
-    order = [k for k in vp.get('layer_order', layers or []) if k in counts]
-    order += [k for k in LAYER_TITLES if k in counts and k not in order]
+    model = {}
+    for stored_layer, type_name, n in _db.session.execute(query).all():
+        key = element_layer(stored_layer, type_name)
+        model[key] = model.get(key, 0) + n
+    rows = []
+    for layer, title in LAYER_TITLES.items():
+        try:
+            records = 0 if layer == COMPOSITE_LAYER else _register_only_count(layer, org_id, allowed_types)
+        except Exception as exc:  # a table that cannot be read leaves the layer uncounted, not under-counted
+            logger.warning("count_layers: records of %s could not be counted: %s", layer, exc)
+            _db.session.rollback()
+            records = None
+        rows.append({
+            "layer": layer, "title": title, "model": model.get(layer, 0), "register_only": records,
+            "count": None if records is None else model.get(layer, 0) + records,
+        })
+    return rows
+
+
+def _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, org_id):
+    """The opening for a model too large to draw readably: one count per layer."""
+    rows = {row["layer"]: row for row in count_layers(org_id, allowed_types)}
+    present = {k: row for k, row in rows.items() if (row["count"] if row["count"] is not None else row["model"])}
+    order = [k for k in vp.get('layer_order', layers or []) if k in present]
+    order += [k for k in LAYER_TITLES if k in present and k not in order]
+    overview = []
+    for k in order:
+        row = present[k]
+        overview.append({
+            'layer': k, 'title': row["title"], 'count': row["count"] if row["count"] is not None else row["model"],
+            'not_on_model_map': row["register_only"] or 0,
+        })
     return {
         'viewpoint_id': viewpoint_id,
         'viewpoint_name': vp['name'],
@@ -467,10 +622,8 @@ def _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, org_id):
         'elements': [],
         'relationships': [],
         'total': 0,
-        'overview': [
-            {'layer': k, 'title': LAYER_TITLES[k], 'count': counts[k]} for k in order
-        ],
-        'store_total': matching,
+        'overview': overview,
+        'store_total': sum(row['count'] for row in overview),
     }
 
 
@@ -517,15 +670,10 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
     allowed_rels = set(vp.get('allowed_relationships', []))
     enterprise_scope = bool(vp.get('enterprise_scope'))
 
-    # `layer` narrows by ArchiMateElement.type via the shared LAYER_TYPES map
-    # (not the unreliable .layer column -- see module docstring above).
+    # `layer` narrows by the stored-layer rule count_layers counts with (layer_criterion).
     # Callers (the API route) are responsible for 400ing an unknown value
-    # before reaching here; an unrecognised value falls through to
-    # `layer_type_names = []`, which -- to fail closed rather than silently
-    # showing everything -- is treated as "match nothing", not "no filter".
-    layer_type_names = None
-    if layer:
-        layer_type_names = [t.lower() for t in _types_for_layer(layer)]
+    # before reaching here; an unrecognised layer matches no element, it does not
+    # fall back to showing everything.
 
     # ── Invariant 1: Scope required ──
     if not solution_id and not enterprise_scope:
@@ -544,6 +692,8 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
     relationships_out = []
     store_total = None
     layer_total = None
+    layer_card_total = None
+    layer_register_only = 0
 
     try:
         from app.models.archimate_core import ArchiMateElement
@@ -576,8 +726,8 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             query = ArchiMateElement.query
             if allowed_types:
                 query = query.filter(ArchiMateElement.type.in_(allowed_types))
-            if layer_type_names is not None:
-                query = _filter_to_layer(query, layer, layer_type_names)
+            if layer:
+                query = _filter_to_layer(query, layer)
             matching = query.count()
             if layer is None and matching > VIEWPOINT_OPENING_LIMIT:
                 return _layer_overview(vp, viewpoint_id, layers, allowed_types, matching, _current_org_id())
@@ -590,6 +740,16 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             # dashboard's element figure reads the same rows), so a viewpoint
             # that shows fewer can say how many it left out and why.
             store_total = ArchiMateElement.query.count()
+            if layer is not None:
+                # The card, the overview line and this status line read one count (count_layers), so the
+                # layer that opens, its total and "of N in your model" agree with the card that opened it.
+                counted = count_layers(_current_org_id(), allowed_types)
+                if all(row["count"] is not None for row in counted):
+                    store_total = sum(row["count"] for row in counted)
+                    row = next((r for r in counted if r["layer"] == layer), None)
+                    if row is not None:
+                        layer_card_total = row["count"]
+                        layer_register_only = row["register_only"]
         else:
             # Get solution's element IDs (junction + fallback)
             from app.models.solution_models import SolutionArchiMateElement
@@ -619,8 +779,8 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             query = ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids))
             if allowed_types:
                 query = query.filter(ArchiMateElement.type.in_(allowed_types))
-            if layer_type_names is not None:
-                query = _filter_to_layer(query, layer, layer_type_names)
+            if layer:
+                query = _filter_to_layer(query, layer)
             elements = query.limit(500).all()
         elif not is_enterprise_wide:
             elements = []
@@ -748,6 +908,16 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
         # With a layer open, "other layers" counts only the other layers: this
         # layer's own capped elements are said once, in layer_omitted_note.
         shown_or_in_layer = layer_total if (layer is not None and layer_total is not None) else len(serialised)
+        if layer_card_total is not None:
+            shown_or_in_layer = layer_card_total
+            if layer_register_only:
+                verb = "is" if layer_register_only == 1 else "are"
+                if layer_total is not None and layer_total <= len(serialised):
+                    result['register_only_note'] = "%d of %d shown; %d %s recorded in a register only" % (
+                        len(serialised), layer_card_total, layer_register_only, verb)
+                else:
+                    result['register_only_note'] = "%d of the %d in this layer %s recorded in a register only" % (
+                        layer_register_only, layer_card_total, verb)
         result['omitted'] = store_total - shown_or_in_layer
         result['omitted_note'] = _omitted_note(
             store_total - shown_or_in_layer, layer, bool(allowed_types)
