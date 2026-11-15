@@ -159,3 +159,38 @@ def test_the_migration_links_old_rows_prints_the_counts_and_is_safe_to_run_twice
     assert "before 1, linked 1, duplicates removed 0, left 0" in printed
     assert "before 0, linked 0, duplicates removed 0, left 0" in printed
     assert [r["application_name"] for r in cs.support_rows(org.id)] == [app_row.name]
+
+
+def test_a_removed_duplicate_is_recorded_in_full_and_the_linked_rows_values_stay(db_session, make_org):
+    from app.models.audit_log import AuditLog
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping as Row
+    from app.services import capability_support as cs
+
+    org, other = make_org(), make_org()
+    app_row, cap = seed(db_session, org)
+    record = _record_of(org, cap)
+    first = _old_row(db_session, org, app_row, record, support_level="primary", coverage_percentage=80)
+    second = _old_row(db_session, org, app_row, record, support_level="minimal", coverage_percentage=20,
+                      maturity_level=4, notes="only the second has this", is_strategic=True)
+    second_id = second.id
+    counts = cs.backfill_unprojected_support()
+    assert counts["duplicates_removed"] == 1
+
+    kept = Row.query.filter_by(organization_id=org.id).one()
+    assert (kept.support_level, kept.coverage_percentage) == ("primary", 80)
+    assert (kept.maturity_level, kept.notes) == (4, "only the second has this")
+    assert Row.query.filter_by(id=second_id).count() == 0
+
+    entries = AuditLog.query.filter_by(table_name=Row.__tablename__, record_id=second_id).all()
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.organization_id == org.id and entry.new_value["merged_into"] == kept.id
+    assert entry.old_value["support_level"] == "minimal" and entry.old_value["coverage_percentage"] == 20
+    assert entry.old_value["maturity_level"] == 4 and entry.old_value["is_strategic"] is True
+    assert entry.old_value["application_component_id"] == app_row.id
+    assert AuditLog.query.filter_by(organization_id=other.id, table_name=Row.__tablename__).count() == 0
+
+    again = cs.backfill_unprojected_support()
+    assert again == {"before": 0, "linked": 0, "duplicates_removed": 0, "left": 0, "after": 0}
+    assert AuditLog.query.filter_by(table_name=Row.__tablename__, record_id=second_id).count() == 1
+    assert first.id == kept.id or Row.query.filter_by(id=first.id).count() == 1

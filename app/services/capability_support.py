@@ -467,12 +467,57 @@ def record_support_for_records(
     )
 
 
+_MERGE_SKIPPED = frozenset({"id", "organization_id", "archimate_relationship_id",
+                            "unified_capability_id", "application_component_id"})
+
+
+def _plain(value):
+    """A column value as JSON holds it."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def _merge_duplicate_into(Row, mate, row) -> None:
+    """Fold a second row for one pair into the row that carries the relationship, then remove it.
+
+    The removed row is first written in full to the audit record, with the id of the row it merged into,
+    and the removal does not happen if that record cannot be written. A column only the removed row holds is
+    copied across; where both hold a different value the linked row's value stays."""
+    from sqlalchemy import inspect as sa_inspect
+
+    from app.models.audit_log import AuditLog
+
+    columns = [attr.key for attr in sa_inspect(Row).mapper.column_attrs]
+    whole = {key: _plain(getattr(row, key)) for key in columns}
+    kept_before = {key: _plain(getattr(mate, key)) for key in columns}
+    db.session.add(AuditLog(
+        organization_id=row.organization_id,
+        action="merge_support",
+        table_name=Row.__tablename__,
+        record_id=row.id,
+        old_value=whole,
+        new_value={"merged_into": mate.id, "row_before": kept_before},
+        extra_json={"reason": "second support row for one application and capability"},
+    ))
+    db.session.flush()
+    for key in columns:
+        if key in _MERGE_SKIPPED:
+            continue
+        if getattr(mate, key) in (None, "") and getattr(row, key) not in (None, ""):
+            setattr(mate, key, getattr(row, key))
+    db.session.delete(row)
+    db.session.flush()
+
+
 def backfill_unprojected_support(organization_id: Optional[int] = None) -> Dict[str, int]:
     """Give every support row written without a relationship its relationship; change nothing already linked.
 
     Counts are returned (and logged by the caller) so a run can be read before and after. A second run
     finds nothing to do. A second row for a pair that already has one is removed after its facts have
-    been copied into the first where the first had none."""
+    been recorded in full in the audit record and its values copied into the first where the first had none."""
     _, _, _, Row, _ = _models()
     query = db.session.query(Row).filter(Row.archimate_relationship_id.is_(None))
     if organization_id is not None:
@@ -517,13 +562,13 @@ def backfill_unprojected_support(organization_id: Optional[int] = None) -> Dict[
         if mate is None or row.id in left_ids:
             counts["left"] += 1
             continue
-        if mate.notes in (None, ""):
-            mate.notes = row.notes
-        if mate.coverage_percentage is None:
-            mate.coverage_percentage = row.coverage_percentage
-        if mate.maturity_level is None:
-            mate.maturity_level = row.maturity_level
-        db.session.delete(row)
+        try:
+            with db.session.begin_nested():
+                _merge_duplicate_into(Row, mate, row)
+        except Exception:
+            logger.exception("support row %s could not be merged into row %s", row.id, mate.id)
+            counts["left"] += 1
+            continue
         counts["duplicates_removed"] += 1
     db.session.flush()
     counts["after"] = counts["left"]
