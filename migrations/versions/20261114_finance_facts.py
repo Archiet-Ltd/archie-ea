@@ -9,7 +9,7 @@ Imports nothing from ``app``.
 Idempotent: the table and index are created only when absent; policies are dropped and recreated.
 
 Revision ID: 20261114_finance_facts
-Revises: 20261114_subscription_offer
+Revises: 20261114_sign_in_identities
 Create Date: 2026-11-14
 """
 import sqlalchemy as sa
@@ -17,7 +17,7 @@ from alembic import op
 from sqlalchemy import inspect, text
 
 revision = "20261114_finance_facts"
-down_revision = "20261114_subscription_offer"
+down_revision = "20261114_sign_in_identities"
 branch_labels = None
 depends_on = None
 
