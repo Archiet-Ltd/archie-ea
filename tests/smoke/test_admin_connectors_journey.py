@@ -18,6 +18,7 @@ from cryptography.fernet import Fernet
 
 from tests.smoke.conftest import PAGE_TIMEOUT, PASSWORD, boot_live_server
 from tests.smoke.fresh_org import api, sign_in
+from tests.smoke.test_change_review_gaps_journey import _the_review_runs, stub  # noqa: F401 - fixture and helper
 
 # Masked credential characters: bullets, or a run of asterisks (a single
 # asterisk marks a required field and is not a mask).
@@ -71,28 +72,9 @@ def _create_two_admins():
     return out
 
 
-def _settle_as_the_review_does(user_id, approval_id):
-    """Apply one request through the approval service, as the automatic review does: the page has no control."""
-    from app import create_app, db
-
-    app = create_app("testing")
-    app.config.update(_KEYS)
-    with app.app_context():
-        from app.jobs.tenant_safe_job import tenant_scope
-        from app.models.user import User
-        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
-
-        org_id = db.session.get(User, user_id).organization_id
-        with tenant_scope(org_id):
-            result = AIChatApprovalService(user_id).approve_and_execute(approval_id, user_id)
-        db.session.commit()
-        assert result.get("success") is True, result
-        db.session.remove()
-
-
 @pytest.mark.smoke
 @pytest.mark.journey
-def test_add_approve_and_see_connector_with_masked_credential(browser, keyed_server):
+def test_add_approve_and_see_connector_with_masked_credential(browser, keyed_server, stub):
     live_server = keyed_server
     org = _create_two_admins()
     context = browser.new_context(ignore_https_errors=True)
@@ -142,12 +124,16 @@ def test_add_approve_and_see_connector_with_masked_credential(browser, keyed_ser
 
         page.goto(live_server + "/account/logout", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
-        # The request waits in Reviewed changes with no Approve or Reject control; it is settled the way the
-        # automatic review settles it, by the second administrator's account through the approval service.
+        # The request waits in Reviewed changes with no Approve or Reject control. The scheduled review then
+        # runs (the same sweep the server runs every few minutes): it checks the request, has a second model
+        # review it, and applies it.
         sign_in(page, live_server, org["emails"]["approver"])
         page.goto(live_server + "/ai-chat/approvals/inbox", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.get_by_role("button", name=re.compile("^(Approve|Reject)")).count() == 0
-        _settle_as_the_review_does(org["user_ids"]["approver"], approval_id)
+        assert "Journey Jira" in page.inner_text("body")
+        _the_review_runs(org["org_id"], approval_id, stub, config=_KEYS)
+        page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.get_by_test_id("approval-decided").get_by_text("Applied").count() >= 1
 
         # Reload the connectors page: the connector is now live, not queued,
         # and its credential is shown masked, never in plain text.

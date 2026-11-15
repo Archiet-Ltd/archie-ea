@@ -107,3 +107,68 @@ def test_requested_by_names_the_import_that_proposed_the_change(app, db_session,
     card = html.split('data-testid="approval-card-%s"' % proposal_id, 1)[1].split("approval-card-", 1)[0]
     assert "Requested by" in card and "GitHub connector" in card
     assert "The system" not in html
+
+
+def _held_row(org_id, user_id, label):
+    """A change inside the review whose last event is a pause: past its expiry it is still PENDING."""
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService, create_approval_record
+
+    approval = create_approval_record(
+        organization_id=org_id,
+        operation_type="create",
+        entity_type="capability",
+        summary="Create capability '%s'" % label,
+        operation_payload={"name": label},
+        user_id=user_id,
+        enter_review=True,
+    )
+    AIChatApprovalService(user_id)._audit(
+        approval, event="paused", to_status="pending", actor_user_id=None, from_status="pending",
+        reason="Changes by the assistant are paused for this workspace.")
+    approval.expires_at = datetime.utcnow() - timedelta(hours=2)
+    return approval
+
+
+def test_a_change_held_by_a_pause_that_passes_its_expiry_is_declined_not_hidden(
+    app, db_session, make_org, tenant_ctx, login_as
+):
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+    from app.models.user import User
+    from app.modules.ai_chat.services.change_review import EXPIRED_REASON
+
+    org = make_org("held-expiry")
+    person = _make_user(db_session, org.id, "Holder")
+    with tenant_ctx(org.id):
+        held = _held_row(org.id, person.id, "Held Cap")
+        db_session.flush()
+        held_id = held.id
+        db_session.commit()
+    client = app.test_client()
+    login_as(client, User.query.get(person.id))
+    html = client.get("/ai-chat/approvals/inbox").get_data(as_text=True)
+    assert 'data-testid="approval-card-%s"' % held_id not in html
+    assert 'data-testid="approval-decided-%s"' % held_id in html
+    assert "Expired before review." in html
+    assert 'data-testid="nav-count-approvals"' not in html
+    with tenant_ctx(org.id):
+        row = AIChatCRUDApproval.query.filter_by(id=held_id, organization_id=org.id).one()
+        assert row.status == ApprovalStatus.REJECTED and row.rejected_reason == EXPIRED_REASON
+
+
+def test_an_expired_change_is_declined_and_never_escalated_to_administrators(app, db_session, make_org, tenant_ctx):
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+    from app.modules.ai_chat.services.ai_chat_approval_service import escalate_overdue_approvals
+
+    org = make_org("held-escalate")
+    person = _make_user(db_session, org.id, "Chased")
+    with tenant_ctx(org.id):
+        held = _held_row(org.id, person.id, "Chased Cap")
+        db_session.flush()
+        held_id = held.id
+        db_session.commit()
+    escalate_overdue_approvals(app)
+    db_session.expire_all()
+    with tenant_ctx(org.id):
+        row = AIChatCRUDApproval.query.filter_by(id=held_id, organization_id=org.id).one()
+        assert row.status == ApprovalStatus.REJECTED
+        assert row.escalated_at is None

@@ -994,6 +994,7 @@ def propose_connector_change(
         operation_payload=payload,
         user_id=actor_user_id,
         source_table="connector_config",
+        enter_review=True,
     )
     return approval
 

@@ -738,9 +738,17 @@ class AIChatApprovalService:
             approval = self._load_scoped_approval(approval_id, actor)
             if not approval:
                 return {"success": False, "code": "NOT_FOUND", "error": f"Approval {approval_id} not found"}
-            if approval.user_id is None or not change_review.in_scope(approval):
+            if not change_review.in_scope(approval):
                 return {**change_review.verdict(approval, "in_review", approval.summary, []), "settles": False}
-            runner = self if approval.user_id == self.user_id else AIChatApprovalService(approval.user_id)
+            if approval.user_id is None:
+                # Found by the product, not asked for by a person: a workspace administrator applies it.
+                asker = change_review.proposal_requester(approval)
+                if asker is None:
+                    return change_review.decline(self, approval, change_review.MOVED_REASON)
+                asker_id = asker.id
+            else:
+                asker_id = approval.user_id
+            runner = self if asker_id == self.user_id else AIChatApprovalService(asker_id)
             requester, requester_error = runner._acting_user()
             if requester is not None and requester.organization_id != approval.organization_id:
                 requester, requester_error = None, {"code": "MOVED"}
@@ -886,7 +894,7 @@ class AIChatApprovalService:
                     "code": "NOT_FOUND",
                     "error": f"Approval {approval_id} not found",
                 }
-            if settled_by_review and approval.user_id != actor.id and approved_by != actor.id:
+            if settled_by_review and approval.user_id not in (None, actor.id) and approved_by != actor.id:
                 return {
                     "success": False,
                     "code": "FORBIDDEN",
@@ -1639,7 +1647,9 @@ class AIChatApprovalService:
     def _in_review_query(actor):
         """The same-organisation changes still in review, whoever asked for them (the queue's one filter).
 
-        A change is no longer hidden from the person who asked for it: nobody else has to approve it."""
+        A change is no longer hidden from the person who asked for it: nobody else has to approve it. One that
+        is past its expiry is not in review: the sweep declines it ("Expired before review"), so it is listed
+        and counted as declined, never as waiting."""
         return AIChatCRUDApproval.query.filter(
             AIChatCRUDApproval.organization_id == actor.organization_id,
             AIChatCRUDApproval.status == ApprovalStatus.PENDING,
@@ -1656,8 +1666,8 @@ class AIChatApprovalService:
     def get_reviewed_changes(self) -> Dict[str, Any]:
         """Same-org changes still in review, including the ones the viewer asked for.
 
-        Overdue-not-expired: includes overdue rows (no expires_at filter — being
-        overdue must never make an item disappear from the queue).
+        Only changes inside their expiry are in review; one past it is declined as "Expired before review"
+        and shown with the decided changes.
         """
         from app.modules.ai_chat.services import change_review
 
@@ -2021,8 +2031,9 @@ class AIChatApprovalService:
 
 
 def escalate_overdue_approvals(app=None) -> Dict[str, int]:
-    """Overdue-not-expired: notify each organisation's administrators about its
-    overdue (past expires_at, still PENDING, not yet escalated) approvals.
+    """Notify each organisation's administrators about its overdue (past expires_at, still PENDING, not yet
+    escalated) approvals. A change past its expiry is declined first (``change_review.decline_expired``), so
+    nothing is left to escalate; this stays as the safety net for a row the decline could not settle.
 
     One email per organisation, listing every overdue item currently pending
     for it. Idempotent: a row's escalated_at is set once escalation is
@@ -2041,7 +2052,13 @@ def escalate_overdue_approvals(app=None) -> Dict[str, int]:
 
     from app._bootstrap._digest_emails import _get_recipients_by_roles, _safe_send_email
 
+    from app.modules.ai_chat.services import change_review
+
     app = app or current_app._get_current_object()
+    # A change past its expiry is declined with its reason, not chased: it is no longer waiting for anyone.
+    for organization_id in sorted({r.organization_id for r in AIChatCRUDApproval.get_overdue_unescalated()
+                                   if r.organization_id is not None}):
+        change_review.decline_expired(organization_id)
     overdue = AIChatCRUDApproval.get_overdue_unescalated()
     by_org: Dict[int, List[AIChatCRUDApproval]] = defaultdict(list)
     for row in overdue:

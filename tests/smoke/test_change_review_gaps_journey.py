@@ -231,7 +231,7 @@ def _status_args(name):
 
 
 
-def _the_review_runs(org_id, approval_id, stub):
+def _the_review_runs(org_id, approval_id, stub, config=None):
     """What the scheduled review does for a change that has been quiet: settle it. The change is aged past
     the quiet window, then the organisation is swept with the same stubbed provider the server uses."""
     from datetime import timedelta
@@ -239,6 +239,7 @@ def _the_review_runs(org_id, approval_id, stub):
     from app import db
 
     app = _app_context()
+    app.config.update(config or {})
     env = _stub_env(stub)
     saved = {k: os.environ.get(k) for k in env}
     os.environ.update(env)

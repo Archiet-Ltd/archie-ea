@@ -339,6 +339,7 @@ def propose(org_id: int, detections: Iterable[Detection], *, requested_by: Optio
             },
             source_table=PROPOSAL_SOURCE,
             expiry_minutes=PROPOSAL_DUE_DAYS * 24 * 60,
+            enter_review=True,
         )
         result["proposed"].append({"id": approval.id, "product": product.product_name, "source": det.source})
     return result
@@ -508,6 +509,7 @@ def _propose_architecture(org_id: int, application, product):
         },
         source_table=PROPOSAL_SOURCE,
         expiry_minutes=PROPOSAL_DUE_DAYS * 24 * 60,
+        enter_review=True,
     )
 
 

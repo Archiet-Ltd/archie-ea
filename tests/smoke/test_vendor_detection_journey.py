@@ -7,6 +7,7 @@ import re
 import pytest
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
+from .test_change_review_gaps_journey import _the_review_runs, stub  # noqa: F401 - fixture and helper
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -42,24 +43,6 @@ def _seed(seeded):
         return {"proposed": sorted(p["product"] for p in result["proposed"]), "stripe": stripe.product_name}
 
 
-def _settle_as_the_review_does(email, approval_id):
-    """Settle one proposal through the service, as the automatic review does: the page offers no control."""
-    from app import create_app, db
-
-    app = create_app("testing")
-    with app.app_context():
-        from app.jobs.tenant_safe_job import tenant_scope
-        from app.models.user import User
-        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
-
-        person = User.query.filter_by(email=email).one()
-        person_id, org_id = person.id, person.organization_id
-        with tenant_scope(org_id):
-            result = AIChatApprovalService(person_id).approve_and_execute(approval_id, person_id)
-        db.session.commit()
-        assert result.get("success"), result
-
-
 def _login(page, base, email):
     page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.fill("#email", email)
@@ -68,7 +51,7 @@ def _login(page, base, email):
     page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
 
 
-def test_cto_confirms_a_vendor_found_on_the_website(page, live_server):
+def test_cto_confirms_a_vendor_found_on_the_website(page, live_server, stub):
     # Its own organisation: an earlier vendor journey in a shared one may already hold Okta.
     from . import fresh_org
     own = fresh_org.create_fresh_org("cto", org_admin=True)
@@ -107,11 +90,11 @@ def test_cto_confirms_a_vendor_found_on_the_website(page, live_server):
         assert "Unknown requester" not in head, head
         assert not re.search(r"\b[A-Za-z]+_[A-Za-z_]+\b", head.replace("okta-verification", "")), head
 
-    # The page offers no Approve or Reject: the review settles the proposal.
+    # The page offers no Approve or Reject: the scheduled review settles the proposal.
     assert page.get_by_role("button", name=re.compile("^(Approve|Reject)")).count() == 0
     card_id = card.get_attribute("data-testid")
     assert card_id and card_id.startswith("approval-card-")
-    _settle_as_the_review_does(own["emails"]["cto"], int(card_id.rsplit("-", 1)[1]))
+    _the_review_runs(own["org_id"], int(card_id.rsplit("-", 1)[1]), stub)
     page.reload(wait_until="domcontentloaded")
     page.locator("[data-testid='%s']" % card_id).wait_for(state="detached", timeout=PAGE_TIMEOUT)
 

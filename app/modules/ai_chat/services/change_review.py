@@ -596,8 +596,41 @@ def resolve_target(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> T
                   before={"kind": "create", "note": "Nothing existed before; undoing it removes the new record."})
 
 
+# Requests another part of the product queues, and the review settles like any other change: a connector request
+# (from the connectors page, the hourly re-read or the API) and a vendor found on the website, in the domain
+# records or in the chat. Each is the source column its writer sets and the operations that writer queues.
+CONNECTOR_SOURCE = "connector_config"
+VENDOR_SOURCE = "vendor_detection"
+SYSTEM_PROPOSALS = {
+    CONNECTOR_SOURCE: ("connectors", ("create", "update", "delete", "sync")),
+    VENDOR_SOURCE: (None, ("vendor_detection", "vendor_architecture")),
+}
+
+
+def is_system_proposal(approval: AIChatCRUDApproval) -> bool:
+    """True for a connector request or a vendor proposal, which the review settles (see SYSTEM_PROPOSALS)."""
+    rule = SYSTEM_PROPOSALS.get(approval.source_table or "")
+    if rule is None:
+        return False
+    entity, operations = rule
+    return approval.operation_type in operations and (entity is None or approval.entity_type == entity)
+
+
+def proposal_requester(approval: AIChatCRUDApproval):
+    """The person a change is applied as: who asked for it, or for a vendor found by the website crawl (nobody
+    asked) an administrator of the workspace. None when the workspace has no such person."""
+    from app.models.user import User
+
+    if approval.user_id is not None:
+        return User.query.filter_by(id=approval.user_id, organization_id=approval.organization_id).first()
+    people = User.query.filter_by(organization_id=approval.organization_id).order_by(User.id).all()
+    return next((u for u in people if getattr(u, "is_active", True) and u.is_admin()), None)
+
+
 def in_scope(approval: AIChatCRUDApproval) -> bool:
-    """True for a change this review settles (see CHAT_CRUD_OPERATIONS)."""
+    """True for a change this review settles (see CHAT_CRUD_OPERATIONS and SYSTEM_PROPOSALS)."""
+    if is_system_proposal(approval):
+        return True
     if approval.user_id is None or approval.source_table:
         return False
     if approval.operation_type == "tool_use":
@@ -702,7 +735,8 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
         allowed, role_reason = False, ACCOUNT_OFF_REASON
     elif allowed and approval.entity_type == "connectors" and not requester.is_admin():
         allowed, role_reason = False, "Connector changes need an administrator, and the person who asked is not one."
-    elif allowed and approval.entity_type == "vendor" and not is_platform_admin(requester):
+    elif (allowed and approval.entity_type == "vendor" and not is_system_proposal(approval)
+          and not is_platform_admin(requester)):
         # The vendor list is shared by every workspace, so only a platform administrator changes it (the
         # same rule as the vendor API).
         allowed, role_reason = False, (
@@ -1399,12 +1433,17 @@ def waiting_ids(organization_id: int) -> List[int]:
         .filter(
             AIChatCRUDApproval.organization_id == organization_id,
             AIChatCRUDApproval.status == ApprovalStatus.PENDING,
-            AIChatCRUDApproval.user_id.isnot(None),
-            AIChatCRUDApproval.source_table.is_(None),
+            db.or_(AIChatCRUDApproval.user_id.isnot(None),
+                   AIChatCRUDApproval.source_table == VENDOR_SOURCE),
+            db.or_(AIChatCRUDApproval.source_table.is_(None),
+                   AIChatCRUDApproval.source_table.in_(list(SYSTEM_PROPOSALS))),
+            db.or_(AIChatCRUDApproval.expires_at.is_(None), AIChatCRUDApproval.expires_at >= datetime.utcnow()),
             db.func.coalesce(last_event.c.last_at, AIChatCRUDApproval.created_at) < cutoff,
-            # Only a change that is in the loop: it carries a rubric version or has review events. A row
-            # from before the loop has neither and is left alone until its own brief moves it in.
-            db.or_(AIChatCRUDApproval.rubric_version.isnot(None), has_loop_event),
+            # Only a change that is in the loop: it carries a rubric version or has review events, or it is a
+            # connector request or vendor proposal, which are always in it. A chat row from before the loop has
+            # none of these and is left alone until its own brief moves it in.
+            db.or_(AIChatCRUDApproval.rubric_version.isnot(None), has_loop_event,
+                   AIChatCRUDApproval.source_table.in_(list(SYSTEM_PROPOSALS))),
         )
         .order_by(AIChatCRUDApproval.id)
         .all()
@@ -1413,12 +1452,11 @@ def waiting_ids(organization_id: int) -> List[int]:
 
 
 def decline_expired(organization_id: int) -> int:
-    """Decline this organisation's changes that waited past their expiry without the review taking them up.
+    """Decline this organisation's changes that are still waiting past their expiry.
 
-    A change the loop is working on (a rubric version or a review event on its record) is left to the loop,
-    which declines it itself when no reviewer can be reached. Everything else that is past its expiry, a
-    proposal from an import or a connector, or one recorded before automatic review, is declined with
-    ``EXPIRED_REASON`` and costs no AI call. Returns how many were declined."""
+    One rule for every change, whatever holds it (no reviewer reachable, writes paused, an import's proposal):
+    past its expiry it is declined with ``EXPIRED_REASON``, costs no AI call, and is neither shown nor counted as
+    in review nor escalated. Returns how many were declined."""
     from datetime import datetime
 
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
@@ -1435,8 +1473,6 @@ def decline_expired(organization_id: int) -> int:
     service = AIChatApprovalService(None)
     declined = 0
     for row in rows:
-        if in_scope(row) and not is_before_the_loop(row):
-            continue
         if service._reject_pending_approval(row.id, organization_id, reason=EXPIRED_REASON):
             _event(service, row, "declined", EXPIRED_REASON, to_status=ApprovalStatus.REJECTED.value)
             declined += 1
@@ -1455,18 +1491,16 @@ def sweep_organisation(organization_id: int, budget: Optional[ReviewBudget] = No
         return counts  # the month's AI budget stopped this run; the changes wait for the next one
     for approval_id in waiting_ids(organization_id):
         row = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=organization_id).first()
-        if row is None or row.user_id is None:
+        if row is None or (row.user_id is None and not is_system_proposal(row)):
             continue
         db.session.expire_all()
-        from app.models.user import User
-
-        requester = User.query.filter_by(id=row.user_id, organization_id=organization_id).first()
+        requester = proposal_requester(row)
         if requester is None:
             # The person who asked now belongs to another workspace (or none): the change is declined, not
             # retried by every sweep. Only this organisation's record is touched.
             outcome = decline(AIChatApprovalService(row.user_id), row, MOVED_REASON)
         else:
-            outcome = AIChatApprovalService(row.user_id).settle_after_review(approval_id, budget=budget)
+            outcome = AIChatApprovalService(requester.id).settle_after_review(approval_id, budget=budget)
         counts[outcome.get("state") if outcome.get("state") in counts else "in_review"] += 1
         if budget.used >= budget.limit or budget.out_of_money:
             break

@@ -113,12 +113,11 @@ class AIChatCRUDApproval(TenantMixin, db.Model):
     source_table = db.Column(db.String(64), nullable=True, index=True)
     source_id = db.Column(db.Integer, nullable=True)
 
-    # Overdue-not-expired: when this row was first found overdue (expires_at in the
-    # past while still PENDING) and its organisation's administrators were
-    # notified. NULL means either not yet overdue or not yet escalated. Being
-    # overdue never removes a row from a pending/inbox query or blocks
-    # approval — see is_overdue()/escalate_overdue() and every query method
-    # below, none of which filter on expires_at any more.
+    # When this row was found overdue (expires_at in the past while still PENDING) and its
+    # organisation's administrators were notified. NULL means not escalated. A row past its
+    # expiry is declined ("Expired before review") by the review sweep, and the in-review queue
+    # and its badge leave out rows past their expiry, so escalation only reaches a row the
+    # sweep has not yet declined — see is_overdue()/escalate_overdue().
     escalated_at = db.Column(db.DateTime, nullable=True)
 
     # The persona under which this tool call was queued. Stored so the charter
