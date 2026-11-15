@@ -52,7 +52,7 @@
              data-level="{{ cap.level|default(1) }}"
              data-cap-id="{{ cap.id }}"
              data-cap-name="{{ cap.name|e }}"
-             data-cap-category="{{ cap.category|default('operational')|e }}"
+             data-cap-category="{{ cap.category|default('', true)|e }}"
              data-cap-level="{{ cap.level|default(1) }}"
              data-cap-desc="{{ cap.description|default('', true)|e }}"
              data-cap-parent="{{ cap.parent_capability_id or '' }}"
@@ -134,6 +134,7 @@
         <div>
           <label class="block text-sm font-medium mb-1" for="cap-category">Category</label>
           <select id="cap-category" class="w-full h-9 px-2 rounded-md border border-border bg-background text-sm">
+            <option value="">Not chosen</option>
             <option value="operational">Operational</option>
             <option value="strategic">Strategic</option>
             <option value="foundational">Foundational</option>
@@ -273,7 +274,7 @@ function openCapEdit(card) {
     capField('cap-dialog-title').textContent = 'Edit Capability';
     capField('cap-id').value = card.dataset.capId;
     capField('cap-name').value = card.dataset.capName || '';
-    capField('cap-category').value = card.dataset.capCategory || 'operational';
+    capField('cap-category').value = card.dataset.capCategory || '';
     capField('cap-level').value = card.dataset.capLevel || '1';
     capField('cap-desc').value = card.dataset.capDesc || '';
     capField('cap-parent').value = card.dataset.capParent || '';
@@ -378,6 +379,18 @@ async function deleteCap(id, name) {
 if (new URLSearchParams(window.location.search).get('new') === '1' && document.getElementById('cap-dialog')) {
     openCapCreate();
 }
+
+/* A score's "Record its importance" step links here with ?edit=<capability id>: open that capability's form. */
+(function () {
+    var editId = new URLSearchParams(window.location.search).get('edit');
+    if (!editId || !document.getElementById('cap-dialog')) return;
+    var card = document.querySelector('.cap-card[data-cap-id="' + String(editId).replace(/"/g, '') + '"]');
+    if (card) openCapEdit(card);
+    // Drop the parameter once the form is open, so the reload after a save does not open it again.
+    var url = new URL(window.location.href);
+    url.searchParams.delete('edit');
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+})();
 
 /* CSP-safe: delegate the page actions instead of inline onclick= (DESIGN.md). */
 document.addEventListener('click', function (e) {

@@ -80,12 +80,18 @@ def get_portfolio_health():
         if scope not in ALLOWED_SCOPES:
             scope = "all"
 
+        from app.services.cost_visibility import withhold_reply
+
         chat_service = get_chat_service()
         result = chat_service.get_advanced_analytics(
             "portfolio_health", {"scope": scope}
         )
 
-        return jsonify(result)
+        return jsonify(
+            withhold_reply(
+                result,
+            )
+        )
     except Exception as e:
         current_app.logger.error(f"Error getting portfolio health: {e}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500

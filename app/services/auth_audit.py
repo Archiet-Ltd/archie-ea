@@ -53,12 +53,13 @@ def _request_context():
         return "", ""
 
 
-def record_login_success(user):
-    """Record a successful authentication. Never raises."""
-    return _record(ACTION_LOGIN, user=user)
+def record_login_success(user, method="password"):
+    """Record a successful authentication and how it was made (``password``, ``oauth:google``,
+    ``oauth:microsoft``). Never raises."""
+    return _record(ACTION_LOGIN, user=user, extra={"method": method})
 
 
-def record_login_failure(email=None):
+def record_login_failure(email=None, method=None, outcome=None):
     """Record a failed authentication attempt. Never raises.
 
     ``user`` is resolved from the submitted email when it matches a real
@@ -79,7 +80,12 @@ def record_login_failure(email=None):
             user = User.query.filter(User.email.ilike(email)).first()  # tenant-scoping-ok: pre-authentication lookup; no tenant context exists yet
         except Exception as exc:
             logger.debug("auth audit: user lookup failed for failed login: %s", exc)
-    return _record(ACTION_LOGIN_FAILED, user=user, extra={"attempted_email": email})
+    extra = {"attempted_email": email}
+    if method:
+        extra["method"] = method
+    if outcome:
+        extra["outcome"] = outcome
+    return _record(ACTION_LOGIN_FAILED, user=user, extra=extra)
 
 
 def record_logout(user):
