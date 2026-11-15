@@ -275,11 +275,12 @@ class RoadmapAutomationEngine:
         }
 
     def _create_application_work_package(
-        self, application: Any, capability: UnifiedCapability, options: GenerationOptions
+        self, application: Dict[str, Any], capability: UnifiedCapability, options: GenerationOptions
     ) -> Dict[str, Any]:
         """Create application-specific work package"""
 
-        app_name = application.name if hasattr(application, "name") else str(application.id)
+        # The canonical reader returns one dict per supported application.
+        app_name = application["application_name"]
 
         return {
             "name": f"Modernize {app_name}",
@@ -292,7 +293,7 @@ class RoadmapAutomationEngine:
             "start_date": (datetime.utcnow() + timedelta(days=30)).isoformat(),
             "end_date": (datetime.utcnow() + timedelta(days=90)).isoformat(),
             "source_type": "application",
-            "source_id": application.id,
+            "source_id": application["application_id"],
             "auto_generated": True,
             "confidence_score": 0.8,
             "generation_method": "application_modernization",

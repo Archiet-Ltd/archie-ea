@@ -384,14 +384,10 @@ class PredictiveInsightsService:
             ).first()
             if app and app.created_at:
                 age = (datetime.utcnow() - app.created_at).days / 365.25
-                # Determine vendor support status from available fields
+                # No field on the application states whether the vendor still
+                # supports it (vendor_risk, support_level and vendor_type describe
+                # something else), so the status stays unknown.
                 vendor_support = "unknown"
-                if app.vendor_risk:
-                    vendor_support = app.vendor_risk
-                elif app.support_level:
-                    vendor_support = app.support_level
-                elif app.vendor_type:
-                    vendor_support = app.vendor_type
 
                 return {
                     "application_name": app.name,
@@ -517,8 +513,6 @@ class PredictiveInsightsService:
         risks = []
         if signals.get("technology_currency", 1.0) < 0.5:
             risks.append({"risk": "Technology obsolescence", "severity": "High"})
-        if signals.get("vendor_support_status") == "limited":
-            risks.append({"risk": "Vendor support ending", "severity": "Medium"})
         if signals.get("maintenance_cost_trend") == "increasing":
             risks.append({"risk": "Rising maintenance costs", "severity": "Medium"})
         return risks
