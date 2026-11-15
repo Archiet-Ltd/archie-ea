@@ -34,13 +34,10 @@ def is_database_error(error) -> bool:
     return bool(_SQL_TEXT.search(str(error or "")))
 
 
-def _tool_names() -> list:
-    try:
-        from app.modules.ai_chat.tools.registry import TOOL_SCHEMAS
+def _registered_names() -> list:
+    from app.modules.ai_chat.tools.registry import TOOL_SCHEMAS
 
-        return sorted({s["name"] for s in TOOL_SCHEMAS if s.get("name")}, key=len, reverse=True)
-    except Exception:
-        return []
+    return sorted({s["name"] for s in TOOL_SCHEMAS if s.get("name")}, key=len, reverse=True)
 
 
 def _spoken(name: str) -> str:
@@ -58,7 +55,7 @@ def in_customer_words(text):
         out = " ".join(kept + [WRITE_FAILED])
     out = re.sub(r"\bgenome patches\b", "proposed changes to your model", out, flags=re.IGNORECASE)
     out = re.sub(r"\bgenome patch\b", "proposed change to your model", out, flags=re.IGNORECASE)
-    for name in _tool_names():
+    for name in _registered_names():
         if name in out:
             out = re.sub(r"(?:\b(?:the|a)\s+)?(?:\b(?:lookup|tool|step|function)\s+)?`?\b%s\b`?" % re.escape(name), "that lookup", out, flags=re.IGNORECASE)
     out = re.sub(r"\bwith\s+`?\bsupported\b`?\s*[:=]\s*`?false`?", "and it is not supported", out, flags=re.IGNORECASE)
