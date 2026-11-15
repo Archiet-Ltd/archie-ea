@@ -2307,7 +2307,11 @@ class AgentRunner:
         if isinstance(text, str) and text.strip():
             from app.modules.ai_chat.services.customer_words import in_customer_words
 
-            result["response"] = in_customer_words(text)
+            said = in_customer_words(text)
+            if said != text:
+                # The streamed words were already shown; the client swaps them for these.
+                result["reworded"] = True
+            result["response"] = said
 
     def _log_would_refuse(self, uncited: list) -> None:
         """One structured WARNING per answer the gate would have refused. The
