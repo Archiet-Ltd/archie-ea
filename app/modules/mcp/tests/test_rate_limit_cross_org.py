@@ -38,7 +38,8 @@ def test_one_organisation_over_budget_does_not_refuse_another_at_the_same_moment
         assert int(refused.headers["Retry-After"]) > 0
         # The same address, the same moment: the second organisation's whole session is answered.
         sent = run_session(app, tokens[second.id], elements[second.id].id)
-        assert [r.status_code for r in sent] == [200] * len(sent)
+        # The second message is the initialized notification, which the transport answers 202.
+        assert [r.status_code for r in sent] == [200, 202] + [200] * (len(sent) - 2)
         # And the first organisation is still refused.
         assert post(app, tokens[first.id], "tools/call", call).status_code == 429
     finally:

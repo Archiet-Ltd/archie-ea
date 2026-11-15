@@ -484,6 +484,13 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"\u26a0\ufe0f  Failed to register codegen drift CLI: {e}")
 
+    # Customer zero: the organisation's own products and what each can do
+    try:
+        from app.commands.customer_zero import init_app as init_customer_zero
+        init_customer_zero(app)
+    except Exception as e:
+        app.logger.warning(f"\u26a0\ufe0f  Failed to register customer-zero CLI: {e}")
+
     # Motivation bridge CLI command (journey Solution* motivation -> enterprise layer)
     try:
         from app.commands.bridge_motivation import init_app as init_bridge_motivation
@@ -588,6 +595,14 @@ def init_cli(app):
         app.logger.info("✅ Application owners backfill CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register application owners backfill CLI: {e}")
+
+# Owners of connector-imported applications worked out from their commits
+    try:
+        from app.commands import owners_from_commits
+        owners_from_commits.init_app(app)
+        app.logger.info("Owners from commits CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register owners from commits CLI: {e}")
 
 # Backlog requirements projected onto the requirements prioritisation ranks
     try:

@@ -6602,6 +6602,8 @@ def api_solution_work_packages(solution_id, wp_id=None):
 
         elif request.method == "PUT":
             wp = RoadmapWorkPackage.query.get_or_404(wp_id)
+            if wp.source_type != "solution" or wp.source_id != solution_id:
+                abort(404)
             data = request.get_json() or {}
             for field in ("name", "status", "priority", "description"):
                 if field in data:
@@ -6632,6 +6634,8 @@ def api_solution_work_packages(solution_id, wp_id=None):
 
         elif request.method == "DELETE":
             wp = RoadmapWorkPackage.query.get_or_404(wp_id)
+            if wp.source_type != "solution" or wp.source_id != solution_id:
+                abort(404)
             db.session.delete(wp)
             db.session.commit()
             return jsonify({"success": True})
