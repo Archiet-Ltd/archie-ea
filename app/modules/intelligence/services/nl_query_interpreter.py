@@ -206,6 +206,34 @@ def _extract_application_for_capabilities(question: str, organization_id: Option
     return None
 
 
+_UNSUPPORTED_WORDS = (
+    "no supporting application", "no application supports", "no applications support",
+    "without a supporting application", "not supported by any application", "nothing supports",
+    "no application is recorded as supporting", "capabilities have no application",
+    "unsupported capabilit",
+)
+_SUPPORTS_OF_PATTERNS = [
+    re.compile(r"\b(?:what|which\s+applications?)\s+(?:applications?\s+)?(?:supports?|realizes?|serves?)\s+(?:the\s+|our\s+)?(.+?)\s*$", re.I),
+]
+
+
+def _extract_capability_supported(question: str, organization_id: Optional[int]) -> Optional[str]:
+    """The capability a 'what supports X' question names, only when X is the whole name of one of the
+    organisation's capability elements."""
+    if organization_id is None:
+        return None
+    from app.services import capability_support as support
+
+    text = (question or "").strip().rstrip("?.! ")
+    for pattern in _SUPPORTS_OF_PATTERNS:
+        found = pattern.search(text)
+        if found:
+            name = found.group(1).strip().strip("'\"")
+            if name and support._elements_named(organization_id, name, "capability"):
+                return name
+    return None
+
+
 _INSTRUCTION_LEAD = re.compile(
     r"^\W*(?:please\s+)?(?:run|search|simulate|model|answer|suppose|assume|imagine|consider|pretend|act)\b", re.I)
 _QUESTION_WORD = re.compile(r"\b(?:what|which|who|when|where|how|why)\b", re.I)
@@ -243,6 +271,12 @@ def _keyword_match(question: str, organization_id: Optional[int] = None) -> Opti
     lowered = question.lower()
     if not asks_one_thing(question):
         return None
+    if any(word in lowered for word in _UNSUPPORTED_WORDS):
+        return {"entry_id": "unsupported_capabilities", "params": {}, "confidence": 0.9, "method": "keyword"}
+    capability = _extract_capability_supported(question, organization_id)
+    if capability:
+        return {"entry_id": "applications_of_capability", "params": {"capability": capability},
+                "confidence": 0.9, "method": "keyword"}
     application = _extract_application_for_capabilities(question, organization_id)
     if application:
         return {"entry_id": "capabilities_of_application", "params": {"service": application},

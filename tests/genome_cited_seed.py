@@ -17,9 +17,6 @@ def seed_cited_model(session, org_id: int, suffix: str = "") -> dict:
     from app.models.application_portfolio import ApplicationComponent
     from app.models.archimate_core import ArchiMateElement
     from app.models.implementation_migration import Gap, Plateau
-    from app.models.unified_application_capability_mapping import (
-        UnifiedApplicationCapabilityMapping,
-    )
     from app.modules.capabilities.services.capability_service import ensure_capability_record
     from app.services import work_package_service
 
@@ -50,10 +47,12 @@ def seed_cited_model(session, org_id: int, suffix: str = "") -> dict:
     app = ApplicationComponent(name=names["app"], organization_id=org_id, archimate_element_id=app_el.id)
     session.add(app)
     session.flush()
-    session.add(UnifiedApplicationCapabilityMapping(
-        application_component_id=app.id, unified_capability_id=caps["supported"].id,
-        support_level="full", coverage_percentage=100, relationship_type="supports",
-    ))
+    from app.services.capability_support import record_capability_support
+
+    record_capability_support(
+        org_id, app_el.id, caps["supported"].archimate_element_id,
+        facts={"support_level": "primary", "coverage_percentage": 100},
+    )
     plateau_el = element(names["plateau"], "Plateau", "implementation_migration")
     plateau = Plateau(name=names["plateau"], organization_id=org_id, sequence_order=1,
                       archimate_element_id=plateau_el.id)

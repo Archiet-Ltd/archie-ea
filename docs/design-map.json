@@ -652,7 +652,8 @@
   "app/templates/archimate_crud/detail.html": "Element page",
   "app/templates/ai_chat/index.html": "AI chat",
   "app/templates/capability_map/index.html": "Capability map",
-  "app/modules/intelligence/templates/intelligence/ask.html": "Ask"
+  "app/modules/intelligence/templates/intelligence/ask.html": "Ask",
+  "app/modules/procurement/templates/procurement/money.html": "Money"
  },
  "personas": {
   "solution_architect": "Solution Architect",
@@ -4858,6 +4859,122 @@
    "tier": "B",
    "type_changed": false
   },
+  "app/modules/procurement/templates/procurement/money.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/disabled_action.html",
+    "components/dropdown_menu.html",
+    "components/element_table.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/fact_list.html",
+    "components/figures.html",
+    "components/filter_bar.html",
+    "components/gantt_timeline.html",
+    "components/inline_hint.html",
+    "components/list_table.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/priority_actions.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/review_queue_panel.html",
+    "components/risk_matrix.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "dashboard",
+   "charts": [],
+   "components": [
+    "alert",
+    "button",
+    "card",
+    "empty",
+    "page-header",
+    "table",
+    "figures",
+    "page-shell",
+    "field",
+    "input",
+    "native-select"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 5,
+    "form": 1,
+    "testid": 6
+   },
+   "departures": [],
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "grid": "G1",
+   "inhouse_components": [
+    "empty_state:Replace",
+    "page-header:Replace"
+   ],
+   "macros": [
+    "components/fact_list.html",
+    "components/figures.html",
+    "components/list_table.html",
+    "macros/page_shell.html"
+   ],
+   "original": "dashboard-01",
+   "page_type": "dashboard",
+   "patterns": [
+    "P01-page-header",
+    "P24-kpi-row",
+    "P25-key-value-summary",
+    "P03-data-table",
+    "P17-empty-state",
+    "P27-evidence-line",
+    "P10-sectioned-form",
+    "P05-pagination"
+   ],
+   "persona": "finance",
+   "reason": "Money facts: four stat cards (cash, outgoings, revenue, months of cash), the latest figures as a fact list, the record form in one card and the history as a table; the template holds no chart.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
+    }
+   },
+   "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-nothing-derived",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
+   "status": "mapped",
+   "tier": "B",
+   "type_changed": false
+  },
   "app/modules/procurement/templates/procurement/renewals_dashboard.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -5296,7 +5413,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 2,
+    "button": 1,
     "form": 1,
     "link": 2
    },
@@ -5424,11 +5541,11 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 5,
-    "form": 3,
+    "button": 6,
+    "form": 4,
     "link": 3,
     "table": 2,
-    "testid": 12
+    "testid": 14
    },
    "departures": [
     {
@@ -5735,8 +5852,8 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 2,
-    "testid": 3
+    "link": 4,
+    "testid": 5
    },
    "departures": [
     {
@@ -7331,10 +7448,10 @@
    "controls": {
     "button": 11,
     "form": 5,
-    "link": 6,
+    "link": 7,
     "modal": 1,
     "table": 1,
-    "testid": 11
+    "testid": 13
    },
    "departures": [],
    "extends": [
@@ -7355,6 +7472,7 @@
     "components/card.html",
     "components/dialog.html",
     "components/empty_state.html",
+    "components/fact_list.html",
     "components/form_field.html",
     "components/input.html",
     "components/page_header.html",
@@ -14929,7 +15047,7 @@
     "link": 11,
     "modal": 2,
     "table": 1,
-    "testid": 33
+    "testid": 34
    },
    "departures": [
     {
@@ -15205,7 +15323,7 @@
     "button": 38,
     "link": 16,
     "table": 2,
-    "testid": 1
+    "testid": 2
    },
    "departures": [
     {
@@ -15324,7 +15442,7 @@
    "controls": {
     "button": 9,
     "form": 2,
-    "testid": 3
+    "testid": 4
    },
    "departures": [],
    "extends": [
@@ -15764,7 +15882,8 @@
    "controls": {
     "button": 6,
     "modal": 1,
-    "table": 2
+    "table": 2,
+    "testid": 1
    },
    "departures": [],
    "extends": [
@@ -23131,7 +23250,7 @@
     "form": 1,
     "link": 2,
     "modal": 1,
-    "testid": 20
+    "testid": 21
    },
    "departures": [
     {
@@ -24760,7 +24879,7 @@
     "button": 13,
     "modal": 1,
     "table": 1,
-    "testid": 10
+    "testid": 11
    },
    "departures": [],
    "extends": [
@@ -28022,7 +28141,8 @@
    "confidence": "high",
    "controls": {
     "button": 32,
-    "table": 1
+    "table": 1,
+    "testid": 1
    },
    "departures": [
     {
@@ -31082,7 +31202,8 @@
     "button": 16,
     "link": 1,
     "modal": 1,
-    "table": 2
+    "table": 2,
+    "testid": 1
    },
    "departures": [],
    "extends": [
@@ -31193,7 +31314,8 @@
    "controls": {
     "button": 2,
     "link": 1,
-    "table": 4
+    "table": 4,
+    "testid": 1
    },
    "departures": [
     {
@@ -32276,7 +32398,6 @@
     "components/status_badge.html",
     "components/stepper.html",
     "components/switch.html",
-    "components/table.html",
     "components/tabs.html",
     "macros/check_password.html",
     "macros/form_macros.html",
@@ -33936,7 +34057,7 @@
     "button": 2,
     "link": 2,
     "table": 2,
-    "testid": 7
+    "testid": 8
    },
    "departures": [],
    "extends": [
@@ -37816,8 +37937,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 1,
-    "table": 1
+    "link": 1
    },
    "departures": [],
    "extends": [
@@ -37829,13 +37949,9 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/badge.html",
-    "components/button.html",
-    "components/card.html",
-    "components/empty_state.html",
-    "components/page_header.html",
-    "components/status_badge.html",
-    "components/table.html"
+    "components/figures.html",
+    "components/list_table.html",
+    "components/page_header.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -41012,8 +41128,8 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 4,
-    "testid": 2
+    "link": 5,
+    "testid": 3
    },
    "departures": [
     {
@@ -43356,7 +43472,7 @@
     "button": 22,
     "form": 2,
     "link": 11,
-    "testid": 47
+    "testid": 48
    },
    "data_types": [
     {
@@ -43753,7 +43869,8 @@
    ],
    "confidence": "low",
    "controls": {
-    "button": 28
+    "button": 28,
+    "testid": 1
    },
    "departures": [
     {
@@ -48366,7 +48483,7 @@
     "form": 1,
     "link": 6,
     "modal": 1,
-    "testid": 6
+    "testid": 7
    },
    "departures": [
     {
@@ -48615,7 +48732,7 @@
     "link": 14,
     "modal": 1,
     "table": 2,
-    "testid": 1
+    "testid": 2
    },
    "departures": [
     {

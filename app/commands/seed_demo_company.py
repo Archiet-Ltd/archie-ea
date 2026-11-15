@@ -4254,6 +4254,7 @@ def _seed_demo_company() -> dict:
 
         # ── 7b. application-to-capability mappings ──────────────────────
         from app.models.application_capability import ApplicationCapabilityMapping
+        from app.services.capability_support import record_capability_support
 
         mapped = {
             (m.application_component_id, m.business_capability_id)
@@ -4275,14 +4276,9 @@ def _seed_demo_company() -> dict:
             profile = _APP_PROFILE.get(app_name)
             ucap = unified_by_code.get(profile[3]) if profile else None
             if ucap is not None and (app.id, ucap.id) not in unified_mapped:
-                db.session.add(UnifiedApplicationCapabilityMapping(
-                    unified_capability_id=ucap.id,
-                    application_component_id=app.id,
-                    support_level="full",
-                    coverage_percentage=80,
-                    relationship_type="supports",
-                    is_active=True,
-                ))
+                record_capability_support(
+                    org_id, app.archimate_element_id, ucap.archimate_element_id, kind="realization",
+                    facts={"support_level": "primary", "coverage_percentage": 80})
                 unified_mapped.add((app.id, ucap.id))
                 unified_created += 1
             supported = [(profile[3], True)] if profile else []
@@ -4291,14 +4287,9 @@ def _seed_demo_company() -> dict:
                 if code != (profile[3] if profile else None):
                     also = unified_by_code.get(code)
                     if also is not None and (app.id, also.id) not in unified_mapped:
-                        db.session.add(UnifiedApplicationCapabilityMapping(
-                            unified_capability_id=also.id,
-                            application_component_id=app.id,
-                            support_level="full",
-                            coverage_percentage=80,
-                            relationship_type="supports",
-                            is_active=True,
-                        ))
+                        record_capability_support(
+                            org_id, app.archimate_element_id, also.archimate_element_id, kind="realization",
+                            facts={"support_level": "primary", "coverage_percentage": 80})
                         unified_mapped.add((app.id, also.id))
                         unified_created += 1
                 bc = existing_bcs.get(code)

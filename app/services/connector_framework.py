@@ -1584,7 +1584,7 @@ def _credential_field_map(connector_type: str, org_id: int, config: dict) -> dic
     return vault.retrieve_credentials(org_id, connector_type) or {}
 
 
-def ensure_application_row(org_id: int, element, name: str, description: str | None = None):
+def ensure_application_row(org_id: int, element, name: str, description: str | None = None, *, flush: bool = True):
     """The organisation's inventory row (``ApplicationComponent``) for an
     element a connector has already made, creating it when there is none.
 
@@ -1607,7 +1607,8 @@ def ensure_application_row(org_id: int, element, name: str, description: str | N
             archimate_element_id=element.id,
         )
         db.session.add(row)
-        db.session.flush()
+        if flush:
+            db.session.flush()
     return row
 
 

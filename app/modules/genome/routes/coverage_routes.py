@@ -5,7 +5,9 @@ the server builds the business-layer genome slice for the current tenant
 (zero LLM), the deterministic Jinja emitter renders it to an HTML heatmap, and
 the page shows it with element-level provenance on every populated cell.
 
-No write path — pure read + deterministic render.
+No write path — pure read + deterministic render. Support is recorded on an application's
+Capabilities tab, on an element page with Add relationship, or in the AI chat; this page only
+reads it and says how much it read.
 """
 from __future__ import annotations
 
@@ -16,6 +18,7 @@ from flask_login import current_user, login_required
 from markupsafe import Markup
 
 from app.modules.genome.emit.coverage_matrix import emit_coverage_matrix_html
+from app.services.capability_support import format_generated_at, support_summary
 from app.modules.genome.services.coverage_slice import (
     SliceProvenanceError,
     build_coverage_slice,
@@ -51,6 +54,17 @@ def _planned_work(org_id):
     return planned
 
 
+def _capability_links(slice_dict):
+    """Each capability's element page, so its name in the matrix opens it."""
+    from app.modules.architecture.routes.archimate_crud.routes import _element_href
+
+    return {
+        c["id"]: _element_href("strategy", "Capability", c["archimate_element_id"])
+        for c in slice_dict["capabilities"]
+        if c.get("archimate_element_id")
+    }
+
+
 @genome_coverage_bp.route("/", methods=["GET"])
 @login_required
 def index():
@@ -60,6 +74,7 @@ def index():
         matrix_html=None,
         error=None,
         org_id=_active_org_id(),
+        summary=None,
     )
 
 
@@ -70,6 +85,7 @@ def generate():
     org_id = _active_org_id()
     matrix_html = None
     error = None
+    summary = None
     if org_id is None:
         error = "No active organization for the current user."
     else:
@@ -77,8 +93,11 @@ def generate():
             slice_dict = build_coverage_slice(org_id)
             # The deterministic emitter escapes every database-derived text field.
             matrix_html = Markup(  # nosec B704
-                emit_coverage_matrix_html(slice_dict, _planned_work(org_id))
+                emit_coverage_matrix_html(slice_dict, _planned_work(org_id), _capability_links(slice_dict))
             )
+            summary = support_summary(org_id)
+            summary["generated_at"] = format_generated_at(summary["generated_at"])
+            summary["supports"] = len(slice_dict["cells"])
         except SliceProvenanceError as exc:
             # Provenance is structural and non-optional — surface the failure,
             # never render a fabricated or half-provenanced matrix.
@@ -89,6 +108,7 @@ def generate():
         matrix_html=matrix_html,
         error=error,
         org_id=org_id,
+        summary=summary,
     )
 
 
