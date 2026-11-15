@@ -36,7 +36,7 @@ def _counts():
 )
 
 
-def test_m22_new_google_person_gets_an_organisation_and_no_confirmation_email(browser, outbox):
+def test_new_google_person_gets_an_organisation_and_no_confirmation_email(browser, outbox):
     """A verified Google sign-up makes a confirmed administrator in a new organisation, with one identity row and no email."""
     from app.models.organization import Organization
     from app.models.sign_in_identity import SignInIdentity
@@ -63,7 +63,7 @@ def test_m22_new_google_person_gets_an_organisation_and_no_confirmation_email(br
     assert user.first_name == "Ada" and user.last_name == "Founder"
 
 
-def test_m22_name_split_when_only_a_full_name_is_given(browser):
+def test_name_split_when_only_a_full_name_is_given(browser):
     """Names: without given and family names, the full name is split at the first space."""
     from app.models.user import User
 
@@ -77,7 +77,7 @@ def test_m22_name_split_when_only_a_full_name_is_given(browser):
     assert (user.first_name, user.last_name) == ("Grace", "Brewster Hopper")
 
 
-def test_m23_unverified_google_email_creates_nothing(browser):
+def test_unverified_google_email_creates_nothing(browser):
     """A Google identity with email_verified false makes no user, organisation or identity row."""
     before = _counts()
     response = browser.sign_in_with("google", browser.providers["google"].google_claims("g-" + uuid.uuid4().hex, _email(), verified=False))
@@ -88,14 +88,14 @@ def test_m23_unverified_google_email_creates_nothing(browser):
     assert "Google did not confirm this email address" in page
 
 
-def test_m23_string_true_counts_as_verified(browser):
+def test_string_true_counts_as_verified(browser):
     """Other side: Google's string "true" is a verified address."""
     email = _email()
     browser.sign_in_with("google", browser.providers["google"].google_claims("g-" + uuid.uuid4().hex, email, verified="true"))
     assert browser.is_signed_in()
 
 
-def test_m24_microsoft_work_account_without_verified_domain_creates_no_user(browser):
+def test_microsoft_work_account_without_verified_domain_creates_no_user(browser):
     """A Microsoft work identity without xms_edov makes no user."""
     before = _counts()
     email = _email()
@@ -106,7 +106,7 @@ def test_m24_microsoft_work_account_without_verified_domain_creates_no_user(brow
     assert "Microsoft did not confirm this email address" in browser.get("/account/login").get_data(as_text=True)
 
 
-def test_m24_microsoft_work_account_with_verified_domain_is_accepted(browser):
+def test_microsoft_work_account_with_verified_domain_is_accepted(browser):
     """Other side: xms_edov true, as boolean, string or 1, lets a work identity sign up."""
     for value in (True, "true", 1):
         person = Browser(browser.app, browser.providers)
@@ -116,7 +116,7 @@ def test_m24_microsoft_work_account_with_verified_domain_is_accepted(browser):
         assert person.is_signed_in(), value
 
 
-def test_m25_personal_microsoft_account_creates_a_user(browser):
+def test_personal_microsoft_account_creates_a_user(browser):
     """A personal Microsoft account (the fixed consumer tenant) with an email creates a user."""
     from app.models.user import User
 
@@ -127,7 +127,7 @@ def test_m25_personal_microsoft_account_creates_a_user(browser):
     assert User.find_by_email(email) is not None
 
 
-def test_m26_preferred_username_is_never_an_email(browser, db_session, make_org):
+def test_preferred_username_is_never_an_email(browser, db_session, make_org):
     """A Microsoft identity whose preferred_username is an existing address, with no email, creates and links nothing."""
     from tests.test_team_invite_acceptance import _make_org, _make_user
 
@@ -141,7 +141,7 @@ def test_m26_preferred_username_is_never_an_email(browser, db_session, make_org)
     assert _counts() == before
 
 
-def test_m27_address_in_a_domain_with_its_own_single_sign_on(browser, db_session):
+def test_address_in_a_domain_with_its_own_single_sign_on(browser, db_session):
     """An address in a domain verified by an organisation with enabled SSO creates no user and says so."""
     from app.models.sso_config import SSOConfig
     from tests.test_team_invite_acceptance import _make_org
@@ -158,7 +158,7 @@ def test_m27_address_in_a_domain_with_its_own_single_sign_on(browser, db_session
     assert "Your organisation signs in through its own single sign-on" in browser.get("/account/login").get_data(as_text=True)
 
 
-def test_m41_signup_never_joins_an_organisation_by_email_domain(browser, db_session):
+def test_signup_never_joins_an_organisation_by_email_domain(browser, db_session):
     """Alice at acme.example gets a new organisation and organisation A's member count is unchanged."""
     from app.models.user import User
     from tests.test_team_invite_acceptance import _make_org, _make_user

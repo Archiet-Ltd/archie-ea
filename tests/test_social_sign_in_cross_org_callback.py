@@ -42,7 +42,7 @@ def _refused(browser, response, email):
     assert not _user_exists(email)
 
 
-def test_m10_wrong_state_makes_no_token_request(browser):
+def test_wrong_state_makes_no_token_request(browser):
     """A callback whose state is wrong never reaches the token endpoint and signs nobody in."""
     email, claims = _google(browser)
     browser.providers["google"].queue(claims)
@@ -53,7 +53,7 @@ def test_m10_wrong_state_makes_no_token_request(browser):
     assert browser.providers["google"].token_requests == []
 
 
-def test_m11_replayed_callback_signs_nobody_in(browser):
+def test_replayed_callback_signs_nobody_in(browser):
     """The address of a completed callback, used again, signs nobody in and asks for nothing more."""
     email, claims = _google(browser)
     browser.providers["google"].queue(claims)
@@ -68,7 +68,7 @@ def test_m11_replayed_callback_signs_nobody_in(browser):
     assert len(browser.providers["google"].token_requests) == 1
 
 
-def test_m12_callback_after_eleven_minutes(browser):
+def test_callback_after_eleven_minutes(browser):
     """A callback 11 minutes after start signs nobody in and makes no token request."""
     email, claims = _google(browser)
     browser.providers["google"].queue(claims)
@@ -80,7 +80,7 @@ def test_m12_callback_after_eleven_minutes(browser):
     assert browser.providers["google"].token_requests == []
 
 
-def test_m12_callback_inside_ten_minutes_is_accepted(browser):
+def test_callback_inside_ten_minutes_is_accepted(browser):
     """Other side: nine minutes after start the same callback still works."""
     email, claims = _google(browser)
     browser.providers["google"].queue(claims)
@@ -92,7 +92,7 @@ def test_m12_callback_inside_ten_minutes_is_accepted(browser):
     assert browser.is_signed_in()
 
 
-def test_m13_token_request_carries_the_stored_verifier(browser):
+def test_token_request_carries_the_stored_verifier(browser):
     """The token endpoint receives exactly the verifier stored at start."""
     email, claims = _google(browser)
     browser.providers["google"].queue(claims)
@@ -105,44 +105,44 @@ def test_m13_token_request_carries_the_stored_verifier(browser):
     assert browser.is_signed_in()
 
 
-def test_m14_different_nonce_refused(browser):
+def test_different_nonce_refused(browser):
     """An id_token with another nonce is refused."""
     email, claims = _google(browser)
     _refused(browser, browser.sign_in_with("google", claims, nonce="somebody-elses"), email)
 
 
-def test_m15_different_audience_refused(browser):
+def test_different_audience_refused(browser):
     """An id_token for another client is refused."""
     email, claims = _google(browser)
     _refused(browser, browser.sign_in_with("google", claims, audience="another-client"), email)
 
 
-def test_m16_hs256_token_signed_with_public_key_refused(browser):
+def test_hs256_token_signed_with_public_key_refused(browser):
     """An HS256 id_token keyed with the public key material is refused."""
     email, claims = _google(browser)
     _refused(browser, browser.sign_in_with("google", claims, algorithm="HS256"), email)
 
 
-def test_m17_google_token_from_another_issuer_refused(browser):
+def test_google_token_from_another_issuer_refused(browser):
     """A Google-shaped id_token whose issuer is https://evil.example is refused."""
     email, claims = _google(browser)
     _refused(browser, browser.sign_in_with("google", claims, issuer="https://evil.example"), email)
 
 
-def test_m17_expired_token_refused(browser):
+def test_expired_token_refused(browser):
     """Other side: an expired id_token is refused."""
     email, claims = _google(browser)
     _refused(browser, browser.sign_in_with("google", claims, expired=True), email)
 
 
-def test_m18_microsoft_tenant_must_match_issuer(browser):
+def test_microsoft_tenant_must_match_issuer(browser):
     """A Microsoft id_token whose issuer names a different tenant than its tid is refused."""
     email, claims = _microsoft(browser)
     provider = browser.providers["microsoft"]
     _refused(browser, browser.sign_in_with("microsoft", claims, issuer=provider.issuer_for(WORK_TENANT)), email)
 
 
-def test_m18_microsoft_matching_tenant_accepted(browser):
+def test_microsoft_matching_tenant_accepted(browser):
     """Other side: the matching tenant issuer signs a new person in."""
     email, claims = _microsoft(browser)
     browser.sign_in_with("microsoft", claims)
@@ -150,14 +150,14 @@ def test_m18_microsoft_matching_tenant_accepted(browser):
     assert _user_exists(email)
 
 
-def test_m19_microsoft_tid_must_be_a_guid(browser):
+def test_microsoft_tid_must_be_a_guid(browser):
     """A Microsoft id_token whose tid is not a GUID is refused."""
     email = _email()
     claims = browser.providers["microsoft"].microsoft_claims(uuid.uuid4().hex, email=email, tid="not-a-guid")
     _refused(browser, browser.sign_in_with("microsoft", claims), email)
 
 
-def test_m20_organisation_provider_with_template_issuer_still_refused(app, social_config):
+def test_organisation_provider_with_template_issuer_still_refused(app, social_config):
     """A per-organisation provider whose discovery issuer holds {tenantid} is refused."""
     from app.services.sso_service import SSONotConfiguredError, SSOService
 
@@ -170,7 +170,7 @@ def test_m20_organisation_provider_with_template_issuer_still_refused(app, socia
             SSOService().initiate_oidc_flow(config, "https://entelim.tech/auth/sso/callback/oidc")
 
 
-def test_m21_no_userinfo_request_for_either_provider(browser):
+def test_no_userinfo_request_for_either_provider(browser):
     """Neither provider's userinfo endpoint is called during sign-in."""
     _, claims = _google(browser)
     browser.sign_in_with("google", claims)

@@ -64,7 +64,7 @@ def _connect(db_session, user, provider="google", subject=None, email=None):
     return row
 
 
-def test_m28_matching_email_signs_nobody_in_and_changes_nothing(browser, db_session):
+def test_matching_email_signs_nobody_in_and_changes_nothing(browser, db_session):
     """A verified email matching a password account signs nobody in and leaves the user and identity rows unchanged."""
     user = _account(db_session)
     before = _snapshot(user)
@@ -78,7 +78,7 @@ def test_m28_matching_email_signs_nobody_in_and_changes_nothing(browser, db_sess
     assert 'value="%s"' % user.email in page
 
 
-def test_m29_password_sign_in_in_the_same_browser_connects_and_tells_the_owner(browser, db_session, outbox):
+def test_password_sign_in_in_the_same_browser_connects_and_tells_the_owner(browser, db_session, outbox):
     """Signing in with the password in the same browser within 10 minutes connects Google and sends one notice."""
     user = _account(db_session)
     sub = "g-" + uuid.uuid4().hex
@@ -93,7 +93,7 @@ def test_m29_password_sign_in_in_the_same_browser_connects_and_tells_the_owner(b
     assert "oauth_pending_link" not in browser.session()
 
 
-def test_m29_after_connecting_google_signs_straight_in(browser, db_session):
+def test_after_connecting_google_signs_straight_in(browser, db_session):
     """Next time: once connected, Continue with Google signs that person in with no password."""
     user = _account(db_session)
     claims = _google(browser, user.email)
@@ -106,7 +106,7 @@ def test_m29_after_connecting_google_signs_straight_in(browser, db_session):
     assert again.signed_in_user_id() == user.id
 
 
-def test_m30_different_browser_creates_no_row(browser, db_session):
+def test_different_browser_creates_no_row(browser, db_session):
     """A password sign-in from another browser connects nothing."""
     user = _account(db_session)
     browser.sign_in_with("google", _google(browser, user.email))
@@ -116,7 +116,7 @@ def test_m30_different_browser_creates_no_row(browser, db_session):
     assert _identities(user.id) == []
 
 
-def test_m31_after_ten_minutes_creates_no_row(browser, db_session):
+def test_after_ten_minutes_creates_no_row(browser, db_session):
     """A password sign-in after the 10 minutes connects nothing."""
     user = _account(db_session)
     browser.sign_in_with("google", _google(browser, user.email))
@@ -128,7 +128,7 @@ def test_m31_after_ten_minutes_creates_no_row(browser, db_session):
     assert _identities(user.id) == []
 
 
-def test_m32_a_different_person_signing_in_connects_nothing(browser, db_session):
+def test_a_different_person_signing_in_connects_nothing(browser, db_session):
     """After a pending link for U, a sign-in by V in the same browser connects nothing for U or V."""
     user_u = _account(db_session, "u")
     user_v = _account(db_session, "v")
@@ -139,7 +139,7 @@ def test_m32_a_different_person_signing_in_connects_nothing(browser, db_session)
     assert "oauth_pending_link" not in browser.session()
 
 
-def test_m34_returning_identity_with_new_email_signs_the_same_user_in(browser, db_session):
+def test_returning_identity_with_new_email_signs_the_same_user_in(browser, db_session):
     """A returning identity whose email claim changed signs in the same user and leaves the stored email alone."""
     user = _account(db_session)
     row = _connect(db_session, user, subject="g-returning")
@@ -150,7 +150,7 @@ def test_m34_returning_identity_with_new_email_signs_the_same_user_in(browser, d
     assert row.last_used_at is not None
 
 
-def test_m35_platform_administrator_is_never_signed_in_by_email(browser, db_session, outbox):
+def test_platform_administrator_is_never_signed_in_by_email(browser, db_session, outbox):
     """A platform administrator matched by email is not signed in, and nothing is stored or sent."""
     admin = _account(db_session)
     admin.is_platform_admin = True
@@ -162,7 +162,7 @@ def test_m35_platform_administrator_is_never_signed_in_by_email(browser, db_sess
     assert outbox == []
 
 
-def test_m35_platform_administrator_with_an_identity_row_is_refused(browser, db_session):
+def test_platform_administrator_with_an_identity_row_is_refused(browser, db_session):
     """Identity row: a platform administrator with an existing identity row is not signed in either."""
     admin = _account(db_session)
     admin.is_platform_admin = True
@@ -171,7 +171,7 @@ def test_m35_platform_administrator_with_an_identity_row_is_refused(browser, db_
     assert not browser.is_signed_in()
 
 
-def test_m36_unactivated_invitee_is_not_signed_in(browser, db_session):
+def test_unactivated_invitee_is_not_signed_in(browser, db_session):
     """A person with an invitation they have not taken up is not signed in and their row is unchanged."""
     from app.models.user import User
 
@@ -188,7 +188,7 @@ def test_m36_unactivated_invitee_is_not_signed_in(browser, db_session):
     assert "You have an invitation waiting" in browser.get("/account/login").get_data(as_text=True)
 
 
-def test_m37_a_second_google_subject_is_not_linked(browser, db_session):
+def test_a_second_google_subject_is_not_linked(browser, db_session):
     """An account connected to Google subject S1 is not linked to S2, and the S1 row stays."""
     user = _account(db_session)
     first = _connect(db_session, user, subject="g-s1")
@@ -199,7 +199,7 @@ def test_m37_a_second_google_subject_is_not_linked(browser, db_session):
     assert "oauth_pending_link" not in browser.session()
 
 
-def test_m40_signing_in_with_organisation_b_identity_stays_in_b(browser, db_session):
+def test_signing_in_with_organisation_b_identity_stays_in_b(browser, db_session):
     """With identities in organisations A and B, B's identity gives a session in B, which cannot open A's records."""
     from app.models.application_portfolio import ApplicationComponent
 
@@ -222,7 +222,7 @@ def test_m40_signing_in_with_organisation_b_identity_stays_in_b(browser, db_sess
     assert browser.get("/applications/%d" % ids["app_b"]).status_code == 200
 
 
-def test_m42_returning_identity_of_an_organisation_that_enabled_sso_is_refused(browser, db_session):
+def test_returning_identity_of_an_organisation_that_enabled_sso_is_refused(browser, db_session):
     """A returning identity whose organisation has since enabled its own SSO is refused."""
     from app.models.sso_config import SSOConfig
 

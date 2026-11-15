@@ -23,7 +23,7 @@ def browser(app, social_config, db_session):
     return Browser(app, social_config)
 
 
-def test_m43_same_provider_and_subject_twice_is_refused(db_session):
+def test_same_provider_and_subject_twice_is_refused(db_session):
     """A second row with the same provider and subject raises an integrity error."""
     one = _account(db_session, "one")
     two = _account(db_session, "two")
@@ -33,7 +33,7 @@ def test_m43_same_provider_and_subject_twice_is_refused(db_session):
             _connect(db_session, two, subject="g-same")
 
 
-def test_m44_same_user_and_provider_twice_is_refused(db_session):
+def test_same_user_and_provider_twice_is_refused(db_session):
     """A second row with the same user and provider raises an integrity error."""
     user = _account(db_session)
     _connect(db_session, user, subject="g-first")
@@ -43,7 +43,7 @@ def test_m44_same_user_and_provider_twice_is_refused(db_session):
     _connect(db_session, user, provider="microsoft", subject="m-first")
 
 
-def test_m45_no_token_is_stored_or_logged(browser, db_session, caplog):
+def test_no_token_is_stored_or_logged(browser, db_session, caplog):
     """The access token and id_token strings appear in no users or sign_in_identities column and in no log line."""
     caplog.set_level(logging.DEBUG)
     email = "tokens-%s@example.com" % uuid.uuid4().hex[:8]
@@ -62,7 +62,7 @@ def test_m45_no_token_is_stored_or_logged(browser, db_session, caplog):
     assert "oauth_flow" not in browser.session()
 
 
-def test_m46_migration_cycles_and_there_is_one_head(app):
+def test_migration_cycles_and_there_is_one_head(app):
     """The revision upgrades, downgrades and upgrades again, and the chain has one head."""
     from alembic.config import Config
     from alembic.migration import MigrationContext
@@ -102,7 +102,7 @@ def test_m46_migration_cycles_and_there_is_one_head(app):
     assert {"user_id", "provider", "issuer", "subject", "email_at_link", "created_at", "last_used_at"} <= columns
 
 
-def test_m47_disconnect_removes_the_row_and_the_next_sign_in_asks_for_the_password(browser, db_session):
+def test_disconnect_removes_the_row_and_the_next_sign_in_asks_for_the_password(browser, db_session):
     """A person with a password disconnects Google; the next Google sign-in for that subject goes to the connect step."""
     user = _account(db_session)
     claims = _google(browser, user.email, "g-gone")
@@ -119,7 +119,7 @@ def test_m47_disconnect_removes_the_row_and_the_next_sign_in_asks_for_the_passwo
     assert "oauth_pending_link" in other.session()
 
 
-def test_m48_google_only_person_cannot_disconnect(browser, db_session):
+def test_google_only_person_cannot_disconnect(browser, db_session):
     """A person with Google only (no password, no other provider) is refused and the row remains."""
     from app.models.user import User
 
@@ -132,7 +132,7 @@ def test_m48_google_only_person_cannot_disconnect(browser, db_session):
     assert "Set a password first: use Forgot password on the sign-in page." in result.get_data(as_text=True)
 
 
-def test_m48_second_provider_lets_google_be_disconnected(browser, db_session):
+def test_second_provider_lets_google_be_disconnected(browser, db_session):
     """Other side: with Microsoft also connected and no password, Google can be disconnected."""
     from app.models.user import User
 
@@ -164,7 +164,7 @@ def test_sign_in_methods_card_empty_state(browser, db_session):
     assert "we connect it after you confirm your password" in page
 
 
-def test_m51_the_old_platform_route_pair_is_gone(app, browser):
+def test_the_old_platform_route_pair_is_gone(app, browser):
     """/account/sso/azure is 404 and neither account blueprint registers a /sso/ route."""
     from flask import Flask
 
@@ -176,3 +176,63 @@ def test_m51_the_old_platform_route_pair_is_gone(app, browser):
         module.register(probe)
         rules = [r.rule for r in probe.url_map.iter_rules() if "/sso" in r.rule]
         assert rules == [], (module_path, rules)
+
+
+PROVIDER_SETTINGS = (
+    "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET",
+    "MICROSOFT_OAUTH_CLIENT_ID", "MICROSOFT_OAUTH_CLIENT_SECRET",
+)
+
+
+def _switch_off(app, monkeypatch, *names):
+    for name in names:
+        monkeypatch.setitem(app.config, name, "")
+
+
+def test_with_no_client_settings_the_sign_up_and_sign_in_pages_offer_no_provider(app, browser, monkeypatch):
+    """No provider button, no terms line for it and no divider appears on either page."""
+    _switch_off(app, monkeypatch, *PROVIDER_SETTINGS)
+    for path in ("/account/register", "/account/login"):
+        page = browser.get(path)
+        html = page.get_data(as_text=True)
+        assert page.status_code == 200, path
+        for absent in ("Continue with", "social-sign-in", "By continuing, you agree"):
+            assert absent not in html, (path, absent)
+
+
+def test_with_no_client_settings_the_sign_in_methods_card_is_not_drawn(app, browser, db_session, monkeypatch):
+    """A person who had connected Google still sees no card while the provider is switched off."""
+    user = _account(db_session)
+    _connect(db_session, user, subject="g-off", email=user.email)
+    browser.password_sign_in(user.email, PASSWORD)
+    _switch_off(app, monkeypatch, *PROVIDER_SETTINGS)
+    page = browser.get("/account/manage")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert "Sign-in methods" not in html and "sign-in-methods-card" not in html
+    assert "/account/oauth/google/disconnect" not in html
+
+
+def test_the_card_lists_only_the_provider_that_is_switched_on(app, browser, db_session, monkeypatch):
+    """With only Google configured, a Microsoft connection is not offered for removal."""
+    user = _account(db_session)
+    _connect(db_session, user, subject="g-on", email=user.email)
+    _connect(db_session, user, provider="microsoft", subject="tid:oid")
+    browser.password_sign_in(user.email, PASSWORD)
+    _switch_off(app, monkeypatch, "MICROSOFT_OAUTH_CLIENT_ID", "MICROSOFT_OAUTH_CLIENT_SECRET")
+    html = browser.get("/account/manage").get_data(as_text=True)
+    assert "/account/oauth/google/disconnect" in html
+    assert "/account/oauth/microsoft/disconnect" not in html
+
+
+@pytest.mark.parametrize("key", ["google", "microsoft"])
+def test_with_no_client_settings_every_provider_route_answers_a_plain_not_found(app, browser, db_session, monkeypatch, key):
+    """Start, return and disconnect each answer 404 with no server error, and a signed-in person is not changed."""
+    user = _account(db_session)
+    _connect(db_session, user, provider=key, subject="s-off")
+    browser.password_sign_in(user.email, PASSWORD)
+    _switch_off(app, monkeypatch, *PROVIDER_SETTINGS)
+    assert browser.start(key).status_code == 404
+    assert browser.get("/account/oauth/%s/callback?code=x&state=y" % key).status_code == 404
+    assert browser.post("/account/oauth/%s/disconnect" % key).status_code == 404
+    assert [r.provider for r in _identities(user.id)] == [key]

@@ -23,7 +23,7 @@ def _enrolled(db_session):
     return user
 
 
-def test_m33_identity_is_connected_only_after_the_code(browser, db_session):
+def test_identity_is_connected_only_after_the_code(browser, db_session):
     """For an account with two-factor on, no identity row after the password step, one after the code."""
     user = _enrolled(db_session)
     browser.sign_in_with("google", _google(browser, user.email))
@@ -36,7 +36,7 @@ def test_m33_identity_is_connected_only_after_the_code(browser, db_session):
     assert [r.provider for r in _identities(user.id)] == ["google"]
 
 
-def test_m38_linked_identity_ends_on_the_challenge(browser, db_session):
+def test_linked_identity_ends_on_the_challenge(browser, db_session):
     """A linked identity for a two-factor user ends on the challenge, and signed-in pages wait for the code."""
     user = _enrolled(db_session)
     _connect(db_session, user, subject="g-mfa")
@@ -49,7 +49,7 @@ def test_m38_linked_identity_ends_on_the_challenge(browser, db_session):
     assert browser.signed_in_user_id() == user.id
 
 
-def test_m39_audit_row_names_the_provider(browser, db_session):
+def test_audit_row_names_the_provider(browser, db_session):
     """After the code that follows a Google sign-in, the login audit row's method is oauth:google."""
     from app.models.audit_log import AuditLog
 
@@ -62,7 +62,7 @@ def test_m39_audit_row_names_the_provider(browser, db_session):
     assert row.new_value["method"] == "oauth:google"
 
 
-def test_m39_password_sign_in_still_says_password(browser, db_session):
+def test_password_sign_in_still_says_password(browser, db_session):
     """Other side: a password sign-in records the method password."""
     from app.models.audit_log import AuditLog
 
