@@ -547,11 +547,24 @@ def backfill_unprojected_support(organization_id: Optional[int] = None) -> Dict[
             logger.exception("support row %s could not be given a relationship", row.id)
             left_ids.append(row.id)
     db.session.flush()
-    linked_by_pair = {}
-    for row in db.session.query(Row).filter(Row.archimate_relationship_id.isnot(None)):
-        linked_by_pair.setdefault(
-            (row.organization_id, row.application_component_id, row.unified_capability_id), row
-        )
+    # The projection holds one row per relationship, so a pair that is both realized and served has two
+    # linked rows; neither is touched here. An unlinked row names no kind, so it stands for the pair and is
+    # folded into the pair's Realizes row, the one the readers show, or else its first row.
+    _, _, Relationship, _, _ = _models()
+    linked_by_pair: Dict[tuple, Any] = {}
+    linked = (
+        db.session.query(Row, Relationship.type)
+        .join(Relationship, Relationship.id == Row.archimate_relationship_id)
+        .order_by(Row.id)
+    )
+    if organization_id is not None:
+        linked = linked.filter(Row.organization_id == organization_id)
+    for row, kind in linked:
+        key = (row.organization_id, row.application_component_id, row.unified_capability_id)
+        held = linked_by_pair.get(key)
+        if held is None or ((kind or "").lower() == "realization" and (held[1] or "").lower() != "realization"):
+            linked_by_pair[key] = (row, kind)
+    linked_by_pair = {key: value[0] for key, value in linked_by_pair.items()}
     for row in orphans:
         if row.archimate_relationship_id is not None:
             counts["linked"] += 1

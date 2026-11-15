@@ -194,3 +194,35 @@ def test_a_removed_duplicate_is_recorded_in_full_and_the_linked_rows_values_stay
     assert again == {"before": 0, "linked": 0, "duplicates_removed": 0, "left": 0, "after": 0}
     assert AuditLog.query.filter_by(table_name=Row.__tablename__, record_id=second_id).count() == 1
     assert first.id == kept.id or Row.query.filter_by(id=first.id).count() == 1
+
+
+def test_a_pair_both_realized_and_served_keeps_both_rows_and_an_old_row_folds_into_the_realizes_row(
+        db_session, make_org):
+    from app.models.audit_log import AuditLog
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping as Row
+    from app.services import capability_support as cs
+    from tests.test_capability_support_writer import relationship_between
+
+    org = make_org()
+    app_row, cap = seed(db_session, org)
+    # The shape the demonstration organisation has: one row for each of the pair's two relationships.
+    served = relationship_between(db_session, org, app_row, cap, "serving")
+    realized = relationship_between(db_session, org, app_row, cap, "realization")
+    cs.record_capability_support(org.id, app_row.archimate_element_id, cap.archimate_element_id, kind="realization")
+    db_session.flush()
+    rows = Row.query.filter_by(organization_id=org.id).order_by(Row.id).all()
+    assert len(rows) == 2 and {r.archimate_relationship_id for r in rows} == {served.id, realized.id}
+
+    untouched = cs.backfill_unprojected_support(org.id)
+    assert untouched == {"before": 0, "linked": 0, "duplicates_removed": 0, "left": 0, "after": 0}
+    assert Row.query.filter_by(organization_id=org.id).count() == 2
+
+    old = _old_row(db_session, org, app_row, _record_of(org, cap), notes="written the old way")
+    old_id = old.id
+    counts = cs.backfill_unprojected_support(org.id)
+    assert counts["duplicates_removed"] == 1 and counts["after"] == 0
+    assert Row.query.filter_by(organization_id=org.id).count() == 2
+    realizes_row = Row.query.filter_by(archimate_relationship_id=realized.id).one()
+    assert realizes_row.notes == "written the old way"
+    entry = AuditLog.query.filter_by(table_name=Row.__tablename__, record_id=old_id).one()
+    assert entry.new_value["merged_into"] == realizes_row.id
