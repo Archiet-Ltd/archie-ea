@@ -134,37 +134,98 @@ def test_trigger_and_outcome_visible_at_both_viewports(
         pg.close()
 
 
-@pytest.mark.parametrize("width,height", VIEWPORTS)
-def test_editor_name_fields_carry_autofocus_at_both_viewports(
-    app, client, browser, width, height
-):
-    """The stage create, stage edit, and value stream edit dialogs each carry
-    autofocus on their name field at both 1440x900 (light) and 390x844 (dark)."""
+def _signed_in_page(app, client, browser, width, height, stages=3):
     from app import db
 
     with app.app_context():
-        org_id = make_org(db, "VsEditAutofocus")
+        org_id = make_org(db, "VsFocus%s" % uuid.uuid4().hex[:6])
         user_id = make_user(
-            db, org_id, "vsa", "enterprise_architect", role_name="Architect"
+            db, org_id, "vf" + uuid.uuid4().hex[:6], "enterprise_architect",
+            role_name="Architect",
         )
-
     login(client, user_id)
     vs_id = _create_value_stream(
-        app, client, "Autofocus %s" % uuid.uuid4().hex[:8]
+        app, client, "Focus %s" % uuid.uuid4().hex[:8]
     )
-
     path = "/value-streams/%d" % vs_id
+    document = client.get(path).get_data(as_text=True)
+    return _open(browser, client, document, path, width, height)
+
+
+_FOCUSED = "document.activeElement && document.activeElement.id"
+
+
+def _shot(pg, name, width):
+    import os
+
+    folder = os.environ.get("VSEDIT_SHOTS")
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+        pg.screenshot(path=os.path.join(folder, "%s_%d.png" % (name, width)))
+
+
+@pytest.mark.parametrize("width,height", VIEWPORTS)
+@pytest.mark.parametrize(
+    "opener,dialog,field",
+    [
+        ("Add Stage", "stage-create-modal", "stage-name"),
+        ("Edit", "vs-edit-modal", "vs-edit-name"),
+        ("Edit stage", "stage-edit-modal", "stage-edit-name"),
+    ],
+)
+def test_editor_opens_with_focus_on_name_and_typing_lands_there(
+    app, client, browser, width, height, opener, dialog, field
+):
+    """Click the button that opens each editor: keyboard focus is on the
+    dialog's name field, and typing without clicking goes into that field."""
+    pg = _signed_in_page(app, client, browser, width, height)
+    try:
+        pg.emulate_media(color_scheme="dark" if width < 800 else "light")
+        if opener == "Edit stage":
+            pg.locator('[data-stage-card] button[aria-label="Edit stage"]').first.click()
+        else:
+            pg.get_by_role("button", name=opener, exact=True).first.click()
+        pg.wait_for_function(
+            "id => document.activeElement && document.activeElement.id === id",
+            arg=field, timeout=3000,
+        )
+        assert pg.evaluate(_FOCUSED) == field
+        pg.keyboard.press("End")
+        pg.keyboard.type("Zq")
+        assert pg.locator("#" + field).input_value().endswith("Zq")
+        _shot(pg, dialog, width)
+    finally:
+        pg.close()
+
+
+@pytest.mark.parametrize("width,height", VIEWPORTS)
+def test_single_stage_reads_as_trigger_and_outcome_once(
+    app, client, browser, width, height
+):
+    """A stream with one stage names it as both trigger and outcome with a
+    single label, not two labels around the same card."""
+    from app import db
+    from app.models.unified_capability import ValueStream, ValueStreamStage
+
+    pg = _signed_in_page(app, client, browser, width, height)
+    pg.close()
+    with app.app_context():
+        vs = db.session.execute(
+            db.select(ValueStream).order_by(ValueStream.id.desc())
+        ).scalars().first()
+        for stage in db.session.execute(
+            db.select(ValueStreamStage).filter_by(value_stream_id=vs.id)
+        ).scalars().all()[1:]:
+            db.session.delete(stage)
+        db.session.commit()
+        path = "/value-streams/%d" % vs.id
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path, width, height)
     try:
-        # The rendered HTML carries autofocus on each editor's name field.
-        stage_name_pos = document.index('id="stage-name"')
-        assert 'autofocus' in document[stage_name_pos:stage_name_pos + 500]
-
-        stage_edit_name_pos = document.index('id="stage-edit-name"')
-        assert 'autofocus' in document[stage_edit_name_pos:stage_edit_name_pos + 500]
-
-        vs_edit_name_pos = document.index('id="vs-edit-name"')
-        assert 'autofocus' in document[vs_edit_name_pos:vs_edit_name_pos + 500]
+        strip = pg.locator("[data-stage-chevrons]")
+        expect(strip.get_by_text("Trigger and outcome")).to_have_count(1)
+        expect(strip.get_by_text("Outcome", exact=True)).to_have_count(0)
+        expect(strip.get_by_text("Trigger", exact=True)).to_have_count(0)
+        _shot(pg, "single_stage", width)
     finally:
         pg.close()

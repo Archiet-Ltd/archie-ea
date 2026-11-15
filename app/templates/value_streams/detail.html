@@ -110,9 +110,7 @@
                 {% if value_stream.stages %}
                 <div class="overflow-x-auto" data-stage-chevrons>
                     <div class="flex items-stretch gap-1 min-w-max pb-2">
-                        {% if value_stream.stages|length > 0 %}
-                        <span class="text-xs font-medium text-muted-foreground shrink-0">Trigger</span>
-                        {% endif %}
+                        <span class="text-xs font-medium text-muted-foreground shrink-0">{% if value_stream.stages|length == 1 %}Trigger and outcome{% else %}Trigger{% endif %}</span>
                         {% for stage in value_stream.stages %}
                         {% set edit_attrs = {'data-stage': stage|tojson|forceescape} %}
                         <div class="w-72 shrink-0" data-stage-card data-stage-id="{{ stage.id }}">
@@ -204,7 +202,7 @@
                             </div>
                         </div>
                         {% endfor %}
-                        {% if value_stream.stages|length > 0 %}
+                        {% if value_stream.stages|length > 1 %}
                         <span class="text-xs font-medium text-muted-foreground shrink-0">Outcome</span>
                         {% endif %}
                     </div>
