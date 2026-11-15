@@ -672,6 +672,11 @@ def get_solution_stakeholders(solution_id):
 def create_solution_stakeholder(solution_id):
     """Add a stakeholder (Phase A — Motivation layer)."""
     Solution.query.get_or_404(solution_id)
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
     from app.models.solution_sad_models import SolutionStakeholderSAD
     data = request.get_json() or {}
     err_response, err_status = _validate_entity(data, ["name"])
@@ -703,6 +708,11 @@ def delete_solution_stakeholder(solution_id, row_id):
     # The solution is tenant-fenced: a solution id from another organisation is a 404,
     # so its stakeholder rows are never reached through the URL.
     require_entity(Solution, solution_id, description="Solution not found")
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
     row = SolutionStakeholderSAD.query.filter_by(id=row_id, solution_id=solution_id).first_or_404()
     db.session.delete(row)
     db.session.commit()
@@ -2138,12 +2148,15 @@ def phase_h_review(solution_id: int):
             "owner": r.owner,
         })
 
-    # Sync outcomes to ArchiMate
+    # Sync outcomes to ArchiMate. Reading the review never stores anything for a person whose
+    # organisation role is viewer: the sync is skipped for them and the page reports reads only.
     archimate_outcomes = []
     try:
-        from app.services.solution_archimate_sync_service import sync_phase_h_outcomes
-        archimate_outcomes = sync_phase_h_outcomes(solution_id)
-        db.session.commit()
+        from app.core.auth.permissions import is_read_only_member
+        if not is_read_only_member(current_user):
+            from app.services.solution_archimate_sync_service import sync_phase_h_outcomes
+            archimate_outcomes = sync_phase_h_outcomes(solution_id)
+            db.session.commit()
     except Exception as e:
         logger.warning(f"Phase H outcome sync failed: {e}")
 

@@ -206,6 +206,31 @@ def test_an_owner_who_has_no_account_can_be_set_from_the_chat(world, client, log
     assert row.user_id is None and row.person_name == "Ifiok Etim"
 
 
+def test_a_colon_after_to_is_accepted_in_both_phrasings():
+    """"Change the description of X to: Y" is how a person writes the request in the chat.
+
+    The colon after "to" (or "as"), with or without a space before it, is accepted in the
+    of-form and the possessive form alike, and the saved value starts after it.
+    """
+    from app.modules.ai_chat.services.application_change import parse_change_request
+
+    for joiner in ("to", "to:", "to :"):
+        of_form = parse_change_request(f"Change the description of Payments {joiner} Runs billing")
+        assert of_form == {
+            "application": "Payments",
+            "key": "description",
+            "label": "description",
+            "value": "Runs billing",
+        }, f"of-form with {joiner!r}: {of_form}"
+        possessive = parse_change_request(f"set Payments's version {joiner} 9.1")
+        assert possessive == {
+            "application": "Payments",
+            "key": "version",
+            "label": "version",
+            "value": "9.1",
+        }, f"possessive with {joiner!r}: {possessive}"
+
+
 def test_crafted_message_parses_in_linear_time():
     """The reviewer's crafted message of several thousand characters parses in linear time.
 

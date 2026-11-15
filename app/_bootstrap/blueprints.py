@@ -224,6 +224,8 @@ def _register_optional_standalone(app):
         ("app.modules.admin.rate_limit_routes", "rate_limits_bp", "/admin"),
         ("app.modules.admin.billing_routes", "billing_bp", "/admin/billing"),
         ("app.modules.admin.team_routes", "team_bp", "/admin"),
+        # Education eligibility: the free plan for a confirmed university or college address.
+        ("app.modules.education", "education_bp", "/education"),
         # Navigation v3: the platform administration tools, out of the customer sidebar.
         ("app.modules.admin.platform_area_routes", "platform_area_bp", "/admin"),
         ("app.modules.business_model_canvas.routes", "business_model_bp", "/business-model"),
