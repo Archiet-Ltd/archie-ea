@@ -2171,10 +2171,6 @@ TOOL_SCHEMAS.extend([
     ),
 ])
 
-# Index by name for O(1) lookup
-TOOL_SCHEMA_BY_NAME = {s["name"]: s for s in TOOL_SCHEMAS}
-
-
 # Derived by reading each implementation for db.session.add/commit/delete — and
 # through the five tools that delegate to a service — not from the tool's name.
 # A startswith("create_") heuristic would miss mark_option_recommended,
@@ -2264,10 +2260,10 @@ def _archimate_element_schemas() -> list:
 
 TOOL_SCHEMAS.extend(_archimate_element_schemas())
 
-# Refresh the lookup in place now that every schema is in the list, so a tool
-# the chat is offered is always one the review loop and risk classifier can find.
-TOOL_SCHEMA_BY_NAME.clear()
-TOOL_SCHEMA_BY_NAME.update({s["name"]: s for s in TOOL_SCHEMAS})
+# Index by name for O(1) lookup, built once now that every schema (the generated
+# element tools included) is in the list, so a tool the chat is offered is always
+# one the review loop and risk classifier can find.
+TOOL_SCHEMA_BY_NAME = {s["name"]: s for s in TOOL_SCHEMAS}
 
 
 def mutating_tool_names() -> set:

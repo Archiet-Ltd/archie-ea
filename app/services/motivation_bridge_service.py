@@ -30,6 +30,7 @@ existing enterprise Driver/Goal/Outcome/Principle row that it matches by name
 """
 
 from app.services.archimate_backbone import sync_archimate_element
+from app.services import goal_store
 import json
 import logging
 
@@ -139,21 +140,19 @@ def _find_or_create_goal(sg, name, org_id=None):
         )
 
     ae = _create_archimate_element(name, "Goal", sg.description, organization_id=org_id)
-    goal = Goal(
-        name=name,
+    goal = goal_store.create_goal(
+        org_id,
+        name,
         description=sg.description,
+        target_date=target_date,
+        status="active",
+        commit=False,
         archimate_element_id=ae.id,
         driver_id=driver_id,
-        target_date=target_date,
         strategic_priority=sg.priority,
         measurable_metrics=json.dumps(sg.kpis) if getattr(sg, "kpis", None) else None,
         notes=sg.measurement_criteria,
-        status="active",
-        organization_id=org_id,
     )
-    db.session.add(goal)
-    sync_archimate_element(goal)
-    db.session.flush()
     return goal, True
 
 
