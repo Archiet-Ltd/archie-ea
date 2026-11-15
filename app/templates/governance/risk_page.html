@@ -76,7 +76,7 @@
                 {% elif t.url %}
                 <a href="{{ t.url }}" class="text-primary hover:underline">{{ t.name }}</a> <span class="text-xs text-muted-foreground">{{ t.kind }}</span>
                 {% elif t.element_id and 'archimate.element_impact_graph_page' in flask.current_app.view_functions %}
-                <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>
+                <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>{% if t.type_word %} <span class="text-xs text-muted-foreground">{{ t.type_word | lower }}</span>{% endif %}
                 {% else %}{{ t.name }}{% endif %}
             </li>
             {% endfor %}
