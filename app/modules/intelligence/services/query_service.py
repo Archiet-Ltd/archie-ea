@@ -83,6 +83,7 @@ NO_CAPABILITY_IN_CHAIN_REASON = validate_reason_code("no_capability_in_chain")
 # means no component was resolved at all).
 NO_COST_RECORDED_REASON = validate_reason_code("no_cost_recorded")
 NO_HEALTH_RECORDED_REASON = validate_reason_code("no_health_recorded")
+NOT_ASSESSED_HEALTH = "Not assessed"
 NO_LICENCE_RECORDED_REASON = validate_reason_code("no_licence_recorded")
 # A licence whose usage has never been synced from the source system carries
 # quantity_used at its column default of zero -- comparing that default
@@ -342,7 +343,7 @@ def _resolve_health_batch(
 
     An application carries the ``health_status`` its owner recorded; a capability
     carries the status the capability health score already computes for the
-    dashboard (measured ones only). Every other element has no health anywhere
+    dashboard, or "Not assessed" when it has none. Every other element has no health anywhere
     in the model, so it is left out and the row says so rather than guessing.
     """
     distinct_ids = sorted(set(element_ids))
@@ -361,6 +362,9 @@ def _resolve_health_batch(
             if status:
                 found[element_id] = str(status).replace("_", " ").capitalize()
     if cap_ids:
+        # A capability always answers: the measured status when it has one,
+        # otherwise a plain "Not assessed" so the row never shows a blank.
+        found.update({element_id: NOT_ASSESSED_HEALTH for element_id in cap_ids})
         from app.models.business_capabilities import BusinessCapability
         from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
 

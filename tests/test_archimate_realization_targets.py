@@ -33,6 +33,13 @@ CORE_ACTIVE_STRUCTURE = [
 ]
 
 
+SPECIFICATION_REALIZATIONS = {
+    ("WorkPackage", "ApplicationComponent"),
+    ("Deliverable", "ApplicationComponent"),
+    ("Artifact", "ApplicationComponent"),
+}
+
+
 @pytest.fixture(scope="module")
 def svc():
     return ArchimateValidityService()
@@ -94,6 +101,9 @@ def test_static_matrix_agrees_with_the_service(target):
         if tgt == target and "realization" in types
         # Grouping/Location/Junction belong to no layer and are permissive by design.
         and source not in ("Grouping", "Location", "Junction")
+        # ArchiMate 3.2 lets a work package or deliverable realize a core element,
+        # and an artifact realize an application component.
+        and (source, tgt) not in SPECIFICATION_REALIZATIONS
     )
     assert offenders == [], (
         f"matrix allows realization into active structure {target} from: {offenders}"

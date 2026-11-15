@@ -113,7 +113,7 @@
             {% call table_cell() %}{% if e.relation.kind == 'derived' %}{% call badge('warning') %}Worked out{% endcall %}{% else %}{% call badge('success') %}Recorded by people{% endcall %}{% endif %}{% endcall %}
             {% call table_cell() %}{{ e.owner_text }}{% endcall %}
             {% call table_cell() %}
-                {% if e.health %}{% call badge('success' if e.health == 'Healthy' else ('warning' if e.health == 'Warning' else 'danger')) %}{{ e.health }}{% endcall %}
+                {% if e.health %}{% call badge('success' if e.health == 'Healthy' else ('warning' if e.health == 'Warning' else ('neutral' if e.health == 'Not assessed' else 'danger'))) %}{{ e.health }}{% endcall %}
                 {% else %}{% call badge('neutral') %}Health not recorded{% endcall %}{% endif %}
             {% endcall %}
             {% call table_cell(class='text-xs text-muted-foreground') %}{{ source_text(e.relation) }}{% endcall %}

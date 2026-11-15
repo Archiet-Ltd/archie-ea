@@ -41,7 +41,8 @@ def _answer(graph):
     text = (
         "**%s** [ref:%s] is served through %s [ref: %s].\n\n"
         "Both are recorded together [ref:%s, %s].\n\n"
-        "A third thing was mentioned [ref:business:cap:424242]." % (service, graph["service"], gateway, graph["gateway"], graph["service"], graph["gateway"])
+        "**The %s** [ref:%s] was named in bold with more words.\n\n"
+        "A third thing was mentioned [ref:business:cap:424242]." % (service, graph["service"], gateway, graph["gateway"], graph["service"], graph["gateway"], service, graph["service"])
     )
     sources = [
         {"id": str(graph["service"]), "name": service, "url": "/intelligence/answers/element/%s" % graph["service"]},
@@ -53,6 +54,8 @@ def _answer(graph):
 def _check(message, graph):
     shown = message.inner_text()
     assert "[ref" not in shown and "ref:" not in shown, shown
+    # Bold around a name and more words never leaves one mark of the pair on screen.
+    assert "**" not in shown, shown
     for key in ("service", "gateway"):
         name = graph["names"][key]
         links = message.locator("a", has_text=name)
@@ -67,15 +70,25 @@ def _check(message, graph):
 
 
 def _open_each_link_lands_on_content(page, message, graph):
-    for key in ("service", "gateway"):
-        href = "/intelligence/answers/element/%s" % graph[key]
-        chat_url = page.url
-        message.locator('a[href="%s"]' % href).first.click()
+    """Click every reference link the answer shows, one after the other, and read the page each opens."""
+    names = {"/intelligence/answers/element/%s" % graph[key]: graph["names"][key] for key in ("service", "gateway")}
+    shown = message.locator("a[href^='/intelligence/answers/']").count()
+    assert shown >= 2, shown
+    chat_url = page.url
+    clicked = 0
+    for index in range(shown):
+        link = message.locator("a[href^='/intelligence/answers/']").nth(index)
+        name = names[link.get_attribute("href")]
+        link.click()
         page.wait_for_url(re.compile(r".*/intelligence/answers/[0-9a-f]{32}"), timeout=PAGE_TIMEOUT)
         body = page.locator("#main-content").inner_text()
-        assert len(body.strip()) > 80 and graph["names"][key] in body, body[:200]
+        assert len(body.strip()) > 80 and name in body, body[:200]
+        clicked += 1
         page.goto(chat_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        return
+        page.evaluate("() => window.loadSession('history-1')")
+        message = page.locator("#messages-container .message-content").last
+        expect(message).to_contain_text("A third thing was mentioned", timeout=PAGE_TIMEOUT)
+    assert clicked == shown, (clicked, shown)
 
 
 def test_a_cited_answer_names_each_record_once_as_a_link_streamed_and_from_history(page, live_server):
@@ -110,8 +123,12 @@ def test_a_cited_answer_names_each_record_once_as_a_link_streamed_and_from_histo
     reloaded = page.locator("#messages-container .message-content").last
     expect(reloaded).to_contain_text("A third thing was mentioned", timeout=PAGE_TIMEOUT)
     shown = reloaded.inner_text()
-    assert "ref:" not in shown, shown
+    assert "ref:" not in shown and "**" not in shown, shown
     assert reloaded.locator("a").count() >= 2
+    # Each record is named once in the replayed answer: the text carries the name, the marker adds no second copy.
+    lines = [line for line in shown.split("\n") if line.strip()]
+    for name in (graph["names"]["service"], graph["names"]["gateway"]):
+        assert lines[0].count(name) == 1, lines[0]
     hrefs = [reloaded.locator("a").nth(i).get_attribute("href") for i in range(reloaded.locator("a").count())]
     assert "/intelligence/answers/element/%s" % graph["service"] in hrefs, hrefs
     shoot(page, "history")
