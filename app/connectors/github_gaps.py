@@ -47,25 +47,62 @@ def _where(element) -> Optional[str]:
     return f"{ref['repository']}{file}{commit}"
 
 
+def _person_name(user) -> str:
+    return " ".join(p for p in (user.first_name, user.last_name) if p) or user.email
+
+
+def _commit_hint(element, org_id) -> Dict[str, Any]:
+    """Why no owner was set from the recent commits, in one sentence, and who could be made owner.
+
+    The candidates are read from what the connector kept and checked again against this
+    organisation's members, so a person who has left, or who belongs to another organisation,
+    is never offered."""
+    from app.models.user import User
+
+    summary = _fact(element, "github_commit_owners")
+    if not isinstance(summary, dict):
+        return {}
+    repository = str(summary.get("repository") or "")
+    named = []
+    for entry in summary.get("candidates") or []:
+        user = db.session.execute(
+            db.select(User).where(User.id == entry.get("user_id")).where(User.organization_id == org_id)
+        ).scalar_one_or_none()
+        if user is not None:
+            named.append({"user_id": user.id, "name": _person_name(user), "commits": entry.get("commits")})
+    if not named:
+        short = repository.rsplit("/", 1)[-1] or "this repository"
+        return {"note": f"No code owner or recent committer of {short} is a member of this organisation."}
+    shared = ", ".join(f"{c['name']} ({c['commits']})" for c in named)
+    return {"note": f"Recent commits are shared: {shared}.", "candidates": named}
+
+
 def _owner_hint(element, org_id) -> Dict[str, Any]:
     """The code owners GitHub names. One person of this organisation whose e-mail is named is a
-    suggestion; a team or a handle is only said, since it names nobody who can be assigned here."""
+    suggestion; a team or a handle is only said, since it names nobody who can be assigned here.
+    With no such person, the recent commits say who could be asked, or why nobody can."""
     from app.connectors.github import _person_in_org
 
     owners = [o for o in (_fact(element, "github_code_owners") or []) if isinstance(o, str)]
     where = _where(element)
     if not owners or not where:
-        return {}
+        return _commit_hint(element, org_id)
     person = _person_in_org(org_id, owners)
     if person is not None:
-        name = " ".join(p for p in (person.first_name, person.last_name) if p) or person.email
+        name = _person_name(person)
         hint = {"suggestion": name, "evidence": f"Named as code owner in {where}"}
         teams = [o for o in owners if o.startswith("@")]
         if teams:
             hint["note"] = f"GitHub also names {', '.join(teams)}."
         return hint
     named = ", ".join(owners)
-    return {"note": f"GitHub names {named} as code owner in {where}. Pick the person here who is that owner."}
+    hint = {"note": f"GitHub names {named} as code owner in {where}. Pick the person here who is that owner."}
+    history = _commit_hint(element, org_id)
+    if history:
+        hint["note"] += " " + history["note"]
+        if history.get("candidates"):
+            hint["candidates"] = history["candidates"]
+    return hint
 
 
 def _capability_hint(element, org_id) -> Dict[str, Any]:
@@ -156,3 +193,19 @@ def application_gaps(org_id, applications: Iterable[Any], skip_ids: Iterable[int
         if gaps:
             out[a.id] = {"where": _where(element), "gaps": gaps}
     return out
+
+
+def owner_source_note(application, owner_rows) -> Optional[str]:
+    """Where a primary owner recorded from the commit history came from, while that person is still the owner."""
+    from app.models.archimate_core import ArchiMateElement
+
+    if not application.archimate_element_id:
+        return None
+    element = db.session.get(ArchiMateElement, application.archimate_element_id)
+    if element is None or element.organization_id != application.organization_id:
+        return None
+    source = _fact(element, "github_owner_source")
+    if not isinstance(source, dict) or not source.get("text"):
+        return None
+    primary = {r.get("user_id") for r in owner_rows if r.get("ownership_type") == "primary"}
+    return source["text"] if source.get("user_id") in primary else None

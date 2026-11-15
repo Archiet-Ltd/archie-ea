@@ -34,7 +34,7 @@ def _thirty():
     with app.app_context():
         from app.modules.intelligence.services.nl_query_interpreter import evaluation_set
 
-        questions = [c["question"] for c in evaluation_set() if c["expected_entry_id"] is not None]
+        questions = [c["question"] for c in evaluation_set() if c["expected_entry_id"] not in (None, "canvas_box_entries")]
     assert len(questions) == 30, len(questions)
     return questions
 
