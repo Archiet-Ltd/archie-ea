@@ -1159,7 +1159,7 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       {% if can('edit', 'application') %}
-      <a href="{{ url_for('unified_applications.application_edit', id=app.id, tab=resolved_tab) }}"
+      <a href="{{ url_for('unified_applications.application_edit', id=app.id, return_to='detail', tab=resolved_tab) }}"
          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Technology Details
       </a>
@@ -1534,7 +1534,7 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       {% if can('edit', 'application') %}
-      <a href="{{ url_for('unified_applications.application_edit', id=app.id, tab=resolved_tab) }}"
+      <a href="{{ url_for('unified_applications.application_edit', id=app.id, return_to='detail', tab=resolved_tab) }}"
          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Compliance Settings
       </a>
@@ -1685,7 +1685,7 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       {% if can('edit', 'application') %}
-      <a href="{{ url_for('unified_applications.application_edit', id=app.id, tab=resolved_tab) }}"
+      <a href="{{ url_for('unified_applications.application_edit', id=app.id, return_to='detail', tab=resolved_tab) }}"
          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Health & Quality Metrics
       </a>
@@ -1834,7 +1834,7 @@
     {% else %}
     <div class="flex justify-end">
       {% if can('edit', 'application') %}
-      <a href="{{ url_for('unified_applications.application_edit', id=app.id, tab=resolved_tab) }}"
+      <a href="{{ url_for('unified_applications.application_edit', id=app.id, return_to='detail', tab=resolved_tab) }}"
          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Cost Details
       </a>

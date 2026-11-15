@@ -85,7 +85,7 @@
   {%- set _ = items.append({'text': 'View', 'icon': 'eye', 'href': url_for('unified_applications.application_detail', id=app.id), 'testid': 'btn-view' ~ sfx ~ '-' ~ app.id}) -%}
   {%- set _ = items.append({'text': 'Fact sheet', 'icon': 'file-text', 'href': url_for('unified_applications.application_fact_sheet', id=app.id), 'testid': 'btn-factsheet' ~ sfx ~ '-' ~ app.id, 'title': 'Fact sheet: the single source of truth'}) -%}
   {%- if can('edit', 'application') -%}
-  {%- set _ = items.append({'text': 'Edit', 'icon': 'pencil', 'href': url_for('unified_applications.application_edit', id=app.id), 'testid': 'btn-edit' ~ sfx ~ '-' ~ app.id}) -%}
+  {%- set _ = items.append({'text': 'Edit', 'icon': 'pencil', 'href': url_for('unified_applications.application_edit', id=app.id, return_to='list'), 'testid': 'btn-edit' ~ sfx ~ '-' ~ app.id}) -%}
   {%- endif -%}
   {%- set _ = items.append({'divider': true}) -%}
   {%- set _ = items.append({'text': 'Map a capability', 'icon': 'box', 'onclick': 'openMappingForApp(' ~ app.id ~ ', ' ~ name_js ~ ", 'capability')", 'testid': 'action-map-capability' ~ sfx ~ '-' ~ app.id}) -%}
@@ -425,7 +425,7 @@
               {% if app.id in repository_ids %}<span class="text-sm text-muted-foreground" data-testid="app-type-{{ app.id }}">Repository</span>
               {% elif app.component_type == 'repository' %}<span class="text-sm text-muted-foreground" data-testid="app-type-{{ app.id }}">Application</span>
               {% elif app.component_type %}<span class="text-sm text-muted-foreground" data-testid="app-type-{{ app.id }}">{{ app.component_type[:1] | upper }}{{ app.component_type[1:] }}</span>
-              {% elif can('edit', 'application') %}<a href="{{ url_for('unified_applications.application_edit', id=app.id) }}" class="text-xs text-muted-foreground underline hover:text-info" data-testid="app-type-{{ app.id }}">{{ explained_value('Not set', 'Open to classify') }}</a>
+              {% elif can('edit', 'application') %}<a href="{{ url_for('unified_applications.application_edit', id=app.id, return_to='list') }}" class="text-xs text-muted-foreground underline hover:text-info" data-testid="app-type-{{ app.id }}">{{ explained_value('Not set', 'Open to classify') }}</a>
               {% else %}{{ explained_value('Not set') }}{% endif %}
             </td>
             <td class="px-2 align-middle">

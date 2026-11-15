@@ -19,6 +19,7 @@
     {{ hidden_input(("csrf_token"), value=(csrf_token())) }}
     {{ hidden_input(("updated_at"), value=(application.updated_at.isoformat() if application.updated_at else '')) }}
     {% if return_tab %}{{ hidden_input(("return_tab"), value=return_tab) }}{% endif %}
+    {% if return_to %}{{ hidden_input(("return_to"), value=return_to) }}{% endif %}
 
     {# ── Identity ── #}
     <section class="rounded-lg border border-border bg-card p-6 space-y-4">

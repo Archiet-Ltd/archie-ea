@@ -465,24 +465,32 @@ def counted_contracts_by_vendor(org_id: Optional[int] = None) -> Dict[int, List[
 def contracts_with_standing(vendor_id: int, org_id: Optional[int] = None, ledger: Optional[Dict] = None):
     """The contracts a vendor's page lists: (contract, reason or None). None means it is counted in the cost.
 
-    Lists what is counted for the vendor and what names the vendor but counts elsewhere or nowhere.
+    Lists only contracts that name this vendor (contract.vendor_id == vendor_id).
     """
     org_id = _org(org_id)
     ledger = ledger or contract_ledger(org_id)
-    counted = ledger["by_vendor"].get(vendor_id, [])
-    counted_ids = {c.id for c in counted}
-    no_vendor_ids = {c.id for c in ledger["unassigned"]}
-    rows = [(c, ledger.get("superseded", {}).get(c.id)) for c in counted]
+    # Only contracts that directly name this vendor
+    rows = []
+    counted_ids = {c.id for c in ledger["by_vendor"].get(vendor_id, [])}
     retired_ids = {c.id for c in ledger.get("retired_system", [])}
+    superseded = ledger.get("superseded", {})
+    unassigned_ids = {c.id for c in ledger.get("unassigned", [])}
     for c in contracts_of(vendor_id, org_id):
         if c.id in counted_ids:
-            continue
-        if c.id in retired_ids:
+            reason = superseded.get(c.id)
+            rows.append((c, reason))
+        elif c.id in retired_ids:
+            # Active contract on a decommissioned/removed system: it still renews
             rows.append((c, RETIRED_SYSTEM_RENEWAL + " Its cost is not counted."))
-            continue
-        rows.append((c, ledger["left_out"].get(c.id)
-                     or (NOT_COUNTED_NO_VENDOR if c.id in no_vendor_ids else
-                         "Not counted here: it is counted under the vendor of the system it sits on")))
+        else:
+            # Contract names this vendor but counts elsewhere or nowhere
+            reason = ledger["left_out"].get(c.id)
+            if reason is None:
+                if c.id in unassigned_ids:
+                    reason = NOT_COUNTED_NO_VENDOR
+                else:
+                    reason = "Not counted here: it is counted under the vendor of the system it sits on"
+            rows.append((c, reason))
     rows.sort(key=lambda r: (r[0].end_date is None, r[0].end_date or date.max, r[0].id))
     return rows
 
@@ -735,8 +743,10 @@ def page_summary() -> Optional[Dict]:
 
     total = total_annual_cost(rows, ledger)
     show_cost = may_see_spend_pages(current_user)
+    # Count only vendors that supply at least one system (system_count > 0)
+    vendors_with_systems = sum(1 for r in rows if r.get("system_count", 0) > 0)
     return {
-        "vendor_count": len(rows),
+        "vendor_count": vendors_with_systems,
         "supplied_count": coverage["supplied_count"],
         "total_systems": coverage["total_systems"],
         "renewals_due": sum(1 for r in rows if r["renewal_due"]),

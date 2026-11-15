@@ -982,14 +982,19 @@ def application_edit(id):
             db.session.commit()
 
             flash("Application updated successfully!", "success")
-            # Back to the tab the person came from; the Architecture tab when they came from none.
-            return redirect(
-                url_for(
-                    "unified_applications.application_detail",
-                    id=app.id,
-                    tab=detail_tab(request.form.get("return_tab")) or "architecture",
-                )
-            )
+            # Return to the page the person came from, with a whitelist.
+            return_to = request.form.get("return_to")
+            allowed_return = {"fact-sheet", "detail", "list"}
+            if return_to in allowed_return:
+                if return_to == "fact-sheet":
+                    return redirect(url_for("unified_applications.application_fact_sheet", id=app.id))
+                elif return_to == "list":
+                    return redirect(url_for("unified_applications.application_list"))
+                else:  # detail
+                    tab = detail_tab(request.form.get("return_tab")) or "overview"
+                    return redirect(url_for("unified_applications.application_detail", id=app.id, tab=tab))
+            # Default: back to the detail page overview tab
+            return redirect(url_for("unified_applications.application_detail", id=app.id, tab="overview"))
 
         # Current architecture state, for pre-selecting the control below —
         # read from the linked ArchiMateElement, same resolution
@@ -1012,6 +1017,7 @@ def application_edit(id):
             abacus_connected=_abacus_connected(org_id),
             show_cost=costs_visible(current_user),
             return_tab=detail_tab(request.args.get("tab")),
+            return_to=request.args.get("return_to"),
         )
 
     except HTTPException:

@@ -304,11 +304,11 @@
                     </div>
                     <div class="flex items-center justify-between">
                         <span class="text-muted-foreground">Start Date</span>
-                        <span class="font-medium">{{ vendor.contract_start_date.strftime('%Y-%m-%d') if vendor.contract_start_date else '-' }}</span>
+                        <span class="font-medium">{{ vendor.contract_start_date.strftime('%Y-%m-%d') if vendor.contract_start_date else 'Not recorded' }}</span>
                     </div>
                     <div class="flex items-center justify-between">
                         <span class="text-muted-foreground">End Date</span>
-                        <span class="font-medium">{{ vendor.contract_end_date.strftime('%Y-%m-%d') if vendor.contract_end_date else '-' }}</span>
+                        <span class="font-medium">{{ vendor.contract_end_date.strftime('%Y-%m-%d') if vendor.contract_end_date else 'Not recorded' }}</span>
                     </div>
                     <div class="flex items-center justify-between">
                         <span class="text-muted-foreground">Annual Contract Value (USD)</span>

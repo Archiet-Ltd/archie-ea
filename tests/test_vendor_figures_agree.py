@@ -196,7 +196,10 @@ def test_every_vendor_figure_agrees_across_vendors_vendor_page_spend_and_renewal
     _forget_cached_user()
     b_page = _answer(client.get(f"/applications/vendors/{b.id}").get_data(as_text=True))
     assert re.search(r"1 of your systems?,? £21,000\.00 a year", b_page)
-    assert f"cross m{tag}" in b_page and "20,000.00 a year" in b_page
+    # The cross contract names Alpha (vendor a) but sits on Bravo's system;
+    # it appears on Alpha's page, not Bravo's. Bravo's page shows only its own contract.
+    assert f"own m{tag}" in b_page and "1,000.00 a year" in b_page
+    assert f"cross m{tag}" not in b_page
     _forget_cached_user()
     vendors = _answer(client.get("/applications/vendors").get_data(as_text=True))
     assert "21,000.00" in vendors and "777" not in vendors
