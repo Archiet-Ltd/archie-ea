@@ -7506,8 +7506,13 @@ def get_impact_analysis(element_id):
     from app.models.solution_archimate_element import SolutionArchiMateElement
     from app.models.solution_models import Solution
 
+    from app.middleware.tenant_context import current_org_id  # noqa: PLC0415
+
     element = db.session.get(ArchiMateElement, element_id)
-    if not element:
+    active_org_id = current_org_id()
+    if not element or (
+        active_org_id is not None and element.organization_id != active_org_id
+    ):
         return jsonify({"error": "Element not found"}), 404
 
     # ── Direct dependents ────────────────────────────────────────────────────
