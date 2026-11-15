@@ -7324,7 +7324,8 @@
     "table",
     "alert-dialog",
     "dialog",
-    "select"
+    "select",
+    "fact-list"
    ],
    "confidence": "high",
    "controls": {
