@@ -12,7 +12,15 @@ from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.models.ai_service import AIPromptTemplate
-from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
+from app.modules.ai_chat.services.agent_runner import (
+    CREDIT_EXHAUSTED,
+    RATE_LIMITED,
+    classify_provider_error,
+)
+from app.modules.ai_chat.services.failure_messages import (
+    AI_CREDIT_EXHAUSTED,
+    ASSISTANT_UNAVAILABLE,
+)
 from app.services.feature_flag_service import FeatureFlagService
 from app.services.rate_limiter import rate_limit
 from app.utils.validators import (
@@ -770,40 +778,13 @@ def send_message():
                 401,
             )
 
-        lowered = error_msg.lower()
-        # Credit-balance errors: the AI service's credit has run out
-        is_credit_balance = any(
-            phrase in lowered
-            for phrase in (
-                "credit balance",
-                "insufficient credit",
-                "quota exceeded",
-                "billing",
-                "402",
-            )
-        )
-        # Also catch "credit" alone but not when it's part of "rate limit"
-        if not is_credit_balance and "credit" in lowered:
-            if "rate limit" not in lowered and "429" not in lowered:
-                is_credit_balance = True
-
-        if is_credit_balance:
+        kind = classify_provider_error(e)
+        if kind == CREDIT_EXHAUSTED:
             return (
-                jsonify(
-                    {
-                        "error": (
-                            "The AI service's credit has run out. "
-                            "Your organisation administrator (or Entelim support for the platform's key) can restore it."
-                        ),
-                        "error_type": "credit_exhausted",
-                    }
-                ),
+                jsonify({"error": AI_CREDIT_EXHAUSTED, "error_type": "credit_exhausted"}),
                 402,
             )
-
-        # True rate limit errors: 429 or "rate limit" (without credit/billing context)
-        is_rate_limit = "429" in lowered or "rate limit" in lowered
-        if is_rate_limit:
+        if kind == RATE_LIMITED:
             return (
                 jsonify(
                     {
@@ -813,7 +794,7 @@ def send_message():
                 ),
                 429,
             )
-        elif "model" in error_msg.lower() and (
+        if "model" in error_msg.lower() and (
             "not found" in error_msg.lower() or "invalid" in error_msg.lower()
         ):
             return (

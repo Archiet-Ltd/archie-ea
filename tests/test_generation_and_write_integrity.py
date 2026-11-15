@@ -355,6 +355,12 @@ def test_sanitize_agent_error_categories():
     assert "run out" in credit_balance.lower() or "exhausted" in credit_balance.lower()
     assert "administrator" in credit_balance.lower() or "support" in credit_balance.lower()
     assert "u_1abc" not in credit_balance
+    assert "402" in credit_balance
+    assert "credit" in sanitize_agent_error("insufficient_quota").lower()
+    assert "credit" not in sanitize_agent_error("context length 140200 tokens exceeds limit").lower()
+    assert "credit" not in sanitize_agent_error(
+        "Error code: 429 - Quota exceeded for quota metric requests per minute"
+    ).lower()
     # Other credit-balance phrases
     insufficient = sanitize_agent_error("insufficient credits")
     assert "credit" in insufficient.lower()

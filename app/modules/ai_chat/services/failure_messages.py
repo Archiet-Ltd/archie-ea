@@ -10,6 +10,13 @@ ASSISTANT_UNAVAILABLE = (
     "Your question is saved; try again in a moment."
 )
 
+# The sentence a person reads when the AI provider reports that the account's
+# credit balance has run out. Retrying cannot fix it, so it names who can.
+AI_CREDIT_EXHAUSTED = (
+    "The AI service's credit has run out. "
+    "Your organisation administrator (or Entelim support for the platform's key) can restore it."
+)
+
 # The sentence a person reads when an AI control cannot run because no
 # organisation has configured a provider for it yet -- a permanent,
 # administrative gap, not the transient failure ASSISTANT_UNAVAILABLE

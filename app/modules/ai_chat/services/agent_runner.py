@@ -27,6 +27,7 @@ from app.modules.intelligence.services.answer_envelope import (
     classify_estate_question,
 )
 from app.utils.tracing import traced
+from app.modules.ai_chat.services.failure_messages import AI_CREDIT_EXHAUSTED
 from app.modules.ai_chat.services.llm_service_impl import _CALLER, _PROVIDER_LABELS
 
 logger = logging.getLogger(__name__)
@@ -132,33 +133,10 @@ def sanitize_agent_error(reason) -> "Optional[str]":
     if any(t in lowered for t in ("no api key", "not configured", "no provider", "no keys")):
         return "No LLM provider is configured."
 
-    # Credit-balance errors: the AI service's credit has run out.
-    # These include: credit balance, insufficient credits, quota exceeded, billing, 402
-    # (but not "rate limit" or "429" which are true rate limits)
-    is_credit_balance = any(
-        phrase in lowered
-        for phrase in (
-            "credit balance",
-            "insufficient credit",
-            "quota exceeded",
-            "billing",
-            "402",
-        )
-    )
-    # Also catch "credit" alone but not when it's part of "rate limit"
-    if not is_credit_balance and "credit" in lowered:
-        if "rate limit" not in lowered and "429" not in lowered:
-            is_credit_balance = True
-
-    if is_credit_balance:
-        return (
-            "The AI service's credit has run out. "
-            "Your organisation administrator (or Entelim support for the platform's key) can restore it."
-        )
-
-    # True rate limit errors: 429 or "rate limit" (without credit/billing context)
-    is_rate_limit = "429" in lowered or "rate limit" in lowered
-    if is_rate_limit:
+    kind = classify_provider_error(text)
+    if kind == CREDIT_EXHAUSTED:
+        return f"{AI_CREDIT_EXHAUSTED}{status}"
+    if kind == RATE_LIMITED:
         return f"AI service rate limit exceeded. Please wait a moment and try again.{status}"
 
     if any(t in lowered for t in ("timeout", "timed out")):
@@ -169,27 +147,40 @@ def sanitize_agent_error(reason) -> "Optional[str]":
 
 
 # Words in a provider's refusal that mean "this one is spent, ask another".
-# Credit-balance phrases (non-retryable): the account's credit has run out
-_CREDIT_BALANCE_PHRASES = (
+# What a provider's refusal means. The one place that decides it; the chat
+# routes, the agent's reply and the failover decision all call it.
+CREDIT_EXHAUSTED = "credit_exhausted"
+RATE_LIMITED = "rate_limit"
+
+# Wording that only a spent balance produces. Checked first because OpenAI
+# answers a spent balance with HTTP 429 and the code "insufficient_quota".
+_CREDIT_PHRASES = (
     "credit balance",
     "insufficient credit",
-    "quota exceeded",
+    "insufficient_quota",
+    "insufficient funds",
+    "out of credit",
+    "no credit",
+    "payment required",
     "billing",
-    "402",
+    "exceeded your current quota",
     "usage limit",
-    "api usage limit",
 )
-# Rate limit phrases (retryable): temporary limits that may resolve
+# A window that resets: waiting is the fix.
 _RATE_LIMIT_PHRASES = (
-    "429",
     "rate limit",
-    "free-models-per-day",
-    "daily limit",
+    "rate_limit",
+    "too many requests",
     "per minute",
     "per hour",
+    "per day",
+    "per-day",
+    "daily limit",
     "monthly limit",
-    "too many requests",
+    "requests per",
+    "tokens per",
 )
+
 
 _PROVIDER_BASE_URLS = {
     "openrouter": "https://openrouter.ai/api/v1",
@@ -209,6 +200,34 @@ def _error_status(exc) -> Optional[int]:
     return status if isinstance(status, int) else None
 
 
+def _status_of(error) -> Optional[int]:
+    """The provider's HTTP status: from the exception, else from "Error code: 402" style text."""
+    import re as _re
+
+    status = _error_status(error) if isinstance(error, BaseException) else None
+    if status is None:
+        m = _re.search(r"(?:error code|http|status(?: code)?)\D{0,3}(\d{3})\b", str(error), _re.I)
+        status = int(m.group(1)) if m else None
+    return status
+
+
+def classify_provider_error(error) -> Optional[str]:
+    """CREDIT_EXHAUSTED, RATE_LIMITED or None for a provider's refusal (exception or text).
+
+    Decided by the provider's status and wording, never by a bare number inside
+    the text: "context length 140200 tokens" is neither.
+    """
+    text = str(error or "").lower()
+    status = _status_of(error)
+    if status == 402 or any(p in text for p in _CREDIT_PHRASES):
+        return CREDIT_EXHAUSTED
+    if status == 429 or any(p in text for p in _RATE_LIMIT_PHRASES):
+        return RATE_LIMITED
+    if "quota" in text and "exceeded" in text:
+        return CREDIT_EXHAUSTED  # a quota with no window named is the balance
+    return None
+
+
 class EmptyModelReply(Exception):
     """A model answered with no words and no tool call: a failure of that model, as a timeout is."""
 
@@ -216,11 +235,10 @@ class EmptyModelReply(Exception):
 def is_retryable_llm_error(exc) -> bool:
     """True when another provider or model may answer what this one refused.
 
-    Rate limits, any server error, timeouts, dropped connections and a
-    model or function the provider does not have. Anything else (a malformed
-    request, a rejected key, credit balance exhausted) would fail the same way elsewhere.
-    Credit-balance errors (402, credit balance, insufficient credits, quota exceeded, billing)
-    are NOT retryable as they won't resolve within the retry window.
+    Rate limits, a spent balance (another key or provider may still have
+    credit), any server error, timeouts, dropped connections and a model or
+    function the provider does not have. Anything else (a malformed request, a
+    rejected key) would fail the same way elsewhere.
     """
     if isinstance(exc, EmptyModelReply):
         return True
@@ -228,38 +246,21 @@ def is_retryable_llm_error(exc) -> bool:
     text = str(exc).lower()
     if "answers are paused" in text:
         return True  # this provider is at its ceiling; the next in the chain may still answer
+    if classify_provider_error(exc):
+        return True
     if status is not None:
-        if status == 429 or status >= 500:
+        if status >= 500:
             return True
-        if status == 402:
-            return False  # credit balance exhausted - not retryable
         if status == 404:
             return "not found" in text or "model" in text
         if status in (400, 401, 403, 422):
-            # Check for rate limit phrases (retryable) vs credit-balance phrases (non-retryable)
-            is_rate_limit = any(phrase in text for phrase in _RATE_LIMIT_PHRASES)
-            is_credit_balance = any(phrase in text for phrase in _CREDIT_BALANCE_PHRASES)
-            # Also catch "credit" alone but not when it's part of "rate limit"
-            if not is_credit_balance and "credit" in text:
-                if "rate limit" not in text and "429" not in text:
-                    is_credit_balance = True
-            if is_credit_balance:
-                return False
-            return is_rate_limit
+            return False
     names = {c.__name__.lower() for c in type(exc).__mro__}
     if any("timeout" in n or "connection" in n for n in names):
         return True
     if isinstance(exc, (TimeoutError, ConnectionError)):
         return True
-    # Text-based fallback: check for rate limit vs credit balance
-    is_rate_limit = any(phrase in text for phrase in _RATE_LIMIT_PHRASES)
-    is_credit_balance = any(phrase in text for phrase in _CREDIT_BALANCE_PHRASES)
-    if not is_credit_balance and "credit" in text:
-        if "rate limit" not in text and "429" not in text:
-            is_credit_balance = True
-    if is_credit_balance:
-        return False
-    return is_rate_limit or "timed out" in text
+    return "timed out" in text
 
 
 def _base_url_of(provider: str) -> Optional[str]:
@@ -917,6 +918,7 @@ class AgentRunner:
         sources = []
 
         chain_pos = 0
+        credit_only = True  # every refusal so far was a spent balance
         for iteration in range(MAX_ITERATIONS):
             # Call LLM
             self._held_tokens = []
@@ -937,6 +939,7 @@ class AgentRunner:
 
                     # The pause is final for platform money: no failover to another key or provider.
                     if is_retryable_llm_error(e) and not isinstance(e, AnswersPaused):
+                        credit_only = credit_only and classify_provider_error(e) == CREDIT_EXHAUSTED
                         logger.warning(
                             "AgentRunner: %s/%s refused (%s)", provider, model,
                             sanitize_agent_error(e),
@@ -948,7 +951,8 @@ class AgentRunner:
                             self._held_tokens = []
                             continue
                         return self._finalize(
-                            self._fallback(f"LLM call failed: {e}", busy=True),
+                            # Only when every key and provider ran out does the person read the credit sentence.
+                            self._fallback(f"LLM call failed: {e}", busy=not credit_only),
                             user_message=user_message, domain=domain, context=context,
                             persona=persona, model_used=model,
                         )
@@ -1826,6 +1830,8 @@ class AgentRunner:
         elif "empty reply" in reason_l:
             msg = "The assistant could not answer this time. Press Retry."
             busy = True
+        elif not busy and classify_provider_error(reason_l) == CREDIT_EXHAUSTED:
+            msg = AI_CREDIT_EXHAUSTED  # waiting cannot restore credit, so no Retry
         elif busy:
             msg = (
                 "The assistant is busy right now. Wait a minute, then press Retry."
@@ -1836,39 +1842,10 @@ class AgentRunner:
                 "Admin → AI settings to enable the assistant."
             )
         else:
-            # Credit-balance errors: the AI service's credit has run out
-            is_credit_balance = any(
-                phrase in reason_l
-                for phrase in (
-                    "credit balance",
-                    "insufficient credit",
-                    "quota exceeded",
-                    "billing",
-                    "402",
-                )
+            msg = (
+                "The AI request couldn't be completed. See the error detail below "
+                "or check Admin → AI settings."
             )
-            # Also catch "credit" alone but not when it's part of "rate limit"
-            if not is_credit_balance and "credit" in reason_l:
-                if "rate limit" not in reason_l and "429" not in reason_l:
-                    is_credit_balance = True
-
-            if is_credit_balance:
-                msg = (
-                    "The AI service's credit has run out. "
-                    "Your organisation administrator (or Entelim support for the platform's key) can restore it."
-                )
-            # True rate limit errors: 429 or "rate limit" (without credit/billing context)
-            elif "429" in reason_l or "rate limit" in reason_l:
-                msg = (
-                    "The AI service is busy right now (rate limit reached). "
-                    "Wait a moment, then press Retry."
-                )
-                busy = True
-            else:
-                msg = (
-                    "The AI request couldn't be completed. See the error detail below "
-                    "or check Admin → AI settings."
-                )
         out = {
             "response": msg,
             "actions_taken": [],
