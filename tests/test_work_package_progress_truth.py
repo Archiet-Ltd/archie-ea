@@ -254,3 +254,22 @@ def test_a_package_without_a_description_shows_no_subtitle_text(db_session, make
     login_as(client, user)
     html = client.get(f"/implementation/work-packages/{wp_id}").get_data(as_text=True)
     assert not re.search(r">\s*None\s*<", html)
+
+
+@pytest.mark.parametrize("url", [
+    "/api/strategic-work-packages",
+    "/api/capability-work-packages",
+    "/api/archimate-work-packages",
+])
+def test_a_create_api_that_omits_progress_leaves_it_not_entered(db_session, make_org, tenant_ctx, client, login_as, url):
+    org = make_org("omit" + uuid.uuid4().hex[:6])
+    user = _user(db_session, org)
+    login_as(client, user)
+    body = {"name": "Omitted progress " + uuid.uuid4().hex[:6], "business_capability": "Payments",
+            "start_date": "2026-01-01", "end_date": "2026-06-30"}
+    resp = client.post(url, json=body)
+    assert resp.status_code in (200, 201), resp.get_data(as_text=True)[:300]
+    with tenant_ctx(org.id):
+        wp = service.query_for(org.id).filter_by(name=body["name"]).one()
+        assert wp.progress_percentage is None
+        assert service.progress_basis(wp)["label"] == "Not recorded"

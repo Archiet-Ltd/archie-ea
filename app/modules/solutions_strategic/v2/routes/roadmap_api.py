@@ -342,7 +342,7 @@ def create_work_package():
             status=data.get("status", "planned"),
             start_date=data.get("start_date"),
             end_date=data.get("end_date"),
-            progress_percentage=data.get("progress_percentage", 0),
+            progress_percentage=data.get("progress_percentage"),
             estimated_cost=data.get("estimated_cost"),
             priority=data.get("priority", "medium"),
             source_data=data.get("source_data"),

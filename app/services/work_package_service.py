@@ -310,6 +310,8 @@ def _apply(wp: UnifiedWorkPackage, fields: Dict[str, Any], organization_id: int)
                 value = None if value in (None, "") else int(value)
             except (TypeError, ValueError) as exc:
                 raise WorkPackageError("Level must be a whole number.") from exc
+        elif key == "description":
+            value = (str(value).strip() or None) if value is not None else None
         elif key == "color":
             value = None if value in (None, "") else str(value)[:20]
         elif key == "archimate_element_id":

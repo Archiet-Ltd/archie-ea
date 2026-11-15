@@ -80,7 +80,7 @@
 
                 <div class="space-y-2">
                     {% call label(for='description') %}Description{% endcall %}
-                    {% call textarea(id='description', name='description', rows=3, placeholder='Describe the work package scope and objectives', aria_label='Describe the work package scope and objectives') %}{{ posted.get('description') if posted else (work_package.description if work_package else '') }}{% endcall %}
+                    {% call textarea(id='description', name='description', rows=3, placeholder='Describe the work package scope and objectives', aria_label='Describe the work package scope and objectives') %}{{ (posted.get('description') if posted else (work_package.description if work_package else '')) or '' }}{% endcall %}
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">

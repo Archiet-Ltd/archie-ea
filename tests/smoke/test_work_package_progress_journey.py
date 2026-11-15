@@ -140,7 +140,83 @@ def test_a_cancelled_package_says_it_was_cancelled(browser, live_server, seeded,
         expect(page.locator("[data-testid='wp-progress']")).not_to_contain_text("Edit")
         expect(page.locator("[data-testid='result-footer-evidence']")).to_contain_text("Progress: cancelled")
         expect(page.locator("[data-testid='result-footer-evidence']")).not_to_contain_text("Progress: not recorded")
+        expect(page.locator("[data-testid='result-footer-source']")).to_contain_text("Progress: cancelled")
+        expect(page.locator("[data-testid='result-footer-source']")).not_to_contain_text("Progress: entered by the team")
         _shot(page, tmp_path, "390 dark", "cancelled")
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    finally:
+        ctx.close()
+
+
+def _sign_in(page, live_server, seeded):
+    page.goto(live_server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.fill("#email", seeded["emails"]["enterprise_architect"])
+    page.fill("#password", PASSWORD)
+    page.locator("#submit").click()
+    page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
+
+
+def test_saving_a_package_with_no_description_keeps_it_empty(browser, live_server, seeded, tmp_path):
+    from app import create_app, db
+    from app.services import work_package_service
+
+    app = create_app("testing")
+    with app.app_context():
+        wp = work_package_service.create_work_package(
+            organization_id=seeded["ids"]["org"], name="Progress journey no description", status="planned",
+        )
+        db.session.commit()
+        wp_id = wp.id
+        db.session.remove()
+
+    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = ctx.new_page()
+    try:
+        _sign_in(page, live_server, seeded)
+        page.goto(live_server + "/implementation/work-packages/%d/edit" % wp_id,
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert page.input_value("#description").strip() == ""
+        page.get_by_role("button", name="Edit Work Package").click()
+        page.wait_for_url(re.compile(r"/work-packages/%d$" % wp_id), timeout=PAGE_TIMEOUT)
+        assert page.get_by_text("None", exact=True).count() == 0
+        _shot(page, tmp_path, "1440 light", "no-description")
+    finally:
+        ctx.close()
+    with app.app_context():
+        stored = work_package_service.get_work_package(wp_id, seeded["ids"]["org"]).description
+        db.session.remove()
+    assert stored in (None, "")
+
+
+def test_progress_worked_out_from_deliverables_reads_the_same_everywhere(browser, live_server, seeded, tmp_path):
+    from app import create_app, db
+    from app.services import work_package_service
+
+    org = seeded["ids"]["org"]
+    app = create_app("testing")
+    with app.app_context():
+        wp = work_package_service.create_work_package(
+            organization_id=org, name="Progress journey deliverables", status="in_progress",
+        )
+        for name, status in (("Design", "completed"), ("Build", "in_progress"), ("Test", "planned")):
+            work_package_service.create_deliverable(wp.id, organization_id=org, name=name, delivery_status=status)
+        db.session.commit()
+        wp_id = wp.id
+        db.session.remove()
+
+    ctx = browser.new_context(viewport={"width": 390, "height": 800})
+    ctx.add_init_script("document.documentElement.classList.add('dark');")
+    page = ctx.new_page()
+    try:
+        _sign_in(page, live_server, seeded)
+        page.goto(live_server + "/implementation/work-packages/%d" % wp_id,
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.locator("[data-testid='wp-progress']")).to_contain_text("33%")
+        expect(page.locator("[data-testid='wp-progress-source']")).to_have_text("1 of 3 deliverables completed")
+        expect(page.locator("[data-testid='result-footer-evidence']")).to_contain_text("Progress: 33% (1 of 3 deliverables completed)")
+        source = page.locator("[data-testid='result-footer-source']")
+        expect(source).to_contain_text("Progress: worked out by the product")
+        expect(source).not_to_contain_text("Progress: entered by the team")
+        _shot(page, tmp_path, "390 dark", "deliverables")
     finally:
         ctx.close()

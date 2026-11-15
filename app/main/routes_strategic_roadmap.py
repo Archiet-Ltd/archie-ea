@@ -112,7 +112,7 @@ def create_strategic_work_package():
             status=data.get("status", "planned"),
             start_date=data["start_date"],
             end_date=data["end_date"],
-            progress_percentage=data.get("progress_percentage", 0),
+            progress_percentage=data.get("progress_percentage"),
             estimated_cost=data.get("estimated_cost", 0),
             priority=data.get("priority", "medium"),
             risk_level=data.get("risk_level", "medium"),
