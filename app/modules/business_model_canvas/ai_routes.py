@@ -64,7 +64,7 @@ def ai_draft_block(canvas_id):
     except BusinessModelAIDraftError as e:
         logger.warning("BMC block draft unparseable for canvas %s: %s", canvas_id, e)
         return jsonify({"error": DRAFT_FAILED}), 502
-    except Exception as e:
+    except Exception:
         logger.exception("BMC block draft generation failed for canvas %s", canvas_id)
         return jsonify({"error": DRAFT_FAILED}), 502
 

@@ -10,7 +10,7 @@
     var status = panel.querySelector('[data-suggest-status]');
     var errorBox = panel.querySelector('[data-suggest-error]');
     var list = panel.querySelector('[data-suggest-list]');
-    var title = document.getElementById('bmc-suggest-title');
+    var root = document.getElementById('bmc-suggest-root');
     var NONE = 'Nothing to suggest for this box from what is on the canvas and in your model yet.';
 
     function showError(text) {
@@ -50,8 +50,9 @@
         list.replaceChildren();
         errorBox.hidden = true;
         status.textContent = 'Drafting suggestions for ' + boxTitle + '…';
-        if (title) title.textContent = 'Suggestions for ' + boxTitle;
-        Platform.modal.open('bmc-suggest');
+        var state = window.Alpine.$data(root);
+        state.suggestTitle = 'Suggestions for ' + boxTitle;
+        state.suggestOpen = true;
         Platform.fetch.post(panel.getAttribute('data-draft-url'), { block: boxKey }, { silent: true })
             .then(function (data) {
                 if (!data || !data.draft) throw new Error('empty');

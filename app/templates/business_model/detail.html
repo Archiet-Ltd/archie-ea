@@ -2,6 +2,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/dialog.html' import dialog %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input, label %}
 {% from 'components/select.html' import native_select %}
@@ -90,16 +91,18 @@
 </div>
 
 {% if can_edit %}
-{% call modal(id='bmc-suggest', title='Suggestions', description='Written by AI from the rest of this canvas and your model. Nothing is added until you accept it.', size='lg') %}
-<div class="flex flex-col gap-4" data-testid="bmc-suggest-panel" data-draft-url="{{ url_for('business_model.ai_draft_block', canvas_id=canvas.id) }}" data-add-url="{{ url_for('business_model.add_entry', canvas_id=canvas.id) }}">
+<div id="bmc-suggest-root" x-data="{ suggestOpen: false, suggestTitle: 'Suggestions' }">
+{% call dialog(open_expr='suggestOpen', close_expr='suggestOpen = false', title_expr='suggestTitle', description='Written by AI from the rest of this canvas and your model. Nothing is added until you accept it.', start_hidden=false) %}
+<div class="flex max-h-[60vh] flex-col gap-4 overflow-y-auto" data-testid="bmc-suggest-panel" data-draft-url="{{ url_for('business_model.ai_draft_block', canvas_id=canvas.id) }}" data-add-url="{{ url_for('business_model.add_entry', canvas_id=canvas.id) }}">
   <p class="text-sm text-muted-foreground" data-suggest-status role="status" aria-live="polite"></p>
   <p class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" data-suggest-error role="alert" hidden></p>
   <ul class="flex flex-col gap-3" data-suggest-list aria-label="Suggested entries"></ul>
   <div class="flex justify-end gap-3">
-    {{ button(text='Close', variant='ghost', attrs_dict={'data-modal-close': 'bmc-suggest'}) }}
+    {{ button(text='Close', variant='ghost', attrs_dict={'@click': 'suggestOpen = false'}) }}
   </div>
 </div>
 {% endcall %}
+</div>
 <template id="bmc-suggest-row">
   <li class="rounded-md border p-3" data-suggest-item>
     <form method="post" action="{{ url_for('business_model.add_entry', canvas_id=canvas.id) }}" class="flex flex-col gap-2">
