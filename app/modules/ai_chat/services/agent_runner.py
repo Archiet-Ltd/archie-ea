@@ -1198,6 +1198,7 @@ class AgentRunner:
                         "drafter_model": verdict.get("drafter_model"),
                         "reviewer_model": verdict.get("reviewer_model"),
                         "record_url": verdict.get("record_url"),
+                        "review_url": verdict.get("review_url"),
                     })
                     result = self._verdict_result(approval_id, verdict)
                     if verdict.get("state") != "in_review" and (

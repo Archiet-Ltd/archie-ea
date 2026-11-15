@@ -502,14 +502,29 @@
                 detail = (what ? 'Checking this change: ' + what.replace(/\.$/, '') + '. ' : 'Checking this change. ') +
                     (c.reasons && c.reasons.length ? c.reasons.join(' ') : '');
             }
-            var link = c.record_url
-                ? ' <a href="' + escapeForHtml(c.record_url) + '" class="underline hover:no-underline" ' +
-                  'data-testid="change-record-link">See how it was checked</a>'
-                : '';
+            /* A goal or risk change is worded "Done: ..." or "Not applied: ..." by the server; the card uses
+               those words and the rest of the sentence. */
+            var word = tone.word;
+            var said = /^(Done|Not applied): /.exec(String(c.message || ''));
+            if (said) {
+                word = said[1];
+                detail = String(c.message).slice(said[0].length);
+            }
+            /* The record the change made is opened by the first link; the record of its checks by the second. */
+            var link = '';
+            if (c.record_url && c.review_url && c.record_url !== c.review_url) {
+                link = ' <a href="' + escapeForHtml(c.record_url) + '" class="underline hover:no-underline" ' +
+                       'data-testid="change-record-link">Open it</a> ' +
+                       '<a href="' + escapeForHtml(c.review_url) + '" class="underline hover:no-underline" ' +
+                       'data-testid="change-review-link">See how it was checked</a>';
+            } else if (c.record_url) {
+                link = ' <a href="' + escapeForHtml(c.record_url) + '" class="underline hover:no-underline" ' +
+                       'data-testid="change-record-link">See how it was checked</a>';
+            }
             return '<li class="flex items-start gap-2 py-1" data-testid="change-verdict" data-state="' +
                      escapeForHtml(String(c.state || 'in_review')) + '">' +
                      '<i data-lucide="' + tone.icon + '" class="h-3.5 w-3.5 mt-0.5 shrink-0 ' + tone.color + '" aria-hidden="true"></i>' +
-                     '<span><strong class="font-medium text-foreground">' + tone.word + ':</strong> ' +
+                     '<span><strong class="font-medium text-foreground">' + escapeForHtml(word) + ':</strong> ' +
                        escapeForHtml(String(detail).trim()) + link + '</span>' +
                    '</li>';
         }).join('');
