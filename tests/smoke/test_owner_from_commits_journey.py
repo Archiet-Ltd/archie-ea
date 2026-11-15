@@ -76,8 +76,9 @@ def estate(live_server):
     shared = _import(org, "Archie Ea %s" % tag, "acme/archie-ea-%s" % tag,
                      _commits((ada, 10), (sam, 10), (stranger, 30)))
     nobody = _import(org, "Billing Hub %s" % tag, "acme/billing-hub-%s" % tag, _commits(("dev@vendor.example", 8)))
+    leader = _import(org, "Ledger Core %s" % tag, "acme/ledger-core-%s" % tag, _commits((ada, 15), (sam, 5)))
     return {"email": org["emails"]["enterprise_architect"], "shared": shared, "nobody": nobody,
-            "tag": tag, "names": names, "repo": "acme/archie-ea-%s" % tag}
+            "leader": leader, "leader_repo": "acme/ledger-core-%s" % tag, "tag": tag, "names": names, "repo": "acme/archie-ea-%s" % tag}
 
 
 @pytest.fixture()
@@ -138,3 +139,20 @@ def test_no_committer_is_a_member_and_the_page_says_so(architect, live_server, e
     assert architect.get_by_test_id("owner-candidates").count() == 0
     expect(architect.get_by_test_id("owner-reason")).to_be_visible()
     _walk(architect, "no-candidates")
+
+
+def test_one_clear_leader_is_the_owner_and_the_page_says_where_that_came_from(architect, live_server, estate):
+    ada = estate["names"]["application_manager"]
+    architect.goto("%s/applications/%s" % (live_server, estate["leader"]), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    owner = architect.get_by_test_id("application-owner")
+    expect(owner).to_contain_text(ada, timeout=PAGE_TIMEOUT)
+    source = architect.get_by_test_id("owner-source")
+    expect(source).to_contain_text("From commit history: 15 of 20 commits in the last 90 days")
+    expect(source).to_contain_text(estate["leader_repo"])
+    assert architect.get_by_test_id("need-owner-reason").count() == 0
+    assert architect.get_by_test_id("owner-candidates").count() == 0
+    owner.scroll_into_view_if_needed()
+    _walk(architect, "owner-set-automatically")
+    architect.reload(wait_until="domcontentloaded")
+    expect(architect.get_by_test_id("application-owner")).to_contain_text(ada, timeout=PAGE_TIMEOUT)
+    expect(architect.get_by_test_id("owner-source")).to_contain_text("15 of 20 commits")
