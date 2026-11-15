@@ -27,7 +27,7 @@ the reason; the downgrade puts those rows back.
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
 Revision ID: 20261113_detect_consol_org
-Revises: 20261114_subscription_offer
+Revises: 20261114_plan_education
 Create Date: 2026-11-13
 """
 import sqlalchemy as sa
@@ -35,7 +35,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261113_detect_consol_org"
-down_revision = "20261114_subscription_offer"
+down_revision = "20261114_plan_education"
 branch_labels = None
 depends_on = None
 
