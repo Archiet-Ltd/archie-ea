@@ -83,7 +83,9 @@ def get_strategic_work_packages():
                 }
             )
 
-        return jsonify({"work_packages": work_packages_list})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"work_packages": work_packages_list}))
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 

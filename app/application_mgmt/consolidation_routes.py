@@ -200,14 +200,18 @@ def find_duplicate_applications():
         ).all()  # Limit to prevent OOM on large datasets
 
         if len(applications) < 2:
+            from app.services.cost_visibility import withhold_reply
+
             return jsonify(
-                {
-                    "duplicates": [],
-                    "total_duplicate_groups": 0,
-                    "total_duplicate_applications": 0,
-                    "estimated_savings": 0,
-                    "message": "Need at least 2 applications to detect duplicates",
-                }
+                withhold_reply(
+                    {
+                        "duplicates": [],
+                        "total_duplicate_groups": 0,
+                        "total_duplicate_applications": 0,
+                        "estimated_savings": 0,
+                        "message": "Need at least 2 applications to detect duplicates",
+                    }
+                )
             )
 
         # If force_analyze, trigger new analysis (side-effect for other screens)
@@ -251,15 +255,19 @@ def find_duplicate_applications():
         # Delegate duplicate detection to the matcher.
         org_id = current_org_id()
         if org_id is None:
+            from app.services.cost_visibility import withhold_reply
+
             return jsonify(
-                {
-                    "duplicates": [],
-                    "total_duplicate_groups": 0,
-                    "total_duplicate_applications": 0,
-                    "estimated_savings": 0,
-                    "analyses_count": 0,
-                    "message": "No organisation context",
-                }
+                withhold_reply(
+                    {
+                        "duplicates": [],
+                        "total_duplicate_groups": 0,
+                        "total_duplicate_applications": 0,
+                        "estimated_savings": 0,
+                        "analyses_count": 0,
+                        "message": "No organisation context",
+                    }
+                )
             )
 
         # Delegate duplicate detection to the matcher. An uncertain verdict
@@ -415,16 +423,20 @@ def find_duplicate_applications():
         total_duplicate_applications = len(processed_app_ids)
         total_duplicate_groups = len(duplicate_groups)
 
+        from app.services.cost_visibility import withhold_reply
+
         return jsonify(
-            {
-                "duplicates": duplicate_groups,
-                "total_duplicate_groups": total_duplicate_groups,
-                "total_duplicate_applications": total_duplicate_applications,
-                "estimated_savings": f"{int(total_savings):,}",
-                "analyses_count": total_duplicate_groups,
-                "message": f"Found {total_duplicate_groups} duplicate group(s) "
-                f"involving {total_duplicate_applications} application(s)",
-            }
+            withhold_reply(
+                {
+                    "duplicates": duplicate_groups,
+                    "total_duplicate_groups": total_duplicate_groups,
+                    "total_duplicate_applications": total_duplicate_applications,
+                    "estimated_savings": f"{int(total_savings):,}",
+                    "analyses_count": total_duplicate_groups,
+                    "message": f"Found {total_duplicate_groups} duplicate group(s) "
+                    f"involving {total_duplicate_applications} application(s)",
+                }
+            )
         )
 
     except Exception as e:

@@ -654,7 +654,9 @@ def api_work_packages():
         if limit:
             query = query.limit(limit)
         work_packages = query.all()
-        return jsonify({"work_packages": work_package_service.to_dicts(work_packages)})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"work_packages": work_package_service.to_dicts(work_packages)}))
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
@@ -702,7 +704,9 @@ def api_work_package_detail(work_package_id):
     work_package = work_package_service.get_work_package(work_package_id, _org_id())
     if work_package is None:
         return jsonify({"error": "Work package not found"}), 404
-    return jsonify(work_package_service.to_dict(work_package))
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply(work_package_service.to_dict(work_package)))
 
 
 @implementation_planning.route("/api/work-packages", methods=["POST"])
@@ -762,7 +766,9 @@ def api_update_work_package(work_package_id):
             **_fields_from(data, partial=True),
         )
         db.session.commit()
-        return jsonify({"success": True, "work_package": work_package_service.to_dict(work_package)})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify({"success": True, "work_package": withhold_reply(work_package_service.to_dict(work_package))})
 
     except work_package_service.WorkPackageNotFound:
         db.session.rollback()
@@ -1388,7 +1394,9 @@ def generate_report():
                 report_data["summary"]["gaps_by_priority"].get(priority, 0) + 1
             )
 
-        return jsonify({"success": True, "report": report_data})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify({"success": True, "report": withhold_reply(report_data)})
 
     except Exception:
         current_app.logger.exception("Error generating implementation planning report")

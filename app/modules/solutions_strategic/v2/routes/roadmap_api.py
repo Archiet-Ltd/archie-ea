@@ -234,7 +234,10 @@ def get_work_packages():
                 }
             )
 
+        from app.services.cost_visibility import withhold_reply
+
         return jsonify(
+            withhold_reply(
             {
                 "work_packages": work_packages,
                 "pagination": {
@@ -251,7 +254,7 @@ def get_work_packages():
                     "assigned_to": assigned_to,
                     "search": search,
                 },
-            }
+            })
         )
 
     except HTTPException:
@@ -445,7 +448,10 @@ def get_work_package(work_package_id: int):
                 .all()
             ]
 
+        from app.services.cost_visibility import withhold_reply
+
         return jsonify(
+            withhold_reply(
             {
                 "work_package": {
                     "id": work_package.id,
@@ -487,7 +493,7 @@ def get_work_package(work_package_id: int):
                 "dependencies": [
                     {"id": dep[0], "name": dep[1], "status": dep[2]} for dep in dependencies
                 ],
-            }
+            })
         )
 
     except HTTPException:
@@ -1658,7 +1664,9 @@ def get_statistics():
             },
         }
 
-        return jsonify(stats)
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply(stats))
 
     except HTTPException:
 

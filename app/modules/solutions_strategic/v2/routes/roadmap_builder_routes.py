@@ -79,7 +79,9 @@ def list_work_packages():
         status_filter=status_filter, priority_filter=priority_filter, limit=limit, offset=offset
     )
 
-    return jsonify({"success": True, "data": result})
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply({"success": True, "data": result}))
 
 
 @roadmap_builder_bp.route("/work-packages", methods=["POST"])
@@ -168,7 +170,9 @@ def get_work_package(work_package_id: int):
     if not result.get("success"):
         return jsonify(result), 404
 
-    return jsonify({"success": True, "data": result})
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply({"success": True, "data": result}))
 
 
 @roadmap_builder_bp.route("/work-packages/<int:work_package_id>", methods=["PUT"])
@@ -424,7 +428,9 @@ def get_dependency_graph():
         include_plateaus=include_plateaus, include_gaps=include_gaps, status_filter=status_filter
     )
 
-    return jsonify({"success": True, "data": result})
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply({"success": True, "data": result}))
 
 
 @roadmap_builder_bp.route("/critical-path", methods=["GET"])
@@ -488,7 +494,9 @@ def get_roadmap_summary():
     service = _get_service()
     result = service.get_roadmap_summary()
 
-    return jsonify({"success": True, "data": result})
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply({"success": True, "data": result}))
 
 
 # =============================================================================
