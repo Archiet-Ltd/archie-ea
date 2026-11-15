@@ -78,6 +78,12 @@ def _review_rubric_version() -> str:
     return RUBRIC_VERSION
 
 
+def _is_proposal_source(source_table: Optional[str]) -> bool:
+    from app.modules.ai_chat.services.change_review import PROPOSAL_SOURCES
+
+    return source_table in PROPOSAL_SOURCES
+
+
 def create_approval_record(
     *,
     organization_id: int,
@@ -140,7 +146,7 @@ def create_approval_record(
         source_id=source_id,
         persona=persona,
         drafter_model=drafter_model,
-        rubric_version=_review_rubric_version(),
+        rubric_version=_review_rubric_version() if (settle or enter_review) else None,
     )
     db.session.add(approval)
     db.session.flush()
@@ -154,9 +160,9 @@ def create_approval_record(
             actor_type="user" if user_id is not None else "system",
         )
     )
-    if not settle:
-        # Every record a writer makes is entered into the review: the job worker settles it as soon as the
-        # writer saves, and nobody approves it. (Added to the writer's own transaction.)
+    if not settle and (enter_review or _is_proposal_source(source_table)):
+        # A record a writer enters into the review (or a proposal nobody asked for) is settled by the job worker
+        # as soon as the writer saves: nobody approves it. Added to the writer's own transaction.
         from app.modules.ai_chat.services.change_review import queue_settling
 
         queue_settling(organization_id)

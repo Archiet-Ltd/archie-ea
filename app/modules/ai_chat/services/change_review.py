@@ -739,10 +739,6 @@ def in_scope(approval: AIChatCRUDApproval) -> bool:
     assistant's tool calls, and the chat's own changes (see CHAT_CRUD_OPERATIONS)."""
     if is_proposal(approval):
         return True
-    if approval.rubric_version is not None and not approval.source_table:
-        # Any other writer's change that was entered into the review when it was written (a person's request
-        # for a classification, a charter or a stewardship change) is settled the same way.
-        return True
     if approval.user_id is None or approval.source_table:
         return False
     if approval.operation_type == "tool_use":
@@ -881,7 +877,7 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
         allowed, role_reason = False, ACCOUNT_OFF_REASON
     elif allowed and approval.entity_type == "connectors" and not requester.is_admin():
         allowed, role_reason = False, "Connector changes need an administrator, and the person who asked is not one."
-    elif allowed and approval.entity_type == "vendor" and not is_platform_admin(requester):
+    elif allowed and approval.entity_type == "vendor" and not is_proposal(approval) and not is_platform_admin(requester):
         # The vendor list is shared by every workspace, so only a platform administrator changes it (the
         # same rule as the vendor API).
         allowed, role_reason = False, (
@@ -2055,17 +2051,6 @@ def queue_settling(organization_id: int) -> None:
                            payload={"organization_id": organization_id}))
 
 
-def _entered_not_started():
-    """A person's change that was entered into the review when it was written and that no review has begun on:
-    the settle pass takes it. One a review is part-way through (it has events) is left to that review or the sweep."""
-    return db.and_(
-        AIChatCRUDApproval.user_id.isnot(None), AIChatCRUDApproval.source_table.is_(None),
-        AIChatCRUDApproval.rubric_version.isnot(None),
-        ~db.exists().where(db.and_(AIChatApprovalAuditLog.approval_id == AIChatCRUDApproval.id,
-                                   AIChatApprovalAuditLog.event.in_(LOOP_EVENTS))),
-    )
-
-
 def settle_proposals(
     organization_id: int, sources: Optional[Tuple[str, ...]] = None, budget: Optional[ReviewBudget] = None,
     only_ids: Optional[List[int]] = None,
@@ -2107,8 +2092,7 @@ def _settle_proposals_locked(
         query = AIChatCRUDApproval.query.filter(
             AIChatCRUDApproval.organization_id == organization_id,
             AIChatCRUDApproval.status == ApprovalStatus.PENDING,
-            AIChatCRUDApproval.source_table.in_(sources) if sources else db.or_(
-                AIChatCRUDApproval.source_table.in_(PROPOSAL_SOURCES), _entered_not_started()),
+            AIChatCRUDApproval.source_table.in_(sources or PROPOSAL_SOURCES),
         )
         if only_ids is not None:
             query = query.filter(AIChatCRUDApproval.id.in_(only_ids))
