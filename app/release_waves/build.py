@@ -122,6 +122,7 @@ PREFIX_OVERRIDES: tuple = (
 # Rules whose path is ambiguous after normalisation (two rules read /<x>): named by endpoint.
 ENDPOINT_OVERRIDES: dict = {
     "main.public_legal_page": ("W1", "PG-PUB", "legal pages"),
+    "education.eligibility": ("W1", "PG-ORG", "the education offer check a university or college member opens from billing"),
     "main.public_site_page": ("W1", "PG-PUB", "public site pages"),
     "main.indexnow_key_file": ("A", "infra", "search engine key file"),
     "main.index": ("W1", "PG-PUB", "home"),

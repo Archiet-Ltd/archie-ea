@@ -334,8 +334,9 @@ SECONDARY: tuple = (
 USER_MENU: tuple = (
     _l("account", "Account", "account.manage", "user", job="account",
        aliases=("Settings", "My settings", "Profile", "Account settings", "Password", "Change password", "Email")),
-    _l("billing", "Billing", "billing.billing_index", "credit-card", job="account", requires="admin",
-       aliases=("Plan", "Subscription", "Invoices", "Payment", "Cancel", "Upgrade")),
+    _l("billing", "Plan and billing", "billing.billing_index", "credit-card", job="account",
+       requires="org_or_platform_admin",
+       aliases=("Billing", "Plan", "Usage", "AI usage", "Seats", "Subscription", "Invoices", "Payment", "Cancel", "Upgrade")),
     _l("team", "Team", "team.team", "users", job="account", requires="org_or_platform_admin",
        aliases=("Invite your team", "Invite", "Members", "People", "Teammates")),
     # The page admits an organisation's administrator (its own people's refusals) as well as the

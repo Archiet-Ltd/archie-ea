@@ -502,6 +502,7 @@ else:
     from .public_visitor_event import PublicVisitorEvent  # noqa: F401
     from .pending_invitation import PendingInvitation  # noqa: F401
     from .account_token import AccountToken  # noqa: F401
+    from .sign_in_identity import SignInIdentity  # noqa: F401
 
     # Stored model-health / drift report per organisation.
     from .drift_report import DriftReport  # noqa: F401

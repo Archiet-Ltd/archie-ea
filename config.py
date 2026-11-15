@@ -117,6 +117,16 @@ class Config:
     # Testing can opt in with the environment variable of the same name. No
     # configuration class turns it on by itself, and Production never reads it.
     ALLOW_INTERNAL_WEBHOOK_TARGETS = False
+    # Continue with Google / Continue with Microsoft. A provider is on exactly when both of its
+    # values are set; OAUTH_REDIRECT_HOSTS names the hosts that may start a sign-in. The two
+    # OAUTH_TEST_METADATA_URL_* values point at a stand-in provider and are read only under TESTING.
+    GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or None
+    GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET") or None
+    MICROSOFT_OAUTH_CLIENT_ID = os.environ.get("MICROSOFT_OAUTH_CLIENT_ID") or None
+    MICROSOFT_OAUTH_CLIENT_SECRET = os.environ.get("MICROSOFT_OAUTH_CLIENT_SECRET") or None
+    OAUTH_REDIRECT_HOSTS = os.environ.get("OAUTH_REDIRECT_HOSTS") or "entelim.tech,entelim.org"
+    OAUTH_TEST_METADATA_URL_GOOGLE = os.environ.get("OAUTH_TEST_METADATA_URL_GOOGLE") or None
+    OAUTH_TEST_METADATA_URL_MICROSOFT = os.environ.get("OAUTH_TEST_METADATA_URL_MICROSOFT") or None
     # Extra networks the outbound-URL guard refuses (comma-separated CIDRs).
     SSRF_BLOCKED_CIDRS = [
         c.strip() for c in os.environ.get("SSRF_BLOCKED_CIDRS", "").split(",") if c.strip()
@@ -254,6 +264,12 @@ class Config:
     # MCP_ENABLED is true and this is empty, so a misconfigured deploy fails
     # loudly instead of quietly serving relative or wrong-host metadata.
     PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    # Additional origins the OAuth/MCP/connector surfaces also answer on.
+    # Comma-separated list (e.g. "https://entelim.org,https://www.entelim.org").
+    # Each alias must include scheme and host exactly. The request's origin is
+    # used only when it matches the canonical PUBLIC_BASE_URL or one of these
+    # aliases; any other Host value gets the canonical origin.
+    PUBLIC_BASE_URL_ALIASES = os.environ.get("PUBLIC_BASE_URL_ALIASES", "")
     MCP_ENABLED = _env_bool("MCP_ENABLED", False)
 
     # DNS rebinding protection for POST /mcp (app/modules/mcp/blueprint.py):
@@ -397,29 +413,6 @@ class Config:
     CELERY_RESULT_SERIALIZER = "json"
     CELERY_TIMEZONE = "UTC"
     CELERY_ENABLE_UTC = True
-
-    # SSO / Enterprise Identity (S0-01)
-    # Supports Azure AD and Okta (OIDC).
-    # Feature-flagged: SSO routes only active when FeatureFlag(key='sso_authentication') is enabled.
-    SSO_PROVIDERS = {
-        "azure": {
-            "client_id": os.environ.get("AZURE_AD_CLIENT_ID", ""),
-            "client_secret": os.environ.get("AZURE_AD_CLIENT_SECRET", ""),
-            "server_metadata_url": os.environ.get(
-                "AZURE_AD_METADATA_URL",
-                "https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration".format(
-                    tenant=os.environ.get("AZURE_AD_TENANT_ID", "common")
-                ),
-            ),
-            "client_kwargs": {"scope": "openid email profile"},
-        },
-        "okta": {
-            "client_id": os.environ.get("OKTA_CLIENT_ID", ""),
-            "client_secret": os.environ.get("OKTA_CLIENT_SECRET", ""),
-            "server_metadata_url": os.environ.get("OKTA_METADATA_URL", ""),
-            "client_kwargs": {"scope": "openid email profile"},
-        },
-    }
 
     # Internationalization (S2-01) — date/number/currency formatting
     # Full string translation (gettext) is Phase 2.

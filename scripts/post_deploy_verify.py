@@ -53,7 +53,7 @@ import urllib.error
 import urllib.request
 from xml.etree import ElementTree
 
-DEFAULT_BASE = "https://entelim.org"
+DEFAULT_BASE = (os.environ.get("PUBLIC_BASE_URL") or "https://entelim.tech").rstrip("/")
 DEFAULT_DROPLET = "root@134.122.105.56"
 DEFAULT_APP_DIR = "/root/archie-ea"
 
