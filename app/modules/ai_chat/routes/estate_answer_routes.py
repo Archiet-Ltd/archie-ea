@@ -78,6 +78,8 @@ def _lens_line(lens):
     name = lens["element"].name
     data = lens["data"] or {}
     if lens["lens"] == "portfolio":
+        if data.get("part_of"):
+            return "Answer from your records: %s Rationalization planning tracks the application." % data["part_of"]
         tracked = "is tracked" if data.get("application_component_id") else "is not tracked"
         return "Answer from your records: %s %s by rationalization planning." % (name, tracked)
     key, noun = _LENS_RECORDS[lens["lens"]]
