@@ -1529,6 +1529,7 @@ def api_create_relationship():
         solution_id (int): Optional — mapped to architecture_id for scoping.
     """
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.models import CrossOrganisationRelationship
 
     data = request.get_json(silent=True) or {}
 
@@ -1611,7 +1612,12 @@ def api_create_relationship():
     )
 
     db.session.add(rel)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except CrossOrganisationRelationship as exc:
+        # Plain refusal, not a 500: the model guard refused a crossing row.
+        db.session.rollback()
+        return api_error(str(exc), 400)
 
     # Return flat JSON (no api_success wrapper) — all JS callers check data.id directly.
     return jsonify({
