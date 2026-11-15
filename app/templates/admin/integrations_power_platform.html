@@ -176,6 +176,7 @@
         );
         el.textContent = msg;
         el.removeAttribute('hidden');
+        el.scrollIntoView({ block: 'nearest' });  // the button pressed can be far below it on a phone
         setTimeout(function () { el.setAttribute('hidden', ''); }, 6000);
     }
 
