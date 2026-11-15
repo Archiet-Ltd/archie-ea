@@ -26,7 +26,7 @@
     'aria-controls': 'panel-' ~ value,
     'tabindex': '0'} -%}
 {%- for k, v in attrs.items() %}{% set _ = trigger_attrs.update({k: v}) %}{% endfor -%}
-{{ library.tabs_trigger(text=caller(), class='px-3 py-1.5 text-sm font-medium data-[active=true]:bg-background data-[active=true]:text-foreground dark:data-[active=true]:border-input dark:data-[active=true]:bg-input/30 ' ~ class, id='tab-' ~ value, attrs=trigger_attrs) }}
+{{ library.tabs_trigger(text=caller(), class='px-3 py-1.5 text-sm font-medium data-[active=true]:bg-background data-[active=true]:text-foreground dark:data-[active=true]:text-foreground dark:data-[active=true]:border-input dark:data-[active=true]:bg-input/30 ' ~ class, id='tab-' ~ value, attrs=trigger_attrs) }}
 {% endmacro %}
 
 {% macro tabs_content(value='', class='') %}
@@ -62,7 +62,7 @@
     {%- for item in items %}
     {%- set active = item[2] -%}
     <a href="{{ item[1] }}" data-slot="tabs-trigger"{% if active %} data-active="true" aria-current="page"{% endif %}{% if item|length > 3 and item[3] %} data-testid="{{ item[3] }}"{% endif %}
-       class="cn-tabs-trigger relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-transparent px-3 py-1 text-sm font-medium text-foreground/60 transition-all hover:text-foreground focus-visible:border-ring focus-visible:outline-1 focus-visible:outline-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:text-muted-foreground dark:hover:text-foreground data-[active=true]:bg-background data-[active=true]:text-foreground dark:data-[active=true]:border-input dark:data-[active=true]:bg-input/30 dark:data-[active=true]:text-foreground">{{ item[0] }}</a>
+       class="cn-tabs-trigger relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-transparent px-3 py-1 text-sm font-medium text-foreground/60 transition-all hover:text-foreground focus-visible:border-ring focus-visible:outline-1 focus-visible:outline-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:text-muted-foreground dark:hover:text-foreground data-[active=true]:bg-background data-[active=true]:text-foreground dark:data-[active=true]:text-foreground dark:data-[active=true]:border-input dark:data-[active=true]:bg-input/30 dark:data-[active=true]:text-foreground">{{ item[0] }}</a>
     {%- endfor %}
   </div>
 </nav>

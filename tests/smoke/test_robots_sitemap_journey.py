@@ -45,7 +45,7 @@ def test_search_engines_may_read_the_early_access_pages(browser, live_server, si
         assert "Disallow: /\n" not in robots + "\n"
         assert "Disallow: /dashboard/" in robots and "Disallow: /api/" in robots
 
-        _response, sitemap = _text(page, live_server + "/sitemap.xml")
+        _response, sitemap = _text(page, live_server + "/sitemap-en.xml")
         listed = re.findall(re.escape(live_server) + r"(/early-access[^\s<]*)", sitemap)
         pages = [p for p in listed if p != "/early-access"]
         assert "/early-access" in listed and len(pages) >= 3, listed

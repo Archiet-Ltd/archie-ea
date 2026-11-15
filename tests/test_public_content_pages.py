@@ -487,7 +487,7 @@ def test_sitemap_xml_includes_every_page(app):
     not_planned)."""
     pages = load_all_pages()
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         assert rv.status_code == 200
         xml = rv.data.decode()
         assert xml.startswith('<?xml')
@@ -509,7 +509,7 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     from urllib.parse import urlparse
 
     with app.test_client() as client:
-        xml = client.get("/sitemap.xml").data.decode()
+        xml = client.get("/sitemap-en.xml").data.decode()
 
     entries = re.findall(r"<url>\s*<loc>([^<]+)</loc>(.*?)</url>", xml, flags=re.S)
     homepage = [(loc, rest) for loc, rest in entries if urlparse(loc).path == "/"]
@@ -562,7 +562,7 @@ def test_withdrawn_pages_200_but_excluded_from_every_feed(app):
                 f"withdrawn page {page.url} should still render, got {rv.status_code}"
             )
 
-            sitemap = client.get("/sitemap.xml").data.decode()
+            sitemap = client.get("/sitemap-en.xml").data.decode()
             assert page.url not in sitemap, (
                 f"sitemap.xml should not include withdrawn page {page.url}"
             )
@@ -641,7 +641,7 @@ def test_indexnow_submission_matches_sitemap_urls(app, monkeypatch):
     )
 
     with app.test_client() as client:
-        sitemap_xml = client.get("/sitemap.xml").data.decode()
+        sitemap_xml = client.get("/sitemap-en.xml").data.decode()
     # Extract the base URL from the sitemap (first <loc> entry)
     import re
     loc_match = re.search(r"<loc>(https://[^/]+)", sitemap_xml)
@@ -703,7 +703,7 @@ def test_llms_txt_has_correct_content_type(app):
 def test_sitemap_xml_has_correct_content_type(app):
     """/sitemap.xml returns application/xml."""
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         assert "xml" in rv.content_type
 
 
@@ -1093,7 +1093,7 @@ This is a test module page.
             assert "Test Module Title" in html
 
             # AC5b: Appears in sitemap
-            rv = client.get("/sitemap.xml")
+            rv = client.get("/sitemap-en.xml")
             assert "/modules/zzz-test-temp-module" in rv.data.decode()
 
             # AC5c: Appears in llms.txt
@@ -1139,7 +1139,7 @@ Content for the test segment page.
             assert 'application/ld+json' in html
 
             # Verify in sitemap and llms.txt
-            rv = client.get("/sitemap.xml")
+            rv = client.get("/sitemap-en.xml")
             assert "/use-cases/zzz-test-new-segment" in rv.data.decode()
 
             rv = client.get("/llms.txt")
@@ -1714,7 +1714,7 @@ code block
 def test_sitemap_includes_homepage(app):
     """/sitemap.xml includes the homepage URL."""
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         assert rv.status_code == 200
         xml = rv.data.decode()
         assert "<loc>https://entelim.tech/</loc>" in xml, (
@@ -1725,7 +1725,7 @@ def test_sitemap_includes_homepage(app):
 def test_sitemap_homepage_has_priority(app):
     """/sitemap.xml homepage entry has priority 1.0."""
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         xml = rv.data.decode()
         assert "<priority>1.0</priority>" in xml, (
             "sitemap.xml homepage missing priority"
@@ -1740,7 +1740,7 @@ def test_sitemap_still_includes_all_content_pages(app):
 
     pages = load_all_pages()
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         xml = rv.data.decode()
         for page in pages:
             if _is_merged(page) or page.is_held:
@@ -1758,7 +1758,7 @@ def test_sitemap_xml_valid_with_homepage(app):
     import xml.etree.ElementTree as ET
 
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         xml = rv.data.decode()
         # Must parse as valid XML
         try:
@@ -1810,7 +1810,7 @@ def test_xss_sanitization_cross_org(app):
 
 # The three files a crawler uses to discover the rest of the site. Each
 # one's own path must be allowed, and so must every entelim.org URL it names.
-_CRAWLER_FACING_ENDPOINTS = ["/sitemap.xml", "/llms.txt", "/llms-full.txt"]
+_CRAWLER_FACING_ENDPOINTS = ["/sitemap-en.xml", "/llms.txt", "/llms-full.txt"]
 
 
 # The crawlers whose rules every discoverable URL is checked against.
@@ -1926,7 +1926,7 @@ def test_every_crawler_discoverable_url_is_allowed_by_robots_txt(app, legal_page
         with app.test_client() as client:
             robots = client.get("/robots.txt").get_data(as_text=True)
             must_allow = _collect_must_allow_paths(client)
-            sitemap = client.get("/sitemap.xml").data.decode()
+            sitemap = client.get("/sitemap-en.xml").data.decode()
     finally:
         app.config["LEGAL_PAGES_ENABLED"] = False
 
@@ -2422,7 +2422,7 @@ def test_use_cases_index_in_robots_and_sitemap(app):
     with app.test_client() as client:
         rules = _parse_robots_rules(client.get("/robots.txt").get_data(as_text=True))
         assert _robots_allows(rules, "/use-cases"), "robots.txt blocks /use-cases"
-        xml = client.get("/sitemap.xml").data.decode()
+        xml = client.get("/sitemap-en.xml").data.decode()
     assert "<loc>https://entelim.tech/use-cases</loc>" in xml
 
 
@@ -2489,7 +2489,7 @@ def test_two_click_reachability_from_home_page(app):
         return paths
 
     with app.test_client() as client:
-        sitemap_xml = client.get("/sitemap.xml").data.decode()
+        sitemap_xml = client.get("/sitemap-en.xml").data.decode()
         must_reach = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml))
         must_reach.discard("/")  # the home page itself, not a link target
 
@@ -2870,21 +2870,21 @@ def test_hub_noindex_until_intro_exists(app):
             if intro_path.exists():
                 # A real intro has landed: the hub is indexable, listed once.
                 assert 'name="robots" content="noindex"' not in client.get(hub).data.decode()
-                assert client.get("/sitemap.xml").data.decode().count(sitemap_loc) == 1
+                assert client.get("/sitemap-en.xml").data.decode().count(sitemap_loc) == 1
                 continue
             assert 'name="robots" content="noindex"' in client.get(hub).data.decode()
-            assert sitemap_loc not in client.get("/sitemap.xml").data.decode()
+            assert sitemap_loc not in client.get("/sitemap-en.xml").data.decode()
             intro = _page_md(f"{slug.title()} hub intro", body="What you can find here.")
             with _temp_pages({f"site/{slug}.md": intro}):
                 html = client.get(hub).data.decode()
                 assert 'name="robots" content="noindex"' not in html
                 assert f"{slug.title()} hub intro" in html
-                assert client.get("/sitemap.xml").data.decode().count(sitemap_loc) == 1
+                assert client.get("/sitemap-en.xml").data.decode().count(sitemap_loc) == 1
             # A held intro keeps the hub out of the index.
             held = _page_md(f"{slug.title()} hub intro", state="not_planned")
             with _temp_pages({f"site/{slug}.md": held}):
                 assert 'name="robots" content="noindex"' in client.get(hub).data.decode()
-                assert sitemap_loc not in client.get("/sitemap.xml").data.decode()
+                assert sitemap_loc not in client.get("/sitemap-en.xml").data.decode()
 
 
 def test_robots_allows_role_and_connector_prefixes(app):
@@ -2912,7 +2912,7 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
         assert hub.index('aria-labelledby="other-roles"') > hub.index('aria-labelledby="startups-and-scale-ups"')
         landed = client.get("/roles/zzz-e2e-role").data.decode()
         assert "Zzz E2e Role" in landed
-        assert "https://entelim.tech/roles/zzz-e2e-role</loc>" in client.get("/sitemap.xml").data.decode()
+        assert "https://entelim.tech/roles/zzz-e2e-role</loc>" in client.get("/sitemap-en.xml").data.decode()
         rules = _parse_robots_rules(client.get("/robots.txt").get_data(as_text=True))
         assert _robots_allows(rules, "/roles/zzz-e2e-role")
 
@@ -2924,7 +2924,7 @@ def test_role_pages_are_live_and_listed_everywhere(app):
     """The four role pages are on main: not held, in the hub, each other's strip, sitemap and llms.txt."""
     with app.test_client() as client:
         hub = client.get("/roles").data.decode()
-        sitemap = client.get("/sitemap.xml").data.decode()
+        sitemap = client.get("/sitemap-en.xml").data.decode()
         llms = client.get("/llms.txt").data.decode()
         for slug in ROLE_PAGE_SLUGS:
             page = load_page("role", slug=slug)
