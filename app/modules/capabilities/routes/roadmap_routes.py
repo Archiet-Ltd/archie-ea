@@ -53,6 +53,13 @@ _LINK_WRITE_ROLES = (
 )
 
 
+def _refuse_unless_may_work_package(action):
+    """The one rule for writing a work package: the organisation's permission matrix. None when allowed."""
+    if can(current_user, action, 'work_package'):
+        return None
+    return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
+
+
 @capability_map.route("/api/roadmap/capabilities")
 @login_required
 @rate_limit(60, "1m")
@@ -1206,7 +1213,6 @@ def api_roadmap_delete_gap(gap_id):
 
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/work-packages", methods=["POST"])
 @login_required
-@require_roles(*_LINK_WRITE_ROLES)
 @rate_limit(30, "1m")
 @audit_log("roadmap_work_package_create")
 def api_roadmap_create_work_package(gap_id):
@@ -1222,6 +1228,9 @@ def api_roadmap_create_work_package(gap_id):
         "template": "auto"  // Or: default, vendor_selection, modernization, retirement
     }
     """
+    refusal = _refuse_unless_may_work_package('create')
+    if refusal:
+        return refusal
     try:
         from app.models.implementation_migration import Gap
         from app.services.gap_archimate_service import gap_archimate_service
@@ -2394,7 +2403,6 @@ def _link_error(exc):
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/link-work-package/<int:wp_id>", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")
-@require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_gap_link_work_package")
 def api_roadmap_gap_link_work_package(gap_id: int, wp_id: int):
     """Link a gap to a work package of the active organisation (both ways at once:
@@ -2403,6 +2411,9 @@ def api_roadmap_gap_link_work_package(gap_id: int, wp_id: int):
     Response 200: {"success": true, "gap_id": int, "work_package": {...}}
     Response 404: the gap or the work package is not in this organisation.
     """
+    refusal = _refuse_unless_may_work_package('edit')
+    if refusal:
+        return refusal
     from app.services import work_package_service
 
     org_id = current_org_id()
@@ -2423,10 +2434,12 @@ def api_roadmap_gap_link_work_package(gap_id: int, wp_id: int):
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/unlink-work-package/<int:wp_id>", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")
-@require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_gap_unlink_work_package")
 def api_roadmap_gap_unlink_work_package(gap_id: int, wp_id: int):
     """Remove the link between a gap and a work package of the active organisation."""
+    refusal = _refuse_unless_may_work_package('edit')
+    if refusal:
+        return refusal
     from app.services import work_package_service
 
     org_id = current_org_id()

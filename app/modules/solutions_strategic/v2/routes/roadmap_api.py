@@ -72,13 +72,35 @@ def _deliverable_or_404(deliverable_id):
 roadmap_bp = Blueprint("roadmap_api", __name__, url_prefix="/api/roadmap")
 
 
+# Endpoints that write work packages answer to the organisation's permission matrix (what this role may do to a
+# work package); every other write answers to can_change_model (whether this role may change the model at all).
+_WORK_PACKAGE_WRITES = {
+    "roadmap_api.create_work_package": "create",
+    "roadmap_api.update_work_package": "edit",
+    "roadmap_api.delete_work_package": "delete",
+    "roadmap_api.create_deliverable": "create",
+    "roadmap_api.update_deliverable": "edit",
+    "roadmap_api.delete_deliverable": "delete",
+    "roadmap_api.generate_work_packages": "create",
+    "roadmap_api.optimize_timeline": "edit",
+    "roadmap_api.generate_archimate_roadmap": "create",
+    "roadmap_api.generate_single_gap_roadmap": "create",
+}
+_READ_ONLY_REFUSAL = "Your role may read the roadmap but not change it."
+
+
 @roadmap_bp.before_request
 def _only_editors_write():
-    """Every POST, PUT, PATCH and DELETE on the roadmap needs a role that may change the model, so a route
-    added later is covered too. Reading stays open to every signed-in role."""
+    """Every POST, PUT, PATCH and DELETE on the roadmap is checked here, so a route added later is covered too.
+    Reading stays open to every signed-in role."""
     if request.method in ("POST", "PUT", "PATCH", "DELETE") and current_user.is_authenticated:
-        if not can_change_model(current_user):
-            return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
+        action = _WORK_PACKAGE_WRITES.get(request.endpoint)
+        if action is not None:
+            allowed = can(current_user, action, "work_package")  # one rule: the matrix, for work packages
+        else:
+            allowed = can_change_model(current_user)
+        if not allowed:
+            return jsonify({"success": False, "error": _READ_ONLY_REFUSAL}), 403
     return None
 
 
@@ -294,9 +316,6 @@ def create_work_package():
       401:
         description: Unauthorized
     """
-    if not can(current_user, "create", "work_package"):
-        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
-
     try:
         # Validate required fields
         validation_error = validate_json_data(["name", "business_capability"])
@@ -522,9 +541,6 @@ def update_work_package(work_package_id: int):
       404:
         description: Not found
     """
-    if not can(current_user, "edit", "work_package"):
-        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
-
     try:
         work_package = _require(work_package_id)
 
@@ -621,9 +637,6 @@ def delete_work_package(work_package_id: int):
       404:
         description: Not found
     """
-    if not can(current_user, "delete", "work_package"):
-        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
-
     try:
         work_package = _require(work_package_id)
 
@@ -796,9 +809,6 @@ def create_deliverable():
       401:
         description: Unauthorized
     """
-    if not can(current_user, "create", "work_package"):
-        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
-
     try:
         validation_error = validate_json_data(["name", "work_package_id"])
         if validation_error:
@@ -888,9 +898,6 @@ def update_deliverable(deliverable_id: int):
       404:
         description: Not found
     """
-    if not can(current_user, "edit", "work_package"):
-        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
-
     try:
         deliverable = _deliverable_or_404(deliverable_id)
 
@@ -967,9 +974,6 @@ def delete_deliverable(deliverable_id: int):
       404:
         description: Not found
     """
-    if not can(current_user, "delete", "work_package"):
-        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
-
     try:
         deliverable = _deliverable_or_404(deliverable_id)
 
