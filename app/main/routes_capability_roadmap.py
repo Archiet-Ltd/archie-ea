@@ -10,8 +10,9 @@ from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from app import db
-from app.utils.recorded_figures import as_figure
+from app.core.auth.permissions import can
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
+from app.utils.recorded_figures import as_figure
 from app.main.views import main
 from app.core.auth.permissions import can_change_model
 from app.models.roadmap import RoadmapTask
@@ -39,6 +40,13 @@ _READ_ONLY_REFUSAL = "Your role may read the roadmap but not change it."
 def _refuse_unless_may_change():
     """The plain refusal for a role that may read the roadmap but not change it."""
     if not can_change_model(current_user):
+        return jsonify({"error": _READ_ONLY_REFUSAL}), 403
+    return None
+
+
+def _refuse_unless_may_do_work_package(action):
+    """The plain refusal when the organisation's permission matrix bars this work-package action."""
+    if not can(current_user, action, "work_package"):
         return jsonify({"error": _READ_ONLY_REFUSAL}), 403
     return None
 
@@ -654,7 +662,7 @@ def get_capability_work_packages():
 @login_required
 def create_capability_work_package():
     """Create new capability work package with multi-capability support"""
-    refusal = _refuse_unless_may_change()
+    refusal = _refuse_unless_may_do_work_package("create")
     if refusal:
         return refusal
     try:
@@ -744,7 +752,7 @@ def create_capability_work_package():
 @login_required
 def update_capability_work_package(wp_id):
     """Update capability work package"""
-    refusal = _refuse_unless_may_change()
+    refusal = _refuse_unless_may_do_work_package("edit")
     if refusal:
         return refusal
     try:
@@ -818,7 +826,7 @@ def update_capability_work_package(wp_id):
 @login_required
 def delete_capability_work_package(wp_id):
     """Delete capability work package"""
-    refusal = _refuse_unless_may_change()
+    refusal = _refuse_unless_may_do_work_package("delete")
     if refusal:
         return refusal
     try:
@@ -888,7 +896,7 @@ def get_work_package_tasks(wp_id):
 @login_required
 def create_work_package_task(wp_id):
     """Create a new task for a work package"""
-    refusal = _refuse_unless_may_change()
+    refusal = _refuse_unless_may_do_work_package("edit")
     if refusal:
         return refusal
     try:
@@ -940,7 +948,7 @@ def create_work_package_task(wp_id):
 @login_required
 def update_work_package_task(wp_id, task_id):
     """Update a task"""
-    refusal = _refuse_unless_may_change()
+    refusal = _refuse_unless_may_do_work_package("edit")
     if refusal:
         return refusal
     try:
@@ -996,7 +1004,7 @@ def update_work_package_task(wp_id, task_id):
 @login_required
 def delete_work_package_task(wp_id, task_id):
     """Delete a task"""
-    refusal = _refuse_unless_may_change()
+    refusal = _refuse_unless_may_do_work_package("delete")
     if refusal:
         return refusal
     try:
@@ -1060,7 +1068,7 @@ def get_work_package_deliverables(wp_id):
 @login_required
 def create_work_package_deliverable(wp_id):
     """Create a new deliverable for a work package"""
-    refusal = _refuse_unless_may_change()
+    refusal = _refuse_unless_may_do_work_package("create")
     if refusal:
         return refusal
     try:
@@ -1108,7 +1116,7 @@ def create_work_package_deliverable(wp_id):
 @login_required
 def update_work_package_deliverable(wp_id, deliverable_id):
     """Update a deliverable"""
-    refusal = _refuse_unless_may_change()
+    refusal = _refuse_unless_may_do_work_package("edit")
     if refusal:
         return refusal
     try:
@@ -1148,7 +1156,7 @@ def update_work_package_deliverable(wp_id, deliverable_id):
 @login_required
 def delete_work_package_deliverable(wp_id, deliverable_id):
     """Delete a deliverable"""
-    refusal = _refuse_unless_may_change()
+    refusal = _refuse_unless_may_do_work_package("delete")
     if refusal:
         return refusal
     try:

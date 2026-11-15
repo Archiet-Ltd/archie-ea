@@ -55,6 +55,61 @@ _WRITE_LIMITS = ["300 per hour", "30 per minute"]
 
 _WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
+# The assistant connector is one POST endpoint that carries every message of an agent's session
+# (start, notification, tool list, each tool call), so the general write limit would refuse a
+# scheduled agent after about twenty sessions an hour. A signed-in connector request is counted
+# against its organisation instead, in two budgets so that starting a session never uses up the
+# budget for tool calls:
+#   session messages (initialize, notifications, tools/list): a session sends three, so 1,200 an
+#     hour covers about 400 sessions across all of an organisation's agents;
+#   tool calls: an agent runs up to ten per session, so 3,000 an hour covers about 300 sessions.
+# Both are held to 120 a minute so a runaway loop is still stopped quickly. A request with no valid
+# token is counted by address against the same write limit as before.
+_CONNECTOR_PATH = "/mcp"
+_CONNECTOR_SESSION_LIMITS = ["1200 per hour", "120 per minute"]
+_CONNECTOR_CALL_LIMITS = ["3000 per hour", "120 per minute"]
+_CONNECTOR_REFUSED = -32029
+
+
+def _connector_message():
+    """The JSON-RPC method of a connector request, or None when the body cannot be read."""
+    from flask import request
+
+    body = request.get_json(silent=True)
+    if isinstance(body, dict) and isinstance(body.get("method"), str):
+        return body["method"]
+    return None
+
+
+def _connector_budget():
+    """``(key, limits)`` for a signed-in connector request, else None (counted by address)."""
+    from flask import request
+
+    if request.method.upper() != "POST" or request.path.rstrip("/") != _CONNECTOR_PATH:
+        return None
+    try:
+        from flask_login import current_user
+
+        if not (current_user and current_user.is_authenticated):
+            return None
+        organization_id = getattr(current_user, "organization_id", None)
+    except Exception as exc:
+        logger.debug("connector budget: current_user unavailable: %s", exc)
+        return None
+    if organization_id is None:
+        return None
+    method = _connector_message()
+    if method in ("initialize", "tools/list") or (method or "").startswith("notifications/"):
+        return f"mcp-org:{organization_id}:session", _CONNECTOR_SESSION_LIMITS
+    return f"mcp-org:{organization_id}:calls", _CONNECTOR_CALL_LIMITS
+
+
+def _default_limits():
+    """The general per-user limit, which a signed-in connector request replaces with its own."""
+    if _connector_budget() is not None:
+        return ""
+    return "; ".join(_DEFAULT_LIMITS)
+
 
 def _write_limits():
     """Per-request extra limits, applied only to state-changing verbs.
@@ -67,6 +122,9 @@ def _write_limits():
 
     if request.method.upper() not in _WRITE_METHODS:
         return ""
+    budget = _connector_budget()
+    if budget is not None:
+        return "; ".join(budget[1])
     return "; ".join(_WRITE_LIMITS)
 
 
@@ -88,7 +146,10 @@ def _storage_uri():
 
 
 def _identity():
-    """Per-user key when authenticated, per-IP otherwise."""
+    """Per-organisation key for a signed-in connector request, per-user when authenticated, per-IP otherwise."""
+    budget = _connector_budget()
+    if budget is not None:
+        return budget[0]
     try:
         from flask_login import current_user
 
@@ -111,6 +172,21 @@ def _wants_json() -> bool:
         or request.headers.get("X-Requested-With") == "XMLHttpRequest"
         or request.path.startswith("/mcp")
     )
+
+
+def _is_connector_request():
+    from flask import request
+
+    return request.path.rstrip("/") == _CONNECTOR_PATH and request.method.upper() == "POST"
+
+
+def _connector_refusal(sentence):
+    """A refusal an agent can read: a JSON-RPC error that echoes the request's id."""
+    from flask import jsonify, request
+
+    body = request.get_json(silent=True)
+    request_id = body.get("id") if isinstance(body, dict) else None
+    return jsonify({"jsonrpc": "2.0", "error": {"code": _CONNECTOR_REFUSED, "message": sentence}, "id": request_id})
 
 
 def _json_refusal(sentence, error_type):
@@ -214,7 +290,9 @@ def refuse(retry_after, rule, verdict=None):
     sentence = "Rate limit exceeded. Slow down and retry shortly."
     if retry_after:
         sentence = "Rate limit exceeded. Try again in %s." % wait_phrase(retry_after)
-    if _wants_json():
+    if _is_connector_request():
+        resp = _connector_refusal(sentence)
+    elif _wants_json():
         resp = _json_refusal(sentence, "rate_limited")
     else:
         # Limits are counted per route, and per person when signed in, so a signed-in person can still
@@ -309,7 +387,7 @@ def init_rate_limiting(app):
             key_func=_identity,
             app=app,
             # Writes carry their own, tighter bucket on top of the default.
-            default_limits=[*_DEFAULT_LIMITS, _write_limits],
+            default_limits=[_default_limits, _write_limits],
             storage_uri=_storage_uri(),
             strategy="fixed-window",
             enabled=True,
