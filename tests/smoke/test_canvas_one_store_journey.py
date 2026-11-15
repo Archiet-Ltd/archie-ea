@@ -247,3 +247,41 @@ def test_the_canvas_page_shows_cost_lines_to_a_cto_and_the_reason_to_a_business_
             assert (WITHHELD in chat) is (not sees)
         finally:
             context.close()
+
+
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
+def test_an_empty_canvas_cost_box_says_why_it_is_empty_to_each_kind_of_person(
+        browser, live_server, seeded, width, scheme):
+    from app import create_app, db
+    from app.models.business_model import BusinessModelCanvas
+
+    org_id = seeded["ids"]["org"]
+    with create_app("testing").app_context():
+        canvas = BusinessModelCanvas(name="Empty cost page model", organization_id=org_id)
+        db.session.add(canvas)
+        db.session.commit()
+        canvas_id = canvas.id
+    for persona, sees in (("cto", True), ("business_architect", False)):
+        context = browser.new_context(viewport={"width": width, "height": 900}, color_scheme=scheme,
+                                      ignore_https_errors=True)
+        context.set_default_timeout(PAGE_TIMEOUT)
+        context.set_default_navigation_timeout(PAGE_TIMEOUT)
+        page = context.new_page()
+        try:
+            sign_in_as(page, live_server, seeded, persona)
+            page.goto("%s/business-model/%d" % (live_server, canvas_id))
+            box = page.locator("#box-cost-structure + *")
+            expect(box).to_be_visible()
+            box.scroll_into_view_if_needed()
+            reason = box.locator('[data-canvas-empty="cost-structure"]')
+            expect(reason).to_be_visible()
+            text = " ".join(reason.inner_text().split())
+            shot(page, "empty-cost-page-" + persona, width, scheme)
+            if sees:
+                assert WITHHELD not in text
+                assert "cost" in text.lower() and len(text.split()) >= 8
+            else:
+                assert WITHHELD in text
+                assert not any(ch.isdigit() for ch in text)
+        finally:
+            context.close()
