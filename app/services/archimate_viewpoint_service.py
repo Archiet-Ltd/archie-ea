@@ -556,7 +556,6 @@ def layer_model_query(layer: str, org_id):
     not enough — the same element id can exist in more than one organisation."""
     if org_id is None:
         raise ValueError("layer_model_query requires an org_id; the tenant filter alone is not enough")
-    from app import db as _db
     from app.models.archimate_core import ArchiMateElement
 
     return ArchiMateElement.query.filter(ArchiMateElement.organization_id == org_id, layer_criterion(layer))
