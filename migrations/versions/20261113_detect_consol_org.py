@@ -27,7 +27,7 @@ the reason; the downgrade puts those rows back.
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
 Revision ID: 20261113_detect_consol_org
-Revises: 20261114_plan_education
+Revises: 20261114_sign_in_identities
 Create Date: 2026-11-13
 """
 import sqlalchemy as sa
@@ -35,7 +35,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261113_detect_consol_org"
-down_revision = "20261114_plan_education"
+down_revision = "20261114_sign_in_identities"
 branch_labels = None
 depends_on = None
 
@@ -308,14 +308,6 @@ def _backfill_consolidation_entries(bind):
     )
 
 
-def _ambiguous_consolidation_entries(bind):
-    return _scalar(
-        bind,
-        "SELECT COUNT(*) FROM consolidation_list_entries e "
-        "WHERE e.organization_id IS NULL",
-    )
-
-
 def _add_column(bind, table):
     if not _has_column(bind, table, "organization_id"):
         op.add_column(table, sa.Column("organization_id", sa.Integer(), nullable=True))
@@ -354,8 +346,6 @@ def upgrade():
 
     if "consolidation_list_entries" in present and _present(bind, "application_components"):
         _backfill_consolidation_entries(bind)
-        ambiguous = _ambiguous_consolidation_entries(bind) if _has_column(bind, "application_components", "organization_id") else 0
-        print(f"consolidation org fence: {ambiguous} entry(ies) with no derivable organisation")
 
     # A row nothing links to any organisation cannot be shown to anyone safely.
     # It is written to the record table first, and the downgrade restores it.

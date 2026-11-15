@@ -581,7 +581,7 @@ class UnifiedDuplicateDetectionService:
         try:
             org_id = getattr(g, "current_org_id", None)
             if org_id is None:
-                return {"success": False, "error": "No organisation context: run_detection must be called within a request context"}
+                return {"success": False, "error": "Duplicate detection needs an organisation. Sign in to an organisation and run it again."}
             # Clean up stale groups from previous runs before creating new ones
             # Use a SAVEPOINT so failure doesn't poison the outer transaction
             try:
@@ -763,7 +763,7 @@ class UnifiedDuplicateDetectionService:
         try:
             org_id = getattr(g, "current_org_id", None)
             if org_id is None:
-                return {"success": False, "error": "No organisation context: run_detection_hybrid must be called within a request context"}
+                return {"success": False, "error": "Duplicate detection needs an organisation. Sign in to an organisation and run it again."}
             # Clean up stale groups from previous runs
             # Use a SAVEPOINT so failure doesn't poison the outer transaction
             try:
