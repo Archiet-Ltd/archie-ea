@@ -12,6 +12,11 @@ from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.models.ai_service import AIPromptTemplate
+from app.modules.ai_chat.services.agent_runner import (
+    CREDIT_EXHAUSTED,
+    RATE_LIMITED,
+    classify_provider_error,
+)
 from app.modules.ai_chat.services.failure_messages import failure_sentence
 from app.services.feature_flag_service import FeatureFlagService
 from app.services.rate_limiter import rate_limit
@@ -810,17 +815,31 @@ def send_message():
                 ),
                 401,
             )
-        elif "rate limit" in error_msg.lower() or "quota" in error_msg.lower():
+
+        kind = classify_provider_error(e)
+        if kind == CREDIT_EXHAUSTED:
             return (
                 jsonify(
                     {
-                        "error": "AI service rate limit exceeded. Please wait a moment and try again.",
+                        "error": failure_sentence("credit_exhausted"),
+                        "reason_code": "credit_exhausted",
+                        "error_type": "credit_exhausted",
+                    }
+                ),
+                402,
+            )
+        if kind == RATE_LIMITED:
+            return (
+                jsonify(
+                    {
+                        "error": failure_sentence("rate_limited"),
+                        "reason_code": "rate_limited",
                         "error_type": "rate_limit",
                     }
                 ),
                 429,
             )
-        elif "model" in error_msg.lower() and (
+        if "model" in error_msg.lower() and (
             "not found" in error_msg.lower() or "invalid" in error_msg.lower()
         ):
             return (
