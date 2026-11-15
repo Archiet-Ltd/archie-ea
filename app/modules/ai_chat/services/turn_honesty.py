@@ -31,14 +31,21 @@ _FACT_SEARCHES = (
     (
         re.compile(
             r"\bcosts?\s+(?:us\s+|me\s+|we\s+)?to\s+serve\b|\bcost\s+of\s+serving\b|\bcosts?\s+per\b"
-            r"|\bunit\s+costs?\b|\bserv(?:e|ing)\s+(?:one|each|a|an|every)\s+customer\b",
+            r"|\bunit\s+costs?\b|\bserv(?:e|ing)\s+(?:one|each|a|an|every)\s+customer\b"
+            r"|\bcustomers?\s+costs?\b|\bcosts?\s+(?:us\s+|me\s+)?(?:for\s+)?(?:each|every|one)\s+customer\b",
             re.I,
         ),
         ("cost to serve", "cost per"),
     ),
     (re.compile(r"\btargets?\b|\bgoals?\b", re.I), ("target", "goal")),
     (
-        re.compile(r"\bwhen\s+(?:does|do|is|are|will|did|can|should)\b|\bby\s+when\b|\bwhat\s+dates?\b|\bdates?\b|\bdeadlines?\b", re.I),
+        re.compile(
+            r"\bwhen\s+(?:does|do|will|did)\b|\bwhen\s+(?:is|are)\s+(?:the|our|my|this|that|these|those)\b"
+            r"|\bwhen\s+(?:can|should)\s+(?:we|i)\s+(?:launch|ship|release|open|close|start|expect|go)\b"
+            r"|\bby\s+when\b|\bwhat\s+dates?\b|\b(?:their|its|our|with|due|launch|target|start|end)\s+dates?\b"
+            r"|\bdeadlines?\b",
+            re.I,
+        ),
         ("date", "deadline"),
     ),
 )
@@ -60,9 +67,21 @@ def fact_searches(message: Optional[str]) -> List[str]:
 
 # A sentence that claims a search was made, or that nothing is missing.
 _ABSENCE_CLAIM = re.compile(
-    r"\bfound\s+no\s+such\b|\bnothing\s+is\s+missing\b|\bsearch(?:ed)?\s+(?:found|returned)\s+nothing\b",
+    r"\bfound\s+no\s+such\b|\bnothing\s+is\s+missing\b|\bsearch(?:ed)?\s+(?:found|returned)\s+nothing\b"
+    r"|\b(?:could\s*n[o']t|can\s*n[o']t|can't|couldn't|did\s*n[o']t|didn't)\s+find\b",
     re.I,
 )
+_NOTHING_MISSING = re.compile(r"\bnothing\s+is\s+missing\b", re.I)
+# What a sentence or a question can be about: the business facts above, plus two the platform
+# does not search for on its own. A claim about a fact is backed by a lookup about that fact.
+_TOPICS = tuple((searches[0], pattern) for pattern, searches in _FACT_SEARCHES) + (
+    ("owner", re.compile(r"\bowners?\b|\bowns?\b|\bowned\b|\bownership\b|\baccountable\b", re.I)),
+    ("dependency", re.compile(r"\bbreaks?\b|\bfails?\b|\bfailure\b|\bdepend\w*\b|\bimpacts?\b", re.I)),
+)
+
+
+def _topics(text: str) -> frozenset:
+    return frozenset(name for name, pattern in _TOPICS if pattern.search(text or ""))
 _SEARCH_CLAIM = re.compile(
     r"\bI(?:'ve| have)?\s+(?:searched|looked\s+(?:it\s+)?up|looked\s+(?:for|into|at|through)|checked\s+the\s+(?:model|records))\b",
     re.I,
@@ -71,6 +90,7 @@ _SENTENCE = re.compile(r"[^.!?\n]+[.!?]*\s*")
 _TERM = re.compile(r"[a-z0-9]{4,}")
 
 NO_SEARCH_NOTE = "No search ran, so this answer cannot say nothing is recorded."
+PARTIAL_SEARCH_NOTE = "The search did not cover everything you asked, so this answer cannot say nothing is missing."
 
 
 @dataclass(frozen=True)
@@ -81,25 +101,43 @@ class Lookup:
     succeeded: bool
     found_nothing: bool
     for_question: bool = False
+    topics: frozenset = frozenset()
 
 
 def record_lookup(arguments, result, for_question: bool = False) -> Lookup:
     """A *Lookup* from a tool's arguments and the result it returned."""
-    values = arguments.values() if isinstance(arguments, dict) else []
+    values = list(arguments.values()) if isinstance(arguments, dict) else []
     terms = frozenset(t for v in values if isinstance(v, str) for t in _TERM.findall(v.lower()))
     ok = isinstance(result, dict) and result.get("success") is not False and not result.get("error")
     payload = result.get("result") if isinstance(result, dict) and "result" in result else None
     empty = ok and isinstance(payload, (list, dict, str)) and not payload
-    return Lookup(terms, bool(ok), bool(empty), for_question)
+    asked = " ".join(v.lower() for v in values if isinstance(v, str)) if isinstance(arguments, dict) else ""
+    return Lookup(terms, bool(ok), bool(empty), for_question, _topics(asked))
 
 
 def _backs(lookup: Lookup, sentence: str, question: str, absence: bool) -> bool:
     if not lookup.succeeded or (absence and not lookup.found_nothing):
         return False
+    about = _topics(sentence)
+    if about:
+        return about <= lookup.topics
     if lookup.for_question:
         return True
     words = set(_TERM.findall((sentence + " " + (question or "")).lower()))
     return bool(lookup.terms & words)
+
+
+def _backs_nothing_missing(lookups: Sequence[Lookup], sentence: str, question: str) -> bool:
+    """Nothing is missing only when every fact the question or the sentence is about was looked
+    up, by a lookup that succeeded and found nothing; with no named fact, any matching lookup."""
+    needed = _topics(sentence) | _topics(question)
+    if not needed:
+        return any(_backs(look, sentence, question, True) for look in lookups)
+    covered = set()
+    for look in lookups:
+        if look.succeeded and look.found_nothing:
+            covered |= look.topics
+    return needed <= covered
 
 
 def remove_unbacked_search_claims(text: str, lookups: Sequence[Lookup], question: str = "") -> str:
@@ -112,15 +150,18 @@ def remove_unbacked_search_claims(text: str, lookups: Sequence[Lookup], question
     dropped = False
     for sentence in _SENTENCE.findall(text):
         absence = bool(_ABSENCE_CLAIM.search(sentence))
-        if (absence or _SEARCH_CLAIM.search(sentence)) and not any(
-            _backs(look, sentence, question, absence) for look in lookups or ()
-        ):
+        if _NOTHING_MISSING.search(sentence):
+            backed = _backs_nothing_missing(lookups or (), sentence, question)
+        else:
+            backed = any(_backs(look, sentence, question, absence) for look in lookups or ())
+        if (absence or _SEARCH_CLAIM.search(sentence)) and not backed:
             dropped = True
         else:
             kept.append(sentence)
     if not dropped:
         return text
-    return ("".join(kept).strip() + " " + NO_SEARCH_NOTE).strip()
+    searched = any(look.succeeded and look.for_question for look in lookups or ())
+    return ("".join(kept).strip() + " " + (PARTIAL_SEARCH_NOTE if searched else NO_SEARCH_NOTE)).strip()
 
 
 _WORD = re.compile(r"[a-z0-9$%][a-z0-9$%,.'-]*", re.I)

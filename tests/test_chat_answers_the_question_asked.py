@@ -254,3 +254,81 @@ def test_a_reply_that_says_it_searched_is_kept_when_the_trail_has_a_lookup(clien
     assert [e for e in events if e["type"] == "tool_start"]
     done = [e for e in events if e["type"] == "done"][0]
     assert "I searched" in done["response"]
+
+
+# --- a claim is backed only by a lookup about the fact it is about ---------------
+
+
+def test_nothing_is_missing_needs_a_lookup_for_each_fact_the_question_asked():
+    from app.modules.ai_chat.services.turn_honesty import NO_SEARCH_NOTE, PARTIAL_SEARCH_NOTE, remove_unbacked_search_claims
+
+    text = "I searched and found no such element. Nothing is missing from this answer."
+    out = remove_unbacked_search_claims(text, [_lookup("revenue", NOTHING, True)], SCENARIO)
+    assert "Nothing is missing" not in out and PARTIAL_SEARCH_NOTE in out and NO_SEARCH_NOTE not in out
+    assert "I searched and found no such element." in out
+
+
+def test_a_claim_about_owners_is_not_backed_by_a_revenue_lookup():
+    from app.modules.ai_chat.services.turn_honesty import PARTIAL_SEARCH_NOTE, remove_unbacked_search_claims
+
+    text = "I searched and found no such owner."
+    out = remove_unbacked_search_claims(text, [_lookup("revenue", NOTHING, True)], "what is our revenue and who owns it")
+    assert "found no such owner" not in out and PARTIAL_SEARCH_NOTE in out
+    assert remove_unbacked_search_claims(text, [_lookup("owner", NOTHING)], "who owns it") == text
+
+
+def test_nothing_is_missing_is_kept_when_every_fact_asked_was_looked_up_and_found_nothing():
+    from app.modules.ai_chat.services.turn_honesty import remove_unbacked_search_claims
+
+    text = "Nothing is missing from this answer."
+    question = "what is our monthly burn and our revenue?"
+    both = [_lookup("burn", NOTHING, True), _lookup("revenue", NOTHING, True)]
+    assert remove_unbacked_search_claims(text, both, question) == text
+    assert "Nothing is missing" not in remove_unbacked_search_claims(text, both[:1], question)
+
+
+def test_could_not_find_any_record_is_removed_when_no_lookup_ran():
+    from app.modules.ai_chat.services.turn_honesty import NO_SEARCH_NOTE, remove_unbacked_search_claims
+
+    out = remove_unbacked_search_claims("I could not find any record of that. The launch is in April.", [])
+    assert "could not find" not in out and "The launch is in April." in out and NO_SEARCH_NOTE in out
+    kept = "I could not find any record of that."
+    assert remove_unbacked_search_claims(kept, [_lookup("launch", NOTHING, True)], "when is the launch") == kept
+
+
+def test_what_each_customer_costs_us_runs_a_cost_search():
+    from app.modules.ai_chat.services.turn_honesty import fact_searches
+
+    assert "cost to serve" in fact_searches("What does each customer cost us?")
+    assert "cost to serve" not in fact_searches("How much will the migration cost us?")
+
+
+@pytest.mark.parametrize("question", ["Is our data up to date?", "When is it a good idea to retire an app?"])
+def test_a_general_question_with_date_words_runs_no_date_search(question):
+    from app.modules.ai_chat.services.turn_honesty import fact_searches
+
+    assert fact_searches(question) == []
+
+
+def test_a_question_started_lookup_reads_only_the_organisation_asking(app, make_org, tenant_ctx, db_session):
+    from app.modules.ai_chat.services.agent_runner import AgentRunner
+    from app.modules.ai_chat.services.turn_honesty import remove_unbacked_search_claims
+
+    org_a, org_b = make_org("lookup-a"), make_org("lookup-b")
+    db_session.add(ArchiMateElement(name="Revenue goal of org B", type="Goal", layer="motivation", organization_id=org_b.id))
+    db_session.flush()
+    runner = AgentRunner.__new__(AgentRunner)
+    text = "I searched the model. Nothing is missing from this answer."
+    with tenant_ctx(org_a.id):
+        seen_a = runner._search_model("revenue", 10)
+    with tenant_ctx(org_b.id):
+        seen_b = runner._search_model("revenue", 10)
+    assert seen_a["success"] and seen_a["result"] == []
+    assert [r["name"] for r in seen_b["result"]] == ["Revenue goal of org B"]
+    from app.modules.ai_chat.services.turn_honesty import record_lookup
+
+    look_a = record_lookup({"query": "revenue"}, seen_a, True)
+    look_b = record_lookup({"query": "revenue"}, seen_b, True)
+    assert look_a.found_nothing and not look_b.found_nothing
+    assert remove_unbacked_search_claims(text, [look_a], "what is our revenue") == text
+    assert "Nothing is missing" not in remove_unbacked_search_claims(text, [look_b], "what is our revenue")

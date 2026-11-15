@@ -182,10 +182,11 @@ def test_a_question_with_no_business_fact_runs_no_search_and_the_claim_of_one_is
     assert "Which applications" not in words
 
 
-def test_a_scenario_that_names_revenue_is_searched_and_its_claim_of_a_search_stands(page, server, founder):
+def test_a_scenario_that_names_revenue_keeps_its_search_but_not_a_claim_that_nothing_is_missing(page, server, founder):
     sign_in(page, server, founder["emails"]["enterprise_architect"])
     words, footer = _ask(page, server, SCENARIO, "scenario")
     assert "I searched and found no such element" in words, words
-    assert "No search ran" not in words, words
+    assert "Nothing is missing" not in words, words
+    assert "The search did not cover everything you asked" in words and "No search ran" not in words, words
     assert "No lookup ran" not in footer and "lookup" in footer, footer
     assert "What breaks if Ifiok fails" not in words and "Which applications" not in words
