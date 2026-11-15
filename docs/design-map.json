@@ -1218,6 +1218,12 @@
     "components/risk_detail_modal.html"
    ]
   },
+  "risk-link-picker": {
+   "source": "app",
+   "macros": [
+    "components/risk_link_picker.html"
+   ]
+  },
   "risk-matrix": {
    "source": "app",
    "macros": [
@@ -1406,11 +1412,11 @@
  },
  "inhouse_exceptions": {
   "app/templates/governance/risk_register.html": [
-    {
-      "macro": "components/risk_link_picker.html",
-      "keep_until": "riskstore01",
-      "why": "the one picker that links a risk to what it touches, shared by the register slide-over and the Add Risk dialog"
-    }
+   {
+    "macro": "components/risk_link_picker.html",
+    "keep_until": "riskstore01",
+    "why": "the one picker that links a risk to what it touches, shared by the register slide-over and the Add Risk dialog"
+   }
   ],
   "app/templates/architecture_assistant/index.html": [
    {
@@ -36807,6 +36813,7 @@
     "components/page_header.html",
     "components/pagination_controls.html",
     "components/provenance.html",
+    "components/risk_link_picker.html",
     "components/risk_matrix.html",
     "components/search_bar.html",
     "components/select.html",
@@ -36818,9 +36825,6 @@
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "extra_macros": [
-     "components/risk_link_picker.html"
-   ],
    "block": "data-table",
    "charts": [],
    "components": [
@@ -36839,11 +36843,12 @@
     "table",
     "tabs",
     "provenance",
-    "risk-matrix"
+    "risk-matrix",
+    "risk-link-picker"
    ],
    "confidence": "high",
    "controls": {
-    "button": 15,
+    "button": 14,
     "link": 6,
     "modal": 3,
     "table": 2,
@@ -36857,6 +36862,9 @@
    ],
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/risk_link_picker.html"
    ],
    "frame": "dashboard-01",
    "grid": "G1",
@@ -36878,6 +36886,7 @@
     "components/input.html",
     "components/modal.html",
     "components/provenance.html",
+    "components/risk_link_picker.html",
     "components/risk_matrix.html",
     "components/select.html",
     "macros/page_shell.html"
