@@ -6,7 +6,7 @@ Applications table, the application count and owner coverage all read ``is_appli
 The kind is one stored fact, ``ApplicationComponent.application_kind``. When a person has set it, that
 is the answer. When it is empty the rule decides: a record composed into or aggregated by another
 application component is a part of that application; a record that is a code repository
-(``repository_type`` filled, or a component type of "repository" that nobody owns yet, however it was entered) is not software; every
+(a component type of "repository" that nobody owns yet, however it was entered) is not software; every
 other record is an application.
 """
 from __future__ import annotations
@@ -62,17 +62,15 @@ def _has_parent_expression(model):
 
 
 def _is_repository_expression(model):
-    """SQL boolean: the record is a code repository: it names the kind of repository it is, its component type
-    is "repository", or the connector brought it in as one and nobody has named an owner for it yet (a person
-    naming an owner says it is run)."""
+    """SQL boolean: the record is a code repository, not software: its component type is "repository" (how the
+    connector brings one in, and how a person enters one by hand) and nobody has named an owner for it yet (a
+    person naming an owner says it is run). ``repository_type`` is where an application's own code is hosted,
+    so it says nothing about what the record is."""
     from app.services.element_ownership_service import application_is_owned_expression
 
-    return db.or_(
-        db.and_(model.repository_type.isnot(None), func.btrim(model.repository_type) != ""),
-        db.and_(
-            func.lower(func.btrim(func.coalesce(model.component_type, ""))) == "repository",
-            ~application_is_owned_expression(model),
-        ),
+    return db.and_(
+        func.lower(func.btrim(func.coalesce(model.component_type, ""))) == "repository",
+        ~application_is_owned_expression(model),
     )
 
 
@@ -176,7 +174,7 @@ def kind_of(application) -> dict:
         when = application.application_kind_set_at
         reason = "Set by %s on %s" % (setter or "a person", _day(when)) if when else "Set by a person"
     elif wholes:
-        kind, reason = PART, "Part of %s" % names
+        kind, reason = PART, "Belongs to %s" % names
     elif _is_repository(application):
         kind, reason = NOT_SOFTWARE, "A code repository: it holds the code of software, it is not software you run"
     else:
@@ -187,9 +185,7 @@ def kind_of(application) -> dict:
 def _is_repository(application) -> bool:
     from app.services.element_ownership_service import application_is_owned
 
-    return bool((application.repository_type or "").strip()) or (
-        (application.component_type or "").strip().lower() == "repository" and not application_is_owned(application)
-    )
+    return (application.component_type or "").strip().lower() == "repository" and not application_is_owned(application)
 
 
 def _day(moment) -> str:

@@ -60,7 +60,7 @@ def seed_kind_org(with_viewer=False):
         gateway = add("Alerts Gateway", legacy_application_owner="Dana Reed")
         consumers = add("Alerts Consumers", legacy_application_owner="Dana Reed")
         billing = add("Billing")
-        repo = add("billing-repo", repository_type="GitHub", application_kind="not_software")
+        repo = add("billing-repo", component_type="repository", repository_type="GitHub", application_kind="not_software")
         launch = add("launch-repo", repository_type="GitHub", application_kind="application")
         for part in (gateway, consumers):
             db.session.add(ArchiMateRelationship(
@@ -128,7 +128,7 @@ def test_the_list_and_every_count_show_applications_and_a_change_of_kind_moves_t
     expect(page.get_by_test_id("application-kind-label")).to_have_text("Application")
     parts.get_by_role("link", name="Alerts Gateway").click()
     expect(page.get_by_test_id("application-kind-label")).to_have_text("Part of an application", timeout=PAGE_TIMEOUT)
-    expect(page.get_by_test_id("application-kind-reason")).to_contain_text("Part of Alerts gateway and consumers")
+    expect(page.get_by_test_id("application-kind-reason")).to_contain_text("Belongs to Alerts gateway and consumers")
 
     # the architect says Billing is not software
     page.goto("%s/applications/%d" % (live_server, ids["Billing"]), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -153,7 +153,7 @@ def test_the_list_and_every_count_show_applications_and_a_change_of_kind_moves_t
     # the records left out can be found again from the note, each with its reason and a way to change it
     page.get_by_test_id("left-out-link").click()
     expect(page.get_by_test_id("not-counted-alert")).to_be_visible(timeout=PAGE_TIMEOUT)
-    for name, reason in (("Billing", "Set by"), ("billing-repo", "Set by"), ("Alerts Gateway", "Part of Alerts gateway")):
+    for name, reason in (("Billing", "Set by"), ("billing-repo", "Set by"), ("Alerts Gateway", "Belongs to Alerts gateway")):
         row_id = ids[name]
         expect(page.get_by_test_id("kind-note-%d" % row_id)).to_contain_text(reason)
     _shot(page, "1440-light-not-counted")

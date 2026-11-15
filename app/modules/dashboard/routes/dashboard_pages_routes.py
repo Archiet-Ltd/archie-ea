@@ -1015,7 +1015,7 @@ def get_tco_cost_tiers():
             ),
             cost_col.isnot(None),
         ).scalar() or 0
-        portfolio_tco = db.session.query(func.sum(cost_col)).filter(
+        portfolio_tco = db.session.query(func.sum(cost_col)).filter(is_application_expression(ApplicationComponent)).filter(
             ApplicationComponent.lifecycle_status.in_(
                 ["operational", "testing", "development", "deprecated"]
             ),
@@ -1027,7 +1027,7 @@ def get_tco_cost_tiers():
         for tier in tiers:  # model-safety-ok: small fixed set (5 cost tiers)
             query = db.session.query(
                 func.count(ApplicationComponent.id)
-            ).filter(cost_col.isnot(None))
+            ).filter(is_application_expression(ApplicationComponent)).filter(cost_col.isnot(None))
 
             if tier["max"]:
                 query = query.filter(cost_col >= tier["min"], cost_col < tier["max"])

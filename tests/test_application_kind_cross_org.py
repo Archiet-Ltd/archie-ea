@@ -45,8 +45,10 @@ def two_orgs(db_session, make_org):
     db_session.add(ArchiMateRelationship(
         type="composition", source_id=out["whole"].archimate_element_id, target_id=out["part"].archimate_element_id,
         organization_id=mine.id))
-    # a relationship recorded in the first organisation that points at the second organisation's record
-    db_session.add(ArchiMateRelationship(
+    db_session.flush()
+    # a relationship recorded in the first organisation that points at the second organisation's record: the
+    # relationship guard refuses it now, so it is written below the ORM, as an old stored row would be
+    db_session.execute(ArchiMateRelationship.__table__.insert().values(
         type="composition", source_id=out["whole"].archimate_element_id, target_id=out["their_app"].archimate_element_id,
         organization_id=mine.id))
     db_session.flush()

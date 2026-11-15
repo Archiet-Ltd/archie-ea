@@ -30,12 +30,13 @@ def test_the_rule_settles_parts_repositories_and_a_persons_choice(db_session, ma
     whole = _row(org, "Alerts gateway and consumers")
     part = _row(org, "Alerts Gateway")
     aggregated = _row(org, "Alerts Consumers")
-    repo = _row(org, "billing-repo", repository_type="GitHub")
+    repo = _row(org, "billing-repo", component_type="repository", repository_type="GitHub")
     typed_repo = _row(org, "archiet-go", component_type="repository")
     promoted = _row(org, "archiet-api", component_type="repository", legacy_application_owner="Dana Reed")
     for imported in (typed_repo, promoted):
         db_session.get(ArchiMateElement, imported.archimate_element_id).source_kind = "connector"
     billing = _row(org, "Billing")
+    hosted = _row(org, "Payroll", repository_type="GitHub")
     chosen = _row(org, "Chosen", application_kind="application", repository_type="GitHub")
     by_hand = _row(org, "typed-in-repo", component_type="repository")
     by_hand_chosen = _row(org, "typed-in-chosen", component_type="repository", application_kind="application")
@@ -46,7 +47,7 @@ def test_the_rule_settles_parts_repositories_and_a_persons_choice(db_session, ma
                                          target_id=whole.archimate_element_id, organization_id=org.id))
     db_session.flush()
     with tenant_ctx(org.id):
-        kinds = {row.name: kind_of(row)["kind"] for row in (whole, part, aggregated, repo, typed_repo, promoted, billing, chosen,
+        kinds = {row.name: kind_of(row)["kind"] for row in (whole, part, aggregated, repo, typed_repo, promoted, billing, hosted, chosen,
                                                                   by_hand, by_hand_chosen)}
         listed = db.session.execute(
             db.select(ApplicationComponent.name).where(
@@ -54,18 +55,18 @@ def test_the_rule_settles_parts_repositories_and_a_persons_choice(db_session, ma
         ).scalars().all()
         assert kinds == {"Alerts gateway and consumers": "application", "Alerts Gateway": "part",
                          "Alerts Consumers": "part", "billing-repo": "not_software", "archiet-go": "not_software",
-                         "archiet-api": "application", "Billing": "application", "Chosen": "application",
+                         "archiet-api": "application", "Billing": "application", "Payroll": "application", "Chosen": "application",
                          "typed-in-repo": "not_software", "typed-in-chosen": "application"}
-        assert sorted(listed) == ["Alerts gateway and consumers", "Billing", "Chosen", "archiet-api",
-                                  "typed-in-chosen"]
+        assert sorted(listed) == ["Alerts gateway and consumers", "Billing", "Chosen", "Payroll",
+                                  "archiet-api", "typed-in-chosen"]
         assert [name for _, name in parts_of(whole)] == ["Alerts Consumers", "Alerts Gateway"]
-        assert kind_of(part)["reason"] == "Part of Alerts gateway and consumers"
+        assert kind_of(part)["reason"] == "Belongs to Alerts gateway and consumers"
 
 
 def test_a_row_with_no_stored_kind_is_read_by_the_rule_never_blank(db_session, make_org, tenant_ctx):
     org = make_org("kind-null")
     billing = _row(org, "Billing")
-    repo = _row(org, "billing-repo", repository_type="GitHub")
+    repo = _row(org, "billing-repo", component_type="repository", repository_type="GitHub")
     db_session.flush()
     db_session.execute(
         db.text(

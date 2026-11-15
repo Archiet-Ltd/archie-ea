@@ -30,19 +30,20 @@ def seeded(db_session, make_org):
     db.session.add(architect)
     instantly = _row(mine, "Instantly", legacy_application_owner="Dana Reed", total_cost_of_ownership=1164)
     apollo = _row(mine, "Apollo", legacy_application_owner="Dana Reed", total_cost_of_ownership=2400)
-    chosen = _row(mine, "launch-repo", repository_type="GitHub", application_kind="application")
-    _row(mine, "billing-repo", repository_type="GitHub")
-    _row(mine, "site-repo", component_type="repository")
-    part = _row(mine, "Instantly mailer")
+    chosen = _row(mine, "launch-repo", repository_type="GitHub", application_kind="application", total_cost_of_ownership=500)
+    _row(mine, "billing-repo", component_type="repository", repository_type="GitHub", total_cost_of_ownership=7000)
+    _row(mine, "site-repo", component_type="repository", total_cost_of_ownership=9000)
+    part = _row(mine, "Instantly mailer", total_cost_of_ownership=800)
+    payroll = _row(mine, "Payroll", legacy_application_owner="Dana Reed", repository_type="GitHub", total_cost_of_ownership=100)
     _row(theirs, "Other tenant app", legacy_application_owner="Sam Lee")
     _row(theirs, "other-repo", repository_type="GitHub")
     db.session.add(ArchiMateRelationship(type="composition", source_id=instantly.archimate_element_id,
                                          target_id=part.archimate_element_id, organization_id=mine.id))
     db.session.flush()
-    return {"org": mine, "architect": architect, "names": {instantly.name, apollo.name, chosen.name}}
+    return {"org": mine, "architect": architect, "names": {instantly.name, apollo.name, chosen.name, payroll.name}}
 
 
-def test_every_surface_counts_the_same_three_applications(seeded, client, login_as, tenant_ctx):
+def test_every_surface_counts_the_same_four_applications(seeded, client, login_as, tenant_ctx):
     org, architect = seeded["org"], seeded["architect"]
     figures = {}
 
@@ -57,7 +58,10 @@ def test_every_surface_counts_the_same_three_applications(seeded, client, login_
     login_as(client, architect)
     tiers = client.get("/dashboard/api/tco/cost-tiers")
     assert tiers.status_code == 200
-    figures["cost tiers"] = tiers.get_json()["summary"]["total_portfolio"]
+    tier_body = tiers.get_json()
+    figures["cost tiers"] = tier_body["summary"]["total_portfolio"]
+    assert sum(t["application_count"] for t in tier_body["data"]) == figures["cost tiers"]
+    assert tier_body["summary"]["total_tco"] == 1164 + 2400 + 500 + 100, "the cost totals leave out repositories and parts"
 
     login_as(client, architect)
     metrics = client.get("/api/v1/dashboard/metrics")
@@ -75,4 +79,4 @@ def test_every_surface_counts_the_same_three_applications(seeded, client, login_
         reply = CommandParserService()._handle_health([], architect.id, "general")["response"]
         figures["chat"] = int(re.search(r"\| Applications \| (\d+) \|", reply).group(1))
 
-    assert figures == {"list": 3, "cost tiers": 3, "v1 dashboard": 3, "overview": 3, "owner coverage": 3, "chat": 3}
+    assert figures == {"list": 4, "cost tiers": 4, "v1 dashboard": 4, "overview": 4, "owner coverage": 4, "chat": 4}
