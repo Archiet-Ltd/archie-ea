@@ -573,6 +573,7 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
             max_depth=params["max_depth"],
             direction=params["direction"],
             with_owner=True,
+            with_relations=True,
             page_size=SET_IMPACT_MAX_ROWS,
         )
         if ELEMENT_NOT_FOUND_REASON in result.get("reasons", []):

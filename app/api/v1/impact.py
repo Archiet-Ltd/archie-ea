@@ -235,6 +235,7 @@ def _derived_elements_for_element(element_id: int, *, include_derived: bool, max
 
     result = IntelligenceQueryService.cross_layer_impact(
         element_id,
+        with_relations=True,
         include_derived=include_derived,
         include_stale=False,
         max_depth=max_depth,

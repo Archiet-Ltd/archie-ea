@@ -1340,7 +1340,11 @@ class IntelligenceQueryService:
         with_owner: bool = True,
         cursor: Optional[int] = None,
         page_size: Optional[int] = None,
+        with_relations: bool = False,
     ) -> Dict[str, Any]:
+        """``with_relations`` keeps, on every row, the full list of ways the element
+        was reached (``relations``) for the answer pages and the set walk; the public
+        endpoints leave it off so their row shape stays as documented."""
         if direction not in VALID_DIRECTIONS:
             raise ValueError(f"direction must be one of {sorted(VALID_DIRECTIONS)}")
         if not (1 <= max_depth <= 10):
@@ -1492,6 +1496,8 @@ class IntelligenceQueryService:
                     scope.explicit_rows = explicit_count
                     scope.derived_rows = derived_count
                     scope.stale_rows = stale_count
+                    if not with_relations:
+                        rows = without_relations(rows)
 
                     summary = {
                         "explicit_count": explicit_count,
@@ -1878,6 +1884,7 @@ class IntelligenceQueryService:
         for seed in seeds:
             single = IntelligenceQueryService.cross_layer_impact(
                 seed,
+                with_relations=True,
                 include_derived=include_derived,
                 include_stale=include_stale,
                 max_depth=max_depth,

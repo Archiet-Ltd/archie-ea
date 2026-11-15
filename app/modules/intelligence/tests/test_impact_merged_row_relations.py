@@ -62,3 +62,24 @@ def test_set_impact_names_the_worked_out_source_of_a_merged_element(app, db_sess
     assert [rel["kind"] for rel in row["relations"]] == ["explicit", "derived"]
     assert answer["summary"]["derived_count"] == 1
     assert answer["summary"]["explicit_count"] == 1
+
+
+def test_the_walk_keeps_relations_only_when_asked(app, db_session, make_org):
+    from app.models import ArchiMateElement  # noqa: F401
+
+    from .test_query_service_elements_map import _derived, _element as _el, _relationship
+
+    org = make_org("relations-opt-in")
+    a = _el(db_session, org.id, "Alpha")
+    b = _el(db_session, org.id, "Bravo")
+    _relationship(db_session, org.id, a, b)
+    _derived(db_session, org.id, a, b, chain_element_ids=[a.id, b.id])
+    db_session.commit()
+
+    def walk(**kw):
+        return _as(app, org.id, lambda: IntelligenceQueryService.cross_layer_impact(a.id, include_derived=True, **kw))
+
+    plain = walk()
+    assert all("relations" not in row for row in plain["rows"])
+    full = walk(with_relations=True)
+    assert [len(row["relations"]) for row in full["rows"]] == [2]
