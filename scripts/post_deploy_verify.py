@@ -51,9 +51,10 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 from xml.etree import ElementTree
 
-DEFAULT_BASE = "https://entelim.org"
+DEFAULT_BASE = (os.environ.get("PUBLIC_BASE_URL") or "https://entelim.tech").rstrip("/")
 DEFAULT_DROPLET = "root@134.122.105.56"
 DEFAULT_APP_DIR = "/root/archie-ea"
 
@@ -129,19 +130,42 @@ def check_pages(base: str) -> list:
     return problems
 
 
-def sitemap_urls(base: str) -> list:
-    """Every <loc> in the live sitemap.xml, read the same way check_pages()
-    reads any other public page -- no new dependency, just the stdlib XML
-    parser already available everywhere Python is."""
-    status, body = _fetch(base.rstrip("/") + "/sitemap.xml")
-    if status != 200 or not body:
-        return []
+_SITEMAP_NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+
+
+def _sitemap_locs(body: str):
+    """(is_index, [<loc> text]) for one sitemap document; (False, []) if unreadable."""
     try:
         root = ElementTree.fromstring(body)
     except ElementTree.ParseError:
+        return False, []
+    locs = [loc.text.strip() for loc in root.findall(".//%sloc" % _SITEMAP_NS) if loc.text]
+    return root.tag == _SITEMAP_NS + "sitemapindex", locs
+
+
+def sitemap_urls(base: str) -> list:
+    """Every page address in the live sitemap.xml.
+
+    /sitemap.xml is an index naming one sitemap per language, so each child is
+    fetched from the same base (the index names the site's public address,
+    which a deploy check against another address cannot reach) and its pages
+    returned. A plain sitemap is read as before."""
+    base = base.rstrip("/")
+    status, body = _fetch(base + "/sitemap.xml")
+    if status != 200 or not body:
         return []
-    ns = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
-    return [loc.text.strip() for loc in root.findall(f".//{ns}loc") if loc.text]
+    is_index, locs = _sitemap_locs(body)
+    if not is_index:
+        return locs
+    pages = []
+    for child in locs:
+        child_status, child_body = _fetch(base + urlsplit(child).path)
+        if child_status != 200 or not child_body:
+            continue
+        child_is_index, child_locs = _sitemap_locs(child_body)
+        if not child_is_index:
+            pages.extend(child_locs)
+    return pages
 
 
 def _indexnow_key() -> str:

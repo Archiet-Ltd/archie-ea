@@ -418,7 +418,7 @@
                             <template x-for="(link, linkIdx) in selectedRisk.entity_links" :key="link.id || ('element-' + linkIdx)">
                                 <li class="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5 text-sm">
                                     <span class="min-w-0">
-                                        <span class="inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1.5" x-text="link.entity_type"></span>
+                                        <span class="inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1.5" x-text="link.entity_kind || link.entity_type"></span>
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
                                         <span x-show="link.via === 'element'" class="ml-1.5 text-xs text-muted-foreground">(linked through the risk's element)</span>
                                     </span>
@@ -427,7 +427,7 @@
                             </template>
                         </ul>
                     </template>
-                    <p x-show="!(selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length)" x-cloak class="text-xs text-muted-foreground">Not mapped to any Application, Capability, Solution or Programme yet.</p>
+                    <p x-show="!(selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length)" x-cloak class="text-xs text-muted-foreground">Not mapped to anything yet. Map it to where its cause sits: an application, product, goal, driver, business actor, capability, solution or programme.</p>
 
                     {% if can_write %}
                     <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3">

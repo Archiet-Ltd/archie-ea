@@ -39,6 +39,7 @@ DEPLOY_DATA_COMMANDS = frozenset(
         "backfill-vendor-links",
         "backfill-decision-register-consolidation",
         "backfill-solution-risk-merge",
+        "backfill-risk-link-relationships",
         "backfill-audit-trail",
         "backfill-review-queue-approvals",
         "backfill-work-package-org",

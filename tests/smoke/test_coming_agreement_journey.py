@@ -77,7 +77,7 @@ def _walk(browser, base, switch):
             assert _open(page, base, "/early-access") == 200
             hub = _rows(page, '[data-testid="early-access-hub"] ul')
             page.screenshot(path=str(SHOTS / ("hub-switch-%s-%s-%d.png" % (switch, scheme, width))), full_page=True)
-            sitemap = page.request.get(base + "/sitemap.xml").text()
+            sitemap = page.request.get(base + "/sitemap-en.xml").text()
             sitemap_paths = [urlsplit(u).path or "/" for u in re.findall(r"<loc>([^<]+)</loc>", sitemap)]
 
             names = [n.lower() for n, _s, _h in coming] + [n.lower() for n, _s, _h in available]
