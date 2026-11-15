@@ -984,17 +984,13 @@ def application_edit(id):
             flash("Application updated successfully!", "success")
             # Return to the page the person came from, with a whitelist.
             return_to = request.form.get("return_to")
-            allowed_return = {"fact-sheet", "detail", "list"}
-            if return_to in allowed_return:
-                if return_to == "fact-sheet":
-                    return redirect(url_for("unified_applications.application_fact_sheet", id=app.id))
-                elif return_to == "list":
-                    return redirect(url_for("unified_applications.application_list"))
-                else:  # detail
-                    tab = detail_tab(request.form.get("return_tab")) or "overview"
-                    return redirect(url_for("unified_applications.application_detail", id=app.id, tab=tab))
-            # Default: back to the detail page overview tab
-            return redirect(url_for("unified_applications.application_detail", id=app.id, tab="overview"))
+            if return_to == "fact-sheet":
+                return redirect(url_for("unified_applications.application_fact_sheet", id=app.id))
+            if return_to == "list":
+                return redirect(url_for("unified_applications.application_list"))
+            # The tab the person came from, whenever one is sent; else the Architecture tab, as before.
+            tab = detail_tab(request.form.get("return_tab")) or "architecture"
+            return redirect(url_for("unified_applications.application_detail", id=app.id, tab=tab))
 
         # Current architecture state, for pre-selecting the control below —
         # read from the linked ArchiMateElement, same resolution
