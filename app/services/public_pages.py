@@ -280,7 +280,7 @@ MODULE_RECORDINGS: dict[str, dict[str, str]] = {
     },
     "risk-register": {
         "title": "See which risk would hit the most of your estate",
-        "promise": "Know which risk reaches the most of what you run.",
+        "promise": "The risk register ranks every risk by how many model elements it reaches, showing blast radius across your estate. Open any risk to see its impact graph.",
         "summary": ("Opens the risk register, which ranks every risk by the number of model elements it reaches and "
                     "names them. Following one named application opens its impact graph, showing what depends on it "
                     "and what it depends on."),
