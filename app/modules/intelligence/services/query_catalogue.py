@@ -762,6 +762,51 @@ def _risk_cost(organization_id: int, risk: Optional[str] = None, **_: Any) -> Di
     return out
 
 
+
+
+def _top_risks(organization_id: int, limit: Any = None, **_: Any) -> Dict[str, Any]:
+    """"What are our top risks?" -- the open risks of the register, highest score first, each with its
+    level, score, owner and what it touches. Read from the one risk register (``risks``) through
+    ``risk_service.ranked_risks``; the order is the recorded score, ties by title, and nothing is
+    invented when the register holds none."""
+    from app.models.risk import RiskStatus
+    from app.services import risk_service
+
+    try:
+        shown = max(1, min(int(limit), 25)) if limit else 5
+    except (TypeError, ValueError):
+        shown = 5
+    rows_all = [r for r in risk_service.ranked_risks(organization_id)["rows"]
+                if r["status"] != RiskStatus.CLOSED.value]
+    rows_all.sort(key=lambda r: (-(r["risk_score"] or 0), (r["title"] or "").lower(), r["risk_id"]))
+    owners = {}
+    if rows_all:
+        from app.models.risk import Risk
+        owners = dict(db.session.execute(
+            db.select(Risk.id, Risk.owner).where(Risk.organization_id == organization_id)).all())
+    rows: List[Dict[str, Any]] = []
+    citations: List[Dict[str, Any]] = []
+    for r in rows_all[:shown]:
+        touches = ", ".join(t["name"] for t in r["touches"][:3]) or "no linked records yet"
+        rows.append({
+            "id": r["risk_id"],
+            "name": r["title"],
+            "source_line": "%s, %s of 25. Owner: %s. Touches: %s." % (
+                (r["risk_level"] or "Level not recorded"), r["risk_score"],
+                owners.get(r["risk_id"]) or "not recorded", touches),
+            "source_table": "risks",
+            "truth_class": truth_class_for("risks"),
+        })
+        citations.append(risk_citation(r["risk_id"], r["title"]))
+    if rows:
+        answer = "the %d highest-scoring open risks in the risk register" % len(rows)
+        reason = "%d open risks are recorded; these score highest" % len(rows_all)
+    else:
+        answer = "the highest-scoring open risks in the risk register"
+        reason = "no open risks are recorded in the risk register yet"
+    return {"answer": answer, "rows": rows, "total": len(rows_all), "citations": citations, "reason": reason}
+
+
 def _risk_url(risk_id: int) -> Optional[str]:
     from flask import has_request_context, url_for
 
@@ -1107,6 +1152,13 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         description="What the company sells, who its customers are, where it is based, what technology its site uses and who leads it, from the facts confirmed from its own website, each cited to the page it was read from.",
         params=["topic"],
         run=_company_profile,
+    ),
+    "top_risks": CatalogueEntry(
+        id="top_risks",
+        title="What are our top risks?",
+        description="The open risks in the risk register with the highest scores, each with its level, owner and what it touches.",
+        params=["limit"],
+        run=_top_risks,
     ),
     "risk_cost": CatalogueEntry(
         id="risk_cost",
