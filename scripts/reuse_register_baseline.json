@@ -162,16 +162,6 @@
    "app/services/sample_company_service.py": 1,
    "app/services/semantic_linking_service.py": 1
   },
-  "capability-support/unified-mapping-row": {
-   "app/application_mgmt/routes.py": 1,
-   "app/modules/ai_chat/services/ai_data_interaction_service.py": 1,
-   "app/modules/ai_chat/services/ai_import_service.py": 2,
-   "app/modules/applications/routes/import_export_routes.py": 3,
-   "app/modules/applications/services/application_capability_mapper.py": 1,
-   "app/modules/applications/services/application_mapping_orchestrator.py": 1,
-   "app/services/ai_import_service.py": 2,
-   "app/services/capability_mapping_inference_service.py": 1
-  },
   "capability-visibility/visibility-helper": {
    "app/modules/portfolio/services/demand_triage.py": 2
   },

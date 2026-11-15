@@ -20,7 +20,11 @@ from app.models.archimate_element_types import is_application_kind
 # Define the logger
 logger = logging.getLogger(__name__)
 
-from app.services.capability_support import SUPPORT_LEVELS
+from app.services.capability_support import (
+    SUPPORT_LEVELS,
+    CapabilitySupportRefused,
+    record_support_for_records,
+)
 from flask import (
     current_app,
     flash,
@@ -814,15 +818,20 @@ def _link_application_to_capabilities(app, capabilities_str):
             # Check if mapping already exists using prefetched set
             if capability.id not in existing_mapping_keys:
                 # Create new mapping
-                mapping = UnifiedApplicationCapabilityMapping(
-                    application_component_id=app.id,
-                    unified_capability_id=capability.id,
-                    support_level="partial",  # Default support level
-                    coverage_percentage=50,  # Default 50% coverage
-                    relationship_type="enables",
-                    notes=f"Auto-linked from import: {cap_name}",
-                )
-                db.session.add(mapping)
+                try:
+                    record_support_for_records(
+                        app.organization_id,
+                        app.id,
+                        capability.id,
+                        facts={
+                            "support_level": "partial",  # Default support level
+                            "coverage_percentage": 50,  # Default 50% coverage
+                            "notes": f"Auto-linked from import: {cap_name}",
+                        },
+                    )
+                except CapabilitySupportRefused:
+                    not_found.append(cap_name)
+                    continue
                 existing_mapping_keys.add(
                     capability.id
                 )  # Update set to prevent duplicates

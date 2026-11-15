@@ -110,10 +110,8 @@ def _models():
 # ---------------------------------------------------------------------------
 # Identity: capability records and application rows
 # ---------------------------------------------------------------------------
-def capability_for_element(organization_id: int, element, *, flush: bool = True):
-    """The capability record for a Capability element, made through the one creator when absent."""
-    from app.modules.capabilities.services.capability_service import ensure_capability_record
-
+def existing_capability_record(organization_id: int, element):
+    """The capability record for a Capability element, or ``None``. Reads only; never writes."""
     _, _, _, _, UnifiedCapability = _models()
     if element is None or element.organization_id != organization_id:
         raise CapabilitySupportRefused("That capability is not in this workspace.")
@@ -152,6 +150,16 @@ def capability_for_element(organization_id: int, element, *, flush: bool = True)
         )
         if projected is not None:
             return projected
+    return None
+
+
+def capability_for_element(organization_id: int, element, *, flush: bool = True):
+    """The capability record for a Capability element, made through the one creator when absent."""
+    from app.modules.capabilities.services.capability_service import ensure_capability_record
+
+    found = existing_capability_record(organization_id, element)
+    if found is not None:
+        return found
     record, _ = ensure_capability_record(
         name=element.name,
         organization_id=organization_id,
@@ -388,6 +396,140 @@ def _record_capability_support(
     row.is_active = True
     db.session.flush()
     return SupportResult(created, rel.id, row.id, app_el.name, cap_el.name, kind)
+
+
+def _application_element(organization_id: int, application):
+    """The element standing for an application row, made through the one backbone creator when absent."""
+    from app.services.archimate_backbone import ensure_archimate_element
+
+    _, Element, _, _, _ = _models()
+    if application is None or application.organization_id != organization_id:
+        raise CapabilitySupportRefused("That application is not in this workspace.")
+    element = ensure_archimate_element(application)
+    if element is None or element.organization_id != organization_id:
+        raise CapabilitySupportRefused("That application has no place in the model yet, so the link could not be saved.")
+    return element
+
+
+def _capability_element(organization_id: int, capability):
+    """The Capability element for a capability record: its own, the one of that name, or a new one."""
+    from app.services.archimate_backbone import create_backbone_element
+
+    _, Element, _, _, _ = _models()
+    if capability is None or capability.organization_id not in (None, organization_id):
+        raise CapabilitySupportRefused("That capability is not in this workspace.")
+    if capability.archimate_element_id:
+        element = db.session.query(Element).filter(
+            Element.id == capability.archimate_element_id, Element.organization_id == organization_id
+        ).first()
+        if element is None:
+            raise CapabilitySupportRefused("That capability is not in this workspace.")
+        return element
+    named = _elements_named(organization_id, capability.name, "capability")
+    element = named[0] if named else create_backbone_element(
+        element_type="Capability", layer="Strategy", name=capability.name, organization_id=organization_id
+    )
+    if capability.organization_id == organization_id:
+        capability.archimate_element_id = element.id
+    return element
+
+
+def record_support_for_records(
+    organization_id: int,
+    application_id: int,
+    capability_id: int,
+    kind: str = "realization",
+    facts: Optional[Dict[str, Any]] = None,
+    actor_id: Optional[int] = None,
+) -> SupportResult:
+    """Record support given the application row and the capability record, as the older writers hold them.
+
+    Finds or makes the two elements, then records through ``record_capability_support``. A row already
+    written for the pair without a relationship is taken over, not duplicated."""
+    ApplicationComponent, _, _, _, UnifiedCapability = _models()
+    application = db.session.query(ApplicationComponent).filter(
+        ApplicationComponent.id == application_id, ApplicationComponent.organization_id == organization_id
+    ).first()
+    capability = db.session.query(UnifiedCapability).filter(UnifiedCapability.id == capability_id).first()
+    if application is None:
+        raise CapabilitySupportRefused("That application is not in this workspace.")
+    try:
+        with db.session.begin_nested():
+            app_el = _application_element(organization_id, application)
+            cap_el = _capability_element(organization_id, capability)
+    except CapabilitySupportRefused:
+        raise
+    except Exception:
+        logger.exception("could not find the model elements for capability support")
+        raise CapabilitySupportRefused(SAVE_FAILED)
+    return record_capability_support(
+        organization_id, app_el.id, cap_el.id, kind=kind, facts=facts, actor_id=actor_id
+    )
+
+
+def backfill_unprojected_support(organization_id: Optional[int] = None) -> Dict[str, int]:
+    """Give every support row written without a relationship its relationship; change nothing already linked.
+
+    Counts are returned (and logged by the caller) so a run can be read before and after. A second run
+    finds nothing to do. A second row for a pair that already has one is removed after its facts have
+    been copied into the first where the first had none."""
+    _, _, _, Row, _ = _models()
+    query = db.session.query(Row).filter(Row.archimate_relationship_id.is_(None))
+    if organization_id is not None:
+        query = query.filter(Row.organization_id == organization_id)
+    orphans = query.order_by(Row.id).all()
+    counts = {"before": len(orphans), "linked": 0, "duplicates_removed": 0, "left": 0}
+    left_ids: List[int] = []
+    for row in orphans:
+        if row.archimate_relationship_id is not None or row in db.session.deleted:
+            continue
+        try:
+            _, _, _, _, UnifiedCapability = _models()
+            shared = db.session.query(UnifiedCapability).filter(
+                UnifiedCapability.id == row.unified_capability_id,
+                UnifiedCapability.organization_id.is_(None),
+            ).first()
+            if shared is not None:
+                # A shared catalogue entry: the organisation's own record of it carries the support.
+                with db.session.begin_nested():
+                    own = capability_for_element(row.organization_id, _capability_element(row.organization_id, shared))
+                    row.unified_capability_id = own.id
+                    db.session.flush()
+            record_support_for_records(
+                row.organization_id, row.application_component_id, row.unified_capability_id
+            )
+        except Exception:
+            logger.exception("support row %s could not be given a relationship", row.id)
+            left_ids.append(row.id)
+    db.session.flush()
+    linked_by_pair = {}
+    for row in db.session.query(Row).filter(Row.archimate_relationship_id.isnot(None)):
+        linked_by_pair.setdefault(
+            (row.organization_id, row.application_component_id, row.unified_capability_id), row
+        )
+    for row in orphans:
+        if row.archimate_relationship_id is not None:
+            counts["linked"] += 1
+            continue
+        mate = linked_by_pair.get(
+            (row.organization_id, row.application_component_id, row.unified_capability_id)
+        )
+        if mate is None or row.id in left_ids:
+            counts["left"] += 1
+            continue
+        if mate.notes in (None, ""):
+            mate.notes = row.notes
+        if mate.coverage_percentage is None:
+            mate.coverage_percentage = row.coverage_percentage
+        if mate.maturity_level is None:
+            mate.maturity_level = row.maturity_level
+        db.session.delete(row)
+        counts["duplicates_removed"] += 1
+    db.session.flush()
+    counts["after"] = counts["left"]
+    if left_ids:
+        logger.warning("support rows that could not be given a relationship: %s", left_ids)
+    return counts
 
 
 def _apply_facts(row, clean: Dict[str, Any]) -> None:

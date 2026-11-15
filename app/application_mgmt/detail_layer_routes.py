@@ -103,6 +103,7 @@ def update_document_file(id, doc_id):
     methods=["POST"],
 )
 @login_required
+@require_roles("admin", "architect")
 def update_capability_mapping(id, mapping_id):
     """Update capability mapping."""
     app = ApplicationComponent.query.get_or_404(id)
@@ -326,6 +327,7 @@ def application_vendor_footprint(id):
 
 @application_mgmt.route("/applications/<int:id>/capability-mappings", methods=["POST"])
 @login_required
+@require_roles("admin", "architect")
 def application_capability_mapping_create(id):
     """Record that this application supports a capability."""
     from app.services import capability_support as support
@@ -384,6 +386,7 @@ def application_capability_mapping_create(id):
     methods=["POST"],
 )
 @login_required
+@require_roles("admin", "architect")
 def application_capability_mapping_delete(id, mapping_id):
     """Take a supported capability off this application."""
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping as Row

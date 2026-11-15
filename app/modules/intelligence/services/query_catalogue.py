@@ -1110,8 +1110,9 @@ def _applications_of_capability(organization_id: int, capability: Optional[str] 
         }
     rows, citations = [], []
     for element in elements:
-        record = support.capability_for_element(organization_id, element)
-        for r in support.applications_of_capability(organization_id, record.id):
+        # A lookup only: asking what supports a capability never makes the capability's record.
+        record = support.existing_capability_record(organization_id, element)
+        for r in (support.applications_of_capability(organization_id, record.id) if record is not None else []):
             rows.append({
                 "id": r["application_id"], "name": r["application_name"], "how": r["kind_word"],
                 "support_level": (r["support_level"] or "").capitalize() or None,

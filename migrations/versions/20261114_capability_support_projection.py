@@ -55,8 +55,24 @@ def upgrade():
             "WHERE a.id = m.application_component_id AND m.organization_id IS NULL"
         )
     )
-    # A row whose application is gone or has no organisation cannot be placed in one.
-    bind.execute(text(f"DELETE FROM {_TABLE} WHERE organization_id IS NULL"))  # nosec B608 - literal table name
+    # An application with no organisation of its own is placed by its capability. A row that neither
+    # names is the only kind removed, and its count and ids are printed first.
+    bind.execute(
+        text(
+            f"UPDATE {_TABLE} AS m SET organization_id = c.organization_id "  # nosec B608 - literal table name
+            "FROM unified_capabilities AS c "
+            "WHERE c.id = m.unified_capability_id AND m.organization_id IS NULL AND c.organization_id IS NOT NULL"
+        )
+    )
+    unplaced = [
+        r[0]
+        for r in bind.execute(
+            text(f"SELECT id FROM {_TABLE} WHERE organization_id IS NULL ORDER BY id")  # nosec B608 - literal table name
+        )
+    ]
+    print(f"capability support: {len(unplaced)} row(s) with no application or capability organisation removed: {unplaced}")
+    if unplaced:
+        bind.execute(text(f"DELETE FROM {_TABLE} WHERE organization_id IS NULL"))  # nosec B608 - literal table name
     bind.execute(text(f"ALTER TABLE {_TABLE} ALTER COLUMN organization_id SET NOT NULL"))
     bind.execute(
         text(

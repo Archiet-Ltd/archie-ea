@@ -116,3 +116,20 @@ def test_another_organisations_names_are_not_resolved_by_the_review(db_session, 
     lookup = change_review._TOOL_TARGETS["link_application_to_capability"]
     refused = lookup({"application_name": "Monelytics", "capability_name": CAPABILITY}, other.id)
     assert refused.ok is False
+
+
+def test_asking_who_supports_a_capability_never_makes_a_capability_record(db_session, make_org, tenant_ctx):
+    from app.models.unified_capability import UnifiedCapability
+    from app.services.archimate_backbone import create_backbone_element
+
+    org, _rows, _cap, user = _world(db_session, make_org)
+    create_backbone_element(element_type="Capability", layer="Strategy", name="Only Modelled", organization_id=org.id)
+    count = lambda: db_session.query(UnifiedCapability).filter(UnifiedCapability.organization_id == org.id).count()  # noqa: E731
+    before = count()
+    from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
+
+    with tenant_ctx(org.id):
+        answer = ToolExecutor(user.id, persona="enterprise_architect").execute(
+            ToolCall(id="t", name="find_applications_by_capability", arguments={"capability_name": "Only Modelled"}))
+    assert answer["success"] is True and answer["result"] == []
+    assert count() == before

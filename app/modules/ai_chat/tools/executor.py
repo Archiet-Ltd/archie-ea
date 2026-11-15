@@ -2081,8 +2081,10 @@ class ToolExecutor:
             return None
         rows = []
         for element in elements:
-            record = support.capability_for_element(org_id, element)
-            rows.extend(support.applications_of_capability(org_id, record.id))
+            # A lookup only: asking who supports a capability never makes the capability's record.
+            record = support.existing_capability_record(org_id, element)
+            if record is not None:
+                rows.extend(support.applications_of_capability(org_id, record.id))
         apps = {
             a.id: a for a in ApplicationComponent.query.filter(
                 ApplicationComponent.organization_id == org_id,

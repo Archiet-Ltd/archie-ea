@@ -1784,16 +1784,17 @@ Provide analysis in JSON format:
                 for mapping in capability_mappings:
                     try:
                         # Check if mapping already exists
+                        from app.services.capability_support import record_support_for_records
+
+                        target_app = ApplicationComponent.query.get(application_id)
                         existing = UnifiedApplicationCapabilityMapping.query.filter_by(
                             application_component_id=application_id, unified_capability_id=mapping["capability_id"]
                         ).first()
 
-                        if not existing:
-                            new_mapping = UnifiedApplicationCapabilityMapping(
-                                application_component_id=application_id,
-                                unified_capability_id=mapping["capability_id"],
+                        if not existing and target_app is not None:
+                            record_support_for_records(
+                                target_app.organization_id, application_id, mapping["capability_id"]
                             )
-                            db.session.add(new_mapping)
                             results["capability_mappings_created"] += 1
                     except Exception:
                         results["errors"].append("Capability mapping failed. Please check data format.")
@@ -2098,12 +2099,9 @@ Provide analysis in JSON format:
                             if not UnifiedApplicationCapabilityMapping.query.filter_by(
                                 application_component_id=app.id, unified_capability_id=m["capability_id"]
                             ).first():
-                                db.session.add(
-                                    UnifiedApplicationCapabilityMapping(
-                                        application_component_id=app.id,
-                                        unified_capability_id=m["capability_id"],
-                                    )
-                                )
+                                from app.services.capability_support import record_support_for_records
+
+                                record_support_for_records(app.organization_id, app.id, m["capability_id"])
                                 result["mappings_created"]["capabilities"] += 1
                 except Exception as e:
                     result["errors"].append(f"Capability error: {e}")

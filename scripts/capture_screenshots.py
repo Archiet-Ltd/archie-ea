@@ -373,6 +373,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int, with_duplicate_copy
         from app.models.unified_application_capability_mapping import (
             UnifiedApplicationCapabilityMapping,
         )
+        from app.services.capability_support import record_support_for_records
 
         app_list = list(apps.values())[:8]
         cap_list = list(caps.values())[:8]
@@ -382,9 +383,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int, with_duplicate_copy
             ).first()
             if exists:
                 continue
-            db.session.add(UnifiedApplicationCapabilityMapping(
-                application_component_id=app_row.id, unified_capability_id=cap_row.id,
-            ))
+            record_support_for_records(app_row.organization_id, app_row.id, cap_row.id)
         db.session.flush()
 
         # The portfolio's initiatives come from seed_demo_company (one seed): seven, each with its benefit and the
