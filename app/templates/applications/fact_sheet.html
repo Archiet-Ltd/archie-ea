@@ -73,7 +73,7 @@
       actions=[
         {'text': 'Trace', 'icon': 'route', 'variant': 'outline',
          'href': url_for('architect_ui.traceability_matrix', element=app.archimate_element_id)} if app.archimate_element_id else {},
-        {'text': 'Edit', 'icon': 'pencil', 'variant': 'primary',
+        {'text': 'Edit', 'icon': 'pencil', 'variant': 'default',
          'href': url_for('unified_applications.application_edit', id=app.id, return_to='fact-sheet')}
       ]
   ) }}
