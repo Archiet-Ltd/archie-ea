@@ -29,11 +29,11 @@
                 return this.labels[type] || type;
             },
 
-            get canCreate() {
+            canCreate() {
                 return this.searched && !this.exact && this.typed !== '';
             },
 
-            get createLabel() {
+            createLabel() {
                 return 'Create a new ' + this.typeLabel(this.chosenType).toLowerCase() + " named '" + this.typed + "'";
             },
 

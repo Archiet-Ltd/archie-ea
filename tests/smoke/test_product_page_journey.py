@@ -379,7 +379,7 @@ def test_adding_an_element_to_an_empty_layer_lists_it_after_a_reload(view, live_
     dialog.get_by_role("combobox").fill(name)
     create = dialog.locator("[data-testid='product-add-create-technology-submit']")
     create.wait_for(state="visible")
-    dialog.get_by_label("Type").select_option("Node")
+    dialog.locator("select[name=element_type]").select_option("Node")
     _shot(page, "add-technology-dialog", scheme, width)
     create.click()
     page.wait_for_selector("[data-testid='product-layers']", timeout=PAGE_TIMEOUT)
