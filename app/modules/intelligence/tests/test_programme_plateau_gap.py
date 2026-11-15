@@ -164,7 +164,7 @@ def _gap(
     return gap
 
 
-def _make_user(db_session, org, *, enterprise_role=None):
+def _make_user(db_session, org, *, enterprise_role=None, org_admin=True):
     from app.models.user import Role, User
 
     # tenant-scoping-ok: Role is a global RBAC table with no organization_id column.
@@ -174,13 +174,16 @@ def _make_user(db_session, org, *, enterprise_role=None):
         # tenant-scoping-ok: Role is a global RBAC table with no organization_id column.
         admin_role = Role.query.filter_by(name="Administrator").first()
 
+    # tenant-scoping-ok: Role is global reference data shared by every organisation
+    member_role = Role.query.filter_by(name="User").first()
+
     user = User(
         email=f"pgap-{uuid.uuid4().hex[:10]}@example.com",
         first_name="Test",
         last_name="User",
         organization_id=org.id,
-        role=admin_role,
-        is_org_admin=True,
+        role=admin_role if org_admin else member_role,
+        is_org_admin=org_admin,
         confirmed=True,
         enterprise_role=enterprise_role,
     )
@@ -713,7 +716,10 @@ def test_fabrication_every_absent_block_is_all_none_never_falsy(app, db_session,
 
 def test_route_redacts_gap_estimated_cost_without_budget_authority(app, db_session, make_org, client, login_as):
     org = make_org("plategap-route-redact")
-    user = _make_user(db_session, org, enterprise_role="solution_architect")
+    user = _make_user(db_session, org, enterprise_role="solution_architect", org_admin=False)
+    from app.services.cost_visibility import costs_visible
+
+    assert costs_visible(user) is False  # the one rule refuses this person, so the figure must not appear
     a = _element(db_session, org.id, "A")
     g1 = _gap(db_session, org.id, name="Costed gap", estimated_cost=5000.0)
     _work_package(db_session, a, name="Migrate", gap_id=g1.id)
@@ -728,6 +734,24 @@ def test_route_redacts_gap_estimated_cost_without_budget_authority(app, db_sessi
     # Unrelated fields are not financial figures and stay visible.
     assert row["gap"]["gap_id"] == g1.id
     assert row["gap"]["name"] == "Costed gap"
+
+
+def test_route_does_not_redact_gap_estimated_cost_for_an_organisation_administrator(
+    app, db_session, make_org, client, login_as
+):
+    org = make_org("plategap-route-admin")
+    user = _make_user(db_session, org, enterprise_role="solution_architect", org_admin=True)
+    a = _element(db_session, org.id, "A")
+    g1 = _gap(db_session, org.id, name="Costed gap", estimated_cost=5000.0)
+    _work_package(db_session, a, name="Migrate", gap_id=g1.id)
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get(f"/api/v1/intelligence/programme/{a.id}")
+    assert resp.status_code == 200
+    row = resp.get_json()["data"]["work_packages"][0]
+    assert row["gap"]["estimated_cost"] == 5000.0
+    assert row["gap"]["access_reason"] is None
 
 
 def test_route_does_not_redact_gap_estimated_cost_for_cto(app, db_session, make_org, client, login_as):

@@ -103,7 +103,7 @@ def _licence(
     return row
 
 
-def _make_user(db_session, org, *, enterprise_role=None):
+def _make_user(db_session, org, *, enterprise_role=None, org_admin=True):
     from app.models.user import Role, User
 
     admin_role = Role.query.filter_by(name="Administrator").first()  # tenant-scoping-ok: Role is global reference data shared by every organisation
@@ -111,13 +111,16 @@ def _make_user(db_session, org, *, enterprise_role=None):
         Role.insert_roles()
         admin_role = Role.query.filter_by(name="Administrator").first()  # tenant-scoping-ok: Role is global reference data shared by every organisation
 
+    # tenant-scoping-ok: Role is global reference data shared by every organisation
+    member_role = Role.query.filter_by(name="User").first()
+
     user = User(
         email=f"portfolio-block-{uuid.uuid4().hex[:8]}@example.com",
         first_name="Test",
         last_name="User",
         organization_id=org.id,
-        role=admin_role,
-        is_org_admin=True,
+        role=admin_role if org_admin else member_role,
+        is_org_admin=org_admin,
         confirmed=True,
         enterprise_role=enterprise_role,
     )
@@ -595,7 +598,10 @@ def test_portfolio_route_redacts_financial_figures_for_a_role_without_budget_aut
     import datetime as _dt
 
     org = make_org("portfolio-block-route-redact")
-    user = _make_user(db_session, org, enterprise_role="solution_architect")
+    user = _make_user(db_session, org, enterprise_role="solution_architect", org_admin=False)
+    from app.services.cost_visibility import costs_visible
+
+    assert costs_visible(user) is False  # the one rule refuses this person, so no figure may appear
     a = _element(db_session, org.id, "A")
     comp = _component(db_session, org.id, a, health_status="at_risk", total_cost_of_ownership=5000.0, maintenance_cost=1000.0)
     _cost_row(db_session, comp, fiscal_year=2026, total_cost=6000.0, total_budget=6500.0, variance=500.0)
@@ -633,6 +639,25 @@ def test_portfolio_route_redacts_financial_figures_for_a_role_without_budget_aut
     assert licence["quantity_used"] == 5
     assert licence["under_used"] is True
     assert licence["compliance_status"] == "compliant"
+
+
+def test_portfolio_route_does_not_redact_for_an_organisation_administrator(
+    app, db_session, make_org, client, login_as
+):
+    org = make_org("portfolio-block-route-admin")
+    user = _make_user(db_session, org, enterprise_role="solution_architect", org_admin=True)
+    a = _element(db_session, org.id, "A")
+    comp = _component(db_session, org.id, a, total_cost_of_ownership=5000.0)
+    _cost_row(db_session, comp, fiscal_year=2026, total_cost=6000.0, total_budget=6500.0, variance=500.0)
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get(f"/api/v1/intelligence/portfolio/{a.id}")
+    component = resp.get_json()["data"]["component"]
+
+    assert component["cost"]["total_cost_of_ownership"] == 5000.0
+    assert component["cost"]["access_reason"] is None
+    assert component["cost_by_period"]["total_cost"] == 6000.0
 
 
 def test_portfolio_route_does_not_redact_for_cto(app, db_session, make_org, client, login_as):
