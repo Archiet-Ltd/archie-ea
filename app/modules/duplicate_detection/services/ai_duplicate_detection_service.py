@@ -327,6 +327,13 @@ class AIDuplicateDetectionService:
         """
         start_time = datetime.utcnow()
 
+        if getattr(g, "current_org_id", None) is None:
+            return {
+                "success": False,
+                "error": "Duplicate detection needs an organisation. Sign in to an organisation and run it again.",
+                "processing_time": 0.0,
+            }
+
         try:
             # The engines are created lazily; without this the semantic engine is
             # still None and every call raises AttributeError.
@@ -736,6 +743,7 @@ class AIDuplicateDetectionService:
         self, strategy: str, threshold: float, duplicates: List[Dict]
     ) -> UnifiedDetectionRun:
         """Create detection run record"""
+        org_id = getattr(g, "current_org_id", None)
         run = UnifiedDetectionRun(
             run_name=f"AI Detection Run {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             strategy=_persisted_strategy(strategy),
@@ -756,7 +764,7 @@ class AIDuplicateDetectionService:
                 d.get("business_impact", {}).get("cost_savings", 0) for d in duplicates
             ),
             algorithm_version="ai_v1.0",
-            organization_id=getattr(g, "current_org_id", None),
+            organization_id=org_id,
         )
 
         db.session.add(run)

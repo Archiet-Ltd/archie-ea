@@ -56,3 +56,22 @@ def test_cleanup_with_no_organisation_returns_an_error_and_deletes_nothing(app, 
     assert result["success"] is False
     assert "organisation" in result["error"]
     assert _counts(db_session, (run_a, run_b), (entry_a, entry_b)) == before
+
+
+def test_ai_detection_with_no_organisation_returns_an_error_and_writes_nothing(app, db_session, make_org):
+    _ua, _ub, run_a, run_b, entry_a, entry_b = _world(db_session, make_org)
+    before = _counts(db_session, (run_a, run_b), (entry_a, entry_b))
+    total_runs = db_session.execute(text("SELECT count(*) FROM unified_detection_runs")).scalar()
+    ctx = _no_organisation(app)
+    try:
+        from app.modules.duplicate_detection.services.ai_duplicate_detection_service import (
+            AIDuplicateDetectionService,
+        )
+
+        result = AIDuplicateDetectionService().detect_duplicates()
+    finally:
+        ctx.pop()
+    assert result["success"] is False
+    assert "needs an organisation" in result["error"]
+    assert db_session.execute(text("SELECT count(*) FROM unified_detection_runs")).scalar() == total_runs
+    assert _counts(db_session, (run_a, run_b), (entry_a, entry_b)) == before

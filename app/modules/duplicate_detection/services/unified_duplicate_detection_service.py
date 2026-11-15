@@ -586,23 +586,19 @@ class UnifiedDuplicateDetectionService:
             # Use a SAVEPOINT so failure doesn't poison the outer transaction
             try:
                 with db.session.begin_nested():
-                    if org_id is not None:
-                        db.session.execute(
-                            db.text(
-                                "DELETE FROM unified_group_members "
-                                "WHERE group_id IN ("
-                                "  SELECT id FROM unified_duplicate_groups "
-                                "  WHERE organization_id = :org_id"
-                                ")"
-                            ),
-                            {"org_id": org_id},
-                        )
-                        UnifiedDuplicateGroup.query.filter_by(
-                            organization_id=org_id
-                        ).delete()
-                    else:
-                        db.session.execute(db.text("DELETE FROM unified_group_members"))
-                        UnifiedDuplicateGroup.query.delete()
+                    db.session.execute(
+                        db.text(
+                            "DELETE FROM unified_group_members "
+                            "WHERE group_id IN ("
+                            "  SELECT id FROM unified_duplicate_groups "
+                            "  WHERE organization_id = :org_id"
+                            ")"
+                        ),
+                        {"org_id": org_id},
+                    )
+                    UnifiedDuplicateGroup.query.filter_by(
+                        organization_id=org_id
+                    ).delete()
                 self.logger.info("Cleaned up previous detection groups")
             except Exception as cleanup_err:
                 self.logger.warning(f"Stale group cleanup failed (will create alongside old): {cleanup_err}")
@@ -615,17 +611,14 @@ class UnifiedDuplicateDetectionService:
                 started_at=datetime.utcnow(),
                 applications_analyzed=0,
                 groups_found=0,
-                organization_id=getattr(g, "current_org_id", None),
+                organization_id=org_id,
             )
             db.session.add(run)
 
             # Get all applications for this organisation
-            if org_id is not None:
-                applications = ApplicationComponent.query.filter_by(
-                    organization_id=org_id
-                ).all()
-            else:
-                applications = ApplicationComponent.query.all()
+            applications = ApplicationComponent.query.filter_by(
+                organization_id=org_id
+            ).all()
             run.applications_analyzed = len(applications)
 
             duplicate_groups = []
@@ -775,23 +768,19 @@ class UnifiedDuplicateDetectionService:
             # Use a SAVEPOINT so failure doesn't poison the outer transaction
             try:
                 with db.session.begin_nested():
-                    if org_id is not None:
-                        db.session.execute(
-                            db.text(
-                                "DELETE FROM unified_group_members "
-                                "WHERE group_id IN ("
-                                "  SELECT id FROM unified_duplicate_groups "
-                                "  WHERE organization_id = :org_id"
-                                ")"
-                            ),
-                            {"org_id": org_id},
-                        )
-                        UnifiedDuplicateGroup.query.filter_by(
-                            organization_id=org_id
-                        ).delete()
-                    else:
-                        db.session.execute(db.text("DELETE FROM unified_group_members"))
-                        UnifiedDuplicateGroup.query.delete()
+                    db.session.execute(
+                        db.text(
+                            "DELETE FROM unified_group_members "
+                            "WHERE group_id IN ("
+                            "  SELECT id FROM unified_duplicate_groups "
+                            "  WHERE organization_id = :org_id"
+                            ")"
+                        ),
+                        {"org_id": org_id},
+                    )
+                    UnifiedDuplicateGroup.query.filter_by(
+                        organization_id=org_id
+                    ).delete()
                 self.logger.info("Cleaned up previous detection groups")
             except Exception as cleanup_err:
                 self.logger.warning(f"Stale group cleanup failed (will create alongside old): {cleanup_err}")
@@ -804,17 +793,14 @@ class UnifiedDuplicateDetectionService:
                 started_at=datetime.utcnow(),
                 applications_analyzed=0,
                 groups_found=0,
-                organization_id=getattr(g, "current_org_id", None),
+                organization_id=org_id,
             )
             db.session.add(run)
 
             # Get all applications for this organisation
-            if org_id is not None:
-                applications = ApplicationComponent.query.filter_by(
-                    organization_id=org_id
-                ).all()
-            else:
-                applications = ApplicationComponent.query.all()
+            applications = ApplicationComponent.query.filter_by(
+                organization_id=org_id
+            ).all()
             run.applications_analyzed = len(applications)
 
             # Create hash-based groups first
