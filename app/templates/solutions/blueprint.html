@@ -398,21 +398,11 @@ function archieShowBanner(msg, type) {
                 {# Proposals list #}
                 <div x-show="proposals.length > 0" x-cloak class="p-5 space-y-3">
                     <div class="flex items-center justify-between">
-                        <p class="text-sm font-medium text-foreground">
+                        <p class="text-sm font-medium text-foreground" data-testid="blueprint-proposals-heading">
                             <span x-text="proposals.length"></span> elements extracted
-                            <span class="text-muted-foreground font-normal">— review and accept what applies</span>
+                            <span class="text-muted-foreground font-normal">— each is checked and settled by the review; nobody has to accept it</span>
                         </p>
                         <div class="flex items-center gap-2">
-                            <button type="button" @click="acceptAll()"
-                                    :disabled="accepting"
-                                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30 hover:bg-success/20 disabled:opacity-50 transition-colors">
-                                <i data-lucide="check-check" class="w-3.5 h-3.5"></i> Accept All
-                            </button>
-                            <button type="button" @click="rejectAll()"
-                                    :disabled="accepting"
-                                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30 hover:bg-destructive/20 disabled:opacity-50 transition-colors">
-                                <i data-lucide="x" class="w-3.5 h-3.5"></i> Dismiss All
-                            </button>
                             <button type="button" @click="resetPanel()"
                                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                                 <i data-lucide="upload" class="w-3.5 h-3.5"></i> Upload another
@@ -448,20 +438,12 @@ function archieShowBanner(msg, type) {
                                               x-text="`${Math.round(p.confidence * 100)}% confident`"></span>
                                     </div>
                                 </div>
-                                {# Actions #}
-                                <div class="flex items-center gap-1 shrink-0">
-                                    <button type="button" @click="accept(p.id)"
-                                            :disabled="accepting"
-                                            title="Accept — create element in blueprint"
-                                            class="p-1.5 rounded-md text-success-emphasis hover:bg-success/10 disabled:opacity-50 transition-colors">
-                                        <i data-lucide="check" class="w-4 h-4"></i>
-                                    </button>
-                                    <button type="button" @click="reject(p.id)"
-                                            :disabled="accepting"
-                                            title="Dismiss — don't add to blueprint"
-                                            class="p-1.5 rounded-md text-destructive-emphasis hover:bg-destructive/10 disabled:opacity-50 transition-colors">
-                                        <i data-lucide="x" class="w-4 h-4"></i>
-                                    </button>
+                                {# What the review decided #}
+                                <div class="shrink-0 max-w-xs text-right space-y-0.5" :data-testid="'blueprint-proposal-verdict-' + p.id">
+                                    <p class="text-sm font-medium text-foreground" x-text="p.outcome"></p>
+                                    <p class="text-xs text-muted-foreground" x-text="p.verdict"></p>
+                                    <p class="text-xs text-muted-foreground leading-relaxed" x-show="p.reason" x-text="p.reason"></p>
+                                    <a x-show="p.record_url" :href="p.record_url" class="text-xs text-primary underline" :data-testid="'blueprint-proposal-record-' + p.id">See the review</a>
                                 </div>
                             </div>
                         </template>
@@ -471,7 +453,7 @@ function archieShowBanner(msg, type) {
                 {# All handled — done state #}
                 <div x-show="allDone" x-cloak class="p-5 flex items-center gap-3 text-sm text-success-emphasis">
                     <i data-lucide="check-circle" class="w-4 h-4 shrink-0"></i>
-                    All proposals reviewed. The accepted elements have been added to your blueprint.
+                    The review has settled every extracted element. The ones it applied are in your blueprint.
                     <button type="button" @click="resetPanel()" class="ml-auto text-xs text-muted-foreground hover:text-foreground underline">Upload another</button>
                 </div>
             </div>
@@ -2229,20 +2211,33 @@ function blueprintDocIngestion(solutionId) {
     return {
         open: false,
         extracting: false,
-        accepting: false,
         uploadError: null,
         proposals: [],
         allDone: false,
 
+        timer: null,
+
         get pendingCount() {
-            return this.proposals.filter(function(p) { return p.status === 'proposed'; }).length;
+            return this.proposals.filter(function(p) { return !p.settled; }).length;
+        },
+
+        // While the review is still deciding, ask again every few seconds; stop when every one is settled.
+        watch() {
+            const self = this;
+            clearTimeout(this.timer);
+            if (this.proposals.length === 0 || this.pendingCount === 0) {
+                this.allDone = this.proposals.length > 0;
+                return;
+            }
+            this.timer = setTimeout(function() { self.loadProposals(); }, 4000);
         },
 
         async loadProposals() {
             try {
-                let d = await Platform.fetch(base + '/proposals?status=proposed', { silent: true });
+                let d = await Platform.fetch(base + '/proposals?recent=1', { silent: true });
                 let items = (d.data ? d.data.proposals : null) || d.proposals || [];
-                this.proposals = items.filter(function(p) { return p.status === 'proposed'; });
+                this.proposals = items;
+                this.watch();
             } catch(e) {
                 this.uploadError = 'Could not load pending document proposals — reload the page to try again.';
             }
@@ -2263,7 +2258,8 @@ function blueprintDocIngestion(solutionId) {
                 let d = await Platform.fetch.post(base + '/upload-documents', fd, { silent: true });
                 if (d && (d.data || d.proposals)) {
                     let items = d.data ? d.data.proposals : d.proposals;
-                    this.proposals = (items || []).filter(function(p) { return p.status === 'proposed'; });
+                    this.proposals = items || [];
+                    this.watch();
                     if (this.proposals.length === 0) {
                         this.uploadError = 'No architecture elements could be extracted. Try a more detailed document.';
                     }
@@ -2278,59 +2274,6 @@ function blueprintDocIngestion(solutionId) {
                 event.target.value = '';
                 this.$nextTick(function() { if (window.lucide) lucide.createIcons(); });
             }
-        },
-
-        async accept(proposalId) {
-            this.accepting = true;
-            this.uploadError = null;
-            try {
-                await Platform.fetch.post(base + '/proposals/' + proposalId + '/accept', undefined, { silent: true });
-                this.proposals = this.proposals.filter(function(p) { return p.id !== proposalId; });
-                if (this.proposals.length === 0) this.allDone = true;
-                // Refresh maturity score if available
-                if (typeof refreshMaturityScore === 'function') refreshMaturityScore();
-            } catch (e) {
-                this.uploadError = e.message || 'Accept failed. Please try again.';
-            } finally { this.accepting = false; }
-        },
-
-        async reject(proposalId) {
-            this.accepting = true;
-            this.uploadError = null;
-            try {
-                await Platform.fetch.post(base + '/proposals/' + proposalId + '/reject', undefined, { silent: true });
-                this.proposals = this.proposals.filter(function(p) { return p.id !== proposalId; });
-                if (this.proposals.length === 0) this.allDone = true;
-            } catch (e) {
-                this.uploadError = e.message || 'Reject failed. Please try again.';
-            } finally { this.accepting = false; }
-        },
-
-        async acceptAll() {
-            this.accepting = true;
-            this.uploadError = null;
-            try {
-                let ids = this.proposals.map(function(p) { return p.id; });
-                await Platform.fetch.post(base + '/proposals/batch-accept', { proposal_ids: ids }, { silent: true });
-                this.proposals = [];
-                this.allDone = true;
-                if (typeof refreshMaturityScore === 'function') refreshMaturityScore();
-            } catch (e) {
-                this.uploadError = e.message || 'Accept all failed. Please try again.';
-            } finally { this.accepting = false; }
-        },
-
-        async rejectAll() {
-            this.accepting = true;
-            this.uploadError = null;
-            try {
-                let ids = this.proposals.map(function(p) { return p.id; });
-                await Platform.fetch.post(base + '/proposals/batch-reject', { proposal_ids: ids }, { silent: true });
-                this.proposals = [];
-                this.allDone = true;
-            } catch (e) {
-                this.uploadError = e.message || 'Reject all failed. Please try again.';
-            } finally { this.accepting = false; }
         },
 
         resetPanel() {

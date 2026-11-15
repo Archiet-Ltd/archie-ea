@@ -2482,10 +2482,8 @@
                     this.docFiles = this.docFiles.map(f => ({ ...f, status: 'done' }));
                     this.docSummary = result.summary || '';
 
-                    // Merge new proposals into existing list
-                    const newProposals = (result.proposals || []).map(p => ({ ...p, _selecting: false }));
-                    this.docProposals = [...this.docProposals, ...newProposals];
-                    this.docProposalsLoaded = true;
+                    // The review checks and settles each one; the list shows what it decided.
+                    await this.loadProposals();
 
                     this._setSuccess(`Extracted ${result.proposals_created || 0} architecture elements from ${files.length} document${files.length > 1 ? 's' : ''}.`);
                 } catch (e) {
@@ -2498,82 +2496,27 @@
             },
 
             async loadProposals() {
+                clearTimeout(this._proposalTimer);
                 try {
-                    const data = await this._fetch(`/architecture-journey/${this.solutionId}/proposals?status=proposed`);
+                    const data = await this._fetch(`/architecture-journey/${this.solutionId}/proposals?recent=1`);
                     const result = data.data || data;
-                    this.docProposals = (result.proposals || []).map(p => ({ ...p, _selecting: false }));
+                    this.docProposals = result.proposals || [];
                     this.docProposalsLoaded = true;
+                    // While the review is still deciding, ask again; stop when every one has its verdict.
+                    if (this.pendingProposalCount > 0) {
+                        this._proposalTimer = setTimeout(() => this.loadProposals(), 4000);
+                    }
                 } catch (e) {
                     this._addError('Failed to load proposals: ' + e.message);
                 }
             },
 
-            async acceptProposal(proposalId) {
-                const p = this.docProposals.find(x => x.id === proposalId);
-                if (p) p._selecting = true;
-                try {
-                    await this._fetch(
-                        `/architecture-journey/${this.solutionId}/proposals/${proposalId}/accept`,
-                        { method: 'POST' }
-                    );
-                    // Update local state
-                    this.docProposals = this.docProposals.map(x =>
-                        x.id === proposalId ? { ...x, status: 'accepted', _selecting: false } : x
-                    );
-                    this.linkedElementsCount++;
-                } catch (e) {
-                    if (p) p._selecting = false;
-                    this._addError('Accept failed: ' + e.message);
-                }
-            },
-
-            async rejectProposal(proposalId) {
-                const p = this.docProposals.find(x => x.id === proposalId);
-                if (p) p._selecting = true;
-                try {
-                    await this._fetch(
-                        `/architecture-journey/${this.solutionId}/proposals/${proposalId}/reject`,
-                        { method: 'POST' }
-                    );
-                    this.docProposals = this.docProposals.map(x =>
-                        x.id === proposalId ? { ...x, status: 'rejected', _selecting: false } : x
-                    );
-                } catch (e) {
-                    if (p) p._selecting = false;
-                    this._addError('Reject failed: ' + e.message);
-                }
-            },
-
-            async batchAcceptProposals() {
-                const pending = this.docProposals.filter(p => p.status === 'proposed');
-                if (pending.length === 0) return;
-                this.docAccepting = true;
-                try {
-                    const data = await this._fetch(
-                        `/architecture-journey/${this.solutionId}/proposals/batch-accept`,
-                        { method: 'POST', body: { proposal_ids: pending.map(p => p.id) } }
-                    );
-                    const result = data.data || data;
-                    // Mark all as accepted
-                    const acceptedIds = new Set(pending.map(p => p.id));
-                    this.docProposals = this.docProposals.map(p =>
-                        acceptedIds.has(p.id) ? { ...p, status: 'accepted' } : p
-                    );
-                    this.linkedElementsCount += result.accepted || pending.length;
-                    this._setSuccess(`Accepted ${result.accepted || pending.length} elements. ${result.elements_created || 0} chain elements inferred.`);
-                } catch (e) {
-                    this._addError('Batch accept failed: ' + e.message);
-                } finally {
-                    this.docAccepting = false;
-                }
-            },
-
             get pendingProposalCount() {
-                return this.docProposals.filter(p => p.status === 'proposed').length;
+                return this.docProposals.filter(p => !p.settled).length;
             },
 
             get acceptedProposalCount() {
-                return this.docProposals.filter(p => p.status === 'accepted').length;
+                return this.docProposals.filter(p => p.outcome === 'Applied' || p.outcome === 'Linked').length;
             },
 
             _proposalTypeBadgeClass(type) {

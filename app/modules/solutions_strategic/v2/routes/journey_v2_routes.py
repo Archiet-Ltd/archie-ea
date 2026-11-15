@@ -1374,7 +1374,7 @@ def list_proposals(solution_id):
         from app.modules.architecture_assistant.journey_orchestrator import JourneyOrchestrator
         status = request.args.get("status")
         orch = JourneyOrchestrator(solution_id)
-        proposals = orch.list_proposals(status)
+        proposals = orch.list_proposals(status, recent=request.args.get("recent") == "1")
         return api_success(data={"proposals": proposals})
     except Exception as e:
         logger.error("List proposals failed: %s", e, exc_info=True)
@@ -1385,15 +1385,9 @@ def list_proposals(solution_id):
 @login_required
 @_require_solution_owner
 def accept_proposal(solution_id, proposal_id):
-    """Accept a single proposal — create element + inference chain."""
-    try:
-        from app.modules.architecture_assistant.journey_orchestrator import JourneyOrchestrator
-        orch = JourneyOrchestrator(solution_id)
-        result = orch.accept_proposal(proposal_id)
-        return api_success(data=result)
-    except Exception as e:
-        logger.error("Accept proposal failed: %s", e, exc_info=True)
-        return api_error("Failed to accept proposal", 500)
+    """Nobody accepts a blueprint proposal by hand: the review checks it and settles it. This asks the job
+    worker to settle the organisation's waiting proposals now and reports what the review has decided so far."""
+    return _hand_to_review(solution_id, [proposal_id])
 
 
 @journey_v2_bp.route("/<int:solution_id>/proposals/<int:proposal_id>/reject", methods=["POST"])
@@ -1479,93 +1473,42 @@ def _get_domain_capability_context(domain_code: str) -> dict:
 @login_required
 @_require_solution_owner
 def batch_accept_proposals(solution_id):
-    """Batch accept multiple proposals — marks status as 'accepted'.
+    """Same as a single accept: no proposal is accepted by hand; the review settles them."""
+    data = request.get_json(silent=True) or {}
+    proposal_ids = data.get("proposal_ids", [])
+    if not isinstance(proposal_ids, list):
+        return api_error("proposal_ids must be a list", 400)
+    if len(proposal_ids) == 0:
+        return api_error("proposal_ids cannot be empty", 400)
+    if not all(isinstance(pid, int) for pid in proposal_ids):
+        return api_error("All proposal_ids must be integers", 400)
+    return _hand_to_review(solution_id, proposal_ids)
 
-    Element creation and inference chains are handled downstream by
-    confirm_domain() → DomainPromotionService.  This endpoint only sets
-    the proposal status so that the promotion step has accepted proposals
-    to work with.  Avoids the JourneyGraph code path that was crashing (JPL-001).
-    """
+
+def _hand_to_review(solution_id, proposal_ids):
+    """Queue the settling of the organisation's waiting proposals and say where each of these stands. Nothing
+    here changes a proposal's status: only the review does that."""
     try:
         from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
+        from app.modules.ai_chat.services.change_review import queue_settling
 
-        data = request.get_json() or {}
-        proposal_ids = data.get("proposal_ids", [])
-
-        # Validate input — 400 for bad data, not 500
-        if not isinstance(proposal_ids, list):
-            return api_error("proposal_ids must be a list", 400)
-        if len(proposal_ids) == 0:
-            return api_error("proposal_ids cannot be empty", 400)
-        if not all(isinstance(pid, int) for pid in proposal_ids):
-            return api_error("All proposal_ids must be integers", 400)
-
-        accepted = 0
-        errors = []
-        domain_codes_to_confirm = set()
-
-        # Single batch query replaces N individual queries (Fix 4 / D11)
-        proposals_in = SolutionBlueprintProposal.query.filter(
+        rows = SolutionBlueprintProposal.query.filter(
             SolutionBlueprintProposal.id.in_(proposal_ids),
             SolutionBlueprintProposal.solution_id == solution_id,
+            SolutionBlueprintProposal.organization_id == current_user.organization_id,
         ).all()
-
-        found_ids = {p.id for p in proposals_in}
-        for pid in proposal_ids:
-            if pid not in found_ids:
-                errors.append({"proposal_id": pid, "error": "Not found"})
-
-        for proposal in proposals_in:
-            if proposal.status not in ("accepted", "promoted"):
-                proposal.status = "accepted"
-                accepted += 1
-            if proposal.acm_domain:
-                domain_codes_to_confirm.add(proposal.acm_domain)
-
+        queue_settling(current_user.organization_id)
         db.session.commit()
-
-        # Spawn background domain promotion — non-blocking, own subprocess + session.
-        # Avoids synchronous LLM calls in the HTTP request (D12).
-        # Worker is module-level in app/tasks/rebuild_tasks.py (PicklingError fix).
-        _promotion_scheduled = False
-        if domain_codes_to_confirm:
-            try:
-                import multiprocessing as _mp
-                import os as _os
-                from app.tasks.rebuild_tasks import promote_domains_worker
-                _app_root = _os.path.dirname(
-                    _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-                )
-                _ctx = _mp.get_context("spawn")
-                _proc = _ctx.Process(
-                    target=promote_domains_worker,
-                    args=(_app_root, solution_id, list(domain_codes_to_confirm)),
-                    daemon=False,
-                )
-                _proc.start()
-                _proc.join(timeout=0)  # non-blocking reap
-                _promotion_scheduled = True
-                logger.info(
-                    "Spawned domain promotion PID=%d for solution %d domains=%s",
-                    _proc.pid, solution_id, list(domain_codes_to_confirm),
-                )
-            except Exception as _spawn_err:
-                logger.warning(
-                    "Could not spawn domain promotion for solution %d: %s",
-                    solution_id, _spawn_err,
-                )
-
+        found = {p.id for p in rows}
         return api_success(data={
-            "accepted": accepted,
-            "errors": errors,
-            "elements_created": 0,  # async — not available synchronously
-            "relationships_created": 0,
-            "promotion_scheduled": _promotion_scheduled,
-            "domains_queued": list(domain_codes_to_confirm),
+            "accepted": 0,
+            "settling": len([p for p in rows if p.status == "proposed"]),
+            "errors": [{"proposal_id": pid, "error": "Not found"} for pid in proposal_ids if pid not in found],
+            "message": "The review settles proposals; nobody accepts them by hand.",
         })
     except Exception as e:
-        logger.error("Batch accept failed for solution %d: %s", solution_id, e, exc_info=True)
-        return api_error("Failed to batch accept", 500)
+        logger.error("Handing proposals to the review failed for solution %d: %s", solution_id, e, exc_info=True)
+        return api_error("Failed to hand the proposals to the review", 500)
 
 
 @journey_v2_bp.route("/<int:solution_id>/proposals/batch-reject", methods=["POST"])
