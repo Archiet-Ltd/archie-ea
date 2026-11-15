@@ -100,6 +100,16 @@ _KEYWORD_RULES = [
         "risk_cost",
         {},
     ),
+    # The top risks of the register, by score. Checked after the cost rule so "what do our top risks cost"
+    # stays a cost question, and before the impact rules.
+    (
+        (
+            "top risks", "biggest risks", "highest risks", "greatest risks", "key risks", "main risks",
+            "worst risks", "most serious risks", "top risk", "risks to reaching", "risks to achieving",
+        ),
+        "top_risks",
+        {},
+    ),
     # UC-S2-01: what breaks if X fails (impact).
     (
         (
@@ -178,6 +188,16 @@ def _extract_application_for_capabilities(question: str, organization_id: Option
     return None
 
 
+def _top_count(lowered: str) -> int:
+    """How many risks a "top five risks" question asks for (five when it gives no number)."""
+    found = re.search(r"\btop\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b", lowered)
+    if not found:
+        return 5
+    word = found.group(1)
+    return int(word) if word.isdigit() else {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                                             "seven": 7, "eight": 8, "nine": 9, "ten": 10}[word]
+
+
 def _keyword_match(question: str, organization_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
     lowered = question.lower()
     application = _extract_application_for_capabilities(question, organization_id)
@@ -189,6 +209,8 @@ def _keyword_match(question: str, organization_id: Optional[int] = None) -> Opti
             resolved = dict(params)
             if entry_id == "company_profile":
                 resolved["topic"] = _profile_topic(lowered)
+            if entry_id == "top_risks":
+                resolved["limit"] = _top_count(lowered)
             if entry_id == "risk_cost":
                 risk = _extract_risk(question)
                 if risk:
@@ -302,7 +324,7 @@ def _model_configured() -> bool:
         return False
 
 
-def _llm_match(question: str) -> Optional[Dict[str, Any]]:
+def _llm_match(question: str, time_limit: Optional[float] = None) -> Optional[Dict[str, Any]]:
     """Ask the gated model gateway which catalogue entry fits, if any."""
     from app.modules.ai_chat.services.llm_service_impl import LLMService
 
@@ -317,7 +339,7 @@ def _llm_match(question: str) -> Optional[Dict[str, Any]]:
         f"Catalogue:\n{entries_desc}\n\nQuestion: {question!r}"
     )
     try:
-        raw = LLMService.generate_from_prompt(prompt, expected_schema="json")
+        raw = LLMService.generate_from_prompt(prompt, expected_schema="json", time_limit=time_limit)
         parsed = json.loads(raw)
     except Exception:
         logger.warning("nl_query_interpreter: model gateway call failed", exc_info=True)
@@ -329,17 +351,20 @@ def _llm_match(question: str) -> Optional[Dict[str, Any]]:
     return {"entry_id": entry_id, "params": parsed.get("params") or {}, "confidence": 0.7, "method": "model"}
 
 
-def interpret(question: str, organization_id: Optional[int] = None) -> Dict[str, Any]:
+def interpret(question: str, organization_id: Optional[int] = None, time_limit: Optional[float] = None) -> Dict[str, Any]:
     """Interpret one plain-language question.
 
     Returns ``{"entry_id": str|None, "params": dict, "confidence": float,
     "method": "keyword"|"model"|"none", "title": str|None}`` — the
     interpretation banner shows ``title``/``params`` before running
     anything, and the caller re-runs with corrected params on request.
+
+    ``time_limit`` (seconds) bounds the one lookup that asks the model: a single attempt that gives up
+    at the limit, after which the question maps to nothing. Without it the lookup is unbounded as before.
     """
     match = _keyword_match(question, organization_id)
     if match is None and _model_configured():
-        match = _llm_match(question)
+        match = _llm_match(question, time_limit)
     if match is None:
         return {"entry_id": None, "params": {}, "confidence": 0.0, "method": "none", "title": None}
     entry = CATALOGUE[match["entry_id"]]
