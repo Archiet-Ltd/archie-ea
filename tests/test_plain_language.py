@@ -91,7 +91,7 @@ def test_vocabulary_map_covers_all_registered_types():
 def test_plain_name_for_known_type():
     from app.models.archimate_element_types import plain_name_for
 
-    assert plain_name_for("ApplicationComponent") == "Application"
+    assert plain_name_for("ApplicationComponent") == "Application component"
     assert plain_name_for("BusinessActor") == "Person or team"
     assert plain_name_for("Node") == "Platform"
     assert plain_name_for("SystemSoftware") == "Software platform"
@@ -139,7 +139,7 @@ def test_plain_name_filter_defaults_to_plain(app):
     """With no user (or show_archimate_names=False), the filter returns plain names."""
     from app.template_helpers import _plain_name
 
-    assert _plain_name("ApplicationComponent") == "Application"
+    assert _plain_name("ApplicationComponent") == "Application component"
     assert _plain_name("BusinessActor") == "Person or team"
     assert _plain_name("Node") == "Platform"
 
@@ -158,7 +158,7 @@ def test_plain_name_filter_with_archimate_off(app, db_session, make_org):
     from app.template_helpers import _plain_name
 
     user = _make_user(db_session, make_org, show_archimate_names=False)
-    assert _plain_name("ApplicationComponent", user) == "Application"
+    assert _plain_name("ApplicationComponent", user) == "Application component"
     assert _plain_name("BusinessActor", user) == "Person or team"
 
 
@@ -226,7 +226,7 @@ def test_element_type_display_with_setting_off(app, db_session, make_org):
     from app.models.archimate_element_types import plain_name_for
 
     # Simulate what the template filter would return
-    assert plain_name_for("ApplicationComponent") == "Application"
+    assert plain_name_for("ApplicationComponent") == "Application component"
     assert plain_name_for("BusinessActor") == "Person or team"
     assert plain_name_for("Node") == "Platform"
     assert plain_name_for("WorkPackage") == "Project"
@@ -299,7 +299,7 @@ def test_plain_name_filter_cross_organisation(app, db_session, make_org):
     user_b = _make_user(db_session, make_org, show_archimate_names=True)
 
     # Both users see the correct names for their setting
-    assert _plain_name("ApplicationComponent", user_a) == "Application"
+    assert _plain_name("ApplicationComponent", user_a) == "Application component"
     assert _plain_name("ApplicationComponent", user_b) == "ApplicationComponent"
 
     # The filter does not mutate the user
@@ -400,8 +400,8 @@ def test_detail_page_uses_plain_name_filter(app, db_session, make_org):
     assert resp.status_code == 200
     html = resp.data.decode()
     # The <title> uses |plain_name so with setting off (default) it
-    # reads "Application: TestApp"
-    assert "<title>Application: TestApp" in html
+    # reads "Application component: TestApp"
+    assert "<title>Application component: TestApp" in html
 
 
 def test_detail_page_respects_show_archimate_names(app, db_session, make_org):
@@ -451,7 +451,7 @@ def test_detail_page_title_changes_with_toggle(app, db_session, make_org):
         f"/architecture/application/ApplicationComponent/{elem.id}"
     )
     html_off = resp_off.data.decode()
-    assert "<title>Application: ToggleTest" in html_off
+    assert "<title>Application component: ToggleTest" in html_off
 
     # Second user with setting ON, same org/element
     client_on, user_on = _make_client(
@@ -613,7 +613,7 @@ def test_plain_name_for_normalizes_snake_case(app, db_session, make_org):
     """plain_name_for converts snake_case input to PascalCase before lookup."""
     from app.models.archimate_element_types import plain_name_for
 
-    assert plain_name_for("application_component") == "Application"
+    assert plain_name_for("application_component") == "Application component"
     assert plain_name_for("business_actor") == "Person or team"
 
 
@@ -660,7 +660,7 @@ def test_plain_name_does_not_crash_on_detached_user(app):
 
     # Should not raise, should fall back to plain name
     result = _plain_name("ApplicationComponent", FakeUser())
-    assert result == "Application"
+    assert result == "Application component"
 
 
 def test_plain_layer_does_not_crash_on_detached_user(app):

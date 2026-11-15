@@ -166,11 +166,9 @@ def _active_applications():
 
 def left_out_applications(org_id) -> dict:
     """How many of the organisation's application records the count leaves out, by the one reason
-    each has: a duplicate, a decommissioned application, a repository nobody owns yet, or a record that is a
-    part of an application or not software."""
+    each has: a duplicate, a decommissioned application, or a repository nobody owns yet."""
     from app.connectors.github import unpromoted_import_expression
     from app.models.application_portfolio import ApplicationComponent as A
-    from app.services.application_kind import is_application_expression
 
     def count(*conditions):
         return db.session.execute(
@@ -179,12 +177,25 @@ def left_out_applications(org_id) -> dict:
 
     return {
         "duplicate": count(_is_duplicate(A)),
-        "decommissioned": count(~_is_duplicate(A), _is_decommissioned(A), is_application_expression(A)),
-        "repository": count(
-            ~_is_duplicate(A), ~_is_decommissioned(A), is_application_expression(A), unpromoted_import_expression(A)
-        ),
-        "not_an_application": count(~_is_duplicate(A), ~is_application_expression(A)),
+        "decommissioned": count(~_is_duplicate(A), _is_decommissioned(A)),
+        "repository": count(~_is_duplicate(A), ~_is_decommissioned(A), unpromoted_import_expression(A)),
     }
+
+
+def left_out_not_applications(org_id) -> int:
+    """How many of the organisation's records the application count leaves out because they are a part of an
+    application or not software. A duplicate, a decommissioned application and an unowned imported repository
+    are counted by ``left_out_applications``, each once."""
+    from app.connectors.github import unpromoted_import_expression
+    from app.models.application_portfolio import ApplicationComponent as A
+    from app.services.application_kind import is_application_expression
+
+    return db.session.execute(
+        db.select(func.count(A.id)).where(
+            A.organization_id == org_id, ~_is_duplicate(A), ~_is_decommissioned(A),
+            ~unpromoted_import_expression(A), ~is_application_expression(A),
+        )
+    ).scalar_one()
 
 
 def _applications(org_id, now):

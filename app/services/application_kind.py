@@ -6,7 +6,7 @@ Applications table, the application count and owner coverage all read ``is_appli
 The kind is one stored fact, ``ApplicationComponent.application_kind``. When a person has set it, that
 is the answer. When it is empty the rule decides: a record composed into or aggregated by another
 application component is a part of that application; a record that is a code repository
-(``repository_type`` filled, or the connector's ``repository`` component type) is not software; every
+(``repository_type`` filled, or imported by the connector as a repository that nobody owns yet) is not software; every
 other record is an application.
 """
 from __future__ import annotations
@@ -24,7 +24,6 @@ KINDS = (APPLICATION, PART, NOT_SOFTWARE)
 KIND_LABELS = {APPLICATION: "Application", PART: "Part of an application", NOT_SOFTWARE: "Not software"}
 
 PARENT_RELATIONSHIPS = ("composition", "aggregation")
-REPOSITORY_COMPONENT_TYPE = "repository"
 
 
 def _has_parent_expression(model):
@@ -58,9 +57,13 @@ def _has_parent_expression(model):
 
 
 def _is_repository_expression(model):
+    """SQL boolean: the record is a code repository: it names the kind of repository it is, or the connector
+    brought it in as one and nobody has named an owner for it yet (a person naming an owner says it is run)."""
+    from app.connectors.github import unpromoted_import_expression
+
     return db.or_(
         db.and_(model.repository_type.isnot(None), func.btrim(model.repository_type) != ""),
-        model.component_type == REPOSITORY_COMPONENT_TYPE,
+        unpromoted_import_expression(model),
     )
 
 
@@ -165,7 +168,9 @@ def kind_of(application) -> dict:
 
 
 def _is_repository(application) -> bool:
-    return bool((application.repository_type or "").strip()) or application.component_type == REPOSITORY_COMPONENT_TYPE
+    from app.connectors.github import is_unpromoted_import
+
+    return bool((application.repository_type or "").strip()) or is_unpromoted_import(application)
 
 
 def _day(moment) -> str:

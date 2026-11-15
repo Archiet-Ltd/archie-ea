@@ -17,7 +17,11 @@ from app import db
 from app.decorators import audit_log, role_required
 from app.modules.my_applications.services import has_assigned_owner
 from app.models.application_portfolio import ApplicationComponent
-from app.modules.dashboard.services.overview_figures import _active_applications, left_out_applications
+from app.modules.dashboard.services.overview_figures import (
+    _active_applications,
+    left_out_applications,
+    left_out_not_applications,
+)
 from app.models.user import ROLE_CTO, ROLE_PORTFOLIO_MANAGER
 from app.services.element_ownership_service import OWNER_TEXT_BLANKS
 
@@ -173,6 +177,7 @@ def coverage_figures(org_id) -> dict:
         "overall_pct": round(100 * total_owned / total_apps) if total_apps > 0 else None,
         "organisation_unit_count": len(units),
         "left_out": left_out_applications(org_id),
+        "left_out_not_applications": left_out_not_applications(org_id),
         "outside_count": outside_count,
         "unmatched_domains": unmatched_domains,
         "merged_units": merged_units,

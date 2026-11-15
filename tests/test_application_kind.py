@@ -4,7 +4,7 @@ import uuid
 from collections import Counter
 
 from app import db
-from app.models import ArchiMateRelationship
+from app.models import ArchiMateElement, ArchiMateRelationship
 from app.models.application_portfolio import ApplicationComponent
 from app.services.application_kind import is_application_expression, kind_of, parts_of
 
@@ -32,6 +32,9 @@ def test_the_rule_settles_parts_repositories_and_a_persons_choice(db_session, ma
     aggregated = _row(org, "Alerts Consumers")
     repo = _row(org, "billing-repo", repository_type="GitHub")
     typed_repo = _row(org, "archiet-go", component_type="repository")
+    promoted = _row(org, "archiet-api", component_type="repository", legacy_application_owner="Dana Reed")
+    for imported in (typed_repo, promoted):
+        db_session.get(ArchiMateElement, imported.archimate_element_id).source_kind = "connector"
     billing = _row(org, "Billing")
     chosen = _row(org, "Chosen", application_kind="application", repository_type="GitHub")
     for kind, target in (("composition", part), ("aggregation", aggregated)):
@@ -41,15 +44,15 @@ def test_the_rule_settles_parts_repositories_and_a_persons_choice(db_session, ma
                                          target_id=whole.archimate_element_id, organization_id=org.id))
     db_session.flush()
     with tenant_ctx(org.id):
-        kinds = {row.name: kind_of(row)["kind"] for row in (whole, part, aggregated, repo, typed_repo, billing, chosen)}
+        kinds = {row.name: kind_of(row)["kind"] for row in (whole, part, aggregated, repo, typed_repo, promoted, billing, chosen)}
         listed = db.session.execute(
             db.select(ApplicationComponent.name).where(
                 ApplicationComponent.organization_id == org.id, is_application_expression(ApplicationComponent))
         ).scalars().all()
         assert kinds == {"Alerts gateway and consumers": "application", "Alerts Gateway": "part",
                          "Alerts Consumers": "part", "billing-repo": "not_software", "archiet-go": "not_software",
-                         "Billing": "application", "Chosen": "application"}
-        assert sorted(listed) == ["Alerts gateway and consumers", "Billing", "Chosen"]
+                         "archiet-api": "application", "Billing": "application", "Chosen": "application"}
+        assert sorted(listed) == ["Alerts gateway and consumers", "Billing", "Chosen", "archiet-api"]
         assert [name for _, name in parts_of(whole)] == ["Alerts Consumers", "Alerts Gateway"]
         assert kind_of(part)["reason"] == "Part of Alerts gateway and consumers"
 
