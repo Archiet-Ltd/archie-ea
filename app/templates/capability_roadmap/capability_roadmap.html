@@ -215,13 +215,13 @@
       <div class="flex items-center justify-between">
         <h2 class="text-base font-semibold text-foreground">Work Packages</h2>
         <div class="flex items-center gap-3">
-          {% if can_change_model() %}
+          {% if can('create', 'work_package') %}
           <template x-if="selectedGapIds.length > 0">
             {% call button(text='Generate roadmap', variant='outline', icon='sparkles', on_click='openAiGenerateModal()', attrs_dict={'x-show': 'selectedGapIds.length > 0'}) %}<span class="ml-1" x-text="selectedGapIds.length"></span>&nbsp;gaps{% endcall %}
           </template>
           {% call button(text='Add Work Package', variant='default', icon='plus', on_click='openCreateWorkPackageModal(null)') %}{% endcall %}
           {% else %}
-          {{ disabled_action('Add Work Package', 'Your role may read the roadmap but not change it. Only an architect can add a work package. Ask an architect in your organisation.', 'add-work-package-reason', icon='plus', variant='default') }}
+          {{ disabled_action('Add Work Package', 'Your role may read work packages but not add them. Ask an administrator in your organisation to allow it.', 'add-work-package-reason', icon='plus', variant='default') }}
           {% endif %}
         </div>
       </div>
@@ -296,12 +296,14 @@
                 </template>
               {% endcall %}
               {% call table_cell(attrs_dict={'class': 'text-right'}) %}
-                {% if can_change_model() %}
                 <div class="inline-flex items-center gap-2">
+                  {% if can('edit', 'work_package') %}
                   {% call button(text='Edit', variant='outline', size='xs', on_click='openEditWorkPackageModal(wp)') %}{% endcall %}
+                  {% endif %}
+                  {% if can('delete', 'work_package') %}
                   {% call button(text='Delete', variant='destructive', size='xs', on_click='deleteWorkPackage(wp)') %}{% endcall %}
+                  {% endif %}
                 </div>
-                {% endif %}
               {% endcall %}
             {% endcall %}
           </template>

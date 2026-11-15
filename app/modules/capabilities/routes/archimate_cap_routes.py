@@ -16,7 +16,9 @@ Routes (8):
 
 from app.services.archimate_backbone import sync_archimate_element
 from flask import current_app, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
+
+from app.core.auth.permissions import can
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
@@ -106,6 +108,8 @@ def api_create_archimate_element():
             return jsonify({"success": False, "error": "Missing required fields: name, type"}), 400
 
         element_type = data.get("type")
+        if element_type == "WorkPackage" and not can(current_user, "create", "work_package"):
+            return jsonify({"success": False, "error": "Your role may read work packages but not create them. Administrators and architects may create, edit and delete work packages."}), 403
         layer = data.get("layer")
         application_id = data.get("application_id")
         properties = data.get("properties", {})

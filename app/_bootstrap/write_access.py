@@ -117,6 +117,9 @@ ANSWERS_FOR_ITSELF = {
     "unified_ai_chat.bulk_process_applications": (
         "With every write switched off it stores nothing; any write asks the matrix for creating relationships first."
     ),
+    "unified_ai_chat.confirm_application_change": (
+        "Checks the person's right to edit applications itself, refuses with the card's own words and records the refusal."
+    ),
     "solution_design.api_set_raci": "Looks the solution up in the caller's organisation, then asks the write rule.",
     "solution_design.create_solution_stakeholder": "Looks the solution up in the caller's organisation, then asks the write rule.",
     "solution_design.delete_solution_stakeholder": "Looks the solution up in the caller's organisation, then asks the write rule.",

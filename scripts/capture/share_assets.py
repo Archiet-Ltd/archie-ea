@@ -17,6 +17,7 @@ import hashlib
 import json
 import pathlib
 
+from app.services.origin import canonical_origin
 from app.services.public_pages import (
     IMG_MODULES_DIR,
     MODULE_RECORDINGS,
@@ -24,7 +25,6 @@ from app.services.public_pages import (
     SHARE_DIR,
     SHARE_MANIFEST,
     SHARE_URL_PREFIX,
-    SITE_URL,
 )
 from scripts.capture.clip_kit import (
     SHAPES,
@@ -72,8 +72,8 @@ def build_entry(slug: str, recorded: dict, out: pathlib.Path) -> dict:
         "claims": [_sentence(line) for line in spoken],
         "cover": f"{SHARE_WEB_PATH}/{cover.name}",
         "files": files,
-        "share_url": f"{SITE_URL}{SHARE_URL_PREFIX}/{slug}",
-        "module_url": f"{SITE_URL}/modules/{slug}",
+        "share_url": f"{canonical_origin()}{SHARE_URL_PREFIX}/{slug}",
+        "module_url": f"{canonical_origin()}/modules/{slug}",
         "alt": entry["alt"],
         "source_sha256": recorded["clip_sha256"],
     }
@@ -96,7 +96,7 @@ def main(argv=None) -> int:
         kept[slug] = build_entry(slug, recorded[slug], SHARE_DIR)
         print("  share  %-24s %s" % (slug, ", ".join("%s %d bytes" % (k, v["bytes"]) for k, v in kept[slug]["files"].items())))
     ordered = [kept[s] for s in sorted(kept) if s in MODULE_RECORDINGS]
-    manifest_path.write_text(json.dumps({"site": SITE_URL, "recordings": ordered}, indent=2, ensure_ascii=False) + "\n",
+    manifest_path.write_text(json.dumps({"site": canonical_origin(), "recordings": ordered}, indent=2, ensure_ascii=False) + "\n",
                              encoding="utf-8")
     return 0
 
