@@ -8,7 +8,7 @@
    login/registration/MFA/OAuth consent or other account pages, which keep the product palette.
 #}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{% block html_lang %}en{% endblock %}">
 <head>
     {% include 'partials/_head.html' %}
     <title>{% block full_title %}{% block title %}Welcome{% endblock %} - {{ config.APP_NAME }}{% endblock %}</title>

@@ -176,3 +176,39 @@ def test_the_chat_leaves_the_amounts_out_for_a_viewer_and_says_why(app, world, t
     assert SENTENCE in (answer["summary"] or "") or answer["reason"] == SENTENCE
     assert answer["next_step"] is None
     assert "1,000" not in str(answer) and "1000" not in str(answer)
+
+
+def _page_text(client, login_as, user, canvas):
+    login_as(client, user)
+    reply = client.get("/business-model/%d" % canvas.id)
+    assert reply.status_code == 200
+    return reply.get_data(as_text=True)
+
+
+def _api_answer(client, login_as, user):
+    login_as(client, user)
+    reply = client.get("/api/v1/intelligence/catalogue/canvas_box_entries?box=cost_structure")
+    assert reply.status_code == 200
+    body = reply.get_json()
+    return body.get("data") or body
+
+
+def test_the_page_the_api_and_get_canvas_agree_on_cost_lines_for_each_person(client, login_as, world, monkeypatch):
+    for person, may_see in (("cto", True), ("architect", False)):
+        user = world[person]
+        page = _page_text(client, login_as, user, world["mine"])
+        api = _api_answer(client, login_as, user)
+        monkeypatch.setattr(route_read_tools, "call_internal_api", _through_the_route(client, login_as, user))
+        chat = route_read_tools._get_canvas({"canvas_type": "business_model", "canvas_id": world["mine"].id})
+        chat_lines = _cost_box(chat["data"])["costs"]["lines"]
+        api_costs = [r for r in api["rows"] if r["kind"] == "application"]
+        assert (len(chat_lines) > 0) is may_see
+        assert (len(api_costs) > 0) is may_see
+        assert (SENTENCE in page) is (not may_see)
+        assert bool(api.get("costs_withheld")) is (not may_see)
+        if may_see:
+            assert len(api_costs) == len(chat_lines) == 3
+            assert all(line["text"] in page for line in chat_lines)
+        else:
+            assert api["reason"] == SENTENCE
+            assert "1,000" not in str(api) and "1000" not in str(api)

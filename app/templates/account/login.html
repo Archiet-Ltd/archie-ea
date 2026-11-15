@@ -43,19 +43,11 @@
         </div>
 
         <div class="relative max-w-md">
-            <p class="text-xs font-semibold uppercase tracking-[0.32em] text-muted-foreground">The company brain for your business</p>
-            <h2 class="mt-5 text-[2rem] font-bold leading-tight text-foreground">
-                Architecture, governed<br>from strategy to code.
-            </h2>
-            <p class="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground">
-                Discover the estate, design within governance, and prove every
-                decision against live data -- the deliverable a consulting bench
-                takes months to assemble, generated continuously.
-            </p>
+            {% with heading_tag='h2', heading_class='text-[2rem] font-bold leading-tight text-foreground', body_class='mt-4 text-[0.95rem] leading-relaxed text-muted-foreground' %}{% include 'account/_promise.html' %}{% endwith %}
         </div>
 
         <div class="relative flex flex-wrap gap-2">
-            {% for chip in ['TOGAF 9.2', 'ArchiMate 3.2', 'AI-Native', 'ARB-Governed'] %}
+            {% for chip in ['ArchiMate 3.2', 'AI-Native', 'ARB-Governed'] %}
             <span class="rounded-full border border-border bg-accent px-3 py-1 text-xs font-medium text-accent-foreground">{{ chip }}</span>
             {% endfor %}
         </div>
@@ -97,6 +89,8 @@
                         'info':    get_flashed_messages(category_filter=['form-info']),
                         'success': get_flashed_messages(category_filter=['form-success'])
                     } %}
+
+                    {% include 'account/_social_sign_in.html' %}
 
                     {{ f.begin_form(form, flashes, action=request.url) }}
                     <form method="post" @submit="handleSubmit" novalidate>
@@ -160,24 +154,6 @@
                             Register
                         </a>
                     </div>
-
-                    {% if sso_providers %}
-                    <div class="mt-6">
-                        <div class="relative">
-                            <div class="absolute inset-0 flex items-center">
-                                <span class="w-full border-t border-border"></span>
-                            </div>
-                            <div class="relative flex justify-center text-xs uppercase">
-                                <span class="bg-card px-2 text-muted-foreground">Or continue with</span>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex flex-col gap-2">
-                            {% for provider in sso_providers %}
-                                {{ button(variant='outline', class='w-full', href=url_for('account.sso_login', provider=provider.key, next=request.args.get('next')), text=provider.name) }}
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
                 </div>
                 {% endcall %}
             {% endcall %}

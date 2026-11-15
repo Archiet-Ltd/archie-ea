@@ -284,6 +284,7 @@ def create_gap(
     target_state_ref: Optional[str] = None,
     auto_generated: bool = False,
     generation_source: Optional[str] = None,
+    source_capability_id: Optional[int] = None,
 ) -> Tuple[Gap, bool]:
     """Create a gap in the one gap register (`gaps`, this module's canonical
     store), refusing a duplicate within the organisation.
@@ -327,6 +328,7 @@ def create_gap(
         target_state_ref=target_state_ref,
         auto_generated=auto_generated,
         generation_source=generation_source,
+        source_capability_id=source_capability_id,
     )
     db.session.add(gap)
     db.session.flush()

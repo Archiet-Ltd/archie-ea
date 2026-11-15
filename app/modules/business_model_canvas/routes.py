@@ -102,7 +102,6 @@ def _canvas_boxes(canvas):
     if not costs_visible(current_user):
         contents = model_service.withhold_cost_lines(contents)
     boxes = {}
-    cost_line_count = 0
     for box in contents["boxes"]:
         key = box["key"].replace("_", "-")
         if box["key"] == model_service.PRICE_BOX:
@@ -117,7 +116,6 @@ def _canvas_boxes(canvas):
             boxes[key] = []
             boxes[key + ":withheld"] = box["empty_reason"]
         elif box["costs"] is not None:
-            cost_line_count = box["costs"]["count"]
             boxes[key] = [{"text": line["text"], "href": line["url"]} for line in box["costs"]["lines"]]
             if box["costs"]["text"]:
                 boxes[key + ":total"] = box["costs"]["text"]
@@ -125,7 +123,7 @@ def _canvas_boxes(canvas):
             boxes[key] = [
                 _note_entry(canvas, box["key"], entry, editable) for entry in box["entries"]
             ]
-    return boxes, cost_line_count
+    return boxes
 
 
 @business_model_bp.route("/<int:canvas_id>")
@@ -137,7 +135,7 @@ def detail(canvas_id):
         return render_template("business_model/not_found.html", canvas_id=canvas_id), 404
 
     key = model_service.template_key(canvas)
-    boxes, cost_line_count = _canvas_boxes(canvas)
+    boxes = _canvas_boxes(canvas)
     zones = model_service.zones(canvas)
     pickers = {
         box: [{"id": el.id, "name": el.name, "type": el.type} for el in model_service.candidates(canvas, box)]
@@ -185,7 +183,6 @@ def detail(canvas_id):
         zones=zones,
         pickers=pickers,
         name_limit=model_service.ELEMENT_NAME_LENGTH,
-        cost_line_count=cost_line_count,
         vision=vision,
         vision_href=model_service.element_href(vision) if vision else None,
         can_edit=_can_edit(),
