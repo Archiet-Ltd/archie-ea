@@ -81,7 +81,13 @@ def count_organisation_groups(high_priority_at=0.85):
     groups = UnifiedDuplicateGroup.query.filter(
         UnifiedDuplicateGroup.id.in_(db.session.query(active.c.group_id))
     )
-    return groups.count(), groups.filter(UnifiedDuplicateGroup.similarity_score >= high_priority_at).count()
+    high = groups.filter(
+        db.or_(
+            UnifiedDuplicateGroup.similarity_score >= high_priority_at,
+            UnifiedDuplicateGroup.duplicate_type == "exact",
+        )
+    )
+    return groups.count(), high.count()
 
 
 @dataclass
@@ -1506,7 +1512,7 @@ class UnifiedDuplicateDetectionService:
                         "name": group.name,
                         "description": group.description,
                         "mode": "simple",
-                        "overall_similarity": group.similarity_score,
+                        "overall_similarity": group.shown_similarity,
                         "similarity_basis": describe_group_similarity(group.duplicate_type, group.match_details),
                         "similarity_threshold": group.similarity_threshold,
                         "detection_method": group.duplicate_type or "unknown",

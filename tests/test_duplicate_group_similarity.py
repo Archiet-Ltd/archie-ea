@@ -177,6 +177,34 @@ def test_list_and_group_page_show_the_same_figure_and_say_how_it_was_worked_out(
     assert "Aggregate match score" not in html
 
 
+def test_an_older_exact_group_holding_zero_reads_as_a_full_name_match(
+    app, db_session, tenant_ctx, login_as, client, world
+):
+    """Exact groups made before the score was stored hold the 0.0 default."""
+    _apps(db_session, world["own"], "Ledger Core", "Ledger Core Copy")
+    user = _user(db_session, world["own"])
+    _run_detection(tenant_ctx, world["own"], 0.50, score=0.53)
+    (group,) = _groups_of(world["own"])
+    group.duplicate_type, group.similarity_score = "exact", 0.0
+    db_session.commit()
+
+    login_as(client, user)
+    row = next(g for g in client.get("/duplicate-detection/simple/groups").get_json()["groups"]
+               if g["id"] == group.id)
+    assert row["overall_similarity"] == pytest.approx(1.0)
+    assert row["similarity_basis"] == "Names match exactly"
+
+    login_as(client, user)
+    html = client.get(f"/duplicate-detection/simple/group/{group.id}").get_data(as_text=True)
+    card = html.split("Overall Similarity")[1][:500]
+    assert "100%" in card and "Names match exactly" in card
+    assert "0%" not in card.replace("100%", "") and "Not scored" not in html
+
+    login_as(client, user)
+    body = client.get("/duplicate-detection/simple/api/statistics").get_json()
+    assert (body["total_groups"], body["high_priority_groups"]) == (1, 1)
+
+
 class _Named:
     def __init__(self, name, description=""):
         self.name, self.description = name, description

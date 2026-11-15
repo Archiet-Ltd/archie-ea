@@ -246,6 +246,13 @@ class UnifiedDuplicateGroup(db.Model):
             raise ValueError(f"similarity_score must be between 0 and 1, got {value}")
         return value
 
+    @property
+    def shown_similarity(self):
+        """The similarity a person reads. A group found by identical names is a full
+        match whatever the column holds (groups made before exact matches stored 1.0
+        hold the 0.0 default)."""
+        return 1.0 if self.duplicate_type == "exact" else self.similarity_score
+
     def get_primary_application(self):
         """Get the primary application in this group"""
         from sqlalchemy import select
@@ -270,7 +277,7 @@ class UnifiedDuplicateGroup(db.Model):
             "name": self.name,
             "description": self.description,
             "duplicate_type": self.duplicate_type,
-            "similarity_score": self.similarity_score,
+            "similarity_score": self.shown_similarity,
             "status": self.status,
             "resolution_action": self.resolution_action,
             "estimated_savings": self.estimated_savings,
