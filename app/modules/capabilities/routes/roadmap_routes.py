@@ -1109,6 +1109,12 @@ def api_roadmap_add_from_capability():
                 400,
             )
 
+        if data.get("capability_type") == "business" and not str(data.get("capability_id")).isdigit():
+            return jsonify({"success": False, "error": "Capability not found"}), 404
+        if data.get("capability_type") == "business" and _derived_capability_name(
+                "business", int(data.get("capability_id"))) is None:
+            return jsonify({"success": False, "error": "Capability not found"}), 404
+
         # Check if gap already exists for this capability
         existing_gap = gap_archimate_service.find_existing_gap(
             data.get("capability_type"), data.get("capability_id")
@@ -1532,6 +1538,8 @@ def _derived_capability_name(capability_type, capability_id):
         from app.models.business_capabilities import BusinessCapability
 
         row = BusinessCapability.query.get(capability_id)
+        if row is not None and row.organization_id != current_org_id():
+            row = None
     elif capability_type == "technical":
         from app.models.technical_capability import TechnicalCapability
 
@@ -2285,7 +2293,7 @@ def api_capability_traceability(capability_id):
         from app.services.capability_support import applications_of_capability
 
         capability = BusinessCapability.query.get(capability_id)
-        if not capability:
+        if not capability or capability.organization_id != current_org_id():
             return jsonify({"success": False, "error": "Capability not found"}), 404
 
         org_id = current_org_id()
