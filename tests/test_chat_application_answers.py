@@ -281,3 +281,10 @@ def test_an_owner_with_no_recorded_role_shows_the_name_alone():
     assert human_join([{"name": "Nneka Okafor", "role": "primary"}, {"name": "Cameron Doyle", "role": "technical"},
                        {"name": "Ada Obi", "role": None}]) == \
         "Nneka Okafor (primary), Cameron Doyle (technical) and Ada Obi"
+
+
+def test_a_name_that_already_ends_in_a_bracket_gets_its_role_after_a_comma():
+    from app.modules.ai_chat.services.lens_answer import human_join
+
+    assert human_join([{"name": "Alex (sample owner)", "role": "application owner"}]) == \
+        "Alex (sample owner), application owner"

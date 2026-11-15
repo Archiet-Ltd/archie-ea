@@ -126,6 +126,9 @@ def platform_admin_required(f=None, *, hide=False):
                     return jsonify({"error": "Platform admin access required"}), 403
                 abort(403)
             return view(*args, **kwargs)
+
+        # The write guard leaves a route that answers a non-administrator for itself.
+        decorated.answers_non_platform_admins = True
         return decorated
 
     return decorate if f is None else decorate(f)
