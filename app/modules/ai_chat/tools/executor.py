@@ -2426,20 +2426,20 @@ class ToolExecutor:
         }
 
     def _tool_propose_genome_patch(self, args: dict) -> dict:
-        """Validate an LLM-proposed genome patch and QUEUE it for approval.
+        """Validate an LLM-proposed change to the model and QUEUE it for approval.
 
         Non-mutating with respect to the enterprise model: it only creates a
-        pending approval (or rejects an invalid patch). The actual model write
+        pending approval (or rejects an invalid proposal). The actual model write
         happens later, in `_tool_apply_genome_patch`, once a human approves —
         exactly the existing approve-tier queue/confirm mechanism.
 
-        The LLM supplies the candidate patch as ``args["patch"]`` (or as the
+        The LLM supplies the candidate proposal as ``args["patch"]`` (or as the
         argument object itself). Whatever it emits is validated deterministically
-        before anything is queued, so a hallucinated patch cannot reach the model.
+        before anything is queued, so a hallucinated proposal cannot reach the model.
         """
         from app.modules.genome.patch.proposer import propose_genome_patch
 
-        request_text = args.get("request") or "propose a genome patch"
+        request_text = args.get("request") or "propose a change to your model"
 
         supplied = args.get("patch")
         if isinstance(supplied, dict):

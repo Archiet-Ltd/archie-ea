@@ -116,10 +116,25 @@
     }
 
     /* Names and addresses the model wrote between backticks are code, not text with backticks in it:
-       no backtick is drawn around them, a stray one is removed, and an answer address becomes a link to that answer. */
+       no backtick is drawn around them, a stray one is removed, and an answer address becomes a link to that answer.
+       Known page paths (e.g. `/solutions`) become named links ("the Solutions page"). */
     function tidyAnswerMarkup(html) {
         var holder = document.createElement('div');
         holder.innerHTML = html;
+        var pagePaths = {
+            '/solutions': 'the Solutions page',
+            '/applications': 'the Applications page',
+            '/capabilities': 'the Capabilities page',
+            '/architecture': 'the Architecture page',
+            '/portfolio': 'the Portfolio page',
+            '/governance': 'the Governance page',
+            '/compliance': 'the Compliance page',
+            '/risk': 'the Risk page',
+            '/arb': 'the ARB page',
+            '/ai-chat': 'the AI Chat page',
+            '/admin': 'the Admin page',
+            '/account': 'the Account page',
+        };
         holder.querySelectorAll('code').forEach(function (c) {
             // A fenced block is shown exactly as written: its indentation and backticks are the code.
             if (c.closest('pre')) return;
@@ -133,6 +148,12 @@
                 a.className = 'underline hover:no-underline';
                 c.parentNode.insertBefore(a, c);
                 a.appendChild(c);
+            } else if (pagePaths[t] && !c.closest('a')) {
+                var a = document.createElement('a');
+                a.setAttribute('href', t);
+                a.className = 'underline hover:no-underline';
+                a.textContent = pagePaths[t];
+                c.parentNode.replaceChild(a, c);
             }
         });
         var walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);

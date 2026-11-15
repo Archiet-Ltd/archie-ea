@@ -2290,6 +2290,18 @@ class AgentRunner:
                 "genome_post_check removed %d citation(s) outside the turn ledger", built["removed"],
             )
 
+    def _rewrite_customer_terms(self, result: dict) -> None:
+        """Rewrite internal terms to customer-facing language in the final answer."""
+        text = result.get("response")
+        if not isinstance(text, str) or not text.strip():
+            return
+        # Replace "genome patch" with "proposed change to your model" (case-insensitive)
+        import re
+        rewritten = re.sub(r'\bgenome patch\b', 'proposed change to your model', text, flags=re.IGNORECASE)
+        # Also replace "genome patches" with "proposed changes to your model"
+        rewritten = re.sub(r'\bgenome patches\b', 'proposed changes to your model', rewritten, flags=re.IGNORECASE)
+        result["response"] = rewritten
+
     def _log_would_refuse(self, uncited: list) -> None:
         """One structured WARNING per answer the gate would have refused. The
         unverified record names are logged; the answer text is not."""
@@ -2334,6 +2346,7 @@ class AgentRunner:
         result["turn_id"] = self._turn_id
         self._apply_genome_post_check(result, provider_used)
         self._apply_citation_gate(result)
+        self._rewrite_customer_terms(result)
         if (result.get("citation_gate") or {}).get("refused"):
             result.pop("genome_answer", None)
         if model_used and not result.get("error"):
