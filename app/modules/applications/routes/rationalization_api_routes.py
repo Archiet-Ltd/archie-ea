@@ -188,23 +188,21 @@ def rationalization_dashboard():
         )
         estimated_savings = sum_recorded(g.get("estimated_savings") for g in groups)
 
-        from flask import g
-        org_id = getattr(g, "current_org_id", None)
-
         # RATA-005: Get latest detection run for metadata display
         from app.models.unified_duplicate_detection import UnifiedDetectionRun
-        latest_run_q = UnifiedDetectionRun.query.order_by(
+        latest_run = UnifiedDetectionRun.query.order_by(
             UnifiedDetectionRun.created_at.desc()
-        )
-        latest_run = latest_run_q.first()
+        ).first()
 
         # Pipeline counts for workflow stepper
         from sqlalchemy import func, or_
 
         # The application count is the Overview's: not decommissioned, not a
         # merged-away duplicate. One query, imported, so the two pages agree.
+        from flask import g
         from app.modules.dashboard.services.overview_figures import _active_applications
 
+        org_id = getattr(g, "current_org_id", None)
         active_q = _active_applications()
         if org_id:
             active_q = active_q.where(ApplicationComponent.organization_id == org_id)
@@ -231,15 +229,13 @@ def rationalization_dashboard():
                 ConsolidationListEntry.recommended_action == "add_to_roadmap",
                 ConsolidationListEntry.roadmap_item_id.isnot(None),
             )
-        )
-        roadmap_count = roadmap_count.count()
+        ).count()
 
         # Combine duplicate group savings + consolidation list savings. When neither
         # carries a cost the total is None, so the page explains it instead of showing 0.
         consolidation_savings = db.session.query(
             func.sum(ConsolidationListEntry.estimated_savings)
-        )
-        consolidation_savings = consolidation_savings.scalar()
+        ).scalar()
         total_savings = recorded_sum(estimated_savings, consolidation_savings)
 
         stats = {

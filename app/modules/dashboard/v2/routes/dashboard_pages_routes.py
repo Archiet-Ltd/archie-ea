@@ -256,15 +256,13 @@ def rationalization_dashboard():
         # Add pipeline stats the template expects (time_scored, consolidation, roadmap)
         try:
             from app.models.application_rationalization import ApplicationRationalizationScore
-            time_scored_q = ApplicationRationalizationScore.query
-            stats["time_scored_count"] = time_scored_q.count()
+            stats["time_scored_count"] = ApplicationRationalizationScore.query.count()
         except Exception:
             stats["time_scored_count"] = 0
 
         try:
             from app.models.consolidation_list import ConsolidationListEntry
-            consolidation_q = ConsolidationListEntry.query
-            stats["consolidation_count"] = consolidation_q.count()
+            stats["consolidation_count"] = ConsolidationListEntry.query.count()
         except Exception:
             stats["consolidation_count"] = 0
 

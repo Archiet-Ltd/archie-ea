@@ -446,13 +446,14 @@ def get_simple_statistics():
     """Get application consolidation statistics (simple mode)"""
     try:
         # Latest run for simple/fast strategies
-        latest_run_q = UnifiedDetectionRun.query.filter(
-            UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
-            UnifiedDetectionRun.status == "completed",
+        latest_run = (
+            UnifiedDetectionRun.query.filter(
+                UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
+                UnifiedDetectionRun.status == "completed",
+            )
+            .order_by(UnifiedDetectionRun.created_at.desc())
+            .first()
         )
-        latest_run = latest_run_q.order_by(
-            UnifiedDetectionRun.created_at.desc()
-        ).first()
 
         # Count only groups that still have 2+ members (exclude orphaned groups)
         from app.models.unified_duplicate_detection import unified_group_members
@@ -1061,10 +1062,8 @@ def get_unified_stats():
         enterprise_groups = DuplicateGroup.query.count()
 
         # Get simple stats
-        simple_runs_q = UnifiedDetectionRun.query
-        simple_groups_q = UnifiedDuplicateGroup.query
-        simple_runs = simple_runs_q.count()
-        simple_groups = simple_groups_q.count()
+        simple_runs = UnifiedDetectionRun.query.count()
+        simple_groups = UnifiedDuplicateGroup.query.count()
 
         stats = {
             "enterprise": {
