@@ -185,7 +185,8 @@ def test_every_record_tool_declares_its_permission_pair_and_kind():
         assert schema["record_kind"] == kind and schema["mutates"] is True
         assert schema["permission"][0] == action and schema["permission"][0] in ACTIONS
         assert schema["permission"][1] in OBJECT_TYPES
-    assert "solution_id" not in TOOL_SCHEMA_BY_NAME["create_goal"]["parameters"]["properties"]
+    assert "solution_id" in TOOL_SCHEMA_BY_NAME["create_goal"]["parameters"]["properties"]
+    assert "owner" not in TOOL_SCHEMA_BY_NAME["update_risk"]["description"]
 
 
 def test_the_review_reads_goal_and_risk_targets_from_the_organisation(db_session, make_org, tenant_ctx):
@@ -218,3 +219,100 @@ def test_a_failed_save_says_nothing_was_changed(db_session, make_org, tenant_ctx
     with tenant_ctx(org.id):
         result = ToolExecutor(user.id).execute(ToolCall(id="9", name="create_goal", arguments={"name": "Anything"}))
     assert result == {"success": False, "error": "The goal could not be saved, so nothing was changed."}
+
+
+def _solution(db_session, org_id, name):
+    from app.models.solution_models import Solution
+
+    solution = Solution(name=name, organization_id=org_id)
+    db_session.add(solution)
+    db_session.flush()
+    return solution
+
+
+def test_a_goal_asked_for_on_a_solution_lands_on_that_solution(db_session, make_org, tenant_ctx, monkeypatch):
+    from app import db
+    from app.models.solution_architect_models import SolutionGoal, SolutionProblemDefinition
+
+    org = make_org("sg")
+    user = _user(db_session, org.id)
+    solution = _solution(db_session, org.id, "Payments rebuild %s" % _tag())
+    name = "Cut settlement time %s" % _tag()
+    FakeReviewer([PASS_ALL]).install(monkeypatch)
+    with tenant_ctx(org.id):
+        _id, verdict = _ask(user, "create_goal", {"name": name, "solution_id": solution.id})
+        assert verdict["state"] == "applied", verdict
+        assert 'on solution "%s"' % solution.name in verdict["message"], verdict["message"]
+        assert verdict["record_url"] and verdict["record_url"] != verdict["review_url"]
+        db.session.expire_all()
+        row = db.session.execute(db.select(SolutionGoal).where(SolutionGoal.name == name)).scalar_one()
+        problem = db.session.get(SolutionProblemDefinition, row.problem_id)
+        assert problem.session.name == "Agent session — solution %d" % solution.id
+        assert _goals_named(org.id, name) == [], "it is the solution's goal, not an organisation goal"
+
+
+def test_a_goal_cannot_be_put_on_another_organisations_solution(db_session, make_org, tenant_ctx, monkeypatch):
+    from app import db
+    from app.models.solution_architect_models import SolutionGoal
+
+    org_a, org_b = make_org("sa"), make_org("sb")
+    user_b = _user(db_session, org_b.id)
+    solution_a = _solution(db_session, org_a.id, "Org A programme %s" % _tag())
+    name = "Sneaky goal %s" % _tag()
+    FakeReviewer([PASS_ALL]).install(monkeypatch)
+    with tenant_ctx(org_b.id):
+        _id, verdict = _ask(user_b, "create_goal", {"name": name, "solution_id": solution_a.id})
+        assert verdict["state"] == "declined", verdict
+        assert db.session.execute(db.select(SolutionGoal).where(SolutionGoal.name == name)).first() is None
+
+
+def test_a_risk_asked_for_on_a_solution_keeps_the_solution(db_session, make_org, tenant_ctx, monkeypatch):
+    from app import db
+    from app.models.risk import Risk
+
+    org = make_org("sr")
+    user = _user(db_session, org.id)
+    solution = _solution(db_session, org.id, "Risk programme %s" % _tag())
+    title = "Vendor may exit %s" % _tag()
+    FakeReviewer([PASS_ALL]).install(monkeypatch)
+    with tenant_ctx(org.id):
+        _id, verdict = _ask(user, "create_risk", {"title": title, "likelihood": 3, "impact": 4,
+                                                  "solution_id": solution.id})
+        assert verdict["state"] == "applied", verdict
+        db.session.expire_all()
+        risk = db.session.execute(db.select(Risk).where(Risk.organization_id == org.id, Risk.title == title)).scalar_one()
+        assert risk.solution_id == solution.id
+
+
+def test_the_role_check_is_listed_once(db_session, make_org, tenant_ctx, monkeypatch):
+    org = make_org("once")
+    user = _user(db_session, org.id)
+    FakeReviewer([PASS_ALL]).install(monkeypatch)
+    with tenant_ctx(org.id):
+        approval_id, verdict = _ask(user, "create_goal", {"name": "Listed once %s" % _tag()})
+        assert verdict["state"] == "applied", verdict
+        from app import db
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+        from app.modules.ai_chat.services import change_review
+
+        row = db.session.get(AIChatCRUDApproval, approval_id)
+        names = [c["name"] for c in change_review._state(row)["checks"]]
+        assert names.count("The person who asked may make it") == 1, names
+
+
+def test_a_percent_or_underscore_in_a_name_matches_only_itself(db_session, make_org):
+    from app.models.risk import Risk
+    from app.modules.ai_chat.tools.resolver import EntityResolver
+    from app.services import goal_store
+
+    org = make_org("like")
+    tag = _tag()
+    goal_store.create_goal(org.id, "Grow 100%% %s" % tag)
+    goal_store.create_goal(org.id, "Grow 1000 now %s" % tag)
+    db_session.add(Risk(title="Lost_data %s" % tag, likelihood=2, impact=2, organization_id=org.id))
+    db_session.add(Risk(title="LostXdata %s" % tag, likelihood=2, impact=2, organization_id=org.id))
+    db_session.flush()
+    assert EntityResolver.resolve_goal("Grow 100%% %s" % tag, org.id)["resolved"] is True
+    assert EntityResolver.resolve_goal("Grow 100%", org.id)["resolved"] is True  # only one name contains "100%"
+    assert EntityResolver.resolve_risk("Lost_data %s" % tag, org.id)["resolved"] is True
+    assert EntityResolver.resolve_risk("Lost_data", org.id)["resolved"] is True  # "LostXdata" is not matched

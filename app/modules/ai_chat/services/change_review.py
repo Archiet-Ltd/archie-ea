@@ -636,7 +636,9 @@ def _target_create_goal(args: Dict[str, Any], org_id: int) -> Target:
     target = Target(True, label=name, creates=True,
                     before={"kind": "create", "note": "Nothing existed before; undoing it removes the new goal."},
                     facts={"goal": name, "target_date": args.get("target_date"), "status": args.get("status")})
-    if _named_goals(org_id, name):
+    if args.get("solution_id") is not None:
+        target.value_reason = _date_problem(args)
+    elif _named_goals(org_id, name):
         target.value_reason = "A goal called '%s' already exists in this workspace." % name
     else:
         target.value_reason = _date_problem(args)
@@ -915,7 +917,9 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
     else:
         role_reason = ("The person who asked still has the role this change needs." if allowed
                        else "The person who asked no longer has a role that can make changes.")
-    if not add("The person who asked may make it", allowed, role_reason):
+    # A record tool already asked this of the permission matrix above: say it once when it holds.
+    asked = any(c.name == "The person who asked may make it" for c in checks)
+    if not (asked and allowed) and not add("The person who asked may make it", allowed, role_reason):
         return checks, target
     return checks, target
 

@@ -1222,9 +1222,41 @@ class ToolExecutor:
     # Tool: create_goal                                                   #
     # ------------------------------------------------------------------ #
 
+    def _solution_goal(self, args: dict) -> dict:
+        """A goal asked for on a named solution is that solution's goal, as it was before the organisation's own."""
+        from app.models.solution_architect_models import SolutionGoal
+        from app.models.solution_models import Solution
+
+        org_id = self._get_organization_id()
+        solution = db.session.execute(db.select(Solution).where(
+            Solution.id == args["solution_id"], Solution.organization_id == org_id)).scalar_one_or_none()
+        if solution is None:
+            return {"success": False, "error": "There is no solution with that number in this workspace."}
+        goal = SolutionGoal(
+            problem_id=self._get_or_create_problem_id(solution.id),
+            name=args["name"],
+            description=args.get("description", ""),
+            priority=args.get("priority", 3),
+            ai_generated=True,
+            organization_id=org_id,
+        )
+        db.session.add(goal)
+        sync_archimate_element(goal)
+        db.session.commit()
+        url = _element_url(goal.archimate_element_id)
+        return {
+            "success": True,
+            "result": {"id": goal.id, "element_id": goal.archimate_element_id, "name": goal.name,
+                       "entity_type": "goal", "solution_id": solution.id, "record_url": url},
+            "message": 'created Goal "%s" on solution "%s"' % (goal.name, solution.name),
+            "record_url": url,
+        }
+
     def _tool_create_goal(self, args: dict) -> dict:
         from app.services import goal_store
 
+        if args.get("solution_id") is not None:
+            return self._solution_goal(args)
         goal = goal_store.create_goal(
             self._get_organization_id(), args["name"], description=args.get("description"),
             target_date=args.get("target_date"), status=args.get("status"))

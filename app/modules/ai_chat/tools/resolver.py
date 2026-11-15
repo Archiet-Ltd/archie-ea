@@ -47,6 +47,11 @@ def _by_name(model, name, organization_id, label, extra=()):
     return {"resolved": False, "candidates": [{"id": r.id, "name": r.name} for r in candidates]}
 
 
+def _literal(text) -> str:
+    """The text with LIKE's own characters made plain, so a name containing % or _ matches only itself."""
+    return str(text).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class EntityResolver:
 
     @staticmethod
@@ -120,10 +125,10 @@ class EntityResolver:
             if org_id is None:
                 return {"resolved": False, "candidates": []}
             base = [ArchiMateElement.organization_id == org_id, ArchiMateElement.type == "Goal"]
-            exact = ArchiMateElement.query.filter(ArchiMateElement.name.ilike(name), *base).order_by(
+            exact = ArchiMateElement.query.filter(ArchiMateElement.name.ilike(_literal(name), escape="\\"), *base).order_by(
                 ArchiMateElement.id).limit(MAX_CANDIDATES).all()
             if not exact:
-                exact = ArchiMateElement.query.filter(ArchiMateElement.name.ilike(f"%{name}%"), *base).order_by(
+                exact = ArchiMateElement.query.filter(ArchiMateElement.name.ilike(f"%{_literal(name)}%", escape="\\"), *base).order_by(
                     ArchiMateElement.id).limit(MAX_CANDIDATES).all()
             if len(exact) == 1:
                 return {"resolved": True, "id": exact[0].id, "name": exact[0].name}
@@ -142,9 +147,9 @@ class EntityResolver:
             if org_id is None:
                 return {"resolved": False, "candidates": []}
             base = [Risk.organization_id == org_id]
-            found = Risk.query.filter(Risk.title.ilike(title), *base).order_by(Risk.id).limit(MAX_CANDIDATES).all()
+            found = Risk.query.filter(Risk.title.ilike(_literal(title), escape="\\"), *base).order_by(Risk.id).limit(MAX_CANDIDATES).all()
             if not found:
-                found = Risk.query.filter(Risk.title.ilike(f"%{title}%"), *base).order_by(Risk.id).limit(
+                found = Risk.query.filter(Risk.title.ilike(f"%{_literal(title)}%", escape="\\"), *base).order_by(Risk.id).limit(
                     MAX_CANDIDATES).all()
             if len(found) == 1:
                 return {"resolved": True, "id": found[0].id, "name": found[0].title}

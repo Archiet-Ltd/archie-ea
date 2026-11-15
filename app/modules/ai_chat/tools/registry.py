@@ -386,7 +386,8 @@ TOOL_SCHEMAS = [
         "description": (
             "Add a goal to the organisation (ArchiMate Motivation layer), with a target date when the person "
             "gives one. Use when the user describes a desired outcome or success criterion. It is the "
-            "organisation's goal, not a solution's."
+            "organisation's goal unless a solution is named: give solution_id only when the person asks for the "
+            "goal on that solution."
         ),
         "parameters": {
             "type": "object",
@@ -396,6 +397,7 @@ TOOL_SCHEMAS = [
                 "target_date": {"type": "string", "format": "date",
                                 "description": "When the goal should be reached, as YYYY-MM-DD"},
                 "status": {"type": "string", "enum": ["draft", "active", "on_hold", "achieved", "cancelled"]},
+                "solution_id": {"type": "integer", "description": "Only when the person names a solution"},
             },
             "required": ["name"],
         },
@@ -536,7 +538,7 @@ TOOL_SCHEMAS = [
         "permission": ["edit", "motivation_element"],
         "record_kind": "risk",
         "description": (
-            "Change a risk in the register: its likelihood, impact, title, description, owner or mitigation "
+            "Change a risk in the register: its likelihood, impact, title, description or mitigation "
             "plan. Use when the person asks to raise, lower or reword a risk. Name the risk by its title."
         ),
         "parameters": {
