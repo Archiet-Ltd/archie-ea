@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20261115_application_kind"
-down_revision = "20261114_sign_in_identities"
+down_revision = "20261114_blank_none_desc"
 branch_labels = None
 depends_on = None
 
