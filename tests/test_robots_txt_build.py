@@ -67,10 +67,14 @@ def test_no_route_that_refuses_a_signed_out_visitor_is_allowed_to_crawlers(app, 
     assert not leaks, f"{len(leaks)} private routes a crawler may read: {sorted(set(leaks))[:20]}"
 
 
-def test_no_public_page_is_disallowed(client, robots_text):
+def test_no_public_page_is_disallowed(app, client, robots_text):
+    from app.services.origin import canonical_origin
+
+    with app.app_context():
+        origin = canonical_origin()
     rules = _parse_robots_rules(robots_text, "Googlebot")
     sitemap = client.get("/sitemap-en.xml").get_data(as_text=True)
-    pages = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap)) | {"/", "/early-access"}
+    pages = set(re.findall(r"<loc>%s([^<]*)</loc>" % re.escape(origin), sitemap)) | {"/", "/early-access"}
     hub = client.get("/early-access").get_data(as_text=True)
     pages |= {urlsplit(h).path for h in re.findall(r'href="(/(?:early-access|vs)/[^"]*)"', hub)}
     pages |= {"/vs/avolution", "/vs/orbus"}
