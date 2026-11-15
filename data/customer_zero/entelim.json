@@ -8,10 +8,15 @@
    "status": "shipped",
    "what_a_person_can_do": "Start free with your name, email address and a password; no payment card is asked for. A few short welcome steps connect your sources and ask about your company, then take you straight to the AI chat.",
    "limits": [
-    "set up in N minutes (any time figure)",
-    "buy a plan online",
-    "no setup at all"
-   ]
+    "Plans cannot be bought online; they are set up in a conversation."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "set up in N minutes (any time figure)",
+     "buy a plan online",
+     "no setup at all"
+    ]
+   }
   },
   {
    "id": "github-first-model",
@@ -19,11 +24,17 @@
    "status": "shipped",
    "what_a_person_can_do": "Connect GitHub when you sign up or later from Connections. Entelim reads your repositories and adds the applications, the technology they run on and the links between them to your model, each marked as read from GitHub, and shows you what it added.",
    "limits": [
-    "discovers your entire estate automatically",
-    "GitLab, Bitbucket or Azure DevOps",
-    "builds your model from Jira",
-    "any time figure for the read"
-   ]
+    "Only GitHub is read: GitLab, Bitbucket and Azure DevOps are not connected.",
+    "Jira is not used to build your model."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "discovers your entire estate automatically",
+     "GitLab, Bitbucket or Azure DevOps",
+     "builds your model from Jira",
+     "any time figure for the read"
+    ]
+   }
   },
   {
    "id": "product-repositories",
@@ -31,9 +42,14 @@
    "status": "shipped",
    "what_a_person_can_do": "From a product's page, pick repositories from your GitHub connection. Entelim proposes the components, services, interfaces and technology they show, already linked to that product, and once you accept them each one links to the file it was read from.",
    "limits": [
-    "maps your whole codebase",
-    "accepted without review"
-   ]
+    "It reads the repositories you pick, not your whole codebase."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "maps your whole codebase",
+     "accepted without review"
+    ]
+   }
   },
   {
    "id": "application-inventory",
@@ -41,10 +57,15 @@
    "status": "shipped",
    "what_a_person_can_do": "Keep one list of your applications. Each has its own page with its owner, lifecycle, the capabilities it supports, the technology and suppliers your model links to it and the framework requirements linked to it, and you can edit and save its details.",
    "limits": [
-    "a complete inventory found automatically",
-    "shows which requirements you comply with",
-    "any count"
-   ]
+    "Applications are added by you or read from GitHub; Entelim does not find every application on its own."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "a complete inventory found automatically",
+     "shows which requirements you comply with",
+     "any count"
+    ]
+   }
   },
   {
    "id": "application-owners",
@@ -52,9 +73,14 @@
    "status": "shipped",
    "what_a_person_can_do": "Record who owns each application, choose the owner by name, and ask the AI chat who owns a system; it names the owner recorded in your model.",
    "limits": [
-    "owners imported from your HR system or directory",
-    "owners kept up to date automatically"
-   ]
+    "Owners are recorded by hand; they are not imported from an HR system or directory."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "owners imported from your HR system or directory",
+     "owners kept up to date automatically"
+    ]
+   }
   },
   {
    "id": "capability-map",
@@ -62,10 +88,15 @@
    "status": "shipped",
    "what_a_person_can_do": "Build your business capability map: add, edit and remove capabilities and see them as a map or a list.",
    "limits": [
-    "a complete industry reference model for every industry",
-    "the full BIAN landscape",
-    "the complete APQC framework"
-   ]
+    "The starter selections are a starting point, not a full reference model for every industry."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "a complete industry reference model for every industry",
+     "the full BIAN landscape",
+     "the complete APQC framework"
+    ]
+   }
   },
   {
    "id": "capability-application-links",
@@ -73,9 +104,14 @@
    "status": "shipped",
    "what_a_person_can_do": "Link each application to the business capabilities it supports, with how fully it supports each one, and see those links on the application's page or by asking the AI chat.",
    "limits": [
-    "links made automatically",
-    "finds every capability an application supports"
-   ]
+    "Links are made by people; Entelim does not find every capability an application supports."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "links made automatically",
+     "finds every capability an application supports"
+    ]
+   }
   },
   {
    "id": "business-model-canvas",
@@ -83,10 +119,15 @@
    "status": "shipped",
    "what_a_person_can_do": "Create a business model canvas for your company and edit each of its blocks.",
    "limits": [
-    "export to PowerPoint",
-    "AI writes your canvas for you",
-    "Lean Canvas"
-   ]
+    "There is no export to PowerPoint and no Lean Canvas."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "export to PowerPoint",
+     "AI writes your canvas for you",
+     "Lean Canvas"
+    ]
+   }
   },
   {
    "id": "gap-register",
@@ -94,12 +135,17 @@
    "status": "shipped",
    "what_a_person_can_do": "Record the gaps between your current and target architecture, each with its kind, severity and the element it concerns, link each gap to the work package that closes it, and see the same gap counts on every page.",
    "limits": [
-    "finds your gaps automatically",
-    "AI gap detection",
-    "compliance gap analysis",
-    "regulatory gap assessment",
-    "análise de conformidade"
-   ]
+    "Gaps are recorded by people; Entelim does not find them for you."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "finds your gaps automatically",
+     "AI gap detection",
+     "compliance gap analysis",
+     "regulatory gap assessment",
+     "análise de conformidade"
+    ]
+   }
   },
   {
    "id": "work-packages",
@@ -107,10 +153,15 @@
    "status": "shipped",
    "what_a_person_can_do": "Plan the work that closes each gap as work packages, each showing its capability, owner, status and dates in one place, with a link to add whatever is missing.",
    "limits": [
-    "Gantt charts",
-    "resource planning",
-    "synchronised with Jira"
-   ]
+    "There are no Gantt charts or resource planning, and no synchronisation with Jira."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "Gantt charts",
+     "resource planning",
+     "synchronised with Jira"
+    ]
+   }
   },
   {
    "id": "gap-roadmap",
@@ -118,12 +169,17 @@
    "status": "shipped",
    "what_a_person_can_do": "See your gaps on a roadmap of plateaus, the stages between your current architecture and your target, opened from the Gaps page.",
    "limits": [
-    "a dated timeline",
-    "Gantt",
-    "programme roadmap",
-    "capability roadmap",
-    "plans dates and resources for you"
-   ]
+    "It shows the order of the work, not a dated timeline or a Gantt chart."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "a dated timeline",
+     "Gantt",
+     "programme roadmap",
+     "capability roadmap",
+     "plans dates and resources for you"
+    ]
+   }
   },
   {
    "id": "risk-register",
@@ -131,10 +187,15 @@
    "status": "shipped",
    "what_a_person_can_do": "Keep a risk register: record, edit and close risks, and see how many are open and how many are critical.",
    "limits": [
-    "Open FAIR certified",
-    "quantifies your financial loss",
-    "regulatory risk compliance"
-   ]
+    "Risks are recorded and rated; Entelim does not work out a financial loss."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "Open FAIR certified",
+     "quantifies your financial loss",
+     "regulatory risk compliance"
+    ]
+   }
   },
   {
    "id": "impact-what-breaks",
@@ -142,10 +203,15 @@
    "status": "shipped",
    "what_a_person_can_do": "Pick a system, or ask in the AI chat, and see what depends on it: the applications, processes and capabilities affected if it fails, each linked to its record, and where each connection came from.",
    "limits": [
-    "predicts outages",
-    "real-time monitoring",
-    "finds dependencies nobody has recorded or connected"
-   ]
+    "It follows the links recorded in your model; it does not find dependencies nobody has recorded."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "predicts outages",
+     "real-time monitoring",
+     "finds dependencies nobody has recorded or connected"
+    ]
+   }
   },
   {
    "id": "scenarios",
@@ -153,10 +219,15 @@
    "status": "shipped",
    "what_a_person_can_do": "Try a change, such as retiring a system, on a copy of your model and see what it does to your elements, links, applications and open risks before you change anything real. Save scenarios and compare them side by side.",
    "limits": [
-    "forecasts savings",
-    "predicts the cost of a change",
-    "AI simulation of the future"
-   ]
+    "Scenarios compare what you enter; Entelim does not forecast savings or the cost of a change."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "forecasts savings",
+     "predicts the cost of a change",
+     "AI simulation of the future"
+    ]
+   }
   },
   {
    "id": "ai-chat-cited-answers",
@@ -164,24 +235,31 @@
    "status": "shipped",
    "what_a_person_can_do": "Ask questions about your architecture in plain language, on a desktop or a phone: who owns a system, what breaks if it fails, which capabilities it supports. Answers cite their sources, and you can open the records behind them.",
    "limits": [
-    "every source in every answer is a link",
-    "instant answers or any time figure",
-    "never wrong",
-    "no hallucinations",
-    "answers any question about your business",
-    "anything about how citations are produced or numbered"
-   ]
+    "It answers from what is recorded in your model, not about the rest of your business."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "every source in every answer is a link",
+     "instant answers or any time figure",
+     "never wrong",
+     "no hallucinations",
+     "answers any question about your business",
+     "anything about how citations are produced or numbered"
+    ]
+   }
   },
   {
    "id": "chat-corrects-a-record",
    "name": "Ask the AI chat to correct a record",
    "status": "shipped",
    "what_a_person_can_do": "Ask the AI chat to correct a record, such as an application's description, and it changes only that record when you press Save.",
-   "limits": [
-    "the AI changes your model on its own",
-    "changes many records at once",
-    "a person approves every AI change in a queue"
-   ]
+   "provenance": {
+    "claims_not_made": [
+     "the AI changes your model on its own",
+     "changes many records at once",
+     "a person approves every AI change in a queue"
+    ]
+   }
   },
   {
    "id": "mcp-assistant-connection",
@@ -189,24 +267,31 @@
    "status": "shipped",
    "what_a_person_can_do": "Connect an AI assistant that supports the Model Context Protocol (MCP) to your organisation's model. You allow the connection with your Entelim sign-in; the assistant can then search your model and ask what breaks, who is accountable and what is at risk, reading only your organisation's data, and you can disconnect it at any time.",
    "limits": [
-    "writes to or changes your model",
-    "an official connector of a named assistant product",
-    "tested with, listed by or endorsed by a named AI company",
-    "works with every AI assistant"
-   ]
+    "The connection reads your model; it does not change it."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "writes to or changes your model",
+     "an official connector of a named assistant product",
+     "tested with, listed by or endorsed by a named AI company",
+     "works with every AI assistant"
+    ]
+   }
   },
   {
    "id": "archimate-modelling",
    "name": "ArchiMate modelling in the browser",
    "status": "shipped",
    "what_a_person_can_do": "Model your architecture in ArchiMate in the browser: create and edit elements in every layer, draw and save diagrams in the Composer, open any element with everything it connects to, and explore the whole model on the model map.",
-   "limits": [
-    "ArchiMate certified",
-    "certified by The Open Group",
-    "conformant or compliant with ArchiMate 3.2",
-    "any count of element or relationship types",
-    "every layer count agrees on every screen"
-   ]
+   "provenance": {
+    "claims_not_made": [
+     "ArchiMate certified",
+     "certified by The Open Group",
+     "conformant or compliant with ArchiMate 3.2",
+     "any count of element or relationship types",
+     "every layer count agrees on every screen"
+    ]
+   }
   },
   {
    "id": "vendors-from-model",
@@ -214,10 +299,15 @@
    "status": "shipped",
    "what_a_person_can_do": "The Vendors page lists the suppliers your model links to your systems, and you can record any of them as a managed vendor in one step.",
    "limits": [
-    "contract renewal alerts",
-    "vendor risk scoring",
-    "spend analytics"
-   ]
+    "There are no contract renewal alerts, vendor risk scores or spend analytics."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "contract renewal alerts",
+     "vendor risk scoring",
+     "spend analytics"
+    ]
+   }
   },
   {
    "id": "consolidation-opportunities",
@@ -225,10 +315,15 @@
    "status": "shipped",
    "what_a_person_can_do": "Consolidation Opportunities ranks the applications you could merge or retire, worked out from your own model, and each row opens that application's page.",
    "limits": [
-    "guaranteed savings",
-    "any saving figure",
-    "decides for you"
-   ]
+    "It points out opportunities; it gives no saving figure and decides nothing for you."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "guaranteed savings",
+     "any saving figure",
+     "decides for you"
+    ]
+   }
   },
   {
    "id": "backlog-prioritisation",
@@ -236,9 +331,14 @@
    "status": "shipped",
    "what_a_person_can_do": "Rank your backlog: every card shows a score worked out from its own inputs with the evidence beneath it, and names the input to add when one is missing.",
    "limits": [
-    "AI decides your priorities",
-    "synchronised with Jira"
-   ]
+    "It orders the work for you to review, and is not synchronised with Jira."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "AI decides your priorities",
+     "synchronised with Jira"
+    ]
+   }
   },
   {
    "id": "investment-matrix",
@@ -246,35 +346,44 @@
    "status": "shipped",
    "what_a_person_can_do": "An investment prioritisation matrix shows your capabilities, and its totals agree with your capability map.",
    "limits": [
-    "recommends where to invest",
-    "any investment or return figure"
-   ]
+    "It places applications in the matrix; it does not recommend where to invest or give a return figure."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "recommends where to invest",
+     "any investment or return figure"
+    ]
+   }
   },
   {
    "id": "costs-by-role",
    "name": "Cost figures only for people allowed to see spending",
    "status": "shipped",
    "what_a_person_can_do": "Cost figures are shown only to people whose role lets them see spending; everyone else sees the rest of the page with a plain note that costs are withheld.",
-   "limits": [
-    "field-level encryption",
-    "any security certification"
-   ]
+   "provenance": {
+    "claims_not_made": [
+     "field-level encryption",
+     "any security certification"
+    ]
+   }
   },
   {
    "id": "organisation-isolation",
    "name": "Each organisation's model kept separate",
    "status": "shipped",
    "what_a_person_can_do": "Each organisation's model is kept separate: people in one organisation cannot find or open another organisation's records.",
-   "limits": [
-    "read-only viewer role",
-    "viewers cannot change anything",
-    "penetration tested",
-    "SOC 2",
-    "ISO 27001",
-    "data stays in a named country or region",
-    "end-to-end encrypted",
-    "bank-grade security"
-   ]
+   "provenance": {
+    "claims_not_made": [
+     "read-only viewer role",
+     "viewers cannot change anything",
+     "penetration tested",
+     "SOC 2",
+     "ISO 27001",
+     "data stays in a named country or region",
+     "end-to-end encrypted",
+     "bank-grade security"
+    ]
+   }
   },
   {
    "id": "business-case",
@@ -282,150 +391,232 @@
    "status": "shipped",
    "what_a_person_can_do": "Build a business case for an investment from its costs and benefits and keep it with the rest of your model.",
    "limits": [
-    "any return or payback figure",
-    "guaranteed return"
-   ]
+    "It does not give a return or payback figure."
+   ],
+   "provenance": {
+    "claims_not_made": [
+     "any return or payback figure",
+     "guaranteed return"
+    ]
+   }
   },
   {
    "id": "sample-company",
    "name": "A sample company to try Entelim",
    "status": "shipped",
    "what_a_person_can_do": "Load a sample company to see Entelim working before you connect your own tools.",
-   "limits": [
-    "any count of sample records"
-   ]
+   "provenance": {
+    "claims_not_made": [
+     "any count of sample records"
+    ]
+   }
   },
   {
    "id": "bian-landscape-import",
    "name": "Import the BIAN landscape",
    "status": "not shipped as stated",
-   "what_exists": "A BIAN starter selection (business areas as level 1 capabilities, service domains as level 2) is loaded when a company chooses 'Banking and payments' at sign-up. The code's own description: 'a starting point ... not the full landscape' (,  INDUSTRIES at 7f59c3b70)."
+   "what_exists": "When a company chooses 'Banking and payments' at sign-up, Entelim loads a BIAN starter selection: business areas as top-level capabilities and service domains beneath them. It is a starting point, not the full BIAN landscape.",
+   "provenance": {
+    "recorded_text": "A BIAN starter selection (business areas as level 1 capabilities, service domains as level 2) is loaded when a company chooses 'Banking and payments' at sign-up. The code's own description: 'a starting point ... not the full landscape' (,  INDUSTRIES at 7f59c3b70)."
+   }
   },
   {
    "id": "togaf-adm",
    "name": "TOGAF ADM",
    "status": "not proven",
-   "what_exists": "An 'ADM Kanban' page opens with content (livejourney05 sweep, /adm-kanban/ 200). TOGAF is offered as a framework at sign-up ('The architecture development method, phase by phase', onboarding_service FRAMEWORKS at 7f59c3b70)."
+   "what_exists": "An ADM Kanban page opens with content, and TOGAF is offered as a framework at sign-up (the architecture development method, phase by phase).",
+   "page": "/adm-kanban/",
+   "provenance": {
+    "recorded_text": "An 'ADM Kanban' page opens with content (livejourney05 sweep, /adm-kanban/ 200). TOGAF is offered as a framework at sign-up ('The architecture development method, phase by phase', onboarding_service FRAMEWORKS at 7f59c3b70)."
+   }
   },
   {
    "id": "programme-and-capability-roadmaps",
    "name": "Programme roadmaps and the capability roadmap",
    "status": "not proven",
-   "what_exists": "The public menu says 'Record programmes and place them on a roadmap'. A capability roadmap page answers sign-in at /capability-roadmap."
+   "what_exists": "A capability roadmap page exists. The menu also promises recording programmes and placing them on a roadmap; that has not been confirmed from start to finish.",
+   "page": "/capability-roadmap",
+   "provenance": {
+    "recorded_text": "The public menu says 'Record programmes and place them on a roadmap'. A capability roadmap page answers sign-in at /capability-roadmap."
+   }
   },
   {
    "id": "archimate-file-import",
    "name": "Import an ArchiMate Open Exchange file",
    "status": "not proven",
-   "what_exists": "The 'Import Architecture Documents' page opens (livejourney05 sweep, /archimate/import 200). Editing imported elements was deployed in d27015d73."
+   "what_exists": "The Import Architecture Documents page opens, and imported elements can be edited afterwards.",
+   "page": "/archimate/import",
+   "provenance": {
+    "recorded_text": "The 'Import Architecture Documents' page opens (livejourney05 sweep, /archimate/import 200). Editing imported elements was deployed in d27015d73."
+   }
   },
   {
    "id": "spreadsheet-import",
    "name": "Import from spreadsheets",
    "status": "not proven",
-   "what_exists": "The 'Batch Import' page opens (livejourney05 sweep, /batch-import/ 200)."
+   "what_exists": "The Batch Import page opens.",
+   "page": "/batch-import/",
+   "provenance": {
+    "recorded_text": "The 'Batch Import' page opens (livejourney05 sweep, /batch-import/ 200)."
+   }
   },
   {
    "id": "buy-and-cancel-online",
    "name": "Buy or cancel a plan online",
    "status": "not shipped",
-   "what_exists": "Plans and prices are published. Startup and Team are set up in a conversation."
+   "what_exists": "Plans and prices are published. Startup and Team plans are set up in a conversation, not bought online.",
+   "provenance": {
+    "recorded_text": "Plans and prices are published. Startup and Team are set up in a conversation."
+   }
   },
   {
    "id": "sso-saml-audit-export",
    "name": "Single sign-on, SAML sign-in and audit log export",
    "status": "not proven",
-   "what_exists": "Listed on the pricing page for Team and Enterprise."
+   "what_exists": "Single sign-on, SAML and audit export are listed on the pricing page for the Team and Enterprise plans.",
+   "provenance": {
+    "recorded_text": "Listed on the pricing page for Team and Enterprise."
+   }
   },
   {
    "id": "self-hosted-edition",
    "name": "Self-host the open-source edition",
    "status": "not proven",
-   "what_exists": "Stated on the pricing page."
+   "what_exists": "A self-hosted edition is stated on the pricing page.",
+   "provenance": {
+    "recorded_text": "Stated on the pricing page."
+   }
   },
   {
    "id": "jira-connection",
    "name": "Jira connection (model from Jira, value stream stage times from Jira)",
    "status": "not proven",
-   "what_exists": "'Connect Jira' is offered on the sign-up sources step."
+   "what_exists": "Connect Jira is offered on the sources step at sign-up.",
+   "provenance": {
+    "recorded_text": "'Connect Jira' is offered on the sign-up sources step."
+   }
   },
   {
    "id": "value-streams",
    "name": "Value streams",
    "status": "not proven",
-   "what_exists": "The 'Value streams' page opens (livejourney05 sweep; flagged 'None shown')."
+   "what_exists": "The Value streams page opens. It shows nothing until value streams are added.",
+   "page": "/value-streams/",
+   "provenance": {
+    "recorded_text": "The 'Value streams' page opens (livejourney05 sweep; flagged 'None shown')."
+   }
   },
   {
    "id": "compliance-tracking",
    "name": "Compliance tracking against frameworks (ISO 27001, SOC 2, GDPR, DORA and others)",
    "status": "not proven",
-   "what_exists": "'Compliance Tracking' and 'Regulatory Compliance' pages open (livejourney05 sweep). The Controls page was walked but its checks 3 and 4 could not be done."
+   "what_exists": "The Compliance Tracking and Regulatory Compliance pages open. Some of the checks on the Controls page could not be completed.",
+   "page": "/dashboard/compliance",
+   "provenance": {
+    "recorded_text": "'Compliance Tracking' and 'Regulatory Compliance' pages open (livejourney05 sweep). The Controls page was walked but its checks 3 and 4 could not be done."
+   }
   },
   {
    "id": "ai-approval-queue",
    "name": "An AI approval queue where a person approves or rejects each change",
    "status": "not proven, and the public description does not match the approach",
-   "what_exists": "The public menu says 'Review changes an AI assistant proposes, then approve or reject each.'"
+   "what_exists": "The menu describes reviewing the changes an AI assistant proposes and approving or rejecting each. In the AI chat a change is made when you confirm it; there is no separate approval queue.",
+   "provenance": {
+    "recorded_text": "The public menu says 'Review changes an AI assistant proposes, then approve or reject each.'"
+   }
   },
   {
    "id": "viewer-read-only",
    "name": "A read-only Viewer role",
    "status": "not shipped",
-   "what_exists": "A Viewer sees no write controls on pages."
+   "what_exists": "A Viewer sees no write controls on pages.",
+   "provenance": {
+    "recorded_text": "A Viewer sees no write controls on pages."
+   }
   },
   {
    "id": "twin-map-page",
    "name": "Twin map as its own page",
    "status": "not proven",
-   "what_exists": "Named in the public menu. The same question ('what depends on this system') is answered through the AI chat and the Composer (see impact-what-breaks)."
+   "what_exists": "A Twin map page is named in the menu. The same question, what depends on this system, is answered in the AI chat and the Composer.",
+   "page": "/intelligence/twin-map",
+   "provenance": {
+    "recorded_text": "Named in the public menu. The same question ('what depends on this system') is answered through the AI chat and the Composer (see impact-what-breaks)."
+   }
   },
   {
    "id": "architecture-review-board",
    "name": "Architecture review board workflow",
    "status": "not proven",
-   "what_exists": "The 'Architecture Review Board' page opens (livejourney05 sweep, /arb/ 200)."
+   "what_exists": "The Architecture Review Board page opens.",
+   "page": "/arb/",
+   "provenance": {
+    "recorded_text": "The 'Architecture Review Board' page opens (livejourney05 sweep, /arb/ 200)."
+   }
   },
   {
    "id": "decision-tables",
    "name": "Decision tables (DMN)",
    "status": "not proven",
-   "what_exists": "The 'Decision tables' page opens (livejourney05 sweep)."
+   "what_exists": "The Decision tables page opens.",
+   "page": "/architecture/decision-tables/",
+   "provenance": {
+    "recorded_text": "The 'Decision tables' page opens (livejourney05 sweep)."
+   }
   },
   {
    "id": "risk-loss-figures",
    "name": "Yearly loss figures for risks (Open FAIR method)",
    "status": "not proven",
-   "what_exists": "Stated in the What's New log of 4 November, checked by test suites."
+   "what_exists": "Risk loss figures are described in the What's New log of 4 November.",
+   "provenance": {
+    "recorded_text": "Stated in the What's New log of 4 November, checked by test suites."
+   }
   },
   {
    "id": "website-reading-at-sign-up",
    "name": "Entelim reads your company website at sign-up and shows public signals",
    "status": "not proven",
-   "what_exists": "'Save website' is offered on the sources step."
+   "what_exists": "Save website is offered on the sources step at sign-up.",
+   "provenance": {
+    "recorded_text": "'Save website' is offered on the sources step."
+   }
   },
   {
    "id": "frameworks-chosen-at-sign-up",
    "name": "Choose canvases and frameworks at sign-up and have them loaded",
    "status": "not proven",
-   "what_exists": "The choice is in code at 7f59c3b70 (onboarding_service FRAMEWORKS and INDUSTRIES)."
+   "what_exists": "A company can choose its frameworks and its industry at sign-up.",
+   "provenance": {
+    "recorded_text": "The choice is in code at 7f59c3b70 (onboarding_service FRAMEWORKS and INDUSTRIES)."
+   }
   },
   {
    "id": "canvas-export",
    "name": "Export a business model canvas",
    "status": "not proven",
-   "what_exists": "The public menu says 'Create a business model canvas and export it.'"
+   "what_exists": "The menu says you can create a business model canvas and export it. The canvas can be created; exporting it has not been confirmed.",
+   "provenance": {
+    "recorded_text": "The public menu says 'Create a business model canvas and export it.'"
+   }
   },
   {
    "id": "sysml-models",
    "name": "Bring your SysML models",
    "status": "not shipped (early access)",
-   "what_exists": "A public early-access page with a waiting list."
+   "what_exists": "A public early-access page takes names for a waiting list.",
+   "provenance": {
+    "recorded_text": "A public early-access page with a waiting list."
+   }
   },
   {
    "id": "software-discovery",
    "name": "Software and tool discovery",
    "status": "not shipped (coming soon)",
-   "what_exists": "Shown as 'Coming soon' in the public menu."
+   "what_exists": "Shown as Coming soon in the menu.",
+   "provenance": {
+    "recorded_text": "Shown as 'Coming soon' in the public menu."
+   }
   }
  ]
 }

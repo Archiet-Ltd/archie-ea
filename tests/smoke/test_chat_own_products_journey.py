@@ -95,17 +95,37 @@ def test_the_chat_answers_what_our_products_can_do_from_the_model(
         sign_in(page, server, organisation["emails"]["enterprise_architect"])
         open_chat(page, server)
 
-        # A claim that is not shipped is said not to be done yet, with what is recorded.
+        # A claim that is not proven is not called missing: it is said not to be recorded as shipped.
         answer = ask(page, server, "Can Entelim export a canvas?", fresh=False)
-        assert answer.get_by_test_id("product-status").inner_text().strip() == "Not shipped"
+        status = answer.get_by_test_id("product-status").inner_text().strip()
+        assert status == "Not proven"
         sentence = answer.get_by_test_id("product-sentence").inner_text()
-        assert "Entelim does not do this yet" in sentence and "Recorded as not proven" in sentence
-        assert "public menu" in answer.get_by_test_id("product-does").inner_text()
+        assert "not recorded as shipped" in sentence and "does not do this yet" not in sentence
+        assert "menu says" in answer.get_by_test_id("product-does").inner_text()
         _shot(page, tmp_path, "own-products-canvas-%s.png" % label)
         href = answer.get_by_test_id("product-source").get_attribute("href")
         page.goto(server + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator("main")).to_contain_text("Export a business model canvas")
         expect(page.locator("main")).to_contain_text("Not shipped (not proven)")
+        # The Status card on the element's page says what the chat said.
+        expect(page.get_by_test_id("kpi-band")).to_contain_text(status)
+        expect(page.get_by_test_id("kpi-band")).not_to_contain_text("Not set")
+
+        # A claim that is not proven but has a page: said so, and the link opens a page with content.
+        open_chat(page, server)
+        answer = ask(page, server, "Does Entelim have an Architecture Review Board?", fresh=False)
+        assert answer.get_by_test_id("product-status").inner_text().strip() == "Not proven"
+        assert "does not do this yet" not in answer.get_by_test_id("product-sentence").inner_text()
+        page.goto(server + answer.get_by_test_id("product-page").get_attribute("href"),
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.locator("main")).to_contain_text("Architecture Review Board")
+
+        # A certification question is answered as one, and no certificate is claimed.
+        open_chat(page, server)
+        answer = ask(page, server, "Is Entelim SOC 2 certified?", fresh=False)
+        assert "No certification is recorded in your model" in answer.get_by_test_id("product-sentence").inner_text()
+        assert "not a certificate" in answer.get_by_test_id("product-related").inner_text()
+        _shot(page, tmp_path, "own-products-certification-%s.png" % label)
 
         # A shipped capability of the second product says what it does and what it does not.
         open_chat(page, server)
@@ -125,7 +145,7 @@ def test_the_chat_answers_what_our_products_can_do_from_the_model(
         open_chat(page, server)
         answer = ask(page, server, "Can Entelim connect GitHub?", fresh=False)
         assert answer.get_by_test_id("product-status").inner_text().strip() == "Shipped"
-        assert "GitLab, Bitbucket or Azure DevOps" in answer.get_by_test_id("product-limits").inner_text()
+        assert "GitLab, Bitbucket and Azure DevOps" in answer.get_by_test_id("product-limits").inner_text()
 
         # Nothing recorded: said so, nothing invented, and the cited page has content.
         open_chat(page, server)
@@ -138,5 +158,7 @@ def test_the_chat_answers_what_our_products_can_do_from_the_model(
         href = answer.get_by_test_id("product-source").get_attribute("href")
         page.goto(server + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator("main")).to_contain_text("Entelim")
+        # The product is an ArchiMate Product, not "an application the business runs".
+        expect(page.locator("main")).not_to_contain_text("An application the business runs")
     finally:
         context.close()

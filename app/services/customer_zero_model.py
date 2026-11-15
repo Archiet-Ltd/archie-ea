@@ -1,8 +1,8 @@
 """The organisation's own products and what each can do, kept in its model.
 
 A product file (``data/customer_zero/<product>.json``) names one product and lists what it can
-and cannot do. ``load_product`` writes the product as an application component and each listed
-capability as an application function it is composed of, through the one element writer. Shipped
+and cannot do. ``load_product`` writes the product as an ArchiMate Product and each listed
+capability as an application function the product is associated with, through the one element writer. Shipped
 status, what the product does, its known limits and the evidence live in the element's own
 properties, so the chat and the element's page read the same record. A second run changes
 nothing that has not changed; a capability dropped from the file is marked withdrawn, never
@@ -22,7 +22,7 @@ from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 from app.services.archimate_backbone import create_backbone_element
 
 KEY_PREFIX = "customer-zero:"
-PRODUCT_TYPE, PRODUCT_LAYER = "ApplicationComponent", "Application"
+PRODUCT_TYPE, PRODUCT_LAYER = "Product", "Business"
 CAPABILITY_TYPE, CAPABILITY_LAYER = "ApplicationFunction", "Application"
 
 SHIPPED, NARROW, NOT_SHIPPED, WITHDRAWN = "shipped", "narrow", "not shipped", "withdrawn"
@@ -47,8 +47,24 @@ def normalise_status(raw: Any) -> str:
     raise ProductFileError("Unknown status %r: use shipped, narrow or not shipped." % (raw,))
 
 
+def status_label(status: str, detail: str = "") -> str:
+    """The one phrase for a capability's status, kept on the element and read by both the element
+    page's Status card and the chat. A claim that is not proven is not called "not shipped"."""
+    if status == NOT_SHIPPED and str(detail or "").strip().lower().startswith("not proven"):
+        return "Not proven"
+    return STATUS_WORDS[status]
+
+
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+def _page(raw: Any, file_name: str) -> Optional[str]:
+    if raw in (None, ""):
+        return None
+    if not isinstance(raw, str) or not raw.startswith("/") or raw.startswith("//") or " " in raw:
+        raise ProductFileError("The page %r in %s must be a path on this site, such as /arb/." % (raw, file_name))
+    return raw
 
 
 def read_product_file(path) -> Dict[str, Any]:
@@ -75,6 +91,7 @@ def read_product_file(path) -> Dict[str, Any]:
             "name": str(row["name"]).strip(),
             "status": normalise_status(raw_status),
             "status_detail": str(raw_status).strip(),
+            "page": _page(row.get("page"), Path(path).name),
             "does": str(row.get("what_a_person_can_do") or row.get("what_exists") or "").strip(),
             "limits": [str(item).strip() for item in (row.get("limits") or []) if str(item).strip()],
             "evidence": str(row.get("evidence") or "").strip() or None,
@@ -104,6 +121,8 @@ def _properties(product: str, capability: Dict[str, Any], as_of: Optional[str]) 
         "customer_zero_key": capability["id"],
         "shipped_status": capability["status"],
         "status_detail": capability["status_detail"],
+        "status_label": status_label(capability["status"], capability["status_detail"]),
+        "page_path": capability["page"],
         "what_it_does": capability["does"],
         "limits": capability["limits"],
         "evidence": capability["evidence"],
@@ -131,13 +150,13 @@ def _compose(organization_id: int, product: ArchiMateElement, element: ArchiMate
     found = db.session.execute(
         db.select(ArchiMateRelationship.id).where(
             ArchiMateRelationship.source_id == product.id, ArchiMateRelationship.target_id == element.id,
-            ArchiMateRelationship.type == "composition",
+            ArchiMateRelationship.type == "association",
         )
     ).first()
     if found:
         return
     link = ArchiMateRelationshipService.create_relationship(
-        product, element, "composition", None, organization_id=organization_id, rollback=False)
+        product, element, "association", None, organization_id=organization_id, rollback=False)
     if link is not None:
         # Written by the product file, not by a person.
         link.source_kind, link.source_ref, link.source_label = "import", key, "%s product record" % product_name
@@ -168,6 +187,11 @@ def load_product(path, organization_id: int, *, dry_run: bool = False) -> Dict[s
                 provenance={"source_model": "customer_zero", "customer_zero_product": name})
     else:
         counts["unchanged"] += 1
+        if (product.type, product.layer) != (PRODUCT_TYPE, PRODUCT_LAYER) and not dry_run:
+            # Loaded before products were modelled as Products: re-file it, keeping its id and links.
+            product.type, product.layer = PRODUCT_TYPE, PRODUCT_LAYER
+            counts["unchanged"] -= 1
+            counts["updated"] += 1
     listed = set()
     for capability in data["capabilities"]:
         key = "%s%s:%s" % (KEY_PREFIX, _slug(name), capability["id"])
@@ -202,7 +226,7 @@ def load_product(path, organization_id: int, *, dry_run: bool = False) -> Dict[s
             continue
         counts["withdrawn"] += 1
         if not dry_run:
-            props.update(shipped_status=WITHDRAWN)
+            props.update(shipped_status=WITHDRAWN, status_label=STATUS_WORDS[WITHDRAWN])
             element.custom_properties = props
             element.description = "Withdrawn. This is no longer in %s's product record. %s" % (name, element.description or "")
     if dry_run:

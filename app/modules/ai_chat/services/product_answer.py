@@ -25,6 +25,9 @@ _FILLER = frozenset(
     "we i be been able yet ever also any all about from by this that these those there support supports "
     "have has tell me us not so if when who whom whose s".split()
 )
+# A question about being certified or audited asks about a certificate, not about a feature.
+_CERTIFICATION = re.compile(
+    r"\b(certif\w*|accredit\w*|attest\w*|soc\s*[123]|iso\s*\d{4,5}|pen(?:etration)?[ -]?test\w*)", re.I)
 _ENOUGH = 0.6  # the share of the question's own words a capability must account for
 
 
@@ -49,6 +52,21 @@ def products_named(message: str, organization_id: int) -> List[ArchiMateElement]
     lowered = (message or "").lower()
     named = [row for row in rows if re.search(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(row.name.lower()), lowered)]
     return sorted(named, key=lambda row: (-len(row.name), row.id))
+
+
+def _longer_element_named(message: str, product: ArchiMateElement) -> bool:
+    """Whether the question names another element whose name contains the product's name, such as
+    "Entelim Billing" for the product Entelim: that question is about the element, not the product."""
+    rows = db.session.execute(
+        db.select(ArchiMateElement.name).where(
+            ArchiMateElement.organization_id == product.organization_id,
+            ArchiMateElement.name.ilike("%" + product.name.replace("%", "").replace("_", "") + "%"),
+            db.func.length(ArchiMateElement.name) > len(product.name),
+            db.or_(ArchiMateElement.source_ref.is_(None), ~ArchiMateElement.source_ref.like(KEY_PREFIX + "%")),
+        ).limit(200)
+    ).scalars().all()
+    lowered = (message or "").lower()
+    return any(re.search(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(name.lower()), lowered) for name in rows)
 
 
 def _capabilities_of(product: ArchiMateElement) -> List[ArchiMateElement]:
@@ -84,7 +102,8 @@ def _facts(element: ArchiMateElement) -> Dict[str, Any]:
     return {
         "element": element,
         "status": status,
-        "status_word": STATUS_WORDS.get(status, "Not recorded"),
+        "status_word": props.get("status_label") or STATUS_WORDS.get(status, "Not recorded"),
+        "page": props.get("page_path"),
         "status_detail": props.get("status_detail"),
         "does": props.get("what_it_does") or None,
         "limits": props.get("limits") or [],
@@ -106,7 +125,12 @@ def answer_product_question(message: str, organization_id: Optional[int]) -> Opt
     if not products:
         return None
     product = products[0]
+    if _longer_element_named(message, product):
+        return None
     capabilities = _capabilities_of(product)
+    if _CERTIFICATION.search(message) and not any("certif" in c.name.lower() for c in capabilities):
+        related = next((c for c in capabilities if c.source_ref.endswith(":compliance-tracking")), None)
+        return {"kind": "certification", "product": product, "related": _facts(related) if related else None}
     words = _stem_set(message, drop=_stem_set(product.name))
     if not words:
         shipped = [c for c in capabilities if (c.custom_properties or {}).get("shipped_status") in ("shipped", "narrow")]
@@ -123,6 +147,8 @@ def answer_line(answer: Dict[str, Any]) -> str:
     product = answer["product"].name
     if answer["kind"] == "not_recorded":
         return "Not recorded in your model: nothing about that is recorded for %s." % product
+    if answer["kind"] == "certification":
+        return "No certification is recorded in your model for %s." % product
     if answer["kind"] == "overview":
         return "%s: %d of %d recorded capabilities are shipped." % (product, answer["shipped"], answer["recorded"])
     return "%s: %s. %s" % (answer["element"].name, answer["status_word"], answer["does"] or "")

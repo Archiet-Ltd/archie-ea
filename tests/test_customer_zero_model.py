@@ -46,7 +46,7 @@ def test_running_twice_gives_the_same_elements_and_leaves_another_organisation_a
     assert len(_elements(org.id)) == 4
     assert _elements(other.id) == []
     links = db.session.execute(db.select(ArchiMateRelationship).where(
-        ArchiMateRelationship.organization_id == org.id, ArchiMateRelationship.type == "composition")).scalars().all()
+        ArchiMateRelationship.organization_id == org.id, ArchiMateRelationship.type == "association")).scalars().all()
     assert len(links) == 3
     # Loading the same product into the second organisation does not touch the first.
     model.load_product(path, other.id)
@@ -99,3 +99,21 @@ def test_the_shipped_entelim_file_loads(app, db_session, make_org):
     org = make_org()
     result = model.load_product(model.DATA_DIRECTORY / "entelim.json", org.id)
     assert result["created"] == 49 and result["product"] == "Entelim"
+
+
+def test_the_product_is_a_product_and_its_status_is_kept_where_the_status_card_reads_it(app, db_session, make_org, tmp_path):
+    org = make_org()
+    model.load_product(_file(tmp_path), org.id)
+    rows = {e.source_ref: e for e in _elements(org.id)}
+    assert rows["customer-zero:entelim"].type == "Product"
+    assert rows["customer-zero:entelim"].layer == "Business"
+    props = rows["customer-zero:entelim:canvas-export"].custom_properties
+    assert props["status_label"] == "Not proven" and props["shipped_status"] == "not shipped"
+    assert rows["customer-zero:entelim:sysml"].custom_properties["status_label"] == "Not shipped"
+
+
+def test_every_page_the_shipped_file_links_to_is_a_page_of_the_product(app):
+    paths = {rule.rule for rule in app.url_map.iter_rules() if "GET" in rule.methods}
+    linked = [row["page"] for row in json.loads((model.DATA_DIRECTORY / "entelim.json").read_text())["capabilities"]
+              if row.get("page")]
+    assert linked and all(page in paths or page.rstrip("/") in paths or page + "/" in paths for page in linked), linked

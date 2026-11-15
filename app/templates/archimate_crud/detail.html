@@ -135,6 +135,10 @@
         {% set k3_label = 'Status' %}
         {% set k3_value = element.resolution_status | replace('_', ' ') | capitalize %}
         {% set k3_hint = None %}
+    {% elif (element.custom_properties or {}).get('status_label') %}
+        {% set k3_label = 'Status' %}
+        {% set k3_value = element.custom_properties.get('status_label') %}
+        {% set k3_hint = 'Whether this can be used today' %}
     {% elif element.status %}
         {% set k3_label = 'Status' %}
         {% set k3_value = element.status | replace('_', ' ') | capitalize %}

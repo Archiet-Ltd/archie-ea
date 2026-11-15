@@ -367,7 +367,8 @@ def _product_response(message, thread_id, keep):
     source = answer.get("element") or answer["product"]
     html = render_template(
         "ai_chat/_product_answer.html", answer=answer, page_url=link(source),
-        links={item["element"].id: link(item["element"]) for item in answer.get("listed", [])})
+        links={item["element"].id: link(item["element"])
+               for item in answer.get("listed", []) + ([answer["related"]] if answer.get("related") else [])})
     return jsonify({
         "success": True,
         "found": True,
