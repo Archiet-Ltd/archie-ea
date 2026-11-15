@@ -335,6 +335,15 @@ def commit_provenance(summary: Dict[str, Any], candidate: Dict[str, Any]) -> str
     )
 
 
+def commit_limit_reason(repository: str) -> str:
+    """The words that say why no owner could be suggested from a very busy repository."""
+    short = repository.rsplit("/", 1)[-1] or "this repository"
+    return (
+        f"No owner was suggested: {short} has too many commits in the last {COMMIT_WINDOW_DAYS} days "
+        "to name one person from them."
+    )
+
+
 def apply_commit_history(org_id, element, component, summary: Dict[str, Any], assigned_by=None) -> bool:
     """Keep what the commits show on the element and, where one member leads, record that member
     as the primary owner through the one owner writer. An application that already has a primary
@@ -353,6 +362,8 @@ def apply_commit_history(org_id, element, component, summary: Dict[str, Any], as
         record.source_table = PROPOSAL_SOURCE
         facts["github_owner_source"] = {"user_id": leader["user_id"], "text": commit_provenance(summary, leader)}
         written = True
+    elif summary.get("unavailable") and not owned:
+        facts["github_owner_source"] = {"user_id": None, "text": summary["unavailable"]}
     _write_facts(element, facts)
     db.session.flush()
     return written
@@ -1408,8 +1419,17 @@ class _RepositoryEvidence:
                 if len(data) < PAGE_SIZE or len(inside) < len(data):
                     break
             else:
-                raise GitHubConnectorError(
-                    f"More than {MAX_PAGES * PAGE_SIZE} commits were listed; the read was stopped")
+                # Too many to count: give up on the owner alone, so the application and its facts are still written.
+                self._histories[full_name] = {
+                    "repository": full_name,
+                    "days": COMMIT_WINDOW_DAYS,
+                    "oldest": None,
+                    "newest": None,
+                    "member_commits": 0,
+                    "candidates": [],
+                    "unavailable": commit_limit_reason(full_name),
+                }
+                return self._histories[full_name]
             self._histories[full_name] = summarise_commits(self.org_id, full_name, commits)
         return self._histories[full_name]
 

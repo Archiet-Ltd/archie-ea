@@ -62,6 +62,8 @@ def _commit_hint(element, org_id) -> Dict[str, Any]:
     summary = _fact(element, "github_commit_owners")
     if not isinstance(summary, dict):
         return {}
+    if summary.get("unavailable"):
+        return {"note": str(summary["unavailable"])}
     repository = str(summary.get("repository") or "")
     named = []
     for entry in summary.get("candidates") or []:
