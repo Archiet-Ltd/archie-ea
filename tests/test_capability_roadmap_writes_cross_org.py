@@ -130,3 +130,24 @@ def test_viewer_is_refused_every_write_in_the_roadmap(
     response = getattr(client, method)(url, json=body) if body is not None else getattr(client, method)(url)
     assert response.status_code == 403, (url, response.status_code)
     assert "may read the roadmap but not change it" in response.get_data(as_text=True)
+
+
+def test_every_read_only_reason_prefix_matches_a_registered_endpoint(app):
+    """A screen's own refusal sentence only reaches people while its prefix still names real endpoints."""
+    from app._bootstrap.write_access import READ_ONLY_REASONS
+
+    endpoints = {rule.endpoint for rule in app.url_map.iter_rules()}
+    unmatched = [prefix for prefix, _ in READ_ONLY_REASONS if not any(e.startswith(prefix) for e in endpoints)]
+    assert unmatched == []
+
+
+def test_each_roadmap_write_endpoint_gets_the_roadmap_sentence(app):
+    from app._bootstrap.write_access import GENERAL_REASON, _reason_for
+
+    writes = [
+        rule.endpoint for rule in app.url_map.iter_rules()
+        if (rule.rule.startswith("/api/capability-work-packages") or rule.rule == "/api/capabilities")
+        and rule.methods & {"POST", "PUT", "DELETE"}
+    ]
+    assert len(writes) == 10
+    assert [e for e in writes if _reason_for(e) == GENERAL_REASON] == []
