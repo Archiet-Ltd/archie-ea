@@ -150,6 +150,9 @@ def test_a_tab_says_it_is_counting_while_the_counts_load(browser, live_server, o
     finally:
         context.close()
 
+# Records a card counts that are entered in a register only, so the opened layer cannot hold them as elements.
+REGISTER_ONLY = {"Implementation & Migration": 1}
+
 
 @pytest.mark.parametrize("viewport,scheme", VIEWPORTS, ids=["1440-light", "390-dark"])
 def test_dashboard_tabs_and_composer_cards_show_one_count_per_layer(browser, live_server, orgs, viewport, scheme):
@@ -206,5 +209,15 @@ def test_dashboard_tabs_and_composer_cards_show_one_count_per_layer(browser, liv
         expect(page.locator("body")).to_contain_text(re.compile(r"— %d elements, " % EXPECTED["Business"]))
         _shot(page, "composer-business", viewport, scheme)
         assert theirs["suffix"] not in page.locator("body").inner_text()
+
+        # Every card opens exactly the elements it counts: the layer that opens holds the card's number.
+        for title, count in cards.items():
+            page.goto(live_server + "/archimate/composer?viewpoint=layered", wait_until="domcontentloaded")
+            card = page.get_by_test_id("composer-layer-buttons").locator("button").filter(
+                has=page.locator("span", has_text=title))
+            card.first.click()
+            held = count - REGISTER_ONLY.get(title, 0)
+            word = "element" if held == 1 else "elements"
+            expect(page.locator("body")).to_contain_text(re.compile(r"— %d %s, " % (held, word)))
     finally:
         context.close()
