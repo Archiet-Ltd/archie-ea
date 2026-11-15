@@ -428,6 +428,9 @@ def _entity_label(entity_type, entity_id):
         elif entity_type == "capability":
             from app.models.business_capabilities import BusinessCapability
             row = BusinessCapability.query.filter_by(id=entity_id).first()
+        elif entity_type == "archimate_element":
+            from app.models.archimate_core import ArchiMateElement
+            row = ArchiMateElement.query.filter_by(id=entity_id).first()
         else:
             return None
         return getattr(row, "name", None) if row else None
@@ -437,6 +440,16 @@ def _entity_label(entity_type, entity_id):
 
 
 _ELEMENT_TYPE_WORD = {"ApplicationComponent": "application"}
+
+
+def _entity_kind(entity_type, entity_id):
+    """What a link points at, in a person's words: the element's type for an element link
+    (Product, Goal, Driver, Business actor), None for the kinds that name themselves."""
+    if entity_type != "archimate_element":
+        return None
+    from app.models.archimate_core import ArchiMateElement
+    element = ArchiMateElement.query.filter_by(id=entity_id).first()
+    return risk_service.element_type_word(element.type) if element else None
 
 
 def _prefetch_risk_context(risks):
@@ -545,6 +558,7 @@ def serialize_risk_row(risk, ctx=None):
                 # None (not a fabricated placeholder) when the linked row is
                 # gone -- the UI shows this distinctly, same rule as M4.
                 "entity_label": _entity_label(link.entity_type, link.entity_id),
+                "entity_kind": _entity_kind(link.entity_type, link.entity_id),
             }
             for link in links
         ] + ([touch] if touch else []),
