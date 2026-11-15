@@ -6,14 +6,14 @@ description that is exactly "None" is changed; running it twice changes nothing 
 It cannot be undone, because the word carried no information.
 
 Revision ID: 20261114_blank_none_desc
-Revises: 20261114_subscription_offer
+Revises: 20261114_sign_in_identities
 Create Date: 2026-11-14
 """
 import sqlalchemy as sa
 from alembic import op
 
 revision = "20261114_blank_none_desc"
-down_revision = "20261114_subscription_offer"
+down_revision = "20261114_sign_in_identities"
 branch_labels = None
 depends_on = None
 
