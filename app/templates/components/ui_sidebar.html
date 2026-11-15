@@ -117,7 +117,7 @@
 
 {#- SidebarRail: the thin strip on the sidebar's edge that also toggles it -#}
 {% macro sidebar_rail(text='', class='', id=none, attrs={}) -%}
-{{ sb_part('button', 'sidebar-rail', 'cn-sidebar-rail absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] sm:flex cursor-w-resize group-data-[collapsible=icon]:cursor-e-resize', 'rail', class, dict({'type': 'button', 'tabindex': '-1', 'aria-label': 'Toggle sidebar', 'title': 'Toggle sidebar'}, **attrs), text, caller() if caller else '', id) }}
+{{ sb_part('button', 'sidebar-rail', 'cn-sidebar-rail absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] sm:flex cursor-w-resize group-data-[collapsible=icon]:cursor-e-resize', 'rail', class, dict({'type': 'button', 'data-sidebar-toggle': '', 'tabindex': '-1', 'aria-label': 'Toggle sidebar', 'title': 'Toggle sidebar'}, **attrs), text, caller() if caller else '', id) }}
 {%- endmacro %}
 
 {#- SidebarInset: the page beside the sidebar -#}
@@ -127,7 +127,7 @@
 
 {#- SidebarTrigger: the button that collapses the sidebar (and opens the drawer below 768px) -#}
 {% macro sidebar_trigger(class='', id=none, attrs={}, testid=none) -%}
-<button type="button" data-slot="sidebar-trigger" data-sidebar="trigger"{% if id %} id="{{ id }}"{% endif %}{% if testid %} data-testid="{{ testid }}"{% endif %}
+<button type="button" data-slot="sidebar-trigger" data-sidebar="trigger" data-sidebar-toggle{% if id %} id="{{ id }}"{% endif %}{% if testid %} data-testid="{{ testid }}"{% endif %}
         class="cn-sidebar-trigger sidebar-collapse-btn inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring{{ ' ' ~ class if class }}"
         aria-label="Toggle sidebar" title="Toggle sidebar (Ctrl+B)"{{ sb_attrs(attrs) }}>
     <i data-lucide="panel-left" class="h-4 w-4" aria-hidden="true"></i>
