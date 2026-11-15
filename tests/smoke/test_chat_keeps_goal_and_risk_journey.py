@@ -53,6 +53,22 @@ def deepseek_server(request, app, stub):
     return boot_live_server(request, None, app, extra_env=env)
 
 
+def _seed_goal(org_id, name, target_date=None):
+    """A goal of the organisation as the earlier screens left it: its row and its element."""
+    from datetime import date
+
+    from app import db
+    from app.models.motivation import Goal
+    from app.services.archimate_backbone import sync_archimate_element
+
+    goal = Goal(name=name, status="active", organization_id=org_id,
+                target_date=date.fromisoformat(target_date) if target_date else None)
+    db.session.add(goal)
+    db.session.flush()
+    sync_archimate_element(goal)
+    return goal
+
+
 def _world():
     """Organisation A (a Contributor, a Viewer, "Grow revenue" related to "Payments") and organisation B."""
     from app import create_app, db
@@ -64,7 +80,6 @@ def _world():
         from app.models.org_role import OrgRole
         from app.models.organization import Organization
         from app.models.user import Role, User
-        from app.services import goal_store
         from app.services.billing_plans import set_contract_plan
 
         Role.insert_roles()
@@ -90,8 +105,8 @@ def _world():
         org_a, org_b = organisation("Alpha"), organisation("Beta")
         dana, vic = person(org_a, "Dana", "architect"), person(org_a, "Vic", "viewer")
         person(org_b, "Bea", "architect")
-        grow_a = goal_store.create_goal(org_a.id, "Grow revenue")
-        goal_store.create_goal(org_b.id, "Grow revenue", target_date="2030-01-01")
+        grow_a = _seed_goal(org_a.id, "Grow revenue")
+        _seed_goal(org_b.id, "Grow revenue", target_date="2030-01-01")
         payments = ArchiMateElement(name="Payments", type="Capability", layer="Strategy", organization_id=org_a.id)
         db.session.add(payments)
         db.session.flush()
@@ -123,9 +138,8 @@ def _add_second_goal(org_id, name):
 
     app = create_app("testing")
     with app.app_context():
-        from app.services import goal_store
-
-        goal_store.create_goal(org_id, name)
+        _seed_goal(org_id, name)
+        db.session.commit()
         db.session.remove()
 
 

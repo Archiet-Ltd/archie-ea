@@ -2,9 +2,9 @@
 
 The server is set up as production is: DeepSeek only, as a stub on a loopback port. deepseek-flash drafts
 the change and deepseek-v4-pro reviews it. The person asks "Create a new Assessment element named ...";
-the reply says Applied (not "being checked"), the link under it opens the record of the checks, and the
-new Assessment opens on its own page in the person's organisation. A second organisation's person
-searching the register never sees it.
+the reply says Applied (not "being checked"), its first link opens the new Assessment on its own page, its
+second link opens the record of the checks, and a second organisation's signed-in person opening the
+Assessment register never sees it.
 """
 import json
 import os
@@ -111,15 +111,15 @@ def _sign_in(page, base, email):
     page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
 
 
-@pytest.mark.parametrize("width", [1440, 390])
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
 def test_asking_the_chat_for_an_assessment_creates_it_and_says_so_in_the_same_turn(
-    browser, deepseek_server, stub, shots, width
+    browser, deepseek_server, stub, shots, width, scheme
 ):
     base = deepseek_server
     ws, other = _workspace("Toolmap"), _workspace("Neighbour")
     name = "%s %s" % (ELEMENT_NAME, uuid.uuid4().hex[:6])
     stub.tool_script = [("create_assessment", {"name": name})]
-    context = browser.new_context(viewport={"width": width, "height": 900})
+    context = browser.new_context(viewport={"width": width, "height": 900}, color_scheme=scheme)
     context.set_default_timeout(PAGE_TIMEOUT)
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
     page = context.new_page()
@@ -144,19 +144,33 @@ def test_asking_the_chat_for_an_assessment_creates_it_and_says_so_in_the_same_tu
         assert len(rows) == 1 and rows[0][1] == "assessment", rows
         assert _elements(other["org_id"], name) == []
 
-        # The link under the answer opens the record of the checks, with the review's reasons on it.
+        # The reply's own link opens the Assessment it made, on its own page.
+        element_id, element_type, layer = rows[0]
+        review_href = page.get_by_test_id("change-review-link").last.get_attribute("href")
         page.get_by_test_id("change-record-link").last.click()
+        page.wait_for_url(re.compile(r"/architecture/%s/%s/%d" % (layer, element_type, element_id)),
+                          timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text(name).locator("visible=true").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        _shot(page, shots, "assessment-page")
+
+        # The second link opens the record of the checks, with the review's reasons on it.
+        page.goto(base + review_href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_url(re.compile(r"/ai-chat/approvals/inbox\?approval=\d+"), timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("review-record-verdict")).to_have_text("Applied")
         round_one = page.get_by_test_id("review-record-round-1")
         expect(round_one.locator("[data-testid^='review-criterion-']")).to_have_count(6)
         _shot(page, shots, "assessment-record")
 
-        # The new Assessment opens on its own page.
-        element_id, element_type, layer = rows[0]
+        # A signed-in person of the second organisation opens the Assessment register: the element is not there.
+        context.clear_cookies()
+        _sign_in(page, base, other["email"])
+        page.goto("%s/architecture/%s/%s" % (base, layer, element_type), wait_until="domcontentloaded",
+                  timeout=PAGE_TIMEOUT)
+        expect(page.locator("main")).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert name not in page.locator("body").inner_text()
         page.goto("%s/architecture/%s/%s/%d" % (base, layer, element_type, element_id),
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text(name).locator("visible=true").first).to_be_visible(timeout=PAGE_TIMEOUT)
-        _shot(page, shots, "assessment-page")
+        assert name not in page.locator("body").inner_text()
+        _shot(page, shots, "assessment-other-organisation")
     finally:
         context.close()
