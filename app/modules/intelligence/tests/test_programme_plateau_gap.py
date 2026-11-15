@@ -373,31 +373,36 @@ def test_foreign_tenant_elements_are_never_asked_for_a_plateau(
     org_b = make_org("plategap-foreign-elem-b")
     app_a = _element(db_session, org_a.id, "AppA")
     foreign = _element(db_session, org_b.id, "OrgBElement", togaf_plateau="Baseline")
+    own = _element(db_session, org_a.id, "OrgAElement", togaf_plateau="Baseline")
     # Org A's own relationship happens to point at org B's element (the
     # dangling cross-tenant pointer the identity map's own fence exists for).
     _relationship(db_session, org_a.id, app_a, foreign)
+    _relationship(db_session, org_a.id, app_a, own)
     _work_package(db_session, app_a, name="WP")
+    # Read every id before the commit expires the instances, so the test's own reads are not counted.
+    app_a_id, foreign_id, own_id, org_a_id = app_a.id, foreign.id, own.id, org_a.id
     db_session.commit()
 
     statement_counter.statements.clear()
     with app.test_request_context("/"):
-        g.current_org_id = org_a.id
-        result = IntelligenceQueryService.programme_for_element(app_a.id)
+        g.current_org_id = org_a_id
+        result = IntelligenceQueryService.programme_for_element(app_a_id)
 
-    row = next(
-        (r for r in result["work_packages"][0]["affected_rows"] if r["element_id"] == foreign.id),
-        None,
-    )
-    assert row is not None
-    assert row["plateau"] is None
-    assert row["plateau_reason"] == "no_plateau_recorded"
+    # The pointer into the other organisation's element is not walked at all: no row names it, so it
+    # has no plateau to show, recorded or not.
+    rows = result["work_packages"][0]["affected_rows"]
+    assert all(r["element_id"] != foreign_id for r in rows)
+    own_row = next((r for r in rows if r["element_id"] == own_id), None)
+    assert own_row is not None  # not vacuous -- the organisation's own linked element is still walked
 
     element_plateau_selects = statement_counter.matching("FROM archimate_elements", "is_baseline", " IN (")
     assert len(element_plateau_selects) == 1
     _, params = element_plateau_selects[0]
     bound_values = _param_values(params)
-    assert foreign.id not in bound_values
-    assert app_a.id in bound_values  # not vacuous -- A's own id is legitimately asked for
+    assert own_id in bound_values  # A's own id is legitimately asked for
+    # Nothing the service sent to the database, in any statement, carries the other organisation's element id.
+    for statement, parameters in statement_counter.statements:
+        assert foreign_id not in _param_values(parameters), statement
 
 
 # --- (4) cross-tenant element id is an honest not-found, not a leak --------

@@ -11,7 +11,7 @@ import uuid
 # pattern). No import needed here.
 
 
-def _user(db_session, org_id):
+def _user(db_session, org_id, role="enterprise_architect"):
     from app.models.user import User
 
     user = User(
@@ -20,7 +20,7 @@ def _user(db_session, org_id):
         last_name="Tester",
         organization_id=org_id,
         confirmed=True,
-        enterprise_role="enterprise_architect",
+        enterprise_role=role,
     )
     db_session.add(user)
     db_session.flush()
@@ -264,12 +264,13 @@ def test_app_id_branch_rejects_include_derived_and_max_depth(app, db_session, ma
     assert resp3.status_code == 200
 
 
-def test_app_id_branch_characterisation_untouched(app, db_session, make_org, client, login_as):
+@pytest.mark.parametrize("role", ["enterprise_architect", "cto"], ids=["costs_refused", "costs_granted"])
+def test_app_id_branch_characterisation_untouched(app, db_session, make_org, client, login_as, role):
     """D2: the app_id branch has no projection today and is untouched by this
     task -- this pins its current response keys.
     """
-    org = make_org("canonical-app-id-characterisation")
-    user = _user(db_session, org.id)
+    org = make_org(f"canonical-app-id-characterisation-{role}")
+    user = _user(db_session, org.id, role)
     from app.models.application_portfolio import ApplicationComponent
 
     comp = ApplicationComponent(name="Char App", organization_id=org.id)
@@ -286,7 +287,15 @@ def test_app_id_branch_characterisation_untouched(app, db_session, make_org, cli
     # Pre-existing contract shape from _to_contract_shape -- no
     # derived_elements/derivation_state on this branch (D2/D8: out of scope).
     expected_keys = {"risk_level", "total_score", "breakdown", "affected_elements", "diagram", "summary", "analysis_id"}
-    assert set(data.keys()) == expected_keys
+    if role == "enterprise_architect":
+        # The cost rule refuses this role: the answer says so, in the one shared sentence, and holds no figure.
+        from app.services.cost_visibility import COSTS_WITHHELD
+
+        assert set(data.keys()) == expected_keys | {"costs_withheld", "costs_withheld_sentence"}
+        assert data["costs_withheld"] is True
+        assert data["costs_withheld_sentence"] == COSTS_WITHHELD
+    else:
+        assert set(data.keys()) == expected_keys
 
 
 # --- B1 fix: a crashed derived-elements lookup must not fabricate "not_computed"
