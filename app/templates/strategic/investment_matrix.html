@@ -74,7 +74,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }}.map(c => ({ ...
             </div>
             <div class="px-6 pb-4 text-sm text-muted-foreground">
                 {% if scores_error %}The investment figures could not be loaded.
-                {% elif costs_withheld %}{{ costs_withheld_text }}
+                {% elif costs_withheld %}{{ costs_withheld_sentence }}
                 {% elif total_inv is none %}No capability has linked work or a funded initiative yet; link a work package to a capability to estimate its investment.
                 {% else %}from {{ portfolio_metrics.investment_costed_count }} of {{ portfolio_metrics.total_capabilities }} capabilities with a recorded figure{% if portfolio_metrics.investment_costed_count < portfolio_metrics.total_capabilities %}; the other {{ portfolio_metrics.total_capabilities - portfolio_metrics.investment_costed_count }} have none yet and add nothing to it{% else %}; every capability has one{% endif %}{% endif %}
             </div>
