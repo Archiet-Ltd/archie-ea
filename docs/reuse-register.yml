@@ -1377,6 +1377,37 @@ entries:
       of the applications that support the capability, then its links to goals, drivers, outcomes or principles,
       then the value streams it serves, then its open risks, and the footer says it was derived. Read the score
       from the service result; do not write a second derivation or a stand-in score for an unrated capability.
+  - id: capability-support
+    concept: An application supporting a capability (the one relationship, its projected facts and the readers of both)
+    status: active
+    canonical:
+      path: app/services/capability_support.py
+      symbols: [record_capability_support, update_support_facts, remove_capability_support, support_rows, capabilities_of_application, applications_of_capability, unsupported_capabilities, support_summary, resolve_support_ends]
+    reuse: >
+      Support is one Realization or Serving relationship from the application's element to the capability's
+      element. Record, change or remove it with record_capability_support, update_support_facts and
+      remove_capability_support; read it with support_rows, capabilities_of_application,
+      applications_of_capability, unsupported_capabilities and support_summary. The projected row is made by the
+      projector inside the module, never by hand. Do not construct a mapping row, a coverage row or a
+      capability-application row anywhere else, and do not write a second reader.
+    must_not_create:
+      - id: unified-mapping-row
+        regex: 'UnifiedApplicationCapabilityMapping\('
+      - id: legacy-mapping-row
+        regex: '\bApplicationCapabilityMapping\('
+      - id: coverage-row
+        regex: '\bApplicationCapabilityCoverage\('
+      - id: capability-application-row
+        regex: '\bUnifiedCapabilityApplicationMapping\('
+    known_exceptions:
+      - path: app/models/unified_application_capability_mapping.py
+        reason: the model's own definition
+      - path: app/models/application_capability.py
+        reason: the model's own definition
+      - path: app/models/business_capabilities.py
+        reason: the coverage model's own definition
+      - path: app/models/capability_to_vendor_mapping.py
+        reason: the capability-application model's own definition
 
   - id: canvas-store
     concept: What a framework canvas (Business Model Canvas, Lean Canvas and the rest) shows in each box, and the one writer of a box entry

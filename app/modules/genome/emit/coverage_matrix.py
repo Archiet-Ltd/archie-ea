@@ -46,12 +46,26 @@ def _cell_alpha(cell: dict) -> float:
     return _DEFAULT_ALPHA
 
 
-def emit_coverage_matrix_html(slice_dict: dict, planned_work: dict | None = None) -> str:
+_KIND_WORDS = {"realization": "Realizes", "serving": "Serves"}
+
+
+def _capability_name(cap: dict, capability_links: dict | None) -> str:
+    href = (capability_links or {}).get(cap["id"])
+    if not href:
+        return escape(cap["name"])
+    return f'<a href="{escape(href)}" class="hover:underline">{escape(cap["name"])}</a>'
+
+
+def emit_coverage_matrix_html(
+    slice_dict: dict, planned_work: dict | None = None, capability_links: dict | None = None
+) -> str:
     """Render the coverage slice to a deterministic HTML heatmap fragment.
 
     Args:
         slice_dict: output of build_coverage_slice (must contain capabilities,
             applications, cells, capability_source, spec_hash).
+        capability_links: optional ``{capability id: url}``; a capability with a link has its name open
+            that page.
         planned_work: optional ``{capability id: [{"name", "href"}]}``, the work packages that change each
             capability, read by the caller through the one slice registry. When given, each row ends with
             what is planned for it (or says none is), so a capability no application supports shows what, if
@@ -144,7 +158,7 @@ def emit_coverage_matrix_html(slice_dict: dict, planned_work: dict | None = None
             f'data-capability-id="{cap["id"]}" '  # raw-html-ok: cap["id"] is a db.Integer PK
             f'data-archimate-element-id="{escape(str(cap.get("archimate_element_id")))}" '
             'scope="row">'
-            f'{escape(cap["name"])}</th>'
+            f'{_capability_name(cap, capability_links)}</th>'
         )
         for app in applications:
             cell = cell_index.get((cap["id"], app["id"]))
@@ -159,12 +173,13 @@ def emit_coverage_matrix_html(slice_dict: dict, planned_work: dict | None = None
             alpha = _cell_alpha(cell)
             title = (
                 f'{cap["name"]} -> {app["name"]} | '
-                f'support={m.get("support_level")}, coverage={m.get("coverage_percentage")}% | '
+                f'{_KIND_WORDS.get(m.get("kind"), "Supports")}, support={m.get("support_level")}, '
+                f'coverage={m.get("coverage_percentage")}% | '
                 f'cap element #{prov["capability_archimate_element_id"]}, '
                 f'app element #{prov["application_archimate_element_id"]}'
             )
             parts.append(
-                '<td class="border-b border-border w-6 h-6 genome-cov-cell" '
+                '<td class="border-b border-border w-6 h-6 genome-cov-cell" data-testid="coverage-cell" '
                 f'style="background-color: rgba({_HEAT_RGB}, {alpha:.2f});" '
                 f'data-capability-id="{cap["id"]}" '  # raw-html-ok: cap["id"] is a db.Integer PK
                 f'data-application-id="{app["id"]}" '  # raw-html-ok: app["id"] is a db.Integer PK

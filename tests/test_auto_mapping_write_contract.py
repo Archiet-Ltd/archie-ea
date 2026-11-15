@@ -97,6 +97,20 @@ def mapping_model(category, session, real_model):
     return Mapping
 
 
+def support_writer(session):
+    """Capability support is recorded by the support module: this double takes its place at that boundary.
+
+    It accepts only what the module accepts - the application's organisation, the application and the
+    capability - and counts one capability write per call."""
+    def record(organization_id, application_id, capability_id, kind='realization', facts=None, actor_id=None):
+        assert (organization_id, application_id) == (7, 10), (organization_id, application_id)
+        row = SimpleNamespace(category='capability', application_component_id=application_id,
+                              unified_capability_id=capability_id, **(facts or {}))
+        session.add(row)
+        return row
+    return record
+
+
 def actual_service(session, rows):
     """Compile exact active methods without importing constructor dependencies."""
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
@@ -111,6 +125,7 @@ def actual_service(session, rows):
         ApplicationComponent=SimpleNamespace(query=Query(rows),
             imported_capabilities=Column('imported_capabilities'), created_at=Column('created_at'), id=Column('id')),
         UnifiedApplicationCapabilityMapping=mapping_model('capability', session, UnifiedApplicationCapabilityMapping),
+        record_support_for_records=support_writer(session),
         ProcessApplicationMapping=mapping_model('process', session, ProcessApplicationMapping))
     module = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), cls], type_ignores=[])
     exec(compile(ast.fix_missing_locations(module), str(path), 'exec'), namespace)
