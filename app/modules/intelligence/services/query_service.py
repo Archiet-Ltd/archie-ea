@@ -28,6 +28,8 @@ from app.modules.intelligence.services.derived_facts import list_derived_facts
 from app.modules.intelligence.services.latency_probe import record_query_latency
 from app.modules.intelligence.services.plain_terms import plain_terms_sentence
 from app.modules.intelligence.services.reason_codes import validate_reason_code
+from app.services.archimate_import_service import _PARENT_RELATIONSHIPS
+from app.services.relationship_origin import manual_origin_text
 from app.models.archimate_element_types import is_application_kind
 
 VALID_DIRECTIONS = {"downstream", "upstream", "both"}
@@ -81,6 +83,7 @@ NO_CAPABILITY_IN_CHAIN_REASON = validate_reason_code("no_capability_in_chain")
 # means no component was resolved at all).
 NO_COST_RECORDED_REASON = validate_reason_code("no_cost_recorded")
 NO_HEALTH_RECORDED_REASON = validate_reason_code("no_health_recorded")
+NOT_ASSESSED_HEALTH = "Not assessed"
 NO_LICENCE_RECORDED_REASON = validate_reason_code("no_licence_recorded")
 # A licence whose usage has never been synced from the source system carries
 # quantity_used at its column default of zero -- comparing that default
@@ -106,6 +109,71 @@ NFR5_INCLUDE_DERIVED = "true"
 # Shape-B trigger's threshold_seconds -- never as a yield target (task 02
 # constraint: no fabricated target anywhere in the payload).
 SHAPE_B_THRESHOLD_SECONDS = 2.0
+
+
+
+def _own_application_component(element, org_id):
+    """The application record the element itself carries (its own link first, the
+    reverse link second), inside the asking organisation; None when it has none."""
+    from app.models.application_portfolio import ApplicationComponent
+
+    component = None
+    if getattr(element, "application_component_id", None):
+        component = db.session.get(ApplicationComponent, element.application_component_id)
+    if component is None and is_application_kind(element.type):
+        component = ApplicationComponent.query.filter_by(archimate_element_id=element.id).first()
+    if component is not None and getattr(component, "organization_id", org_id) != org_id:
+        return None
+    return component
+
+
+def resolve_application_component(element, org_id):
+    """``(component, resolved_through)`` for the application record answering for *element*.
+
+    An element with a record of its own answers with it (``resolved_through`` is None). A
+    part of another element keeps no record of its own, so it is followed up through
+    composition and aggregation, nearest whole first, to the first one that has a record;
+    ``resolved_through`` then names the relationships followed and the whole's element id.
+    ``(None, None)`` when neither the element nor anything it is part of has one. The walk is
+    ``cross_layer_impact`` upstream, so it never leaves the asking organisation.
+    """
+    component = _own_application_component(element, org_id)
+    if component is not None:
+        return component, None
+
+    from app.models import ArchiMateElement, ArchiMateRelationship
+
+    walk = IntelligenceQueryService.cross_layer_impact(
+        element.id, direction="upstream", include_derived=False, with_owner=False, max_depth=5
+    )
+    rows = [
+        row
+        for row in walk.get("rows") or []
+        if row["relation"]["kind"] == "explicit"
+        and str(row["relation"].get("type") or "").lower() in _PARENT_RELATIONSHIPS
+    ]
+    rows.sort(key=lambda row: row["relation"]["depth"])
+    for row in rows:
+        chain = row["relation"]["chain"]
+        types = db.session.execute(
+            db.select(ArchiMateRelationship.type).where(ArchiMateRelationship.id.in_(chain))
+        ).scalars().all()
+        if len(types) != len(chain) or any(str(t or "").lower() not in _PARENT_RELATIONSHIPS for t in types):
+            continue
+        whole = db.session.execute(
+            db.select(ArchiMateElement).where(ArchiMateElement.id == row["element_id"])
+        ).scalar_one_or_none()
+        if whole is None or whole.organization_id != org_id:
+            continue
+        component = _own_application_component(whole, org_id)
+        if component is not None:
+            return component, {"relationship_ids": list(chain), "parent_element_id": whole.id, "parent_name": whole.name}
+    return None, None
+
+
+def part_of_sentence(part_name, application_name):
+    """The plain sentence saying a part answers with the application it belongs to."""
+    return "%s is part of %s; figures are %s's." % (part_name, application_name, application_name)
 
 
 def _include_derived_gate(include_derived: bool) -> bool:
@@ -266,6 +334,57 @@ def _resolve_owners_batch(
     return results
 
 
+def _resolve_health_batch(
+    element_ids: List[int],
+    org_id: int,
+    elements: Dict[str, Dict[str, Any]],
+) -> Dict[int, str]:
+    """The health word recorded for each element that has one, in two reads.
+
+    An application carries the ``health_status`` its owner recorded; a capability
+    carries the status the capability health score already computes for the
+    dashboard, or "Not assessed" when it has none. Every other element has no health anywhere
+    in the model, so it is left out and the row says so rather than guessing.
+    """
+    distinct_ids = sorted(set(element_ids))
+    found: Dict[int, str] = {}
+    app_ids = [e for e in distinct_ids if is_application_kind((elements.get(str(e)) or {}).get("type"))]
+    cap_ids = [e for e in distinct_ids if ((elements.get(str(e)) or {}).get("type") or "").lower() == "capability"]
+    if app_ids:
+        from app.models.application_portfolio import ApplicationComponent
+
+        for element_id, status in db.session.execute(
+            db.select(ApplicationComponent.archimate_element_id, ApplicationComponent.health_status)
+            .where(ApplicationComponent.archimate_element_id.in_(app_ids))
+            .where(ApplicationComponent.organization_id == org_id)
+            .order_by(ApplicationComponent.id.desc())
+        ).all():
+            if status:
+                found[element_id] = str(status).replace("_", " ").capitalize()
+    if cap_ids:
+        # A capability always answers: the measured status when it has one,
+        # otherwise a plain "Not assessed" so the row never shows a blank.
+        found.update({element_id: NOT_ASSESSED_HEALTH for element_id in cap_ids})
+        from app.models.business_capabilities import BusinessCapability
+        from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
+
+        element_by_capability = {
+            cap_id: element_id
+            for cap_id, element_id in db.session.execute(
+                db.select(BusinessCapability.id, BusinessCapability.archimate_element_id)
+                .where(BusinessCapability.archimate_element_id.in_(cap_ids))
+                .where(BusinessCapability.organization_id == org_id)
+            ).all()
+        }
+        if element_by_capability:
+            metrics = CapabilityHealthService().get_capability_health_metrics()
+            for item in metrics.get("health_by_capability") or []:
+                element_id = element_by_capability.get(item.get("id"))
+                if element_id is not None and item.get("score") is not None:
+                    found[element_id] = str(item["status"])
+    return found
+
+
 def _resolve_application_owners_batch(
     element_ids: List[int],
     org_id: int,
@@ -291,7 +410,8 @@ def _resolve_application_owners_batch(
     so the owner fetch costs a constant number of reads however many rows
     the page holds.
 
-    Returns ``{element_id: [{"name": str, "role": str}, ...]}``, with an
+    Returns ``{element_id: [{"name": str, "role": str, "element_id": int, "since": str|None}, ...]}``
+    (``since`` is the day the ownership record was made, when it has one), with an
     empty list for elements that have no ApplicationOwner record or whose
     type has no owner store.
     """
@@ -383,9 +503,42 @@ def _resolve_application_owners_batch(
     }
     for eid, owners in pending.items():
         results[eid] = [
-            {"name": display_by_id[o.id]["user_name"], "role": display_by_id[o.id]["ownership_type_label"]}
+            {
+                "name": display_by_id[o.id]["user_name"],
+                "role": display_by_id[o.id]["ownership_type_label"],
+                # Where the owner is recorded and since when, so an answer can cite its record.
+                "element_id": eid,
+                "since": o.assigned_at.date().isoformat() if o.assigned_at else None,
+            }
             for o in owners
         ]
+
+    # An application whose owner is recorded as text on the application (the rule that counts it as
+    # owned, element_ownership_service.application_is_owned) names that owner here too, so the answer
+    # and the "applications with no owner" figure agree. The text is shown as written.
+    still_missing = [eid for eid in app_component_ids if not results[eid]]
+    if still_missing:
+        from app.models.application_portfolio import ApplicationComponent
+        from app.services.element_ownership_service import (
+            ACCOUNTABLE_LEGACY_OWNER_COLUMNS,
+            OWNER_TEXT_BLANKS,
+        )
+
+        labels = {"legacy_application_owner": "Application owner", "legacy_business_owner": "Business owner"}
+        for comp in db.session.execute(
+            db.select(ApplicationComponent)
+            .where(ApplicationComponent.archimate_element_id.in_(still_missing))
+            .where(ApplicationComponent.organization_id == org_id)
+            .order_by(ApplicationComponent.id)
+        ).scalars():
+            if results[comp.archimate_element_id]:
+                continue
+            for column in ACCOUNTABLE_LEGACY_OWNER_COLUMNS:
+                text = (getattr(comp, column, None) or "").strip(OWNER_TEXT_BLANKS)
+                if text and text not in [o["name"] for o in results[comp.archimate_element_id]]:
+                    results[comp.archimate_element_id].append(
+                        {"name": text, "role": labels.get(column, "Owner"), "element_id": comp.archimate_element_id}
+                    )
 
     # The one owner store holds people only. A repository's code owner (a team or a handle) is
     # not a person in the organisation, so approval records it as a fact on the element with its
@@ -404,7 +557,11 @@ def _resolve_application_owners_batch(
             shown = ", ".join(owners) if owners else (props.get("github_owning_team") or {}).get("value")
             if shown:
                 results[eid] = [
-                    {"name": f"{shown} (from GitHub code owners; assign an owner)", "role": "GitHub code owner"}
+                    {
+                        "name": f"{shown} (from GitHub code owners; assign an owner)",
+                        "role": "GitHub code owner",
+                        "element_id": eid,
+                    }
                 ]
 
     return results
@@ -482,6 +639,62 @@ def _element_ids_in_rows(rows: List[Dict[str, Any]]) -> List[int]:
     return ids
 
 
+def filter_relationships_by_org(
+    relationships: List[Any], org_id: Optional[int], *, direction: str = "both"
+) -> List[Any]:
+    """Return only relationships whose far end belongs to ``org_id``.
+
+    This is the single shared fence for every screen that lists relationships.
+    The element drawer, the relationships list, the element relationships
+    endpoint, the enterprise relationships list and the drawer's solutions
+    list all use it, so a far end that belongs to another organisation is
+    left out everywhere.
+
+    Elements carry no shared-reference rows (the element table refuses a row with
+    no organisation), so there is no unowned far end to allow; ``org_id`` of
+    ``None`` sees nothing.
+
+    Args:
+        relationships: List of ArchiMateRelationship objects (or objects with
+            ``source_id`` and ``target_id`` attributes).
+        org_id: The organisation to fence on. If ``None``, returns an empty list
+            (no tenant context means nothing is shown).
+        direction: "incoming" keeps relationships where the source is in the org;
+            "outgoing" keeps relationships where the target is in the org;
+            "both" (default) keeps relationships where both ends are in the org.
+
+    Returns:
+        Filtered list of the same relationship objects, in the same order.
+    """
+
+    if org_id is None:
+        return []
+
+    # Collect all far-end element IDs we need to check
+    far_end_ids: List[int] = []
+    for rel in relationships:
+        if direction in ("incoming", "both"):
+            far_end_ids.append(rel.source_id)
+        if direction in ("outgoing", "both"):
+            far_end_ids.append(rel.target_id)
+
+    # Resolve in one batched query: only elements inside org_id are returned
+    resolved = _resolve_elements_batch(far_end_ids, org_id)
+    allowed_ids = set(resolved.keys())
+
+    # Filter relationships
+    kept = []
+    for rel in relationships:
+        if direction in ("incoming", "both"):
+            if str(rel.source_id) not in allowed_ids:
+                continue
+        if direction in ("outgoing", "both"):
+            if str(rel.target_id) not in allowed_ids:
+                continue
+        kept.append(rel)
+    return kept
+
+
 def _name_in(elements: Dict[str, Dict[str, Any]], element_id: Optional[int]) -> Optional[str]:
     entry = elements.get(str(element_id))
     return entry["name"] if entry is not None else None
@@ -528,9 +741,11 @@ def _row_origin(rel) -> Dict[str, Any]:
     if kind == "import" and label:
         text = f"Imported from {label}"
     elif kind == "manual" and label:
-        text = f"Drawn by {label}"
+        text = manual_origin_text(label)
     elif kind in ("connector", "derived") and label:
         text = label
+    elif kind == "sample":
+        text = "Sample data"
     created = getattr(rel, "created_at", None)
     recorded = getattr(rel, "source_recorded_at", None) or created
     person_ids: List[int] = []
@@ -603,7 +818,7 @@ def _attach_origins(rows: List[Dict[str, Any]], org_id: int) -> None:
         ).scalars():
             first = (user.first_name or "").strip()
             last = (user.last_name or "").strip()
-            full = f"{first} {last}".strip() or user.username or user.email
+            full = f"{first} {last}".strip() or user.email
             if full:
                 names[user.id] = full
     for row in rows:
@@ -623,6 +838,171 @@ def _attach_origins(rows: List[Dict[str, Any]], org_id: int) -> None:
             relation["computed_at"] = created_at
 
 
+# --------------------------------------------------------------------------- #
+# Data flow: who writes a data object, who reads it, where it is copied
+# --------------------------------------------------------------------------- #
+
+_ACCESS_WORDS = {"C": "creates", "R": "reads", "U": "updates", "D": "deletes"}
+_WRITE_WORDS = frozenset({"creates", "updates", "deletes", "writes"})
+DATA_FLOW_RULE = "data-flow-writer-to-reader"
+
+
+def _access_words(rel) -> List[str]:
+    """What an access relationship says the application does with the data, in
+    plain words: the recorded C/R/U/D letters, else the ArchiMate access mode."""
+    crud = (getattr(rel, "crud_operations", None) or "").upper()
+    if crud:
+        return [_ACCESS_WORDS[letter] for letter in "CRUD" if letter in crud]
+    mode = (getattr(rel, "access_mode", None) or "").lower()
+    return {"read": ["reads"], "write": ["writes"], "readwrite": ["reads", "writes"]}.get(mode, ["uses"])
+
+
+def _words(words: List[str]) -> str:
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " and " + words[-1]
+
+
+def _data_flow_walk(object_id: int, object_name: str, level: int, chain: List[int],
+                    chain_elements: List[int], seen: set, max_depth: int,
+                    rows: List[Dict[str, Any]], org_id: int, computed_at: str) -> None:
+    """Rows for one data object, in cascade order: the applications that write
+    it; under them the applications that read it and the data objects it is
+    copied to; under each copy, the same again. Applications are recognised by
+    the element registry's application kinds, never by a type string."""
+    from app.models import ArchiMateElement, ArchiMateRelationship, DataLineage
+
+    accesses = [
+        rel for rel in db.session.execute(
+            db.select(ArchiMateRelationship)
+            .where(ArchiMateRelationship.target_id == object_id)
+            .order_by(ArchiMateRelationship.id)
+        ).scalars()
+        if (rel.type or "").strip().lower() == "access"
+    ]
+    sources = {}
+    if accesses:
+        sources = {
+            el.id: el for el in db.session.execute(
+                db.select(ArchiMateElement).where(
+                    ArchiMateElement.id.in_({rel.source_id for rel in accesses}),
+                    ArchiMateElement.organization_id == org_id,
+                )
+            ).scalars()
+            if is_application_kind(el.type)
+        }
+    users = sorted(
+        ((rel, sources[rel.source_id], _access_words(rel)) for rel in accesses if rel.source_id in sources),
+        key=lambda item: (item[1].name or "").lower(),
+    )
+    writers = [item for item in users if _WRITE_WORDS.intersection(item[2])]
+    readers = [item for item in users if not _WRITE_WORDS.intersection(item[2])]
+
+    for rel, app, words in writers:
+        row = _explicit_row(rel, len(chain) + 1, chain + [rel.id], chain_elements + [app.id], app.id)
+        row.update({"level": level, "hop": "writes", "access": words, "data_object_id": object_id})
+        rows.append(row)
+
+    under = level + 1 if writers else level
+    writer_names = _words([app.name for _rel, app, _w in writers]) if writers else None
+    for rel, app, words in readers:
+        if writers:
+            # Worked out from two recorded facts: the writers write this data
+            # and this application reads it, so the data flows from them to it.
+            text = (f"Worked out: {writer_names} {'write' if len(writers) > 1 else 'writes'} "
+                    f"{object_name}, and {app.name} {_words(words)} it")
+            row = {
+                "element_id": app.id,
+                "_endpoints": (writers[0][1].id, app.id),
+                "relation": {
+                    "kind": "derived",
+                    "type": "flow",
+                    "depth": len(chain) + 2,
+                    "rule_id": DATA_FLOW_RULE,
+                    "chain": chain + [w.id for w, _a, _x in writers] + [rel.id],
+                    "chain_elements": chain_elements + [writers[0][1].id, app.id],
+                    "confidence": None,
+                    "provenance": {"basis": "derived", "kind": "derived", "label": None,
+                                   "text": text, "recorded_at": None},
+                    "computed_at": computed_at,
+                    "stale": False,
+                    "derived_id": None,
+                    "engine_version": None,
+                    "plain_terms": text,
+                },
+            }
+        else:
+            row = _explicit_row(rel, len(chain) + 1, chain + [rel.id], chain_elements + [app.id], app.id)
+        row.update({"level": under, "hop": "reads", "access": words, "data_object_id": object_id})
+        rows.append(row)
+
+    copies = db.session.execute(
+        db.select(DataLineage)
+        .where(DataLineage.archimate_element_id == object_id)
+        .where(DataLineage.target_archimate_element_id.isnot(None))
+        .order_by(DataLineage.id)
+    ).scalars().all()
+    targets = {}
+    if copies:
+        targets = {
+            el.id: el for el in db.session.execute(
+                db.select(ArchiMateElement).where(
+                    ArchiMateElement.id.in_({c.target_archimate_element_id for c in copies}),
+                    ArchiMateElement.organization_id == org_id,
+                )
+            ).scalars()
+        }
+    for copy in copies:
+        target = targets.get(copy.target_archimate_element_id)
+        if target is None:
+            continue
+        recorded = copy.created_at.isoformat() if copy.created_at else None
+        kind_of = f" ({copy.lineage_type})" if copy.lineage_type else ""
+        rows.append({
+            "element_id": target.id,
+            "_endpoints": (object_id, target.id),
+            "relation": {
+                "kind": "explicit",
+                "type": "lineage",
+                "depth": len(chain) + 1,
+                "rule_id": None,
+                "chain": list(chain),
+                "chain_elements": chain_elements + [target.id],
+                "lineage_id": copy.id,
+                "confidence": RECORDED_CONFIDENCE,
+                "provenance": {"basis": "explicit", "kind": "lineage", "label": copy.lineage_type,
+                               "text": f"Copy recorded in the data lineage{kind_of}",
+                               "recorded_at": recorded},
+                "computed_at": recorded,
+                "stale": False,
+                "derived_id": None,
+                "engine_version": None,
+                "plain_terms": None,
+            },
+            "level": under,
+            "hop": "copied to",
+            "access": [],
+            "data_object_id": object_id,
+        })
+        if target.id not in seen and under + 1 < max_depth:
+            seen.add(target.id)
+            _data_flow_walk(target.id, target.name, under + 1, list(chain),
+                            chain_elements + [target.id], seen, max_depth, rows, org_id, computed_at)
+
+
+def _stewards_by_element(element_ids: List[int], org_id: int) -> Dict[int, Optional[str]]:
+    """The data steward recorded on the domain of each data object's entity."""
+    from app.models.process_data import DataDomain, DataEntity
+
+    if not element_ids:
+        return {}
+    pairs = db.session.execute(
+        db.select(DataEntity.archimate_element_id, DataDomain.data_steward)
+        .join(DataDomain, DataDomain.id == DataEntity.domain_id)
+        .where(DataEntity.archimate_element_id.in_(element_ids))
+        .where(DataEntity.organization_id == org_id)
+    ).all()
+    return {eid: (steward or "").strip() or None for eid, steward in pairs}
+
+
 def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[str, Any]]:
     """BFS over ``ArchiMateRelationship`` (TenantMixin-fenced, no hand-written
     predicate needed) up to ``max_depth`` hops, in the requested direction.
@@ -630,8 +1010,11 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
     Cycle-safe: a node already visited is never re-queued, so this
     terminates even on a cyclic graph within ``max_depth`` iterations.
     """
-    from app.models import ArchiMateRelationship
+    from app.models import ArchiMateElement, ArchiMateRelationship
 
+    # A relationship with a deleted element at either end is not walked: the row stays for a
+    # restore, but no answer reads it, so no row is named for an element that is gone.
+    live = db.select(ArchiMateElement.id).where(ArchiMateElement.deleted_at.is_(None))
     frontier: Dict[int, Dict[str, List[int]]] = {root_id: {"chain": [], "chain_elements": [root_id]}}
     visited = {root_id}
     rows: List[Dict[str, Any]] = []
@@ -649,7 +1032,13 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
             break
 
         rels = (
-            db.session.execute(db.select(ArchiMateRelationship).where(db.or_(*conditions)))
+            db.session.execute(
+                db.select(ArchiMateRelationship).where(
+                    db.or_(*conditions),
+                    ArchiMateRelationship.source_id.in_(live),
+                    ArchiMateRelationship.target_id.in_(live),
+                )
+            )
             .scalars()
             .all()
         )
@@ -1060,14 +1449,13 @@ class IntelligenceQueryService:
 
                     derived_rows: List[Dict[str, Any]] = []
                     if _include_derived_gate(include_derived):
-                        matching = list_derived_facts(
-                            org_id,
-                            include_stale=include_stale,
-                            source_element_id=src,
-                            target_element_id=tgt,
-                            max_depth=max_depth,
-                            direction=dir_kw,
-                            layer=layer,
+                        # The same rows already read above, less the stale ones
+                        # unless asked for: a second read would return exactly
+                        # this, and cost a statement for every seed.
+                        matching = (
+                            all_matching_derived
+                            if include_stale
+                            else [r for r in all_matching_derived if not r["stale"]]
                         )
                         derived_rows = [_derived_row(fact, element_id) for fact in matching]
 
@@ -1206,6 +1594,14 @@ class IntelligenceQueryService:
                     existing_reason = row.get("reason")
                     row["reason"] = existing_reason if existing_reason else None
 
+            health_by_element = (
+                _resolve_health_batch([row["element_id"] for row in rows], org_id, elements)
+                if org_id is not None and rows
+                else {}
+            )
+            for row in rows:
+                row["health"] = health_by_element.get(row["element_id"])
+
         summary["latency_ms"] = scope.latency_ms
 
         return {
@@ -1216,6 +1612,80 @@ class IntelligenceQueryService:
             "maturity_flags": maturity_flags,
             "total": total,
             "next_cursor": next_cursor,
+        }
+
+    @staticmethod
+    def data_flow(element_id: int, *, max_depth: int = 4) -> Dict[str, Any]:
+        """Where the data in one data object goes: the applications that write
+        it, the ones that read it and the data objects it is copied to, hop by
+        hop, each row resting on the record it came from.
+
+        Two stores and no other: ArchiMate access relationships (an application
+        creates, reads, updates or deletes the data object) and DataLineage rows
+        (the data is copied to another data object). An access or a copy is an
+        explicit row citing its record; a reader under a writer is a derived
+        row ("worked out"), citing both accesses. Rows come in cascade order,
+        each child after its parent, with its ``level``. Owners come from the
+        same batch readers ``cross_layer_impact`` uses; a data object row
+        carries the steward of its entity's domain.
+        """
+        import datetime as _dt
+
+        if not (1 <= max_depth <= 10):
+            raise ValueError("max_depth must be between 1 and 10")
+        org_id = current_org_id()
+        summary = {"explicit_count": 0, "derived_count": 0, "stale_count": 0,
+                   "derivation_state": "not_computed"}
+        if org_id is None:
+            return {"rows": [], "summary": summary, "reasons": [NO_TENANT_CONTEXT_REASON],
+                    "elements": {}, "total": 0}
+        from app.models import ArchiMateElement
+
+        root = db.session.execute(
+            db.select(ArchiMateElement).where(
+                ArchiMateElement.id == element_id, ArchiMateElement.organization_id == org_id
+            )
+        ).scalar_one_or_none()
+        if root is None:
+            return {"rows": [], "summary": summary, "reasons": [ELEMENT_NOT_FOUND_REASON],
+                    "elements": {}, "total": 0}
+
+        rows: List[Dict[str, Any]] = []
+        computed_at = _dt.datetime.utcnow().isoformat()
+        _data_flow_walk(root.id, root.name, 0, [], [root.id], {root.id}, max_depth, rows, org_id, computed_at)
+        for row in rows:
+            row.pop("_endpoints", None)
+        elements = _resolve_elements_batch(_element_ids_in_rows(rows) + [root.id], org_id)
+        _attach_origins(rows, org_id)
+        _attach_connector_origins(rows, org_id)
+
+        ids = [row["element_id"] for row in rows]
+        owners_by_element = _resolve_owners_batch(ids, org_id)
+        application_owners = _resolve_application_owners_batch(ids, org_id, elements)
+        stewards = _stewards_by_element(ids + [root.id], org_id)
+        for row in rows:
+            owner, _reason = owners_by_element.get(row["element_id"], (None, NO_OWNERSHIP_REASON))
+            row["owner"] = owner
+            row["owners"] = application_owners.get(row["element_id"], [])
+            row["steward"] = stewards.get(row["element_id"]) if row["hop"] == "copied to" else None
+            accountable = row["owner"] or row["owners"] or row["steward"]
+            row["reason"] = None if accountable else NO_OWNERSHIP_REASON
+
+        explicit = sum(1 for r in rows if r["relation"]["kind"] == "explicit")
+        summary = {
+            "explicit_count": explicit,
+            "derived_count": len(rows) - explicit,
+            "stale_count": 0,
+            "derivation_state": "computed",
+            "root_steward": stewards.get(root.id),
+        }
+        return {
+            "rows": rows,
+            "summary": summary,
+            "reasons": [],
+            "elements": elements,
+            "root_element_id": root.id,
+            "total": len(rows),
         }
 
     @staticmethod
@@ -1232,18 +1702,14 @@ class IntelligenceQueryService:
         algorithm, per the platform convention against parallel scoring
         logic.
 
-        Scope note, not silently dropped: ``RiskEntityLink`` (a risk
-        threatening an Application/Solution/Programme with no direct
-        ``archimate_element_id`` of its own on this element) is not resolved
-        here -- none of those three models carry an ArchiMate mirror id
-        today, so there is no element to seed a traversal from. Only
-        directly-mirrored risks are answered; an indirect risk is invisible
-        to this query, not wrongly reported as "none". Tracked as a
-        follow-up, not implemented speculatively.
+        A risk is also found when a link points at the record this element mirrors (an
+        application, capability or programme) or at the element itself, read through
+        ``risk_service.risk_ids_touching_elements``. The legacy pointer branch stays for an
+        element that is not the risk's own mirror.
 
         Score is a **display** label, not a stored fact (per
         ``intelligence-lenses-v1.md`` L6): each risk's own
-        ``likelihood x impact`` is shown on its row; when a risk's blast
+        named score (residual, else inherent) is shown on its row; when a risk's blast
         radius reaches other elements, the chain's aggregate score is the
         single worst (max) risk reaching it, the conservative choice
         documented in the L3/L6 brief, not a summed exposure figure.
@@ -1274,13 +1740,21 @@ class IntelligenceQueryService:
                     "elements": {},
                 }
 
+            from app.services import risk_service
+
+            touching = risk_service.risk_ids_touching_elements(org_id, [element_id])
             seed_risks = (
                 db.session.execute(
-                    db.select(Risk).where(Risk.archimate_element_id == element_id)
+                    db.select(Risk).where(
+                        Risk.organization_id == org_id,
+                        db.or_(Risk.archimate_element_id == element_id,
+                               Risk.id.in_(list(touching) or [-1])),
+                    ).order_by(Risk.id)
                 )
                 .scalars()
                 .all()
             )
+            ranked = {row["risk_id"]: row for row in risk_service.ranked_risks(org_id)["rows"]}
 
             if not seed_risks:
                 return {
@@ -1291,14 +1765,15 @@ class IntelligenceQueryService:
 
             all_elements: Dict[str, Dict[str, Any]] = {}
             risk_payloads: List[Dict[str, Any]] = []
+            blast = IntelligenceQueryService.cross_layer_impact(
+                element_id,
+                include_derived=include_derived,
+                max_depth=max_depth,
+                with_owner=True,
+            )
+            all_elements.update(blast.get("elements") or {})
             for risk in seed_risks:
-                blast = IntelligenceQueryService.cross_layer_impact(
-                    element_id,
-                    include_derived=include_derived,
-                    max_depth=max_depth,
-                    with_owner=True,
-                )
-                all_elements.update(blast.get("elements") or {})
+                row = ranked.get(risk.id) or {}
                 risk_payloads.append(
                     {
                         "risk_id": risk.id,
@@ -1306,10 +1781,13 @@ class IntelligenceQueryService:
                         "status": risk.status.value if risk.status else None,
                         "likelihood": risk.likelihood,
                         "impact": risk.impact,
-                        "risk_score": risk.risk_score,
+                        "risk_score": risk._effective_score,
+                        "score_text": risk.score_text,
                         "risk_level": risk.risk_level,
                         "owner": risk.owner,
                         "mitigation_plan": risk.mitigation_plan,
+                        "touches": row.get("touches") or [],
+                        "url": "/risks/%d" % risk.id,
                         "affected_rows": blast.get("rows", []),
                         "affected_summary": blast.get("summary", {}),
                     }
@@ -1784,7 +2262,8 @@ class IntelligenceQueryService:
                     "status": risk.status.value if risk.status else None,
                     "likelihood": risk.likelihood,
                     "impact": risk.impact,
-                    "risk_score": risk.risk_score,
+                    "risk_score": risk._effective_score,
+                    "score_text": risk.score_text,
                     "risk_level": risk.risk_level,
                     "owner": risk.owner,
                     "mitigation_plan": risk.mitigation_plan,
@@ -2050,17 +2529,16 @@ class IntelligenceQueryService:
                 "component": None,
             }
 
-        component = None
-        if getattr(element, "application_component_id", None):
-            component = db.session.get(ApplicationComponent, element.application_component_id)
-        if component is None and is_application_kind(element.type):
-            component = ApplicationComponent.query.filter_by(archimate_element_id=element.id).first()
+        component, resolved_through = resolve_application_component(element, org_id)
 
         if component is None:
             return {
                 "application_component_id": None,
                 "reasons": [NO_APPLICATION_COMPONENT_REASON],
                 "component": None,
+                "resolved_through": None,
+                "part_of": None,
+                "message": "%s is not part of any application in the model." % element.name,
             }
 
         licence_entries = _licence_entries(component, org_id)
@@ -2077,6 +2555,9 @@ class IntelligenceQueryService:
             "application_component_id": component.id,
             "reasons": [],
             "component": component_block,
+            "resolved_through": resolved_through,
+            "part_of": part_of_sentence(element.name, component.name) if resolved_through else None,
+            "message": None,
         }
 
     @staticmethod
@@ -2402,6 +2883,16 @@ class IntelligenceQueryService:
         return {"work_packages": wp_payloads, "reasons": [], "elements": all_elements}
 
     @staticmethod
+    def owners_for_element(element_id: int) -> List[Dict[str, str]]:
+        """The element's own recorded owners ([{name, role}]), from the one owner store.
+
+        The same reader accountability_for_element and the impact rows use, so every surface
+        that names an owner for an element names the same one."""
+        org_id = current_org_id()
+        elements = _resolve_elements_batch([element_id], org_id)
+        return _resolve_application_owners_batch([element_id], org_id, elements).get(element_id, [])
+
+    @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:
         """L4, "who's accountable for ___, and can they take on more?":
 
@@ -2674,7 +3165,6 @@ class IntelligenceQueryService:
 
         from app.models import ArchiMateElement
         from app.models.application_compliance import ApplicationComplianceControl
-        from app.models.application_portfolio import ApplicationComponent
         from app.models.compliance_models import ComplianceControl, RegulatoryFramework
         from app.models.policy_monitoring import ArchitecturePolicy, ComplianceStatus, PolicyViolation
 
@@ -2694,19 +3184,8 @@ class IntelligenceQueryService:
         if element is None:
             return {**empty, "reasons": [ELEMENT_NOT_FOUND_REASON]}
 
-        component_id = None
-        if getattr(element, "application_component_id", None):
-            component_id = db.session.execute(
-                db.select(ApplicationComponent.id)
-                .where(ApplicationComponent.id == element.application_component_id)
-                .where(predicate(ApplicationComponent, org_id))
-            ).scalar_one_or_none()
-        if component_id is None:
-            component_id = db.session.execute(
-                db.select(ApplicationComponent.id)
-                .where(ApplicationComponent.archimate_element_id == element_id)
-                .where(predicate(ApplicationComponent, org_id))
-            ).scalars().first()
+        resolved, _through = resolve_application_component(element, org_id)
+        component_id = resolved.id if resolved is not None else None
         if component_id is None:
             return {**empty, "reasons": [NO_APPLICATION_COMPONENT_REASON]}
 

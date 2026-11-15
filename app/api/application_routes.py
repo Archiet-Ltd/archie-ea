@@ -124,6 +124,7 @@ def api_applications_table():
         sort_direction (str): asc or desc
         status (str): Filter by status
         type (str): Filter by application type
+        filter_owner (str): "none" lists only applications with no owner
 
     Returns:
         JSON with data, recordsTotal, recordsFiltered, page, pages
@@ -187,6 +188,11 @@ def api_applications_table():
             query = query.filter(getattr(ApplicationComponent, status_field) == status_filter)
         if type_filter:
             query = query.filter(ApplicationComponent.application_type == type_filter)
+        if request.args.get("filter_owner") == "none":
+            # The same "is it owned" rule the Applications list and the chat read.
+            from app.services.element_ownership_service import application_is_owned_expression
+
+            query = query.filter(~application_is_owned_expression(ApplicationComponent))
         if search:
             search_term = f"%{search}%"
             query = query.filter(
@@ -406,7 +412,7 @@ def api_application_details(id):
 # =============================================================================
 
 
-@application_api_bp.route("/<string:id>/architecture/elements", methods=["GET", "POST"])
+@application_api_bp.route("/<int:id>/architecture/elements", methods=["GET", "POST"])
 @login_required
 @require_roles("admin", "architect")
 @audit_log("arch_element_create")
@@ -631,7 +637,7 @@ def api_arch_element_ops(id, element_id):
         return api_error("Failed to process element", "INTERNAL_ERROR", 500)
 
 
-@application_api_bp.route("/<string:id>/architecture/export-csv", methods=["GET"])
+@application_api_bp.route("/<int:id>/architecture/export-csv", methods=["GET"])
 @login_required
 def api_arch_export(id):
     """

@@ -47,6 +47,20 @@ def _element(db_session, org, name="El"):
     return el
 
 
+def _element_with_no_audit_entry(db_session, org, name="El"):
+    """An element written by a Core insert, which the audit listener (it watches ORM
+    flushes) never sees: the state of a row that predates the audit trail."""
+    from app.models.archimate_core import ArchiMateElement
+
+    new_id = db_session.execute(
+        ArchiMateElement.__table__.insert().values(
+            name=name, type="ApplicationComponent", layer="application", organization_id=org.id
+        ).returning(ArchiMateElement.__table__.c.id)
+    ).scalar()
+    db_session.flush()
+    return db_session.get(ArchiMateElement, new_id)
+
+
 def _relationship(db_session, org, source, target):
     from app.models.archimate_core import ArchiMateRelationship
 
@@ -163,7 +177,7 @@ def test_backfill_seeds_one_open_version_per_pre_existing_row_with_no_history(ap
     from app.commands.backfill_entity_history import backfill_entity_history
 
     org = make_org("eh-backfill")
-    el = _element(db_session, org, name=f"El-{uuid.uuid4().hex[:6]}")
+    el = _element_with_no_audit_entry(db_session, org, name=f"El-{uuid.uuid4().hex[:6]}")
     db_session.commit()
     el_id = el.id
 
@@ -331,7 +345,7 @@ def test_backfill_does_not_hide_a_pre_existing_row_from_an_earlier_as_of_date(
     from app.commands.backfill_entity_history import backfill_entity_history
 
     org = make_org("eh-backfill-asof")
-    el = _element(db_session, org, name=f"El-{uuid.uuid4().hex[:6]}")
+    el = _element_with_no_audit_entry(db_session, org, name=f"El-{uuid.uuid4().hex[:6]}")
     db_session.commit()
     el_id = el.id
 

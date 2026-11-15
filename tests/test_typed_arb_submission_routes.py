@@ -848,6 +848,10 @@ def test_cross_tenant_decision_brief_id_is_not_found_and_leaks_nothing(
         db.session.remove()
         with db.engine.begin() as connection:
             connection.execute(
+                db.text("DELETE FROM soc2_audit_log WHERE organization_id = :org"),
+                {"org": other_org_id},
+            )
+            connection.execute(
                 db.text("DELETE FROM users WHERE organization_id = :org"),
                 {"org": other_org_id},
             )

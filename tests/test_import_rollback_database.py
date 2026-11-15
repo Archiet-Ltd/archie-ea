@@ -53,7 +53,8 @@ def batch(db_session, make_org):
         db_session.add_all([application, capability, process])
         db_session.flush()
         cap_mapping = UnifiedApplicationCapabilityMapping(application_component_id=application.id,
-                                                          unified_capability_id=capability.id)
+                                                          unified_capability_id=capability.id,
+                                                          organization_id=organization.id)
         proc_mapping = ProcessApplicationMapping(application_id=application.id, apqc_process_id=process.id)
         db_session.add_all([cap_mapping, proc_mapping])
         db_session.flush()

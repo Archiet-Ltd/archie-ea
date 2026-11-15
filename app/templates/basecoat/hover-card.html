@@ -1,0 +1,23 @@
+{# hover-card: port of shadcn/ui hover-card.tsx (pinned in compliance/upstream). Macros: hover_card, hover_card_trigger, hover_card_portal, hover_card_content #}
+
+{#- HoverCard: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro hover_card(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- HoverCardTrigger -#}
+{% macro hover_card_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('hover-card-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- HoverCardContent: renders no element upstream. The macro groups trigger and content in the template only; the runtime pairs each content with the trigger that precedes it in document order. -#}
+{% macro hover_card_portal(class='', id=none, attrs={}) -%}
+{{ caller() if caller }}
+{%- endmacro %}
+
+{#- HoverCardContent -#}
+{% macro hover_card_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('hover-card-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

@@ -15,54 +15,6 @@ from app import db
 # ASSOCIATION TABLES - Defined Once Only
 # ============================================================================
 
-# Business Capability <-> Application Capability Mapping
-business_app_capability_mapping = db.Table(
-    "business_app_capability_mapping",
-    db.Column(
-        "business_capability_id",
-        db.Integer,
-        db.ForeignKey("business_capability.id"),
-        primary_key=True,
-    ),
-    db.Column(
-        "application_capability_id",
-        db.Integer,
-        db.ForeignKey("application_capability.id"),
-        primary_key=True,
-    ),
-    db.Column("created_at", db.DateTime, default=datetime.utcnow),
-    db.Column("updated_at", db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow),
-    # Additional metadata for the relationship
-    db.Column("relationship_strength", db.Integer, default=1),  # 1 - 10 scale
-    db.Column(
-        "relationship_type", db.String(50), default="supports"
-    ),  # supports, enables, depends_on
-    db.Column("notes", db.Text, nullable=True),
-)
-
-# Application Capability <-> Technology Capability Mapping
-app_tech_capability_mapping = db.Table(
-    "app_tech_capability_mapping",
-    db.Column(
-        "application_capability_id",
-        db.Integer,
-        db.ForeignKey("application_capability.id"),
-        primary_key=True,
-    ),
-    db.Column(
-        "technology_capability_id",
-        db.Integer,
-        db.ForeignKey("technology_capabilities.id"),
-        primary_key=True,
-    ),
-    db.Column("created_at", db.DateTime, default=datetime.utcnow),
-    db.Column("updated_at", db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow),
-    # Implementation metadata
-    db.Column("implementation_complexity", db.String(20), default="medium"),  # low, medium, high
-    db.Column("integration_level", db.String(20), default="standard"),  # basic, standard, advanced
-    db.Column("notes", db.Text, nullable=True),
-)
-
 # Data Lineage Mappings
 data_lineage_mapping = db.Table(
     "data_lineage_mapping",
@@ -203,8 +155,6 @@ permission_role_mapping = db.Table(
 def get_all_association_tables():
     """Return all association table definitions for reference"""
     return {
-        "business_app_capability_mapping": business_app_capability_mapping,
-        "app_tech_capability_mapping": app_tech_capability_mapping,
         "data_lineage_mapping": data_lineage_mapping,
         "business_object_data_lineage": business_object_data_lineage,
         "physical_model_software_mapping": physical_model_software_mapping,

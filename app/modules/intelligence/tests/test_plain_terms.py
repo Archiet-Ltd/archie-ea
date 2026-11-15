@@ -21,6 +21,7 @@ import pytest
 
 from app.modules.intelligence.services.plain_terms import (
     SUPPORTED_TYPES,
+    link_sentence,
     plain_terms_sentence,
     wording_family,
 )
@@ -35,6 +36,22 @@ def _sentence(confidence, *, source="Ledger", target="Billing", type_="Serving",
     return plain_terms_sentence(
         source_name=source, target_name=target, relation_type=type_, depth=depth, confidence=confidence
     )
+
+
+# --- one drawn link ---------------------------------------------------------
+
+
+@pytest.mark.parametrize("stored", ["Serving", "serving", "ServingRelationship"])
+def test_a_link_reads_the_same_whatever_spelling_it_was_stored_in(stored):
+    assert link_sentence(source_name="Ledger", target_name="Billing", relation_type=stored) == (
+        "Billing depends on Ledger."
+    )
+
+
+@pytest.mark.parametrize("stored", [None, "", "pairs-with"])
+def test_a_link_with_no_wording_still_reads_as_a_sentence_never_a_missing_value(stored):
+    sentence = link_sentence(source_name="Ledger", target_name="Billing", relation_type=stored)
+    assert sentence == "Ledger and Billing are linked."
 
 
 # --- the shape and the three bands ------------------------------------------

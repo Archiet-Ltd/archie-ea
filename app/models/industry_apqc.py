@@ -183,11 +183,32 @@ class IndustryAPQCProcess(HybridTenantMixin, db.Model):
         }
 
     @classmethod
+    def visible_to_caller(cls):
+        """Criteria limiting a read to shared rows plus the signed-in organisation's own.
+
+        Same rule as ``_visible`` in app/services/tree_service.py for the hybrid reference tree. Inside a request
+        with no organisation only shared rows are visible; outside a request (seeds, migrations, CLI) the read
+        stays global, as every platform-scope read does.
+        """
+        from flask import has_request_context
+        from sqlalchemy import or_
+
+        from app.middleware.tenant_context import current_org_id
+
+        org_id = current_org_id()
+        if org_id is not None:
+            return or_(cls.organization_id.is_(None), cls.organization_id == org_id)
+        if has_request_context():
+            return cls.organization_id.is_(None)
+        return db.true()
+
+    @classmethod
     def get_industry_unique_processes(cls, industry_code):
         """Get processes unique to an industry."""
         return (
             cls.query.join(IndustryAPQCFramework)
             .filter(
+                cls.visible_to_caller(),
                 IndustryAPQCFramework.industry_code == industry_code,
                 cls.is_industry_unique == True,
                 cls.is_active == True,
@@ -201,6 +222,7 @@ class IndustryAPQCProcess(HybridTenantMixin, db.Model):
         return (
             cls.query.join(IndustryAPQCFramework)
             .filter(
+                cls.visible_to_caller(),
                 IndustryAPQCFramework.industry_code == industry_code,
                 cls.regulatory_requirements.isnot(None),
                 cls.is_active == True,
@@ -323,3 +345,27 @@ class IndustryProcessRecommendation(TenantMixin, db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+def _load_frameworks_for_new_organisation(mapper, connection, organisation):
+    """A new organisation finds the industry frameworks already there.
+
+    The frameworks are one shared copy, loaded by a data migration for the
+    organisations that exist. This covers an installation or database that
+    has none yet; it adds only what is missing, so it costs one query once
+    the frameworks are present.
+    """
+    from app.modules.industry_apqc.framework_data import load_default_frameworks
+
+    load_default_frameworks(connection)
+
+
+def _register_framework_loader():
+    from sqlalchemy import event
+
+    from app.models.organization import Organization
+
+    event.listen(Organization, "after_insert", _load_frameworks_for_new_organisation)
+
+
+_register_framework_loader()

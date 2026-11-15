@@ -99,7 +99,7 @@ let ComposerGraph = (function() {
                 return;
             }
 
-            Platform.fetch.post('/archimate/api/relationships', {
+            let relPayload = {
                 source_element_id: self.relPickerSourceId,
                 target_element_id: self.relPickerTargetId,
                 relationship_type: relType,
@@ -108,7 +108,8 @@ let ComposerGraph = (function() {
                 flow_label: relType === 'flow' ? self.flowLabel : undefined,
                 description: pendingLink.get('description') || undefined,
                 custom_label: pendingLink.get('customLabel') || undefined,
-            }, { silent: true })
+            };
+            Platform.fetch.post('/archimate/api/relationships', relPayload, { silent: true })
                 .then(function(data) {
                 if (data.id) {
                     let style = REL_STYLES[relType] || REL_STYLES.association;
@@ -146,6 +147,7 @@ let ComposerGraph = (function() {
                     pendingLink.set('relType', relType);
                     pendingLink.set('relId', data.id);
                     self.relCount++;
+                    self.shellRecordRelationship(pendingLink, relPayload);
                     self.statusText = relType + ' relationship created';
                     let srcName = self.relPickerSourceCell ? self.relPickerSourceCell.get('elName') : '';
                     let tgtName = self.relPickerTargetCell ? self.relPickerTargetCell.get('elName') : '';

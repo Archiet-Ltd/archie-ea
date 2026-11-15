@@ -41,6 +41,7 @@ from app import db
 from app.decorators import audit_log
 from app.models import BusinessCapability
 from app.models.models import RiskAssessment
+from app.services.rate_limiter import apply_headers, count_hit
 from app.utils.pagination import safe_int_arg
 
 
@@ -199,68 +200,23 @@ def _audit_log(action, endpoint, details=None):
 # RATE LIMITING (DOS Protection)
 # ============================================================================
 
-class RateLimiter:
-    """
-    Simple rate limiter for DOS prevention.
-    
-    Tracks requests per user per endpoint.
-    Default: 30 requests per minute per endpoint.
-    """
-    
-    def __init__(self):
-        self._requests = {}  # {user_id: {endpoint: [(timestamp, count)]}}
-    
-    def is_allowed(self, user_id, endpoint, max_requests=30, window_seconds=60):
-        """
-        Check if request is allowed under rate limit.
-        """
-        key = f"{user_id}:{endpoint}"
-        now = datetime.utcnow()
-        
-        if key not in self._requests:
-            self._requests[key] = []
-        
-        # Remove old requests outside window
-        self._requests[key] = [
-            (ts, count) for ts, count in self._requests[key]
-            if (now - ts).total_seconds() < window_seconds
-        ]
-        
-        # Count requests in window
-        total_requests = sum(count for _, count in self._requests[key])
-        
-        if total_requests >= max_requests:
-            return False
-        
-        # Add this request
-        if self._requests[key] and self._requests[key][-1][0] == now:
-            self._requests[key][-1] = (now, self._requests[key][-1][1] + 1)
-        else:
-            self._requests[key].append((now, 1))
-        
-        return True
-
-
-_rate_limiter = RateLimiter()
-
-
 def rate_limit(max_requests=30, window_seconds=60):
     """
-    Decorator for rate limiting.
+    Decorator for rate limiting, counted per user and path in the shared store.
     """
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            if not _rate_limiter.is_allowed(
-                current_user.id,
-                request.path,
-                max_requests=max_requests,
-                window_seconds=window_seconds
-            ):
-                return jsonify({"error": "Rate limit exceeded"}), 429
-            
+            verdict = count_hit(
+                "strategic-risks", f"{current_user.id}:{request.path}", max_requests, window_seconds
+            )
+            if not verdict.allowed:
+                refusal = jsonify({"error": "Rate limit exceeded"})
+                refusal.status_code = 429
+                return apply_headers(refusal, verdict)
+
             return f(*args, **kwargs)
-        
+
         return decorated_function
     return decorator
 
@@ -399,121 +355,6 @@ def get_risk_details(capability_id):
     except Exception as e:
         current_app.logger.error(f"Error getting risk details: {str(e)}", exc_info=True)
         _audit_log("view_risk_details_error", request.path, {"error": str(e)[:100]})
-        return jsonify({"error": "Internal server error"}), 500
-
-
-@strategic_risks_bp.route("/risks/<int:capability_id>/mitigation", methods=["POST"])
-@login_required  # ✅ FIX #1: ADD AUTHENTICATION
-@require_roles("architect", "compliance_officer")  # ✅ FIX #2: STRICTER ROLE REQUIREMENT
-@rate_limit(max_requests=10, window_seconds=60)  # ✅ FIX #3: STRICTER RATE LIMIT
-@audit_log("update_risk_mitigation")
-def update_risk_mitigation(capability_id):
-    """
-    Update risk mitigation strategy.
-    
-    HARDENED:
-    - Requires authentication
-    - Requires architect or compliance_officer role (not just authenticated)
-    - Validates all input
-    - Filters by division
-    - Logs all modifications (audit trail)
-    - Stricter rate limiting (10 updates per minute max)
-    """
-    try:
-        # ✅ FIX #4: Input validation
-        data = request.get_json() or {}
-        
-        if not data.get("mitigation_strategy"):
-            return jsonify({"error": "mitigation_strategy required"}), 400
-        
-        if not isinstance(data.get("mitigation_strategy"), str):
-            return jsonify({"error": "mitigation_strategy must be string"}), 400
-        
-        if len(data.get("mitigation_strategy", "")) > 2000:
-            return jsonify({"error": "mitigation_strategy too long"}), 400
-        
-        # ✅ FIX #5: Multi-tenancy filtering
-        capability = _apply_division_filter(
-            db.session.query(BusinessCapability),
-            BusinessCapability,
-            current_user
-        ).filter(BusinessCapability.id == capability_id).first()
-        
-        if not capability:
-            audit_logger.warning(
-                f"Unauthorized mitigation update: user {current_user.id} → {capability_id}"
-            )
-            return jsonify({"error": "Access denied"}), 403
-        
-        # Get risk
-        risk = (
-            db.session.query(RiskAssessment)
-            .filter(RiskAssessment.capability_id == capability_id)
-            .first()
-        )
-        
-        if not risk:
-            return jsonify({"error": "Risk not found"}), 404
-        
-        # ✅ FIX #6: Create audit log BEFORE modification
-        old_value = risk.mitigation_strategy if hasattr(risk, 'mitigation_strategy') else None
-        
-        # Update mitigation — save all fields the modal sends
-        risk.mitigation_strategy = data.get("mitigation_strategy")
-        risk.response_strategy = data.get("response_strategy", risk.response_strategy)
-        risk.risk_owner = data.get("risk_owner", risk.risk_owner)
-        risk.action_owner = data.get("action_owner") or data.get("owner_id", risk.action_owner)
-        risk.status = data.get("status", risk.status)
-        risk.contingency_plan = data.get("contingency_plan", risk.contingency_plan)
-        risk.mitigation_cost = data.get("mitigation_cost", risk.mitigation_cost)
-        risk.mitigation_effort = data.get("mitigation_effort", risk.mitigation_effort)
-        risk.residual_probability = data.get("residual_probability", risk.residual_probability)
-        risk.residual_impact = data.get("residual_impact", risk.residual_impact)
-        review_date_str = data.get("next_review_date") or data.get("target_date")
-        if review_date_str:
-            try:
-                from datetime import date as date_type
-                risk.next_review_date = date_type.fromisoformat(review_date_str)
-            except (ValueError, TypeError):
-                pass  # Ignore invalid date format
-        risk.updated_at = datetime.utcnow()
-        
-        db.session.commit()
-        
-        # ✅ FIX #7: Audit log modification
-        _audit_log("update_risk_mitigation", request.path, {
-            "capability_id": capability_id,
-            "risk_id": risk.id,
-            "old_value": old_value,
-            "new_value": risk.mitigation_strategy,
-            "modified_by": current_user.id
-        })
-        
-        return jsonify({
-            "success": True,
-            "message": "Risk mitigation updated",
-            "risk_id": risk.id,
-            "mitigation": {
-                "risk_owner": risk.risk_owner or "",
-                "action_owner": risk.action_owner or "",
-                "status": risk.status or "identified",
-                "response_strategy": risk.response_strategy or "",
-                "mitigation_strategy": risk.mitigation_strategy or "",
-                "contingency_plan": risk.contingency_plan or "",
-                "mitigation_cost": float(risk.mitigation_cost) if risk.mitigation_cost else None,
-                "mitigation_effort": risk.mitigation_effort or "",
-                "next_review_date": risk.next_review_date.isoformat() if risk.next_review_date else None,
-                "residual_probability": risk.residual_probability,
-                "residual_impact": risk.residual_impact,
-            },
-        }), 200
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error updating risk mitigation: {str(e)}", exc_info=True)
-        _audit_log("update_risk_mitigation_error", request.path, {"error": str(e)[:100]})
         return jsonify({"error": "Internal server error"}), 500
 
 

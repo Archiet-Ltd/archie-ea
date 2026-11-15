@@ -479,6 +479,9 @@ def _register_api_auth(app, csrf):
             or user.password_hash is None
             or not user.verify_password(password)
         ):
+            from app.services import auth_audit
+
+            auth_audit.record_login_failure(email)
             return jsonify(
                 {"success": False, "error": "Invalid email or password"}
             ), 401
@@ -490,7 +493,10 @@ def _register_api_auth(app, csrf):
         # outright -- never call login_and_register -- and tell the caller
         # why. Mirrors the gate app/modules/account/v2/routes/account_routes.py's
         # login() already applies to the form-based login.
-        if mfa_service.required_for(user):
+        mfa_service.start_window_if_due(user)
+        if mfa_service.is_administrator(user) or (
+            mfa_service.required_for(user) and not mfa_service.may_defer_enrolment(user)
+        ):
             return jsonify(
                 {
                     "success": False,
@@ -501,6 +507,9 @@ def _register_api_auth(app, csrf):
 
         # Fix Session Fixation: Regenerate session ID after successful authentication
         session_registry.login_and_register(user, remember=remember_me)
+        from app.services import auth_audit
+
+        auth_audit.record_login_success(user)
 
         return (
             jsonify(

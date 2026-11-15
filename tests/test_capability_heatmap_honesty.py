@@ -64,7 +64,7 @@ def _capability(
     return cap
 
 
-def _make_user(db_session, org, label):
+def _make_user(db_session, org, label, role="enterprise_architect"):
     from app.models.user import User
 
     suffix = uuid.uuid4().hex[:8]
@@ -74,7 +74,7 @@ def _make_user(db_session, org, label):
         last_name="Honesty",
         organization_id=org.id,
         confirmed=True,
-        enterprise_role="enterprise_architect",
+        enterprise_role=role,
     )
     user.password = "Sup3rSecret!23"
     db_session.add(user)
@@ -590,7 +590,7 @@ def test_investment_guard_leaves_no_domain_group_unset_and_real_domain_unchanged
     )
 
     org = make_org("investment-guard")
-    actor = _make_user(db_session, org, "investment")
+    actor = _make_user(db_session, org, "investment", "cto")
     domain = _domain(db_session, "investment")
     _capability(db_session, org, domain=domain, current=3, target=4, name="Domain-linked capability")
     _capability(db_session, org, domain=None, current=2, name="No-domain capability")

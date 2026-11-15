@@ -60,6 +60,8 @@ def ensure_capability_record(
     specialization_type: str = "BUSINESS",
     organization_id: int | None = None,
     scope: str | None = None,
+    archimate_element_id: int | None = None,
+    flush: bool = True,
     **extra_fields,
 ):
     """
@@ -82,6 +84,9 @@ def ensure_capability_record(
         specialization_type: BUSINESS, MANUFACTURING, APPLICATION, TECHNICAL
         organization_id: Tenant ID (None for shared reference capabilities)
         scope: "reference" for shared catalogue, "tenant" for tenant-owned
+        archimate_element_id: when given, the record is found by organisation and
+            element alone (never by name), and a new one is bound to that element
+        flush: set False inside a flush hook, where the session cannot flush
         **extra_fields: Any other UnifiedCapability columns
 
     Returns:
@@ -99,14 +104,21 @@ def ensure_capability_record(
     if scope is None:
         scope = "reference" if organization_id is None else "tenant"
 
-    # Check for existing capability with same name/code/org
-    query = UnifiedCapability.query.filter(UnifiedCapability.name == name)
-    if code:
-        query = query.filter(UnifiedCapability.code == code)
-    if organization_id is not None:
-        query = query.filter(UnifiedCapability.organization_id == organization_id)
+    # Check for existing capability with same name/code/org, or by element alone
+    if archimate_element_id is not None and organization_id is not None:
+        query = UnifiedCapability.query.filter(
+            UnifiedCapability.organization_id == organization_id,
+            UnifiedCapability.archimate_element_id == archimate_element_id,
+            UnifiedCapability.retired_into_id.is_(None),
+        )
     else:
-        query = query.filter(UnifiedCapability.organization_id.is_(None))
+        query = UnifiedCapability.query.filter(UnifiedCapability.name == name)
+        if code:
+            query = query.filter(UnifiedCapability.code == code)
+        if organization_id is not None:
+            query = query.filter(UnifiedCapability.organization_id == organization_id)
+        else:
+            query = query.filter(UnifiedCapability.organization_id.is_(None))
 
     existing = query.first()
     if existing:
@@ -125,8 +137,10 @@ def ensure_capability_record(
         specialization_type=specialization_type,
         organization_id=organization_id,
         scope=scope,
+        archimate_element_id=archimate_element_id,
         **extra_fields,
     )
     db.session.add(cap)
-    db.session.flush()  # Get ID without committing
+    if flush:
+        db.session.flush()  # Get ID without committing
     return cap, True

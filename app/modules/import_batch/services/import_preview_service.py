@@ -19,9 +19,9 @@ from app.models.batch_import import BatchImportApplication, BatchImportJob
 from app.modules.import_batch.v2.services.duplicate_detection_utils_v2 import (
     DuplicateDetectionUtils,
 )
+from app.services.application_status import status_cell
 from app.services.application_cost_accessor import (
     detect_cost_columns,
-    get_reporting_currency,
     map_import_cost_columns,
 )
 
@@ -155,6 +155,11 @@ class ImportPreviewService:
             clean_rows = []
             for row in applications_data:
                 clean = {k: v for k, v in row.items() if not k.startswith("_")}
+                if "deployment_status" not in clean:
+                    # A file headed Status or Application Status is validated as the status.
+                    found, cell = status_cell(clean)
+                    if found:
+                        clean["deployment_status"] = cell
                 clean_rows.append(clean)
 
             ImportValidator = _get_import_validator()
@@ -397,7 +402,9 @@ class ImportPreviewService:
             import_row = row.get("_import_row", 0)
             app_name = row.get("_app_name", "")
 
-            parsed = map_import_cost_columns(row, column_mapping, reporting_currency=get_reporting_currency())
+            from config import CurrencyConfig
+
+            parsed = map_import_cost_columns(row, column_mapping, reporting_currency=CurrencyConfig.get_org_currency_code())
 
             has_cost = bool(parsed["cost_fields"])
             has_errors = bool(parsed["cost_errors"])

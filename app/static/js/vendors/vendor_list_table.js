@@ -20,12 +20,19 @@
             // hasActiveFilters) are non-enumerable and Object.assign drops them.
             return Platform.dataTable.extend(
                 Platform.dataTable.mixin({
-                    apiUrl:     '/api/vendors/list',
+                    apiUrl:     '/api/vendors/register',
                     perPage:    25,
                     itemsKey:   'vendors',
                     storageKey: 'vendor-list'
                 }),
                 {
+                    // Which tab is showing: the vendors, or the systems still to be mapped.
+                    tab: 'vendors',
+
+                    showTab: function (name) {
+                        this.tab = name;
+                    },
+
                     // ── Edit form state ───────────────────────────────
                     editForm: {
                         name:           '',
@@ -53,6 +60,7 @@
 
                     // ── Init ──────────────────────────────────────────
                     init: function () {
+                        if (new URLSearchParams(window.location.search).get('tab') === 'mapping') this.tab = 'mapping';
                         this._tableInit();
                     },
 

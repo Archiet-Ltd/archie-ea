@@ -92,11 +92,129 @@
        where the payload is model output or extracted document content.
        Falls back to escaped plain text if DOMPurify is unavailable - degraded
        formatting is an acceptable outcome; unsanitised HTML is not. */
-    function renderMarkdown(text) {
+    function renderMarkdown(text, sources) {
         if (window.DOMPurify && window.marked) {
-            return DOMPurify.sanitize(marked.parse(text == null ? '' : String(text)));
+            var raw = referencesAsLinks(text == null ? '' : String(text), sources);
+            return externalLinksInNewTab(tidyAnswerMarkup(DOMPurify.sanitize(marked.parse(raw))));
         }
         return escapeForHtml(text);
+    }
+
+    /* The model marks each record it relied on as [ref:<id>], and sometimes writes a space after
+       the colon or lists several ids in one marker. A reader sees a link, not the marker: to the
+       record's page when the turn's sources name it, otherwise to the stored answer (an address) or
+       the answer about that element (a number). An id that reaches no record is dropped, never shown
+       as text. When the sentence already says the record's name just before the marker, the name
+       becomes the link instead of being written twice. */
+    function referencesAsLinks(text, sources) {
+        var list = Array.isArray(sources) ? sources : [];
+        var marker = /\[ref:([^\]]*)\]/gi;
+        var out = '';
+        var pos = 0;
+        var m;
+        var closing = '';
+        while ((m = marker.exec(text))) {
+            closing = '';
+            out += text.slice(pos, m.index);
+            pos = m.index + m[0].length;
+            var links = [];
+            m[1].split(/[\s,;]+/).filter(Boolean).forEach(function (id) {
+                var found = list.filter(function (s) { return s && String(s.id) === id && s.url; })[0];
+                var url = found ? found.url
+                    : /^[0-9a-f]{16,}$/i.test(id) ? '/intelligence/answers/' + id
+                    : /^\d+$/.test(id) ? '/intelligence/answers/element/' + id
+                    : '';
+                if (!url) return;
+                var name = found && found.name ? String(found.name).replace(/[\[\]]/g, '') : '';
+                if (name && links.length === 0) {
+                    var trimmed = out.replace(/[\s*_`"'\u201d]+$/, '');
+                    var tail = out.slice(trimmed.length);
+                    var cut = trimmed.length - name.length;
+                    // The name counts only as a whole word: "ApplePay" is not the record "Pay".
+                    if (cut >= 0 && trimmed.toLowerCase().slice(cut) === name.toLowerCase()
+                        && !/[\p{L}\p{N}_]$/u.test(trimmed.slice(0, cut))) {
+                        var before = trimmed.slice(0, cut);
+                        var opener = before.match(/[*_`"'\u201c]+$/);
+                        if (opener) {
+                            // The marks wrapped the name alone: they go with the name, as a pair.
+                            out = before.slice(0, before.length - opener[0].length);
+                        } else {
+                            // The bold covers more than the name: keep it whole, close it after the link.
+                            out = before;
+                            var closer = tail.match(/(\*\*|__|\*|_)/);
+                            if (closer) {
+                                var line = before.slice(before.lastIndexOf('\n') + 1);
+                                if (line.split(closer[1]).length % 2 === 0) closing = closer[1];
+                            }
+                        }
+                    }
+                }
+                links.push('[' + (name || 'View the record') + '](' + url + ')');
+            });
+            if (links.length) out += links.join(', ') + closing;
+            else if (/^[.,;:!?]/.test(text.slice(pos))) out = out.replace(/\s+$/, '');
+        }
+        return out + text.slice(pos);
+    }
+
+    /* While an answer is still arriving, a marker that has not closed yet is not text for the reader. */
+    function withoutOpenMarker(text) {
+        return text.replace(/\[(?:r(?:e(?:f(?::[^\]]*)?)?)?)?$/i, '');
+    }
+
+    /* Names and addresses the model wrote between backticks are code, not text with backticks in it:
+       no backtick is drawn around them, a stray one is removed, and an answer address becomes a link to that answer.
+       A page path the product serves (`/solutions`) becomes a link named for the page (Solutions). */
+    function tidyAnswerMarkup(html) {
+        var holder = document.createElement('div');
+        holder.innerHTML = html;
+        var pagePaths = window.chatKnownPages || {};
+        holder.querySelectorAll('code').forEach(function (c) {
+            // A fenced block is shown exactly as written: its indentation and backticks are the code.
+            if (c.closest('pre')) return;
+            var t = c.textContent.replace(/^[\s`]+|[\s`]+$/g, '');
+            c.textContent = t;
+            // The answer style draws a backtick before and after code; a name reads as a name.
+            c.classList.add('not-prose', 'font-mono', 'font-semibold', 'break-all');
+            if (/^\/intelligence\/answers\/[0-9a-f]{16,}$/i.test(t) && !c.closest('a')) {
+                var a = document.createElement('a');
+                a.setAttribute('href', t);
+                a.className = 'underline hover:no-underline';
+                c.parentNode.insertBefore(a, c);
+                a.appendChild(c);
+            } else if (Object.prototype.hasOwnProperty.call(pagePaths, t.replace(/\/$/, '')) && !c.closest('a')) {
+                var a = document.createElement('a');
+                a.setAttribute('href', t);
+                a.className = 'underline hover:no-underline';
+                a.textContent = pagePaths[t.replace(/\/$/, '')];
+                c.parentNode.replaceChild(a, c);
+            }
+        });
+        var walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
+        var node;
+        while ((node = walker.nextNode())) {
+            if (node.nodeValue.indexOf('`') !== -1 && !(node.parentNode.closest && node.parentNode.closest('pre'))) {
+                node.nodeValue = node.nodeValue.replace(/`/g, '');
+            }
+        }
+        return holder.innerHTML;
+    }
+
+    /* A link in an answer that leaves this site (a file on GitHub, a source page) opens in
+       a new tab, marked noopener noreferrer, so reading a citation never replaces the
+       conversation. Links within the product stay where they are. */
+    function externalLinksInNewTab(html) {
+        var holder = document.createElement('div');
+        holder.innerHTML = html;
+        holder.querySelectorAll('a[href]').forEach(function (a) {
+            var url;
+            try { url = new URL(a.getAttribute('href'), window.location.href); } catch (e) { return; }
+            if ((url.protocol === 'http:' || url.protocol === 'https:') && url.origin !== window.location.origin) {
+                a.setAttribute('target', '_blank');
+                a.setAttribute('rel', 'noopener noreferrer');
+            }
+        });
+        return holder.innerHTML;
     }
 
     /* Records the answer was actually built from.
@@ -210,7 +328,19 @@
         var cited = Array.isArray(sources) && sources.length > 0;
 
         var state, summary;
-        if (ran) {
+        if (o.restored && !ran && !cited && !o.fromRecords) {
+            /* A reply opened again from the saved conversation: what it read was not kept, so no
+               claim is made either way. */
+            return '';
+        }
+        if (o.fromRecords) {
+            state = 'records';
+            summary = 'Answered from your organisation\'s records.';
+        } else if (o.paused) {
+            /* The platform's pause: nothing was read, nothing answered, so no source is claimed. */
+            state = 'paused';
+            summary = 'Answers are paused; nothing was read for this reply.';
+        } else if (ran) {
             state = 'retrieved';
             summary = trail.length + (trail.length === 1 ? ' lookup' : ' lookups')
                     + (cited ? ', ' + sources.length + ' record' + (sources.length === 1 ? '' : 's') + ' cited' : '');
@@ -244,7 +374,16 @@
            Unretrieved states have to reach a screen-reader user with the same
            prominence as Retrieved, because those are the ones that change
            whether an answer can be taken to an ARB. */
-        var icon = state === 'retrieved' ? 'database' : (state === 'context' ? 'layers' : 'help-circle');
+        var icon = (state === 'retrieved' || state === 'records') ? 'database' : (state === 'context' ? 'layers' : (state === 'paused' ? 'pause' : 'help-circle'));
+        if (!ran && !cited && state === 'records') {
+            /* Nothing was stored to show, so the line is a statement and not a control. */
+            return '<div class="mt-3 pt-2 border-t border-border text-xs text-muted-foreground">' +
+                     '<span class="inline-flex items-center gap-1.5">' +
+                       '<i data-lucide="' + icon + '" class="h-3 w-3" aria-hidden="true"></i>' +
+                       '<span>' + escapeForHtml(summary) + '</span>' +
+                     '</span>' +
+                   '</div>';
+        }
         return '<div class="mt-3 pt-2 border-t border-border text-xs">' +
                  '<button type="button" class="js-evidence-toggle inline-flex items-center gap-1.5 ' +
                     'text-muted-foreground hover:text-foreground transition-colors" ' +
@@ -364,46 +503,66 @@
                '</div>';
     }
 
-    /* Pending approvals, attached to the answer that caused them rather than to
-       a badge in the header. Uses the endpoints the live modal already calls —
-       approval_modal.js — not approval_gate's 202 payload, which is a different
-       mechanism. The header modal stays as the roll-up.
-
-       The requester who triggers this card can never be the one who approves
-       it: AIChatApprovalService.get_approver_queue() deliberately excludes the
-       actor's own requests (dual control / segregation of duties), so the
-       modal this card's button opens will always read "No approvals waiting
-       for your review" for the person looking at their own pending card. A
-       "Review" button that always opens an empty modal for the only person
-       who can see this card reads as broken, not as enforcing a control -
-       state whose queue it is and who can act on it instead of offering a
-       dead-looking control. */
-    function renderPendingApprovals(pending) {
-        if (!Array.isArray(pending) || pending.length === 0) return '';
-        var rows = pending.map(function (p) {
-            return '<li class="py-0.5">' +
-                     escapeForHtml(String(p.operation_type || 'change')) + ' ' +
-                     escapeForHtml(String(p.entity_type || '')) +
-                     (p.summary ? ' — ' + escapeForHtml(p.summary) : '') +
+    /* What the server did with each change this answer asked for, attached to the answer that caused
+       it. The server checks the change, has a model other than the drafter review it, and applies it
+       or declines it in the same turn, so the card reads "Applied: ..." or "Declined: ..." with a link
+       to the record that shows the checks, the rounds, both models and every reason. A change that
+       could not be reviewed yet reads "In review" and is settled without anyone being asked to approve
+       it. */
+    function renderPendingApprovals(changes) {
+        if (!Array.isArray(changes) || changes.length === 0) return '';
+        var tones = {
+            applied: { box: 'border-success/30 bg-success/10', icon: 'check', color: 'text-success', word: 'Applied' },
+            declined: { box: 'border-destructive/30 bg-destructive/10', icon: 'circle-x', color: 'text-destructive', word: 'Declined' },
+            in_review: { box: 'border-warning/30 bg-warning/10', icon: 'clock', color: 'text-warning', word: 'In review' }
+        };
+        var rows = changes.map(function (c) {
+            var tone = tones[c.state] || tones.in_review;
+            var detail;
+            if (c.state === 'declined') {
+                detail = (c.reasons && c.reasons.length ? c.reasons.join(' ') : (c.summary || ''));
+            } else if (c.state === 'applied') {
+                detail = c.summary || '';
+            } else {
+                /* Named in plain words, so two changes waiting together can be told apart. */
+                var what = String(c.plain || '').trim();
+                detail = (what ? 'Checking this change: ' + what.replace(/\.$/, '') + '. ' : 'Checking this change. ') +
+                    (c.reasons && c.reasons.length ? c.reasons.join(' ') : '');
+            }
+            var link = c.record_url
+                ? ' <a href="' + escapeForHtml(c.record_url) + '" class="underline hover:no-underline" ' +
+                  'data-testid="change-record-link">See how it was checked</a>'
+                : '';
+            return '<li class="flex items-start gap-2 py-1" data-testid="change-verdict" data-state="' +
+                     escapeForHtml(String(c.state || 'in_review')) + '">' +
+                     '<i data-lucide="' + tone.icon + '" class="h-3.5 w-3.5 mt-0.5 shrink-0 ' + tone.color + '" aria-hidden="true"></i>' +
+                     '<span><strong class="font-medium text-foreground">' + tone.word + ':</strong> ' +
+                       escapeForHtml(String(detail).trim()) + link + '</span>' +
                    '</li>';
         }).join('');
-        return '<div class="mt-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs" role="status">' +
-                 '<div class="font-medium text-warning-emphasis mb-1">' +
-                   pending.length + ' change' + (pending.length === 1 ? '' : 's') + ' awaiting approval' +
-                 '</div>' +
+        var worst = changes.some(function (c) { return c.state === 'declined'; }) ? 'declined'
+                  : changes.some(function (c) { return c.state === 'in_review'; }) ? 'in_review' : 'applied';
+        return '<div class="mt-3 rounded-md border ' + tones[worst].box + ' px-3 py-2 text-xs" role="status" ' +
+                 'data-testid="change-verdicts">' +
                  '<ul class="list-none p-0 m-0 text-muted-foreground">' + rows + '</ul>' +
-                 '<p class="mt-1.5 text-muted-foreground">' +
-                   'You requested ' + (pending.length === 1 ? 'this' : 'these') + ' — a different reviewer in your ' +
-                   'organization must approve it from their own Approvals for review menu before it executes.' +
-                 '</p>' +
                '</div>';
     }
 
     /* The assistant's own "couldn't be completed" text already names Admin
-       -> API Settings, but as plain text a reader cannot click through from.
+       -> AI settings, but as plain text a reader cannot click through from.
        This is the pointer the brief asks for, attached below the message
        rather than parsed out of it — no assumption about the exact wording
        survives a copy edit to agent_runner.py's fallback strings. */
+    /* The way to the provider settings is a secondary link for an administrator
+       only; the page sets window.chatIsAdmin from the same check the sidebar uses. */
+    function adminProviderLink(ownKeyOnly) {
+        if (!window.chatIsAdmin) return '';
+        /* A failed reply points to the keys only when the organisation has its own key to look at;
+           on the built-in AI there is nothing there to fix. */
+        if (ownKeyOnly && !window.chatOwnKeyAdmin) return '';
+        return '<a href="/admin/api-settings" data-testid="chat-provider-settings-link" class="mt-1 inline-flex items-center gap-1 underline hover:no-underline">Check the AI provider settings</a>';
+    }
+
     function renderApiSettingsNotice(error) {
         if (!error) return '';
         return '<div class="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive-emphasis" role="alert">' +
@@ -411,9 +570,7 @@
                    '<i data-lucide="alert-circle" class="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true"></i>' +
                    '<div class="flex-1">' +
                      '<div class="font-medium">This reply could not be completed as requested.</div>' +
-                     '<a href="/admin/api-settings" class="mt-1 inline-flex items-center gap-1 underline hover:no-underline">' +
-                       'Open Admin → API Settings' +
-                     '</a>' +
+                     adminProviderLink(true) +
                    '</div>' +
                  '</div>' +
                '</div>';
@@ -426,6 +583,9 @@
         return renderApiSettingsNotice(m.error) +
                renderEvidence(m.trail, m.sources, {
                    contextUsed: m.contextUsed,
+                   paused: m.paused,
+                   restored: m.restored,
+                   fromRecords: m.fromRecords,
                    domainLabel: m.domain
                }) +
                renderReceipts(m.actions) +
@@ -497,7 +657,7 @@
         var bubble = isAi
             ? '<div class="rounded-xl ' + (isAiError ? 'bg-destructive/10 text-destructive-emphasis' : 'bg-muted/50') + ' p-4 text-sm prose max-w-3xl">' +
                 renderMetaBadge(metadata) +
-                '<div class="message-content">' + renderMarkdown(text) + '</div>' +
+                '<div class="message-content">' + renderMarkdown(text, metadata.sources) + '</div>' +
                 renderAnswerFooter(metadata) +
               '</div>'
             : '<div class="rounded-xl bg-primary text-primary-foreground p-4 text-sm max-w-3xl">' +
@@ -505,6 +665,17 @@
               '</div>';
 
         div.innerHTML = avatar + bubble;
+        if (isAi) {
+            /* A slash command an answer offers (the closest recorded names) is run by a click or Enter. */
+            div.querySelectorAll('.message-content code').forEach(function (code) {
+                if (!/^\/[a-z-]+ \S/.test(code.textContent)) return;
+                code.setAttribute('role', 'button');
+                code.setAttribute('tabindex', '0');
+                code.setAttribute('data-run-command', code.textContent);
+                code.classList.add('cursor-pointer', 'underline');
+            });
+        }
+        if (isAi && metadata.genomeHtml) applyGenomeAnswer(div, metadata.genomeHtml);
         if (container) container.appendChild(div);
 
         // ENT-122: inject "Open in Composer" button for ArchiMate responses
@@ -574,11 +745,11 @@
        3.30 on its own tint (DESIGN.md). */
     /* `opts.adminLink` adds the route to the remedy for failures an ordinary
        user cannot retry their way out of — chiefly the no-provider 503 from
-       FeatureFlagService.require_ai_for_route, where the server says "LLM
-       provider must be configured" and Retry can only fail again forever.
-       Offering Retry there is worse than offering nothing: it implies the
-       failure is transient. Callers pass a link INSTEAD of a retry for
-       configuration faults, and a retry for transient ones. */
+       FeatureFlagService.require_ai_for_route, where the server reports the
+       organisation has not set up an AI provider and Retry can only fail
+       again forever. Offering Retry there is worse than offering nothing: it
+       implies the failure is transient. Callers pass a link INSTEAD of a
+       retry for configuration faults, and a retry for transient ones. */
     function appendError(message, onRetry, opts) {
         var o = opts || {};
         var div = document.createElement('div');
@@ -588,9 +759,7 @@
             '<div class="flex items-start gap-2">' +
               '<i data-lucide="alert-circle" class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"></i>' +
               '<div class="flex-1"><p>' + escapeForHtml(message) + '</p>' +
-                (o.adminLink
-                    ? '<a href="/admin/api-settings" class="mt-1 inline-flex items-center gap-1 underline hover:no-underline">Open Admin → API Settings</a>'
-                    : '') +
+                (o.ownKeyLink ? adminProviderLink(true) : o.adminLink ? adminProviderLink() : '') +
               '</div>' +
               (onRetry ? '<button type="button" class="js-retry inline-flex items-center rounded-md border border-input bg-background px-3 py-1 text-xs font-medium hover:bg-accent">Retry</button>' : '') +
             '</div>';
@@ -605,6 +774,75 @@
         scrollToBottom();
         if (window.lucide) lucide.createIcons();
         return div;
+    }
+
+    /* The one way a drawn estate answer is made safe to insert as markup: sanitised, with
+       the link target kept so a citation to the source (the file on GitHub) opens in a new
+       tab and the conversation stays where it is, and every such link marked noopener
+       noreferrer. Returns '' when the sanitiser is not loaded. */
+    function sanitiseAnswerHtml(html) {
+        if (!window.DOMPurify) return '';
+        var holder = document.createElement('div');
+        holder.innerHTML = DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
+        holder.querySelectorAll('a[target="_blank"]').forEach(function (a) { a.setAttribute('rel', 'noopener noreferrer'); });
+        return holder.innerHTML;
+    }
+
+    /* The cited answer cards for an estate question. The HTML is drawn on the
+       server from the stored answer; it is sanitised again here because it is
+       inserted as markup. */
+    function appendAnswerCards(html) {
+        var div = document.createElement('div');
+        div.className = 'flex gap-4';
+        div.setAttribute('data-testid', 'estate-answer');
+        div.innerHTML = avatarHtml() +
+            '<div class="min-w-0 max-w-3xl flex-1">' + sanitiseAnswerHtml(html) + '</div>';
+        var container = messages();
+        if (container) container.appendChild(div);
+        bindApplicationChange(div);
+        scrollToBottom();
+        if (window.lucide) lucide.createIcons();
+        return div;
+    }
+
+    /* A change to an application shown for approval: Save sends the signed change
+       the card carries and puts what the server says in the card's place; Cancel
+       says nothing was changed. */
+    function bindApplicationChange(div) {
+        var card = div.querySelector('[data-application-change="preview"]');
+        if (!card) return;
+        var save = card.querySelector('[data-application-change-save]');
+        var cancel = card.querySelector('[data-application-change-cancel]');
+        var problem = card.querySelector('[data-change-error]');
+        var token = card.getAttribute('data-change-token');
+        function setDisabled(flag) {
+            if (save) save.disabled = flag;
+            if (cancel) cancel.disabled = flag;
+        }
+        if (save) save.addEventListener('click', function () {
+            setDisabled(true);
+            if (problem) problem.hidden = true;
+            ArchieChat.transport.confirmApplicationChange(token).then(function (data) {
+                var holder = card.parentNode;
+                holder.innerHTML = sanitiseAnswerHtml(data.html);
+                if (window.lucide) lucide.createIcons();
+            }).catch(function () {
+                setDisabled(false);
+                if (problem) {
+                    problem.textContent = 'The change could not be saved just now. Nothing was changed. Press Save to try again.';
+                    problem.hidden = false;
+                }
+            });
+        });
+        if (cancel) cancel.addEventListener('click', function () {
+            var actions = card.querySelector('[data-application-change-save]');
+            if (actions && actions.parentNode) {
+                actions.parentNode.replaceWith(Object.assign(document.createElement('p'), {
+                    className: 'mt-4 text-sm text-muted-foreground',
+                    textContent: 'Cancelled. Nothing was changed.'
+                }));
+            }
+        });
     }
 
     // ------------------------------------------------------- streamed answer
@@ -629,7 +867,7 @@
     function updateStreamedMessage(el, text) {
         if (!el) return;
         var body = el.querySelector('.message-content');
-        if (body) body.innerHTML = renderMarkdown(text);
+        if (body) body.innerHTML = renderMarkdown(withoutOpenMarker(text == null ? '' : String(text)));
         scrollToBottom();
     }
 
@@ -637,11 +875,24 @@
        whole element and re-appended a fresh one through appendMessage, so the
        transcript flashed and jumped on every completion — at the exact moment
        the reader had started reading. */
+    /* An answer that read the organisation's model is drawn on the server: its
+       links are built from the records the model was given, never from the model's
+       text, and it carries the AI notice and the time the facts were read. It is
+       sanitised again here because it is inserted as markup. */
+    function applyGenomeAnswer(el, html) {
+        var body = el.querySelector('.message-content');
+        if (!body || !window.DOMPurify) return false;
+        body.innerHTML = externalLinksInNewTab(DOMPurify.sanitize(html));
+        el.setAttribute('data-testid', 'genome-answer');
+        return true;
+    }
+
     function finaliseStreamedMessage(el, text, meta) {
         if (!el) return null;
         meta = meta || {};
         var body = el.querySelector('.message-content');
-        if (body) body.innerHTML = renderMarkdown(text);
+        if (body) body.innerHTML = renderMarkdown(text, meta.sources);
+        if (meta.genomeHtml) applyGenomeAnswer(el, meta.genomeHtml);
         var caret = el.querySelector('.stream-caret');
         if (caret) caret.remove();
         el.removeAttribute('aria-busy');
@@ -691,6 +942,8 @@
         renderAnswerFooter: renderAnswerFooter,
         appendSystemMessage: appendSystemMessage,
         appendError: appendError,
+        appendAnswerCards: appendAnswerCards,
+        sanitiseAnswerHtml: sanitiseAnswerHtml,
         beginStreamedMessage: beginStreamedMessage,
         updateStreamedMessage: updateStreamedMessage,
         finaliseStreamedMessage: finaliseStreamedMessage,

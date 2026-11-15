@@ -546,7 +546,7 @@
                          this.relChatUnresolved = [];
                          return Platform.fetch.post('/api/solutions/' + this.relSid + '/relationships/extract', { message: this.relChatMsg }, { silent: true })
                              .then(function (d) {
-                                 self.relChatProposals = ((d && d.proposals) || []).map(p => ({...p, checked: (p.confidence || 0) >= 80}));
+                                 self.relChatProposals = ((d && d.proposals) || []).map(p => ({...p, checked: Platform.figure.num(p.confidence) >= 80}));
                                  self.relChatUnresolved = (d && d.unresolved) || [];
                                  if (self.relChatProposals.length === 0 && self.relChatUnresolved.length === 0) {
                                      self.relChatError = 'No relationships could be extracted. Try being more specific about element names.';
@@ -649,8 +649,8 @@
                                           x-text="(p.relationship_type || '').charAt(0).toUpperCase() + (p.relationship_type || '').slice(1)"></span>
                                     <span class="font-medium text-foreground" x-text="p.target_name"></span>
                                     <span class="ml-auto inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border"
-                                          :class="relConfBadge(p.confidence || 0)"
-                                          x-text="(p.confidence || 0) + '%'"></span>
+                                          :class="relConfBadge(p.confidence)"
+                                          x-text="Platform.figure.percent(p.confidence)"></span>
                                 </div>
                             </template>
                         </div>

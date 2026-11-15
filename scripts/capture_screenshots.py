@@ -46,6 +46,7 @@ import argparse
 import json
 import os
 import pathlib
+import shutil
 import socket
 import subprocess
 import sys
@@ -83,10 +84,28 @@ def main() -> int:
                              "pages -- see the module docstring. Ignores every other "
                              "flag above except --out, which it reinterprets as the "
                              "repo root's static asset tree is used instead.")
+    parser.add_argument("--help-clips", action="store_true",
+                        help="record the \"See how\" clips the first empty screens offer, in the "
+                             "demonstration organisation -- see scripts/capture/help_clips.py. "
+                             "Re-run after each release.")
+    parser.add_argument("--only", default="",
+                        help="with --help-clips: the clip keys to record, comma separated (default: all six); "
+                             "with --modules --clips-only: the module slugs to record (default: every module "
+                             "with a storyboard)")
+    parser.add_argument("--clips-only", action="store_true",
+                        help="with --modules: record only the whole-journey module recordings -- see "
+                             "scripts/capture/module_clips.py -- and leave the screenshots as they are")
+    parser.add_argument("--with-duplicate-copy", action="store_true",
+                        help="with --modules: also add a copy of one system so the duplicate detection page has an "
+                             "overlap to show. It is a twentieth system a new customer does not have, so leave it "
+                             "off for every other picture")
     args = parser.parse_args()
 
     if args.modules:
-        return run_public_pages_capture()
+        return run_public_pages_capture(with_duplicate_copy=args.with_duplicate_copy, clips_only=args.clips_only,
+                                        only=[k for k in args.only.split(",") if k] or None)
+    if args.help_clips:
+        return run_help_clips_capture(only=[k for k in args.only.split(",") if k] or None)
 
     try:
         from playwright.sync_api import sync_playwright
@@ -173,6 +192,7 @@ sys.path.insert(0, str(REPO))
 # constants.
 from app.services.public_pages import (  # noqa: E402
     APP_MANAGER_PERSONA as APP_MANAGER_EMAIL,
+    IMG_HELP_DIR,
     IMG_MODULES_DIR,
     IMG_USE_CASES_DIR,
     ITOPS_ADMIN_PERSONA as ITOPS_ADMIN_EMAIL,
@@ -183,9 +203,13 @@ from app.services.public_pages import (  # noqa: E402
     VIDEO_USE_CASES_DIR,
 )
 from app.services.public_pages import DEMO_PERSONA as DEMO_EMAIL  # noqa: E402
+from scripts.capture.clip_kit import (  # noqa: E402
+    compress_to_webp,
+    encode_recording,
+    extract_poster,
+    ffprobe_duration_seconds as _ffprobe_duration_seconds,
+)
 
-MAX_IMAGE_BYTES = 200 * 1024
-MAX_VIDEO_BYTES = 3 * 1024 * 1024
 IMAGE_CAPTURE_VIEWPORT = {"width": 1440, "height": 900}
 IMAGE_TARGET_WIDTH = 1200
 VIDEO_VIEWPORT = {"width": 1280, "height": 800}
@@ -197,7 +221,38 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
+def _complete_overlapping_copy(code: str = "LQ-DOCMGMT-DUP") -> None:
+    """The overlapping copy of Document Management is a real system in the portfolio, so it carries what every
+    other system carries: the same vendor, owner and capability as the one it overlaps. Without them the
+    Applications list opens on a "1 of 20 have no owner, capability or vendor" warning that is about this
+    capture, not the product. Idempotent: a value or link that exists is left as it is."""
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+
+    copy = ApplicationComponent.query.filter_by(application_code=code).first()
+    if copy is None:
+        return
+    source = (ApplicationComponent.query.filter_by(name=copy.name)
+              .filter(ApplicationComponent.id != copy.id).order_by(ApplicationComponent.id).first())
+    if source is None:
+        return
+    from app.models.application_owner import ApplicationOwner
+    from app.models.application_capability import ApplicationCapabilityMapping
+
+    for column in ("vendor_name", "vendor_organization_id", "vendor_product_id", "component_type", "business_domain"):
+        if getattr(copy, column) in (None, ""):
+            setattr(copy, column, getattr(source, column))
+    for model, link in ((ApplicationOwner, "application_id"), (ApplicationCapabilityMapping, "application_component_id")):
+        if model.query.filter(getattr(model, link) == copy.id).first():
+            continue
+        for row in model.query.filter(getattr(model, link) == source.id).all():
+            values = {c.name: getattr(row, c.name) for c in model.__table__.columns if not c.primary_key}
+            values[link] = copy.id
+            db.session.add(model(**values))
+    db.session.flush()
+
+
+def _seed_module_screen_data(org_id: int, demo_user_id: int, with_duplicate_copy: bool = False) -> None:
     """Fill in the modules seed_demo_company() doesn't reach.
 
     That command builds Lantern Quay Systems' ArchiMate model, applications,
@@ -235,47 +290,11 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         apps = _resolve_apps(org_id)
         caps = _resolve_caps(org_id)
 
-        # ── ARB review items (arb.dashboard reads ARBReviewItem) ───────────
-        from app.models.architecture_review_board import ARBReviewItem
+        # The board's reviews come from seed_demo_company (one seed). The capture adds none, so the figures a
+        # picture shows are the seed's.
 
-        arb_rows = [
-            ("REV-2026-001", "Migrate event backbone to a managed message broker",
-             "architecture_change", "submitted", "high"),
-            ("REV-2026-002", "Consolidate supplier onboarding into Supplier Portal",
-             "architecture_change", "under_review", "medium"),
-            ("REV-2026-003", "Adopt predictive maintenance for field service",
-             "architecture_change", "approved", "high"),
-            ("REV-2026-004", "Retire the manual inventory reconciliation spreadsheet",
-             "architecture_change", "rejected", "low"),
-        ]
-        for number, title, review_type, status, priority in arb_rows:
-            if ARBReviewItem.query.filter_by(review_number=number).first():
-                continue
-            db.session.add(ARBReviewItem(
-                review_number=number, title=title, review_type=review_type,
-                status=status, priority=priority, submitter_id=demo_user_id,
-                submitted_at=_dt.datetime.utcnow() - _dt.timedelta(days=14),
-            ))
-        db.session.flush()
-
-        # ── Business cases (business_case.index reads BusinessCase) ────────
-        from app.models.business_case import BusinessCase
-
-        case_rows = [
-            ("Automate calibration batch release", "draft", 450000, 95000, 820000, 22.5, 18),
-            ("Migrate the event backbone to the cloud", "submitted", 210000, 48000, 610000, 31.0, 14),
-            ("Consolidate the supplier panel", "approved", 95000, 15000, 240000, 18.0, 24),
-        ]
-        for title, status, capex, opex, benefit, roi, payback in case_rows:
-            if BusinessCase.query.filter_by(title=title).first():
-                continue
-            db.session.add(BusinessCase(
-                title=title, description=f"Business case: {title.lower()}.",
-                status=status, capex=capex, opex_annual=opex,
-                financial_benefit_annual=benefit, roi_percentage=roi,
-                payback_months=payback, created_by_id=demo_user_id,
-            ))
-        db.session.flush()
+        # Business cases come from seed_demo_company (one seed): three cases with their options, recommendation and
+        # three-year cost and return, tied to the solutions they support.
 
         # ── Business model canvas (business_model.index) ───────────────────
         from app.models.business_model import BusinessModelCanvas
@@ -317,38 +336,44 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         db.session.flush()
 
         # ── Duplicate detection: one real duplicate, then run it ───────────
-        from app.models.application_portfolio import ApplicationComponent
+        # Only when asked: the copy is a twentieth system a new customer does not have, so it would change the
+        # figures every other picture shows. Pictures of the other modules are taken without it.
+        if with_duplicate_copy:
+            from app.models.application_portfolio import ApplicationComponent
 
-        if not ApplicationComponent.query.filter_by(application_code="LQ-DOCMGMT-DUP").first():
-            source = apps.get("Document Management")
-            db.session.add(ApplicationComponent(
-                name="Document Management",
-                lifecycle_status="active", health_status="healthy",
-                archimate_element_id=source.archimate_element_id if source else None,
-                application_code="LQ-DOCMGMT-DUP",
-                implementation_date=_dt.date(2023, 1, 10),
-                go_live_date=_dt.date(2023, 4, 1),
-                total_cost_of_ownership=60000, license_cost_annual=9000,
-                infrastructure_cost_monthly=1800,
-                business_criticality="medium", strategic_importance="medium",
-            ))
-            db.session.flush()
+            if not ApplicationComponent.query.filter_by(application_code="LQ-DOCMGMT-DUP").first():
+                source = apps.get("Document Management")
+                db.session.add(ApplicationComponent(
+                    name="Document Management",
+                    lifecycle_status="active", health_status="healthy",
+                    archimate_element_id=source.archimate_element_id if source else None,
+                    application_code="LQ-DOCMGMT-DUP",
+                    implementation_date=_dt.date(2023, 1, 10),
+                    go_live_date=_dt.date(2023, 4, 1),
+                    total_cost_of_ownership=60000, license_cost_annual=9000,
+                    infrastructure_cost_monthly=1800,
+                    business_criticality="medium", strategic_importance="medium",
+                ))
+                db.session.flush()
 
-        try:
-            from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
-                UnifiedDuplicateDetectionService,
-            )
+            _complete_overlapping_copy()
 
-            UnifiedDuplicateDetectionService().run_detection(
-                similarity_threshold=0.55, strategy="fast"
-            )
-        except Exception as exc:  # pragma: no cover -- capture-time diagnostic only
-            print(f"  duplicate detection run did not complete: {type(exc).__name__}: {exc}")
+            try:
+                from app.modules.duplicate_detection.services.unified_duplicate_detection_service import (
+                    UnifiedDuplicateDetectionService,
+                )
+
+                UnifiedDuplicateDetectionService().run_detection(
+                    similarity_threshold=0.55, strategy="fast"
+                )
+            except Exception as exc:  # pragma: no cover -- capture-time diagnostic only
+                print(f"  duplicate detection run did not complete: {type(exc).__name__}: {exc}")
 
         # ── Investment priorities (application <-> capability mapping) ─────
         from app.models.unified_application_capability_mapping import (
             UnifiedApplicationCapabilityMapping,
         )
+        from app.services.capability_support import record_support_for_records
 
         app_list = list(apps.values())[:8]
         cap_list = list(caps.values())[:8]
@@ -358,84 +383,13 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             ).first()
             if exists:
                 continue
-            db.session.add(UnifiedApplicationCapabilityMapping(
-                application_component_id=app_row.id, unified_capability_id=cap_row.id,
-            ))
+            record_support_for_records(app_row.organization_id, app_row.id, cap_row.id)
         db.session.flush()
 
-        # ── Portfolio (portfolio.index reads EnterpriseInitiative, NOT
-        #    PortfolioInitiative -- two separate, pre-existing models) ──────
-        from app.models.vendor.vendor_organization import EnterpriseInitiative
+        # The portfolio's initiatives come from seed_demo_company (one seed): seven, each with its benefit and the
+        # objective it serves. A second set made here duplicated four of them under other codes.
 
-        initiative_rows = [
-            ("Calibration Modernisation", "LQ-INIT-CAL", "active", "green", "implementation",
-             62, 450000, 320000, "Chief Operations Officer"),
-            ("Field Service Transformation", "LQ-INIT-FSV", "active", "yellow", "design",
-             35, 280000, 95000, "Head of Engineering"),
-            ("Event Backbone Hardening", "LQ-INIT-EVT", "on_hold", "red", "planning",
-             10, 210000, 40000, "Shared Services Director"),
-            ("Supplier Optimisation", "LQ-INIT-SUP", "completed", "green", "closure",
-             100, 95000, 92000, "Regulatory Compliance Officer"),
-        ]
-        for name, code, status, health, phase, pct, budget, spent, sponsor in initiative_rows:
-            if EnterpriseInitiative.query.filter_by(code=code).first():
-                continue
-            db.session.add(EnterpriseInitiative(
-                name=name, code=code, status=status, health_status=health,
-                current_phase=phase, completion_percentage=pct,
-                approved_budget=budget, spent_to_date=spent,
-                executive_sponsor=sponsor,
-                planned_end_date=_dt.datetime.utcnow() + _dt.timedelta(days=180),
-            ))
-        db.session.flush()
-
-        # ── Vendor catalogue + contracts (vendors, procurement.renewals) ───
-        # VendorOrganization is DELIBERATELY not tenant-scoped (ADR-0003): a
-        # shared, name-unique reference catalogue. This capture runs against
-        # an isolated, throwaway database made only to render these static
-        # images -- never a shared or production database -- so adding
-        # fictional entries here cannot leak into any real install. Names
-        # are invented the same way the rest of the seeded cast is.
-        from app.models.application_portfolio import VendorContract
-        from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
-
-        vendor_rows = [
-            ("Meridian Sensor Systems", "software_vendor", "Calibration Ledger"),
-            ("Calderbrook Cloud Services", "cloud_provider", "Event Transport"),
-            ("Northgate Field Equipment", "systems_integrator", "Field Service Scheduler"),
-        ]
-        vendor_ids = []
-        for name, vendor_type, product_name in vendor_rows:
-            vendor = VendorOrganization.query.filter_by(name=name).first()
-            if vendor is None:
-                vendor = VendorOrganization(name=name, display_name=name, vendor_type=vendor_type)
-                db.session.add(vendor)
-                db.session.flush()
-                db.session.add(VendorProduct(
-                    vendor_organization_id=vendor.id, name=product_name,
-                ))
-            vendor_ids.append(vendor.id)
-        db.session.flush()
-
-        today = _dt.date.today()
-        contract_rows = [
-            ("Calibration Ledger support contract", today.replace(year=today.year - 1),
-             today + _dt.timedelta(days=15), vendor_ids[0]),
-            ("Event Transport hosting agreement", today.replace(year=today.year - 2),
-             today + _dt.timedelta(days=45), vendor_ids[1]),
-            ("Field Service Scheduler licence", today.replace(year=today.year - 1),
-             today + _dt.timedelta(days=100), vendor_ids[2]),
-            ("Calibration Ledger disaster-recovery add-on",
-             today.replace(year=today.year - 1), today + _dt.timedelta(days=200), vendor_ids[0]),
-        ]
-        for name, start, renewal, vendor_id in contract_rows:
-            if VendorContract.query.filter_by(contract_name=name).first():
-                continue
-            db.session.add(VendorContract(
-                contract_name=name, start_date=start, renewal_date=renewal,
-                status="active", vendor_id=vendor_id, organization_id=org_id,
-            ))
-        db.session.flush()
+        # The vendors and their contract renewals come from seed_demo_company (one seed); the capture adds none.
 
         # ── Work packages (enterprise.work_packages reads WorkPackage, NOT
         #    UnifiedWorkPackage -- two separate, pre-existing models) ──────
@@ -501,7 +455,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
                 name=name, solution_type=solution_type, business_domain=domain,
                 complexity_level=complexity, status=status,
                 governance_status="proposed" if status == "planned" else "approved",
-                solution_owner="Demo User", created_by_id=demo_user_id,
+                solution_owner="Alex Brooks", created_by_id=demo_user_id,
             ))
         db.session.flush()
 
@@ -525,9 +479,9 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
         # No ConnectorConfig seeding: app/services/public_pages.py's
         # MODULE_CAPTURES explains why (api_list_connectors 500s on any
-        # row). sage.itops keeps her Administrator role grant above anyway
-        # -- harmless, and ready for whenever that bug is fixed and this
-        # module's capture_status goes back to live.
+        # row). The Administrator role grant above is harmless meanwhile,
+        # and ready for whenever that bug is fixed and this module's
+        # capture_status goes back to live.
 
         db.session.commit()
 
@@ -540,43 +494,8 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
     IndustryAPQCService().seed_default_frameworks()
 
-    # Regulatory compliance frameworks (dashboard/compliance): standard,
-    # real framework/control names (GDPR, ISO 27001 -- not fictional data,
-    # the same two the page's own empty-state copy names as examples).
-    # RegulatoryFrameworkService.seed_manufacturing_frameworks() is the
-    # product's own default-seed path for this, but its hardcoded fallback
-    # (used when app/data/compliance_frameworks.json is absent, as it is
-    # here) passes ComplianceControl a control_id kwarg that model doesn't
-    # have -- a pre-existing bug in that fallback, out of this brief's
-    # scope to fix. Insert directly instead, with the model's real fields.
-    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
-
-    framework_rows = [
-        ("GDPR", "General Data Protection Regulation", "privacy", "EU", "mandatory",
-         [("Art.30", "Records of processing activities"),
-          ("Art.32", "Security of processing")]),
-        ("ISO-27001", "ISO 27001 Information Security", "security", "Global", "recommended",
-         [("A.9.2.1", "User access provisioning"),
-          ("A.12.1.2", "Change management")]),
-    ]
-    for code, name, category, jurisdiction, enforcement, controls in framework_rows:
-        framework = RegulatoryFramework.query.filter_by(code=code).first()
-        if framework is None:
-            framework = RegulatoryFramework(
-                code=code, name=name, category=category,
-                jurisdiction=jurisdiction, enforcement_level=enforcement,
-            )
-            db.session.add(framework)
-            db.session.flush()
-        for control_code, title in controls:
-            if ComplianceControl.query.filter_by(
-                framework_id=framework.id, control_code=control_code
-            ).first():
-                continue
-            db.session.add(ComplianceControl(
-                framework_id=framework.id, control_code=control_code, title=title,
-            ))
-    db.session.commit()
+    # Regulatory compliance frameworks: the seed holds them (seed_demo_company), and the capture adds none, so
+    # the compliance picture counts the frameworks and controls a new customer has.
 
     # Batch import jobs (batch-import.dashboard): scoped by user_id only, no
     # organization_id column on this model at all.
@@ -596,7 +515,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
     db.session.commit()
 
 
-def _seed_lantern_quay(demo_password: str) -> None:
+def _seed_lantern_quay(demo_password: str, with_duplicate_copy: bool = False) -> None:
     """Seed Lantern Quay Systems and grant three capture-only persona roles.
 
     Calls the existing seed_demo_company() unchanged (app/commands/seed_demo_company.py
@@ -639,7 +558,7 @@ def _seed_lantern_quay(demo_password: str) -> None:
 
         org = Organization.query.filter_by(slug="lantern-quay").first()
         demo_user = User.query.filter_by(email=DEMO_EMAIL).first()
-        _seed_module_screen_data(org.id, demo_user.id)
+        _seed_module_screen_data(org.id, demo_user.id, with_duplicate_copy)
 
 
 def _boot(port: int, log_path: pathlib.Path):
@@ -740,88 +659,6 @@ def _visit_and_check(page, base: str, path: str, label: str):
         )
 
 
-def compress_to_webp(png_bytes: bytes, dest: pathlib.Path, target_width: int,
-                      max_bytes: int = MAX_IMAGE_BYTES) -> tuple[int, int]:
-    """Write a PNG screenshot out as a WebP under max_bytes. Returns (width, height).
-
-    Shrinks width in steps before dropping quality much further than ~40: a
-    smaller-but-crisp image reads better than a full-size, muddier one, for a
-    product screenshot full of small text and icons.
-    """
-    import io
-
-    from PIL import Image
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    im = Image.open(io.BytesIO(png_bytes)).convert("RGB")
-
-    width = min(target_width, im.width)
-    quality = 82
-    while True:
-        height = round(im.height * (width / im.width))
-        resized = im.resize((width, height), Image.LANCZOS)
-        resized.save(dest, format="WEBP", quality=quality, method=6)
-        size = dest.stat().st_size
-        if size <= max_bytes or (quality <= 35 and width <= 480):
-            return width, height
-        if quality > 35:
-            quality -= 12
-        else:
-            width = round(width * 0.85)
-            quality = 60
-
-
-def _ffmpeg(*args: str) -> None:
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", *args]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise SystemExit(f"ffmpeg failed ({' '.join(cmd)}):\n{result.stderr}")
-
-
-def _ffprobe_duration_seconds(path: pathlib.Path) -> float:
-    result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "csv=p=0", str(path)],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        raise SystemExit(f"ffprobe failed on {path}:\n{result.stderr}")
-    return float(result.stdout.strip())
-
-
-def encode_recording(raw_webm: pathlib.Path, dest: pathlib.Path,
-                      width: int = 1280, max_bytes: int = MAX_VIDEO_BYTES) -> None:
-    """Transcode Playwright's raw (VP8) capture to a size-capped VP9 WebM.
-
-    No audio track (Playwright's recording never has one; -an is explicit
-    rather than assumed). Tightens crf upward until the cap is met -- product
-    UI footage with little motion compresses hard, so a wide crf range rarely
-    takes more than one or two passes in practice.
-    """
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    for crf in (32, 36, 40, 44, 48, 52):
-        _ffmpeg(
-            "-i", str(raw_webm),
-            "-an",
-            "-vf", f"scale={width}:-2",
-            "-c:v", "libvpx-vp9",
-            "-crf", str(crf), "-b:v", "0",
-            "-row-mt", "1", "-deadline", "good", "-cpu-used", "2",
-            str(dest),
-        )
-        if dest.stat().st_size <= max_bytes:
-            return
-    raise SystemExit(f"could not encode {raw_webm} under {max_bytes} bytes")
-
-
-def extract_poster(video: pathlib.Path, dest_webp: pathlib.Path, at_seconds: float) -> tuple[int, int]:
-    tmp_png = video.with_suffix(".poster.png")
-    _ffmpeg("-ss", str(at_seconds), "-i", str(video), "-frames:v", "1", str(tmp_png))
-    width, height = compress_to_webp(tmp_png.read_bytes(), dest_webp, target_width=1280)
-    tmp_png.unlink(missing_ok=True)
-    return width, height
-
-
 def _wander(page, points) -> None:
     """A little mouse motion so a recording doesn't look like a frozen photo."""
     for x, y in points:
@@ -832,7 +669,7 @@ def _wander(page, points) -> None:
         page.wait_for_timeout(500)
 
 
-def run_public_pages_capture() -> int:
+def run_public_pages_capture(clips_only: bool = False, only=None, with_duplicate_copy: bool = False) -> int:
     for tool in ("ffmpeg", "ffprobe"):
         if subprocess.run(["where" if os.name == "nt" else "which", tool],
                           capture_output=True).returncode != 0:
@@ -848,9 +685,10 @@ def run_public_pages_capture() -> int:
 
     import secrets
     demo_password = os.environ.get("DEMO_USER_PASSWORD") or secrets.token_urlsafe(18)
+    os.environ["DEMO_USER_PASSWORD"] = demo_password
 
     print("seeding Lantern Quay Systems ...")
-    _seed_lantern_quay(demo_password)
+    _seed_lantern_quay(demo_password, with_duplicate_copy)
 
     port = _free_port()
     scratch = pathlib.Path(os.environ.get("CAPTURE_SCRATCH_DIR",
@@ -873,6 +711,8 @@ def run_public_pages_capture() -> int:
                 image_jobs = [(slug, path, email, IMG_MODULES_DIR) for slug, path, email, _, _ in MODULES]
                 image_jobs += [(slug, path, email, IMG_USE_CASES_DIR)
                                for slug, path, email, _, _ in USE_CASE_SCREENSHOTS]
+                if clips_only:
+                    image_jobs = []
                 for slug, path, email, out_dir in image_jobs:
                     try:
                         context = browser.new_context(viewport=IMAGE_CAPTURE_VIEWPORT)
@@ -890,7 +730,7 @@ def run_public_pages_capture() -> int:
                         failed.append(f"{slug}: {type(exc).__name__}: {exc}")
 
                 # ── use-case recordings ─────────────────────────────────────
-                for slug, steps, email, caption, alt in USE_CASE_VIDEOS:
+                for slug, steps, email, caption, alt in ([] if clips_only else USE_CASE_VIDEOS):
                     try:
                         # Log in outside the recording so the clip is all product,
                         # no login-form filler, then replay the session into the
@@ -943,6 +783,20 @@ def run_public_pages_capture() -> int:
                         print(f"  video  {slug:45s} {size:7d} bytes  {duration:.1f}s")
                     except Exception as exc:
                         failed.append(f"{slug} (video): {type(exc).__name__}: {exc}")
+
+                # ── whole-journey module recordings ─────────────────────────
+                from scripts.capture import module_clips
+                from app import create_app
+                from app.models.organization import Organization
+                from app.models.user import User
+
+                with create_app("testing").app_context():
+                    demo_org_id = User.query.filter_by(email=DEMO_EMAIL).one().organization_id
+                    others = [o.name for o in Organization.query.all() if o.name and o.id != demo_org_id]
+                written, clip_failed = module_clips.record_all(
+                    browser, base, IMG_MODULES_DIR, other_organisation_names=others, only=only)
+                captured_videos += [(pathlib.Path(w).stem, w, pathlib.Path(w).stat().st_size, 0) for w in written]
+                failed += clip_failed
             finally:
                 browser.close()
     finally:
@@ -955,6 +809,77 @@ def run_public_pages_capture() -> int:
     print()
     print(f"images captured: {len(captured_images)}, videos captured: {len(captured_videos)}, "
           f"failed: {len(failed)}")
+    for line in failed:
+        print("  FAILED: " + line)
+    return 0 if not failed else 1
+
+
+def run_help_clips_capture(only=None) -> int:
+    """Record every "See how" clip as the demonstration person, then scan each for secrets and other organisations."""
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        print("ffmpeg and ffprobe are required to record the clips", file=sys.stderr)
+        return 2
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("playwright is not installed: pip install playwright && "
+              "python -m playwright install chromium", file=sys.stderr)
+        return 2
+
+    import secrets
+    from scripts.capture import github_fixture, help_clips
+    from scripts.capture.clip_kit import DEMO_PASSWORD_VARIABLE, DEMO_USER_EMAIL
+
+    demo_password = os.environ.get(DEMO_PASSWORD_VARIABLE) or secrets.token_urlsafe(18)
+    os.environ[DEMO_PASSWORD_VARIABLE] = demo_password
+    print("seeding Lantern Quay Systems ...")
+    _seed_lantern_quay(demo_password)
+
+    from app import create_app
+    from app.models.organization import Organization
+
+    from app.models.user import User
+
+    with create_app("testing").app_context():
+        demo_org_id = User.query.filter_by(email=DEMO_USER_EMAIL).one().organization_id
+        others = [o.name for o in Organization.query.all() if o.name and o.id != demo_org_id]
+
+    scratch = pathlib.Path(os.environ.get("CAPTURE_SCRATCH_DIR", REPO / "scripts" / "_capture_scratch"))
+    scratch.mkdir(parents=True, exist_ok=True)
+    # The server answers GitHub from the recorded organisation, and runs the background read the connect step starts.
+    (scratch / "sitecustomize.py").write_text(github_fixture.SITECUSTOMIZE)
+    os.environ["PYTHONPATH"] = os.pathsep.join(p for p in (str(scratch), os.environ.get("PYTHONPATH", "")) if p)
+    os.environ["ALLOW_EXTERNAL_API_CALLS"] = "true"
+    os.environ["RUN_JOB_WORKER"] = "1"
+    # The testing configuration makes new vault keys at every start, so a connection saved by an earlier
+    # recording could not be read by this one. Keep one pair beside the scratch folder instead.
+    from cryptography.fernet import Fernet
+
+    keys = scratch / "vault-keys.json"
+    if not keys.is_file():
+        keys.write_text(json.dumps({name: Fernet.generate_key().decode() for name in
+                                    ("CREDENTIAL_ENCRYPTION_KEY", "ORG_ENCRYPTION_MASTER_KEY")}))
+        keys.chmod(0o600)
+    for name, value in json.loads(keys.read_text()).items():
+        os.environ.setdefault(name, value)
+    process, base = _boot(_free_port(), scratch / "server.log")
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            try:
+                help_clips.prepare_github_model(browser, base, "recorder-" + secrets.token_hex(8))
+                written, failed = help_clips.record_all(browser, base, IMG_HELP_DIR, other_organisation_names=others, only=only)
+            finally:
+                browser.close()
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+    print()
+    print(f"clips recorded: {len(written)}, failed: {len(failed)}")
     for line in failed:
         print("  FAILED: " + line)
     return 0 if not failed else 1

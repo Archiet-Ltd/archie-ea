@@ -22,14 +22,16 @@ Chief Architect Workbench:
 
 import logging
 
-from flask import current_app, g, jsonify, redirect, render_template, request
+from flask import current_app, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
+from app.services.cost_visibility import ROLLUP_FIGURE_KEYS
 from app.models.solution_models import Solution
 from app.models.strategic import StrategicInitiative
 
 from .solution_design_routes import solution_design_bp
+from app.utils.plain_errors import render_plain_error
 
 logger = logging.getLogger(__name__)
 
@@ -62,15 +64,12 @@ def programmes_list():
 def solution_review_packet(solution_id):
     """Board-ready packet: conformance + decision + readiness for one solution."""
     from app.models.solution_models import Solution
-    from app.modules.solutions_strategic.v2.services.chief_architect_service import (
-        ChiefArchitectService,
-    )
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:
-        return render_template("errors/404.html"), 404
-    packet = ChiefArchitectService.solution_packet(solution_id)
-    return render_template("solutions/review_packet.html", solution=solution, packet=packet)
+        return render_plain_error(404)
+    # The packet is the Review tab of the solution record now.
+    return redirect(url_for("solution_design.view_solution", solution_id=solution_id, tab="review"))
 
 
 @solution_design_bp.route("/<int:solution_id>/review-packet/api", methods=["GET"])
@@ -144,10 +143,8 @@ def _chief_architect_workbench():
 @solution_design_bp.route("/architect-synthesis", methods=["GET"])
 @login_required
 def architect_synthesis():
-    """Enterprise-wide Chief Architect Workbench."""
-    return render_template(
-        "solutions/architect_synthesis.html", synthesis=_chief_architect_workbench()
-    )
+    """The workbench's address now opens the weekly briefing."""
+    return redirect("/solutions/briefings")
 
 
 @solution_design_bp.route("/architect-synthesis/api", methods=["GET"])
@@ -298,17 +295,12 @@ def data_stewardship_classify():
 def solution_conformance(solution_id):
     """AI Technical Architect: conformance review against technical policy."""
     from app.models.solution_models import Solution
-    from app.modules.solutions_strategic.v2.services.conformance_reviewer import (
-        ConformanceReviewer,
-    )
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:
-        return render_template("errors/404.html"), 404
-    review = ConformanceReviewer.review(solution_id)
-    return render_template(
-        "solutions/conformance_review.html", solution=solution, review=review,
-    )
+        return render_plain_error(404)
+    # The findings are on the Review tab of the solution record now.
+    return redirect(url_for("solution_design.view_solution", solution_id=solution_id, tab="review"))
 
 
 @solution_design_bp.route("/<int:solution_id>/conformance/api", methods=["GET"])
@@ -336,7 +328,7 @@ def solution_options(solution_id):
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     latest = SolutionOptionsAdvisor.latest(solution_id)
     return render_template(
         "solutions/options_advisor.html",
@@ -383,7 +375,7 @@ def solution_migration_roadmap(solution_id):
 
     solution = db.session.get(Solution, solution_id)
     if solution is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     latest = MigrationRoadmapAdvisor.latest(solution_id)
     return render_template(
         "solutions/migration_roadmap.html",
@@ -409,37 +401,30 @@ def solution_migration_roadmap_generate(solution_id):
 @solution_design_bp.route("/briefings", methods=["GET"])
 @login_required
 def ea_briefings():
-    """Enterprise Architecture briefing — latest digest + history."""
-    from app.modules.solutions_strategic.v2.services.enterprise_briefing_service import (
-        EnterpriseBriefingService,
-    )
+    """The weekly briefing: this week first, earlier weeks listed."""
+    from app.middleware.tenant_context import current_org_id
+    from app.modules.solutions_strategic.v2.services import weekly_briefing
 
-    latest = EnterpriseBriefingService.latest()
-    history = EnterpriseBriefingService.history()
-    return render_template(
-        "solutions/ea_briefing.html",
-        latest=latest.to_dict() if latest else None,
-        history=[b.to_dict() for b in history],
-    )
+    org_id = current_org_id()
+    if org_id is None:
+        return render_plain_error(404)
+    week = weekly_briefing.parse_week(request.args.get("week"))
+    briefing = weekly_briefing.build(org_id, week)
+    return render_template("solutions/weekly_briefing.html", briefing=briefing)
 
 
 @solution_design_bp.route("/briefings/<int:briefing_id>", methods=["GET"])
 @login_required
 def ea_briefing_detail(briefing_id):
-    """A specific past briefing."""
+    """A stored briefing opens the weekly briefing for the week it was made."""
     from app.models.strategic import EnterpriseBriefing
-    from app.modules.solutions_strategic.v2.services.enterprise_briefing_service import (
-        EnterpriseBriefingService,
-    )
+    from app.modules.solutions_strategic.v2.services import weekly_briefing
 
-    b = db.session.get(EnterpriseBriefing, briefing_id)
-    if b is None:
-        return render_template("errors/404.html"), 404
-    return render_template(
-        "solutions/ea_briefing.html",
-        latest=b.to_dict(),
-        history=[x.to_dict() for x in EnterpriseBriefingService.history()],
-    )
+    stored = db.session.get(EnterpriseBriefing, briefing_id)
+    if stored is None or stored.generated_at is None:
+        return render_plain_error(404)
+    week = weekly_briefing.week_start_for(stored.generated_at.date())
+    return redirect(f"/solutions/briefings?week={week.isoformat()}")
 
 
 @solution_design_bp.route("/briefings/api/generate", methods=["POST"])
@@ -478,7 +463,7 @@ def programme_drift(initiative_id):
 
     rollup = ProgrammeGovernanceService.rollup(initiative_id)
     if rollup is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     snapshots = ProgrammeGovernanceService.list_snapshots(initiative_id, limit=50) or []
     return render_template(
         "solutions/programme_cockpit.html",
@@ -506,7 +491,7 @@ def programme_cockpit(initiative_id):
 
     rollup = ProgrammeGovernanceService.rollup(initiative_id)
     if rollup is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     # PROG-013: surface the most recent AI-on-contact review (captured at import).
     import_review = None
     for snap in (ProgrammeGovernanceService.list_snapshots(initiative_id, limit=20) or []):
@@ -545,7 +530,9 @@ def programme_rollup(initiative_id):
     rollup = ProgrammeGovernanceService.rollup(initiative_id)
     if rollup is None:
         return jsonify({"success": False, "error": "Programme not found."}), 404
-    return jsonify({"success": True, **rollup})
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply({"success": True, **rollup}, keys=ROLLUP_FIGURE_KEYS))
 
 
 @solution_design_bp.route("/programmes/<int:initiative_id>/solutions", methods=["POST"])
@@ -618,7 +605,7 @@ def programme_fit_gap(initiative_id):
 
     rollup = ProgrammeGovernanceService.rollup(initiative_id)
     if rollup is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
     entries = ProgrammeGovernanceService.fit_gap_entries(initiative_id) or []
     return render_template(
         "solutions/programme_fit_gap.html",

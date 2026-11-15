@@ -10,6 +10,8 @@ import json
 
 import pytest
 
+from tests.test_change_review import PASS_ALL, FakeReviewer
+
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
@@ -233,6 +235,8 @@ def test_approve_and_execute_requires_approver_and_writes_audit(db_session, tena
 
         monkeypatch.setattr(svc_mod, "AIDataInteractionService", _FakeDataService)
 
+        # An approve is a request to settle the change; it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         svc = AIChatApprovalService(user_id=approver.id)
         result = svc.approve_and_execute(approval.id, approving_user_id=approver.id)
 
@@ -297,6 +301,8 @@ def test_approve_and_execute_mirrors_into_compliance_audit_log(db_session, tenan
 
         monkeypatch.setattr(svc_mod, "AIDataInteractionService", _FakeDataService)
 
+        # An approve is a request to settle the change; it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         svc = AIChatApprovalService(user_id=approver.id)
         result = svc.approve_and_execute(approval.id, approving_user_id=approver.id)
         assert result["success"] is True
@@ -398,6 +404,8 @@ def test_overdue_approval_still_executes_when_a_real_approver_approves_it(db_ses
 
         monkeypatch.setattr(svc_mod, "AIDataInteractionService", _FakeDataService)
 
+        # An approve is a request to settle the change; it is applied only because the review passes it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         svc = AIChatApprovalService(user_id=approver.id)
         result = svc.approve_and_execute(approval.id, approving_user_id=approver.id)
 
@@ -450,6 +458,8 @@ def test_execution_refused_without_approving_user(db_session, tenant_ctx):
 
 
 def test_queue_then_chat_approve_executes_exactly_once(db_session, tenant_ctx, monkeypatch):
+    from tests.test_change_review import PASS_ALL, FakeReviewer
+
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
 
@@ -483,25 +493,39 @@ def test_queue_then_chat_approve_executes_exactly_once(db_session, tenant_ctx, m
         )
         assert queued["success"]
 
+        # "approve it" is a request to settle the change now, not a way round its review: with no
+        # reviewer reachable the change is not applied.
+        confirmation = svc.check_for_confirmation_command("approve it")
+        stuck = svc.resolve_natural_confirmation(confirmation, chat_session_id=session_id)
+        assert stuck["success"] is False, stuck
+        assert call_count["n"] == 0, "an approve without a passing review must not apply the change"
+        waiting = AIChatCRUDApproval.query.filter_by(user_id=user.id, entity_type="capability").one()
+        assert waiting.status == ApprovalStatus.PENDING
+
+        # Once a reviewer passes it, the same words settle it.
+        FakeReviewer([PASS_ALL]).install(monkeypatch)
         confirmation = svc.check_for_confirmation_command("approve it")
         result = svc.resolve_natural_confirmation(confirmation, chat_session_id=session_id)
 
-        # TWO FINDINGS MEET HERE, and the resolution is deliberate.
-        # ARCH-020 required that "approve it" act on the pending approval
-        # rather than silently queueing a second one. M-05/V-01 then required
-        # that nobody approve their own request. In a chat session the person
-        # typing IS the requester, so the honest outcome is: resolve to the
-        # existing approval, refuse it as self-approval, and execute nothing.
-        # Separation of duties wins over conversational convenience — an
-        # approval gate that the requester can satisfy is not a gate.
-        assert result["success"] is False
-        assert "APPROVAL_DENIED" in str(result.get("code", "")) or "own request" in str(result.get("error", ""))
+        # "approve it" acts on the change already recorded rather than queueing a second one. No change
+        # waits for a second person: the person who asked may ask for it to be settled, and it is
+        # applied, once, after it passes review.
+        assert result["success"] is True, result
 
-    assert call_count["n"] == 0, "a self-approval must not execute the operation"
+    assert call_count["n"] == 1, "the confirmed change must be applied exactly once"
     rows = AIChatCRUDApproval.query.filter_by(user_id=user.id, entity_type="capability").all()
-    assert len(rows) == 1, "ARCH-020: a second, duplicate approval must not have been queued"
-    assert rows[0].status == ApprovalStatus.PENDING
-    assert rows[0].approved_by_id is None
+    assert len(rows) == 1, "a second, duplicate approval must not have been queued"
+    assert rows[0].status == ApprovalStatus.APPROVED
+    assert rows[0].approved_by_id == user.id, "the person who approved it, after its review passed"
+    assert rows[0].reviewer_model, "the record names the model that reviewed it"
+
+    # A second "approve it" finds nothing left to approve and applies nothing again.
+    with tenant_ctx(org.id):
+        again = svc.resolve_natural_confirmation(
+            svc.check_for_confirmation_command("approve it"), chat_session_id=session_id
+        )
+    assert again["success"] is False
+    assert call_count["n"] == 1
 
 
 # --- ARCH-020 follow-up: consent must be the WHOLE message -------------------

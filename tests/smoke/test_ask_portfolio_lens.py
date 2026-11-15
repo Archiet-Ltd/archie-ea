@@ -1,5 +1,5 @@
 """L3, "what is the rationalization status of <element>": the portfolio
-question on the Ask page, in a real browser.
+question asked in the AI chat, in a real browser.
 
     Ledger Service   -- ApplicationComponent, has a rationalization score
     Ledger Committee -- BusinessActor, not an application at all
@@ -14,7 +14,8 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT, PASSWORD, type_and_wait
+from .chat_ask import ask, sign_in_as
+from .conftest import PAGE_TIMEOUT
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -69,82 +70,41 @@ def portfolio_graph(seeded, live_server):
     return _seed_portfolio_graph(seeded["ids"]["org"])
 
 
-def _login(page, base, email):
-    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.fill("#email", email)
-    page.fill("#password", PASSWORD)
-    try:
-        page.click("#submit", no_wait_after=True)
-    except TypeError:
-        page.locator("#submit").click()
-    try:
-        page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
-    except Exception:
-        pass
-    assert "/account/login" not in page.url, "could not sign in as %s" % email
-
-
-def _ready(page, factory):
-    page.wait_for_function(
-        "(f) => { const el = document.querySelector('[x-data=\"' + f + '()\"]');"
-        " return !!(el && el._x_dataStack); }",
-        arg=factory,
-    )
+def _question(name):
+    return "What is the rationalization status of %s" % name
 
 
 def test_the_portfolio_question_links_to_rationalization_planning(
     page, live_server, seeded, portfolio_graph
 ):
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-portfolio").click()
-    expect(page.locator("#ask-picker-input")).to_be_focused()
-    type_and_wait(page, "ask", portfolio_graph["noun"])
-    page.locator("#ask-picker-listbox [role=option]", has_text="Service").click()
-
-    card = page.locator("[data-ask-portfolio-card]")
-    expect(card).to_be_visible()
+    sign_in_as(page, live_server, seeded, "solution_architect")
+    card = ask(page, live_server, _question(portfolio_graph["service_name"]))
     link = card.get_by_role("link", name="Open rationalization planning")
+    expect(link).to_be_visible()
     href = link.get_attribute("href")
     assert href == "/applications/rationalization/planning/%s" % portfolio_graph["component_id"]
+    # The link lands on the planning page for that application, with content.
+    page.goto(live_server + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert portfolio_graph["service_name"] in page.locator("body").inner_text()
 
 
 def test_a_non_application_element_reads_as_an_honest_not_tracked_state(
     page, live_server, seeded, portfolio_graph
 ):
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-portfolio").click()
-    expect(page.locator("#ask-picker-input")).to_be_focused()
-    type_and_wait(page, "ask", portfolio_graph["noun"])
-    page.locator("#ask-picker-listbox [role=option]", has_text="Committee").click()
-
-    expect(page.get_by_text("This is not something the rationalization view tracks.")).to_be_visible()
-    assert not page.locator("[data-ask-portfolio-card]").is_visible()
+    sign_in_as(page, live_server, seeded, "solution_architect")
+    card = ask(page, live_server, _question(portfolio_graph["committee_name"]))
+    expect(card.get_by_text("This is not something the rationalization view tracks")).to_be_visible()
+    assert card.get_by_role("link", name="Open rationalization planning").count() == 0
 
 
-def test_all_three_questions_keep_their_own_answers_separate(
+def test_the_portfolio_and_impact_questions_keep_their_own_answers_separate(
     page, live_server, seeded, portfolio_graph
 ):
-    """Regression guard: three questions now share one picker component."""
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-impact").click()
-    type_and_wait(page, "ask", portfolio_graph["noun"])
-    page.locator("#ask-picker-listbox [role=option]", has_text="Service").click()
-    page.wait_for_selector("[data-ask-row]")
-    expect(page.locator("#ask-results")).to_be_visible()
-    expect(page.locator("#ask-portfolio-results")).to_be_hidden()
-
-    page.locator("#ask-question-portfolio").click()
-    type_and_wait(page, "ask", portfolio_graph["noun"])
-    page.locator("#ask-picker-listbox [role=option]", has_text="Service").click()
-    page.wait_for_selector("[data-ask-portfolio-card]")
-    expect(page.locator("#ask-portfolio-results")).to_be_visible()
-    expect(page.locator("#ask-results")).to_be_hidden()
+    sign_in_as(page, live_server, seeded, "solution_architect")
+    impact = ask(page, live_server, "What breaks if %s fails" % portfolio_graph["service_name"])
+    assert impact.locator("[data-answer-row]").count() >= 1
+    portfolio = ask(page, live_server, _question(portfolio_graph["service_name"]), fresh=False)
+    assert portfolio.locator("[data-lens-portfolio]").count() == 1
+    assert portfolio.locator("[data-answer-row]").count() == 0
+    assert impact.locator("[data-lens-portfolio]").count() == 0
+    assert impact.locator("[data-answer-row]").count() >= 1

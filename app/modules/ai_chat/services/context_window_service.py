@@ -21,7 +21,7 @@ class ContextWindowService:
         "anthropic": 180000,    # Claude: 200k context
         "huggingface": 4000,    # Flan-T5: small context
         "gemini": 900000,       # Gemini: 1M context
-        "deepseek": 60000,      # DeepSeek: 64k context
+        "nvidia": 200000,       # NVIDIA Nemotron: 256k context
     }
 
     DEFAULT_LIMIT: int = 8000

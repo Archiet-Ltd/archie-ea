@@ -24,6 +24,7 @@ Routes:
 """
 
 from app.services.archimate_backbone import sync_archimate_element
+from app.services.cost_visibility import ROLLUP_FIGURE_KEYS
 import json
 import logging
 import os
@@ -133,6 +134,18 @@ def _check_solution_access(solution, user=None) -> bool:
             )
     if getattr(user, "is_platform_admin", False):
         return True
+    # A persona the permission matrix lets read every solution (an architect,
+    # the reviewer, the CTO, a viewer) opens the solutions of their own
+    # organisation, the same answer the solutions list is drawn from.
+    org_id = getattr(solution, "organization_id", None)
+    if org_id is not None and getattr(user, "organization_id", None) == org_id:
+        try:
+            from app.core.auth.permissions import can
+
+            if can(user, "view_all", "solution", org_id):
+                return True
+        except Exception:  # noqa: BLE001 - an unreadable grant is no ability
+            logger.exception("view_all check failed in _check_solution_access")
     _stakeholder_emails = [
         solution.solution_owner,
         solution.business_sponsor,
@@ -2795,6 +2808,84 @@ def api_phase_summary(solution_id: int):
     })
 
 
+# A control mapping that is not verified is a shortfall; the status decides how
+# serious. A mapping not yet assessed is reported, not recorded: nobody has
+# found a shortfall in it.
+_COMPLIANCE_SHORTFALL_SEVERITY = {"non_compliant": "high", "partial": "medium"}
+
+
+@solution_design_bp.route("/<int:solution_id>/api/compliance-gap", methods=["POST"])
+@login_required
+def api_compliance_gap(solution_id: int):
+    """Assess the solution's compliance mappings and record each shortfall in
+    the one gap register, inside the solution's organisation.
+
+    Only controls whose recorded verification status is non-compliant or
+    partial become gaps, each naming the mapping it came from. A solution with
+    no mappings, or none with a shortfall, records nothing and says so.
+    """
+    solution = Solution.query.get_or_404(solution_id)
+    if not _check_solution_access(solution):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    from app.models.solution_sad_models import SolutionComplianceMapping
+    from app.services.gap_register_service import create_gap
+
+    mappings = SolutionComplianceMapping.query.filter_by(solution_id=solution.id).order_by(
+        SolutionComplianceMapping.id
+    ).all()
+    if not mappings:
+        return jsonify({
+            "success": True,
+            "compliance_status": "not_assessed",
+            "gaps": [],
+            "message": "No compliance controls are mapped to this solution, so there is nothing to assess.",
+        })
+
+    gaps = []
+    for mapping in mappings:
+        severity = _COMPLIANCE_SHORTFALL_SEVERITY.get(mapping.verification_status)
+        if severity is None:
+            continue
+        status_text = mapping.verification_status.replace("_", " ")
+        where = " on %s" % mapping.element_name if mapping.element_name else ""
+        description = "%s control %s%s is %s." % (mapping.framework, mapping.control_id, where, status_text)
+        gap, created = create_gap(
+            organization_id=solution.organization_id,
+            name="Compliance gap: %s %s (%s, solution %d)" % (
+                mapping.framework, mapping.control_id, solution.name, solution.id),
+            description=description,
+            gap_type="compliance",
+            priority=severity,
+            severity=severity,
+            resolution_status="identified",
+            current_state_ref="solution_compliance_mappings:%d" % mapping.id,
+            auto_generated=True,
+            generation_source="solution_compliance_mapping",
+        )
+        gaps.append({
+            "id": gap.id,
+            "description": description,
+            "control_id": mapping.control_id,
+            "severity": severity,
+            "source": "%s control %s, status %s" % (mapping.framework, mapping.control_id, status_text),
+            "created": created,
+        })
+    db.session.commit()
+
+    statuses = {m.verification_status for m in mappings}
+    if "non_compliant" in statuses:
+        overall = "non_compliant"
+    elif gaps or statuses - {"verified"}:
+        overall = "partial"
+    else:
+        overall = "compliant"
+    message = None
+    if not gaps and overall == "partial":
+        message = "No shortfall found, but some mapped controls have not been assessed yet."
+    return jsonify({"success": True, "compliance_status": overall, "gaps": gaps, "message": message})
+
+
 def _build_blueprint_context(solution):
     """Build template context for the blueprint page.
 
@@ -3048,6 +3139,20 @@ def _run_proactive_analysis(app, solution_id: int, organization_id):
             logger.debug("Proactive analysis failed for sol %s: %s", solution_id, _e)
 
 
+def _for_cost_rule(ctx):
+    """A solution page's context for the signed-in person: for one the cost rule withholds from, no cost
+    figure and no amount written into the solution's text, and the page told to say why once."""
+    from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, without_amounts, withhold_costs
+
+    if costs_visible(current_user):
+        return {**ctx, "costs_withheld": False, "costs_withheld_sentence": COSTS_WITHHELD}
+    out = {**withhold_costs(ctx), "costs_withheld": True}
+    solution = ctx.get("solution")
+    if solution is not None:
+        out["solution_description"] = without_amounts(solution.description or "")
+    return out
+
+
 @solution_design_bp.route("/<int:solution_id>", methods=["GET"])
 @login_required
 def view_solution(solution_id: int):
@@ -3058,33 +3163,16 @@ def view_solution(solution_id: int):
     if not _check_solution_access(solution):
         abort(403)
 
-    # Blueprint page ships ON by default (wired, reachable). Explicit config/env
-    # value can opt OUT; ?edit=1 forces the legacy detail/editor view.
-    _bp_setting = current_app.config.get("USE_BLUEPRINT_PAGE")
-    if _bp_setting is None:
-        _bp_setting = os.environ.get("USE_BLUEPRINT_PAGE", "true")
-    use_blueprint = (
-        str(_bp_setting).strip().lower() in ("true", "1", "yes", "on")
-        and request.args.get("edit") != "1"
-    )
+    # The solution record: one record page with seven tabs (the solutions
+    # rethink, slice 5). ?edit=1 still opens the legacy editor.
+    if request.args.get("edit") != "1":
+        from app.modules.solutions_strategic.v2.services import solution_record_service
 
-    if use_blueprint:
-        try:
-            ctx = _build_blueprint_context(solution)
-
-            # Fire proactive analysis in background — does not block page render
-            import threading as _t
-            _t.Thread(
-                target=_run_proactive_analysis,
-                args=(current_app._get_current_object(), solution.id, solution.organization_id),
-                daemon=True,
-            ).start()
-
-            ctx["show_created_banner"] = request.args.get("created") == "1"
-            return render_template("solutions/blueprint.html", **ctx)
-        except Exception as e:
-            logger.error("Blueprint page failed for solution %s: %s. Falling back to legacy.", solution.id, e, exc_info=True)
-            # Fall through to legacy detail page
+        ctx = solution_record_service.build(
+            solution, tab=request.args.get("tab"), user=current_user,
+        )
+        ctx["show_created_banner"] = request.args.get("created") == "1"
+        return render_template("solutions/record.html", **_for_cost_rule(ctx))
 
     # AIC-312: Check for active workbench workspace linked to this solution
     active_workspace_id = None
@@ -3116,7 +3204,7 @@ def view_solution(solution_id: int):
         ctx = _build_solution_detail_context_fallback(solution)
     ctx["show_created_banner"] = request.args.get("created") == "1"
     ctx["active_workspace_id"] = active_workspace_id
-    return render_template("solutions/detail.html", **ctx)
+    return render_template("solutions/detail.html", **_for_cost_rule(ctx))
 
 
 # =============================================================================
@@ -3128,12 +3216,14 @@ def view_solution(solution_id: int):
 @login_required
 def get_copilot_insights(solution_id: int):
     """Return unseen, undismissed CopilotInsights for the blueprint page."""
+    from app.core.auth.permissions import is_read_only_member
     Solution.query.get_or_404(solution_id)
     from app.models.copilot_insight import CopilotInsight
     insights = CopilotInsight.get_unseen_for_solution(solution_id)
-    for i in insights:
-        i.seen = True
-    db.session.commit()
+    if not is_read_only_member(current_user):
+        for i in insights:
+            i.seen = True
+        db.session.commit()
     return jsonify({"insights": [i.to_dict() for i in insights]})
 
 
@@ -4480,6 +4570,41 @@ def list_solution_comments(solution_id: int):
         return jsonify({"error": str(e)}), 500
 
 
+@solution_design_bp.route("/<int:solution_id>/notes", methods=["POST"])
+@login_required
+def create_solution_note(solution_id: int):
+    """A typed note on the solution record: meeting, email, decision, escalation or
+    status update (the solutions rethink, slice 5b; the old communication log)."""
+    solution = Solution.query.get_or_404(solution_id)
+    if not _check_solution_access(solution):
+        abort(403)
+    from app.modules.solutions_strategic.v2.services.solution_record_service import NOTE_KINDS
+    from app.services import communication_log_service
+
+    data = request.get_json(silent=True) or {}
+    kind = (data.get("kind") or data.get("comm_type") or "").strip().lower()
+    subject = (data.get("subject") or "").strip()
+    if kind not in dict(NOTE_KINDS):
+        return jsonify({"error": "kind must be one of " + ", ".join(k for k, _ in NOTE_KINDS)}), 400
+    if not subject:
+        return jsonify({"error": "subject is required"}), 400
+    try:
+        entry = communication_log_service.log_communication(
+            solution_id=solution.id,
+            stakeholder_id=None,
+            comm_type=kind,
+            subject=subject[:255],
+            summary=(data.get("summary") or "").strip() or None,
+            outcome=(data.get("outcome") or "").strip() or None,
+            action_items=[],
+            logged_by=current_user.id,
+        )
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"success": True, "note": entry.to_dict()}), 201
+
+
 @solution_design_bp.route("/<int:solution_id>/comments", methods=["POST"])
 @login_required
 def create_solution_comment(solution_id: int):
@@ -4524,7 +4649,8 @@ def export_archimate_oef(solution_id):
     from app.services.archimate_oef_export_service import archimate_oef_export_service
 
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not is_active_org_admin():
+    # Exporting reads what the person may already open.
+    if not _check_solution_access(solution):
         abort(403)
 
     try:
@@ -6431,6 +6557,10 @@ def api_solution_gantt_data(solution_id: int):
 def api_solution_work_packages(solution_id, wp_id=None):
     """CRUD for solution work packages (used by Gantt component)."""
     from app.models.roadmap_models import RoadmapWorkPackage
+
+    action = {"POST": "create", "PUT": "edit", "DELETE": "delete"}[request.method]
+    if not _matrix_can(current_user, action, "work_package"):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
 
     solution = Solution.query.get_or_404(solution_id)
 
@@ -10365,7 +10495,7 @@ def generate_section_narrative(solution_id, section_id, user_id):
         narrative = LLMService.generate_from_prompt(prompt, use_cache=False)
     except ValueError:
         raise NarrativeGenerationError(
-            "No LLM provider configured. Add an API key in Admin → API Settings.", "NO_LLM"
+            "No LLM provider configured. Add an API key in Admin → AI settings.", "NO_LLM"
         )
     except Exception as e:
         logger.error("Blueprint narrative generation failed for solution %s section %s: %s", solution_id, section_id, e)
@@ -10558,13 +10688,13 @@ def api_blueprint_codegen(solution_id, section_id):
             )
             return jsonify({
                 "success": False,
-                "error": "The LLM returned an empty response. Please try again — if this persists, verify your LLM API key is valid in Admin → API Settings.",
+                "error": "The LLM returned an empty response. Please try again — if this persists, verify your LLM API key is valid in Admin → AI settings.",
                 "error_code": "EMPTY_RESPONSE",
             }), 500
     except ValueError:
         return jsonify({
             "success": False,
-            "error": "No LLM provider configured. Add an API key in Admin → API Settings.",
+            "error": "No LLM provider configured. Add an API key in Admin → AI settings.",
             "error_code": "NO_LLM",
         }), 503
     except Exception as e:
@@ -10605,7 +10735,7 @@ def api_generate_draft(solution_id):
     except ValueError:
         return jsonify({
             "success": False,
-            "error": "No LLM provider configured. Add an API key in Admin → API Settings.",
+            "error": "No LLM provider configured. Add an API key in Admin → AI settings.",
             "error_code": "NO_LLM",
         }), 503
 
@@ -10829,7 +10959,7 @@ def api_get_viewpoint_elements(solution_id, section_id):
             "description": elem.description or "",
             "scope": elem.scope,
             "building_block_type": getattr(elem, "building_block_type", None),
-            "plateau": elem.plateau,
+            "plateau": elem.togaf_plateau,
             "status": "linked",
             # Contextual intelligence fields (empty for non-app elements)
             "lifecycle": ctx.get("lifecycle", ""),
@@ -10888,7 +11018,7 @@ def api_get_viewpoint_elements(solution_id, section_id):
                 "description": getattr(elem, "description", "") or "",
                 "scope": getattr(elem, "scope", None),
                 "building_block_type": getattr(elem, "building_block_type", None),
-                "plateau": getattr(elem, "plateau", None),
+                "plateau": getattr(elem, "togaf_plateau", None),
                 "status": "context",
                 "lifecycle": "",
                 "other_solutions": 0,
@@ -11891,6 +12021,11 @@ def api_raci_matrix(solution_id):
 def api_set_raci(solution_id):
     """FRAG-030: Set RACI assignment."""
     require_entity(Solution, solution_id, description="Solution not found")
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
     try:
         from app.services.raci_service import set_raci_assignment
         data = request.get_json()
@@ -11954,7 +12089,9 @@ def api_outcomes(solution_id):
         from app.services.outcome_tracking_service import OutcomeTrackingService
         service = OutcomeTrackingService()
         summary = service.get_solution_realization_summary(solution_id)
-        return jsonify({"success": True, "data": summary})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "data": summary}, keys=ROLLUP_FIGURE_KEYS))
     except HTTPException:
         raise
     except Exception as e:

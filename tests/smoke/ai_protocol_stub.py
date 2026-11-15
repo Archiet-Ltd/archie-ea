@@ -58,6 +58,7 @@ class AIProtocolStub:
 
     def __init__(self):
         self._records = []
+        self._sent_text = []
         self._lock = Lock()
         owner = self
 
@@ -117,6 +118,9 @@ class AIProtocolStub:
                 if not isinstance(messages, list) or not messages or not isinstance(messages[-1], dict):
                     self._reject(400, 'A final user message is required.', model=MODEL)
                     return
+                with owner._lock:
+                    owner._sent_text.append(' '.join(
+                        str(m.get('content')) for m in messages if isinstance(m, dict)))
                 last = messages[-1]
                 content = last.get('content')
                 matches = [(name, scenario) for name, scenario in [
@@ -166,6 +170,12 @@ class AIProtocolStub:
         self.base_url = f'http://127.0.0.1:{self.port}/v1'
 
     @property
+    def sent_text(self):
+        """The message text of each request, in arrival order (never the credentials)."""
+        with self._lock:
+            return list(self._sent_text)
+
+    @property
     def records(self):
         with self._lock:
             return [dict(record) for record in self._records]
@@ -173,8 +183,8 @@ class AIProtocolStub:
     def child_environment(self, original):
         """Return isolated settings; never alter pytest's already-scrubbed env."""
         env = dict(original)
-        providers = ('ANTHROPIC', 'AZURE', 'CLAUDE', 'DEEPSEEK', 'GEMINI',
-                     'GOOGLE', 'HUGGINGFACE', 'OPENAI', 'OPENROUTER')
+        providers = ('ANTHROPIC', 'AZURE', 'CLAUDE', 'GEMINI',
+                     'GOOGLE', 'HUGGINGFACE', 'NVIDIA', 'OPENAI', 'OPENROUTER')
         for provider in providers:
             for suffix in ['', '_SECONDARY'] + ['_' + str(number) for number in range(1, 10)]:
                 env[provider + '_API_KEY' + suffix] = ''

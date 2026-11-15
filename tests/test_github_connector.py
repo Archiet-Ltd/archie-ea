@@ -85,6 +85,8 @@ def github(app, monkeypatch):
 
     with open(_FIXTURE) as handle:
         bundle = json.load(handle)["responses"]
+    # Add the account type response for the organization
+    bundle["users/acme"] = {"type": "Organization", "login": "acme"}
     state = SimpleNamespace(bundle=copy.deepcopy(bundle), overrides={}, calls=[])
     monkeypatch.setitem(app.config, "ALLOW_EXTERNAL_API_CALLS", True)
 
@@ -852,3 +854,222 @@ def test_the_connector_is_registered_in_the_framework(app):
 
     _register_concrete_connectors()
     assert _CONNECTOR_CLASSES["github"] is GitHubConnector
+
+
+# --------------------------------------------------------------------- #
+# Personal account support                                              #
+# --------------------------------------------------------------------- #
+
+
+def _make_personal_account_fixture(github, account_type="User"):
+    """Create a fixture bundle for a personal account with two repositories."""
+    bundle = copy.deepcopy(github.bundle)
+    # Add the account type response
+    bundle["users/octocat"] = {"type": account_type, "login": "octocat"}
+    # Two repositories under the personal account
+    bundle["users/octocat/repos"] = [
+        {
+            "archived": False,
+            "created_at": "2022-01-04T09:00:00Z",
+            "default_branch": "main",
+            "description": "Personal payments service",
+            "disabled": False,
+            "fork": False,
+            "full_name": "octocat/payments-service",
+            "html_url": "https://github.com/octocat/payments-service",
+            "id": 8001,
+            "is_template": False,
+            "language": "Python",
+            "name": "payments-service",
+            "node_id": "R_8001",
+            "open_issues_count": 3,
+            "owner": {"id": 2, "login": "octocat", "type": account_type},
+            "private": True,
+            "pushed_at": "2026-10-10T09:15:00Z",
+            "size": 1200,
+            "topics": [],
+            "updated_at": "2026-10-10T09:15:00Z",
+            "visibility": "private",
+        },
+        {
+            "archived": False,
+            "created_at": "2022-01-04T09:00:00Z",
+            "default_branch": "main",
+            "description": "Personal customer portal",
+            "disabled": False,
+            "fork": False,
+            "full_name": "octocat/customer-portal",
+            "html_url": "https://github.com/octocat/customer-portal",
+            "id": 8002,
+            "is_template": False,
+            "language": "TypeScript",
+            "name": "customer-portal",
+            "node_id": "R_8002",
+            "open_issues_count": 3,
+            "owner": {"id": 2, "login": "octocat", "type": account_type},
+            "private": True,
+            "pushed_at": "2026-10-12T14:02:00Z",
+            "size": 1200,
+            "topics": [],
+            "updated_at": "2026-10-12T14:02:00Z",
+            "visibility": "private",
+        },
+    ]
+    # Repository contents
+    bundle["repos/octocat/payments-service/contents"] = [
+        {"name": "Dockerfile", "path": "Dockerfile", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "type": "file"},
+        {"name": "pyproject.toml", "path": "pyproject.toml", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "type": "file"},
+        {"name": "src", "path": "src", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "type": "dir"},
+        {"name": "README.md", "path": "README.md", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "type": "file"},
+    ]
+    bundle["repos/octocat/customer-portal/contents"] = [
+        {"name": "Dockerfile", "path": "Dockerfile", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "type": "file"},
+        {"name": "package.json", "path": "package.json", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "type": "file"},
+        {"name": "src", "path": "src", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "type": "file"},
+        {"name": "README.md", "path": "README.md", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "type": "file"},
+    ]
+    # No teams for personal account
+    bundle["users/octocat/teams"] = []
+    return bundle
+
+
+@pytest.fixture
+def github_personal(app, monkeypatch):
+    """Serve recorded GitHub responses for a personal account (User type)."""
+    import requests
+
+    with open(_FIXTURE) as handle:
+        bundle = json.load(handle)["responses"]
+    # Replace with personal account fixture
+    bundle = _make_personal_account_fixture(SimpleNamespace(bundle=bundle), "User")
+    state = SimpleNamespace(bundle=bundle, overrides={}, calls=[])
+    monkeypatch.setitem(app.config, "ALLOW_EXTERNAL_API_CALLS", True)
+
+    def fake_request(self, method=None, url=None, params=None, headers=None, **kw):
+        assert url.startswith(API), f"a request left for an unexpected host: {url}"
+        path = url[len(API):].strip("/")
+        params = dict(params or {})
+        auth = {**self.headers, **(headers or {})}.get("Authorization")
+        state.calls.append({"method": method, "path": path, "params": params, "auth": auth})
+        page = int(params.get("page", 1))
+        for key in (f"{path}?page={page}", path):
+            if key in state.overrides:
+                return _Resp(*state.overrides[key])
+        if path not in state.bundle:
+            return _Resp(404, {"message": "Not Found"})
+        body = state.bundle[path]
+        if path.endswith("/repos") or path.endswith("/teams"):
+            per_page = int(params.get("per_page", 30))
+            body = body[(page - 1) * per_page : page * per_page]
+        return _Resp(200, body)
+
+    monkeypatch.setattr(requests.Session, "request", fake_request)
+    return state
+
+
+@pytest.fixture
+def github_unknown_account(app, monkeypatch):
+    """Serve GitHub responses for a name that is neither User nor Organization."""
+    import requests
+
+    with open(_FIXTURE) as handle:
+        bundle = json.load(handle)["responses"]
+    # Unknown account type
+    bundle["users/unknown"] = {"type": "Bot", "login": "unknown"}
+    state = SimpleNamespace(bundle=bundle, overrides={}, calls=[])
+    monkeypatch.setitem(app.config, "ALLOW_EXTERNAL_API_CALLS", True)
+
+    def fake_request(self, method=None, url=None, params=None, headers=None, **kw):
+        assert url.startswith(API), f"a request left for an unexpected host: {url}"
+        path = url[len(API):].strip("/")
+        params = dict(params or {})
+        auth = {**self.headers, **(headers or {})}.get("Authorization")
+        state.calls.append({"method": method, "path": path, "params": params, "auth": auth})
+        page = int(params.get("page", 1))
+        for key in (f"{path}?page={page}", path):
+            if key in state.overrides:
+                return _Resp(*state.overrides[key])
+        if path not in state.bundle:
+            return _Resp(404, {"message": "Not Found"})
+        body = state.bundle[path]
+        if path.endswith("/repos") or path.endswith("/teams"):
+            per_page = int(params.get("per_page", 30))
+            body = body[(page - 1) * per_page : page * per_page]
+        return _Resp(200, body)
+
+    monkeypatch.setattr(requests.Session, "request", fake_request)
+    return state
+
+
+def test_personal_account_reads_through_user_repos_path_and_produces_proposals(
+    db_session, org_a, github_personal, connect, sync
+):
+    """A name GitHub reports as a User is read through /users/{name}/repos and produces proposals."""
+    from app.connectors import github as gh
+
+    # Connect with the personal account name
+    cfg = connect(org_a, {"organization": "octocat"})
+    result = sync(org_a, cfg)
+
+    assert result["success"] is True, result
+    assert result["records_processed"] == 2
+    assert result["records_proposed"] == 2  # both become proposals (no existing components to match)
+    assert result["records_failed"] == 0
+
+    # Verify the repositories were read from the user path
+    user_repos_calls = [c for c in github_personal.calls if c["path"] == "users/octocat/repos"]
+    assert user_repos_calls, "should have called /users/octocat/repos"
+    org_repos_calls = [c for c in github_personal.calls if c["path"] == "orgs/octocat/repos"]
+    assert not org_repos_calls, "should not have called /orgs/octocat/repos"
+
+    # Verify account type was detected
+    account_type_calls = [c for c in github_personal.calls if c["path"] == "users/octocat"]
+    assert account_type_calls, "should have called /users/octocat to detect account type"
+
+    # Verify teams were not read
+    teams_calls = [c for c in github_personal.calls if c["path"] == "users/octocat/teams"]
+    assert not teams_calls, "should not have called /users/octocat/teams for a personal account"
+
+    # Verify proposals were created with correct classification
+    from app.models.ai_chat_crud_approval import ApprovalStatus
+    pending = _proposals(org_a.id, status=ApprovalStatus.PENDING)
+    assert len(pending) == 2
+    classifications = {_payload(a)["repository"]: _payload(a)["classification"] for a in pending}
+    assert classifications == {
+        "octocat/payments-service": "application",
+        "octocat/customer-portal": "application",
+    }
+
+
+def test_organisation_still_reads_through_org_path_with_teams(
+    db_session, org_a, github, connect, sync
+):
+    """An organisation still reads through /orgs/{name}/repos with its teams."""
+    cfg = connect(org_a)
+    result = sync(org_a, cfg)
+
+    assert result["success"] is True, result
+    assert result["records_processed"] == 12
+
+    # Verify the repositories were read from the org path
+    org_repos_calls = [c for c in github.calls if c["path"] == "orgs/acme/repos"]
+    assert org_repos_calls, "should have called /orgs/acme/repos"
+    user_repos_calls = [c for c in github.calls if c["path"] == "users/acme/repos"]
+    assert not user_repos_calls, "should not have called /users/acme/repos for an organisation"
+
+    # Verify teams were read
+    teams_calls = [c for c in github.calls if c["path"] == "orgs/acme/teams"]
+    assert teams_calls, "should have called /orgs/acme/teams for an organisation"
+
+
+def test_unknown_account_type_produces_error_message(
+    db_session, org_a, github_unknown_account, connect, sync
+):
+    """A name GitHub reports as neither User nor Organization produces an error message."""
+    from app.connectors import github as gh
+
+    cfg = connect(org_a, {"organization": "unknown"})
+    result = sync(org_a, cfg)
+
+    assert result["success"] is False
+    assert "unexpected account type" in result.get("error", "")

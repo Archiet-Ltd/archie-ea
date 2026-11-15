@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: comparison
 competitor: Bizzdesign HOPEX (formerly MEGA HOPEX)
 url_slug: archiet.ai/vs/mega-hopex

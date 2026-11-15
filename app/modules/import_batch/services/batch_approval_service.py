@@ -32,7 +32,6 @@ from app.models.batch_import import (  # dead-code-ok
 from app.services.application_cost_accessor import (
     apply_cost_to_application,
     detect_cost_columns_from_dict,
-    get_reporting_currency,
     map_import_cost_columns,
 )
 
@@ -48,6 +47,10 @@ class BatchApprovalService:
     - Individual element approval/rejection/modification
     - Committing approved elements to database
     """
+
+    # The service keeps nothing between requests. A status the preview could not map is
+    # recorded as {row, name, reason} in a list that one commit builds and returns, so it
+    # can only reach that commit's own checkpoint and response.
 
     def approve_batch(
         self,
@@ -252,6 +255,13 @@ class BatchApprovalService:
         return element
 
     def commit_batch(self, batch_id: int, user_id: int) -> BatchImportBatch:
+        """Commit a batch and return it. See commit_batch_with_refusals for the refusals."""
+        batch, _refusals = self.commit_batch_with_refusals(batch_id, user_id)
+        return batch
+
+    def commit_batch_with_refusals(
+        self, batch_id: int, user_id: int
+    ) -> Tuple[BatchImportBatch, List[Dict[str, Any]]]:
         """
         Commit approved elements to the database.
 
@@ -263,7 +273,7 @@ class BatchApprovalService:
             user_id: ID of the user committing
 
         Returns:
-            Updated batch instance
+            The updated batch and the statuses this commit refused ({row, name, reason})
 
         Raises:
             ValueError: If batch cannot be committed
@@ -288,6 +298,7 @@ class BatchApprovalService:
 
         committed_count = 0
         errors = []
+        status_refusals: List[Dict[str, Any]] = []
         successful_applications = []
         successful_elements = []
 
@@ -324,7 +335,9 @@ class BatchApprovalService:
                     # Create savepoint for each application
                     app_savepoint = db.session.begin_nested()
                     
-                    committed_app = self._commit_application(app, conflict_resolutions, app_lookup)
+                    committed_app = self._commit_application(
+                        app, conflict_resolutions, app_lookup, status_refusals
+                    )
                     if committed_app:
                         app.committed_application_id = committed_app.id
                         app.status = AppProcessingStatus.COMMITTED
@@ -414,6 +427,7 @@ class BatchApprovalService:
                     "skipped_by_resolution": skipped_by_resolution,
                     "error_count": len(errors),
                     "errors": errors[:10],  # Limit stored errors
+                    "status_refusals": status_refusals[:50],
                     "successful_applications": len(successful_applications),
                     "successful_elements": len(successful_elements),
                 },
@@ -431,7 +445,7 @@ class BatchApprovalService:
             batch_service = BatchImportService()
             batch_service.check_and_complete_job(batch.job_id)
 
-            return batch
+            return batch, status_refusals
 
         except Exception as e:
             # Rollback the entire transaction on critical failure
@@ -559,12 +573,14 @@ class BatchApprovalService:
         app: BatchImportApplication,
         conflict_resolutions: Optional[Dict] = None,
         app_lookup: Optional[Dict] = None,
+        status_refusals: Optional[List[Dict[str, Any]]] = None,
     ) -> Optional[ApplicationComponent]:
         """
         Commit an application to the ApplicationComponent table.
 
         Respects user conflict resolution decisions when available.
-        Returns the ApplicationComponent, or None if skipped.
+        Returns the ApplicationComponent, or None if skipped. A status the preview could
+        not map is appended to `status_refusals`, the caller's list for this commit.
         """
         # Check if user has a conflict resolution for this row
         resolution = (conflict_resolutions or {}).get(app.row_number)
@@ -587,7 +603,7 @@ class BatchApprovalService:
                         "Merging application %s (row %d) into existing ID %s — user resolution: update",
                         app.application_name, app.row_number, target_id,
                     )
-                    return self._merge_into_existing(app, existing)
+                    return self._merge_into_existing(app, existing, status_refusals)
                 else:
                     logger.warning(
                         "Target app %s not found for merge, creating new instead", target_id
@@ -610,6 +626,7 @@ class BatchApprovalService:
             if existing:
                 logger.debug("Application %s already exists (id=%s), returning existing",
                              app.application_name, match["id"])
+                self._merge_status(app, existing, status_refusals)
                 return existing
 
         # Create new application
@@ -635,6 +652,9 @@ class BatchApprovalService:
             from app.config.abacus_field_mapping import normalize_lifecycle_status
 
             new_app.lifecycle_status = normalize_lifecycle_status(source["lifecycle_status"])
+        mapped_status = self._mapped_status(app, source, status_refusals)
+        if mapped_status is not None:
+            new_app.deployment_status = mapped_status
         if "criticality" in source:
             new_app.criticality = source["criticality"]
         if "business_domain" in source:
@@ -643,13 +663,59 @@ class BatchApprovalService:
         # Apply cost fields through the accessor
         cost_mapping = self._extract_cost_mapping(source)
         if cost_mapping:
-            parsed = map_import_cost_columns(source, cost_mapping, reporting_currency=get_reporting_currency())
+            from config import CurrencyConfig
+
+            parsed = map_import_cost_columns(source, cost_mapping, reporting_currency=CurrencyConfig.get_org_currency_code())
             apply_cost_to_application(new_app, parsed["cost_fields"])
 
         db.session.add(new_app)
         db.session.flush()
 
         return new_app
+
+    def _mapped_status(
+        self,
+        app: BatchImportApplication,
+        source: Dict[str, Any],
+        status_refusals: Optional[List[Dict[str, Any]]] = None,
+    ) -> Optional[str]:
+        """The status the import preview said it mapped, or None.
+
+        The column is found by the headings the CSV import reads. A blank stays unset. A
+        word the preview cannot map stays unset too, and its refusal is appended to
+        `status_refusals`, the list of the commit that is running.
+        """
+        from app.services.application_status import refusal_for, status_cell, status_for_write
+        from app.services.import_validation.validation_schemas import (
+            APPLICATION_COMPONENT_SCHEMA,
+        )
+        from app.services.import_validation.value_normalizer import ValueNormalizer
+
+        found, cell = status_cell(source)
+        if not found:
+            return None
+        mapped, _note = ValueNormalizer.normalize_value(
+            cell, "deployment_status", APPLICATION_COMPONENT_SCHEMA["deployment_status"]
+        )
+        stored, refusal = status_for_write(mapped)
+        if stored is None and str(cell or "").strip():
+            refusal = refusal_for(cell)  # a word the preview could not map
+        if refusal and status_refusals is not None:
+            status_refusals.append(
+                {"row": app.row_number, "name": app.application_name, "reason": refusal_for(cell)}
+            )
+        return stored
+
+    def _merge_status(
+        self,
+        app: BatchImportApplication,
+        existing: ApplicationComponent,
+        status_refusals: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
+        """A row that matches an existing application merges its mapped status, as the preview said."""
+        mapped = self._mapped_status(app, app.source_data or {}, status_refusals)
+        if mapped is not None and mapped != existing.deployment_status:
+            existing.deployment_status = mapped
 
     def _attach_to_programme(self, batch, applications, user_id) -> None:
         """PROG-002: link committed apps into the target programme's
@@ -692,6 +758,7 @@ class BatchApprovalService:
         self,
         app: BatchImportApplication,
         existing: ApplicationComponent,
+        status_refusals: Optional[List[Dict[str, Any]]] = None,
     ) -> ApplicationComponent:
         """Merge import application data into an existing ApplicationComponent.
         
@@ -741,10 +808,14 @@ class BatchApprovalService:
                 (isinstance(import_val, str) and import_val.strip() and import_val != existing_val)):
                 setattr(existing, field, import_val)
         
+        self._merge_status(app, existing, status_refusals)
+
         # Apply cost fields through the accessor
         cost_mapping = self._extract_cost_mapping(source)
         if cost_mapping:
-            parsed = map_import_cost_columns(source, cost_mapping, reporting_currency=get_reporting_currency())
+            from config import CurrencyConfig
+
+            parsed = map_import_cost_columns(source, cost_mapping, reporting_currency=CurrencyConfig.get_org_currency_code())
             apply_cost_to_application(existing, parsed["cost_fields"])
         
         return existing

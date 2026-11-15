@@ -3,20 +3,23 @@ Connector health monitoring routes.
 Provides UI and API for monitoring external system integrations.
 """
 
+import logging
 from datetime import datetime, timedelta
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, current_app, jsonify, render_template, request
 
 from app.decorators import admin_required, audit_log
 
 from app.services.connector_framework import (
     ConnectorConfig,
-    ConnectorManager,
+    build_connector,
     SyncLog,
 )
 from flask_login import login_required
 from app.utils.api_response import error_response, not_found_response
 from app.utils.pagination import safe_int_arg
+
+logger = logging.getLogger(__name__)
 
 connector_bp = Blueprint("connectors", __name__, url_prefix="/integrations")
 
@@ -33,7 +36,16 @@ connector_bp = Blueprint("connectors", __name__, url_prefix="/integrations")
 # reach it.
 def dashboard():
     """Connector health monitoring dashboard (admin-only, no self-serve config)."""
-    return render_template("integrations/connector_dashboard.html")
+    from flask import g
+    from flask_login import current_user
+
+    from app.utils.role_access import may_open_connector_pages
+
+    return render_template(
+        "integrations/connector_dashboard.html",
+        can_open_connectors=may_open_connector_pages(current_user, getattr(g, "current_org_id", None))
+        and "m365_connector.connectors_index" in current_app.view_functions,
+    )
 
 
 @connector_bp.route("/api/connectors", methods=["GET"])
@@ -205,23 +217,43 @@ def api_test_connection(connector_id):
         if not conn:
             return jsonify({"error": "Connector not found"}), 404
 
-        # Get connector instance from manager
-        manager = ConnectorManager()
-        connector = manager.get_connector(connector_id)
+        try:
+            connector = build_connector(conn, conn.organization_id)
+        except LookupError:
+            connector = None
+            success, message = False, "This connector type cannot be tested yet."
+        except Exception:
+            logger.exception("Connector could not be built for %s", connector_id)
+            connector = None
+            success, message = (
+                False,
+                "The test could not be completed. Check the address and credentials in the connector settings.",
+            )
+        if connector is not None:
+            try:
+                if hasattr(connector, "check_connection"):
+                    success, message = connector.check_connection()
+                else:
+                    import asyncio
 
-        if not connector:
-            return jsonify({"error": "Connector not initialized"}), 500
-
-        # Test connection (async in production, sync for simplicity here)
-        import asyncio
-
-        success = asyncio.run(connector.test_connection())
+                    success = bool(asyncio.run(connector.test_connection()))
+                    message = (
+                        "Connection successful"
+                        if success
+                        else "The connection failed. Check the address and credentials in the connector settings."
+                    )
+            except Exception:
+                logger.exception("Connector test failed for %s", connector_id)
+                success, message = (
+                    False,
+                    "The test could not be completed. Check the address and credentials in the connector settings.",
+                )
 
         return (
             jsonify(
                 {
                     "success": success,
-                    "message": "Connection successful" if success else "Connection failed",
+                    "message": message,
                     "tested_at": datetime.utcnow().isoformat(),
                 }
             ),

@@ -1,0 +1,24 @@
+{# What cannot be read from a website, asked once: company size, the person's role and their first goal. #}
+<div class="grid gap-4 sm:grid-cols-3" data-testid="signup-asked">
+    <div class="space-y-1.5" data-testid="signup-size">
+        {% call label(for='welcome-size') %}Company size{% endcall %}
+        {% call native_select(id='welcome-size', name='size_band', class='w-full') %}
+            <option value="">Not sure yet</option>
+            {% for key, name in size_bands %}
+            <option value="{{ key }}"{% if chosen.size_band == key %} selected{% endif %}>{{ name }} people</option>
+            {% endfor %}
+        {% endcall %}
+    </div>
+    <div class="space-y-1.5" data-testid="signup-role">
+        {% call label(for='welcome-role') %}Your role{% endcall %}
+        {{ input(id='welcome-role', name='role', placeholder='For example, CTO', value=(chosen.role or ''), maxlength='120') }}
+    </div>
+    <div class="space-y-1.5" data-testid="signup-goal">
+        {% call label(for='welcome-goal') %}What do you want first?{% endcall %}
+        {% call native_select(id='welcome-goal', name='goal', class='w-full') %}
+            {% for key, name in goals %}
+            <option value="{{ key }}"{% if (chosen.goal or 'understand') == key %} selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        {% endcall %}
+    </div>
+</div>

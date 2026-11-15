@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 
@@ -20,7 +21,7 @@ document.addEventListener('alpine:init', () => {
         dataLoaded: false,
         error: '',
         filters: { vendor: '', capability: '', minCoverage: '0', category: '' },
-        stats: { totalCaps: 0, totalVendors: 0, avgCoverage: null, strongCount: 0 },
+        stats: { totalCaps: 0, totalVendors: 0, avgCoverage: null, strongCount: null },
 
         init() { this.loadCategories(); },
 
@@ -57,7 +58,7 @@ document.addEventListener('alpine:init', () => {
 
         applyFilters() {
             const { vendor, capability, minCoverage, category } = this.filters;
-            const min = parseInt(minCoverage) || 0;
+            const min = parseInt(minCoverage) || 0; /* zero-fallback-ok: a blank filter box means no minimum, it is not a measured figure */
             this.filteredData = this.matrixData.filter(d =>
                 (!vendor || d.vendor_name.toLowerCase().includes(vendor.toLowerCase())) &&
                 (!capability || d.capability_name.toLowerCase().includes(capability.toLowerCase())) &&
@@ -209,7 +210,7 @@ document.addEventListener('alpine:init', () => {
         </div>
         <div class="bg-card border border-border rounded-lg p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Strong Fits (80%+)</p>
-            <p class="text-2xl font-bold text-success mt-1" x-text="stats.strongCount"></p>
+            <p class="text-2xl font-bold text-success mt-1" x-text="stats.strongCount != null ? stats.strongCount : '—'"></p>
         </div>
     </div>
 
@@ -301,7 +302,12 @@ document.addEventListener('alpine:init', () => {
         <div x-cloak x-show="!loading && !error && !dataLoaded"
              class="flex flex-col items-center justify-center py-24 gap-3">
             <i data-lucide="table-2" class="h-10 w-10 text-muted-foreground" aria-hidden="true"></i>
-            <p class="text-sm font-medium text-foreground">Select a product category to load the matrix</p>
+            <p class="text-sm font-medium text-foreground" x-show="loadingCategories || allCategories.length > 0">Select a product category to load the matrix</p>
+            <p class="text-sm font-medium text-foreground" x-cloak x-show="!loadingCategories && allCategories.length === 0" data-testid="no-categories">No vendor products are recorded yet, so there is no category to pick</p>
+            <p x-cloak class="text-xs text-muted-foreground" x-show="!loadingCategories && allCategories.length === 0">
+                Vendor products are added when vendor details are imported or detected, and a system's Vendors tab then links one to that system. No product is recorded yet, so start by adding the vendor on the Vendors list.
+                <a href="{{ url_for('unified_applications.vendors') }}" class="text-primary underline underline-offset-2" data-testid="no-categories-next">Open the vendors list</a>
+            </p>
             <p x-cloak class="text-xs text-muted-foreground" x-show="loadingCategories">Loading categories…</p>
             <p x-cloak class="text-xs text-muted-foreground" x-show="!loadingCategories && allCategories.length > 0">
                 <span x-text="allCategories.length"></span> categories available — use the Category filter above
@@ -435,7 +441,7 @@ document.addEventListener('alpine:init', () => {
                 <div class="h-2 rounded-full bg-muted overflow-hidden">
                     <div class="h-2 rounded-full transition-all duration-500"
                          :class="$store.matrixModal.barClass"
-                         :style="'width:' + ($store.matrixModal.data?.coverage_percentage ?? 0) + '%'"></div><!-- inline-style-ok -->
+                         :style="'width:' + Platform.figure.barWidth($store.matrixModal.data?.coverage_percentage) + '%'"></div><!-- inline-style-ok -->
                 </div>
             </div>
 
@@ -444,12 +450,12 @@ document.addEventListener('alpine:init', () => {
                 <div class="bg-muted/40 rounded-lg p-3">
                     <p class="text-xs text-muted-foreground">Out-of-Box</p>
                     <p class="text-xl font-bold text-foreground mt-0.5"
-                       x-text="($store.matrixModal.data?.out_of_box_percentage ?? 0) + '%'"></p>
+                       x-text="Platform.figure.percent($store.matrixModal.data?.out_of_box_percentage)"></p>
                 </div>
                 <div class="bg-muted/40 rounded-lg p-3">
                     <p class="text-xs text-muted-foreground">Via Customisation</p>
                     <p class="text-xl font-bold text-foreground mt-0.5"
-                       x-text="(($store.matrixModal.data?.coverage_percentage ?? 0) - ($store.matrixModal.data?.out_of_box_percentage ?? 0)) + '%'"></p>
+                       x-text="Platform.figure.missing($store.matrixModal.data?.coverage_percentage) || Platform.figure.missing($store.matrixModal.data?.out_of_box_percentage) ? Platform.figure.NOT_SCORED : ($store.matrixModal.data.coverage_percentage - $store.matrixModal.data.out_of_box_percentage) + '%'"></p>
                 </div>
                 <div class="bg-muted/40 rounded-lg p-3">
                     <p class="text-xs text-muted-foreground">Impl. Complexity</p>

@@ -17,7 +17,7 @@ Routes:
 import logging
 from urllib.parse import urlencode
 
-from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import current_app, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload, selectinload
@@ -28,8 +28,11 @@ from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_capability import UnifiedCapability
 from app.modules.my_applications.services import has_assigned_owner
 from app.security.import_decorators import with_import_security
+from app.services.vendor_register import _app_vendor_expr, system_coverage
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant_users import escape_like_literal
+
+from .coverage_routes import _domain_matches_unit, outside_every_unit
 
 # Import performance utilities (conditionally available)  # dead-code-ok
 try:
@@ -137,8 +140,15 @@ def application_list():
             sunset_decom_pipeline=None,
             decommissioned=None,
             owner_assigned=None,
-            vendor_assigned=None,
+            summary_total=None,
+            no_owner=None,
+            no_capability=None,
+            no_vendor=None,
         ),
+        owner_names_by_app={},
+        footers_by_app={},
+        repository_ids=set(),
+        imported_gaps={},
         sort="",
         dir="asc",
         load_error="The application portfolio could not be read.",
@@ -170,6 +180,12 @@ def application_list():
         process_level_filter = request.args.get("process_level", "").strip()
         capability_level_filter = request.args.get("capability_level", "").strip()
         domain_filter = request.args.get("domain", "").strip()
+        # T-council-10: data-quality summary filters (no_owner, no_capability, no_vendor)
+        no_owner_filter = request.args.get("no_owner", "").strip().lower() in ("1", "true", "yes")
+        has_owner_filter = request.args.get("has_owner", "").strip().lower() in ("1", "true", "yes")
+        no_domain_filter = request.args.get("no_domain", "").strip().lower() in ("1", "true", "yes")
+        no_capability_filter = request.args.get("no_capability", "").strip().lower() in ("1", "true", "yes")
+        no_vendor_filter = request.args.get("no_vendor", "").strip().lower() in ("1", "true", "yes")
         page = max(1, safe_int_arg('page', 1, minimum=1))
         page_size = min(max(1, safe_int_arg('page_size', 25, minimum=1, maximum=500)), 100)
 
@@ -219,8 +235,6 @@ def application_list():
         # bug admin_required/org_admin_required already fix elsewhere in this
         # PR.
         if _bu_all_requested:
-            from flask import g
-
             from app.middleware.tenant_decorators import is_platform_admin
             from app.services.rbac_service import rbac_service
 
@@ -335,8 +349,33 @@ def application_list():
                 pass
 
         # Domain filter: direct field match on application_components.business_domain
+        # Matched the way ownership coverage counts a unit (case and surrounding spaces ignored),
+        # so the list a coverage figure opens holds the applications that figure counted.
         if domain_filter:
-            query = query.filter(ApplicationComponent.business_domain == domain_filter)
+            query = query.filter(_domain_matches_unit(domain_filter))
+        if no_domain_filter:
+            query = query.filter(outside_every_unit(g.current_org_id))
+
+        # T-council-10: data-quality summary filters. Each gap is one predicate,
+        # used by the filter here and by the summary counts below, so the figure
+        # in the summary is the number of rows its link then shows.
+        _has_owner = has_assigned_owner(g.current_org_id)
+        # The capability a row shows comes from application_capability_mapping,
+        # so that is the store the summary and the filter read.
+        _has_capability = db.exists().where(
+            ApplicationCapabilityMapping.application_component_id == ApplicationComponent.id,
+            ApplicationCapabilityMapping.business_capability_id.isnot(None),
+        )
+        # the one definition of "has a vendor": the Vendors pages' (a direct link, else the product's vendor)
+        _has_vendor = _app_vendor_expr().isnot(None)
+        if no_owner_filter:
+            query = query.filter(~_has_owner)
+        if has_owner_filter:
+            query = query.filter(_has_owner)
+        if no_capability_filter:
+            query = query.filter(~_has_capability)
+        if no_vendor_filter:
+            query = query.filter(~_has_vendor)
 
         # ── 4. Count filtered results ─────────────────────────────────────────
         if has_relationship_joins:
@@ -377,6 +416,54 @@ def application_list():
             pagination = query.order_by(order_by_clause).paginate(
                 page=page, per_page=page_size, error_out=False
             )
+
+        # T-council-10: batch-load owner display rows for the current page
+        from app.models.application_owner import ApplicationOwner
+        application_ids = [app.id for app in pagination.items]
+        owners_by_app = ApplicationOwner.get_display_rows_for_applications(
+            application_ids, g.current_org_id
+        )
+        # The Owner column answers the same question as the summary and the
+        # no-owner filter: is this application owned (has_assigned_owner)?
+        # When it is, show the people on its owner records, or the owner text
+        # recorded on the application when no record names anyone.
+        owned_ids = set()
+        if application_ids:
+            owned_ids = {
+                row[0]
+                for row in db.session.query(ApplicationComponent.id)
+                .filter(ApplicationComponent.id.in_(application_ids), _has_owner)
+                .all()
+            }
+        # The type column follows the one rule for an import: a repository until someone owns it.
+        from app.connectors.github import unpromoted_import_ids
+
+        repository_ids = unpromoted_import_ids(g.current_org_id, application_ids)
+        from app.connectors.github_gaps import application_gaps
+
+        imported_gaps = application_gaps(g.current_org_id, pagination.items, skip_ids=repository_ids)
+        owner_names_by_app = {}
+        for listed in pagination.items:
+            if listed.id not in owned_ids:
+                continue
+            names = [
+                o["user_name"]
+                for o in owners_by_app.get(listed.id, [])
+                if o.get("user_name") and o["user_name"] != "\u2014"
+            ]
+            if not names:
+                legacy = (listed.legacy_business_owner or listed.legacy_application_owner or "").strip()
+                names = [legacy] if legacy else ["Name not recorded"]
+            owner_names_by_app[listed.id] = names
+
+        from app.services import result_footer_service
+
+        origins = result_footer_service.application_origins(g.current_org_id, pagination.items)
+        footers_by_app = {
+            listed.id: result_footer_service.application_footer(
+                listed, owner_names_by_app.get(listed.id), origins=origins)
+            for listed in pagination.items
+        }
 
         # ── 6. Build filter option lists (deduplicated, normalised) ───────────
         def _distinct_normalised(col):
@@ -454,17 +541,23 @@ def application_list():
         # recorded on it or an application manager is assigned to it; the second half
         # is the same ownership the My Applications screens count for a user.
         owner_assigned_count = _stats_base.filter(
-            has_assigned_owner(current_user.organization_id)
+            has_assigned_owner(g.current_org_id)
         ).count()
-        vendor_assigned_count = _stats_base.filter(
-            db.or_(
-                db.and_(
-                    ApplicationComponent.vendor_name.isnot(None),
-                    ApplicationComponent.vendor_name != "",
-                ),
-                ApplicationComponent.vendor_product_id.isnot(None),
+
+        # T-council-10: count applications with a capability mapping
+        capability_mapped_count = _stats_base.filter(_has_capability).count()
+
+        # The summary counts the applications the list shows by default (the
+        # active portfolio unless decommissioned ones are included), so
+        # "N of M have no owner" is the number of rows its link then lists.
+        _summary_base = _stats_base
+        if not include_decom:
+            _summary_base = _summary_base.filter(
+                db.or_(
+                    ApplicationComponent.lifecycle_status.is_(None),
+                    func.lower(ApplicationComponent.lifecycle_status) != "5. decommissioned",
+                )
             )
-        ).count()
 
         stats = {
             "total": portfolio_total,
@@ -474,8 +567,18 @@ def application_list():
             "sunset_decom_pipeline": _lifecycle_count(_sunset_pipeline_vals),
             "decommissioned": decommissioned_count,
             "owner_assigned": owner_assigned_count,
-            "vendor_assigned": vendor_assigned_count,
+            "capability_mapped": capability_mapped_count,
+            "summary_total": _summary_base.count(),
+            "no_owner": _summary_base.filter(~_has_owner).count(),
+            "no_capability": _summary_base.filter(~_has_capability).count(),
+            "no_vendor": _summary_base.filter(~_has_vendor).count(),
         }
+        if not include_decom:
+            # the banner states the coverage the Vendors pages state, from the same function
+            coverage = system_coverage()
+            if coverage is not None:
+                stats["summary_total"] = coverage["total_systems"]
+                stats["no_vendor"] = coverage["unmapped_count"]
 
         # ── 8. Currency symbol ────────────────────────────────────────────────
         try:
@@ -488,9 +591,45 @@ def application_list():
             )
             currency_symbol = "\u00a3"
 
+        # T-council-10: active filter flags for chip display
+        active_filters = {
+            "no_owner": no_owner_filter,
+            "no_capability": no_capability_filter,
+            "no_vendor": no_vendor_filter,
+            "has_owner": has_owner_filter,
+            "no_domain": no_domain_filter,
+        }
+        # A chip's remove link keeps every other filter the list was opened with.
+        chip_remove_urls = {
+            key: url_for(
+                "unified_applications.application_list",
+                **{k: v for k, v in request.args.items() if k not in (key, "page")},
+            )
+            for key in ("has_owner", "no_domain")
+        }
+
+        run_cost = None
+        try:
+            from flask_login import current_user as _viewer
+
+            from app.middleware.tenant_context import current_org_id as _org_of_request
+            from app.modules.dashboard.services.overview_figures import run_cost_line
+
+            _org = _org_of_request()
+            run_cost = run_cost_line(_org, _viewer) if _org is not None else None
+        except Exception:
+            current_app.logger.warning("Run cost could not be read for the applications list", exc_info=True)
+            db.session.rollback()
+
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
         return render_template(
             "applications/list_simple.html",
+            run_cost=run_cost,
+            costs_withheld=not costs_visible(_viewer),
+            costs_withheld_sentence=COSTS_WITHHELD,
             applications=pagination.items,
+            chip_remove_urls=chip_remove_urls,
             total_count=total_count,
             portfolio_total=portfolio_total,
             current_page=page,
@@ -523,6 +662,12 @@ def application_list():
             qs_include_decom_false=qs_include_decom_false,
             sort=sort_param if sort_column is not None else "",
             dir=sort_dir,
+            active_filters=active_filters,
+            owners_by_app=owners_by_app,
+            owner_names_by_app=owner_names_by_app,
+            footers_by_app=footers_by_app,
+            repository_ids=repository_ids,
+            imported_gaps=imported_gaps,
         )
 
     except Exception as exc:
@@ -608,9 +753,11 @@ def api_list():
 
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         apps = pagination.items
+        from app.connectors.github import unpromoted_import_ids
 
         # Enrich with capability counts for picker context
         app_ids = [app.id for app in apps]
+        unpromoted = unpromoted_import_ids(g.current_org_id, app_ids)
         cap_counts = {}
         if app_ids:
             try:
@@ -645,6 +792,7 @@ def api_list():
                         "lifecycle_status": app.lifecycle_status or "",
                         "capability_count": cap_counts.get(app.id, 0),
                         "created_at": app.created_at.isoformat() if app.created_at else None,
+                        "unpromoted_import": app.id in unpromoted,
                     }
                     for app in apps
                 ],

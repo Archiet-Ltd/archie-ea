@@ -35,30 +35,34 @@ else:
         # MoSCoW prioritisation (TPM-006)
         moscow_priority = db.Column(db.String(16), nullable=True)  # MUST/SHOULD/COULD/WONT
 
-        # WSJF components (TPM-006)
-        business_value = db.Column(db.Integer, default=1)
-        time_criticality = db.Column(db.Integer, default=1)
-        risk_reduction = db.Column(db.Integer, default=1)
-        job_size = db.Column(db.Integer, default=1)
+        # WSJF components — empty until a person records them
+        business_value = db.Column(db.Integer)
+        time_criticality = db.Column(db.Integer)
+        risk_reduction = db.Column(db.Integer)
+        job_size = db.Column(db.Integer)
 
-        # RICE components (TPM-006)
-        reach = db.Column(db.Integer, default=0)
-        impact = db.Column(db.Integer, default=1)
-        confidence = db.Column(db.Integer, default=100)
+        # RICE components — empty until a person records them
+        reach = db.Column(db.Integer)
+        impact = db.Column(db.Integer)
+        confidence = db.Column(db.Integer)
 
         @property
         def wsjf_score(self):
-            cod = (self.business_value or 1) + (self.time_criticality or 1) + (self.risk_reduction or 1)
-            return round(cod / max(self.job_size or 1, 1), 2)
+            """None until all four WSJF inputs are recorded."""
+            from app.services.wsjf_service import compute_wsjf_score
+
+            parts = (self.business_value, self.time_criticality, self.risk_reduction, self.job_size)
+            if any(part is None for part in parts) or self.job_size < 1:
+                return None
+            return compute_wsjf_score(*parts)
 
         @property
         def rice_score(self):
-            sp = self.story_points or 1
-            return round(
-                ((self.reach or 0) * (self.impact or 1) * ((self.confidence or 100) / 100))
-                / max(sp, 1),
-                2,
-            )
+            """None until reach, impact, confidence and story points are all recorded."""
+            parts = (self.reach, self.impact, self.confidence, self.story_points)
+            if any(part is None for part in parts) or self.story_points < 1:
+                return None
+            return round((self.reach * self.impact * (self.confidence / 100)) / self.story_points, 2)
 
         def __repr__(self):
             return f"<Requirement {self.title or self.category or self.id}>"

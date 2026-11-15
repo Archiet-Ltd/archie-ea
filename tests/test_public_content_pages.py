@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from app.services.origin import canonical_origin
+import app.services.public_pages as public_pages
 from app.services.public_pages import (
     CONTENT_ROOT,
     FAMILY_DIR_MAP,
@@ -28,6 +30,7 @@ from app.services.public_pages import (
     load_all_pages,
     load_feed_pages,
     load_page,
+    role_hub_cards,
 )
 
 
@@ -484,7 +487,7 @@ def test_sitemap_xml_includes_every_page(app):
     not_planned)."""
     pages = load_all_pages()
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         assert rv.status_code == 200
         xml = rv.data.decode()
         assert xml.startswith('<?xml')
@@ -506,7 +509,7 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     from urllib.parse import urlparse
 
     with app.test_client() as client:
-        xml = client.get("/sitemap.xml").data.decode()
+        xml = client.get("/sitemap-en.xml").data.decode()
 
     entries = re.findall(r"<url>\s*<loc>([^<]+)</loc>(.*?)</url>", xml, flags=re.S)
     homepage = [(loc, rest) for loc, rest in entries if urlparse(loc).path == "/"]
@@ -518,7 +521,14 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     # the sitemap is built from the feed set, which leaves out a held page,
     # a merged page, and a page withdrawn from discovery (state:
     # not_planned) -- see app/services/public_pages.py::load_feed_pages.
-    assert len(entries) == len(load_feed_pages()) + 3
+    # The early-access hub and the page of each capability it lists, and one share page (/see/<slug>) for each
+    # recording, are views too.
+    from app.release_waves.routes import early_access_paths
+    from app.services.public_pages import share_page_paths
+
+    with app.app_context():
+        views = early_access_paths() + share_page_paths()
+    assert len(entries) == len(load_feed_pages()) + 3 + len(views)
 
 
 def test_withdrawn_pages_200_but_excluded_from_every_feed(app):
@@ -552,7 +562,7 @@ def test_withdrawn_pages_200_but_excluded_from_every_feed(app):
                 f"withdrawn page {page.url} should still render, got {rv.status_code}"
             )
 
-            sitemap = client.get("/sitemap.xml").data.decode()
+            sitemap = client.get("/sitemap-en.xml").data.decode()
             assert page.url not in sitemap, (
                 f"sitemap.xml should not include withdrawn page {page.url}"
             )
@@ -631,8 +641,12 @@ def test_indexnow_submission_matches_sitemap_urls(app, monkeypatch):
     )
 
     with app.test_client() as client:
-        sitemap_xml = client.get("/sitemap.xml").data.decode()
-    sitemap_paths = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml))
+        sitemap_xml = client.get("/sitemap-en.xml").data.decode()
+    # Extract the base URL from the sitemap (first <loc> entry)
+    import re
+    loc_match = re.search(r"<loc>(https://[^/]+)", sitemap_xml)
+    base_url = loc_match.group(1) if loc_match else "https://entelim.tech"
+    sitemap_paths = set(re.findall(rf"<loc>{re.escape(base_url)}([^<]*)</loc>", sitemap_xml))
     submitted_paths = {urlparse(url).path or "/" for url in submitted}
 
     assert submitted_paths == sitemap_paths, (
@@ -689,7 +703,7 @@ def test_llms_txt_has_correct_content_type(app):
 def test_sitemap_xml_has_correct_content_type(app):
     """/sitemap.xml returns application/xml."""
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         assert "xml" in rv.content_type
 
 
@@ -717,7 +731,7 @@ def test_llms_txt_has_capabilities_section(app):
             # Title should appear
             assert page.title in text, f"llms.txt Capabilities section missing title '{page.title}'"
             # Should have a descriptive sentence (the — separator)
-            assert f"[{page.title}](https://entelim.org{page.url}) —" in text, (
+            assert f"[{page.title}](https://entelim.tech{page.url}) —" in text, (
                 f"llms.txt Capabilities section missing description for {page.url}"
             )
 
@@ -816,14 +830,14 @@ def test_llms_full_txt_includes_urls(app):
 
         for page in target_pages:
             if _is_merged(page) or page.is_held:
-                # Checked as its own "URL: https://entelim.org<path>" line
+                # Checked as its own "URL: https://entelim.tech<path>" line
                 # (the exact format llms_full_txt emits for an included
                 # page's own entry), not a bare substring: a held/merged
                 # page's old URL can still legitimately appear as an
                 # inline link inside a still-included page's own body
                 # copy, which is not the same as llms-full.txt carrying
                 # its own entry for that page.
-                assert f"URL: https://entelim.org{page.url}" not in text, (
+                assert f"URL: https://entelim.tech{page.url}" not in text, (
                     f"llms-full.txt should not include a merged/held/withdrawn "
                     f"page entry for {page.url}"
                 )
@@ -878,8 +892,8 @@ def test_llms_txt_first_sentence_not_glued_to_title(app):
     # Find the line for portfolio in the Capabilities section
     import re
 
-    # Pattern: - [Portfolio](https://entelim.org/modules/portfolio) — <sentence>
-    pattern = rf"\[{re.escape(page.title)}\]\(https://entelim\.org{re.escape(page.url)}\) — ([^\n]+)"
+    # Pattern: - [Portfolio](https://entelim.tech/modules/portfolio) — <sentence>
+    pattern = rf"\[{re.escape(page.title)}\]\(https://entelim\.tech{re.escape(page.url)}\) — ([^\n]+)"
     match = re.search(pattern, text)
     assert match is not None, "portfolio entry not found in llms.txt Capabilities section"
 
@@ -980,7 +994,12 @@ def test_comparison_pages_have_faq_jsonld(app):
 
 def test_module_pages_have_software_application_jsonld(app):
     """Module pages have SoftwareApplication JSON-LD."""
-    pages = [p for p in load_all_pages() if p.family == "module" and not _is_merged(p)]
+    # A module still on the waiting list is a plain page: no software node for a
+    # capability that cannot be used yet.
+    pages = [
+        p for p in load_all_pages()
+        if p.family == "module" and not _is_merged(p) and p.cta != "waiting_list"
+    ]
     assert len(pages) > 0, "No module pages found"
     with app.test_client() as client:
         for page in pages[:5]:  # Sample first 5
@@ -1074,7 +1093,7 @@ This is a test module page.
             assert "Test Module Title" in html
 
             # AC5b: Appears in sitemap
-            rv = client.get("/sitemap.xml")
+            rv = client.get("/sitemap-en.xml")
             assert "/modules/zzz-test-temp-module" in rv.data.decode()
 
             # AC5c: Appears in llms.txt
@@ -1120,7 +1139,7 @@ Content for the test segment page.
             assert 'application/ld+json' in html
 
             # Verify in sitemap and llms.txt
-            rv = client.get("/sitemap.xml")
+            rv = client.get("/sitemap-en.xml")
             assert "/use-cases/zzz-test-new-segment" in rv.data.decode()
 
             rv = client.get("/llms.txt")
@@ -1302,7 +1321,7 @@ def test_comparison_external_url():
     page = load_page("comparison", slug="leanix")
     assert page is not None
     assert page.external_url == "https://archiet.ai/vs/leanix"
-    assert page.self_canonical_url == "https://entelim.org/vs/leanix"
+    assert page.self_canonical_url == "https://entelim.tech/vs/leanix"
 
 
 def test_non_comparison_no_external_url():
@@ -1334,8 +1353,10 @@ def test_no_waiting_list_on_non_cta_pages(app):
     with app.test_client() as client:
         rv = client.get("/modules/applications")
         html = rv.data.decode()
-        # applications has no cta field, so no waiting list
-        assert "Join the waiting list" not in html
+        # applications has no cta field, so no waiting list. The site menus (the
+        # Coming soon column) are the shell, not this page's content.
+        content = re.sub(r"<footer.*?</footer>", "", re.sub(r"<header.*?</header>", "", html, flags=re.DOTALL), flags=re.DOTALL)
+        assert "Join the waiting list" not in content
 
 
 def test_page_count_consistency(app):
@@ -1693,10 +1714,10 @@ code block
 def test_sitemap_includes_homepage(app):
     """/sitemap.xml includes the homepage URL."""
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         assert rv.status_code == 200
         xml = rv.data.decode()
-        assert "<loc>https://entelim.org/</loc>" in xml, (
+        assert "<loc>https://entelim.tech/</loc>" in xml, (
             "sitemap.xml missing homepage URL"
         )
 
@@ -1704,7 +1725,7 @@ def test_sitemap_includes_homepage(app):
 def test_sitemap_homepage_has_priority(app):
     """/sitemap.xml homepage entry has priority 1.0."""
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         xml = rv.data.decode()
         assert "<priority>1.0</priority>" in xml, (
             "sitemap.xml homepage missing priority"
@@ -1719,7 +1740,7 @@ def test_sitemap_still_includes_all_content_pages(app):
 
     pages = load_all_pages()
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         xml = rv.data.decode()
         for page in pages:
             if _is_merged(page) or page.is_held:
@@ -1737,7 +1758,7 @@ def test_sitemap_xml_valid_with_homepage(app):
     import xml.etree.ElementTree as ET
 
     with app.test_client() as client:
-        rv = client.get("/sitemap.xml")
+        rv = client.get("/sitemap-en.xml")
         xml = rv.data.decode()
         # Must parse as valid XML
         try:
@@ -1773,37 +1794,40 @@ def test_xss_sanitization_cross_org(app):
 
 # ── robots.txt crawl-access guard ──────────────────────────────────────────
 #
-# app/static/robots.txt is an explicit allow-list: every ``Allow:`` line
-# names one path a crawler may fetch, and the file ends in a catch-all
-# ``Disallow: /`` that blocks anything not explicitly named. That shape makes
-# it easy to add a new public page or a new crawler-facing file (llms.txt,
-# llms-full.txt, sitemap.xml) without ever adding the matching ``Allow:``
-# line — the page renders fine for a signed-out visitor, and is simply
-# invisible to every crawler.
+# robots.txt is generated by the /robots.txt route (app/services/crawl_rules.py):
+# everything is allowed except the routes that are not public pages. A new
+# public page or crawler-facing file is therefore never blocked by an
+# allow-list line nobody wrote — the page renders fine for a signed-out
+# visitor and stays invisible to every crawler only when a rule names it.
 #
 # This guard treats /sitemap.xml, /llms.txt and /llms-full.txt as the three
 # places a real crawler discovers the rest of the site, fetches each one for
 # real, collects every entelim.org URL any of them names (plus their own
-# three paths), and checks each one against the actual rules in robots.txt
+# three paths), and checks each one against the actual rules the route serves
 # using the same longest-match-wins algorithm real crawlers use. A URL that
 # is reachable from one of those three files but not allowed by robots.txt
 # fails this test by name.
 
-_ROBOTS_TXT_PATH = Path(__file__).resolve().parent.parent / "app" / "static" / "robots.txt"
-
 # The three files a crawler uses to discover the rest of the site. Each
 # one's own path must be allowed, and so must every entelim.org URL it names.
-_CRAWLER_FACING_ENDPOINTS = ["/sitemap.xml", "/llms.txt", "/llms-full.txt"]
+_CRAWLER_FACING_ENDPOINTS = ["/sitemap-en.xml", "/llms.txt", "/llms-full.txt"]
 
 
-def _parse_robots_rules(text: str) -> list[tuple[str, str]]:
-    """Return the ordered ``(directive, pattern)`` rules for ``User-agent: *``.
+# The crawlers whose rules every discoverable URL is checked against.
+_ROBOTS_CHECKED_AGENTS = ["*", "Googlebot", "Bingbot", "GPTBot", "ClaudeBot", "PerplexityBot"]
 
-    Only the rule lines that apply to the wildcard user-agent group are
-    kept, in file order, which is all this robots.txt has.
+
+def _parse_robots_rules(text: str, agent: str = "*") -> list[tuple[str, str]]:
+    """Return the ordered ``(directive, pattern)`` rules that apply to ``agent``.
+
+    A crawler obeys the group naming it most specifically (a group token
+    contained in its name, longest first) and the ``*`` group only when no
+    group names it. Lines ending in ``$`` are kept: the anchor belongs to
+    the pattern.
     """
-    rules: list[tuple[str, str]] = []
-    group_applies = False
+    groups: dict[str, list[tuple[str, str]]] = {}
+    current: list[str] = []
+    last_was_agent = False
     for raw_line in text.splitlines():
         line = raw_line.split("#", 1)[0].strip()
         if not line or ":" not in line:
@@ -1812,22 +1836,31 @@ def _parse_robots_rules(text: str) -> list[tuple[str, str]]:
         key = key.strip().lower()
         value = value.strip()
         if key == "user-agent":
-            group_applies = value == "*"
+            if not last_was_agent:
+                current = []
+            current.append(value.lower())
+            groups.setdefault(value.lower(), [])
+            last_was_agent = True
             continue
-        if not group_applies:
-            continue
+        last_was_agent = False
         if key in ("allow", "disallow") and value:
-            rules.append((key, value))
-    return rules
+            for token in current:
+                groups[token].append((key, value))
+    name = agent.lower()
+    named = [t for t in groups if t != "*" and t in name]
+    if named:
+        return groups[max(named, key=len)]
+    return groups.get("*", [])
 
 
 def _robots_pattern_matches(pattern: str, path: str) -> bool:
-    """A robots.txt pattern matches a path by prefix, except a trailing
-    ``$`` which anchors the match to the exact path (used here only by
-    ``/$``, the home page)."""
-    if pattern.endswith("$"):
-        return path == pattern[:-1]
-    return path.startswith(pattern)
+    """A robots.txt pattern matches a path by prefix; ``*`` matches any run
+    of characters and a trailing ``$`` anchors the match to the end of the
+    path."""
+    regex = re.escape(pattern).replace(r"\*", ".*")
+    if regex.endswith(r"\$"):
+        regex = regex[:-2] + "$"
+    return re.match(regex, path) is not None
 
 
 def _robots_allows(rules: list[tuple[str, str]], path: str) -> bool:
@@ -1836,8 +1869,7 @@ def _robots_allows(rules: list[tuple[str, str]], path: str) -> bool:
     The longest matching pattern wins, the de facto standard algorithm most
     crawlers use, including Google's documented behaviour; a tie between an
     Allow and a Disallow of the same length favours Allow; a path matched by
-    no rule at all is allowed by default (this file has no such paths, since
-    its own last rule is the catch-all ``Disallow: /``).
+    no rule at all is allowed by default.
     """
     best_length = -1
     best_directive = "allow"
@@ -1850,11 +1882,11 @@ def _robots_allows(rules: list[tuple[str, str]], path: str) -> bool:
     return best_directive == "allow"
 
 
-def _entelim_paths_in(text: str) -> set[str]:
-    """Every ``https://entelim.org/...`` URL referenced in a rendered
+def _entelim_paths_in(text: str, origin: str) -> set[str]:
+    """Every URL on the site's configured ``origin`` referenced in a rendered
     response, reduced to its path."""
     paths = set()
-    for match in re.finditer(r"https://entelim\.org([^\s)\"'<>]*)", text):
+    for match in re.finditer(re.escape(origin) + r"([^\s)\"'<>]*)", text):
         paths.add(match.group(1) or "/")
     return paths
 
@@ -1869,26 +1901,46 @@ def _collect_must_allow_paths(client) -> set[str]:
     further URLs from.
     """
     paths: set[str] = set(_CRAWLER_FACING_ENDPOINTS)
+    with client.application.app_context():
+        origin = canonical_origin()
     for endpoint in _CRAWLER_FACING_ENDPOINTS:
         response = client.get(endpoint)
         if response.status_code == 200:
-            paths |= _entelim_paths_in(response.data.decode())
+            paths |= _entelim_paths_in(response.data.decode(), origin)
     return paths
 
 
-def test_every_crawler_discoverable_url_is_allowed_by_robots_txt(app):
-    """No URL reachable from sitemap.xml, llms.txt or llms-full.txt, and none
-    of those three files' own paths, is blocked by robots.txt's catch-all
-    ``Disallow: /``."""
-    rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
-    with app.test_client() as client:
-        must_allow = _collect_must_allow_paths(client)
+def test_the_crawl_reads_the_urls_a_sitemap_names():
+    sitemap = "<urlset><url><loc>https://entelim.tech/vs</loc></url></urlset>"
+    assert _entelim_paths_in(sitemap, "https://entelim.tech") == {"/vs"}
+    assert _entelim_paths_in(sitemap, "https://entelim.org") == set()
 
-    blocked = sorted(path for path in must_allow if not _robots_allows(rules, path))
-    assert not blocked, (
-        "robots.txt blocks these URLs that a crawler reaches from sitemap.xml, "
-        "llms.txt or llms-full.txt: " + ", ".join(blocked)
-    )
+
+@pytest.mark.parametrize("legal_pages_enabled", [False, True], ids=["legal-off", "legal-on"])
+def test_every_crawler_discoverable_url_is_allowed_by_robots_txt(app, legal_pages_enabled):
+    """No URL reachable from sitemap.xml, llms.txt or llms-full.txt, and none
+    of those three files' own paths, is blocked by the served robots.txt for any of the named crawlers, with the legal pages
+    switched off and on. The signed-in product stays disallowed."""
+    app.config["LEGAL_PAGES_ENABLED"] = legal_pages_enabled
+    try:
+        with app.test_client() as client:
+            robots = client.get("/robots.txt").get_data(as_text=True)
+            must_allow = _collect_must_allow_paths(client)
+            sitemap = client.get("/sitemap-en.xml").data.decode()
+    finally:
+        app.config["LEGAL_PAGES_ENABLED"] = False
+
+    assert len(must_allow) > len(_CRAWLER_FACING_ENDPOINTS), "the crawl found nothing beyond the three endpoint paths"
+    assert "/cookie-policy" in sitemap or not legal_pages_enabled, "legal pages missing from the sitemap with the flag on"
+    for agent in _ROBOTS_CHECKED_AGENTS:
+        rules = _parse_robots_rules(robots, agent)
+        blocked = sorted(path for path in must_allow if not _robots_allows(rules, path))
+        assert not blocked, (
+            f"robots.txt blocks these URLs for {agent} that a crawler reaches from sitemap.xml, "
+            "llms.txt or llms-full.txt: " + ", ".join(blocked)
+        )
+        for path in ("/dashboard/overview", "/applications/"):
+            assert not _robots_allows(rules, path), f"{path} is a signed-in page and must stay disallowed for {agent}"
 
 
 def test_robots_root_dollar_matches_only_exact_root():
@@ -2059,7 +2111,12 @@ def test_cta_plans_url_slug_matches_a_real_route(app):
     """
     from werkzeug.exceptions import MethodNotAllowed, NotFound
 
-    adapter = app.url_map.bind("entelim.org")
+    with app.app_context():
+        from app.services.origin import canonical_origin
+        base = canonical_origin()
+        # Extract host from base URL (e.g., "https://entelim.tech" -> "entelim.tech")
+        host = base.replace("https://", "").replace("http://", "")
+        adapter = app.url_map.bind(host)
     pages = [
         p for p in load_all_pages() if p.family in ("module", "function-per-segment")
     ]
@@ -2362,12 +2419,11 @@ def test_use_cases_index_groups_by_segment(app):
 def test_use_cases_index_in_robots_and_sitemap(app):
     """/use-cases (the index) is allowed by robots.txt and listed in the
     sitemap, same as every other public index."""
-    rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
-    assert _robots_allows(rules, "/use-cases"), "robots.txt blocks /use-cases"
-
     with app.test_client() as client:
-        xml = client.get("/sitemap.xml").data.decode()
-    assert "<loc>https://entelim.org/use-cases</loc>" in xml
+        rules = _parse_robots_rules(client.get("/robots.txt").get_data(as_text=True))
+        assert _robots_allows(rules, "/use-cases"), "robots.txt blocks /use-cases"
+        xml = client.get("/sitemap-en.xml").data.decode()
+    assert "<loc>https://entelim.tech/use-cases</loc>" in xml
 
 
 # ── Home page: curated use-case highlights per segment, plus the /vs hub ──
@@ -2426,14 +2482,14 @@ def test_two_click_reachability_from_home_page(app):
         hrefs = re.findall(r'href="([^"]+)"', html)
         paths = set()
         for href in hrefs:
-            if href.startswith("https://entelim.org"):
-                href = href[len("https://entelim.org"):] or "/"
+            if href.startswith("https://entelim.tech"):
+                href = href[len("https://entelim.tech"):] or "/"
             if href.startswith("/") and not href.startswith("//"):
                 paths.add(urlparse(href).path)
         return paths
 
     with app.test_client() as client:
-        sitemap_xml = client.get("/sitemap.xml").data.decode()
+        sitemap_xml = client.get("/sitemap-en.xml").data.decode()
         must_reach = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml))
         must_reach.discard("/")  # the home page itself, not a link target
 
@@ -2465,20 +2521,24 @@ import html as _html  # noqa: E402
 
 @contextlib.contextmanager
 def _temp_pages(files: dict[str, str]):
-    """Write content files (relative path under content/pages/ -> text) and
-    remove them afterwards, whatever happens in between."""
-    written: list[Path] = []
-    try:
+    """Run with a temporary copy of the content folder holding these files
+    (relative path under content/pages/ -> text). The shared folder is never
+    written, so two test workers cannot see each other's pages."""
+    import shutil
+    from unittest import mock
+
+    import app.services.public_pages as public_pages
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "pages"
+        shutil.copytree(public_pages.CONTENT_ROOT, root)
         for rel, text in files.items():
-            path = CONTENT_ROOT / rel
+            path = root / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             assert not path.exists(), f"refusing to overwrite real content: {rel}"
             path.write_text(text, encoding="utf-8")
-            written.append(path)
-        yield
-    finally:
-        for path in written:
-            path.unlink(missing_ok=True)
+        with mock.patch.object(public_pages, "CONTENT_ROOT", root):
+            yield
 
 
 def _page_md(title: str, group_line: str = "", state: str = "on_main", body: str = "A short answer.") -> str:
@@ -2502,60 +2562,124 @@ def _feed_urls(family: str) -> list[tuple[str, str]]:
     return [(p.url, p.title) for p in load_feed_pages() if p.family == family]
 
 
+def _role_cards_on(html: str) -> list[str]:
+    """The role cards the /roles hub shows, in page order."""
+    return re.findall(r'<a href="([^"]+)"[^>]*data-role-card', html)
+
+
+def _registry_role_cards(app) -> list[dict]:
+    from app.services.site_registry import site_registry
+
+    with app.test_request_context("/roles"):
+        return site_registry()["roles"]["cards"]
+
+
+def _hub_ld_urls(html: str) -> list[str]:
+    """The page URLs the hub's CollectionPage structured data lists, in order."""
+    (ld,) = _jsonld_blocks(html)
+    items = _graph_types(ld)["CollectionPage"]["mainEntity"]["itemListElement"]
+    return [item["url"].removeprefix("https://entelim.tech") for item in items]
+
+
 def test_role_and_connector_feed_pages_are_linked_from_their_hub(app):
     files = {
-        "roles/zzz-hub-known.md": _page_md("Zzz Hub Known Role", "role_group: architecture\n"),
-        "roles/zzz-hub-nogroup.md": _page_md("Zzz Hub Ungrouped Role"),
         "roles/zzz-hub-held.md": _page_md("Zzz Hub Held Role", state="not_planned"),
         "connectors/zzz-hub-known.md": _page_md("Zzz Hub Known Connector", "connector_group: sign-in\n"),
         "connectors/zzz-hub-nogroup.md": _page_md("Zzz Hub Ungrouped Connector"),
         "connectors/zzz-hub-held.md": _page_md("Zzz Hub Held Connector", state="not_planned"),
     }
     with _temp_pages(files), app.test_client() as client:
-        for family, hub in (("role", "/roles"), ("connector", "/connectors")):
-            rv = client.get(hub)
-            assert rv.status_code == 200
-            html = rv.data.decode()
-            entries = _feed_urls(family)
-            assert len(entries) >= 2
-            for url, title in entries:
-                assert f'href="{url}"' in html, f"{hub} does not link {url}"
-                assert _html.escape(title, quote=False) in html
-            assert f"{FAMILY_URL_PREFIX[family]}/zzz-hub-held" not in html
-            assert "Zzz Hub Held" not in html
-            assert f'href="{FAMILY_URL_PREFIX[family]}/zzz-hub-nogroup"' in html
+        # Roles: every registry entry has a card, and each card lands on a page with content.
+        rv = client.get("/roles")
+        assert rv.status_code == 200
+        html = rv.data.decode()
+        cards = _role_cards_on(html)
+        expected = [c["href"] for group in role_hub_cards(_registry_role_cards(app)) for c in group["cards"]]
+        assert len(expected) >= 2
+        assert cards == expected
+        # What the structured data lists is the cards, in the same order.
+        assert _hub_ld_urls(html) == cards
+        for href in cards:
+            landed = client.get(href)
+            assert landed.status_code == 200, f"/roles card {href} does not open"
+            assert "<h1" in landed.data.decode(), f"/roles card {href} opens a page with no heading"
+        assert "Zzz Hub Held" not in html
+
+        # Connectors: the hub still lists every live feed page.
+        rv = client.get("/connectors")
+        assert rv.status_code == 200
+        html = rv.data.decode()
+        entries = _feed_urls("connector")
+        assert len(entries) >= 2
+        for url, title in entries:
+            assert f'href="{url}"' in html, f"/connectors does not link {url}"
+            assert _html.escape(title, quote=False) in html
+        assert f"{FAMILY_URL_PREFIX['connector']}/zzz-hub-held" not in html
+        assert "Zzz Hub Held" not in html
+        assert f'href="{FAMILY_URL_PREFIX["connector"]}/zzz-hub-nogroup"' in html
+
+
+def test_a_role_page_with_no_family_is_carded_under_other_roles(app):
+    files = {"roles/zzz-nofamily.md": _page_md("Zzz Nofamily Role", body="")}
+    with _temp_pages(files), app.test_client() as client:
+        html = client.get("/roles").data.decode()
+        cards = _role_cards_on(html)
+        assert "/roles/zzz-nofamily" in cards
+        assert _hub_ld_urls(html) == cards
+        assert "Other roles" in html
+        # No description: a plain line from the title, not an empty blurb.
+        assert "Read the guide for Zzz Nofamily Role" in html
+        assert client.get("/roles/zzz-nofamily").status_code == 200
+
+
+def test_a_held_registry_role_page_has_no_card_and_no_structured_data_entry(app):
+    registry = _registry_role_cards(app)
+    held_href = registry[0]["cards"][0]["href"]
+    original = next(p for p in load_all_pages() if p.url == held_href)
+    held = original.source_path.read_text(encoding="utf-8")
+    assert "state: not_planned" not in held
+    body = re.sub(r"^state:.*$", "state: not_planned", held, count=1, flags=re.M)
+    if body == held:
+        body = held.replace("---\n", "---\nstate: not_planned\n", 1)
+    original_root = public_pages.CONTENT_ROOT
+    with _temp_pages({}), app.test_client() as client:
+        target = public_pages.CONTENT_ROOT / original.source_path.relative_to(original_root)
+        assert target.exists()
+        target.write_text(body, encoding="utf-8")
+        html = client.get("/roles").data.decode()
+        cards = _role_cards_on(html)
+        assert held_href not in cards
+        assert held_href not in _hub_ld_urls(html)
+        assert _hub_ld_urls(html) == cards
+        assert len(cards) >= 2
 
 
 def test_roles_and_connectors_hub_groups_and_extra_entries(app):
-    from app.services.public_pages import (
-        CONNECTOR_HUB_EXTRA_ENTRIES,
-        ROLE_HUB_EXTRA_ENTRIES,
-        hub_extra_entries,
-    )
+    from app.services.public_pages import CONNECTOR_HUB_EXTRA_ENTRIES, hub_extra_entries
 
     files = {
-        "roles/zzz-grp-a.md": _page_md("Zzz Grp Owner", "role_group: owners\n"),
-        "roles/zzz-grp-b.md": _page_md("Zzz Grp Architect", "role_group: architecture\n"),
-        "roles/zzz-grp-c.md": _page_md("Zzz Grp Unknown", "role_group: no-such-group\n"),
         "connectors/zzz-grp-a.md": _page_md("Zzz Grp Collab", "connector_group: collaboration\n"),
         "connectors/zzz-grp-b.md": _page_md("Zzz Grp Assistant", "connector_group: ai-assistants\n"),
     }
     with _temp_pages(files), app.test_client() as client:
+        # Roles: the rebuilt hub shows one section per role family, in registry order, the
+        # startup family first, and a role card sits in the section of its own family.
         role_html = client.get("/roles").data.decode()
-        assert (
-            role_html.index("<h2>Architecture</h2>")
-            < role_html.index("<h2>Owners</h2>")
-            < role_html.index("<h2>More</h2>")
-        )
-        # Empty groups are not rendered.
-        assert "<h2>Security, risk and compliance</h2>" not in role_html
+        families = role_hub_cards(_registry_role_cards(app))
+        assert families[0]["id"] == "startups-and-scale-ups"
+        headings = re.findall(r'<h2 id="([^"]+)"[^>]*>([^<]+)</h2>', role_html)
+        assert headings == [(f["id"], f["label"]) for f in families]
+        for family in families:
+            section = role_html.split(f'aria-labelledby="{family["id"]}"')[1].split("</section>")[0]
+            assert _role_cards_on(section) == [c["href"] for c in family["cards"]]
 
         conn_html = client.get("/connectors").data.decode()
         assert conn_html.index("<h2>AI assistants</h2>") < conn_html.index("<h2>Collaboration</h2>")
         assert "<h2>Sign-in</h2>" not in conn_html
 
         feed_titles = {p.url: p.title for p in load_feed_pages()}
-        for entries, html in ((ROLE_HUB_EXTRA_ENTRIES, role_html), (CONNECTOR_HUB_EXTRA_ENTRIES, conn_html)):
+        assert _hub_ld_urls(role_html) == _role_cards_on(role_html)
+        for entries, html in ((CONNECTOR_HUB_EXTRA_ENTRIES, conn_html),):
             for label, urls in entries:
                 live = [u for u in urls if u in feed_titles]
                 assert (f"<h2>{label}</h2>" in html) == bool(live)
@@ -2586,7 +2710,9 @@ def test_every_role_page_links_every_sibling(app):
         for url in role_urls:
             html = client.get(url).data.decode()
             assert "<h2>Other roles</h2>" in html
-            links = _hrefs(html)
+            # The strip only: the site navbar and footer link every role page, this page included.
+            strip = html[html.index('aria-label="Other roles"'):]
+            links = _hrefs(strip[: strip.index("</section>")])
             for other in role_urls:
                 assert (other in links) == (other != url), f"{url} vs {other}"
             for _, targets in ROLE_HUB_EXTRA_ENTRIES:
@@ -2614,13 +2740,15 @@ def test_modules_integrations_301_to_connectors(app):
     assert "/modules/integrations" not in feed_page_paths()
 
 
-def test_assistant_connector_page_is_held():
+def test_assistant_connector_page_is_live_and_listed():
+    """Connecting the customer's own AI assistant works on every plan, so its page is
+    indexable and the /connectors hub lists it."""
     page = load_page("connector", slug="ai-assistants")
     assert page is not None, "ai-assistants connector page not found"
-    assert _is_held(page), (
-        "ai-assistants connector page should be held (its own front matter "
-        "sets state: held)"
-    )
+    assert not _is_held(page), "ai-assistants connector page should be live, not held"
+    from app.services.public_pages import feed_page_paths
+
+    assert "/connectors/ai-assistants" in feed_page_paths()
 
 
 def test_features_page_shows_captured_module_screenshots(app):
@@ -2693,11 +2821,20 @@ def test_hub_jsonld_collection_page(app):
             items = nodes["CollectionPage"]["mainEntity"]
             assert items["@type"] == "ItemList"
             named = {item["url"]: item["name"] for item in items["itemListElement"]}
-            linked = _hrefs(html)
-            for family in families:
-                for url, title in _feed_urls(family):
-                    assert named.get(f"https://entelim.org{url}") == title
-                    assert url in linked
+            if path == "/roles":
+                # The structured data names exactly the cards on the page, in card order,
+                # and every live role page has a card.
+                cards = _role_cards_on(html)
+                assert cards
+                assert _hub_ld_urls(html) == cards
+                for url, _title in _feed_urls("role"):
+                    assert url in cards, f"/roles has no card for {url}"
+            else:
+                linked = _hrefs(html)
+                for family in families:
+                    for url, title in _feed_urls(family):
+                        assert named.get(f"https://entelim.tech{url}") == title
+                        assert url in linked
             positions = [item["position"] for item in items["itemListElement"]]
             assert positions == list(range(1, len(positions) + 1))
             assert nodes["BreadcrumbList"]["itemListElement"][0]["name"] == "Home"
@@ -2718,9 +2855,9 @@ def test_role_and_connector_pages_breadcrumb(app):
             assert "WebPage" in nodes
             trail = [(i["name"], i["item"]) for i in nodes["BreadcrumbList"]["itemListElement"]]
             assert trail == [
-                ("Home", "https://entelim.org/"),
-                (parent[0], f"https://entelim.org{parent[1]}"),
-                (title, f"https://entelim.org{url}"),
+                ("Home", "https://entelim.tech/"),
+                (parent[0], f"https://entelim.tech{parent[1]}"),
+                (title, f"https://entelim.tech{url}"),
             ]
 
 
@@ -2728,38 +2865,36 @@ def test_hub_noindex_until_intro_exists(app):
     for hub in ("/roles", "/connectors"):
         slug = hub.lstrip("/")
         intro_path = CONTENT_ROOT / "site" / f"{slug}.md"
-        sitemap_loc = f"<loc>https://entelim.org{hub}</loc>"
+        sitemap_loc = f"<loc>https://entelim.tech{hub}</loc>"
         with app.test_client() as client:
             if intro_path.exists():
                 # A real intro has landed: the hub is indexable, listed once.
                 assert 'name="robots" content="noindex"' not in client.get(hub).data.decode()
-                assert client.get("/sitemap.xml").data.decode().count(sitemap_loc) == 1
+                assert client.get("/sitemap-en.xml").data.decode().count(sitemap_loc) == 1
                 continue
             assert 'name="robots" content="noindex"' in client.get(hub).data.decode()
-            assert sitemap_loc not in client.get("/sitemap.xml").data.decode()
+            assert sitemap_loc not in client.get("/sitemap-en.xml").data.decode()
             intro = _page_md(f"{slug.title()} hub intro", body="What you can find here.")
             with _temp_pages({f"site/{slug}.md": intro}):
                 html = client.get(hub).data.decode()
                 assert 'name="robots" content="noindex"' not in html
                 assert f"{slug.title()} hub intro" in html
-                assert client.get("/sitemap.xml").data.decode().count(sitemap_loc) == 1
+                assert client.get("/sitemap-en.xml").data.decode().count(sitemap_loc) == 1
             # A held intro keeps the hub out of the index.
             held = _page_md(f"{slug.title()} hub intro", state="not_planned")
             with _temp_pages({f"site/{slug}.md": held}):
                 assert 'name="robots" content="noindex"' in client.get(hub).data.decode()
-                assert sitemap_loc not in client.get("/sitemap.xml").data.decode()
+                assert sitemap_loc not in client.get("/sitemap-en.xml").data.decode()
 
 
-def test_robots_allows_role_and_connector_prefixes():
-    text = _ROBOTS_TXT_PATH.read_text(encoding="utf-8")
+def test_robots_allows_role_and_connector_prefixes(app):
+    with app.test_client() as client:
+        text = client.get("/robots.txt").get_data(as_text=True)
     rules = _parse_robots_rules(text)
     for path in ("/roles", "/roles/x", "/connectors", "/connectors/x"):
         assert _robots_allows(rules, path), path
-    for path in ("/rolesx", "/connectorsx"):
-        assert not _robots_allows(rules, path), path
-    assert [
-        line for line in text.splitlines() if line.startswith(("Allow: /roles", "Allow: /connectors"))
-    ] == ["Allow: /roles$", "Allow: /roles/", "Allow: /connectors$", "Allow: /connectors/"]
+    # robots.txt allows everything by default, so no line is written for a public section
+    assert not [line for line in text.splitlines() if line.startswith(("Disallow: /roles", "Disallow: /connectors"))]
 
 
 def test_new_role_page_appears_everywhere_with_no_other_edit(app):
@@ -2767,8 +2902,54 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
     with _temp_pages({"roles/zzz-e2e-role.md": page}), app.test_client() as client:
         assert client.get("/roles/zzz-e2e-role").status_code == 200
         hub = client.get("/roles").data.decode()
-        assert 'href="/roles/zzz-e2e-role"' in hub
-        assert hub.index("<h2>Architecture</h2>") < hub.index('href="/roles/zzz-e2e-role"')
-        assert "https://entelim.org/roles/zzz-e2e-role</loc>" in client.get("/sitemap.xml").data.decode()
-        rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
+        # A page no family lists still gets a card, in the last group, and the structured data
+        # names the same cards in the same order.
+        cards = _role_cards_on(hub)
+        assert "/roles/zzz-e2e-role" in cards
+        assert _hub_ld_urls(hub) == cards
+        other = hub.split('aria-labelledby="other-roles"')[1].split("</section>")[0]
+        assert "Other roles" in hub and _role_cards_on(other) == ["/roles/zzz-e2e-role"]
+        assert hub.index('aria-labelledby="other-roles"') > hub.index('aria-labelledby="startups-and-scale-ups"')
+        landed = client.get("/roles/zzz-e2e-role").data.decode()
+        assert "Zzz E2e Role" in landed
+        assert "https://entelim.tech/roles/zzz-e2e-role</loc>" in client.get("/sitemap-en.xml").data.decode()
+        rules = _parse_robots_rules(client.get("/robots.txt").get_data(as_text=True))
         assert _robots_allows(rules, "/roles/zzz-e2e-role")
+
+
+ROLE_PAGE_SLUGS = ("enterprise-architects", "cto-and-cio", "it-portfolio-managers", "solution-architects")
+
+
+def test_role_pages_are_live_and_listed_everywhere(app):
+    """The four role pages are on main: not held, in the hub, each other's strip, sitemap and llms.txt."""
+    with app.test_client() as client:
+        hub = client.get("/roles").data.decode()
+        sitemap = client.get("/sitemap-en.xml").data.decode()
+        llms = client.get("/llms.txt").data.decode()
+        for slug in ROLE_PAGE_SLUGS:
+            page = load_page("role", slug=slug)
+            assert not page.is_held, f"{slug} is still held"
+            url = "/roles/" + slug
+            assert url in hub and url in sitemap and url in llms, f"{slug} missing from hub, sitemap or llms.txt"
+            html = client.get(url).data.decode()
+            for other in ROLE_PAGE_SLUGS:
+                if other != slug:
+                    assert "/roles/" + other in html, f"{slug}: sibling strip does not list {other}"
+
+
+
+def test_robots_dollar_disallow_is_honoured():
+    rules = _parse_robots_rules("User-agent: *\nAllow: /pricing\nDisallow: /pricing$\n")
+    assert _robots_allows(rules, "/pricing") is False
+    assert _robots_allows(rules, "/pricing/x") is True
+
+
+def test_robots_named_bot_group_replaces_the_wildcard_group():
+    text = "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /pricing\n"
+    assert _robots_allows(_parse_robots_rules(text, "GPTBot"), "/pricing") is False
+    assert _robots_allows(_parse_robots_rules(text, "ClaudeBot"), "/pricing") is True
+
+
+def test_robots_star_wildcard_matches_any_run():
+    assert _robots_allows([("disallow", "/a*/b")], "/axx/b") is False
+    assert _robots_allows([("disallow", "/a*/b")], "/c") is True

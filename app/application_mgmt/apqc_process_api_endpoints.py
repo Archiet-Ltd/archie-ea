@@ -342,6 +342,189 @@ def _tier2_capability_bridge(process_ids):
     return vendors
 
 
+def _resolve_business_capability_ids_for_value_streams(value_stream_ids):
+    """Value streams -> the business capabilities they depend on.
+
+    Two existing links, both already populated for a tenant whose value
+    streams have been mapped: directly (value_stream_capabilities) and
+    through each value stream's stages (value_stream_stage_capabilities).
+    Both are plain association tables, so the automatic tenant filter on the
+    ValueStream / ValueStreamStage / BusinessCapability join partners is what
+    keeps this scoped to the signed-in organisation.
+    """
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.relationship_tables import (
+        value_stream_capabilities,
+        value_stream_stage_capabilities,
+    )
+    from app.models.unified_capability import ValueStream, ValueStreamStage
+
+    direct_cap_ids = [
+        row[0]
+        for row in db.session.query(BusinessCapability.id)
+        .join(
+            value_stream_capabilities,
+            value_stream_capabilities.c.business_capability_id == BusinessCapability.id,
+        )
+        .join(
+            ValueStream,
+            ValueStream.id == value_stream_capabilities.c.value_stream_id,
+        )
+        .filter(ValueStream.id.in_(value_stream_ids))
+        .all()
+    ]
+
+    stage_cap_ids = [
+        row[0]
+        for row in db.session.query(BusinessCapability.id)
+        .join(
+            value_stream_stage_capabilities,
+            value_stream_stage_capabilities.c.business_capability_id == BusinessCapability.id,
+        )
+        .join(
+            ValueStreamStage,
+            ValueStreamStage.id == value_stream_stage_capabilities.c.value_stream_stage_id,
+        )
+        .filter(ValueStreamStage.value_stream_id.in_(value_stream_ids))
+        .all()
+    ]
+
+    return list(set(direct_cap_ids + stage_cap_ids))
+
+
+def _vendor_coverage_for_business_capabilities(biz_cap_ids):
+    """Vendor coverage for an already-resolved set of BusinessCapability ids.
+
+    Same VendorProductCapability -> VendorProduct -> VendorOrganization join
+    the capability bridge above runs; shared here so value-stream discovery
+    does not grow a third copy of it.
+    """
+    from sqlalchemy import distinct, func
+
+    from app.models.vendor import VendorProductCapability
+    from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
+
+    vendor_coverage = (
+        db.session.query(
+            VendorOrganization.id,
+            VendorOrganization.name,
+            func.count(distinct(VendorProductCapability.business_capability_id)).label(
+                "cap_count"
+            ),
+            func.count(distinct(VendorProduct.id)).label("product_count"),
+        )
+        .join(VendorProduct, VendorOrganization.id == VendorProduct.vendor_organization_id)
+        .join(
+            VendorProductCapability,
+            VendorProduct.id == VendorProductCapability.vendor_product_id,
+        )
+        .filter(VendorProductCapability.business_capability_id.in_(biz_cap_ids))
+        .group_by(VendorOrganization.id, VendorOrganization.name)
+        .order_by(
+            func.count(distinct(VendorProductCapability.business_capability_id)).desc()
+        )
+        .limit(30)
+        .all()
+    )
+
+    if not vendor_coverage:
+        return []
+
+    total_caps = len(biz_cap_ids)
+    vendors = []
+    for vendor_id, vendor_name, cap_count, product_count in vendor_coverage:
+        vendors.append(
+            {
+                "id": vendor_id,
+                "name": vendor_name,
+                "supported_capabilities": cap_count,
+                "total_capabilities": total_caps,
+                "total_products": product_count,
+            }
+        )
+
+    return vendors
+
+
+@application_mgmt.route("/api/vendors/by-value-streams", methods=["POST"])
+@login_required
+def api_get_vendors_by_value_streams():
+    """Get vendors that enable the selected value streams, through the
+    capabilities those value streams resolve to.
+
+    Resolution happens here, server-side, not in the browser: a value stream
+    carries no vendor coverage of its own, so this maps each selected value
+    stream to its mapped capabilities (directly and through its stages) and
+    runs the same vendor-coverage lookup the capabilities tab uses. An honest
+    empty list when nothing is mapped, matching the other two discovery
+    routes.
+    """
+    try:
+        data = request.get_json()
+        value_stream_ids = data.get("value_stream_ids", [])
+
+        if not value_stream_ids:
+            return jsonify({"error": "value_stream_ids required"}), 400
+
+        resolved_biz_cap_ids = _resolve_business_capability_ids_for_value_streams(
+            value_stream_ids
+        )
+
+        if not resolved_biz_cap_ids:
+            current_app.logger.info(
+                "No capability maps to value streams %s. Vendor discovery returned 0 results.",
+                value_stream_ids,
+            )
+            return jsonify([])
+
+        vendors = _vendor_coverage_for_business_capabilities(resolved_biz_cap_ids)
+        return jsonify(vendors)
+
+    except Exception as e:
+        current_app.logger.error(
+            f"Error getting vendors by value streams: {str(e)}", exc_info=True
+        )
+        return jsonify({"error": "An internal error occurred"}), 500
+
+
+@application_mgmt.route("/api/value-stream-capabilities", methods=["POST"])
+@login_required
+def api_get_value_stream_capabilities():
+    """Get capabilities linked to the selected value streams.
+
+    Mirrors /api/process-capabilities: used by the frontend in value-stream
+    mode to resolve a valid capability_id for the OptionsAnalysis model
+    (which requires a capability_id FK), the same way process mode resolves
+    one through APQC processes.
+    """
+    try:
+        from app.models.business_capabilities import BusinessCapability
+
+        data = request.get_json()
+        value_stream_ids = data.get("value_stream_ids", [])
+
+        if not value_stream_ids:
+            return jsonify({"error": "value_stream_ids required"}), 400
+
+        biz_cap_ids = _resolve_business_capability_ids_for_value_streams(value_stream_ids)
+
+        if not biz_cap_ids:
+            return jsonify([])
+
+        rows = (
+            db.session.query(BusinessCapability.id, BusinessCapability.name)
+            .filter(BusinessCapability.id.in_(biz_cap_ids))
+            .all()
+        )
+        return jsonify([{"id": row[0], "name": row[1]} for row in rows])
+
+    except Exception as e:
+        current_app.logger.error(
+            f"Error getting value stream capabilities: {str(e)}", exc_info=True
+        )
+        return jsonify({"error": "An internal error occurred"}), 500
+
+
 @application_mgmt.route("/api/process-capabilities", methods=["POST"])
 @login_required
 def api_get_process_capabilities():

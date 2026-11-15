@@ -9,7 +9,7 @@ Provides full CRUD operations with RBAC enforcement and audit logging.
 """
 
 import logging
-from flask import Blueprint, abort, jsonify, render_template, request
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from werkzeug.exceptions import NotFound
 from flask_login import current_user, login_required
 
@@ -157,11 +157,53 @@ def capability_fact_sheet(capability_id):
         build_capability_fact_sheet,
     )
 
+    from app.services.capability_type import (  # noqa: PLC0415
+        CAPABILITY_TYPE_HELP,
+        CAPABILITY_TYPE_LABELS,
+    )
+    from app.utils.role_access import can_edit_capabilities  # noqa: PLC0415
+
     cap = BusinessCapability.query.get(capability_id)
     if not cap:
         abort(404)
     return render_template("capabilities/capability_fact_sheet.html",
+                           type_labels=CAPABILITY_TYPE_LABELS,
+                           type_help=CAPABILITY_TYPE_HELP,
+                           can_edit_type=can_edit_capabilities(current_user),
                            **build_capability_fact_sheet(cap))
+
+
+@enterprise_crud_bp.route("/capabilities/<int:capability_id>/type", methods=["POST"])
+@login_required
+def set_capability_type_route(capability_id):
+    """Set whether a capability is strategic, operational or supporting."""
+    from app.services.capability_fact_sheet import unified_capability_for  # noqa: PLC0415
+    from app.services.capability_type import (  # noqa: PLC0415
+        CAPABILITY_TYPE_LABELS,
+        set_capability_type,
+    )
+    from app.utils.role_access import can_edit_capabilities  # noqa: PLC0415
+
+    if not can_edit_capabilities(current_user):
+        abort(403)
+    cap = BusinessCapability.query.filter_by(id=capability_id).first()
+    if not cap:
+        abort(404)
+    unified = unified_capability_for(cap)
+    if unified is None:
+        abort(404)
+    try:
+        chosen = set_capability_type(unified, request.form.get("capability_type"))
+    except ValueError as exc:
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        # The map is cached per organisation; it must show the new group straight away.
+        from app.extensions.cache import invalidate_cache  # noqa: PLC0415
+
+        invalidate_cache(f"capability_map:*:{cap.organization_id}")
+        flash(f"{cap.name} is now {CAPABILITY_TYPE_LABELS[chosen].lower()}.", "success")
+    return redirect(url_for("enterprise_crud.capability_fact_sheet", capability_id=cap.id))
 
 
 @enterprise_crud_bp.route("/capabilities/<int:capability_id>", methods=["GET"])
@@ -331,7 +373,7 @@ def create_capability():
         # Create capability
         capability = BusinessCapability(
             name=data["name"],
-            category=data.get("type", "operational"),
+            category=data.get("type") or "operational",
             description=data.get("description", ""),
             level=data.get("level", 1),
         )
@@ -397,7 +439,7 @@ def update_capability(capability_id):
         if "name" in data and data["name"] != capability.name:
             changes["name"] = {"from": capability.name, "to": data["name"]}
             capability.name = data["name"]
-        if "type" in data and data["type"] != capability.category:
+        if data.get("type") not in (None, "") and data["type"] != capability.category:
             changes["type"] = {
                 "from": capability.category,
                 "to": data["type"],
@@ -471,7 +513,9 @@ def delete_capability(capability_id):
 @enterprise_crud_bp.route("/compliance", methods=["GET"])
 @login_required
 def compliance_dashboard():
-    """Get compliance dashboard with statistics."""
+    """Compliance statistics for a script; a browser is sent to the compliance dashboard."""
+    if request.accept_mimetypes.best_match(["application/json", "text/html"]) == "text/html":
+        return redirect(url_for("application_mgmt.compliance_frameworks_dashboard"))
     try:
         org_id = current_org_id()
         if org_id is None:
@@ -483,7 +527,7 @@ def compliance_dashboard():
                         "total_violations": 0,
                         "critical_violations": 0,
                         "open_violations": 0,
-                        "compliance_score": 100,
+                        "compliance_score": None,
                     },
                 }
             )
@@ -495,6 +539,17 @@ def compliance_dashboard():
         critical_violations = violations.filter(ComplianceViolation.severity == "Critical").count()
         open_violations = violations.filter(ComplianceViolation.status == "Open").count()
 
+        # The score is the one the compliance pages show; with no policy there is nothing to score against.
+        score = None
+        if total_policies:
+            from app.models.business_capability import BusinessCapability
+            from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService
+
+            assessments = ComplianceInheritanceService.assess_capabilities(
+                [row.id for row in BusinessCapability.query.filter_by(organization_id=org_id)], org_id
+            )
+            score = ComplianceInheritanceService.portfolio_score(assessments.values())
+
         return jsonify(
             {
                 "success": True,
@@ -503,7 +558,7 @@ def compliance_dashboard():
                     "total_violations": total_violations,
                     "critical_violations": critical_violations,
                     "open_violations": open_violations,
-                    "compliance_score": max(0, 100 - (critical_violations * 10)),
+                    "compliance_score": score,
                 },
             }
         )
@@ -827,7 +882,13 @@ def requirements_backlog():
     """Requirements Backlog — TPM replacement lifecycle management page."""
     from app.models.business_capabilities import BusinessCapability as BC
     capabilities = BC.query.order_by(BC.name).all()
-    return render_template("enterprise/requirements_backlog.html", capabilities=capabilities)
+    from app.services import result_footer_service
+    from app.utils.tenant import current_organization_id
+
+    return render_template(
+        "enterprise/requirements_backlog.html", capabilities=capabilities,
+        footer=result_footer_service.requirements_backlog_footer(current_organization_id()),
+    )
 
 
 @enterprise_crud_bp.route("/requirements-traceability", methods=["GET"])

@@ -16,6 +16,8 @@ def header_html():
     fragment = "{% macro _bp_meta() %}" + source.split("{% macro _bp_meta() %}", 1)[1].split("{# Completeness strip #}", 1)[0]
     env = Environment(loader=FileSystemLoader(ROOT / "app/templates"), autoescape=True)
     env.globals["url_for"] = lambda endpoint, **kw: "/solutions/32/codegen" if endpoint == "codegen.workbench_page" else "/solutions/32"
+    # The signed-in person may open the workbench: the header shows the link, not the reason it is closed.
+    env.globals["can_open_code_workbench"] = lambda solution: True
     rendered = env.from_string("{% from 'macros/page_shell.html' import page_shell %}" + fragment).render(
         solution=SimpleNamespace(id=32, name=LONG_TITLE, status="draft", blueprint_version=1, solution_type="Transformation", updated_at=datetime(2026, 9, 5)),
         flask=SimpleNamespace(current_app=SimpleNamespace(view_functions={})),

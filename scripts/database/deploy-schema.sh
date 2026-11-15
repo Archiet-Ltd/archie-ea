@@ -9,9 +9,52 @@ set -eu
 # rather than start new code on a schema it does not expect. On an existing
 # database the baseline revision changes nothing; a database recorded at a
 # pre-baseline revision is re-stamped (record only) and the old id is printed.
-flask --app manage init-db
-flask --app manage schema-upgrade
-flask --app manage reconcile-schema
+# Quick path. The old server is still serving while this runs, so a deploy that
+# changes nothing in the database should not hold up the swap. Taken only when
+# schema-status says nothing is pending AND a reconcile-schema dry run finds no
+# column to add and no table missing. Anything else, including a status command
+# that prints nothing, runs init-db, schema-upgrade and reconcile-schema too. A
+# pending revision is never skipped: it makes schema-status exit non-zero, and
+# the full pass applies it.
+# The quick path skips ONLY those three structural steps. Every backfill and
+# guard below them (including the fatal merge-work-package-stores --verify) runs
+# on every deploy, because a backfill can have work to do, or a new command can
+# arrive, without any revision or column change.
+# The drift check reads only reconcile-schema's own summary lines: other
+# output (background job logs say FAILED for one organisation) must not defeat it.
+# FORCE_FULL_SCHEMA_PASS=1 runs the three structural steps regardless; it is not
+# needed for a new or changed backfill, which always runs.
+#
+# A revision that cannot run beside the old code declares REQUIRES_DOWNTIME =
+# True. Unless ALLOW_DOWNTIME_MIGRATIONS=1, the pass stops here (exit 3) before
+# changing anything, so the old server keeps serving until a window is agreed.
+quick_path=0
+status_out=$(flask --app manage schema-status 2>&1) && status_rc=0 || status_rc=$?
+printf '%s\n' "$status_out"
+case "$status_out" in
+    *"schema-status: downtime-required"*)
+        if [ "${ALLOW_DOWNTIME_MIGRATIONS:-0}" != "1" ]; then
+            echo 'STOP: a pending migration is marked as needing downtime. Nothing was changed and the old server is still serving. Schedule a downtime window, then rerun with ALLOW_DOWNTIME_MIGRATIONS=1.' >&2
+            exit 3
+        fi ;;
+esac
+if [ "${FORCE_FULL_SCHEMA_PASS:-0}" != "1" ] && [ "$status_rc" -eq 0 ] \
+        && printf '%s' "$status_out" | grep -q 'schema-status: at head'; then
+    drift_out=$(flask --app manage reconcile-schema --dry-run 2>&1) && drift_rc=0 || drift_rc=$?
+    case "$drift_out" in
+        *"reconcile-schema: 0 column(s) would add."*)
+            if [ "$drift_rc" -eq 0 ] && ! printf '%s\n' "$drift_out" | grep -Eq '^[0-9]+ (table\(s\) absent|column\(s\) FAILED)'; then
+                echo 'schema-deploy: database is already at the latest revision and matches the models; skipping init-db, schema-upgrade and reconcile-schema, running the backfills.'
+                quick_path=1
+            fi ;;
+    esac
+fi
+
+if [ "$quick_path" != "1" ]; then
+    flask --app manage init-db
+    flask --app manage schema-upgrade
+    flask --app manage reconcile-schema
+fi
 flask --app manage migrate-connector-credentials || echo 'WARN connector credential migration skipped - ServiceNow/Lucidchart secrets saved before this fix remain only in the retired encrypted columns; ServiceNowConnectorService and LucidchartConnectorService read the new OrgCredentialVault store and will treat those organisations as unconfigured until it runs'
 flask --app manage backfill-servicenow-connector-config || echo 'WARN ServiceNow connector config backfill skipped - organisations configured before the connector-framework change remain invisible to the new /admin/connectors page until it runs'
 flask --app manage migrate-connector-row-secrets || echo 'WARN Jira/M365 connector row-secret migration skipped - a legacy connector row still carries its secret only in ConnectorConfig.config instead of the vault until it runs'
@@ -26,8 +69,10 @@ flask --app manage backfill-kanban-card-org || echo 'WARN kanban card tenancy ba
 flask --app manage backfill-saved-diagram-tenancy || echo 'WARN saved-diagram tenancy backfill skipped - composer diagrams keep nullable organization_id until it runs; rows left NULL are invisible to every org (CMP-01)'
 flask --app manage drop-audit-log-viewpoint-fk || echo 'WARN audit-log viewpoint-FK drop skipped - composer audit writes keep failing with a FK violation until it runs (CMP-03)'
 flask --app manage backfill-architect-role
+flask --app manage backfill-vendor-links || echo 'WARN vendor link backfill skipped - systems that name a vendor only as text stay out of the Vendors list until it runs'
 flask --app manage backfill-decision-register-consolidation || echo 'WARN decision register consolidation backfill skipped - decision_ledger rows remain untenanted and architecture_decision_records rows stay unpaired with the canonical register until it runs' >&2
 flask --app manage backfill-solution-risk-merge || echo 'WARN solution risk merge backfill skipped - solution risks stay unlinked from the one risk register (no risk_entity_links row, no shared score history) until it runs'
+flask --app manage backfill-risk-link-relationships || echo 'WARN risk link relationship backfill skipped - risks mapped before now show no connections on their model element until it runs'
 # RUN-01: copy ARB, ArchiMate composer and rationalisation audit history into
 # soc2_audit_log (the system of record per ADR 0008). Runs here because
 # CREATE INDEX IF NOT EXISTS ix_soc2_audit_org_id requires table ownership
@@ -58,6 +103,10 @@ flask --app manage backfill-work-package-org
 flask --app manage merge-work-package-stores
 flask --app manage backfill-work-package-org
 flask --app manage merge-work-package-stores --verify
+# Backlog requirements written before projection ran get the record prioritisation ranks.
+flask --app manage project-backlog-requirements
+# Consolidation pairs proposed under the old rule are re-scored or dismissed; decided pairs are untouched.
+flask --app manage rescore-consolidation-candidates || echo 'WARN consolidation re-score skipped - pairs proposed under the old rule keep their old score until it runs' >&2
 # The generic history trigger reconcile-schema cannot create, then
 # one seeded version per pre-existing element/relationship. Trigger first so
 # the backfill's "no entity_history row at all" check is not racing a
@@ -149,6 +198,11 @@ if [ -f /tmp/project-capabilities-report.json ]; then
     cat /tmp/project-capabilities-report.json
     echo '--- end report ---'
 fi
+
+# Every capability carries a type (strategic, operational or supporting). Untyped rows get
+# the starting rule; a type someone has set is never changed. Idempotent.
+flask --app manage backfill-capability-types --apply \
+    || echo 'WARN capability type backfill failed - some capabilities may show as untyped until it is re-run' >&2
 
 # ADR 0008 -- retire the remaining four superseded capability stores
 # (capabilities, enterprise_capabilities, archimate_capabilities,

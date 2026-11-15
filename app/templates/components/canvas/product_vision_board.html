@@ -1,0 +1,18 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ product-vision-board.html. Adapted only to Entelim macro names. #}
+{# Product Vision Board, C4. Roman Pichler (romanpichler.com, 2011): the Vision across the top, beneath it four columns, left to right Target Group, Needs, Product, Business Goals. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% set SPEC = {
+  'form': 'C4', 'name': 'Product vision board', 'grid': 'grid-cols-4 grid-rows-[auto_auto]',
+  'hint': 'Scroll sideways on a narrow screen to see all four columns.',
+  'credit': 'Product Vision Board by Roman Pichler (romanpichler.com).',
+  'width': 'min-w-260',
+  'boxes': [
+    {'key': 'vision', 'title': 'Vision', 'icon': 'sparkles', 'question': 'What is your purpose for creating the product? Which positive change should it bring about?', 'empty': 'No vision yet. Add the goal the product serves.', 'area': 'col-span-4 row-start-1'},
+    {'key': 'target-group', 'title': 'Target Group', 'icon': 'users', 'question': 'Which market or segment does the product address? Who are the customers and users?', 'empty': 'No target group yet. Add the segments and roles the product is for.', 'area': 'col-start-1 row-start-2'},
+    {'key': 'needs', 'title': 'Needs', 'icon': 'heart', 'question': 'What problem does the product solve? Which benefit does it provide?', 'empty': 'No needs yet. Add the goals and problems it answers.', 'area': 'col-start-2 row-start-2'},
+    {'key': 'product', 'title': 'Product', 'icon': 'package', 'question': 'What product is it? What makes it stand out? Is it feasible to develop?', 'empty': 'No product yet. Add the product or service.', 'area': 'col-start-3 row-start-2'},
+    {'key': 'business-goals', 'title': 'Business Goals', 'icon': 'trending-up', 'question': 'How will the product benefit the company? What are the business goals?', 'empty': 'No business goals yet. Add the goals and outcomes it should reach.', 'area': 'col-start-4 row-start-2'},
+  ]} %}
+{% macro product_vision_board(data, id='product-vision-board') -%}
+{{ f.grid_canvas(SPEC, data, id) }}
+{%- endmacro %}

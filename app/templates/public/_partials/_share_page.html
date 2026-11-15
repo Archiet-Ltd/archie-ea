@@ -1,0 +1,36 @@
+{#- smoke-coverage-ok: covered by tests/smoke/test_share_page_journey.py (every share page, signed out, 1440 and 390 wide).
+   Partial: public/_partials/_share_page.html -- the page one recording is shared from (/see/<slug>): the
+   recording, its text summary, the call to action every module page carries, the link back to the module
+   page and the files of the three shapes. Expects `page` (the module page), `share` (its manifest entry),
+   `recording` (get_module_recording()) and `landing` (for the shared call to action) and `module_href` (the public module page, for signed-in people too). -#}
+{% set primary_label, primary_url = landing.primary_action %}
+{% set hero = {
+  'testid': 'share-hero',
+  'breadcrumb': (page.title, module_href),
+  'title': share.title,
+  'compact': true,
+  'lead': share.message,
+  'primary': (primary_label, primary_url),
+  'secondary': ('Read about ' ~ page.title, module_href),
+  'figure': none,
+} %}
+{% include 'public/_partials/_hero.html' %}
+
+<section class="home-section" data-testid="share-media">
+  <div class="container px-4">
+    <div class="mx-auto max-w-5xl [&>figure:first-child]:mt-0">{% include 'public/_partials/_page_media.html' %}</div>
+    <div class="public-page-content prose mx-auto mt-8 max-w-5xl">
+      <h2>Files to share</h2>
+      <ul data-testid="share-files">
+        <li><a href="{{ share.files.wide.path }}" download>Wide, 16:9, for the web and YouTube</a></li>
+        <li><a href="{{ share.files.square.path }}" download>Square, for LinkedIn</a></li>
+        <li><a href="{{ share.files.upright.path }}" download>Upright, for Shorts and Reels</a></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+{% with closing_testid = 'landing-closing', closing_primary = (primary_label, primary_url, 'share-cta'),
+        closing_secondary = ('Back to ' ~ page.title, module_href, 'share-module-link') %}
+{% include 'public/_partials/_section_closing.html' %}
+{% endwith %}

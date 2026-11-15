@@ -21,6 +21,7 @@ from flask import abort, current_app, flash, jsonify, redirect, render_template,
 from flask_login import current_user, login_required
 from sqlalchemy import or_
 
+from app.core.auth.permissions import can
 from .. import db  # dead-code-ok
 from ..models.implementation_migration import (
     Deliverable,
@@ -29,7 +30,7 @@ from ..models.implementation_migration import (
     Plateau as ImplementationPlateau,
 )
 from ..models.unified_work_package import UnifiedWorkPackage as ImplementationWorkPackage
-from ..services import work_package_service
+from ..services import gap_register_service, result_footer_service, work_package_service
 from ..models.unified_capability import UnifiedCapability
 from ..services.gap_discovery_service import GapDiscoveryService
 from . import implementation_planning
@@ -66,6 +67,11 @@ def _to_iso(value):
     return value.isoformat() if value else None
 
 
+def _to_day(value):
+    """A date as YYYY-MM-DD, whether the column holds a date or a timestamp."""
+    return value.isoformat()[:10] if value else None
+
+
 def _serialize_entity(entity):
     if hasattr(entity, "to_dict"):
         return entity.to_dict()
@@ -93,9 +99,7 @@ def implementation_dashboard():
             "completed": ImplementationWorkPackage.query.filter_by(
                 status="completed"
             ).count(),
-            "critical_gaps": ImplementationGap.query.filter_by(
-                priority="critical"
-            ).count(),
+            "critical_gaps": gap_register_service.count_gaps(_org_id(), severity="critical"),
         }
 
         # Get recent work packages
@@ -108,12 +112,7 @@ def implementation_dashboard():
         )
 
         # Get critical gaps
-        critical_gaps = (
-            ImplementationGap.query.filter_by(priority="critical")
-            .order_by(ImplementationGap.created_at.desc())
-            .limit(5)
-            .all()
-        )
+        critical_gaps = gap_register_service.list_gaps(_org_id(), severity="critical", limit=5, closed=False)
 
         # Get capability implementation summary
         # Maps Capability -> List of Work Packages via Application mapping
@@ -214,6 +213,7 @@ def work_packages_list():
         return render_template(
             "implementation_planning/dashboard.html",
             work_packages=work_packages,
+            roadmap_footer=result_footer_service.roadmap_footer(work_packages.items, work_packages.total),
             search=search,
             status=status,
             priority=priority,
@@ -283,8 +283,28 @@ def work_package_detail(work_package_id):
         )
         from app.models.user import Permission
 
+        capability = None
+        if getattr(work_package, "capability_id", None):
+            from app.models.unified_capability import UnifiedCapability
+
+            capability = UnifiedCapability.query.filter_by(
+                id=work_package.capability_id, organization_id=org_id).first()
+        # The capability's own page is the strategy-layer record the unified
+        # capability was projected from; without that record, the coverage view.
+        capability_url = None
+        if capability is not None:
+            if capability.source_table == "business_capability" and str(capability.source_id or "").isdigit():
+                capability_url = url_for(
+                    "archimate_crud.detail_element", layer="strategy",
+                    element_type="Capability", element_id=int(capability.source_id))
+            else:
+                capability_url = url_for("genome_coverage.generate") + "#capability-%s" % capability.id
+        gap_records = result_footer_service.gap_rows(org_id, [g["id"] for g in shown["gaps"]])
         return render_template(
             "implementation_planning/work_package_detail.html",
+            capability=capability,
+            capability_url=capability_url,
+            progress_value=work_package_service.progress_percent(work_package),
             work_package=work_package,
             deliverables=deliverables,
             events=events,
@@ -293,6 +313,8 @@ def work_package_detail(work_package_id):
             owner_name=shown["owner_name"],
             can_link=bool(current_user.can(Permission.GENERAL)),
             owner_panel=work_package_service.owner_and_approval_panel(work_package, org_id),
+            footer=result_footer_service.work_package_detail_footer(
+                work_package, shown["owner_name"], [gap_records.get(g["id"], g) for g in shown["gaps"]], capability),
         )
 
     except HTTPException:
@@ -318,7 +340,7 @@ def _picker_options(work_package, org_id, q):
     return query.limit(_PICKER_LIMIT).all()
 
 
-def _form_context(work_package, action):
+def _form_context(work_package, action, field_errors=None, posted=None):
     org_id = _org_id()
     others = _picker_options(work_package, org_id, request.args.get("q"))
     names = {w.id: w.name for w in others}
@@ -333,6 +355,8 @@ def _form_context(work_package, action):
     return dict(
         work_package=work_package,
         action=action,
+        field_errors=field_errors or {},
+        posted=posted or {},
         programmes=work_package_service.list_programmes(org_id),
         other_work_packages=others,
         dependencies=[
@@ -348,6 +372,12 @@ def create_work_package():
     """
     Create a new work package (the one writer: work_package_service).
     """
+    if not can(current_user, "create", "work_package"):
+        if request.is_json:
+            return jsonify({"success": False, "error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+        flash("Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages.", "error")
+        return redirect(url_for("implementation_planning.work_packages_list"))
+
     if request.method == "POST":
         try:
             data = request.get_json() if request.is_json else request.form.to_dict()
@@ -382,6 +412,11 @@ def create_work_package():
             db.session.rollback()
             if request.is_json:
                 return jsonify({"success": False, "errors": {"general": str(e)}}), 400
+            if getattr(e, "field", None):
+                return render_template(
+                    "implementation_planning/work_package_form.html",
+                    **_form_context(None, "Create", {e.field: str(e)}, data),
+                ), 400
             flash(str(e), "error")
             return render_template(
                 "implementation_planning/work_package_form.html",
@@ -410,6 +445,12 @@ def edit_work_package(work_package_id):
     if work_package is None:
         abort(404)
 
+    if not can(current_user, "edit", "work_package"):
+        if request.is_json:
+            return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+        flash("Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages.", "error")
+        return redirect(url_for("implementation_planning.work_packages_list"))
+
     if request.method == "POST":
         try:
             data = request.get_json() if request.is_json else request.form.to_dict()
@@ -436,6 +477,12 @@ def edit_work_package(work_package_id):
             db.session.rollback()
             if request.is_json:
                 return jsonify({"error": str(e)}), 400
+            if getattr(e, "field", None):
+                work_package = work_package_service.get_work_package(work_package_id, _org_id())
+                return render_template(
+                    "implementation_planning/work_package_form.html",
+                    **_form_context(work_package, "Edit", {e.field: str(e)}, data),
+                ), 400
             flash(str(e), "error")
         except Exception:
             db.session.rollback()
@@ -456,6 +503,12 @@ def edit_work_package(work_package_id):
 @login_required
 def add_work_package_dependency(work_package_id):
     """Record that this work package depends on another (form or JSON)."""
+    if not can(current_user, "edit", "work_package"):
+        if request.is_json:
+            return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+        flash("Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages.", "error")
+        return redirect(url_for("implementation_planning.edit_work_package", work_package_id=work_package_id))
+
     data = request.get_json(silent=True) if request.is_json else request.form.to_dict()
     data = data or {}
     try:
@@ -492,6 +545,12 @@ def add_work_package_dependency(work_package_id):
 )
 @login_required
 def remove_work_package_dependency(work_package_id, dependency_id):
+    if not can(current_user, "edit", "work_package"):
+        if request.is_json:
+            return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+        flash("Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages.", "error")
+        return redirect(url_for("implementation_planning.edit_work_package", work_package_id=work_package_id))
+
     try:
         work_package_service.remove_dependency(
             work_package_id, dependency_id, organization_id=_org_id()
@@ -516,6 +575,12 @@ def delete_work_package(work_package_id):
     """
     Delete a work package.
     """
+    if not can(current_user, "delete", "work_package"):
+        if request.is_json:
+            return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+        flash("Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages.", "error")
+        return redirect(url_for("implementation_planning.work_packages_list"))
+
     try:
         work_package_service.delete_work_package(work_package_id, organization_id=_org_id())
         db.session.commit()
@@ -558,9 +623,7 @@ def api_dashboard_stats():
             "completed": ImplementationWorkPackage.query.filter_by(
                 status="completed"
             ).count(),
-            "critical_gaps": ImplementationGap.query.filter_by(
-                priority="critical"
-            ).count(),
+            "critical_gaps": gap_register_service.count_gaps(_org_id(), severity="critical"),
         }
         return jsonify({"stats": stats})
     except Exception:
@@ -591,7 +654,9 @@ def api_work_packages():
         if limit:
             query = query.limit(limit)
         work_packages = query.all()
-        return jsonify({"work_packages": work_package_service.to_dicts(work_packages)})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"work_packages": work_package_service.to_dicts(work_packages)}))
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
@@ -639,7 +704,9 @@ def api_work_package_detail(work_package_id):
     work_package = work_package_service.get_work_package(work_package_id, _org_id())
     if work_package is None:
         return jsonify({"error": "Work package not found"}), 404
-    return jsonify(work_package_service.to_dict(work_package))
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(withhold_reply(work_package_service.to_dict(work_package)))
 
 
 @implementation_planning.route("/api/work-packages", methods=["POST"])
@@ -648,6 +715,9 @@ def api_create_work_package():
     """
     API endpoint to create a new work package.
     """
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         data = request.get_json(silent=True) or {}
         if not (data.get("name") or "").strip():
@@ -684,6 +754,9 @@ def api_update_work_package(work_package_id):
     """
     API endpoint to update a work package.
     """
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         data = request.get_json(silent=True) or {}
         work_package = work_package_service.update_work_package(
@@ -693,7 +766,9 @@ def api_update_work_package(work_package_id):
             **_fields_from(data, partial=True),
         )
         db.session.commit()
-        return jsonify({"success": True, "work_package": work_package_service.to_dict(work_package)})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify({"success": True, "work_package": withhold_reply(work_package_service.to_dict(work_package))})
 
     except work_package_service.WorkPackageNotFound:
         db.session.rollback()
@@ -714,6 +789,9 @@ def api_delete_work_package(work_package_id):
     """
     API endpoint to delete a work package.
     """
+    if not can(current_user, "delete", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         work_package_service.delete_work_package(work_package_id, organization_id=_org_id())
         db.session.commit()
@@ -757,14 +835,14 @@ def gaps_list():
             query = query.filter(ImplementationGap.gap_type == gap_type)
 
         if priority:
-            query = query.filter(ImplementationGap.priority == priority)
+            query = query.filter(gap_register_service.priority_filter_clause(priority))
 
         if status:
             query = query.filter(ImplementationGap.resolution_status == status)
 
         # Order by priority and creation date
         query = query.order_by(
-            ImplementationGap.priority.desc(), ImplementationGap.created_at.desc()
+            gap_register_service.severity_order_expr(), ImplementationGap.created_at.desc()
         )
 
         # Paginate
@@ -773,7 +851,7 @@ def gaps_list():
         # Get statistics
         stats = {
             "total": ImplementationGap.query.count(),
-            "critical": ImplementationGap.query.filter_by(priority="critical").count(),
+            "critical": gap_register_service.count_gaps(_org_id(), severity="critical"),
             "high": ImplementationGap.query.filter_by(priority="high").count(),
             "identified": ImplementationGap.query.filter_by(
                 resolution_status="identified"
@@ -840,7 +918,7 @@ def gap_detail(gap_id):
     Show detailed view of a gap.
     """
     try:
-        gap = ImplementationGap.query.get_or_404(gap_id)
+        gap = ImplementationGap.query.filter_by(id=gap_id).first_or_404()
 
         # Get related work packages (Gap.work_packages: the gap_work_packages
         # association table, not a required_work_packages id list -- that
@@ -865,19 +943,27 @@ def gap_detail(gap_id):
 def api_gaps():
     """
     API endpoint to get gaps.
-    Supports query parameters: priority (filter), limit.
+    Supports query parameters: priority (filter), severity (filter), limit.
+
+    Both filters read the rating the gap register filters on and leave out
+    plateau transitions, so a count here is the register's count.
     """
     try:
-        query = ImplementationGap.query
-        priority = request.args.get("priority")
-        if priority:
-            query = query.filter_by(priority=priority)
-        query = query.order_by(ImplementationGap.created_at.desc())
+        # ?severity= and ?priority= both ask for a level: the register's own list and count, so this list,
+        # the register and every critical-gap figure are one rule (plateau transitions left out).
+        level = request.args.get("severity") or request.args.get("priority")
         limit = safe_int_arg('limit', None, minimum=1, maximum=500)
-        if limit:
-            query = query.limit(limit)
-        gaps = query.all()
-        return jsonify({"gaps": [_serialize_entity(gap) for gap in gaps]})
+        total = None
+        # `open` asks only for the gaps not yet closed, as the register's own list does.
+        only_open = False if request.args.get("open") else None
+        gaps = gap_register_service.list_gaps(_org_id(), severity=level, limit=limit, closed=only_open)
+        total = gap_register_service.count_gaps(_org_id(), severity=level, closed=only_open)
+        shown = [_serialize_entity(gap) for gap in gaps]
+        if request.args.get("footer"):
+            # The page draws each gap in the browser, so the one footer travels with it as markup.
+            for gap, item in zip(gaps, shown):
+                item["footer_html"] = result_footer_service.render_footer(result_footer_service.gap_footer(gap))
+        return jsonify({"gaps": shown, "total": total if total is not None else len(shown)})
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
@@ -984,6 +1070,9 @@ def api_create_deliverable():
     """
     API endpoint to create a new deliverable.
     """
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not change them. Administrators and architects may create, edit and delete work packages."}), 403
+
     try:
         data = request.get_json()
 
@@ -1065,6 +1154,42 @@ def api_plateaus():
         return jsonify({"error": "An internal error occurred"}), 500
 
 
+def _work_package_roadmap_item(wp):
+    """One work package as a roadmap row; the dashboard timeline and the
+    roadmap data endpoint both read it."""
+    wp_start = getattr(wp, "start_date", None)
+    wp_end = getattr(wp, "target_date", None) or getattr(wp, "end_date", None)
+    wp_progress = getattr(wp, "percent_complete", None)
+    if wp_progress is None:
+        wp_progress = getattr(wp, "progress_percentage", 0)
+    wp_owner = getattr(wp, "assigned_to", None)
+    if not wp_owner and getattr(wp, "owner", None):
+        wp_owner = getattr(wp.owner, "username", None)
+    item = {
+        "id": wp.id,
+        "type": "work_package",
+        "name": wp.name,
+        "description": wp.description or "",
+        "start_date": _to_iso(wp_start),
+        "end_date": _to_iso(wp_end),
+        "status": wp.status or "not_started",
+        "priority": wp.priority or "medium",
+        "progress": wp_progress or 0,
+        "assigned_to": wp_owner or "Unassigned",
+        "domain_name": (
+            getattr(wp, "business_capability", None)
+            or (getattr(wp, "layer", None) or "").capitalize()
+            or "Unassigned"
+        ),
+        "level": 1,
+        "parent_id": getattr(wp, "parent_id", None)
+        or getattr(wp, "parent_work_package_id", None),
+        "gap_types": [],
+        "work_packages": [],
+    }
+    return item
+
+
 @implementation_planning.route("/api/roadmap-data", methods=["GET"])
 @login_required
 def api_roadmap_data():
@@ -1086,39 +1211,7 @@ def api_roadmap_data():
         ).all()
 
         # Transform work packages to roadmap items
-        items = []
-        for wp in work_packages:
-            wp_start = getattr(wp, "start_date", None)
-            wp_end = getattr(wp, "target_date", None) or getattr(wp, "end_date", None)
-            wp_progress = getattr(wp, "percent_complete", None)
-            if wp_progress is None:
-                wp_progress = getattr(wp, "progress_percentage", 0)
-            wp_owner = getattr(wp, "assigned_to", None)
-            if not wp_owner and getattr(wp, "owner", None):
-                wp_owner = getattr(wp.owner, "username", None)
-            item = {
-                "id": wp.id,
-                "type": "work_package",
-                "name": wp.name,
-                "description": wp.description or "",
-                "start_date": _to_iso(wp_start),
-                "end_date": _to_iso(wp_end),
-                "status": wp.status or "not_started",
-                "priority": wp.priority or "medium",
-                "progress": wp_progress or 0,
-                "assigned_to": wp_owner or "Unassigned",
-                "domain_name": (
-                    getattr(wp, "business_capability", None)
-                    or (getattr(wp, "layer", None) or "").capitalize()
-                    or "Unassigned"
-                ),
-                "level": 1,
-                "parent_id": getattr(wp, "parent_id", None)
-                or getattr(wp, "parent_work_package_id", None),
-                "gap_types": [],
-                "work_packages": [],
-            }
-            items.append(item)
+        items = [_work_package_roadmap_item(wp) for wp in work_packages]
 
         # Transform gaps to roadmap items
         for gap in gaps:
@@ -1177,6 +1270,75 @@ def api_roadmap_data():
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
+@implementation_planning.route("/api/roadmap-timeline", methods=["GET"])
+@login_required
+def api_roadmap_timeline():
+    """Work packages, their dependencies and the plateaus, shaped for the
+    library timeline component on the planning dashboard."""
+    try:
+        work_packages = ImplementationWorkPackage.query.all()
+        plateaus = ImplementationPlateau.query.order_by(
+            ImplementationPlateau.sequence_order
+        ).all()
+
+        known_ids = {wp.id for wp in work_packages}
+        tasks = []
+        groups = {}
+        for wp in work_packages:
+            item = _work_package_roadmap_item(wp)
+            group_id = item["domain_name"]
+            groups.setdefault(group_id, {"id": group_id, "label": group_id})
+            tasks.append(
+                {
+                    "id": item["id"],
+                    "name": item["name"],
+                    "group": group_id,
+                    "status": item["status"],
+                    "start_date": item["start_date"][:10] if item["start_date"] else None,
+                    "end_date": item["end_date"][:10] if item["end_date"] else None,
+                    "progress": item["progress"],
+                    "assigned_to": item["assigned_to"],
+                    "priority": item["priority"],
+                    "dependencies": [
+                        d for d in work_package_service.dependency_ids(wp) if d in known_ids and d != wp.id
+                    ],
+                }
+            )
+
+        milestones = [
+            {"id": f"plateau_{p.id}", "label": p.name, "date": _to_day(p.target_date)}
+            for p in plateaus
+            if p.target_date
+        ]
+        stats = [
+            {"label": "Work packages", "value": len(work_packages)},
+            {"label": "Plateaus", "value": len(plateaus)},
+            {"label": "In progress", "value": sum(1 for t in tasks if t["status"] == "in_progress")},
+            {"label": "Completed", "value": sum(1 for t in tasks if t["status"] == "completed")},
+        ]
+        return jsonify(
+            {
+                "success": True,
+                "gantt": {
+                    "groups": sorted(groups.values(), key=lambda g: g["label"]),
+                    "tasks": tasks,
+                    "milestones": milestones,
+                },
+                "config": {
+                    "detailFields": [
+                        {"key": "assigned_to", "label": "Assigned to"},
+                        {"key": "priority", "label": "Priority"},
+                    ],
+                    "features": {"export": []},
+                },
+                "stats": stats,
+            }
+        )
+    except Exception:
+        current_app.logger.exception("roadmap timeline failed")
+        return jsonify({"success": False, "error": "An internal error occurred"}), 500
+
+
 @implementation_planning.route("/reports/generate")
 @login_required
 def generate_report():
@@ -1189,7 +1351,8 @@ def generate_report():
         work_packages = ImplementationWorkPackage.query.all()
 
         # Get gaps
-        gaps = ImplementationGap.query.all()
+        # The register's gaps (plateau transitions left out), so this report's counts are the register's.
+        gaps = gap_register_service.gap_register_query(_org_id()).all()
 
         # Get deliverables
         deliverables = work_package_service.deliverables_query(_org_id()).all()
@@ -1226,12 +1389,14 @@ def generate_report():
 
         # Calculate gaps by priority
         for gap in gaps:
-            priority = gap.priority or "medium"
+            priority = (gap_register_service.effective_severity(gap) or "").strip().lower() or "unrated"
             report_data["summary"]["gaps_by_priority"][priority] = (
                 report_data["summary"]["gaps_by_priority"].get(priority, 0) + 1
             )
 
-        return jsonify({"success": True, "report": report_data})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify({"success": True, "report": withhold_reply(report_data)})
 
     except Exception:
         current_app.logger.exception("Error generating implementation planning report")

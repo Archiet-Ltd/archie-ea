@@ -121,6 +121,8 @@ class BusinessProcess(TenantMixin, db.Model):
 
     # Documentation
     bpmn_model_url = db.Column(db.String(500))  # Link to BPMN diagram
+    # The drawn flow (pools, lanes, events, tasks, gateways, flows); nullable, a process with no drawing has none.
+    bpmn_flow = db.Column(db.JSON, nullable=True)
     process_documentation_url = db.Column(db.String(500))
     sop_url = db.Column(db.String(500))  # Standard Operating Procedure
 
@@ -141,6 +143,11 @@ class BusinessProcess(TenantMixin, db.Model):
     archimate_element = db.relationship("ArchiMateElement", foreign_keys=[archimate_element_id])
     architecture = db.relationship("ArchitectureModel", backref="business_processes")
     created_by = db.relationship("User", backref="created_processes")
+
+    # One record per process element in an organisation (a missing element is not constrained).
+    __table_args__ = (
+        db.UniqueConstraint("organization_id", "archimate_element_id", name="uq_business_processes_org_element"),
+    )
 
     # ArchiMate 3.2 Relationships - Commented out to avoid conflicts
     # logical_models = db.relationship('LogicalDataModel',
@@ -599,6 +606,67 @@ class DataEntity(TenantMixin, db.Model):
         return ensure_archimate_element(self)
 
 
+ERD_CARDINALITIES = ("exactly_one", "zero_or_one", "one_or_many", "zero_or_many")
+
+
+class DataEntityAttribute(TenantMixin, db.Model):
+    """A named, typed attribute of a data entity: one row of its logical model."""
+
+    __tablename__ = "data_entity_attributes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    entity_id = db.Column(
+        db.Integer, db.ForeignKey("data_entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name = db.Column(db.String(200), nullable=False)
+    data_type = db.Column(db.String(60), nullable=True)
+    is_primary_key = db.Column(db.Boolean, nullable=False, default=False)
+    is_foreign_key = db.Column(db.Boolean, nullable=False, default=False)
+    is_nullable = db.Column(db.Boolean, nullable=False, default=True)
+    position = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    entity = db.relationship(
+        "DataEntity",
+        backref=db.backref(
+            "attributes",
+            order_by="DataEntityAttribute.position",
+            cascade="all, delete-orphan",
+            passive_deletes=True,
+        ),
+    )
+
+
+class DataEntityRelationship(TenantMixin, db.Model):
+    """A relationship between two data entities with a cardinality at each end."""
+
+    __tablename__ = "data_entity_relationships"
+
+    id = db.Column(db.Integer, primary_key=True)
+    source_entity_id = db.Column(
+        db.Integer, db.ForeignKey("data_entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    target_entity_id = db.Column(
+        db.Integer, db.ForeignKey("data_entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    label = db.Column(db.String(200), nullable=True)
+    # How many records of each end take part: the source end and the target end.
+    source_cardinality = db.Column(db.String(20), nullable=False, default="exactly_one")
+    target_cardinality = db.Column(db.String(20), nullable=False, default="zero_or_many")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    source_entity = db.relationship(
+        "DataEntity",
+        foreign_keys=[source_entity_id],
+        backref=db.backref("outgoing_relationships", cascade="all, delete-orphan", passive_deletes=True),
+    )
+    target_entity = db.relationship(
+        "DataEntity",
+        foreign_keys=[target_entity_id],
+        backref=db.backref("incoming_relationships", cascade="all, delete-orphan", passive_deletes=True),
+    )
+
+
 # DataEntity's ArchiMate element is now created by the shared
 # flush listener in app/services/archimate_backbone.py, which is also the
 # writer used by app/commands/backfill_domain_elements.py. The raw-insert
@@ -721,16 +789,21 @@ def create_businessprocess_archimate_element(mapper, connection, target):
 
     from .archimate_core import ArchiMateElement
 
-    result = connection.execute(
-        insert(ArchiMateElement.__table__).values(
-            organization_id=target.organization_id,
-            name=target.name,
-            type="BusinessProcess",
-            layer="business",
-            description=target.description or f"Business process: {target.name}",
-        )
-    )
+    values = {
+        "organization_id": target.organization_id,
+        "name": target.name,
+        "type": "BusinessProcess",
+        "layer": "business",
+        "description": target.description or f"Business process: {target.name}",
+    }
+    result = connection.execute(insert(ArchiMateElement.__table__).values(**values))
     target.archimate_element_id = result.inserted_primary_key[0]
+    # A Core insert fires no mapper event, so the element's first version is recorded here, as the
+    # strategy-layer mirror elements do.
+    from app.middleware.audit_middleware import record_create
+
+    # reuse-ok: a transient instance, never added to a session, that only describes the row the Core insert above wrote
+    record_create(connection, "archimate_elements", ArchiMateElement(id=target.archimate_element_id, **values))
 
 
 def _link_process_relationship_via_connection(

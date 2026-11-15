@@ -209,7 +209,7 @@ def suggest_import_completions(transformed: Dict[str, Any]) -> Dict[str, Any]:
             "reason": "No LLM provider is configured (or the call failed), so "
                       "AI assist could not run. The import above is complete "
                       "and correct on its own; add an Anthropic, OpenAI or "
-                      "Gemini key in Admin -> API Settings to enable AI assist.",
+                      "Gemini key in Admin -> AI settings to enable AI assist.",
         }
 
     parsed = None

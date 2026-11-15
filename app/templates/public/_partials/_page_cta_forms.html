@@ -3,6 +3,9 @@
    Partial: public/_partials/_page_cta_forms.html -- the "tell us you need this" waiting-list
    form (page.cta == 'waiting_list') and the offer inquiry form (page.cta == 'inquiry'),
    included from both layouts of public/page.html so the markup exists once. -#}
+  {% from 'components/button.html' import button %}
+  {% from 'components/input.html' import input %}
+  {% from 'components/checkbox.html' import checkbox %}
   {% if page.cta == 'waiting_list' %}
   {# "Tell us you need this": reuses the same /offers/inquire mechanism as a
      paid offer page's inquiry form (see app/main/views.py:product_inquiry_submit
@@ -13,7 +16,7 @@
     {% if thanks %}
     <p class="text-muted-foreground" data-testid="feature-interest-thanks">Thank you. We will tell you when this becomes available.</p>
     {% else %}
-    <p class="text-muted-foreground mb-4">This isn't built yet. Leave your email and we'll tell you the day it ships.</p>
+    <p class="text-muted-foreground mb-4">This isn't built yet. Leave your email and we'll tell you when you can use it.</p>
     {% if error %}
     <p class="text-sm text-destructive mb-4" role="alert">{{ error }}</p>
     {% endif %}
@@ -24,14 +27,10 @@
       <input type="hidden" name="slug" value="{{ page.slug }}">
       <div>
         <label for="feature-interest-email" class="block text-sm font-medium text-foreground mb-1">Email</label>
-        <input type="email" id="feature-interest-email" name="email" required
-               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+        {{ input(id='feature-interest-email', name='email', type='email', required=true) }}
       </div>
-      <div class="flex items-start gap-2">
-        <input type="checkbox" id="feature-interest-consent" name="consent" value="1" required class="mt-1">
-        <label for="feature-interest-consent" class="text-sm text-muted-foreground">Used to tell you when this becomes available, and for nothing else.</label>
-      </div>
-      <button type="submit" class="public-btn public-btn--primary" data-testid="feature-interest-submit">Tell us you need this</button>
+      {{ checkbox(id='feature-interest-consent', name='consent', value='1', required=true, label='Used to tell you when this becomes available, and for nothing else.') }}
+      {{ button(text='Tell us you need this', type='submit', testid='feature-interest-submit') }}
     </form>
     {% endif %}
   </section>
@@ -44,6 +43,8 @@
      checkbox below always matches what gets stored. #}
   <section aria-labelledby="inquiry-heading" class="mt-12 p-6 border border-border rounded-lg bg-card" data-testid="offer-inquiry">
     <h2 id="inquiry-heading" class="text-2xl font-semibold text-foreground mb-2">Ask about this</h2>
+    {% set topic = page.enquiry_topic(page.enquiry_source(request.args.get('from') or request.form.get('source'))) %}
+    {% if topic %}<p class="text-muted-foreground" data-testid="offer-inquiry-topic">Your enquiry is about: {{ topic }}.</p>{% endif %}
     {% if thanks %}
     <p class="text-muted-foreground" data-testid="offer-inquiry-thanks">Thank you. We will be in touch to arrange next steps.</p>
     {% else %}
@@ -52,25 +53,22 @@
     {% endif %}
     <form method="POST" action="{{ url_for('main.product_inquiry_submit') }}" class="space-y-4" data-testid="offer-inquiry-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="offer" value="{{ page.front_matter.get('offer', '') }}">
+      {% set source = page.enquiry_source(request.args.get('from') or request.form.get('source')) %}
+      <input type="hidden" name="offer" value="{{ page.enquiry_offer(source) }}">
+      <input type="hidden" name="source" value="{{ source }}">
       <input type="hidden" name="family" value="{{ page.family }}">
       <input type="hidden" name="slug" value="{{ page.slug }}">
       <div>
         <label for="inquiry-email" class="block text-sm font-medium text-foreground mb-1">Email</label>
-        <input type="email" id="inquiry-email" name="email" required
-               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+        {{ input(id='inquiry-email', name='email', type='email', required=true) }}
       </div>
       <div>
         <label for="inquiry-name" class="block text-sm font-medium text-foreground mb-1">Name (optional)</label>
-        <input type="text" id="inquiry-name" name="name"
-               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+        {{ input(id='inquiry-name', name='name', type='text') }}
       </div>
       <p class="text-sm text-muted-foreground">{{ page.front_matter.get('offer_summary', "I'd like to talk about this.") }}</p>
-      <div class="flex items-start gap-2">
-        <input type="checkbox" id="inquiry-consent" name="consent" value="1" required class="mt-1">
-        <label for="inquiry-consent" class="text-sm text-muted-foreground">{{ page.front_matter.get('inquiry_consent_text', '') }}</label>
-      </div>
-      <button type="submit" class="public-btn public-btn--primary" data-testid="offer-inquiry-submit">Request this</button>
+      {{ checkbox(id='inquiry-consent', name='consent', value='1', required=true, label=page.front_matter.get('inquiry_consent_text', '')) }}
+      {{ button(text='Request this', type='submit', testid='offer-inquiry-submit') }}
     </form>
     {% endif %}
   </section>

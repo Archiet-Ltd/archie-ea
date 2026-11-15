@@ -79,27 +79,184 @@
       ]
     },
     "sidebar": {
-      "pattern": "sidebar-group",
+      "pattern": "sidebar-07",
       "children": [
-        "sidebar-collapsible"
+        "sidebar-menu-sub"
       ],
-      "macros": "components/sidebar_nav.html: sidebar_group, sidebar_item, sidebar_collapsible, sidebar_subitem",
+      "macros": "components/ui_sidebar.html: sidebar_wrapper, sidebar, sidebar_gap, sidebar_container, sidebar_inner, sidebar_header, sidebar_content, sidebar_footer, sidebar_group, sidebar_group_label, sidebar_menu, sidebar_menu_item, sidebar_menu_button, sidebar_menu_sub, sidebar_menu_sub_item, sidebar_menu_sub_button, sidebar_menu_badge, sidebar_rail, sidebar_inset, sidebar_trigger",
       "spec": {
         "levels": 2,
-        "group_heading": "10px, weight 600, uppercase, 0.08em tracking, muted, role=heading level 3",
-        "item": "32px row, 13px, 16px icon, 8px horizontal padding, 6px radius",
-        "item_active": "muted surface, info text, weight 500, aria-current=page",
-        "collapsible": "the item row as a button with a 14px chevron that turns 90 degrees when open; aria-expanded and aria-controls; opening one never closes another",
-        "subitem": "28px row, 13px, no icon, indented 32px under the parent icon, aria-current=page when active",
-        "count": "right-aligned 11px tabular figure, muted",
-        "pending": "right-aligned 16px primary badge with the figure, aria-label '<n> pending'; replaces the count",
-        "open_state": "persisted per item id in localStorage (archie_sidebar_group_<id>); a collapsible whose child is the current page is always open",
-        "collapsed_rail": "the existing 4rem collapsed state hides labels, counts and sub-lists; the rail with flyouts is sidebar-rail (P2), not this pattern"
+        "source": "flask-basecoat b327186: the sidebar parts and the sidebar-07 block, vendored with the Tailwind 3 spellings",
+        "collapsible": "icon: the trigger, Ctrl/Cmd+B and the rail fold the sidebar to a 3rem icon rail; the state is the sidebar_state cookie",
+        "rail_tooltips": "each menu button names itself in a tooltip beside its icon while the sidebar is folded",
+        "phone": "below 768px the sidebar is a drawer opened by the trigger: Tab stays inside, Escape closes it and returns focus to the trigger",
+        "group_label": "sentence case, 12px, weight 500, muted, role=heading level 3",
+        "menu_button": "32px row, 14px, 16px icon, aria-current=page and data-active on the current page",
+        "menu_sub": "one level under an entry, hidden in the icon rail"
       },
       "banned": [
         "sidebar-third-level",
         "exclusive-accordion",
-        "hover-flyout-on-desktop"
+        "hover-flyout-on-desktop",
+        "second-sidebar-element"
+      ]
+    },
+    "record_detail": {
+      "pattern": "record-detail",
+      "structure": [
+        "page-header",
+        "detail-meta",
+        "sections",
+        "related-records"
+      ],
+      "rules": [
+        "actions-in-header",
+        "one-column-on-narrow",
+        "every-link-lands-on-content"
+      ]
+    },
+    "settings": {
+      "pattern": "settings-sections",
+      "structure": [
+        "page-header",
+        "section-nav",
+        "form-body",
+        "form-footer"
+      ],
+      "rules": [
+        "one-section-per-panel",
+        "label-above-input",
+        "right-aligned-actions"
+      ]
+    },
+    "conversation": {
+      "pattern": "conversation",
+      "structure": [
+        "thread",
+        "answer-cascade",
+        "composer"
+      ],
+      "rules": [
+        "sources-under-every-answer",
+        "composer-pinned-to-bottom"
+      ]
+    },
+    "board": {
+      "pattern": "board",
+      "structure": [
+        "action-bar",
+        "columns",
+        "cards"
+      ],
+      "rules": [
+        "column-heading-with-count",
+        "keyboard-move",
+        "empty-column-says-why"
+      ]
+    },
+    "onboarding": {
+      "pattern": "onboarding",
+      "structure": [
+        "brand",
+        "single-card",
+        "form-body",
+        "next-step"
+      ],
+      "rules": [
+        "one-task-per-screen",
+        "label-above-input"
+      ]
+    },
+    "public": {
+      "pattern": "public-page",
+      "structure": [
+        "public-navbar",
+        "hero",
+        "sections",
+        "public-footer"
+      ],
+      "rules": [
+        "public-palette-scoped"
+      ]
+    },
+    "empty_state": {
+      "pattern": "empty-state",
+      "structure": [
+        "page-header",
+        "empty-state"
+      ],
+      "rules": [
+        "says-why-it-is-empty",
+        "offers-the-next-step"
+      ]
+    },
+    "site_nav": {
+      "pattern": "disclosure-navigation",
+      "structure": [
+        "skip-link",
+        "wordmark",
+        "top-level-entries",
+        "site-cta",
+        "account"
+      ],
+      "rules": [
+        "registry-driven",
+        "sticky-h-16-hairline",
+        "no-shadow",
+        "one-site-primary",
+        "disclosure-not-menu-role"
+      ],
+      "spec": {
+        "height": "h-16",
+        "breakpoint": "lg",
+        "mobile": "header-disclosure-panel",
+        "cta": "primary, data-site-cta",
+        "signin": "ghost",
+        "registry": "content/site/registry.yml read by site_registry()"
+      },
+      "banned": [
+        "side-drawers",
+        "full-screen-modals",
+        "drop-shadows",
+        "literal-link-lists"
+      ]
+    },
+    "mega_menu": {
+      "pattern": "grouped-icon-rows",
+      "parent": "site_nav",
+      "structure": [
+        "group-heading",
+        "item-row",
+        "see-all",
+        "early-access-group"
+      ],
+      "spec": {
+        "item": "icon + label + blurb<=80 chars",
+        "max_items_per_group": 8,
+        "early_access_group": "last, dashed hairline, muted icon, heading Coming soon"
+      },
+      "banned": [
+        "card-grid-navigation",
+        "tooltip-only-descriptions"
+      ]
+    },
+    "site_footer": {
+      "pattern": "site-map",
+      "structure": [
+        "brand-line",
+        "registry-rows",
+        "bottom-bar"
+      ],
+      "rules": [
+        "registry-driven",
+        "max-12-links-per-column",
+        "links-look-like-links",
+        "coming-soon-column-last",
+        "labels-equal-navbar-labels"
+      ],
+      "banned": [
+        "literal-link-lists",
+        "fake-link-spans"
       ]
     }
   },
@@ -123,6 +280,58 @@
     "composer-matrix",
     "paginated-matrix",
     "sidebar-third-level",
-    "exclusive-accordion"
+    "exclusive-accordion",
+    "literal-link-lists",
+    "fake-link-spans",
+    "placeholder-screenshots",
+    "screenshots-on-early-access",
+    "gradient-backgrounds",
+    "decorative-blur",
+    "hover-lift"
+  ],
+  "public_scope": [
+    "app/templates/components/public_navbar.html",
+    "app/templates/components/public_menu.html",
+    "app/templates/components/public_footer.html"
+  ],
+  "public_icons": [
+    "arrow-right",
+    "arrow-up-right",
+    "book-open",
+    "boxes",
+    "building-2",
+    "check",
+    "chevron-down",
+    "clock",
+    "cloud",
+    "code",
+    "file-text",
+    "gauge",
+    "git-branch",
+    "git-compare",
+    "globe",
+    "history",
+    "layers",
+    "layout-dashboard",
+    "lightbulb",
+    "link",
+    "list-checks",
+    "lock",
+    "log-out",
+    "map",
+    "menu",
+    "message-square",
+    "network",
+    "plug",
+    "route",
+    "scale",
+    "search",
+    "shield-check",
+    "sparkles",
+    "target",
+    "user",
+    "users",
+    "workflow",
+    "x"
   ]
 }

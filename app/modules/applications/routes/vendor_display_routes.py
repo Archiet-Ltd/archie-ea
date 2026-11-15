@@ -13,7 +13,7 @@ Routes:
 import logging
 
 from flask import current_app, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import audit_log
@@ -193,11 +193,17 @@ def vendor_detail(vendor_id):
         with db.session.no_autoflush:
             # Get all ArchiMate elements linked to this vendor's products
             try:
-                archimate_elements = (
-                    ArchiMateElement.query.join(ArchiMateElement.vendor_products)
+                # Distinct ids first: DISTINCT over whole elements fails on their JSON columns.
+                element_ids = [r[0] for r in (
+                    db.session.query(ArchiMateElement.id)
+                    .join(ArchiMateElement.vendor_products)
                     .filter(VendorProduct.vendor_organization_id == vendor_id)
                     .distinct()
                     .all()
+                )]
+                archimate_elements = (
+                    ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids)).all()
+                    if element_ids else []
                 )
             except Exception as e:
                 current_app.logger.warning("Could not load ArchiMate elements: %s", e, exc_info=True)
@@ -323,6 +329,35 @@ def vendor_detail(vendor_id):
             {"id": c.id, "name": c.name} for c in all_business_capabilities
         ]
 
+        # The systems and contracts this organisation attaches to the vendor: the
+        # register's answer, so this page agrees with the Vendors list.
+        from app.services import vendor_register
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+
+        supplied_systems = vendor_register.systems_of(vendor_id)
+        ledger = vendor_register.contract_ledger()
+        vendor_contracts = vendor_register.contracts_with_standing(vendor_id, ledger=ledger)
+        counted = ledger["by_vendor"].get(vendor_id, [])
+        known = {a.id for a in deployed_applications}
+        deployed_applications = list(deployed_applications) + [
+            a for a in supplied_systems if a.id not in known]
+
+        # The Vendors list's permission decides every cost figure on this page too.
+        cost_visible = costs_visible(current_user)
+        supplied_cost = (vendor_register.annual_cost_with_basis(supplied_systems, vendor_id, counted=counted)[0] if cost_visible else None)
+        renewing = ledger["renewing_by_vendor"].get(vendor_id, [])
+        next_renewal = vendor_register.next_renewal(renewing)
+        overdue = [c for c in renewing if vendor_register.renewal_is_overdue(c)
+                   and vendor_register.renewal_date_of(c) == next_renewal]
+        next_renewal_overdue = vendor_register.renewal_state(overdue[0]).text if overdue else None
+
+        from app.middleware.tenant_context import current_org_id
+        from app.services import result_footer_service
+
+        systems_footer = result_footer_service.vendor_detail_footer(
+            current_org_id(), vendor, supplied_systems,
+            [contract for contract, _standing in vendor_contracts])
+
         from datetime import datetime, timedelta
         _stale_cutoff = datetime.utcnow() - timedelta(days=90)
         stale_product_ids = {
@@ -338,6 +373,15 @@ def vendor_detail(vendor_id):
             vendor_capabilities=vendor_capabilities,
             vendor_apqc_mappings=vendor_apqc_mappings,
             deployed_applications=deployed_applications,
+            supplied_systems=supplied_systems,
+            vendor_contracts=vendor_contracts,
+            supplied_cost=supplied_cost,
+            cost_visible=cost_visible,
+            costs_withheld=not cost_visible,
+            costs_withheld_sentence=COSTS_WITHHELD,
+            systems_footer=systems_footer,
+            next_renewal=next_renewal,
+            next_renewal_overdue=next_renewal_overdue,
             all_business_capabilities=all_business_capabilities,
             products_json=products_json,
             capabilities_json=capabilities_json,

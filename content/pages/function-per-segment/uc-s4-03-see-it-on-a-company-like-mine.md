@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: function-per-segment
 use_case_id: UC-S4-03
 segment_id: S4
@@ -26,7 +27,7 @@ A services-shaped demonstration company, walking through the same three-question
 segment gets, built specifically for services businesses rather than adapted from a manufacturing
 example.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

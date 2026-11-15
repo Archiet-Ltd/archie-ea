@@ -1,0 +1,64 @@
+{# Building blocks of the Overview dashboard, from flask-basecoat's examples/_dashboards.html
+   (feat/shadcn-100-compliance, b327186c2). Every visible part is a component macro. #}
+{% import 'basecoat/index.html' as ui %}
+
+{#- A JSON value as an attribute string. Iterating the JSON yields plain characters, which join escapes for an attribute. -#}
+{% macro json_attr(value) %}{{ value | tojson | list | join('') }}{% endmacro %}
+
+{#- A change as a small badge. good is true when the change is welcome, false when it is not, none when neither. -#}
+{% macro delta(value, good=none) -%}
+{%- call ui.badge(variant='secondary' if good else 'outline', class='tabular-nums text-foreground') -%}{{ lucide('trending-down' if value.startswith('-') else 'trending-up', 'text-destructive' if good == false else '') }}{{ value }}{%- endcall -%}
+{%- endmacro %}
+
+{#- Square icon tile used at the top right of stat cards and in lists. -#}
+{% macro icon_tile(name, class='') -%}
+<span class="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground [&_svg]:size-4 {{ class }}">{{ lucide(name) }}</span>
+{%- endmacro %}
+
+{#- Chart container driven by the runtime chart renderer. -#}
+{% macro chart(type, data, series, x='month', class='aspect-auto h-[250px] w-full', legend=false, y_axis=false, grid=true, label='Chart', testid=none) -%}
+{%- set a = {'data-chart-type': type, 'data-chart-x': x, 'data-chart-data': json_attr(data), 'data-chart-series': json_attr(series), 'role': 'img', 'aria-label': label} -%}
+{%- if testid %}{% set _ = a.update({'data-testid': testid}) %}{% endif -%}
+{%- if not grid %}{% set _ = a.update({'data-chart-no-grid': ''}) %}{% endif -%}
+{%- if legend %}{% set _ = a.update({'data-chart-legend': ''}) %}{% endif -%}
+{%- if y_axis %}{% set _ = a.update({'data-chart-y-axis': ''}) %}{% endif -%}
+{{ ui.chart(class=class, attrs=a) }}
+{%- endmacro %}
+
+{#- Bars read down the page: one row for each category, its name in full on the left, so no name is ever left
+    out under a bar. The rows are drawn from the spec below; the data is also kept on the element. -#}
+{% macro bar_rows(data, name_key, value_key, series_label, color, class='aspect-auto h-[280px] w-full', label='Chart', testid=none, name_width=130) -%}
+{%- set spec = {
+  'type': 'bar', 'component': 'BarChart',
+  'config': {value_key: {'label': series_label, 'color': color}},
+  'data': data,
+  'props': {'accessibilityLayer': true, 'layout': 'vertical', 'margin': {'left': 16, 'right': 12}},
+  'series': [{'component': 'Bar', 'dataKey': value_key, 'fill': color, 'radius': 4, 'labelList': [{'dataKey': value_key, 'position': 'right', 'fill': color, 'offset': 6}]}],
+  'axes': [
+    {'component': 'XAxis', 'type': 'number', 'dataKey': value_key, 'hide': true},
+    {'component': 'YAxis', 'dataKey': name_key, 'type': 'category', 'tickLine': false, 'axisLine': false, 'tickMargin': 8, 'width': name_width, 'interval': 0},
+  ],
+  'grid': none,
+  'tooltip': {'cursor': false, 'content': 'ChartTooltipContent', 'indicator': 'dashed'},
+  'legend': none,
+  'labels': [],
+} -%}
+{%- set a = {'data-chart-type': 'bar', 'data-chart-x': name_key, 'data-chart-data': json_attr(data), 'role': 'img', 'aria-label': label} -%}
+{%- if testid %}{% set _ = a.update({'data-testid': testid}) %}{% endif -%}
+{% call ui.chart(class=class, attrs=a) %}<script type="application/json" data-chart-spec>{{ spec | tojson }}</script>{% endcall %}
+{%- endmacro %}
+
+{#- Small legend row with coloured dots. items: [(label, tone)] -#}
+{% macro legend(items, class='') -%}
+<div class="flex flex-wrap items-center gap-4 text-sm text-muted-foreground {{ class }}">
+  {%- for label, tone in items %}<span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-chart-{{ tone }}"></span>{{ label }}</span>{% endfor -%}
+</div>
+{%- endmacro %}
+
+{#- Card header with title and optional description. -#}
+{% macro card_head(title, description=none) -%}
+{%- call ui.card_header() -%}
+  {{ ui.card_title(text=title) }}
+  {%- if description %}{{ ui.card_description(text=description) }}{% endif -%}
+{%- endcall -%}
+{%- endmacro %}

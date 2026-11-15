@@ -1,0 +1,13 @@
+{# toggle-group: port of shadcn/ui toggle-group.tsx (pinned in compliance/upstream). Macros: toggle_group, toggle_group_item #}
+
+{#- ToggleGroup -#}
+{% macro toggle_group(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('toggle-group', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- ToggleGroupItem -#}
+{% macro toggle_group_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('toggle-group-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

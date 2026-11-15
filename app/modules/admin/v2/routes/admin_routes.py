@@ -14,6 +14,7 @@ url_for("admin.api_settings"))
 All routes preserved exactly from v1 admin_routes.py.
 """
 
+import re
 import logging
 import os
 
@@ -30,8 +31,10 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from app.modules.account.mfa_flow import enrol_first
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
+from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
 from app.utils.pagination import safe_int_arg
 
 try:
@@ -60,6 +63,7 @@ from werkzeug.exceptions import HTTPException
 from app import csrf
 from app.extensions import db
 from app.services.billing_plans import PlanLimitReached
+from app.services.administrator_guard import LastAdministratorError, ensure_keeps_administrator
 from app.services import solution_prompt_override_service
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
@@ -78,7 +82,7 @@ from app.middleware.tenant_decorators import (
     platform_admin_required,
     require_org_or_platform_admin,
 )
-from app.models import APISettings, EditableHTML, Permission, Role, User
+from app.models import APISettings, Permission, Role, User
 from app.models.organization import Organization
 from app.models.org_role import OrgRole
 from app.models.ai_service import AIPromptTemplate, AIPromptTemplateVersion
@@ -421,6 +425,7 @@ def _plan_limit():
 @admin_bp_v2.route("/new-user", methods=["GET", "POST"])
 @timed_route
 @login_required
+@enrol_first("invite")
 @admin_required
 @audit_log("create_user")
 def new_user():
@@ -449,6 +454,7 @@ def new_user():
 @admin_bp_v2.route("/invite-user", methods=["GET", "POST"])
 @timed_route
 @login_required
+@enrol_first("invite")
 @admin_required
 @audit_log("invite_user")
 def invite_user():
@@ -498,6 +504,8 @@ def manage_users_redirect():
 @admin_required
 def registered_users():
     """View all registered users."""
+    from app.services.rbac_service import rbac_service
+
     require_org_or_platform_admin(g.current_org_id)
     users = _svc.get_all_users()
     roles = _svc.get_all_roles()
@@ -511,6 +519,7 @@ def registered_users():
         users=users,
         roles=roles,
         current_org=current_org,
+        member_roles=rbac_service.member_role_labels(g.current_org_id, users),
     )
 
 
@@ -592,7 +601,12 @@ def change_account_type(user_id):
     # so POST behaviour is unchanged.
     form = ChangeAccountTypeForm(obj=user)
     if form.validate_on_submit():
-        _svc.change_user_role(user, form.role.data)
+        try:
+            _svc.change_user_role(user, form.role.data)
+        except LastAdministratorError as exc:
+            db.session.rollback()
+            flash(exc.message, "error")
+            return render_template("admin/manage_user.html", user=user, form=form)
         role_name = user.role.name if user.role else "No Role"
         flash(
             "Role for user {} successfully changed to {}.".format(
@@ -684,6 +698,10 @@ def delete_user(user_id):
                 ip_address=request.remote_addr,
                 description=f"admin_user_delete via {request.path}",
             )
+        except LastAdministratorError as exc:
+            db.session.rollback()
+            flash(exc.message, "error")
+            return redirect(url_for("admin.user_info", user_id=user_id))
         except IntegrityError:
             db.session.rollback()
             flash(
@@ -695,32 +713,7 @@ def delete_user(user_id):
 
 
 # ============================================================================
-# Editor Contents
-# ============================================================================
-
-
-@admin_bp_v2.route("/_update_editor_contents", methods=["POST"])
-@timed_route
-@login_required
-@platform_admin_required
-@audit_log("update_editor_contents")
-def update_editor_contents():
-    """Update the contents of an editor."""
-    edit_data = request.form.get("edit_data")
-    editor_name = request.form.get("editor_name")
-
-    editor_contents = EditableHTML.query.filter_by(editor_name=editor_name).first()
-    if editor_contents is None:
-        editor_contents = EditableHTML(editor_name=editor_name)
-    editor_contents.value = edit_data
-
-    db.session.add(editor_contents)
-    db.session.commit()
-    return "OK", 200
-
-
-# ============================================================================
-# API Settings
+# AI settings
 # ============================================================================
 
 
@@ -735,6 +728,12 @@ def api_settings():
     edit_id = request.args.get("edit", type=int)
     edit_settings = APISettings.query.get(edit_id) if edit_id else None
     form = APISettingsForm()
+    # a person who came from sign-up to add a key keeps the way back after saving it
+    settings_url = url_for("admin.api_settings", **({"from": "signup"} if request.args.get("from") == "signup" else {}))
+    from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+    # What the platform has spent on answers this month, per provider in its order, with ceilings.
+    spend_ledger = LLMService.spend_ledger_rows()
 
     if form.validate_on_submit():
         provider = form.provider.data
@@ -772,6 +771,8 @@ def api_settings():
                     all_settings=all_settings,
                     edit_id=edit_id,
                     edit_settings=edit_settings,
+                    spend_ledger=spend_ledger,
+                    settings_url=settings_url,
                 )
 
             settings = APISettings(
@@ -801,7 +802,7 @@ def api_settings():
         if form.test.data:
             if not api_key_to_test:
                 flash("No API key available to test.", "error")
-                return redirect(url_for("admin.api_settings"))
+                return redirect(settings_url)
             test_result = test_api_key(provider, api_key_to_test)
             settings.test_status = "success" if test_result["success"] else "failed"
             settings.test_message = test_result.get("message", "")
@@ -818,10 +819,10 @@ def api_settings():
                 )
         else:
             label_suffix = f" ({key_label})" if key_label else ""
-            flash(f"API settings for {provider}{label_suffix} saved successfully.", "success")
+            flash(f"AI settings for {provider}{label_suffix} saved successfully.", "success")
 
         db.session.commit()
-        return redirect(url_for("admin.api_settings"))
+        return redirect(settings_url)
 
     if edit_settings:
         form.provider.data = edit_settings.provider
@@ -846,6 +847,8 @@ def api_settings():
         all_settings=all_settings,
         edit_id=edit_id,
         edit_settings=edit_settings,
+        spend_ledger=spend_ledger,
+        settings_url=settings_url,
     )
 
 
@@ -860,7 +863,7 @@ def delete_api_settings(settings_id):
     provider = settings.provider
     db.session.delete(settings)
     db.session.commit()
-    flash(f"API settings for {provider} deleted successfully.", "success")
+    flash(f"AI settings for {provider} deleted successfully.", "success")
     return redirect(url_for("admin.api_settings"))
 
 
@@ -874,10 +877,14 @@ def test_api_settings(settings_id):
     settings = APISettings.query.get_or_404(settings_id)
 
     try:
-        result = test_api_key(settings.api_key, settings.api_provider)
-        flash(f"API test successful: {result}", "success")
+        result = test_api_key(settings.provider, settings.api_key, settings.default_model)
     except Exception:
-        flash("API test failed. Please try again.", "error")
+        result = {"success": False, "message": "the test could not be run"}
+    message = (result or {}).get("message") or ""
+    if (result or {}).get("success"):
+        flash(f"API test successful: {message}".rstrip(": "), "success")
+    else:
+        flash(f"API test failed: {message}".rstrip(": "), "error")
 
     return redirect(url_for("admin.api_settings"))
 
@@ -896,7 +903,7 @@ def preview_env_keys():
         "ANTHROPIC_API_KEY": "anthropic",
         "GOOGLE_API_KEY": "gemini",
         "GEMINI_API_KEY": "gemini",
-        "DEEPSEEK_API_KEY": "deepseek",
+        "NVIDIA_API_KEY": "nvidia",
         "HUGGINGFACE_API_KEY": "huggingface",
         "HF_TOKEN": "huggingface",
         "AZURE_OPENAI_API_KEY": "azure",
@@ -907,10 +914,10 @@ def preview_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "deepseek": "deepseek-chat",
+        "nvidia": DEFAULT_MODELS["nvidia"],
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
-        "openrouter": "google/gemini-2.5-flash-preview:free",
+        "openrouter": "google/gemma-4-31b-it:free",
     }
 
     existing = {s.provider for s in APISettings.query.all()}
@@ -992,7 +999,7 @@ def load_env_keys():
         "ANTHROPIC_API_KEY": "anthropic",
         "GOOGLE_API_KEY": "gemini",
         "GEMINI_API_KEY": "gemini",
-        "DEEPSEEK_API_KEY": "deepseek",
+        "NVIDIA_API_KEY": "nvidia",
         "HUGGINGFACE_API_KEY": "huggingface",
         "HF_TOKEN": "huggingface",
         "AZURE_OPENAI_API_KEY": "azure",
@@ -1003,10 +1010,10 @@ def load_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "deepseek": "deepseek-chat",
+        "nvidia": DEFAULT_MODELS["nvidia"],
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
-        "openrouter": "google/gemini-2.5-flash-preview:free",
+        "openrouter": "google/gemma-4-31b-it:free",
     }
 
     requested_keys = data["keys"]
@@ -1073,7 +1080,7 @@ def load_env_keys():
 @admin_bp_v2.route("/consolidation")
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def consolidation_status():
     """Blueprint Consolidation Status Dashboard"""
     from app.api_registry import (
@@ -2294,6 +2301,7 @@ from app.models.user import VALID_ROLES as _VALID_ROLES  # noqa: E402
 @admin_bp_v2.route("/sso-settings", methods=["GET", "POST"])
 @timed_route
 @login_required
+@enrol_first("sso")
 @admin_required
 @audit_log("update_sso_settings")
 def sso_settings():
@@ -3337,6 +3345,10 @@ def api_bulk_delete_users():
     if not ids or not isinstance(ids, list):
         return jsonify({"error": "ids list required"}), 400
     safe_ids = [i for i in ids if i != current_user.id]
+    try:
+        ensure_keeps_administrator(g.current_org_id, safe_ids, leaving=True)
+    except LastAdministratorError as exc:
+        return jsonify({"error": exc.message}), 409
     deleted = User.query.filter(
         User.id.in_(safe_ids), User.organization_id == g.current_org_id
     ).delete(synchronize_session=False)
@@ -4873,7 +4885,15 @@ def _get_capability_suggestion_default():
 @admin_required
 def solution_prompts_page():
     """Render the solution AI prompt management page."""
-    return render_template("admin/solution_prompts.html")
+    # The list is rendered on the server (the CSP Alpine build cannot run the old
+    # client-side table); the same data the JSON endpoint below returns.
+    try:
+        prompts = solution_prompts_data().get_json().get("prompts", [])
+        load_error = None
+    except Exception:
+        logger.exception("Failed to load solution prompts")
+        prompts, load_error = [], "The prompts could not be read. Refresh the page to try again."
+    return render_template("admin/solution_prompts.html", prompts=prompts, load_error=load_error)
 
 
 @admin_bp_v2.route("/solution-prompts/data")
@@ -5129,6 +5149,31 @@ def solution_prompt_rollback(prompt_key, version):
     })
 
 
+_PRICING_DATETIME_CELL = re.compile(r"^(\d{4}-\d{2}-\d{2})[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$")
+
+
+def _pricing_normalise_dates(rows):
+    """Excel date cells arrive as 'YYYY-MM-DD 00:00:00'; stage them as ISO dates
+    so confirm can read them with date.fromisoformat."""
+    for row in rows:
+        for key, value in list(row.items()):
+            if isinstance(value, str):
+                match = _PRICING_DATETIME_CELL.match(value.strip())
+                if match:
+                    row[key] = match.group(1)
+    return rows
+
+
+def _pricing_parse_error(exc):
+    """A plain sentence for a spreadsheet that could not be read, never raw exception text."""
+    text = str(exc).lower()
+    if "codec" in text or "utf-8" in text or "decode" in text:
+        return "This file isn't UTF-8 encoded. Save it as CSV UTF-8 and upload again."
+    if "zip" in text or "excel" in text or "workbook" in text or "xlsx" in text:
+        return "This doesn't look like an Excel workbook."
+    return "We couldn't read this file. Check it is a CSV or XLSX file with the columns listed above."
+
+
 # ─── Vendor Pricing Import ──────────────────────────────────────────────
 @admin_bp_v2.route("/vendor-pricing/import", methods=["GET", "POST"])
 @timed_route
@@ -5149,26 +5194,23 @@ def vendor_pricing_import():
         filename = secure_filename(file.filename)
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
-        if ext in ("csv", "xlsx", "xls"):
+        if ext == "xls":
+            upload_error = "Legacy .xls files are not supported. Save the file as .xlsx (Excel Workbook) and upload again."
+
+        elif ext in ("csv", "xlsx"):
             # Path A: Structured upload — parse with ImportFileParser
             try:
                 from app.services.import_core.file_parser import ImportFileParser
                 parser = ImportFileParser()
-                rows, errors = parser.parse_file(file, filename)
-                if errors:
-                    upload_error = "; ".join(errors[:5])
+                rows, headers = parser.parse_file(file, filename.lower())
+                required = {"vendor_name", "product_name", "tier", "annual_cost"}
+                validation = parser.validate_file_structure(rows, headers, required)
+                if not validation.get("valid"):
+                    upload_error = "; ".join(validation.get("errors", [])[:5])
                 else:
-                    required = {"vendor_name", "product_name", "tier", "annual_cost"}
-                    validation = parser.validate_file_structure(
-                        rows, list(rows[0].keys()) if rows else [],
-                        required
-                    )
-                    if not validation.get("valid"):
-                        upload_error = "; ".join(validation.get("errors", [])[:5])
-                    else:
-                        staging_items = rows
-            except Exception as e:
-                upload_error = f"Parse error: {str(e)}"
+                    staging_items = _pricing_normalise_dates(rows)
+            except Exception as exc:
+                upload_error = _pricing_parse_error(exc)
 
         elif ext in ("pdf", "docx", "txt", "md"):
             # Path B: Document ingestion — LLM extraction
@@ -5179,9 +5221,10 @@ def vendor_pricing_import():
                 if result["success"]:
                     staging_items = result["items"]
                 else:
-                    upload_error = result["error"]
-            except Exception as e:
-                upload_error = f"Extraction error: {str(e)}"
+                    upload_error = "We couldn't read this document. Try a CSV or XLSX file instead."
+            except Exception:
+                logger.exception("Pricing document extraction failed")
+                upload_error = "We couldn't read this document. Try a CSV or XLSX file instead."
         else:
             upload_error = f"Unsupported file type: .{ext}. Use CSV, XLSX, PDF, or DOCX."
 
@@ -5260,7 +5303,9 @@ def vendor_pricing_confirm():
 
         # Check for existing pricing row (same product + tier)
         existing = VendorProductPricing.query.filter_by(
-            product_id=product.id, tier_name=tier
+            product_id=product.id,
+            tier_name=tier,
+            organization_id=current_user.organization_id,
         ).first()
 
         if existing:
@@ -5272,7 +5317,6 @@ def vendor_pricing_confirm():
             existing.implementation_fee = item.get("implementation_fee")
             existing.source = "Contract Import"
             existing.last_verified_at = datetime.now(timezone.utc)
-            existing.organization_id = 1
             if item.get("expiry_date"):
                 try:
                     from datetime import date
@@ -5298,7 +5342,7 @@ def vendor_pricing_confirm():
                 typical_discount_percent=item.get("discount_percent"),
                 data_source_type="contract_verified",
                 last_verified_at=datetime.now(timezone.utc),
-                organization_id=1,
+                organization_id=current_user.organization_id,
                 created_by_id=current_user.id,
             )
             if item.get("expiry_date"):
@@ -5481,15 +5525,19 @@ def governance_gates_delete(gate_id):
 @platform_admin_required
 def organizations_list():
     """List all organizations with user counts."""
-    from app.services.billing_plans import user_limit_status
+    from app.services.billing_plans import is_holding_slug, user_limit_status
 
     orgs = Organization.query.order_by(Organization.name).all()
     org_data = []
     for org in orgs:
-        user_count = User.query.filter_by(organization_id=org.id).count()
+        holding = is_holding_slug(org.slug)
+        user_count = 0 if holding else User.query.filter_by(organization_id=org.id).count()
+        waiting = User.query.filter_by(organization_id=org.id, confirmed=False).count() if holding else None
         org_data.append({
             "org": org,
+            "holding": holding,
             "user_count": user_count,
+            "waiting": waiting,
             "limits": user_limit_status(org.id),
         })
     return render_template("admin/organizations/list.html", organizations=org_data)
@@ -5523,6 +5571,9 @@ def organization_create():
         db.session.add(org)
         db.session.flush()
         set_contract_plan(org, plan_key, seats)
+        from app.commands.seed_agent_charters import ensure_charters
+
+        ensure_charters(org.id)
         db.session.commit()
         flash(f'Organization "{name}" created.', "success")
         return redirect(url_for("admin.organizations_list"))
@@ -5683,6 +5734,11 @@ def toggle_org_admin(org_id, user_id):
     # (checked above), so this is always a grant/revoke in their own
     # organisation.
     if user.is_admin():
+        try:
+            ensure_keeps_administrator(org_id, [user_id])
+        except LastAdministratorError as exc:
+            flash(exc.message, "error")
+            return redirect(url_for("admin.organization_detail", org_id=org_id))
         user.revoke_org_admin()
         OrgRole.query.filter_by(
             organization_id=org_id, user_id=user_id
@@ -5704,6 +5760,11 @@ def organization_delete(org_id):
     """Delete an organization. Moves all users to the Default org first."""
     org = Organization.query.get_or_404(org_id)
 
+    from app.services.billing_plans import is_holding_slug
+
+    if is_holding_slug(org.slug):
+        flash("Cannot delete the organization unconfirmed sign-ups wait in.", "error")
+        return redirect(url_for("admin.organization_detail", org_id=org_id))
     if org.slug == "default":
         flash("Cannot delete the Default organization.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
@@ -5732,6 +5793,14 @@ def organization_delete(org_id):
         synchronize_session=False
     )
 
+    # The audit trail outlives the organisation: its entries are kept and only
+    # lose the reference to the deleted organisation, the way a deleted user's
+    # entries lose theirs (SET NULL, never a delete).
+    db.session.execute(
+        db.text("UPDATE soc2_audit_log SET organization_id = NULL WHERE organization_id = :org_id"),  # tenancy-ok: detaches the deleted organisation's own entries
+        {"org_id": org.id},
+    )
+
     org_name = org.name
     db.session.delete(org)
     db.session.commit()
@@ -5756,6 +5825,12 @@ def remove_user_from_org(org_id, user_id):
     default_org = Organization.query.filter_by(slug="default").first()
     if not default_org or default_org.id == org_id:
         flash("Cannot remove user — no other organization to move them to.", "error")
+        return redirect(url_for("admin.organization_detail", org_id=org_id))
+
+    try:
+        ensure_keeps_administrator(org_id, [user_id], leaving=True)
+    except LastAdministratorError as exc:
+        flash(exc.message, "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
 
     user.organization_id = default_org.id

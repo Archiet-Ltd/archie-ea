@@ -1,0 +1,38 @@
+{
+ "feed": [
+  {
+   "post": {
+    "uri": "at://did:plc:author/app.bsky.feed.post/post1",
+    "author": {
+     "handle": "northwind.bsky.social",
+     "displayName": "Northwind Freight"
+    },
+    "record": {
+     "text": "Northwind Freight announces new depot",
+     "createdAt": "2026-10-19T10:00:00.000Z"
+    },
+    "replyCount": 5,
+    "repostCount": 10,
+    "likeCount": 25,
+    "indexedAt": "2026-10-19T10:05:00.000Z"
+   }
+  },
+  {
+   "post": {
+    "uri": "at://did:plc:author/app.bsky.feed.post/post2",
+    "author": {
+     "handle": "northwind.bsky.social",
+     "displayName": "Northwind Freight"
+    },
+    "record": {
+     "text": "Northwind Freight hiring drivers",
+     "createdAt": "2026-10-18T10:00:00.000Z"
+    },
+    "replyCount": 2,
+    "repostCount": 3,
+    "likeCount": 15,
+    "indexedAt": "2026-10-18T10:05:00.000Z"
+   }
+  }
+ ]
+}

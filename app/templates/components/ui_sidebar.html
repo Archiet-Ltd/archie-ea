@@ -1,0 +1,135 @@
+{# Sidebar parts: the shadcn/ui sidebar (sidebar-07 block), vendored from the pattern library.
+
+   Source: flask-basecoat commit b327186, templates/basecoat/sidebar.html (macros) with the class
+   recipes in data/recipes.json and the parts' behaviour in static/js/src/components/sidebar.js.
+   Class strings are the library's, with the Tailwind 4 spellings rewritten for the Tailwind 3
+   build this app ships (w-(--x) -> w-[--x], outline-hidden -> outline-none). The rules behind
+   the library's cn-sidebar-* classes are in static/styles/sidebar-shell.css; the behaviour
+   (Ctrl+B, trigger, rail, cookie, drawer below 768px, tooltips in the icon rail) is
+   static/js/sidebar/sidebar_shell.js.
+
+   Usage (the one call is components/admin_sidebar.html):
+
+     {% from 'components/ui_sidebar.html' import sidebar_wrapper, sidebar, sidebar_gap,
+             sidebar_container, sidebar_inner, sidebar_header, sidebar_content, sidebar_footer,
+             sidebar_group, sidebar_group_label, sidebar_menu, sidebar_menu_item,
+             sidebar_menu_button, sidebar_menu_sub, sidebar_menu_sub_item,
+             sidebar_menu_sub_button, sidebar_menu_badge, sidebar_rail, sidebar_inset,
+             sidebar_trigger %}
+
+   Every part takes class='' and attrs={} and renders its call block. sidebar() takes
+   collapsible ('icon' keeps an icon rail, 'offcanvas' hides, 'none' never collapses),
+   variant, side and state ('expanded' or 'collapsed'). sidebar_menu_button() renders a
+   link when given href, a button otherwise, and takes a tooltip: the label shown beside the
+   icon in the icon rail, and wrap: a long label wraps onto a second line instead of being cut off. #}
+
+{%- macro sb_attrs(d) -%}
+{%- for k, v in d.items() if v is not none and v is not false %} {{ k }}="{{ v }}"{% endfor -%}
+{%- endmacro -%}
+
+{%- macro sb_part(tag, slot, base, data, extra, attrs, text, content, id=none) -%}
+<{{ tag }} data-slot="{{ slot }}" class="{{ base }}{{ ' ' ~ extra if extra }}"{% if id %} id="{{ id }}"{% endif %}{% if data %} data-sidebar="{{ data }}"{% endif %}{{ sb_attrs(attrs) }}>{{ text }}{{ content }}</{{ tag }}>
+{%- endmacro -%}
+
+
+{% macro sidebar_wrapper(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('div', 'sidebar-wrapper', 'group/sidebar-wrapper flex min-h-svh w-full has-[[data-variant=inset]]:bg-card', none, class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{#- Sidebar: the outer element that carries the state every child reads (group-data-[...]) -#}
+{% macro sidebar(text='', class='', id=none, attrs={}, variant='sidebar', side='left', collapsible='offcanvas', state='expanded', tag='div') -%}
+{%- if collapsible == 'none' -%}
+{{ sb_part(tag, 'sidebar', 'flex h-full w-[--sidebar-width] flex-col bg-card text-foreground', none, class, attrs, text, caller() if caller else '', id) }}
+{%- else -%}
+{{ sb_part(tag, 'sidebar', 'group peer hidden text-foreground md:block', none, class, dict({'data-state': state, 'data-collapsible': (collapsible if state == 'collapsed' else ''), 'data-collapsible-mode': collapsible, 'data-variant': variant, 'data-side': side}, **attrs), text, caller() if caller else '', id) }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro sidebar_gap(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('div', 'sidebar-gap', 'cn-sidebar-gap relative w-[--sidebar-width] bg-transparent group-data-[collapsible=offcanvas]:w-0 group-data-[side=right]:rotate-180 group-data-[collapsible=icon]:w-[--sidebar-width-icon]', none, class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_container(text='', class='', id=none, attrs={}, side='left') -%}
+{{ sb_part('div', 'sidebar-container', 'fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l', none, class, dict({'data-side': side}, **attrs), text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_inner(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('div', 'sidebar-inner', 'cn-sidebar-inner flex size-full flex-col', 'sidebar', class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_header(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('div', 'sidebar-header', 'cn-sidebar-header flex flex-col', 'header', class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_content(text='', class='', id=none, attrs={}, tag='div') -%}
+{{ sb_part(tag, 'sidebar-content', 'cn-sidebar-content flex min-h-0 flex-1 flex-col overflow-auto group-data-[collapsible=icon]:overflow-hidden', 'content', class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_footer(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('div', 'sidebar-footer', 'cn-sidebar-footer flex flex-col', 'footer', class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_group(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('div', 'sidebar-group', 'cn-sidebar-group relative flex w-full min-w-0 flex-col', 'group', class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_group_label(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('div', 'sidebar-group-label', 'cn-sidebar-group-label flex shrink-0 items-center outline-none [&>svg]:shrink-0', 'group-label', class, dict({'role': 'heading', 'aria-level': '3'}, **attrs), text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_menu(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('ul', 'sidebar-menu', 'cn-sidebar-menu flex w-full min-w-0 flex-col', 'menu', class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_menu_item(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('li', 'sidebar-menu-item', 'group/menu-item relative', 'menu-item', class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{#- SidebarMenuButton: a link (href) or a button; active marks the current page; tooltip is the icon rail's label -#}
+{% macro sidebar_menu_button(text='', class='', id=none, attrs={}, href=none, active=false, size='default', tooltip=none, wrap=false) -%}
+{%- set tag = 'a' if href else 'button' -%}
+{%- set sizes = {'default': 'cn-sidebar-menu-button-size-default', 'sm': 'cn-sidebar-menu-button-size-sm', 'lg': 'cn-sidebar-menu-button-size-lg'} -%}
+{%- set extra = {'data-size': size, 'data-active': 'true' if active else 'false'} -%}
+{%- if href -%}{%- set _ = extra.update({'href': href}) -%}{%- else -%}{%- set _ = extra.update({'type': 'button'}) -%}{%- endif -%}
+{%- if active and href -%}{%- set _ = extra.update({'aria-current': 'page'}) -%}{%- endif -%}
+{%- if tooltip -%}{%- set _ = extra.update({'data-tooltip': tooltip}) -%}{%- endif -%}
+{%- if wrap -%}{%- set _ = extra.update({'data-wrap': 'true'}) -%}{%- endif -%}
+{{ sb_part(tag, 'sidebar-menu-button', 'cn-sidebar-menu-button peer/menu-button group/menu-button flex w-full items-center overflow-hidden outline-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0' ~ ('' if wrap else ' [&>span:last-child]:truncate') ~ ' ' ~ sizes.get(size, sizes['default']) ~ ' cn-sidebar-menu-button-variant-default', 'menu-button', class, dict(extra, **attrs), text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_menu_badge(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('div', 'sidebar-menu-badge', 'cn-sidebar-menu-badge flex items-center justify-center tabular-nums select-none group-data-[collapsible=icon]:hidden', 'menu-badge', class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_menu_sub(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('ul', 'sidebar-menu-sub', 'cn-sidebar-menu-sub flex min-w-0 flex-col group-data-[collapsible=icon]:hidden', 'menu-sub', class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_menu_sub_item(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('li', 'sidebar-menu-sub-item', 'group/menu-sub-item relative', 'menu-sub-item', class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{% macro sidebar_menu_sub_button(text='', class='', id=none, attrs={}, href='#', active=false) -%}
+{%- set extra = {'href': href, 'data-size': 'md', 'data-active': 'true' if active else 'false'} -%}
+{%- if active -%}{%- set _ = extra.update({'aria-current': 'page'}) -%}{%- endif -%}
+{{ sb_part('a', 'sidebar-menu-sub-button', 'cn-sidebar-menu-sub-button flex min-w-0 -translate-x-px items-center overflow-hidden outline-none group-data-[collapsible=icon]:hidden disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:shrink-0', 'menu-sub-button', class, dict(extra, **attrs), text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{#- SidebarRail: the thin strip on the sidebar's edge that also toggles it -#}
+{% macro sidebar_rail(text='', class='', id=none, attrs={}) -%}
+{{ sb_part('button', 'sidebar-rail', 'cn-sidebar-rail absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] sm:flex cursor-w-resize group-data-[collapsible=icon]:cursor-e-resize', 'rail', class, dict({'type': 'button', 'tabindex': '-1', 'aria-label': 'Toggle sidebar', 'title': 'Toggle sidebar'}, **attrs), text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{#- SidebarInset: the page beside the sidebar -#}
+{% macro sidebar_inset(text='', class='', id=none, attrs={}, tag='div') -%}
+{{ sb_part(tag, 'sidebar-inset', 'cn-sidebar-inset relative flex w-full min-w-0 flex-1 flex-col', none, class, attrs, text, caller() if caller else '', id) }}
+{%- endmacro %}
+
+{#- SidebarTrigger: the button that collapses the sidebar (and opens the drawer below 768px) -#}
+{% macro sidebar_trigger(class='', id=none, attrs={}, testid=none) -%}
+<button type="button" data-slot="sidebar-trigger" data-sidebar="trigger"{% if id %} id="{{ id }}"{% endif %}{% if testid %} data-testid="{{ testid }}"{% endif %}
+        class="cn-sidebar-trigger sidebar-collapse-btn inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring{{ ' ' ~ class if class }}"
+        aria-label="Toggle sidebar" title="Toggle sidebar (Ctrl+B)"{{ sb_attrs(attrs) }}>
+    <i data-lucide="panel-left" class="h-4 w-4" aria-hidden="true"></i>
+</button>
+{%- endmacro %}

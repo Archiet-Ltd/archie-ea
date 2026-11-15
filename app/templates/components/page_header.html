@@ -20,6 +20,7 @@
 #}
 
 {% from 'components/_breadcrumb_root.html' import crumb_label %}
+{% from 'components/button.html' import button as header_button %}
 {% macro page_header(
     title='',
     description='',
@@ -28,6 +29,19 @@
     actions=[],
     class=''
 ) %}
+{#- No breadcrumbs given: draw the registry trail for the current page (the sidebar's group
+    and entry), with the page title as the last crumb unless the trail already ends in it —
+    the same rule page_shell applies, so every signed-in page shows exactly one trail. -#}
+{%- if not breadcrumbs -%}
+  {%- set _where = page_trail() if page_trail is defined else {'trail': []} -%}
+  {%- if _where.trail -%}
+    {%- set _ns = namespace(trail=[{'label': 'Home', 'href': url_for('main.index')}]) -%}
+    {%- for l, h in close_trail(_where.trail, title) -%}
+      {%- set _ns.trail = _ns.trail + [{'label': l, 'href': h}] -%}
+    {%- endfor -%}
+    {%- set breadcrumbs = _ns.trail -%}
+  {%- endif -%}
+{%- endif -%}
 <div class="mb-6 {{ class }}">
     <!-- Breadcrumbs -->
     {% if breadcrumbs %}
@@ -80,8 +94,15 @@
                     {% if action.icon %}<i data-lucide="{{ action.icon }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>{% endif %}
                     {{ action.text }}
                 </a>
+                {% elif action.post %}
+                {#- A button that posts: an inline form with the CSRF token. A disabled one says why, in words, beside it. -#}
+                <form method="post" action="{{ action.post }}" class="inline-flex flex-col gap-1"{% if action.testid %} data-testid="{{ action.testid }}-form"{% endif %}>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {{ header_button(text=action.text, variant=action.variant or 'default', type='submit', icon=action.icon, disabled=action.disabled, testid=action.testid, attrs_dict=({'aria-describedby': action.testid ~ '-reason'} if action.disabled and action.reason else {})) }}
+                    {% if action.disabled and action.reason %}<p id="{{ action.testid }}-reason" data-testid="{{ action.testid }}-reason" class="text-xs text-muted-foreground">{{ action.reason }}</p>{% endif %}
+                </form>
                 {% elif action.onclick %}
-                <button type="button" @click="{{ action.onclick }}"
+                <button type="button" x-data @click="{{ action.onclick }}"
                         class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-10 px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ btn_classes[variant] }}" aria-label="{{ action.text }}">
                     {% if action.icon %}<i data-lucide="{{ action.icon }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>{% endif %}
                     {{ action.text }}

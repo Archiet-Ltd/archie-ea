@@ -1,6 +1,11 @@
+{# shadcn-reference: example:tasks@e55b60b #}
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/empty_state.html" import empty_state %}
+{% from "components/input.html" import input, label %}
+{% from "components/button.html" import button %}
+{% from "components/badge.html" import badge %}
 
 {% block title %}Reference catalogue{% endblock %}
 
@@ -16,27 +21,24 @@
   {# ── Filter bar (GET form) ───────────────────────────────────────────── #}
   <form method="get" action="{{ url_for('enterprise_crud.reference_catalog') }}" class="flex flex-wrap items-end gap-3 mb-5 rounded-xl border border-border bg-card p-4">
     <div class="flex-1 min-w-[200px]">
-      <label for="q" class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
-      <input id="q" name="q" type="text" value="{{ active.q }}" placeholder="Solution name…"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+      {% call label(for='q') %}Search{% endcall %}
+      {{ input(id='q', name='q', type='text', value=active.q, placeholder='Solution name…') }}
     </div>
     <div>
-      <label for="domain" class="block text-sm font-medium text-muted-foreground mb-1">Domain</label>
-      <select id="domain" name="domain" class="h-9 rounded-md border border-input bg-background px-3 text-sm">
+      {% call label(for='domain') %}Domain{% endcall %}
+      <select id="domain" name="domain" class="flex h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
         <option value="">All domains</option>
         {% for d in facets.domains %}<option value="{{ d }}" {% if active.domain == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
       </select>
     </div>
     <div>
-      <label for="type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
-      <select id="type" name="type" class="h-9 rounded-md border border-input bg-background px-3 text-sm">
+      {% call label(for='type') %}Type{% endcall %}
+      <select id="type" name="type" class="flex h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
         <option value="">All types</option>
         {% for t in facets.types %}<option value="{{ t }}" {% if active.type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
       </select>
     </div>
-    <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-      <i data-lucide="search" class="h-3.5 w-3.5" aria-hidden="true"></i> Filter
-    </button>
+    {{ button(text='Filter', icon='search', type='submit') }}
     {% if active.q or active.domain or active.type %}
     <a href="{{ url_for('enterprise_crud.reference_catalog') }}" class="inline-flex items-center h-9 px-3 text-sm text-muted-foreground hover:text-foreground">Clear</a>
     {% endif %}
@@ -56,11 +58,9 @@
       <div class="flex items-start justify-between gap-3">
         <h2 class="text-base font-semibold text-foreground leading-snug">{{ s.name }}</h2>
         {% if s.approved_on %}
-        <span class="shrink-0 inline-flex items-center gap-1 text-xs text-success bg-success/10 rounded-full px-2 py-0.5">
-          <i data-lucide="badge-check" class="h-3 w-3" aria-hidden="true"></i> Approved
-        </span>
+        {% call badge(variant='success') %}<i data-lucide="badge-check" class="h-3 w-3" aria-hidden="true"></i> Approved{% endcall %}
         {% elif s.governance %}
-        <span class="shrink-0 text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5 capitalize">{{ s.governance }}</span>
+        {% call badge(variant='neutral') %}{{ s.governance }}{% endcall %}
         {% endif %}
       </div>
       {% if s.description %}<p class="text-sm text-muted-foreground mt-2 line-clamp-2">{{ s.description }}</p>{% endif %}

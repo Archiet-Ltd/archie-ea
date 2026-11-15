@@ -1,0 +1,18 @@
+{
+ "statuses": [
+  {
+   "id": "1",
+   "content": "<p>Northwind Freight on custom instance</p>",
+   "created_at": "2026-10-17T08:00:00.000Z",
+   "url": "https://mastodon.example/@northwind/1",
+   "account": {
+    "username": "northwind",
+    "display_name": "Northwind Freight",
+    "acct": "northwind@mastodon.example"
+   },
+   "reblogs_count": 5,
+   "favourites_count": 10,
+   "replies_count": 2
+  }
+ ]
+}

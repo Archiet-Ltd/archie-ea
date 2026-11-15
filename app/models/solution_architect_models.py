@@ -324,6 +324,17 @@ class SolutionDriver(TenantMixin, db.Model):
         Index("idx_solution_driver_type", "driver_type"),
     )
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "driver_type": (self.driver_type.value if self.driver_type else None),
+            "impact_level": self.impact_level,
+            "urgency": self.urgency,
+            "source": self.source,
+        }
+
     def __repr__(self):
         return f"<SolutionDriver {self.id}: {self.name}>"
 
@@ -372,6 +383,17 @@ class SolutionGoal(TenantMixin, db.Model):
     driver = relationship("SolutionDriver", foreign_keys=[driver_id])
 
     __table_args__ = (Index("idx_solution_goal_problem", "problem_id"),)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "target_date": self.target_date.isoformat() if self.target_date else None,
+            "measurement_criteria": self.measurement_criteria,
+            "kpis": self.kpis,
+            "priority": self.priority,
+        }
 
     def __repr__(self):
         return f"<SolutionGoal {self.id}: {self.name}>"
@@ -540,6 +562,21 @@ class SolutionRequirement(TenantMixin, db.Model):
         Index("idx_solution_requirement_type", "requirement_type"),
     )
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "requirement_type": self.requirement_type.value if self.requirement_type else None,
+            "priority": self.priority,
+            "is_mandatory": self.is_mandatory,
+            "source": self.source,
+            "rationale": self.rationale,
+            "acceptance_criteria": self.acceptance_criteria,
+            "status": self.status,
+            "owner": self.owner,
+        }
+
     def __repr__(self):
         return f"<SolutionRequirement {self.id}: {self.name}>"
 
@@ -589,6 +626,18 @@ class SolutionConstraint(TenantMixin, db.Model):
         Index("idx_solution_constraint_problem", "problem_id"),
         Index("idx_solution_constraint_type", "constraint_type"),
     )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "constraint_type": (self.constraint_type.value if self.constraint_type else None),
+            "value": self.value,
+            "unit": self.unit,
+            "severity": self.severity,
+            "source": self.source,
+        }
 
     def __repr__(self):
         return f"<SolutionConstraint {self.id}: {self.name}>"
@@ -890,3 +939,18 @@ def _bind_solution_roadmap_relationship():
 
 
 _bind_solution_roadmap_relationship()
+
+
+@db.event.listens_for(db.session, "before_flush")
+def _project_backlog_requirements_on_write(session, flush_context, instances):
+    """A backlog requirement written, edited or deleted updates the requirement prioritisation ranks."""
+    from app.services.prioritisation_service import sync_backlog_requirements
+
+    sync_backlog_requirements(session)
+
+
+@db.event.listens_for(db.session, "after_flush_postexec")
+def _link_backlog_projections(session, flush_context):
+    from app.services.prioritisation_service import link_backlog_projections
+
+    link_backlog_projections(session)

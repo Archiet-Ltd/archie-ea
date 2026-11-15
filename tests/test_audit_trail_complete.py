@@ -81,13 +81,13 @@ def test_export_contains_only_the_callers_organisation(db_session, make_org, cli
     for i in range(2):
         _log(org_b, admin_b, record_id=100 + i)
 
-    resp, rows = _export(client, login_as, admin_a)
+    resp, rows = _export(client, login_as, admin_a, "&entity_type=application_component")
     assert resp.headers["X-Audit-Row-Count"] == "3"
     assert len(rows) == 3
     assert {r["organisation"] for r in rows} == {org_a.name}
     assert {r["entity_id"] for r in rows} == {"0", "1", "2"}
 
-    resp, rows = _export(client, login_as, admin_b)
+    resp, rows = _export(client, login_as, admin_b, "&entity_type=application_component")
     assert resp.headers["X-Audit-Row-Count"] == "2"
     assert {r["organisation"] for r in rows} == {org_b.name}
 
@@ -115,7 +115,7 @@ def test_export_streams_every_row_beyond_ten_thousand(db_session, make_org, clie
     )
     db_session.flush()
 
-    resp, rows = _export(client, login_as, admin)
+    resp, rows = _export(client, login_as, admin, "&entity_type=application_component")
     assert resp.headers["X-Audit-Row-Count"] == "25000"
     assert len(rows) == 25_000
     assert len({r["id"] for r in rows}) == 25_000

@@ -1,0 +1,181 @@
+{
+  "ifml": "1.0",
+  "model": "application_overview",
+  "navigationFlows": [],
+  "viewContainers": [
+    {
+      "events": [
+        {
+          "action": {
+            "dynamic": false,
+            "endpoint": "unified_applications.retire_application",
+            "method": "POST",
+            "route": {
+              "file": "app/modules/applications/routes/crud_routes.py",
+              "line": 404,
+              "rule": "/applications/<int:id>/retire"
+            }
+          },
+          "component": "form-line-96",
+          "id": "form-line-96.submit",
+          "line": 96,
+          "type": "submit"
+        },
+        {
+          "action": {
+            "dynamic": false,
+            "endpoint": "unified_applications.update_overview",
+            "method": "POST",
+            "route": {
+              "file": "app/modules/applications/routes/update_routes.py",
+              "line": 155,
+              "rule": "/applications/<int:id>/overview-update"
+            }
+          },
+          "component": "overview-edit-form",
+          "id": "overview-edit-form.submit",
+          "line": 289,
+          "type": "submit"
+        },
+        {
+          "action": {
+            "dynamic": false,
+            "endpoint": "unified_applications.generate_application_archimate",
+            "method": "POST",
+            "route": {
+              "file": "app/modules/applications/routes/crud_routes.py",
+              "line": 505,
+              "rule": "/applications/<int:id>/generate-archimate"
+            }
+          },
+          "component": "form-line-577",
+          "id": "form-line-577.submit",
+          "line": 577,
+          "type": "submit"
+        },
+        {
+          "action": {
+            "dynamic": true,
+            "endpoint": null,
+            "method": "POST",
+            "route": null
+          },
+          "component": "form-line-739",
+          "id": "form-line-739.submit",
+          "line": 739,
+          "type": "submit"
+        },
+        {
+          "action": {
+            "dynamic": true,
+            "endpoint": null,
+            "method": "POST",
+            "route": null
+          },
+          "component": "form-line-948",
+          "id": "form-line-948.submit",
+          "line": 948,
+          "type": "submit"
+        },
+        {
+          "action": {
+            "dynamic": false,
+            "endpoint": "unified_applications.generate_application_archimate",
+            "method": "POST",
+            "route": {
+              "file": "app/modules/applications/routes/crud_routes.py",
+              "line": 505,
+              "rule": "/applications/<int:id>/generate-archimate"
+            }
+          },
+          "component": "form-line-1098",
+          "id": "form-line-1098.submit",
+          "line": 1098,
+          "type": "submit"
+        },
+        {
+          "action": {
+            "dynamic": false,
+            "endpoint": "application_mgmt.application_vendor_footprint",
+            "method": "POST",
+            "route": {
+              "file": "app/application_mgmt/detail_layer_routes.py",
+              "line": 192,
+              "rule": "/dashboard/applications/<int:id>/vendor-footprint"
+            }
+          },
+          "component": "form-line-1124",
+          "id": "form-line-1124.submit",
+          "line": 1124,
+          "type": "submit"
+        },
+        {
+          "action": {
+            "dynamic": false,
+            "endpoint": "unified_applications.generate_application_archimate",
+            "method": "POST",
+            "route": {
+              "file": "app/modules/applications/routes/crud_routes.py",
+              "line": 505,
+              "rule": "/applications/<int:id>/generate-archimate"
+            }
+          },
+          "component": "form-line-1143",
+          "id": "form-line-1143.submit",
+          "line": 1143,
+          "type": "submit"
+        }
+      ],
+      "id": "app/templates/applications/dashboard.html",
+      "template": "app/templates/applications/dashboard.html",
+      "viewComponents": [
+        {
+          "id": "form-line-96",
+          "line": 96,
+          "type": "Form"
+        },
+        {
+          "id": "overview-edit-form",
+          "line": 289,
+          "type": "Form"
+        },
+        {
+          "id": "form-line-577",
+          "line": 577,
+          "type": "Form"
+        },
+        {
+          "id": "form-line-739",
+          "line": 739,
+          "type": "Form"
+        },
+        {
+          "id": "form-line-948",
+          "line": 948,
+          "type": "Form"
+        },
+        {
+          "id": "form-line-1098",
+          "line": 1098,
+          "type": "Form"
+        },
+        {
+          "id": "form-line-1124",
+          "line": 1124,
+          "type": "Form"
+        },
+        {
+          "id": "form-line-1143",
+          "line": 1143,
+          "type": "Form"
+        }
+      ]
+    },
+    {
+      "events": [],
+      "id": "app/templates/application_mgmt/partials/_views_crud_tab.html",
+      "template": "app/templates/application_mgmt/partials/_views_crud_tab.html",
+      "viewComponents": []
+    }
+  ]
+}

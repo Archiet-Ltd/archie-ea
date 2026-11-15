@@ -191,3 +191,36 @@ def test_application_guide_reply_survives_scoped_history_reload(protocol_page, l
             cleared = page.request.post(live_server + '/ai-chat/guide/history/clear',
                 headers=_csrf(page), data={'page_key': 'applications.detail', 'scope_key': scope})
             assert cleared.status == 200, 'Could not clean up this exact protocol guide scope'
+
+
+def test_chat_question_with_personal_details_leaves_scrubbed_and_still_answers(protocol_page, live_server, required_protocol):
+    """An architect pastes a colleague's email, phone and a password into the chat.
+
+    The answer arrives, and what reached the provider carries none of the three.
+    """
+    page = protocol_page
+    before = len(required_protocol.sent_text)
+    page.goto(live_server + '/ai-chat', wait_until='domcontentloaded')
+    page.locator('#user-input').fill(
+        CHAT['prompt'] + ' Ask jane.doe@acme-corp.example or ring +44 20 7946 0958; '
+        'portal password=hunter2hunter2.')
+    thread_id = None
+    try:
+        with page.expect_response(lambda res: res.url.endswith('/ai-chat/message/stream')
+                                  and res.request.method == 'POST') as streamed:
+            page.locator('#send-btn').click()
+        events = [json.loads(line[6:]) for line in streamed.value.text().splitlines()
+                  if line.startswith('data: ') and line != 'data: [DONE]']
+        done = [event for event in events if event.get('type') == 'done']
+        thread_id = done[0].get('thread_id') if done else None
+        expect(page.locator('#messages-container')).to_contain_text(CHAT['reply'])
+        sent = required_protocol.sent_text[before:]
+        assert len(sent) == 1, sent
+        assert CHAT['marker'] in sent[0]
+        for leaked in ('jane.doe@acme-corp.example', '7946 0958', 'hunter2hunter2'):
+            assert leaked not in sent[0]
+        assert '[EMAIL_REDACTED]' in sent[0] and '[PHONE_REDACTED]' in sent[0]
+        assert '[CREDENTIAL_REDACTED]' in sent[0]
+    finally:
+        if thread_id:
+            page.request.delete(live_server + '/ai-chat/threads/' + thread_id, headers=_csrf(page))

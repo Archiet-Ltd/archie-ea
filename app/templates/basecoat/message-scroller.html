@@ -1,0 +1,31 @@
+{# message-scroller: port of shadcn/ui message-scroller.tsx (pinned in compliance/upstream). Macros: message_scroller, message_scroller_viewport, message_scroller_content, message_scroller_item, message_scroller_button #}
+
+{#- MessageScroller -#}
+{% macro message_scroller(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('message-scroller', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MessageScrollerViewport -#}
+{% macro message_scroller_viewport(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('message-scroller-viewport', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MessageScrollerContent -#}
+{% macro message_scroller_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('message-scroller-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MessageScrollerItem -#}
+{% macro message_scroller_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('message-scroller-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- MessageScrollerButton -#}
+{% macro message_scroller_button(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('message-scroller-button', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

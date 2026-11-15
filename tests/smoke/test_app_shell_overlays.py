@@ -35,35 +35,32 @@ def _login(page, base, email):
 # ── Phone sidebar opener ────────────────────────────────────────────────────
 
 
-def test_phone_sidebar_opener_z_index_below_backdrop(browser, live_server, seeded):
-    """At a phone viewport the sidebar opener must render at a lower z-index
-    than the mobile sidebar backdrop, so it never draws over content or
-    modal backdrops."""
+def test_phone_sidebar_drawer_draws_over_the_header_trigger(browser, live_server, seeded):
+    """At a phone viewport the sidebar is a drawer. It must draw over the header (and so
+    over the trigger that opened it), so nothing of the page is clickable through it."""
     page = browser.new_page(viewport={"width": 390, "height": 844})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
         page.goto(live_server + "/dashboard/overview",
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(1000)
-
+        trigger = page.locator('[data-slot="sidebar-trigger"]')
+        assert trigger.count() == 1, "phone sidebar trigger not found"
+        trigger.click()
+        drawer = page.get_by_role("dialog", name="Navigation")
+        assert drawer.is_visible(), "the trigger did not open the drawer"
         z_indices = page.evaluate("""() => {
-            const opener = document.querySelector('[aria-label="Open sidebar"]');
-            // The mobile backdrop is the fixed inset-0 div with z-40 inside
-            // the overflow-hidden layout container.
-            const backdrop = document.querySelector(
-                'div.fixed.inset-0.z-40, div[class*="fixed inset-0"][class*="z-40"]'
-            );
+            const header = document.getElementById('admin-header');
+            const sheet = document.querySelector('[data-fb-sidebar-mobile] [data-slot="sheet-content"]');
             return {
-                openerZ: opener ? parseInt(getComputedStyle(opener).zIndex, 10) : null,
-                backdropZ: backdrop ? parseInt(getComputedStyle(backdrop).zIndex, 10) : null,
+                headerZ: header ? parseInt(getComputedStyle(header).zIndex, 10) : null,
+                sheetZ: sheet ? parseInt(getComputedStyle(sheet.parentElement).zIndex, 10) : null,
             };
         }""")
-
-        assert z_indices["openerZ"] is not None, "phone sidebar opener not found"
-        assert z_indices["backdropZ"] is not None, "mobile sidebar backdrop not found"
-        assert z_indices["openerZ"] <= z_indices["backdropZ"], (
-            "opener z-index (%d) must be at or below backdrop z-index (%d)"
-            % (z_indices["openerZ"], z_indices["backdropZ"])
+        assert z_indices["headerZ"] is not None and z_indices["sheetZ"] is not None, z_indices
+        assert z_indices["sheetZ"] > z_indices["headerZ"], (
+            "drawer z-index (%d) must be above the header's (%d)"
+            % (z_indices["sheetZ"], z_indices["headerZ"])
         )
     finally:
         page.close()
@@ -221,12 +218,12 @@ def test_help_button_z_index_below_overlays(browser, live_server, seeded):
 
 
 def test_help_button_reserves_space_on_main(browser, live_server, seeded):
-    """When guided_mode_steps are defined the main-content element must carry
-    pb-20 so the help button never covers a control."""
+    """When a page defines guided_mode_steps (the review board's page does) the
+    main-content element must carry pb-20 so the help button never covers a control."""
     page = browser.new_page(viewport={"width": 1280, "height": 800})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        page.goto(live_server + "/dashboard/overview",
+        page.goto(live_server + "/arb/",
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(1000)
 
@@ -250,66 +247,42 @@ def test_help_button_reserves_space_on_main(browser, live_server, seeded):
         page.close()
 
 
-# ── Search and onboarding modals not at the same z-index ────────────────────
+# ── Search results and the first screen: nothing stands over what a person needs ─
 
 
-def test_search_and_onboarding_modals_different_z_index(browser, live_server, seeded):
-    """The search modal (z-[100]) and onboarding modal (z-[200]) must not
-    stack at the same level, so one never obscures the other's interaction
-    surface when both could be open."""
+def test_sidebar_search_results_stand_above_the_page_and_can_be_clicked(browser, live_server, seeded):
+    """The search box lives in the sidebar. Its results open over the page content and the
+    first result is what a click at its centre lands on (nothing sits on top of it)."""
     page = browser.new_page(viewport={"width": 1280, "height": 800})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
         page.goto(live_server + "/dashboard/overview",
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(1000)
+        assert page.locator("#search-modal").count() == 0, "a second search modal is on the page"
 
-        # Open the search modal so it is visible
-        page.evaluate("""() => {
-            const modal = document.getElementById('search-modal');
-            if (modal) modal.style.display = 'flex';
-        }""")
-        page.wait_for_timeout(300)
-
-        z_indices = page.evaluate("""() => {
-            const searchModal = document.getElementById('search-modal');
-            // The onboarding modal overlay div (the outer fixed container)
-            const onboardingOverlay = document.querySelector(
-                '[x-show="showOnboarding"]'
-            );
+        page.fill('[data-testid="sidebar-search"]', "applications")
+        page.wait_for_selector('[data-testid="sidebar-search-page"]', timeout=PAGE_TIMEOUT)
+        hit = page.evaluate("""() => {
+            const first = document.querySelector('[data-testid="sidebar-search-page"]');
+            const box = first.getBoundingClientRect();
+            const atCentre = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
             return {
-                searchZ: searchModal
-                    ? parseInt(getComputedStyle(searchModal).zIndex, 10) : null,
-                onboardingZ: onboardingOverlay
-                    ? parseInt(getComputedStyle(onboardingOverlay).zIndex, 10) : null,
+                text: first.textContent.trim(),
+                landsOnResult: !!atCentre && first.contains(atCentre),
+                panelZ: parseInt(getComputedStyle(document.getElementById('sidebar-search-results')).zIndex, 10),
             };
         }""")
-
-        assert z_indices["searchZ"] is not None, "search modal not found"
-        # The search modal must be at z-index 100
-        assert z_indices["searchZ"] == 100, (
-            "search modal z-index (%d) must be 100" % z_indices["searchZ"]
-        )
-        # If the onboarding overlay is present (it may not be for a user who
-        # already completed onboarding), it must be at a different z-index
-        if z_indices["onboardingZ"] is not None:
-            assert z_indices["onboardingZ"] != z_indices["searchZ"], (
-                "onboarding modal z-index (%d) must differ from search modal "
-                "z-index (%d) so they never stack at the same level"
-                % (z_indices["onboardingZ"], z_indices["searchZ"])
-            )
-            assert z_indices["onboardingZ"] > z_indices["searchZ"], (
-                "onboarding modal z-index (%d) must be above search modal "
-                "z-index (%d) so onboarding is never hidden behind search"
-                % (z_indices["onboardingZ"], z_indices["searchZ"])
-            )
+        assert "Applications" in hit["text"], hit
+        assert hit["landsOnResult"], "something covers the first search result: %s" % hit
+        assert hit["panelZ"] >= 30, hit
     finally:
         page.close()
 
 
-def test_onboarding_modal_z_index_is_200(browser, live_server):
-    """The onboarding modal overlay must render at z-index 200, above the
-    search modal (100) and every other overlay in the app shell."""
+def test_first_screen_of_a_new_user_has_no_overlay_over_the_page(browser, live_server):
+    """A person with no role in an empty workspace meets the page itself: no modal, wizard or
+    other full-screen layer stands over it, and the middle of the page is the page."""
     from app import create_app, db
     from app.models.organization import Organization
     from app.models.user import User
@@ -343,26 +316,32 @@ def test_onboarding_modal_z_index_is_200(browser, live_server):
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(1500)
 
-        z_index = page.evaluate("""() => {
-            const overlay = document.querySelector('[x-show="showOnboarding"]');
-            if (!overlay) return null;
-            return parseInt(getComputedStyle(overlay).zIndex, 10);
+        state = page.evaluate("""() => {
+            const covering = [...document.querySelectorAll('body *')].filter((el) => {
+                const cs = getComputedStyle(el);
+                if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden') return false;
+                const r = el.getBoundingClientRect();
+                return r.width >= window.innerWidth * 0.9 && r.height >= window.innerHeight * 0.9
+                    && parseFloat(cs.opacity) > 0;
+            }).map((el) => el.id || el.className.toString().slice(0, 60));
+            const main = document.getElementById('main-content').getBoundingClientRect();
+            const atMiddle = document.elementFromPoint(main.left + main.width / 2, window.innerHeight / 2);
+            return {
+                covering,
+                middleIsPage: !!atMiddle && document.getElementById('main-content').contains(atMiddle),
+                role: document.body.textContent.includes("What's your role?"),
+            };
         }""")
-
-        assert z_index is not None, (
-            "onboarding modal overlay not found for a user with no role in "
-            "an empty workspace"
-        )
-        assert z_index == 200, (
-            "onboarding modal z-index (%d) must be 200, above the search "
-            "modal (100)" % z_index
-        )
+        assert state["covering"] == [], "a full-screen layer stands over the first screen: %s" % state["covering"]
+        assert state["middleIsPage"], "the middle of the first screen is not the page"
+        assert not state["role"], "the role wizard is back over the first screen"
     finally:
         page.close()
         with app.app_context():
             db.session.remove()
             db.session.execute(
-                db.text("DELETE FROM soc2_audit_log WHERE user_id=:uid"), {"uid": user_id})
+                db.text("DELETE FROM soc2_audit_log WHERE user_id=:uid OR organization_id=:oid"),
+                {"uid": user_id, "oid": org_id})
             db.session.execute(
                 db.text("DELETE FROM users WHERE id=:uid"), {"uid": user_id})
             db.session.execute(
@@ -371,12 +350,12 @@ def test_onboarding_modal_z_index_is_200(browser, live_server):
             db.session.remove()
 
 
-# ── Phone sidebar opener clickable ───────────────────────────────────────────
+# ── Phone sidebar trigger clickable ──────────────────────────────────────────
 
 
-def test_phone_sidebar_opener_clickable_and_below_modal(browser, live_server, seeded):
-    """At a phone viewport the sidebar opener must be clickable (no force)
-    and must sit below an open modal in the stacking context."""
+def test_phone_sidebar_trigger_clickable_and_opens_the_drawer(browser, live_server, seeded):
+    """At a phone viewport the sidebar trigger must be clickable (no force), open the
+    drawer, and Escape must close it."""
     page = browser.new_page(viewport={"width": 390, "height": 844})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
@@ -384,54 +363,12 @@ def test_phone_sidebar_opener_clickable_and_below_modal(browser, live_server, se
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(1000)
 
-        # The opener must be visible at phone width
-        opener = page.locator("button[aria-label='Open sidebar']")
-        assert opener.count() > 0, "phone sidebar opener not rendered at 390px"
-
-        # Click the opener normally — no force=True. If the spacer intercepts
-        # pointer events this click lands on the spacer and the sidebar never opens.
-        opener.first.click()
-        page.wait_for_timeout(700)
-
-        # The sidebar must be open: the Alpine store must report open=true
-        sidebar_open = page.evaluate("""() => {
-            const store = window.Alpine
-                && window.Alpine.store('sidebar');
-            return store ? store.open : null;
-        }""")
-        assert sidebar_open is True, (
-            "sidebar store.open is %s after clicking the opener — "
-            "the click was intercepted" % sidebar_open
-        )
-
-        # Close the sidebar for the modal test
-        page.evaluate("""() => {
-            const store = window.Alpine && window.Alpine.store('sidebar');
-            if (store) store.open = false;
-        }""")
-        page.wait_for_timeout(300)
-
-        # Open the search modal (z-[100]) and verify the opener (z-30) is below it
-        page.evaluate("""() => {
-            const modal = document.getElementById('search-modal');
-            if (modal) modal.style.display = 'flex';
-        }""")
-        page.wait_for_timeout(300)
-
-        z_indices = page.evaluate("""() => {
-            const opener = document.querySelector('[aria-label="Open sidebar"]');
-            const searchModal = document.getElementById('search-modal');
-            return {
-                openerZ: opener ? parseInt(getComputedStyle(opener).zIndex, 10) : null,
-                modalZ: searchModal ? parseInt(getComputedStyle(searchModal).zIndex, 10) : null,
-            };
-        }""")
-
-        assert z_indices["openerZ"] is not None, "phone sidebar opener not found"
-        assert z_indices["modalZ"] is not None, "search modal not found"
-        assert z_indices["openerZ"] < z_indices["modalZ"], (
-            "opener z-index (%d) must be below search modal z-index (%d)"
-            % (z_indices["openerZ"], z_indices["modalZ"])
-        )
+        trigger = page.locator('[data-slot="sidebar-trigger"]')
+        assert trigger.count() > 0, "phone sidebar trigger not rendered at 390px"
+        trigger.first.click()
+        drawer = page.get_by_role("dialog", name="Navigation")
+        assert drawer.is_visible(), "the click on the trigger did not open the drawer"
+        page.keyboard.press("Escape")
+        assert not drawer.is_visible(), "Escape did not close the drawer"
     finally:
         page.close()

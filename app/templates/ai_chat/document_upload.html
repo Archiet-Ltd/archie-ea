@@ -829,9 +829,9 @@
                         </div>
                     </div>
                     <div class="w-full bg-muted rounded-full h-1.5 mb-1">
-                        <div class="bg-success h-1.5 rounded-full" :style="'width: ' + (analysisResults?.gap_analysis?.coverage_percentage || 0) + '%'"></div>
+                        <div class="bg-success h-1.5 rounded-full" :style="'width: ' + Platform.figure.barWidth(analysisResults?.gap_analysis?.coverage_percentage) + '%'"></div>
                     </div>
-                    <p class="text-xs text-warning-emphasis" x-text="(analysisResults?.gap_analysis?.coverage_percentage || 0) + '% coverage'"></p>
+                    <p class="text-xs text-warning-emphasis" x-text="Platform.figure.percent(analysisResults?.gap_analysis?.coverage_percentage) + ' coverage'"></p>
                     <div x-show="analysisResults?.gap_analysis?.recommendations && analysisResults.gap_analysis.recommendations.length > 0" x-cloak class="mt-2 space-y-1">
                         <template x-for="rec in (analysisResults?.gap_analysis?.recommendations || [])" :key="rec">
                             <p class="text-xs text-warning-emphasis"><i data-lucide="info" class="h-3 w-3 inline mr-1"></i><span x-text="rec"></span></p>

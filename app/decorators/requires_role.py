@@ -40,7 +40,37 @@ def may_handle_data_subject_requests(user):
 
     if is_platform_admin(user):
         return True
+    if _administers_own_organisation(user):
+        return True
     return get_user_role(user) in DATA_SUBJECT_REQUEST_ROLES
+
+
+def _administers_own_organisation(user):
+    """True when ``user`` administers their own organisation, by the one check
+    every caller uses. Requests are the organisation's records, so its
+    administrator handles them whatever their working persona is."""
+    try:
+        return bool(getattr(user, "is_authenticated", False) and user.is_org_admin)
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        return False
+
+
+def requires_data_subject_request_access(f):
+    """Admit what ``may_handle_data_subject_requests`` admits; everyone else gets 403."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            abort(401)
+        if not may_handle_data_subject_requests(current_user):
+            current_app.logger.warning(
+                f"Access denied: user {current_user.id} attempted to access {request.path}"
+            )
+            abort(403, description="Access denied. Data subject requests are handled by "
+                                   "your organisation's administrator or Data Protection Officer.")
+        return f(*args, **kwargs)
+
+    return decorated_function
 
 
 def requires_role(allowed_roles: Union[str, List[str]]):
@@ -147,12 +177,111 @@ def requires_admin(f):
     return requires_role([ROLE_PLATFORM_ADMIN])(f)
 
 
+PROCUREMENT_ROLES = ("procurement", "portfolio_manager")
+
+
+def procurement_role_names():
+    """The display names of the roles that may open the procurement pages, as one phrase."""
+    from app.models.user import ROLE_DISPLAY_NAMES
+
+    names = [ROLE_DISPLAY_NAMES.get(r, r) for r in PROCUREMENT_ROLES]
+    return " and ".join(names)
+
+
+def may_open_procurement(user):
+    """True when ``user`` may open the procurement pages: the roles
+    ``requires_procurement`` admits, and platform authority."""
+    from app.middleware.tenant_decorators import is_platform_admin
+
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return bool(is_platform_admin(user)) or get_user_role(user) in PROCUREMENT_ROLES
+
+
+def may_open_spend(user):
+    """True when ``user`` may open the spend page: the people
+    ``requires_procurement_or_finance`` admits, and platform authority."""
+    from app.middleware.tenant_decorators import is_platform_admin
+
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return bool(is_platform_admin(user)) or get_user_role(user) in (
+        "procurement",
+        "portfolio_manager",
+        "finance",
+    )
+
+
+def may_see_contract_pages(user):
+    """True when ``user`` may read the contract pages (contracts, renewals): the procurement
+    roles, whoever may see cost figures (the one cost-visibility rule), and the Administrator
+    of the organisation whose contracts the pages list."""
+    from app.utils.role_access import can_see_costs
+
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return bool(may_open_procurement(user) or can_see_costs(user) or user.is_org_admin)
+
+
+def may_see_spend_pages(user):
+    """True when ``user`` may read the spend and licence pages: the people the spend page is
+    opened to, and whoever may see cost figures."""
+    from app.utils.role_access import can_see_costs
+
+    return bool(may_open_spend(user) or can_see_costs(user))
+
+
+def may_see_licence_pages(user):
+    """True when ``user`` may read the licence pages (the list, one licence): the people the spend
+    pages are open to, and the Administrator of the organisation whose licences the pages list,
+    who reads the contracts beside them."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return bool(may_see_spend_pages(user) or user.is_org_admin)
+
+
+def _requires_visibility(predicate):
+    """A route guard for a read-only page: login, then ``predicate(current_user)``."""
+
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                abort(401)
+            if not predicate(current_user):
+                current_app.logger.warning(
+                    f"Access denied: user {current_user.id} attempted to read {request.path}"
+                )
+                abort(403, description="Access denied. Your role does not include cost visibility.")
+            return f(*args, **kwargs)
+
+        return decorated_function
+
+    return decorator
+
+
+def requires_contract_visibility(f):
+    """The contract pages (list, detail, renewals): procurement roles and cost viewers read them;
+    creating and editing stays with ``requires_procurement``."""
+    return _requires_visibility(may_see_contract_pages)(f)
+
+
+def requires_spend_visibility(f):
+    """The spend and licence pages: the spend roles and cost viewers read them."""
+    return _requires_visibility(may_see_spend_pages)(f)
+
+
+def requires_licence_visibility(f):
+    """The licence pages: the spend roles, cost viewers and the organisation's Administrator."""
+    return _requires_visibility(may_see_licence_pages)(f)
+
+
 def requires_procurement(f):
     """
     Shorthand decorator for procurement routes.
     Allows procurement role and portfolio_manager (read-only context).
     """
-    return requires_role(["procurement", "portfolio_manager"])(f)
+    return requires_role(list(PROCUREMENT_ROLES))(f)
 
 
 def requires_procurement_or_finance(f):
@@ -164,7 +293,7 @@ def requires_procurement_or_finance(f):
     page to it, which the authorisation matrix caught as a real mismatch
     (POLICY only names the two pages finance's own sidebar links to).
     """
-    return requires_role(["procurement", "portfolio_manager", "finance"])(f)
+    return requires_role([*PROCUREMENT_ROLES, "finance"])(f)
 
 
 def requires_application_owner(f):
@@ -172,6 +301,20 @@ def requires_application_owner(f):
     Shorthand decorator for application manager routes.
     """
     return requires_role(["application_manager"])(f)
+
+
+def may_manage_owned_applications(user):
+    """True when ``user`` may open the My Applications edit pages: exactly the
+    people ``requires_application_owner_or_org_admin`` admits."""
+    from app.middleware.tenant_decorators import is_active_org_admin, is_platform_admin
+
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return bool(
+        is_active_org_admin()
+        or is_platform_admin(user)
+        or get_user_role(user) == "application_manager"
+    )
 
 
 def requires_application_owner_or_org_admin(f):

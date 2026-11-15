@@ -1,22 +1,21 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/dense_table.html' import dense_table %}
-{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/data_table.html' import data_table, data_table_script with context %}
+{% from 'components/input.html' import input, textarea, label %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/provenance.html' import result_footer %}
+{% from 'components/risk_matrix.html' import risk_matrix %}
+{% from 'components/risk_link_picker.html' import risk_link_picker, risk_link_picker_script with context %}
+{% from 'components/alert.html' import alert as quiet_alert %}
+{% from 'macros/page_shell.html' import page_shell %}
 
-{% block title %}Risk Register{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Governance', 'href': url_for('capability_governance.governance_dashboard')},
-    {'text': 'Risk Register', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
+{% block title %}Risk Register{% endblock %}{% block content %}
 {#
   This page was a stub: an "Add Risk" button with no handler of any kind, and a
   single placeholder line where the register should be. The QA audit of 30 Aug
@@ -30,44 +29,73 @@
 #}
 <div class="p-6 space-y-6 mx-auto" x-data="riskRegister()" x-cloak>
     {% macro _ps_actions() %}
-        <button type="button" @click="openCreate()"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Risk
-        </button>
+        {% if can_write %}{{ button(text='Add Risk', icon='plus', on_click='openCreate()') }}{% endif %}
     {% endmacro %}
     {{ page_shell(title='Risk Register', subtitle='Enterprise architecture risk tracking and mitigation', actions_caller=_ps_actions) }}
+    {% if not can_write %}
+        {% call quiet_alert('info', testid='risk-register-view-only') %}You can view this register. Ask an administrator for edit access.{% endcall %}
+    {% endif %}
 
-    {% set _open = risks | selectattr('status.value', 'equalto', 'open') | list | length %}
-    {# A closed or mitigated risk is not current exposure. This tile is read as
-       "how much critical risk exists right now" - counting risk_level alone,
-       with no status filter, kept a CRITICAL count at 1 for a risk that had
-       already been closed (TOTAL 1, OPEN 0, CRITICAL 1: confirmed live on
-       6 Sep 2026, Archie-E2E-Workflow-Test-Report.md E2E-N). Restrict to open
-       risks, matching what OPEN itself counts. #}
-    {% set _crit = risks | selectattr('status.value', 'equalto', 'open') | selectattr('risk_level', 'equalto', 'critical') | list | length %}
+    {% set _row_actions = [{'label': 'View', 'click': 'openView(row)'}] %}
+    {% if can_write %}
+    {% set _row_actions = [
+        {'label': 'View', 'click': 'openView(row)'},
+        {'label': 'Edit', 'click': 'openEdit(row)'},
+        {'label': 'Map to…', 'click': 'openView(row, true)'},
+        {'label': 'Mark mitigated', 'click': "setStatus(row.id, 'mitigated')",
+         'show_when': "row.status !== 'mitigated' && row.status !== 'closed'",
+         'disabled_when': 'updatingId === row.id'},
+        {'label': 'Reopen', 'click': "setStatus(row.id, 'open')",
+         'show_when': "row.status === 'mitigated' || row.status === 'closed'",
+         'disabled_when': 'updatingId === row.id'},
+        {'label': 'Close', 'click': "setStatus(row.id, 'closed')",
+         'show_when': "row.status !== 'closed'",
+         'disabled_when': 'updatingId === row.id'},
+        {'label': 'Delete', 'click': 'confirmDelete(row)', 'variant': 'danger'},
+    ] %}
+    {% endif %}
+
+    {# Open and Critical are the one open-risk count the route passes in (risk_service.level_counts):
+       a closed or mitigated risk is not current exposure, and the risk assessment shows the same figures. #}
     {% set _mit = risks | selectattr('status.value', 'equalto', 'mitigated') | list | length %}
+    {% macro _count_card(href, testid=none, title=none) -%}
+    {%- set inner = caller() -%}
+    {%- if href -%}<a href="{{ href }}" class="block rounded-lg border border-border bg-card p-4 outline-none hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50"{% if testid %} data-testid="{{ testid }}"{% endif %}>{{ inner }}</a>
+    {%- else -%}<div class="rounded-lg border border-border bg-card p-4"{% if testid %} data-testid="{{ testid }}"{% endif %}>{{ inner }}</div>{%- endif -%}
+    {%- endmacro %}
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="rounded-lg border border-border bg-card p-4">
+        {% call _count_card(url_for('risk.risk_register') if total else none, 'register-card-total') %}
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground">{{ total if total is not none else '—' }}</div>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground" data-testid="register-total">{{ total if total is not none else 'Not available' }}</div>
+            <div class="text-xs text-muted-foreground">Every risk, whatever its status</div>
+        {% endcall %}
+        {% call _count_card(url_for('risk.risk_register', show='open') if counts.open else none, 'register-card-open') %}
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Open</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground">{{ _open }}</div>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground" title="Open critical risks only -- a closed or mitigated critical does not count as current exposure">Critical</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-destructive-emphasis">{{ _crit }}</div>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground" data-testid="register-open">{{ counts.open }}</div>
+            <div class="text-xs text-muted-foreground">Still to be treated</div>
+        {% endcall %}
+        {% call _count_card(url_for('risk.risk_register', show='critical') if counts.critical else none, 'register-card-critical') %}
+            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Critical</div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-destructive-emphasis" data-testid="register-critical">{{ counts.critical }}</div>
+            <div class="text-xs text-muted-foreground">Open risks at the critical level; a closed or mitigated one is not current exposure</div>
+        {% endcall %}
+        {% call _count_card(url_for('risk.risk_register', show='mitigated') if _mit else none, 'register-card-mitigated') %}
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mitigated</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-success-emphasis">{{ _mit }}</div>
-        </div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-success-emphasis" data-testid="register-mitigated">{{ _mit }}</div>
+            <div class="text-xs text-muted-foreground">Risks marked mitigated</div>
+        {% endcall %}
     </div>
+    {% if show %}
+    <p class="flex flex-wrap items-center gap-2 text-sm" data-testid="register-filter-note">
+        <span class="text-muted-foreground">Showing only {{ 'the open risks' if show == 'open' else 'the mitigated risks' if show == 'mitigated' else 'the open risks at the ' ~ show ~ ' level' }} ({{ risk_rows|length }} of {{ total }}).</span>
+        <a href="{{ url_for('risk.risk_register') }}" class="font-medium text-primary hover:underline" data-testid="register-filter-clear">Show every risk</a>
+    </p>
+    {% endif %}
 
     {# Ranked list: exposure comes from the one impact answer, see risk_service.ranked_risks. #}
     {% if ranked is defined and ranked %}
-    <div class="rounded-lg border border-border bg-card p-4" id="ranked-risks">
+    <div class="grid gap-4 lg:grid-cols-3 lg:items-start">
+    <div class="rounded-lg border border-border bg-card p-4 lg:col-span-2" id="ranked-risks">
         <h2 class="text-sm font-semibold text-foreground">Top risks ({{ ranked.total }})</h2>
         <p class="text-xs text-muted-foreground mt-0.5 mb-3" id="ranked-risks-rule">{{ ranked.rule }}</p>
         {% if ranked.rows %}
@@ -82,13 +110,15 @@
                     </div>
                     <p class="text-xs text-muted-foreground mt-0.5" data-risk-reason>{{ r.reason }}</p>
                     {% if r.touches %}
-                    {% set _linked = r.touches | selectattr('kind', 'equalto', 'application') | list %}
-                    {% set _reached = r.touches | rejectattr('kind', 'equalto', 'application') | list %}
+                    {% set _linked = r.touches | rejectattr('kind', 'equalto', 'element') | list %}
+                    {% set _reached = r.touches | selectattr('kind', 'equalto', 'element') | list %}
                     <p class="text-xs text-muted-foreground mt-1" data-risk-touches>
                         {% macro _touch(t) -%}
                         {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions -%}
                         <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a>
-                        {%- elif 'archimate.element_impact_graph_page' in flask.current_app.view_functions -%}
+                        {%- elif t.url -%}
+                        <a href="{{ t.url }}" class="text-primary hover:underline">{{ t.name }}</a>
+                        {%- elif t.element_id and 'archimate.element_impact_graph_page' in flask.current_app.view_functions -%}
                         <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>
                         {%- else -%}{{ t.name }}{%- endif %}
                         {%- endmacro %}
@@ -96,12 +126,13 @@
                         {% if _reached %}<span data-risk-reached>{{ 'reaches' if _linked else 'Reaches' }} <span class="tabular-nums">{{ r.reached_total }}</span>{{ ' more' if _linked }}{{ ', including' if r.reached_total > _reached | length }}: {% for t in _reached %}{{ _touch(t) }}{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
                     </p>
                     {% elif r.worked_out %}
-                    <p class="text-xs text-muted-foreground mt-1" data-risk-unlinked>Not linked to any application, solution or programme yet.
-                        <button type="button" @click="openMap({{ r.risk_id }})" class="text-primary hover:underline">Link it</button>
+                    <p class="text-xs text-muted-foreground mt-1" data-risk-unlinked>Not linked to any application, capability, solution or programme yet.
+                        {% if can_write %}{{ button(text='Link it', variant='link', size='bare', class='text-primary hover:underline', on_click='openMap(' + r.risk_id|string + ')') }}{% endif %}
                     </p>
                     {% else %}
                     <p class="text-xs text-muted-foreground mt-1">What this risk touches could not be worked out.</p>
                     {% endif %}
+                    {{ result_footer(r.footer) }}
                 </div>
             </li>
             {% endfor %}
@@ -110,10 +141,18 @@
         <p class="text-sm text-muted-foreground">No risks recorded yet.</p>
         {% endif %}
     </div>
+    {# The same risks by probability and impact: each cell counts the risks in it and names them on hover. On a phone it is shown
+       before the long list (order-first); from the large width it sits beside the list. #}
+    <div class="rounded-lg border border-border bg-card p-4 lg:col-span-1 order-first lg:order-2" id="risk-matrix-card">
+        <h2 class="text-sm font-semibold text-foreground">Risks by probability and impact</h2>
+        <p class="text-xs text-muted-foreground mt-0.5 mb-3">Each square counts the risks in the register at that probability and impact.</p>
+        {{ risk_matrix(matrix) }}
+    </div>
+    </div>
     {% endif %}
 
     <div class="rounded-lg border border-border bg-card p-4">
-        <h2 class="text-sm font-semibold text-foreground mb-3">All risks</h2>
+        <h2 class="text-sm font-semibold text-foreground mb-3">{{ 'Risks' if show else 'All risks' }}</h2>
 
         {# Migrated onto the shared data_table component (components/data_table.html)
            instead of a hand-rolled <table class="dense-table"> — it already had search, sort, a
@@ -138,25 +177,11 @@
                 {'key': 'owner', 'label': 'Owner', 'sortable': true},
                 {'key': 'likelihood', 'label': 'Likelihood', 'sortable': true, 'class': 'tabular-nums'},
                 {'key': 'impact', 'label': 'Impact', 'sortable': true, 'class': 'tabular-nums'},
-                {'key': 'risk_score', 'label': 'Score', 'class': 'tabular-nums font-medium'},
+                {'key': 'score_text', 'label': 'Score', 'class': 'tabular-nums font-medium'},
                 {'key': 'risk_level', 'label': 'Level', 'type': 'risk-level'},
                 {'key': 'status', 'label': 'Status', 'sortable': true, 'type': 'status'},
                 {'key': 'actions', 'label': 'Action', 'type': 'row-actions', 'class': 'text-right',
-                 'actions': [
-                    {'label': 'View', 'click': 'openView(row)'},
-                    {'label': 'Edit', 'click': 'openEdit(row)'},
-                    {'label': 'Map to…', 'click': 'openView(row, true)'},
-                    {'label': 'Mark mitigated', 'click': "setStatus(row.id, 'mitigated')",
-                     'show_when': "row.status !== 'mitigated' && row.status !== 'closed'",
-                     'disabled_when': 'updatingId === row.id'},
-                    {'label': 'Reopen', 'click': "setStatus(row.id, 'open')",
-                     'show_when': "row.status === 'mitigated' || row.status === 'closed'",
-                     'disabled_when': 'updatingId === row.id'},
-                    {'label': 'Close', 'click': "setStatus(row.id, 'closed')",
-                     'show_when': "row.status !== 'closed'",
-                     'disabled_when': 'updatingId === row.id'},
-                    {'label': 'Delete', 'click': 'confirmDelete(row)', 'variant': 'danger'},
-                 ]},
+                 'actions': _row_actions},
             ],
             rows_expr='RISK_ROWS',
             searchable=true,
@@ -172,7 +197,7 @@
                 ]},
             ],
             empty_icon='shield-alert',
-            empty_text='No risks recorded yet. Use Add Risk to record the first one.'
+            empty_text=('No risks recorded yet. Use Add Risk to record the first one.' if can_write else 'No risks recorded yet.')
         ) }}
     </div>
 
@@ -193,16 +218,10 @@
                     {# DEF-002, Capgemini dry-run: naive "k + 's'" pluralised
                        'dependency' to "dependencys". Real plurals. #}
                     <template x-for="k in kinds" :key="k">
-                        <button type="button" @click="kindFilter = (kindFilter === k ? '' : k)"
-                                :class="kindFilter === k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
-                                class="px-2.5 py-1 rounded text-xs font-medium capitalize transition-colors"
-                                x-text="k === 'dependency' ? 'Dependencies' : (k + 's')"></button>
+                        {{ button(text='', size='xs', variant='bare', class='capitalize', on_click="kindFilter = (kindFilter === k ? '' : k)", attrs_dict={':class': "kindFilter === k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'", 'x-text': "k === 'dependency' ? 'Dependencies' : (k + 's')"}) }}
                     </template>
                 </div>
-                <button type="button" @click="openCreate()"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="plus" class="h-3.5 w-3.5" aria-hidden="true"></i> Add item
-                </button>
+                {% if can_write %}{{ button(text='Add item', icon='plus', on_click='openCreate()', size='sm') }}{% endif %}
             </div>
         </div>
         {% if raid_items %}
@@ -230,27 +249,9 @@
                             </span>
                         </td>
                         <td class="px-2 text-right whitespace-nowrap">
-                            {% if item.status.value != 'closed' %}
-                            {# DEF-068, Capgemini dry-run pass 3: the ternary's
-                               output ('resolved'/'closed') rendered as a bare
-                               JS identifier, not a string literal — Alpine
-                               evaluated it as an undefined variable, so
-                               setStatus(id, undefined) shipped a PATCH body
-                               with no status key at all. The route still
-                               replied 200 (nothing to update), which read as
-                               "Resolve did nothing" with no error anywhere.
-                               |tojson emits double-quoted JSON, which broke
-                               this double-quoted HTML attribute the first
-                               time (closed it early) — single-quote the
-                               attribute instead, per this codebase's
-                               established fix for that exact class of bug. #}
-                            <button type="button"
-                                    @click='setStatus({{ item.id }}, {{ ("resolved" if item.status.value == "open" else "closed")|tojson }})'
-                                    :disabled="updatingId === {{ item.id }}"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                                {{ 'Resolve' if item.status.value == 'open' else 'Close' }}
-                            </button>
-                            {% else %}
+                            {% if item.status.value != 'closed' and can_write %}
+                            {{ button(text='Resolve' if item.status.value == 'open' else 'Close', type='button', variant='outline', size='sm', attrs_dict={':disabled': 'updatingId === ' ~ item.id}, on_click='setStatus(' ~ item.id ~ ", '" ~ ('resolved' if item.status.value == 'open' else 'closed') ~ "')") }}
+                            {% elif item.status.value == 'closed' %}
                             <span class="text-xs text-muted-foreground">Closed</span>
                             {% endif %}
                         </td>
@@ -270,118 +271,96 @@
        once already (silently broke the Kind dropdown and Save in production,
        caught only by a live browser round trip — the tests hit the API
        directly and never noticed). #}
+    {% if can_write %}
     {% call modal(id='create-raid-modal', title='Add RAID Item', description='Record an assumption, issue or dependency.', size='lg') %}
     <div class="space-y-4">
         {% call form_group(id='raid-kind', label='Kind', required=true) %}
-            <select id="raid-kind" x-model="raidForm.kind"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm capitalize">
+            {% call native_select(id='raid-kind', size='sm', class='capitalize', attrs_dict={'x-model': 'raidForm.kind'}) %}
                 <template x-for="k in kinds" :key="k">
                     <option :value="k" x-text="k" class="capitalize"></option>
                 </template>
-            </select>
+            {% endcall %}
         {% endcall %}
         {% call form_group(id='raid-title', label='Title', required=true) %}
-            <input id="raid-title" type="text" x-model="raidForm.title"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {{ input(id='raid-title', type='text', size='sm', attrs_dict={'x-model': 'raidForm.title'}) }}
         {% endcall %}
         {% call form_group(id='raid-description', label='Description') %}
-            <textarea id="raid-description" x-model="raidForm.description" rows="3"
-                      class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"></textarea>
+            {{ textarea(id='raid-description', rows=3, attrs_dict={'x-model': 'raidForm.description'}) }}
         {% endcall %}
         <div class="grid grid-cols-2 gap-3">
             {% call form_group(id='raid-owner', label='Owner') %}
-                <input id="raid-owner" type="text" x-model="raidForm.owner"
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                {{ input(id='raid-owner', type='text', size='sm', attrs_dict={'x-model': 'raidForm.owner'}) }}
             {% endcall %}
             {% call form_group(id='raid-target-date', label='Target date') %}
-                <input id="raid-target-date" type="date" x-model="raidForm.target_date"
-                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                {{ input(id='raid-target-date', type='date', size='sm', attrs_dict={'x-model': 'raidForm.target_date'}) }}
             {% endcall %}
         </div>
         <div>
-            <label for="raid-programme" class="block text-sm font-medium mb-1">Programme</label>
-            <select id="raid-programme" x-model="raidForm.strategic_initiative_id"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+            {% call label(for='raid-programme') %}Programme{% endcall %}
+            {% call native_select(id='raid-programme', size='sm', attrs_dict={'x-model': 'raidForm.strategic_initiative_id'}) %}
                 <option value="">— Not linked to a programme —</option>
                 {% for p in programmes %}
                 <option value="{{ p.id }}">{{ p.name }}</option>
                 {% endfor %}
-            </select>
+            {% endcall %}
         </div>
         <p x-show="raidError" x-cloak class="text-sm text-destructive-emphasis" x-text="raidError"></p>
     </div>
     <div class="flex justify-end gap-2 mt-4">
-        <button type="button" data-modal-close="create-raid-modal"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            Cancel
-        </button>
-        <button type="button" @click="submitRaid()" :disabled="raidSaving"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+        {{ button(text='Cancel', type='button', variant='outline', attrs_dict={'data-modal-close': 'create-raid-modal'}) }}
+        {% call button(text='', type='button', on_click='submitRaid()', attrs_dict={':disabled': 'raidSaving'}) %}
             <span x-show="raidSaving" x-cloak class="mr-1.5 h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
             Save
-        </button>
+        {% endcall %}
     </div>
     {% endcall %}
+    {% endif %}
     </div>
 
-    {% call modal(id='create-risk-modal', title='Add Risk', description='Record an enterprise architecture risk.', size='lg') %}
+    {% if can_write %}
+    {% call modal(id='create-risk-modal', title='', labelledby='create-risk-modal-heading', size='lg') %}
     <div class="space-y-4">
-        <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span> — use Map to… on the risk's own row to link it to an Application, Solution or Programme.</p>
+        <div class="flex flex-col space-y-1.5 pr-8 -mt-1">
+            <h2 id="create-risk-modal-heading" class="text-base font-semibold text-foreground" x-text="editingId ? 'Edit risk' : 'Add risk'">Add risk</h2>
+            <p class="text-sm text-muted-foreground">Record an enterprise architecture risk.</p>
+        </div>
+        <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing <span x-text="editingTitle"></span>. Change what it touches with Map to… on the risk's own row.</p>
         {% call form_group(id='risk-title', label='Title', required=true) %}
-            <input id="risk-title" type="text" x-model="form.title"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                   placeholder="What could go wrong?">
+            {{ input(id='risk-title', type='text', size='sm', placeholder='What could go wrong?', attrs_dict={'x-model': 'form.title'}) }}
         {% endcall %}
         {% call form_group(id='risk-description', label='Description') %}
-            <textarea id="risk-description" rows="2" x-model="form.description"
-                      class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      placeholder="Context and consequence"></textarea>
+            {{ textarea(id='risk-description', rows=2, placeholder='Context and consequence', attrs_dict={'x-model': 'form.description'}) }}
         {% endcall %}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {% call form_group(id='risk-likelihood', label='Likelihood (1-5)', required=true) %}
-                <select id="risk-likelihood" x-model="form.likelihood"
-                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                </select>
+                {% call native_select(id='risk-likelihood', size='sm', options=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5')], attrs_dict={'x-model': 'form.likelihood'}) %}{% endcall %}
             {% endcall %}
             {% call form_group(id='risk-impact', label='Impact (1-5)', required=true) %}
-                <select id="risk-impact" x-model="form.impact"
-                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                </select>
+                {% call native_select(id='risk-impact', size='sm', options=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5')], attrs_dict={'x-model': 'form.impact'}) %}{% endcall %}
             {% endcall %}
         </div>
         {% call form_group(id='risk-owner', label='Owner') %}
-            <input id="risk-owner" type="text" x-model="form.owner"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                   placeholder="Who carries this risk?">
+            {{ input(id='risk-owner', type='text', size='sm', placeholder='Who carries this risk?', attrs_dict={'x-model': 'form.owner'}) }}
         {% endcall %}
         {% call form_group(id='risk-mitigation', label='Mitigation plan') %}
-            <textarea id="risk-mitigation" rows="2" x-model="form.mitigation_plan"
-                      class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      placeholder="What reduces it?"></textarea>
+            {{ textarea(id='risk-mitigation', rows=2, placeholder='What reduces it?', attrs_dict={'x-model': 'form.mitigation_plan'}) }}
         {% endcall %}
+        <div x-show="!editingId" x-cloak>
+            <p class="mb-1 text-sm font-medium text-foreground">What it touches</p>
+            {{ risk_link_picker('chooseLink(entity)', chips=true, testid='add-risk-link-picker') }}
+        </div>
         <div x-show="error" x-cloak role="alert"
              class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
              x-text="error"></div>
     </div>
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
-        <button type="button" data-modal-close="create-risk-modal"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
-        <button type="button" @click="submit()" :disabled="saving"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            <span x-text="saving ? 'Saving' : (editingId ? 'Save Changes' : 'Add Risk')"></span>
-        </button>
+        {{ button(text='Cancel', type='button', variant='outline', attrs_dict={'data-modal-close': 'create-risk-modal'}) }}
+        {% call button(text='', type='button', on_click='submit()', attrs_dict={':disabled': 'saving'}) %}
+            <span x-text="saving ? 'Saving' : (editingId ? 'Save changes' : 'Add risk')"></span>
+        {% endcall %}
     </div>
     {% endcall %}
+    {% endif %}
 
     {# ── H2: risk detail slide-over -----------------------------------
        Rows in this table opened nothing; the ADM Kanban board's Sprint
@@ -400,7 +379,7 @@
              @click.self="panelOpen = false"
              class="fixed inset-0 z-40 bg-overlay/50"></div>
 
-        <div x-show="panelOpen" x-cloak role="dialog" aria-modal="true" aria-label="Risk detail"
+        <div x-show="panelOpen" x-cloak :role="'dialog'" aria-modal="true" aria-label="Risk detail"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
              x-transition:leave="transition ease-in duration-150"
@@ -409,15 +388,13 @@
 
             <div class="flex items-center justify-between px-4 py-3 border-b border-border">
                 <h2 class="text-sm font-semibold text-foreground truncate" x-text="selectedRisk ? selectedRisk.title : 'Risk detail'"></h2>
-                <button type="button" @click="panelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close risk detail">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
+                {{ button(text='', variant='ghost', size='icon-sm', aria_label='Close risk detail', on_click='panelOpen = false', icon='x', attrs_dict={'class': 'h-8 w-8'}) }}
             </div>
 
             <div class="flex-1 overflow-y-auto p-4 space-y-5" x-show="selectedRisk">
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted capitalize" x-text="selectedRisk ? selectedRisk.status : ''"></span>
-                    <span class="text-xs text-muted-foreground">Score <span class="font-medium text-foreground" x-text="selectedRisk ? selectedRisk.risk_score : ''"></span></span>
+                    <span class="text-xs text-muted-foreground">Score <span class="font-medium text-foreground" x-text="selectedRisk ? selectedRisk.score_text : ''"></span></span>
                     <span class="text-xs text-muted-foreground">Owner: <span class="text-foreground" x-text="selectedRisk ? selectedRisk.owner : ''"></span></span>
                 </div>
 
@@ -434,53 +411,38 @@
                 <div>
                     <div class="flex items-center justify-between mb-1">
                         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapped to</h3>
-                        <button type="button" @click="showMapPicker = !showMapPicker" class="text-xs text-primary hover:underline">Map to…</button>
+                        {% if can_write %}{{ button(text='Map to…', variant='link', size='bare', on_click='showMapPicker = !showMapPicker', class='text-xs') }}{% endif %}
                     </div>
                     <template x-if="selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length">
                         <ul class="space-y-1.5">
                             <template x-for="(link, linkIdx) in selectedRisk.entity_links" :key="link.id || ('element-' + linkIdx)">
                                 <li class="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5 text-sm">
                                     <span class="min-w-0">
-                                        <span class="inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1.5" x-text="link.entity_type"></span>
+                                        <span class="inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1.5" x-text="link.entity_kind || link.entity_type"></span>
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
                                         <span x-show="link.via === 'element'" class="ml-1.5 text-xs text-muted-foreground">(linked through the risk's element)</span>
                                     </span>
-                                    <button type="button" x-show="link.id" @click="removeLink(link.id)" aria-label="Unmap" class="text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0">Unmap</button>
+                                    {% if can_write %}{{ button(text='Unmap', variant='bare', size='bare', aria_label='Unmap', class='text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0', attrs_dict={'x-show': 'link.id', '@click': 'removeLink(link.id)'}) }}{% endif %}
                                 </li>
                             </template>
                         </ul>
                     </template>
-                    <p x-show="!(selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length)" x-cloak class="text-xs text-muted-foreground">Not mapped to any Application, Solution or Programme yet.</p>
+                    <p x-show="!(selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length)" x-cloak class="text-xs text-muted-foreground">Not mapped to anything yet. Map it to where its cause sits: an application, product, goal, driver, business actor, capability, solution or programme.</p>
 
-                    <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3 space-y-2">
-                        <div class="flex gap-2">
-                            <select x-model="linkType" aria-label="Entity type to link" class="h-8 rounded-md border border-input bg-background px-2 text-xs">
-                                <option value="application">Application</option>
-                                <option value="solution">Solution</option>
-                                <option value="programme">Programme</option>
-                            </select>
-                            <input type="text" x-model="linkSearch" @input.debounce.300ms="searchLinkEntities()"
-                                   aria-label="Search entities to link"
-                                   class="flex-1 h-8 rounded-md border border-input bg-background px-2 text-xs"
-                                   :placeholder="'Search ' + linkType + 's…'">
-                        </div>
-                        <div x-show="linkResults.length > 0" x-cloak class="max-h-40 overflow-y-auto rounded-md border border-border divide-y divide-border">
-                            <template x-for="entity in linkResults" :key="entity.id">
-                                <button type="button" @click="addLink(entity)" class="w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent transition-colors" x-text="entity.name"></button>
-                            </template>
-                        </div>
+                    {% if can_write %}
+                    <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3">
+                        {{ risk_link_picker('addLink(entity)') }}
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
+            {% if can_write %}
             <div class="flex items-center gap-2 px-4 py-3 border-t border-border" x-show="selectedRisk">
-                <button type="button" @click="openEdit(selectedRisk)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i> Edit
-                </button>
-                <button type="button" @click="confirmDelete(selectedRisk)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i> Delete
-                </button>
+                {{ button(text='Edit', icon='pencil', variant='outline', on_click='openEdit(selectedRisk)') }}
+                {{ button(text='Delete', icon='trash-2', variant='outline', on_click='confirmDelete(selectedRisk)') }}
             </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -488,9 +450,12 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ risk_link_picker_script() }}
 <script>
 function riskRegister() {
     return {
+        ...riskLinkPicker(),
+        pendingLinks: [],
         saving: false,
         error: '',
         form: {
@@ -498,6 +463,7 @@ function riskRegister() {
             owner: '', mitigation_plan: ''
         },
         editingId: null,
+        editingTitle: '',
 
         // H2: detail slide-over state.
         panelOpen: false,
@@ -505,9 +471,6 @@ function riskRegister() {
 
         // H1: entity-link picker state, scoped to whichever risk the panel is showing.
         showMapPicker: false,
-        linkType: 'application',
-        linkSearch: '',
-        linkResults: [],
 
         updatingId: null,
 
@@ -543,6 +506,7 @@ function riskRegister() {
 
         openCreate() {
             this.editingId = null;
+            this.editingTitle = '';
             this.form.title = '';
             this.form.description = '';
             this.form.likelihood = '3';
@@ -551,6 +515,9 @@ function riskRegister() {
             this.form.mitigation_plan = '';
             this.error = '';
             this.saving = false;
+            this.pendingLinks = [];
+            this.linkSearch = '';
+            this.linkResults = [];
             Platform.modal.open('create-risk-modal');
         },
 
@@ -560,6 +527,7 @@ function riskRegister() {
             if (!row) return;
             this.panelOpen = false;
             this.editingId = row.id;
+            this.editingTitle = row.title || 'this risk';
             this.form.title = row.title || '';
             this.form.description = row.description || '';
             this.form.likelihood = String(row.likelihood);
@@ -596,7 +564,7 @@ function riskRegister() {
             // native confirm() (DESIGN.md / CLAUDE.md: no native dialogs).
             Platform.confirm({
                 title: 'Delete risk?',
-                message: 'Delete "' + row.title + '"? This also removes its Application/Solution/Programme links. This cannot be undone.',
+                message: 'Delete "' + row.title + '"? This also removes its Application/Capability/Solution/Programme links. This cannot be undone.',
                 confirmText: 'Delete',
                 variant: 'destructive'
             }).then(function (confirmed) {
@@ -615,22 +583,16 @@ function riskRegister() {
             });
         },
 
-        // H1: entity picker backing /api/{applications|solutions|programmes}/search.
-        searchLinkEntities() {
-            const q = this.linkSearch.trim();
-            if (q.length < 2) { this.linkResults = []; return; }
-            const self = this;
-            const endpoints = {
-                application: '/applications/api/list?search=' + encodeURIComponent(q) + '&limit=10',
-                solution: '/api/solutions/search?q=' + encodeURIComponent(q),
-                programme: '/api/programmes/search?q=' + encodeURIComponent(q)
-            };
-            Platform.fetch.get(endpoints[this.linkType], null, { silent: true })
-                .then(function (data) {
-                    const rows = data.applications || data.items || data || [];
-                    self.linkResults = rows.map(function (r) { return { id: r.id, name: r.name }; });
-                })
-                .catch(function () { self.linkResults = []; });
+        // Add Risk dialog: a choice becomes a chip; the chips are saved with the risk in one request.
+        chooseLink(entity) {
+            const known = this.pendingLinks.some(function (c) { return c.type === entity.type && c.id === entity.id; });
+            if (!known) this.pendingLinks.push({ type: entity.type, id: entity.id, name: entity.name });
+            this.linkSearch = '';
+            this.linkResults = [];
+        },
+
+        removeChip(chip) {
+            this.pendingLinks = this.pendingLinks.filter(function (c) { return c !== chip; });
         },
 
         addLink(entity) {
@@ -638,7 +600,7 @@ function riskRegister() {
             const self = this;
             Platform.fetch(`/api/risks/${this.selectedRisk.id}/links`, {
                 method: 'POST',
-                body: { entity_type: this.linkType, entity_id: entity.id },
+                body: { entity_type: entity.type, entity_id: entity.id },
                 silent: true
             })
                 .then(function (link) {
@@ -708,6 +670,9 @@ function riskRegister() {
                 owner: this.form.owner,
                 mitigation_plan: this.form.mitigation_plan
             };
+            if (!this.editingId) {
+                payload.links = this.pendingLinks.map(function (c) { return { entity_type: c.type, entity_id: c.id }; });
+            }
             // silent: this modal shows its own inline error, so a toast would duplicate it.
             const request = this.editingId
                 ? Platform.fetch('/api/risks/' + this.editingId, { method: 'PATCH', body: payload, silent: true })

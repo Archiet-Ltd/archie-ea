@@ -532,6 +532,8 @@ ROUTES = (
     "/data-governance/undeclared-copies",
     "/data-governance/domains",
     "/data-governance/models",
+    "/data-governance/no-steward",
+    "/data-governance/retention-breaches",
 )
 
 

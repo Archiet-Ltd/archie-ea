@@ -211,7 +211,7 @@
             <template x-if="autoFixResult">
                 <div class="p-4 bg-muted/50 rounded-lg space-y-2">
                     <p class="text-sm"><span class="font-medium">Root cause:</span> <span x-text="autoFixResult.diagnosis?.root_cause"></span></p>
-                    <p class="text-sm"><span class="font-medium">Confidence:</span> <span x-text="Math.round((autoFixResult.diagnosis?.confidence || 0) * 100) + '%'"></span></p>
+                    <p class="text-sm"><span class="font-medium">Confidence:</span> <span x-text="Platform.figure.percent(autoFixResult.diagnosis?.confidence, 100)"></span></p>
                     <template x-if="autoFixResult.fix">
                         <div class="mt-2 p-3 bg-background border border-border rounded-md">
                             <p class="text-xs font-medium text-muted-foreground mb-1">Suggested Fix:</p>

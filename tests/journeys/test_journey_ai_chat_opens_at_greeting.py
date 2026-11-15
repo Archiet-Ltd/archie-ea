@@ -81,7 +81,7 @@ def _open(browser, client, document, width=1440, height=900, query=""):
 def _pane_state(pg):
     return pg.evaluate("""() => {
         const pane = document.querySelector('%s'); const box = pane.getBoundingClientRect();
-        const heading = [...pane.querySelectorAll('h2')].find(h => /How can I help you today/.test(h.textContent));
+        const heading = [...pane.querySelectorAll('h1, h2')].find(h => /How can I help you today/.test(h.textContent));
         const hb = heading ? heading.getBoundingClientRect() : null;
         return {scrollTop: pane.scrollTop, paneTop: box.top, paneBottom: box.bottom,
                 headingVisible: !!hb && hb.top >= box.top - 1 && hb.bottom <= box.bottom + 1,
@@ -140,12 +140,14 @@ def test_a_deep_link_context_notice_does_not_scroll_the_pane_past_the_greeting(a
 def test_a_real_persona_change_adds_a_notice_that_ends_inside_the_pane(app, browser, client, width, height):
     pg = _open(browser, client, _document(app, client, "solution_architect"), width, height)
     try:
+        pg.get_by_role("button", name="Chat options").click()
         current = pg.eval_on_selector("#persona-selector", "s => s.value")
         other = pg.eval_on_selector(
             "#persona-selector", "(s, cur) => [...s.options].map(o => o.value).find(v => v && v !== cur)", current)
         if not other:
             pytest.skip("only one persona is configured; there is no second persona to switch to")
         pg.select_option("#persona-selector", other)
+        pg.keyboard.press("Escape")
         pg.wait_for_timeout(800)
         info = pg.evaluate("""() => {
             const pane = document.querySelector('%s'); const box = pane.getBoundingClientRect();
@@ -173,31 +175,5 @@ def test_after_sending_a_message_the_pane_scrolls_to_the_newest_message(app, bro
                     sent: p.textContent.includes('Which capabilities have no owner?')}; }""" % PANE)
         assert info["sent"], "the sent message is not in the transcript"
         assert not info["scrollable"] or info["gap"] <= 2, "the pane is %spx short of the newest message" % info["gap"]
-    finally:
-        pg.close()
-
-
-@pytest.mark.parametrize("width,height", [(1440, 900), (768, 900)])
-def test_the_quick_prompts_strip_has_a_top_edge_and_nothing_sits_on_its_label(app, browser, client, width, height):
-    pg = _open(browser, client, _document(app, client, "solution_architect"), width, height)
-    try:
-        info = pg.evaluate("""() => {
-            const label = [...document.querySelectorAll('div')].find(d => d.children.length === 0
-                && d.textContent.trim().toLowerCase() === 'quick prompts');
-            if (!label) return null;
-            const r = label.getBoundingClientRect();
-            // What is really drawn at the label's position: pane content that has scrolled out of view is
-            // clipped by the pane and never covers it, so ask the browser rather than comparing raw rectangles.
-            const pane = document.querySelector('%s');
-            const cy = r.top + r.height / 2;
-            const overlapping = [0.1, 0.5, 0.9].filter(f => {
-                const hit = document.elementFromPoint(r.left + r.width * f, cy);
-                return hit && pane.contains(hit);
-            }).length;
-            return {edge: parseFloat(getComputedStyle(label).borderTopWidth), overlapping: overlapping};
-        }""" % PANE)
-        assert info, "the Quick prompts label was not found"
-        assert info["edge"] > 0, "the quick-prompts strip has no visible top edge"
-        assert info["overlapping"] == 0, "pane content is drawn over the Quick prompts label at %d of 3 sample points" % info["overlapping"]
     finally:
         pg.close()

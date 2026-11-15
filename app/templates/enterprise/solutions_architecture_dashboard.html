@@ -1,18 +1,8 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 
-{% block title %}Buy / Build / Reuse Analysis{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Solutions Architecture', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Buy / Build / Reuse Analysis{% endblock %}{% block content %}
 <div class="space-y-6" x-data="solutionWorkspace()" x-init="init()">
     <!-- Page Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -20,6 +10,31 @@
             title='Buy / Build / Reuse Analysis',
             description='AI-powered options analysis for solution architects — TOGAF ADM Phase B/C'
         ) }}
+    </div>
+
+    {% if load_error %}
+    <p class="text-sm text-muted-foreground" role="status">{{ load_error }}</p>
+    {% endif %}
+
+    <!-- YOUR SOLUTIONS, PATTERNS AND CONTRACTS -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" data-testid="solutions-counts">
+        <div class="rounded-xl border border-input bg-background p-5" data-testid="count-solutions">
+            <p class="text-sm font-medium text-muted-foreground">Solutions</p>
+            <p class="text-2xl font-bold tracking-tight mt-1" data-testid="count-solutions-value">{{ solution_count|dash }}</p>
+        </div>
+        <div class="rounded-xl border border-input bg-background p-5" data-testid="count-patterns">
+            <p class="text-sm font-medium text-muted-foreground">Solution patterns</p>
+            <p class="text-2xl font-bold tracking-tight mt-1" data-testid="count-patterns-value">{{ pattern_count|dash }}</p>
+        </div>
+        {% if contract_count is not none or load_error %}
+        <div class="rounded-xl border border-input bg-background p-5" data-testid="count-contracts">
+            <p class="text-sm font-medium text-muted-foreground">Contracts</p>
+            <p class="text-2xl font-bold tracking-tight mt-1" data-testid="count-contracts-value">{{ contract_count|dash }}</p>
+            {% if contract_count is not none %}
+            <a href="{{ url_for('procurement.contracts_list') }}" class="text-sm font-medium text-primary hover:underline">View the contracts register</a>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- ANALYSIS FORM -->
@@ -126,6 +141,7 @@
 
     <!-- ANALYSIS RESULTS -->
     <div x-show="results" x-cloak x-transition.opacity>
+        <p x-show="costsWithheld" x-cloak class="mb-4 text-sm text-muted-foreground" role="status" data-testid="costs-withheld" x-text="costsWithheldText"></p>
         <div x-show="topRec" x-cloak class="border flex items-center gap-4 px-3 py-2 rounded-md border-2 border-primary/40 bg-primary/10 mb-4">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary">
                 <i data-lucide="award" class="h-5 w-5 text-primary-foreground"></i>
@@ -168,7 +184,7 @@
                     <p class="text-sm text-muted-foreground" x-text="rec.description"></p>
 
                     <div class="flex flex-wrap items-center gap-3 text-sm">
-                        <template x-if="rec.estimated_cost">
+                        <template x-if="rec.estimated_cost && !costsWithheld">
                             <div class="flex items-center gap-1.5">
                                 <i data-lucide="pound-sterling" class="h-4 w-4 text-muted-foreground"></i>
                                 <span class="font-medium" x-text="'£' + formatCost(rec.estimated_cost)"></span>
@@ -247,14 +263,14 @@
                            x-text="results.existing_applications.found_count + ' applications in your portfolio may address this need'"></p>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Solutions architecture table">
                     <table class="dense-table w-full text-sm text-left">
                         <thead class="bg-muted/50 text-muted-foreground text-xs font-medium border-b border-input">
                             <tr>
                                 <th class="px-5 py-3">Application</th>
                                 <th class="px-5 py-3">Status</th>
                                 <th class="px-5 py-3">Relevance</th>
-                                <th class="px-5 py-3">Annual Cost</th>
+                                <th x-show="!costsWithheld" class="px-5 py-3">Annual Cost</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-input">
@@ -275,8 +291,8 @@
                                             <span class="text-xs font-mono" x-text="app.relevance_score + '%'"></span>
                                         </div>
                                     </td>
-                                    <td class="px-5 py-3 font-mono text-xs"
-                                        x-text="app.annual_cost ? '£' + formatCost(app.annual_cost) : ''"></td>
+                                    <td x-show="!costsWithheld" class="px-5 py-3 font-mono text-xs"
+                                        x-text="Platform.figure.money(app.annual_cost)"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -295,7 +311,7 @@
             </div>
             <span class="inline-flex items-center justify-center h-6 min-w-6 px-2 rounded-full bg-muted text-muted-foreground text-xs font-medium">{{ solution_count|dash }}</span>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Solutions architecture table">
             <table class="dense-table w-full text-sm text-left">
                 <thead class="bg-muted/50 text-muted-foreground font-medium border-b border-input text-xs uppercase tracking-wide">
                     <tr>
@@ -355,6 +371,8 @@ function solutionWorkspace() {
         results: null,
         savedSolutions: {},
         savingOption: null,
+        costsWithheld: {{ 'true' if costs_withheld else 'false' }},
+        costsWithheldText: {{ costs_withheld_sentence|tojson }},
 
         init() { if (typeof lucide !== 'undefined') lucide.createIcons(); },
 

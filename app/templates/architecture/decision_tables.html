@@ -1,0 +1,89 @@
+{# design-block: data-table #}
+{% extends 'layouts/admin_base.html' %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+
+{% block title %}Decision tables{% endblock %}
+
+{% macro _create_form() %}
+<form method="post" action="{{ url_for('decision_tables.create') }}" class="space-y-4" data-testid="decision-create-form">
+  {{ ui.input(type='hidden', name='csrf_token', value=csrf_token()) }}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Name', attrs={'for': 'decision-name'}) }}
+    {{ ui.input(id='decision-name', name='name', required=true, maxlength=200, class='w-full', placeholder='Approve supplier') }}
+  {% endcall %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='Hit policy', attrs={'for': 'decision-policy'}) }}
+    {% call native_select_wrapper(class='w-full') %}
+      {% call native_select(id='decision-policy', name='hit_policy', class='w-full') %}
+        {% for p in policies %}{{ native_select_option(text=p.letter ~ ' - ' ~ p.name ~ ': ' ~ p.meaning, value=p.letter, selected=(p.letter == 'U')) }}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
+  {% call ui.field() %}
+    {{ ui.field_label(text='What it decides', attrs={'for': 'decision-description'}) }}
+    {{ ui.textarea(id='decision-description', name='description', rows=3, maxlength=2000, class='w-full') }}
+  {% endcall %}
+  <div class="flex justify-end">{{ ui.button(text='Create decision', type='submit', attrs={'data-testid': 'decision-create-submit'}) }}</div>
+</form>
+{% endmacro %}
+
+{% macro _actions() %}
+{% if can_edit %}
+{{ ui.button(text='New decision', type='button', attrs={'data-fb-open': 'decision-dialog', 'data-testid': 'decision-new'}) }}
+{% call ui.dialog() %}
+{{ ui.dialog_overlay() }}
+{% call ui.dialog_content(id='decision-dialog') %}
+  {% call ui.dialog_header() %}
+    {{ ui.dialog_title(text='New decision') }}
+    {{ ui.dialog_description(text='A decision table says what to decide from a set of inputs. Add its columns and rules on the next page.') }}
+  {% endcall %}
+  {{ _create_form() }}
+  {% call ui.dialog_close(class='absolute top-4 right-4', attrs={'aria-label': 'Close'}) %}{{ lucide('x') }}{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endif %}
+{% endmacro %}
+
+{% block breadcrumb %}
+{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb', 'class': 'mb-3'}) %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Home', attrs={'href': url_for('main.index')}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Architecture', attrs={'href': url_for('archimate_crud.dashboard')}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_page(text='Decision tables') }}{% endcall %}
+{% endcall %}{% endcall %}
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+<div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+  <div class="min-w-0">
+    <h1 class="text-3xl font-bold tracking-tight text-foreground">Decision tables</h1>
+    <p class="mt-1 text-sm text-muted-foreground">DMN decision tables, and the business processes that apply them</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 xl:shrink-0">{{ _actions() }}</div>
+</div>
+
+{% macro _empty_next() %}
+{% if can_edit %}<p class="text-sm text-muted-foreground">Use New decision to write the first table, or import a DMN file from <a class="text-primary underline" href="{{ url_for('architect_ui.import_oef') }}">the model import</a>.</p>
+{% else %}<p class="text-sm text-muted-foreground">An architect can add the first decision table or import a DMN file.</p>{% endif %}
+{% endmacro %}
+
+{%- set columns = [{'label': 'Decision', 'sortable': true}, ('Hit policy', ''), {'label': 'Inputs', 'align': 'right', 'sortable': true},
+                   {'label': 'Outputs', 'align': 'right', 'sortable': true}, {'label': 'Rules', 'align': 'right', 'sortable': true},
+                   {'label': 'Applied by', 'class': 'hidden md:table-cell'}] -%}
+{% call(row) list_table(rows=rows, columns=columns, caption='Decision tables', testid='decision-table-list', row_testid='decision-row',
+                        search_placeholder='Filter decisions...', toolbar=true,
+                        empty_message='No decision tables yet.', empty_action=_empty_next) %}
+  {% call table_cell(class='max-w-md') %}
+    <a href="{{ url_for('decision_tables.detail', decision_id=row.id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="decision-link">{{ row.name }}</a>
+  {% endcall %}
+  {% call table_cell(class='whitespace-nowrap') %}<span title="{{ row.policy_name }}">{{ row.policy }}</span> <span class="text-muted-foreground">{{ row.policy_name }}</span>{% endcall %}
+  {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.inputs}) %}{{ row.inputs }}{% endcall %}
+  {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.outputs}) %}{{ row.outputs }}{% endcall %}
+  {% call table_cell(class='text-right tabular-nums', attrs={'data-sort': row.rules}) %}{{ row.rules }}{% endcall %}
+  {% call table_cell(class='hidden md:table-cell') %}{% if row.processes %}{{ row.processes | join(', ') }}{% else %}<span class="text-muted-foreground">No process applies it yet</span>{% endif %}{% endcall %}
+{% endcall %}
+</div>
+{% endblock %}

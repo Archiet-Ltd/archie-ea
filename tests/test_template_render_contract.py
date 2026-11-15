@@ -184,7 +184,7 @@ def test_custom_field_edit_does_not_render_a_wtforms_template_without_a_form():
 # ─────────────────────────────────────────────────────────────────────
 # Encoding contract: a template Jinja cannot decode has no tags at all.
 #
-# strategic_roadmap/enhanced_roadmap_fixed.html shipped as UTF-16LE with
+# the strategic roadmap template (since merged into genome/roadmap.html) shipped as UTF-16LE with
 # no BOM. Jinja reads templates as UTF-8, so every second byte was a NUL
 # and not one `{%` matched: the page did not extend a layout, no block
 # was defined, and the route emitted ~59 KB of literal template text to
@@ -194,7 +194,7 @@ def test_custom_field_edit_does_not_render_a_wtforms_template_without_a_form():
 # a file that renders nothing.
 # ─────────────────────────────────────────────────────────────────────
 
-_ROADMAP_TEMPLATE = "strategic_roadmap/enhanced_roadmap_fixed.html"
+_ROADMAP_TEMPLATE = "genome/roadmap.html"
 
 
 def _template_bytes(app, name):
@@ -244,24 +244,19 @@ def test_enhanced_roadmap_parses_its_jinja_tags(app):
 
 
 def test_enhanced_roadmap_renders_with_its_view_kwargs(app):
-    """Exactly the keywords app/main/routes_strategic_roadmap.py passes."""
+    """Exactly the keywords app/modules/genome/routes/roadmap_routes.py passes when
+    the board could not be built."""
     html = _render_none_safe(
         app,
         _ROADMAP_TEMPLATE,
-        domains=[],
-        capabilities=[],
-        users=[],
-        unmapped_capabilities=[],
-        total_capabilities=None,
-        mapped_capabilities=None,
-        mapping_coverage=None,
-        work_packages=[],
-        start_date=None,
-        end_date=None,
-        months=[],
-        selected_levels=["L1", "L2", "L3"],
-        selected_domain="",
-        selected_importance="",
+        board=None,
+        plateaus=[],
+        error="The roadmap could not be built.",
+        lens="strategic",
+        tabs=[("Strategic", "/genome/roadmap/", True)],
+        crumbs=[("Enterprise", None)],
+        critical_paths=[],
+        clear_url=None,
     )
     if html is None:
         pytest.skip("layout needs request-scoped state unavailable here")
@@ -269,18 +264,13 @@ def test_enhanced_roadmap_renders_with_its_view_kwargs(app):
         "%s emitted its own tags as text - it is mis-encoded again"
         % _ROADMAP_TEMPLATE
     )
-    # The component is deliberately NOT called `roadmapApp`: alpine-architecture.js
-    # registers a generic Alpine.data('roadmapApp'), and an Alpine.data registration
-    # beats a page-local global of the same name. This page silently bound to that
-    # generic component, which has no formatStat and defaults apiBase to /api/roadmap
-    # - so the page 404'd and its statistic tiles sat on a fabricated 0. Asserting
-    # the distinct name here keeps the collision from being reintroduced.
-    assert "enhancedStrategicRoadmap()" in html, (
+    # The failure is shown to the person, not drawn as an empty roadmap.
+    assert "The roadmap could not be built." in html, (
         "%s content block did not render" % _ROADMAP_TEMPLATE
     )
     assert "roadmapApp()" not in html, (
-        "%s re-adopted the generic roadmapApp name that alpine-architecture.js "
-        "already registers; the page will bind to the wrong component"
+        "%s adopted the generic roadmapApp name that alpine-architecture.js "
+        "already registers; the page would bind to the wrong component"
         % _ROADMAP_TEMPLATE
     )
 
@@ -347,27 +337,6 @@ _ERROR_PATH_CONTEXTS = [
             unmapped_caps=[],
             unmapped_products=[],
             unmapped_archimate=[],
-            load_error="x",
-        ),
-    ),
-    (
-        "vendor_analysis/archimate_mapping.html",
-        dict(
-            vendor_orgs=None,
-            vendor_products=None,
-            archimate_elements=None,
-            with_archimate=None,
-            without_archimate=None,
-            vendor_coverage=None,
-            with_source_product=None,
-            without_source_product=None,
-            archimate_coverage=None,
-            orphaned_elements=None,
-            orphaned_details=[],
-            app_vendor_products=None,
-            product_types=[],
-            element_types=[],
-            unmapped_products=[],
             load_error="x",
         ),
     ),

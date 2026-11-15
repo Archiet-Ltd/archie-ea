@@ -15,9 +15,12 @@ class OrgService:
         slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
         if Organization.query.filter_by(slug=slug).first():
             slug = f"{slug}-{uuid.uuid4().hex[:6]}"
-        org = Organization(name=name, slug=slug)
+        org = Organization(name=name, slug=slug, reporting_currency="GBP")
         db.session.add(org)
         db.session.flush()  # get org.id
+        from app.commands.seed_agent_charters import ensure_charters
+
+        ensure_charters(org.id)
         admin_role = Role.query.filter_by(name="Administrator").first()
         if not admin_role:
             admin_role = Role(name="Administrator", permissions=Permission.ADMINISTER)
@@ -70,6 +73,9 @@ class OrgService:
 
     @staticmethod
     def get_org_usage(org_id):
-        users = User.query.filter_by(organization_id=org_id).count()
+        from app.services.billing_plans import is_holding_organisation
+
+        # the holding organisation (unconfirmed sign-ups) has no members
+        users = 0 if is_holding_organisation(db.session.connection(), org_id) else User.query.filter_by(organization_id=org_id).count()
         # For apps and solutions, use 0 as stub (replace with real queries if models exist)
         return {"users": users, "apps": 0, "solutions": 0}

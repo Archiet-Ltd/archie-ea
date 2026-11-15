@@ -1,4 +1,5 @@
 ---
+wave: 3
 page_family: function-per-segment
 use_case_id: UC-S1-07
 segment_id: S1
@@ -28,7 +29,7 @@ list written in the vendor's own words, and Entelim creates the right elements f
 provenance attached, so you can always see they came from a pack, not something you typed. The
 Impact question then answers over all of it at once, immediately.
 
-Coming in an upcoming release. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Who this is for
 

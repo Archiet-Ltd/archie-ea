@@ -1,19 +1,9 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
-{% block title %}Architecture Governance{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Strategy Layer', 'href': url_for('archimate_crud.dashboard') + '#strategy'},
-    {'text': 'Strategic Planning', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Architecture Governance{% endblock %}{% block content %}
 {# Builds the href for a row's record, or an empty string when the blueprint that
    owns the destination failed to register -- blueprints register non-fatally here,
    so an unguarded url_for would raise BuildError and 500 every page rendering the
@@ -29,7 +19,7 @@
     <!-- Metrics Cards -->
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {{ metrics_card(title='Total Reviews', value=portfolio_metrics.total_reviews|default(0), icon='clipboard-check') }}
-        {{ metrics_card(title='Compliance Rate', value=(portfolio_metrics.compliance_rate|default(0)|string) ~ '%', icon='check-circle', icon_class='!text-success', value_class='text-success') }}
+        {{ metrics_card(title='Compliance Rate', value=(portfolio_metrics.compliance_rate|dash('%', 'Not scored')), icon='check-circle', icon_class='!text-success', value_class='text-success') }}
         {{ metrics_card(title='Critical Violations', value=critical_governance|length|default(0), icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
         {{ metrics_card(title='Pending Approvals', value=high_governance|length|default(0), icon='clock', icon_class='!text-warning', value_class='text-warning') }}
     </div>

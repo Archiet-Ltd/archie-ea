@@ -27,6 +27,12 @@ KINDS: Dict[str, Dict] = {
             "time_criticality": {"type": "integer", "label": "Time Criticality", "min": 1},
             "risk_reduction": {"type": "integer", "label": "Risk Reduction", "min": 1},
             "job_size": {"type": "integer", "label": "Job Size", "min": 1},
+            "kanban_state": {
+                "type": "enum",
+                "label": "Kanban State",
+                "values": ["Funnel", "Reviewing", "Analyzing", "Portfolio Backlog", "Implementing", "Done"],
+                "default": "Funnel",
+            },
         },
     },
     "Feature": {

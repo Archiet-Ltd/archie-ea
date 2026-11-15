@@ -1,18 +1,8 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 
-{% block title %}Demand intake{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Portfolio', 'href': url_for('portfolio.index')},
-    {'text': 'Demand', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Demand intake{% endblock %}{% block content %}
 <div class="p-6 space-y-6 mx-auto">
 
   {% macro _ps_actions() %}
@@ -111,7 +101,7 @@
         Kept, including declines &mdash; the record is what stops a rejected idea returning each quarter
       </p>
     </div>
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Demand decisions">
       <table class="dense-table w-full text-sm">
         <thead class="border-b bg-muted/40">
           <tr class="text-left">

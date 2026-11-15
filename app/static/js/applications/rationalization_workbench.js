@@ -120,7 +120,7 @@ function workbenchApp() {
                         return {
                             id: app.id || app.app_id || app.application_id,
                             name: app.name || app.app_name || app.application_name || 'Unknown',
-                            health: app.overall_health_score || 0,
+                            health: app.overall_health_score ?? null,
                             disposition_label: app.disposition_label || dispLabel || '—',
                             disposition_desc: dispDesc,
                             is_ready: app.is_decision_ready || false,

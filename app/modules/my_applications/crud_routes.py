@@ -24,6 +24,13 @@ from app.extensions import db
 from app.models.application_owner import ApplicationOwner
 from app.models.application_portfolio import ApplicationComponent
 
+from app.services.application_status import (
+    StatusRefused,
+    match_status,
+    status_options,
+    status_to_store,
+)
+
 from . import my_applications_bp
 
 # Vocabularies are pinned here rather than accepted from the form. Both fields
@@ -32,8 +39,21 @@ from . import my_applications_bp
 LIFECYCLE_STATUSES = [
     "planning", "development", "testing", "operational", "deprecated", "retired",
 ]
-DEPLOYMENT_STATUSES = ["design", "development", "testing", "production"]
 HEALTH_STATUSES = ["healthy", "at_risk", "critical"]
+
+
+def _render_form(app, **extra):
+    """The owner's edit form, with the one status list for the deployment select."""
+    stored = app.deployment_status
+    return render_template(
+        "my_applications/app_form.html",
+        app=app,
+        statuses=LIFECYCLE_STATUSES,
+        deployment_options=status_options(stored),
+        deployment_selected=match_status(stored) or stored,
+        health_statuses=HEALTH_STATUSES,
+        **extra,
+    )
 
 
 def _owned_application_or_404(app_id):
@@ -61,6 +81,14 @@ def app_edit(app_id):
     if request.method == "POST":
         form = request.form
 
+        # A status off the list is refused before anything is changed.
+        try:
+            deployment_status = status_to_store(
+                app.deployment_status, (form.get("deployment_status") or "").strip() or None
+            )
+        except StatusRefused as refusal:
+            return _render_form(app, deployment_error=str(refusal)), 400
+
         description = (form.get("description") or "").strip()
         app.description = description or None
 
@@ -70,19 +98,15 @@ def app_edit(app_id):
         # status is worse than storing the junk. Empty still means "not set".
         for field, allowed in (
             ("lifecycle_status", LIFECYCLE_STATUSES),
-            ("deployment_status", DEPLOYMENT_STATUSES),
             ("health_status", HEALTH_STATUSES),
         ):
             value = (form.get(field) or "").strip()
             if value and value not in allowed:
                 flash("%s is not a recognised value." % field.replace("_", " ").title(), "danger")
-                return render_template(
-                    "my_applications/app_form.html",
-                    app=app, statuses=LIFECYCLE_STATUSES,
-                    deployment_statuses=DEPLOYMENT_STATUSES,
-                    health_statuses=HEALTH_STATUSES,
-                ), 400
+                return _render_form(app), 400
             setattr(app, field, value or None)
+
+        app.deployment_status = deployment_status
 
         for field in ("business_owner", "technical_owner"):
             value = (form.get(field) or "").strip()
@@ -113,12 +137,8 @@ def app_edit(app_id):
     if suggested_lifecycle not in LIFECYCLE_STATUSES:
         suggested_lifecycle = None
 
-    return render_template(
-        "my_applications/app_form.html",
-        app=app,
-        statuses=LIFECYCLE_STATUSES,
-        deployment_statuses=DEPLOYMENT_STATUSES,
-        health_statuses=HEALTH_STATUSES,
+    return _render_form(
+        app,
         suggested_health=suggested_health,
         suggested_lifecycle=suggested_lifecycle,
     )

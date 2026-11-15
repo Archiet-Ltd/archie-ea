@@ -15,6 +15,8 @@ stack (tenant context, tenant isolation, login) with the caller already resolved
 
 from __future__ import annotations
 
+import re
+
 from typing import Any, Callable
 
 from app.utils.internal_api import call_internal_api
@@ -138,10 +140,73 @@ def _impact_answer(args: dict) -> dict:
     )
 
 
+def _data_flow(args: dict) -> dict:
+    """``ask_data_flow``: the data entities overview from the data architecture
+    route, or, for one data object, the answer service's data-flow envelope
+    (stored like ``ask_impact``'s)."""
+    if args.get("element_id") is None:
+        _status, data = call_internal_api("GET", "/architecture/api/data-flows", pass_session=True)
+        if isinstance(data, dict):
+            _fence_response_text(data)
+        return data
+
+    from flask_login import current_user
+
+    from .executor import ToolCall, ToolExecutor
+
+    return ToolExecutor(user_id=current_user.id).execute(
+        ToolCall(
+            id="mcp-ask-data-flow",
+            name="answer",
+            arguments={"question": "data_flow", "element_id": args["element_id"]},
+        ),
+        propagate_errors=True,
+    )
+
+
 # Tools whose result is the answer service's envelope. It names records and
 # carries free text (element names, reasons, messages), so on the connector it
 # is fenced like every route tool's payload. Chat does not go through here.
-ANSWER_ENVELOPE_TOOLS = frozenset({"answer", "ask_impact"})
+ANSWER_ENVELOPE_TOOLS = frozenset({"answer", "ask_impact", "ask_data_flow"})
+
+
+_URL_KEYS = ("url", "link", "href")
+_OPEN_AT = re.compile(r"(open at )(/[^\s)\]\"']*)")
+
+
+def absolutise_connector_urls(result: Any, base: str) -> Any:
+    """Make every address the connector returns absolute, built from the public base URL.
+
+    A client outside the product (an assistant in another app) cannot open a path such as
+    /intelligence/answers/<id>. Only values under a url/link/href key, and the 'open at <path>'
+    phrase in a message, are changed: a name that happens to start with a slash is never touched.
+    """
+    base = (base or "").rstrip("/")
+    if not base:
+        return result
+
+    def fix(value):
+        if isinstance(value, str) and value.startswith("/") and not value.startswith("//"):
+            return base + value
+        return value
+
+    def walk(node):
+        if isinstance(node, dict):
+            for key, value in list(node.items()):
+                if isinstance(value, str):
+                    lowered = key.lower()
+                    if lowered in _URL_KEYS or lowered.endswith(("_url", "_link", "_href")):
+                        node[key] = fix(value)
+                    elif lowered == "message":
+                        node[key] = _OPEN_AT.sub(lambda m: m.group(1) + base + m.group(2), value)
+                else:
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(result)
+    return result
 
 
 def fence_connector_result(tool_name: str, result: Any) -> Any:
@@ -198,26 +263,59 @@ _CASE_TEXT_KEYS = ("title", "description", "problem_statement", "options_conside
                    "recommended_option", "expected_benefits", "key_risks")
 
 
+def _fence_canvas(canvas_data: dict) -> None:
+    """Neutralise every string a canvas carries that a person typed: its name, each box's title, guidance,
+    entries, prices and costs, and the text kept from before the canvas listed elements."""
+    _fence_keys(canvas_data, ("name", "description", "type_name"))
+    for box in canvas_data.get("boxes") or []:
+        _fence_keys(box, ("title", "guidance", "empty_reason"))
+        for entry in box.get("entries") or []:
+            _fence_keys(entry, ("name", "detail"))
+        for price in box.get("prices") or []:
+            _fence_keys(price, ("entry", "plan_name", "text"))
+        costs = box.get("costs")
+        if isinstance(costs, dict):
+            _fence_keys(costs, ("text",))
+            for line in costs.get("lines") or []:
+                _fence_keys(line, ("text",))
+    earlier = canvas_data.get("earlier_text")
+    if isinstance(earlier, dict):
+        _fence_keys(earlier, tuple(earlier))
+
+
+def _organisation_canvas_id(canvas_type: str) -> int | None:
+    """The id of the organisation's most recently updated Business Model Canvas, from the same list route."""
+    _status, listing = call_internal_api("GET", "/business-model/api/list", pass_session=True)
+    for canvas in (listing.get("data") or []) if isinstance(listing, dict) else []:
+        if canvas.get("canvas_type") == "business_model_canvas":
+            return canvas["id"]
+    return None
+
+
 def _get_canvas(args: dict) -> dict:
     canvas_type = str(args["canvas_type"])
-    canvas_id = int(args["canvas_id"])
+    canvas_id = args.get("canvas_id")
 
     if canvas_type == "business_model":
+        if canvas_id in (None, ""):
+            canvas_id = _organisation_canvas_id(canvas_type)
+        if canvas_id is None:
+            return {"success": False, "error": {"code": "NOT_FOUND", "message": "Business Model Canvas not found"}}
         status, data = call_internal_api(
-            "GET", f"/business-model/api/{canvas_id}", pass_session=True
+            "GET", f"/business-model/api/{int(canvas_id)}", pass_session=True
         )
         if status != 200 or not (isinstance(data, dict) and data.get("success")):
             return {"success": False, "error": {"code": "NOT_FOUND", "message": "Business Model Canvas not found"}}
         canvas_data = data["data"]
-        _fence_keys(canvas_data, ("name", "description"))
-        for block_key, block_content in (canvas_data.get("blocks") or {}).items():
-            if isinstance(block_content, str):
-                canvas_data["blocks"][block_key] = neutralize_fence_lookalikes(block_content)
+        _fence_canvas(canvas_data)
         return {"success": True, "data": canvas_data}
 
     if canvas_type == "business_case":
+        if canvas_id in (None, ""):
+            return {"success": False, "error": {"code": "INVALID_PARAMETER",
+                    "message": "canvas_id is required for a business_case"}}
         status, data = call_internal_api(
-            "GET", f"/business-case/api/{canvas_id}", pass_session=True
+            "GET", f"/business-case/api/{int(canvas_id)}", pass_session=True
         )
         if status != 200 or not (isinstance(data, dict) and data.get("success")):
             return {"success": False, "error": {"code": "NOT_FOUND", "message": "Business Case not found"}}
@@ -231,6 +329,7 @@ def _get_canvas(args: dict) -> dict:
 
 ROUTE_READ_HANDLERS: dict[str, Callable[[dict], dict]] = {
     "ask_impact": _impact_answer,
+    "ask_data_flow": _data_flow,
     "ask_strategy": _intelligence("strategy"),
     "ask_portfolio": _intelligence("portfolio"),
     "ask_programme": _intelligence("programme"),
@@ -285,6 +384,53 @@ def _is_connector_tool(schema: dict) -> bool:
     )
 
 
+# The route-rule pattern(s) (the wave map's own key format -- a `<name>`
+# placeholder collapses to a bare "<x>" inside entry_for, so the exact
+# parameter name here does not matter) that the wave map gates each tool
+# through. A tool is released only when every one of its rules is OPEN.
+#
+# Most tools call their rule directly (see ROUTE_READ_HANDLERS). ask_impact is
+# the one exception: _impact_answer stores its result at the canonical answer
+# service's own permanent address rather than calling a route of its own, so
+# that address -- not a route ask_impact never calls -- is what the wave map
+# actually gates for it.
+TOOL_ROUTE_PATHS: dict[str, tuple[str, ...]] = {
+    "list_canvases": ("/business-model/api/list", "/business-case/api/list"),
+    "get_canvas": ("/business-model/api/<x>", "/business-case/api/<x>"),
+    "get_element": ("/archimate/api/elements/<x>/detail",),
+    "search_elements": ("/archimate/api/elements/search",),
+    "ask_strategy": ("/api/v1/intelligence/strategy/<x>",),
+    "ask_portfolio": ("/api/v1/intelligence/portfolio/<x>",),
+    "ask_programme": ("/api/v1/intelligence/programme/<x>",),
+    "ask_risk": ("/api/v1/intelligence/risk/<x>",),
+    "ask_accountability": ("/api/v1/intelligence/accountability/<x>",),
+    "ask_impact": ("/intelligence/answers/<x>",),
+}
+
+
+def tool_released(tool_name: str) -> bool:
+    """True when every route the tool reads is open in the released waves (always true with the switch off).
+
+    Reads the wave map directly (``entry_for``/``state_for``), not
+    ``is_released_path``: that needs a live app's ``url_map`` to resolve a
+    concrete URL to a rule, which is more than this needs when the rule
+    pattern is already known, and it requires a request-bound app context
+    this function's callers (including plain unit tests) do not always have.
+    """
+    from app.release_waves import OPEN, configured_wave, entry_for, state_for
+
+    wave = configured_wave()
+    if wave is None:
+        return True
+    rules = TOOL_ROUTE_PATHS.get(CONNECTOR_ALIASES.get(tool_name, tool_name))
+    if not rules:
+        # No rule is recorded for this tool (a generic primitive like `answer`,
+        # or one with no page/API equivalent of its own): nothing in the wave
+        # map holds it back.
+        return True
+    return all(state_for(entry_for(rule), wave) == OPEN for rule in rules)
+
+
 def connector_tools() -> list[dict]:
     """The tools the connector publishes, in its wire format, sorted by name.
 
@@ -294,12 +440,18 @@ def connector_tools() -> list[dict]:
     """
     tools = []
     for schema in TOOL_SCHEMAS:
-        if _is_connector_tool(schema):
+        if _is_connector_tool(schema) and tool_released(schema["name"]):
             tools.append({
                 "name": schema["name"],
                 "description": schema["description"],
                 "inputSchema": schema["parameters"],
-                "annotations": {"readOnlyHint": True},
+                "annotations": {
+                    "title": schema["name"].replace("_", " ").capitalize(),
+                    "readOnlyHint": True,
+                    "destructiveHint": False,
+                    "idempotentHint": True,
+                    "openWorldHint": False,
+                },
             })
     for alias, target in CONNECTOR_ALIASES.items():
         for tool in list(tools):

@@ -72,7 +72,12 @@ def _owned_license_or_404(license_id):
 
 
 def _contract_form_context(contract, form):
+    from app.services.application_cost_accessor import get_reporting_currency
+    from config import CurrencyConfig
+
     return {
+        "currencies": CurrencyConfig.SUPPORTED_CURRENCIES,
+        "organisation_currency": get_reporting_currency(current_user.organization_id),
         "contract": contract,
         "form": form,
         "vendors": VendorOrganization.query.order_by(VendorOrganization.name).all(),
@@ -113,7 +118,13 @@ def _apply_contract_form(contract, form):
 
     contract.contract_value = _parse_number(form.get("contract_value"))
     contract.annual_cost = _parse_number(form.get("annual_cost"))
-    contract.currency = (form.get("currency") or "USD").strip()[:10]
+    from app.services.application_cost_accessor import get_reporting_currency
+    from config import CurrencyConfig
+
+    currency = (form.get("currency") or "").strip().upper()
+    if currency and not CurrencyConfig.is_supported(currency):
+        raise ValueError("Choose a currency from the list.")
+    contract.currency = currency or get_reporting_currency(contract.organization_id)
     contract.start_date = _parse_date(form.get("start_date"))
     contract.end_date = _parse_date(form.get("end_date"))
     contract.renewal_date = _parse_date(form.get("renewal_date"))

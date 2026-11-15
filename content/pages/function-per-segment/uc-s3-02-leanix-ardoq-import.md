@@ -1,4 +1,5 @@
 ---
+wave: EA
 page_family: function-per-segment
 use_case_id: UC-S3-02
 segment_id: S3

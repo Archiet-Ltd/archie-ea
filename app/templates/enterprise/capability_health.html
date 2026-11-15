@@ -1,18 +1,8 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 
-{% block title %}Capability Health{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Capability Health', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Capability Health{% endblock %}{% block content %}
 <div class="flex flex-col space-y-8 animate-in fade-in duration-500">
     {{ page_header(
         title='Capability Health Assessment',
@@ -29,17 +19,21 @@
                     {% if cap.strategic_importance == 'critical' %}bg-destructive/20 text-destructive-emphasis
                     {% elif cap.strategic_importance == 'high' %}bg-warning/20 text-warning-emphasis
                     {% else %}bg-muted text-muted-foreground{% endif %}">
-                    {{ cap.strategic_importance|default('Normal')|title }}
+                    {{ (cap.strategic_importance or "Not rated")|title }}
                 </span>
             </div>
             <p class="text-sm text-muted-foreground mb-4">{{ cap.description|default('No description', true)|truncate(100) }}</p>
             <div class="space-y-2">
                 <div class="flex justify-between text-sm">
-                    <span class="text-muted-foreground">Maturity</span>
-                    <span>{{ cap.current_maturity|default(0) }} / {{ cap.target_maturity|default(5) }}</span>
+                    <span class="text-muted-foreground">Current Maturity</span>
+                    <span>{{ cap.current_maturity_level if cap.current_maturity_level is not none else 'Not assessed' }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-muted-foreground">Target Maturity</span>
+                    <span>{{ cap.target_maturity_level if cap.target_maturity_level is not none else 'No target set' }}</span>
                 </div>
                 <div class="h-2 bg-secondary rounded-full overflow-hidden">
-                    <div class="h-full bg-primary" style="width: {{ (cap.current_maturity|default(0) / 5 * 100)|int }}%"></div>
+                    {% if cap.current_maturity_level is not none %}<div class="h-full bg-primary" style="width: {{ (cap.current_maturity_level / 5 * 100)|int }}%"></div>{% endif %}
                 </div>
             </div>
         </div>

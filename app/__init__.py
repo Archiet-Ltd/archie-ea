@@ -63,11 +63,13 @@ def create_app(config=None):
 
     Config[config_name].init_app(app)
 
+    # 0. The wave switch (RELEASE_WAVE): installed first so a page of a later release answers its
+    # early-access page before the CSRF check or any sign-in redirect.
+    from app.release_waves import install_hook
+    install_hook(app)
+
     # 1. Extensions (db, csrf, mail, login_manager, compress, migrate, rq, cache)
     init_extensions(app)
-
-    # 1a. Background scheduler (APScheduler for EA workflow schedules)
-    init_scheduler(app)
 
     # 1b. Multi-tenancy: tenant context (before_request) + query isolation (ORM events)
     from app.middleware.tenant_context import install_tenant_context
@@ -100,6 +102,14 @@ def create_app(config=None):
     from app.middleware.audit_middleware import install_audit_logging
     install_audit_logging(app)
 
+    # 1d-3. Activity record: page use and security events in the one audit store
+    from app._bootstrap.activity import install_activity_record
+    install_activity_record(app)
+
+    # 1d-4. Sign-up origin: utm_source, utm_campaign and ref are kept for the register step
+    from app.services.signup_attribution import install_signup_origin
+    install_signup_origin(app)
+
     # 1e. Server-side error aggregation: dedupes WARNING+ log records into
     # error_events (see app/_bootstrap/error_tracking.py) so silent
     # degradation shows up at /admin/errors instead of only in stdout.
@@ -118,8 +128,16 @@ def create_app(config=None):
     from app._bootstrap.session_policy import init_session_policy
     init_session_policy(app)
 
+    # 1h. Every person whose first week without two-factor has ended is sent to enrol.
+    from app._bootstrap.mfa_enrolment import init_mfa_enrolment
+    init_mfa_enrolment(app)
+
     # 2. Security headers, guardrails, batch config
     init_security(app)
+
+    # 2b. A role with no write permission cannot change anything through the API.
+    from app._bootstrap.write_access import init_write_access
+    init_write_access(app)
 
     # 3. Inline routes (health check, API auth endpoints)
     init_inline_routes(app, config_name)
@@ -129,6 +147,8 @@ def create_app(config=None):
 
     # 5. Asset pipeline (Flask-Assets)
     init_assets(app)
+    from app.basecoat_kit import init_basecoat
+    init_basecoat(app)
 
     # 6. Services (SSL, LLM validation, error handlers, template filters,
     #              job queue, audit, prometheus, LLM health check)
@@ -136,6 +156,10 @@ def create_app(config=None):
 
     # 7. All blueprints and feature-flagged modules
     init_blueprints(app)
+
+    # 7-0. The early-access pages a closed address answers (wave switch).
+    from app.release_waves import register_routes as register_early_access_routes
+    register_early_access_routes(app)
 
     # 7a. Solution AI Prompt admin (separate from admin_routes.py to survive deploys)
     try:
@@ -168,6 +192,16 @@ def create_app(config=None):
         reconcile_admin_password(app)
     except Exception as _adm_exc:  # noqa: BLE001 — never block boot
         app.logger.warning("admin password reconciliation skipped: %s", _adm_exc)
+
+    # 10b'. The background scheduler (APScheduler: EA workflow schedules, event-log relay, ...)
+    # starts only now. Its thread runs ORM queries, and a query iterates the session's listener
+    # lists; every listener the tenant filter, the models and the modules add to that session must
+    # already be in place, or a job firing during boot fails with "deque mutated during iteration".
+    init_scheduler(app)
+
+    # 10c. The background job worker begins last, when every model and screen is loaded.
+    from app._bootstrap.services import start_job_worker
+    start_job_worker(app, config_name)
 
     # 11. Global session teardown — prevent InFailedSqlTransaction cascading across requests
     @app.teardown_appcontext

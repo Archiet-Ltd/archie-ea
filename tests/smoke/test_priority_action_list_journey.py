@@ -19,6 +19,7 @@ from .fresh_org import create_fresh_org, sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 LIST_PAGES = ("/strategic/impact-analysis", "/enterprise/analysis/ai-architecture")
+ENTERPRISE_IMPACT_PAGE = "/enterprise/analysis/impact-analysis"
 
 
 def _seed(org_id, suffix):
@@ -62,7 +63,7 @@ def test_architect_works_from_the_prioritised_action_list(browser, live_server):
 
         expect(page.get_by_test_id("priority-actions-rule")).to_contain_text("Ranked by severity, critical first")
         expected = [
-            "Convert the %s to a work package" % names["gap"],
+            "Convert the gap \u201c%s\u201d to a work package" % names["gap"],
             "Finish %s: due %s, 58 percent done" % (
                 names["work"], (datetime.utcnow() - timedelta(days=10)).strftime("%-d %b")),
             "Reduce the risk: %s" % names["risk"],
@@ -74,8 +75,12 @@ def test_architect_works_from_the_prioritised_action_list(browser, live_server):
         page.wait_for_url(lambda url: "/implementation/gap-analysis" in url, timeout=PAGE_TIMEOUT)
         gap_row = page.locator("tr").filter(has_text=names["gap"]).first
         expect(gap_row).to_be_visible()
-        expect(gap_row.get_by_role("button", name="Convert this gap to a work package")).to_be_visible()
-        expect(gap_row.get_by_role("button", name="Convert this gap to a work package")).to_be_enabled()
+        # The row's actions menu carries the convert action (the rebuilt gap table keeps one menu per row).
+        gap_row.get_by_role("button", name="Actions for").click()
+        convert = page.get_by_role("menuitem", name="Convert to a work package")
+        expect(convert).to_be_visible()
+        expect(convert).to_be_enabled()
+        expect(convert).to_have_attribute("title", "Convert this gap to a work package")
 
         page.go_back(wait_until="domcontentloaded")
         page.get_by_test_id("priority-action-link").nth(2).click()
@@ -121,7 +126,8 @@ def test_a_list_cut_at_ten_has_a_link_to_all_of_it(browser, live_server):
         context.close()
 
 
-def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server):
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server, theme):
     """The row the list calls Critical is, on the page it opens, Critical and marked."""
     org = create_fresh_org("enterprise_architect")
     suffix = org["suffix"]
@@ -140,6 +146,7 @@ def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server
         db.session.remove()
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    context.add_init_script("try { localStorage.setItem('theme', '%s') } catch (e) {}" % theme)
     page = context.new_page()
     try:
         sign_in(page, live_server, org["emails"]["enterprise_architect"])
@@ -151,25 +158,37 @@ def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server
                           timeout=PAGE_TIMEOUT)
 
         landing = page.locator("#gap-%d" % critical_id)
+        assert page.evaluate("() => document.documentElement.classList.contains('dark')") == (theme == "dark")
         expect(landing).to_be_visible()
         expect(landing).to_contain_text("Critical")
         # The page's own summary agrees with the list: one critical gap.
-        summary = page.get_by_text("By the severity recorded on each gap").locator(
-            "xpath=ancestor::*[@data-slot='card'][1]")
-        expect(summary).to_contain_text(re.compile(r"Critical\s+1\b"))
+        summary = page.get_by_test_id("gap-stat-critical")
+        expect(summary).to_contain_text("Rated critical on severity or priority, all still open")
+        expect(summary).to_contain_text(re.compile(r"\b1\s+Critical\b"))
+        expect(page.get_by_test_id("gap-stat-critical-value")).to_have_text("1")
 
         # The landing row is the browser's target and is marked; the other row is not.
         assert page.evaluate("document.querySelector(':target') && document.querySelector(':target').id")             == "gap-%d" % critical_id
         shade = lambda sel: page.evaluate(  # noqa: E731
             "s => getComputedStyle(document.querySelector(s)).backgroundColor", sel)
         assert shade("#gap-%d" % critical_id) != shade("#gap-%d" % calm_id)
+        # ... and it is tinted away from the card colour itself, in this theme, not merely different from a row.
+        card = page.evaluate(
+            "() => { const e = document.createElement('div'); e.style.backgroundColor = 'hsl(var(--card))';"
+            " document.body.appendChild(e); const c = getComputedStyle(e).backgroundColor; e.remove(); return c; }")
+        assert shade("#gap-%d" % critical_id) != card
         # ... across the whole row, the pinned first and last cells included.
         for cell in ("td:first-child", "td:last-child"):
             assert shade("#gap-%d %s" % (critical_id, cell)) != shade("#gap-%d %s" % (calm_id, cell)), cell
+            assert shade("#gap-%d %s" % (critical_id, cell)) != card, cell
 
-        # No bare dashes: an empty Type or Work packages cell says why and what to do.
-        expect(landing.get_by_test_id("gap-type-unset")).to_contain_text("open the gap to classify it")
-        expect(landing.get_by_test_id("gap-no-work-package")).to_contain_text("Convert to Work Package")
+        # No bare dashes: a Type or Work package that is empty on every row is said once above the table,
+        # and the row's own menu offers the next step.
+        notice = page.locator("[data-slot='data-table-notice']").first
+        expect(notice).to_contain_text("no gap is classified yet")
+        expect(notice).to_contain_text("no gap has a work package yet")
+        landing.get_by_role("button", name="Actions for").click()
+        expect(page.get_by_role("menuitem", name="Convert to a work package")).to_be_visible()
         expect(landing.get_by_role("cell", name="—", exact=True)).to_have_count(0)
     finally:
         context.close()
@@ -262,7 +281,7 @@ def test_on_a_phone_the_landing_row_shows_its_severity(browser, live_server):
               const vw = document.documentElement.clientWidth;
               const out = [];
               for (const el of row.querySelectorAll('span, div')) {
-                if (el.children.length || el.textContent.trim() !== 'Critical') continue;
+                if ([...el.children].some(c => c.getAttribute('aria-hidden') !== 'true') || el.textContent.trim() !== 'Critical') continue;
                 const r = el.getBoundingClientRect();
                 if (!r.width || !r.height) continue;
                 const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
@@ -282,10 +301,136 @@ def test_on_a_phone_the_landing_row_shows_its_severity(browser, live_server):
 def test_in_dark_mode_the_critical_badge_is_readable(browser, live_server):
     context, page, gap_id = _landing_page(browser, live_server, 1440, "dark")
     try:
-        badge = page.locator("#gap-%d [data-testid='gap-severity-narrow'], #gap-%d td:nth-child(3) span"
+        badge = page.locator("#gap-%d [data-testid='gap-severity-narrow'], #gap-%d td[data-sort] [data-tone]"
                              % (gap_id, gap_id)).filter(has_text=re.compile("^\s*Critical\s*$")).last
         expect(badge).to_be_visible()
         ratio = badge.evaluate(_CONTRAST_JS)
         assert ratio >= 4.5, "Critical badge contrast in dark mode is %.2f:1" % ratio
+    finally:
+        context.close()
+
+
+def test_enterprise_impact_analysis_empty_org_shows_no_priority_actions(browser, live_server):
+    """A fresh organisation with no elements sees no prioritised-actions section on the enterprise Impact Analysis page."""
+    org = create_fresh_org("enterprise_architect")
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + ENTERPRISE_IMPACT_PAGE, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        # The empty model state is shown
+        expect(page.get_by_test_id("impact-first-steps")).to_be_visible()
+        expect(page.get_by_text("Nothing is modelled yet")).to_be_visible()
+
+        # The prioritised actions section is not rendered at all
+        expect(page.get_by_test_id("priority-actions")).to_have_count(0)
+        expect(page.get_by_test_id("priority-actions-empty")).to_have_count(0)
+    finally:
+        context.close()
+
+
+def test_enterprise_impact_analysis_populated_org_shows_priority_actions(browser, live_server):
+    """An organisation with gaps, work packages and risks sees the ranked list on the enterprise Impact Analysis page."""
+    org = create_fresh_org("enterprise_architect")
+    names = _seed(org["org_id"], org["suffix"])
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + ENTERPRISE_IMPACT_PAGE, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        # The prioritised actions section is rendered with the ranked list
+        expect(page.get_by_test_id("priority-actions")).to_be_visible()
+        expect(page.get_by_test_id("priority-actions-rule")).to_contain_text("Ranked by severity, critical first")
+        expected = [
+            "Convert the gap \u201c%s\u201d to a work package" % names["gap"],
+            "Finish %s: due %s, 58 percent done" % (
+                names["work"], (datetime.utcnow() - timedelta(days=10)).strftime("%-d %b")),
+            "Reduce the risk: %s" % names["risk"],
+        ]
+        assert _order(page) == expected
+    finally:
+        context.close()
+
+
+def test_phone_landing_from_scenarios_shows_priority_actions_in_view(browser, live_server):
+    """At 390 wide, following the 'ranked on Impact Analysis' link from Scenarios opens with the section in view."""
+    org = create_fresh_org("enterprise_architect")
+    names = _seed(org["org_id"], org["suffix"])
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 390, "height": 844},
+                                  color_scheme="dark")
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    context.add_init_script("localStorage.setItem('theme', 'dark');document.documentElement.classList.add('dark');")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        # Start from the Scenarios page which has the link
+        page.goto(live_server + "/simulations", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        link = page.get_by_test_id("priority-actions-link")
+        expect(link).to_be_visible()
+        link.click()
+        page.wait_for_url(lambda url: ENTERPRISE_IMPACT_PAGE in url and "#priority-actions" in url, timeout=PAGE_TIMEOUT)
+
+        # The priority-actions section should be in the viewport
+        section = page.get_by_test_id("priority-actions")
+        expect(section).to_be_visible()
+        box = section.bounding_box()
+        assert box is not None, "priority-actions section has no bounding box"
+        viewport_height = page.evaluate("() => window.innerHeight")
+        assert box["y"] < viewport_height, "priority-actions section top (%d) is below viewport height (%d)" % (box["y"], viewport_height)
+        assert box["y"] + box["height"] > 0, "priority-actions section is entirely above viewport"
+
+        # The list should have the expected rows
+        expect(page.get_by_test_id("priority-actions-rule")).to_contain_text("Ranked by severity, critical first")
+        expected = [
+            "Convert the gap \u201c%s\u201d to a work package" % names["gap"],
+            "Finish %s: due %s, 58 percent done" % (
+                names["work"], (datetime.utcnow() - timedelta(days=10)).strftime("%-d %b")),
+            "Reduce the risk: %s" % names["risk"],
+        ]
+        assert _order(page) == expected
+    finally:
+        context.close()
+
+
+def test_show_all_preserves_element_parameter(browser, live_server):
+    """Clicking 'Show all N actions' keeps the chosen ?element= parameter in the URL."""
+    org = create_fresh_org("enterprise_architect")
+    suffix = org["suffix"]
+    from app import create_app, db
+    from app.models.implementation_migration import Gap
+
+    app = create_app("testing")
+    with app.app_context():
+        for n in range(13):
+            db.session.add(Gap(name="Show-all gap %02d %s" % (n, suffix), severity="high",
+                               organization_id=org["org_id"]))
+        db.session.commit()
+        db.session.remove()
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        # Visit the enterprise impact analysis page with an element parameter
+        page.goto(live_server + ENTERPRISE_IMPACT_PAGE + "?element=42", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        # The page should show the prioritised actions (since org has gaps)
+        expect(page.get_by_test_id("priority-actions")).to_be_visible()
+        assert len(_order(page)) == 10
+
+        # Click "Show all 13 actions"
+        page.get_by_role("link", name="Show all 13 actions").click()
+        page.wait_for_url(lambda url: "all_actions=1" in url and "element=42" in url, timeout=PAGE_TIMEOUT)
+
+        # The URL should still have element=42
+        assert "element=42" in page.url, "element parameter was dropped: %s" % page.url
+        assert "all_actions=1" in page.url, "all_actions parameter missing: %s" % page.url
+
+        # All 13 actions should be shown
+        assert len(_order(page)) == 13
     finally:
         context.close()

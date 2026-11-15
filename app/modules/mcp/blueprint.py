@@ -45,12 +45,15 @@ from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user
 
 from app.extensions import csrf
+from app.services.origin import canonical_origin
 from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
 from app.modules.ai_chat.tools.route_read_tools import (
     connector_tools,
+    absolutise_connector_urls,
     fence_connector_result,
     resolve_connector_tool,
     scrub_credentials,
+    tool_released,
 )
 from app.modules.oauth_provider.scopes import MCP_READ_SCOPE
 
@@ -228,6 +231,12 @@ def mcp_endpoint():
             return jsonify(_jsonrpc_error(req_id, JSONRPC_METHOD_NOT_FOUND,
                                           f"Tool not found: {tool_name}")), 404
 
+        if not tool_released(catalogue_name):
+            return jsonify(_jsonrpc_error(
+                req_id, JSONRPC_METHOD_NOT_FOUND,
+                f"{tool_name} is not available yet. It is in early access.",
+            )), 404
+
         # Authenticated via Bearer token by the request_loader in
         # app.modules.oauth_provider.identity, resolved the first time
         # current_user was touched (the tenant-context before_request hook).
@@ -281,6 +290,8 @@ def mcp_endpoint():
                     propagate_errors=True,
                 )
             ))
+            # Addresses leave the product, so they are absolute (canonical origin).
+            result = absolutise_connector_urls(result, canonical_origin())
             elapsed_ms = int((time.monotonic() - start) * 1000)
 
             logger.info(

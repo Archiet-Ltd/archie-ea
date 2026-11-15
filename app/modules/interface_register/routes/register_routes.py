@@ -21,6 +21,7 @@ from flask_login import login_required
 from app.models.application_portfolio import ApplicationComponent
 from app.modules.interface_register.services import interface_register_service as service
 from app.utils.role_access import can_access_section
+from app.utils.plain_errors import render_plain_error
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def _guard():
     from flask_login import current_user
 
     if not can_access_section(current_user, "data_integration"):
-        return render_template("errors/403.html"), 403
+        return render_plain_error(403)
     return None
 
 
@@ -101,7 +102,7 @@ def index():
     try:
         initiative = service.resolve_initiative(initiative_id, g.current_org_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     rows = service.list_interfaces(initiative_id, g.current_org_id)
     return render_template(
@@ -127,7 +128,7 @@ def new():
     try:
         initiative = service.resolve_initiative(initiative_id, g.current_org_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     return render_template(
         "interface_register/form.html",
@@ -157,7 +158,7 @@ def create():
     try:
         initiative = service.resolve_initiative(initiative_id, g.current_org_id)
     except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     try:
         element = service.create_interface(initiative_id, request.form, g.current_org_id)
@@ -188,7 +189,7 @@ def edit(element_id):
 
     record = service.get_interface(element_id, g.current_org_id)
     if record is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     element = record["element"]
     props = element.custom_properties or {}
@@ -228,7 +229,7 @@ def update(element_id):
 
     record = service.get_interface(element_id, g.current_org_id)
     if record is None:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404)
 
     props = record["element"].custom_properties or {}
     initiative_id = props.get("initiative_id")

@@ -19,6 +19,7 @@ from sqlalchemy import Column, Date, DateTime, Float, ForeignKey, Index, Integer
 from sqlalchemy.orm import attributes, relationship
 
 from .. import db
+from .mixins.core import TenantMixin
 
 _state_logger = logging.getLogger(__name__ + ".state_machine")
 
@@ -41,7 +42,7 @@ _OPPORTUNITY_TRANSITIONS = {
 }
 
 
-class ConsolidationCandidate(db.Model):
+class ConsolidationCandidate(TenantMixin, db.Model):
     """
     Consolidation Candidate Model
 
@@ -142,7 +143,7 @@ class ConsolidationCandidate(db.Model):
         }
 
 
-class ConsolidationOpportunity(db.Model):
+class ConsolidationOpportunity(TenantMixin, db.Model):
     """
     Consolidation Opportunity Model
 
@@ -301,7 +302,7 @@ class ConsolidationOpportunity(db.Model):
         }
 
 
-class SavingsRealization(db.Model):
+class SavingsRealization(TenantMixin, db.Model):
     """
     Savings Realization Model
 

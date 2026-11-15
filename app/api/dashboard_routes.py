@@ -11,7 +11,7 @@ Phase 2c: Updated to support BusinessCapability fallback for heatmap profiling (
 import logging
 
 from werkzeug.exceptions import HTTPException
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.decorators import audit_log
@@ -98,6 +98,8 @@ def rationalization_dashboard():
     except Exception:
         currency_symbol = "£"
 
+    from app.utils.recorded_figures import sum_recorded
+
     try:
         service = UnifiedDuplicateDetectionService()
         total_apps = ApplicationComponent.query.count()
@@ -109,7 +111,8 @@ def rationalization_dashboard():
         resolved_groups = len(
             [g for g in groups if g.get("status") in ["resolved", "approved"]]
         )
-        estimated_savings = sum(g.get("estimated_savings", 0) for g in groups)
+        # A group whose saving was never estimated carries the column default 0.0: no figure, not a nil.
+        estimated_savings = sum_recorded(g.get("estimated_savings") or None for g in groups)
 
         stats = {
             "total_applications": total_apps,
@@ -139,12 +142,24 @@ def rationalization_dashboard():
         except Exception:
             stats["roadmap_count"] = 0
 
+        # The one cost rule decides; the page prints what it is given.
+        from flask_login import current_user
+
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        costs_withheld = not costs_visible(current_user)
+        if costs_withheld:
+            stats = withhold_costs(stats)
+            groups = withhold_costs(groups)
+
         return render_template(
             "applications/rationalization.html",
             stats=stats,
             groups=groups,
             runs=runs[:10] if runs else [],
             currency_symbol=currency_symbol,
+            costs_withheld=costs_withheld,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception as e:
         from app import db
@@ -292,7 +307,9 @@ def calculate_portfolio_scores():
         # get_json(silent=True) returns None instead of raising.
         payload = request.get_json(silent=True) or {}
         force_recalc = bool(payload.get("force_recalculate", False))
-        results = RationalizationScoringService.calculate_portfolio_scores(force_recalc)
+        results = RationalizationScoringService.calculate_portfolio_scores(
+            getattr(g, "current_org_id", None), force_recalc
+        )
         # Add flat keys expected by scorecard JS (updateMetrics function)
         avg = results.get("average_scores", {})
         results["total_scored"] = results.get("processed", 0)
@@ -496,7 +513,9 @@ def get_blast_radius(app_id):
         if "error" in blast_radius:
             return jsonify({"success": False, "error": blast_radius["error"]}), 404
 
-        return jsonify({"success": True, "data": blast_radius})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"success": True, "data": blast_radius}))
     except Exception as e:
         logger.error(
             f"Error calculating blast radius for app {app_id}: {e}", exc_info=True
@@ -716,6 +735,18 @@ def submit_rationalization_assessment():
 def get_tco_cost_tiers():
     """Get TCO cost range tiers for executive reporting."""
     try:
+        # The tiers are bands of what applications cost, so a person the one cost rule withholds from gets none.
+        from flask_login import current_user
+
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        if not costs_visible(current_user):
+            return jsonify({
+                "success": True,
+                "data": [],
+                "summary": withhold_costs({"total_tco": None}),
+                "costs_withheld_sentence": COSTS_WITHHELD,
+            })
         from app.models import ApplicationComponent
         from app import db
         from sqlalchemy import func, case

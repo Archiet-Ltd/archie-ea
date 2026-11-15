@@ -1,4 +1,5 @@
 ---
+wave: 3
 page_family: function-per-segment
 use_case_id: UC-S1-01
 segment_id: S1
@@ -27,7 +28,7 @@ Every block on your Business Model Canvas linked directly to what you actually r
 applications, roles, vendors — so you can ask what breaks or what's at risk straight from a canvas
 box, instead of translating it into the model by hand first.
 
-Coming in an upcoming release. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

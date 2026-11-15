@@ -1,0 +1,193 @@
+"""A startup CTO loads the sample company and reads a cited, complete first answer.
+
+As the architect of a fresh workspace: loads the sample company and reads a toast
+count that equals the card; opens the capability map and the capabilities list and
+finds the five capabilities the model holds; asks in the chat what breaks if the payments
+service fails and reads, on every connection, where it came from and (where the
+model records one) its health, with each owner named once and no prompt to work
+the indirect connections out; when an answer fails, presses Retry and gets it;
+opens the removal dialog and closes it by its name.
+"""
+import json
+import os
+import re
+
+import pytest
+from playwright.sync_api import expect
+
+from .conftest import PAGE_TIMEOUT
+from .test_try_sample_company_journey import _empty_organisation_user, _login
+
+pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+WALK = os.environ.get("SAMPLE_WALK_DIR")
+FIVE = ["Process online payments", "Track customer orders", "Sell to customers online",
+        "Manage stock", "Run customer support"]
+
+
+# The one sentence every chat failure reads, with Retry beside it.
+FAILED_ANSWER = "The assistant could not answer just now. Your question is saved; try again in a moment."
+
+
+def _shot(page, name, width):
+    if WALK:
+        page.screenshot(path=os.path.join(WALK, "%s-%d.png" % (name, width)), full_page=True)
+
+
+def _load_sample(page, base):
+    """Press the sample company's button where the first screen offers it, and wait for the sample bar."""
+    page.goto(base + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.get_by_test_id("chat-first-sample").click()
+    expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+
+
+def _ask_payments(page, base):
+    """Ask in the chat, where every question is asked."""
+    page.goto(base + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.locator("#user-input").fill("What breaks if Payments service fails")
+    page.locator("#user-input").press("Enter")
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_first_answer_is_cited_and_the_figures_agree(browser, live_server, seeded, width):
+    email, org_id = _empty_organisation_user(live_server)
+    context = browser.new_context(viewport={"width": width, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+        _login(page, live_server, email)
+        _load_sample(page, live_server)
+
+        # The toast counts what the card counts: the Overview's "Facts with a source" card counts the elements.
+        card = re.search(r"\b(\d+) elements", page.get_by_test_id("sourced-sentence").inner_text()).group(1)
+        toast = page.get_by_text(re.compile(r"Sample company loaded: \d+ elements created")).first
+        assert re.search(r"(\d+) elements", toast.inner_text()).group(1) == card
+        _shot(page, "loaded", width)
+
+        # The capability map and the list count the five capabilities.
+        page.goto(live_server + "/capability-map/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("capability-total")).to_have_text("5 capabilities", timeout=PAGE_TIMEOUT)
+        _shot(page, "capability-map", width)
+        page.goto(live_server + "/enterprise/capability-map/capabilities", wait_until="domcontentloaded",
+                  timeout=PAGE_TIMEOUT)
+        for name in FIVE:
+            expect(page.get_by_text(name, exact=True).first).to_be_attached()
+        expect(page.get_by_text("No capabilities yet")).to_have_count(0)
+
+        # The first answer: every connection cites its source; nothing asks to be worked out.
+        _ask_payments(page, live_server)
+        answer = page.get_by_test_id("estate-answer")
+        expect(answer).to_be_visible(timeout=PAGE_TIMEOUT)
+        rows = answer.locator("[data-answer-row]")
+        assert rows.count() >= 10
+        cards = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]"))
+        for i in range(cards.count()):
+            source = cards.nth(i).locator("[data-citation]").inner_text()
+            # the file's own links read "Imported from Sample company"; the links the load adds are of kind
+            # "sample" and read "Sample data"
+            assert "Sample company" in source or source.strip() == "Sample data" or "Worked out from the model" in source, source
+        _shot(page, "first-answer", width)
+
+        # An application shows its health and its owner once; a capability its computed health.
+        web = cards.filter(has_text="Customer web app").first
+        assert web.get_by_label(re.compile(r"^Health: ")).get_attribute("aria-label") == "Health: Healthy"
+        owner = web.get_by_label(re.compile(r"^Owner: ")).get_attribute("aria-label")
+        # the sample's owners are plain names labelled as the sample's, never a person's account
+        assert owner == "Owner: Sam (sample owner)", owner
+        capability = cards.filter(has_text="Process online payments").first
+        assert re.match(r"Health: (Healthy|Warning|Critical)$",
+                        capability.get_by_label(re.compile(r"^Health: ")).get_attribute("aria-label"))
+    finally:
+        context.close()
+
+
+def test_a_failed_answer_offers_try_again(browser, live_server, seeded):
+    """The AI's own answer request fails: the person reads the plain sentence, presses Retry and gets an answer."""
+    email, org_id = _empty_organisation_user(live_server)
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+        _login(page, live_server, email)
+        _load_sample(page, live_server)
+
+        failures = {"left": 1}
+        asked = []
+        reply = "Payments service connects to the Order database and the Customer web app."
+
+        def ai_answer(route):
+            asked.append(route.request.url)
+            if failures["left"]:
+                failures["left"] -= 1
+                route.abort()
+                return
+            body = "".join("data: %s\n\n" % json.dumps(e) for e in (
+                {"type": "token", "text": reply},
+                {"type": "done", "response": reply, "sources": [], "actions_taken": [], "pending_approvals": []}))
+            route.fulfill(status=200, content_type="text/event-stream", body=body)
+
+        # The records lookup is left to answer on its own here; only the AI's answer request is refused.
+        page.route(re.compile(r"/ai-chat/message/stream"), ai_answer)
+        page.route(re.compile(r"/ai-chat/message$"), lambda route: route.abort())
+        page.route(re.compile(r"/ai-chat/estate-answer"), lambda route: route.abort())
+        _ask_payments(page, live_server)
+        expect(page.get_by_text(FAILED_ANSWER).first).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.get_by_role("button", name="Retry").click()
+        expect(page.locator("#messages-container .message-content", has_text=reply).last).to_be_visible(
+            timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text(FAILED_ANSWER)).to_have_count(0)
+    finally:
+        context.close()
+
+
+def test_an_aborted_records_lookup_still_sends_the_question_to_the_ai(browser, live_server, seeded):
+    email, org_id = _empty_organisation_user(live_server)
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+        _login(page, live_server, email)
+        _load_sample(page, live_server)
+
+        asked = []
+        reply = "Payments service connects to the Order database."
+
+        def ai_answer(route):
+            asked.append(json.loads(route.request.post_data)["message"])
+            body = "".join("data: %s\n\n" % json.dumps(e) for e in (
+                {"type": "token", "text": reply},
+                {"type": "done", "response": reply, "sources": [], "actions_taken": [], "pending_approvals": []}))
+            route.fulfill(status=200, content_type="text/event-stream", body=body)
+
+        page.route(re.compile(r"/ai-chat/estate-answer"), lambda route: route.abort())
+        page.route(re.compile(r"/ai-chat/message/stream"), ai_answer)
+        _ask_payments(page, live_server)
+        expect(page.locator("#messages-container .message-content", has_text=reply).last).to_be_visible(
+            timeout=PAGE_TIMEOUT)
+        assert asked == ["What breaks if Payments service fails"], asked
+        expect(page.get_by_text(FAILED_ANSWER)).to_have_count(0)
+    finally:
+        context.close()
+
+
+def test_the_removal_dialog_closes_by_its_name(browser, live_server, seeded):
+    email, org_id = _empty_organisation_user(live_server)
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+        _login(page, live_server, email)
+        _load_sample(page, live_server)
+        page.get_by_role("button", name="Remove it", exact=True).first.click()
+        dialog = page.get_by_test_id("sample-company-indicator").get_by_role("dialog")
+        expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
+        _shot(page, "dialog", 1440)
+        dialog.get_by_role("button", name="Close").click()
+        expect(dialog).to_be_hidden()
+        expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible()
+    finally:
+        context.close()

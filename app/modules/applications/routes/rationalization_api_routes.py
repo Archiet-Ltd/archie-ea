@@ -5,23 +5,28 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 
-from flask import current_app, jsonify, render_template, render_template_string, request
+from flask import current_app, flash, g, jsonify, redirect, render_template, render_template_string, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import audit_log, require_roles
 from app.middleware.tenant_decorators import platform_admin_required
 from app.models.application_portfolio import ApplicationComponent
+from app.core.auth.decorators import require_permission
 from app.services.application_cost_accessor import set_annual_cost
+from app.services.cost_visibility import (
+    COSTS_WITHHELD, ROLLUP_FIGURE_KEYS, costs_visible, withhold_costs, withhold_evidence_trail, withhold_reply,
+)
+from ._helpers import _verify_app_in_org
 from app.services.rate_limiter import rate_limit
 
 from . import unified_applications_bp
 from app.utils.pagination import safe_int_arg
+from app.utils.recorded_figures import as_figure, recorded_sum, sum_recorded
 from app.utils.route_guards import require_entity, require_entity_in_active_org
 from app.utils.tenant_users import escape_like_literal
 
 logger = logging.getLogger(__name__)
-
 
 # ── RAT-114: Audit trail helper ──────────────────────────────────────────
 
@@ -122,6 +127,29 @@ def _auto_create_consolidation_for_app(app_id, score, actor_name):
 # ── Rationalization dashboard & duplicate detection ──────────────────────
 
 
+def _counted_application_ids():
+    """The applications the portfolio counts: the one rule the dashboard, its summary and the workbench share."""
+    from flask import g
+
+    from app.modules.dashboard.services.overview_figures import _active_applications
+
+    active = _active_applications()
+    org_id = getattr(g, "current_org_id", None)
+    if org_id:
+        active = active.where(ApplicationComponent.organization_id == org_id)
+    return active.with_only_columns(ApplicationComponent.id)
+
+
+def _scored_among_counted_applications():
+    """The condition that keeps a score only when its application is one the portfolio counts.
+
+    A score kept on a decommissioned or merged-away record is not one of the applications the page
+    totals, so every figure on the dashboard and its summary uses this one condition and they agree."""
+    from app.models.application_rationalization import ApplicationRationalizationScore
+
+    return ApplicationRationalizationScore.application_component_id.in_(_counted_application_ids())
+
+
 @unified_applications_bp.route("/rationalization")
 @login_required
 def rationalization_dashboard():
@@ -159,7 +187,7 @@ def rationalization_dashboard():
         resolved_groups = len(
             [g for g in groups if g.get("status") in ["resolved", "approved"]]
         )
-        estimated_savings = sum(g.get("estimated_savings", 0) for g in groups)
+        estimated_savings = sum_recorded(g.get("estimated_savings") for g in groups)
 
         # RATA-005: Get latest detection run for metadata display
         from app.models.unified_duplicate_detection import UnifiedDetectionRun
@@ -170,11 +198,33 @@ def rationalization_dashboard():
         # Pipeline counts for workflow stepper
         from sqlalchemy import func, or_
 
+        # The application count is the Overview's: not decommissioned, not a
+        # merged-away duplicate. One query, imported, so the two pages agree.
+        from flask import g
+        from app.modules.dashboard.services.overview_figures import _active_applications
+
+        org_id = getattr(g, "current_org_id", None)
+        active_q = _active_applications()
+        if org_id:
+            active_q = active_q.where(ApplicationComponent.organization_id == org_id)
+        total_apps = db.session.execute(
+            db.select(func.count()).select_from(active_q.with_only_columns(ApplicationComponent.id).subquery())
+        ).scalar_one()
+        decommissioned_q = ApplicationComponent.query.filter(
+            func.lower(ApplicationComponent.lifecycle_status) == "5. decommissioned"
+        )
+        if org_id:
+            decommissioned_q = decommissioned_q.filter(ApplicationComponent.organization_id == org_id)
+        decommissioned_count = decommissioned_q.count()
+
         from app.models.consolidation_list import ConsolidationListEntry
         from app.models.application_rationalization import ApplicationRationalizationScore
 
         consolidation_count = ConsolidationListEntry.query.count()
-        time_scored_count = ApplicationRationalizationScore.query.count()
+        # Scored out of the same applications the total counts: a score kept on a decommissioned
+        # or merged-away record is not one of them, so it cannot make "21 of 20".
+        scored_in_total = _scored_among_counted_applications()
+        time_scored_count = ApplicationRationalizationScore.query.filter(scored_in_total).count()
         roadmap_count = ConsolidationListEntry.query.filter(
             or_(
                 ConsolidationListEntry.recommended_action == "add_to_roadmap",
@@ -182,14 +232,16 @@ def rationalization_dashboard():
             )
         ).count()
 
-        # Combine duplicate group savings + consolidation list savings
+        # Combine duplicate group savings + consolidation list savings. When neither
+        # carries a cost the total is None, so the page explains it instead of showing 0.
         consolidation_savings = db.session.query(
-            func.coalesce(func.sum(ConsolidationListEntry.estimated_savings), 0)
-        ).scalar() or 0
-        total_savings = estimated_savings + float(consolidation_savings)
+            func.sum(ConsolidationListEntry.estimated_savings)
+        ).scalar()
+        total_savings = recorded_sum(estimated_savings, consolidation_savings)
 
         stats = {
             "total_applications": total_apps,
+            "decommissioned_applications": decommissioned_count,
             "duplicate_groups": total_groups,
             "total_groups": total_groups,
             "pending_groups": pending_groups,
@@ -227,8 +279,15 @@ def rationalization_dashboard():
 
         # Count insufficient_evidence dispositions
         insufficient_count = ApplicationRationalizationScore.query.filter(
-            ApplicationRationalizationScore.disposition_action == "insufficient_evidence"
+            ApplicationRationalizationScore.disposition_action == "insufficient_evidence",
+            scored_in_total,
         ).count() if time_scored_count > 0 else 0
+
+        # The one cost rule decides; the page prints what it is given.
+        costs_withheld = not costs_visible(current_user)
+        if costs_withheld:
+            stats = withhold_costs(stats)
+            groups = withhold_costs(groups)
 
         return render_template(
             "applications/rationalization/dashboard.html",
@@ -240,6 +299,8 @@ def rationalization_dashboard():
             active_tab="dashboard",
             data_quality=data_quality,
             insufficient_count=insufficient_count,
+            costs_withheld=costs_withheld,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception as e:
         current_app.logger.exception("Error loading rationalization dashboard: %s", e)
@@ -366,17 +427,51 @@ def rationalization_tracking():
         current_app.logger.error(f"Error loading tracking financials: {e}")
         financial = {"projected": 0, "actual": 0}
 
+    costs_withheld = not costs_visible(current_user)
+    if costs_withheld:
+        financial = withhold_costs(financial, keys=ROLLUP_FIGURE_KEYS)
+
     return render_template(
         "applications/rationalization/tracking.html",
         currency_symbol=currency_symbol,
         active_tab="tracking",
         financial_summary=financial,
+        costs_withheld=costs_withheld,
+        costs_withheld_sentence=COSTS_WITHHELD,
     )
+
+
+def _disposition_labels():
+    """The model's label for each disposition code: the one map every screen reads."""
+    from app.models.application_rationalization import DispositionAction
+
+    return {action.value: action.label for action in DispositionAction}
+
+
+def _architect_or_platform_admin(view):
+    """Architect role check (require_roles) for members; a platform admin passes."""
+    from functools import wraps
+
+    from app.middleware.tenant_decorators import is_platform_admin
+
+    architect_only = require_roles("architect")(view)
+
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if is_platform_admin(current_user):
+            return view(*args, **kwargs)
+        return architect_only(*args, **kwargs)
+
+    return wrapper
 
 
 @unified_applications_bp.route("/rationalization/api/run-detection", methods=["POST"])
 @login_required
-@platform_admin_required
+# The Architect role check, and no wider: an organisation Administrator who is
+# not an Architect is refused (hotfix 440 keeps duplicate detection off org
+# admins), a platform admin keeps access, and a member without the role cannot
+# start a scoring run.
+@_architect_or_platform_admin
 @rate_limit(3, "1h")
 @audit_log("rationalization_run_detection")
 def rationalization_run_detection():
@@ -385,28 +480,44 @@ def rationalization_run_detection():
         UnifiedDuplicateDetectionService,
     )
 
+    from_page = bool(request.form.get("from_dashboard"))
+
+    def _reply(payload, status=200):
+        if not from_page:
+            return jsonify(payload), status
+        if payload.get("success"):
+            flash("Detection finished. New duplicate groups are listed below.", "success")
+        else:
+            flash(payload.get("error") or "Detection could not be run. Try again.", "error")
+        return redirect(url_for("unified_applications.rationalization_dashboard"))
+
     try:
-        data = request.get_json() or {}
+        data = request.form if from_page else (request.get_json() or {})
         strategy = data.get("strategy", "hybrid")
         threshold = data.get("similarity_threshold", 0.55)
+        if from_page:
+            try:
+                threshold = float(threshold)
+            except (TypeError, ValueError):
+                threshold = -1.0
 
         if strategy not in ["fast", "hybrid", "enhanced"]:
-            return jsonify({"success": False, "error": "Invalid strategy"}), 400
+            return _reply({"success": False, "error": "Invalid strategy"}, 400)
 
         if not (0.0 <= threshold <= 1.0):
-            return jsonify(
-                {"success": False, "error": "Threshold must be between 0 and 1"}
-            ), 400
+            return _reply({"success": False, "error": "Threshold must be between 0 and 1"}, 400)
 
         service = UnifiedDuplicateDetectionService()
         result = service.run_detection(
             similarity_threshold=threshold, strategy=strategy
         )
+        if not costs_visible(current_user):
+            result = withhold_costs(result)
 
-        return jsonify(result)
+        return _reply(result)
     except Exception as e:
         current_app.logger.error(f"Detection error: {e}")
-        return jsonify({"success": False, "error": "An internal error occurred"}), 500
+        return _reply({"success": False, "error": "An internal error occurred"}, 500)
 
 
 @unified_applications_bp.route("/rationalization/api/groups")
@@ -420,7 +531,10 @@ def rationalization_get_groups():
     try:
         service = UnifiedDuplicateDetectionService()
         groups = service.get_duplicate_groups("simple", include_applications=True)
-        return jsonify({"success": True, "groups": groups})
+        reply = {"success": True, "groups": groups}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as e:
         current_app.logger.error(f"Error getting groups: {e}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -1095,14 +1209,16 @@ def rationalization_dependency_impact(app_id):
         )
 
         return jsonify(
-            {
-                "success": True,
-                "app_id": app_id,
-                "app_name": app_obj.name,
-                "blockers": blockers,
-                "blast_radius": blast_radius,
-                "retirement_safe": retirement_safe,
-            }
+            withhold_reply(
+                {
+                    "success": True,
+                    "app_id": app_id,
+                    "app_name": app_obj.name,
+                    "blockers": blockers,
+                    "blast_radius": blast_radius,
+                    "retirement_safe": retirement_safe,
+                }
+            )
         )
     except Exception as e:
         current_app.logger.error(
@@ -1418,7 +1534,10 @@ def rationalization_evidence_trail(app_id):
         if "error" in result:
             return jsonify({"success": False, "error": result["error"]}), 500
 
-        return jsonify({"success": True, **result})
+        reply = {"success": True, **result}
+        if not costs_visible(current_user):
+            reply = withhold_evidence_trail(reply)
+        return jsonify(reply)
 
     except Exception as e:
         current_app.logger.error(
@@ -2025,6 +2144,9 @@ def rationalization_portfolio_workbench():
                 .join(ApplicationComponent, ApplicationRationalizationScore.application_component_id == ApplicationComponent.id)
             )
 
+        # Only the applications the dashboard counts, so its Scored card and this list agree.
+        query = query.filter(ApplicationComponent.id.in_(_counted_application_ids()))
+
         # Apply filters (score-dependent filters only apply when not include_unscored or score exists)
         if not include_unscored:
             if readiness == "ready":
@@ -2071,7 +2193,7 @@ def rationalization_portfolio_workbench():
         rows = query.offset((page - 1) * per_page).limit(per_page).all()
 
         # Build facets from the unfiltered base — always reflect global counts
-        base_q = db.session.query(ApplicationRationalizationScore)
+        base_q = db.session.query(ApplicationRationalizationScore).filter(_scored_among_counted_applications())
 
         disp_counts = dict(
             base_q.with_entities(
@@ -2139,7 +2261,10 @@ def rationalization_portfolio_workbench():
             db.session.query(
                 ApplicationComponent.lifecycle_status,
                 func.count(ApplicationComponent.id),
-            ).filter(ApplicationComponent.lifecycle_status.isnot(None))
+            ).filter(
+                ApplicationComponent.lifecycle_status.isnot(None),
+                ApplicationComponent.id.in_(_counted_application_ids()),
+            )
             .group_by(ApplicationComponent.lifecycle_status).all()
         )
 
@@ -2157,6 +2282,7 @@ def rationalization_portfolio_workbench():
                 "review_statuses": {k: v for k, v in status_counts.items() if k},
                 "lifecycle_statuses": {k: v for k, v in lifecycle_counts.items() if k},
             },
+            "disposition_labels": _disposition_labels(),
         })
     except Exception as exc:
         current_app.logger.error(f"Error in portfolio workbench: {exc}", exc_info=True)
@@ -2735,6 +2861,7 @@ def rationalization_decision_dossier(app_id):
             "action_rationale": score.action_rationale,
             "overall_health_score": score.overall_health_score,
             "priority": score.priority,
+            "disposition_label": _disposition_labels().get(score.disposition_action),
         }
 
         # Score dimensions
@@ -2813,6 +2940,12 @@ def rationalization_decision_dossier(app_id):
                 float(score.total_cost_of_ownership) if score.total_cost_of_ownership else None
             ),
         }
+        # The one cost rule decides here; the panel only prints what it is given.
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
+
+        if not costs_visible(current_user):
+            dossier["financial"] = withhold_costs(dossier["financial"], keys=tuple(dossier["financial"]))
+            dossier["costs_withheld_sentence"] = COSTS_WITHHELD
 
         return jsonify({"success": True, **dossier})
     except Exception as exc:
@@ -3312,7 +3445,7 @@ def rationalization_get_benefits(app_id):
         ).first()
         if not tracker:
             return jsonify({"success": True, "has_tracking": False})
-        return jsonify(
+        reply = (
             {
                 "success": True,
                 "has_tracking": True,
@@ -3345,6 +3478,9 @@ def rationalization_get_benefits(app_id):
                 },
             }
         )
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as exc:
         current_app.logger.error(
             "Error fetching benefits for app %d: %s", app_id, exc, exc_info=True
@@ -3458,7 +3594,7 @@ def rationalization_model_metadata():
 
     try:
         metadata = RationalizationScoringService.get_model_metadata()
-        return jsonify({"success": True, **metadata})
+        return jsonify(withhold_reply({"success": True, **metadata}))
     except Exception as exc:
         current_app.logger.error(f"Error fetching model metadata: {exc}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -3482,17 +3618,20 @@ def rationalization_calibration_report():
 @login_required
 def rationalization_executive_summary():
     """RAT-122: Portfolio-level executive summary for rationalization posture."""
-    from app.models.application_rationalization import ApplicationRationalizationScore
+    from app.models.application_rationalization import (
+        ApplicationRationalizationScore,
+    )
     from sqlalchemy import func
 
     try:
+        counted = _scored_among_counted_applications()
         # Portfolio disposition distribution
         disposition_dist = dict(
             db.session.query(
                 ApplicationRationalizationScore.disposition_action,
                 func.count(ApplicationRationalizationScore.id),
             ).filter(
-                ApplicationRationalizationScore.disposition_action.isnot(None)
+                ApplicationRationalizationScore.disposition_action.isnot(None), counted
             ).group_by(ApplicationRationalizationScore.disposition_action).all()
         )
 
@@ -3501,25 +3640,28 @@ def rationalization_executive_summary():
             db.session.query(
                 ApplicationRationalizationScore.rationalization_action,
                 func.count(ApplicationRationalizationScore.id),
-            ).group_by(ApplicationRationalizationScore.rationalization_action).all()
+            ).filter(counted).group_by(ApplicationRationalizationScore.rationalization_action).all()
         )
 
         # Score distribution (health score buckets: 0-25, 26-50, 51-75, 76-100)
-        total_scored = ApplicationRationalizationScore.query.count()
+        total_scored = ApplicationRationalizationScore.query.filter(counted).count()
         score_buckets = {
             "critical_0_25": ApplicationRationalizationScore.query.filter(
-                ApplicationRationalizationScore.overall_health_score <= 25
+                ApplicationRationalizationScore.overall_health_score <= 25, counted
             ).count(),
             "poor_26_50": ApplicationRationalizationScore.query.filter(
                 ApplicationRationalizationScore.overall_health_score > 25,
                 ApplicationRationalizationScore.overall_health_score <= 50,
+                counted,
             ).count(),
             "fair_51_75": ApplicationRationalizationScore.query.filter(
                 ApplicationRationalizationScore.overall_health_score > 50,
                 ApplicationRationalizationScore.overall_health_score <= 75,
+                counted,
             ).count(),
             "good_76_100": ApplicationRationalizationScore.query.filter(
                 ApplicationRationalizationScore.overall_health_score > 75,
+                counted,
             ).count(),
         }
 
@@ -3527,14 +3669,16 @@ def rationalization_executive_summary():
         savings_agg = db.session.query(
             func.sum(ApplicationRationalizationScore.estimated_annual_savings),
             func.sum(ApplicationRationalizationScore.estimated_investment_needed),
-        ).first()
+        ).filter(counted).first()
 
         # Readiness overview
         ready_count = ApplicationRationalizationScore.query.filter(
-            ApplicationRationalizationScore.is_decision_ready == True  # noqa: E712
+            ApplicationRationalizationScore.is_decision_ready == True,  # noqa: E712
+            counted,
         ).count()
         not_ready_count = ApplicationRationalizationScore.query.filter(
-            ApplicationRationalizationScore.is_decision_ready == False  # noqa: E712
+            ApplicationRationalizationScore.is_decision_ready == False,  # noqa: E712
+            counted,
         ).count()
 
         # Review status distribution
@@ -3542,7 +3686,7 @@ def rationalization_executive_summary():
             db.session.query(
                 ApplicationRationalizationScore.review_status,
                 func.count(ApplicationRationalizationScore.id),
-            ).group_by(ApplicationRationalizationScore.review_status).all()
+            ).filter(counted).group_by(ApplicationRationalizationScore.review_status).all()
         )
 
         # Confidence distribution
@@ -3551,27 +3695,32 @@ def rationalization_executive_summary():
                 ApplicationRationalizationScore.disposition_confidence,
                 func.count(ApplicationRationalizationScore.id),
             ).filter(
-                ApplicationRationalizationScore.disposition_confidence.isnot(None)
+                ApplicationRationalizationScore.disposition_confidence.isnot(None), counted
             ).group_by(ApplicationRationalizationScore.disposition_confidence).all()
         )
 
-        return jsonify({
+        reply = {
             "success": True,
             "total_scored": total_scored,
             "disposition_distribution": {k: v for k, v in disposition_dist.items() if k},
             "time_distribution": {k: v for k, v in time_dist.items() if k},
             "score_buckets": score_buckets,
             "financial": {
-                "total_projected_savings": float(savings_agg[0]) if savings_agg[0] else 0,
-                "total_investment_needed": float(savings_agg[1]) if savings_agg[1] else 0,
+                # None when no decision carries a figure; a recorded 0 stays 0.
+                "total_projected_savings": as_figure(savings_agg[0]),
+                "total_investment_needed": as_figure(savings_agg[1]),
             },
+            "disposition_labels": _disposition_labels(),
             "readiness": {
                 "ready": ready_count,
                 "not_ready": not_ready_count,
             },
             "review_status_distribution": {k: v for k, v in review_dist.items() if k},
             "confidence_distribution": {k: v for k, v in confidence_dist.items() if k},
-        })
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as exc:
         current_app.logger.exception(
             "Error generating executive summary: %s", exc
@@ -3634,7 +3783,7 @@ def rationalization_score_app(app_id):
             details={"overall_score": score.overall_health_score, "action": score.rationalization_action},
         )
 
-        return jsonify({
+        reply = {
             "success": True,
             "score": {
                 "id": score.id,
@@ -3646,7 +3795,7 @@ def rationalization_score_app(app_id):
                 "rationalization_action": score.rationalization_action,
                 "disposition_action": score.disposition_action,
                 "disposition_confidence": score.disposition_confidence,
-                "estimated_annual_savings": float(score.estimated_annual_savings or 0),
+                "estimated_annual_savings": as_figure(score.estimated_annual_savings),
             },
             "data_quality": {
                 "readiness_score": readiness["readiness_score"],
@@ -3654,7 +3803,10 @@ def rationalization_score_app(app_id):
                 "missing_critical": readiness["missing_critical"],
                 "dimensions": readiness["dimensions"],
             },
-        })
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as exc:
         logger.error("RATA-002 score app %s failed: %s", app_id, exc, exc_info=True)
         return jsonify({"success": False, "error": str(exc)}), 500
@@ -3708,11 +3860,14 @@ def rationalization_bulk_score():
                 .distinct()
                 .all()
             ]
+            from sqlalchemy import func as _func
+
             from app.services.rationalization_scoring_service import (
                 RationalizationScoringService as _RSS,
             )
-            base_filter = ApplicationComponent.lifecycle_status.in_(
-                _RSS.SCOREABLE_LIFECYCLE_VALUES
+            # Matched case-insensitively -- see calculate_portfolio_scores.
+            base_filter = _func.lower(ApplicationComponent.lifecycle_status).in_(
+                [v.lower() for v in _RSS.SCOREABLE_LIFECYCLE_VALUES]
             )
             query = ApplicationComponent.query.filter(base_filter)
             if scored_ids:
@@ -3721,6 +3876,7 @@ def rationalization_bulk_score():
         else:
             # scope == "all" — delegate to portfolio scorer
             results = RationalizationScoringService.calculate_portfolio_scores(
+                getattr(g, "current_org_id", None),
                 force_recalculate=payload.get("force", False)
             )
             total = results.get("total_apps", 0)
@@ -3788,6 +3944,7 @@ def rationalization_rescore_all():
 
     try:
         results = RationalizationScoringService.calculate_portfolio_scores(
+            getattr(g, "current_org_id", None),
             force_recalculate=force
         )
         total = results.get("total_apps", 0)
@@ -3914,16 +4071,21 @@ def rationalization_portfolio_scores():
     # protect it. With no organisation in context nothing is read or kept.
     org_key = org_scoped_cache_key(f"portfolio_scores:{disposition_filter}")
 
+    def _reply(payload, cache_state):
+        # The cache keeps the full figures for the organisation; the one cost rule is applied to each
+        # reader on the way out, so a person it withholds from never receives them.
+        if not costs_visible(current_user):
+            payload = json.dumps(withhold_costs(json.loads(payload)))
+        resp = current_app.response_class(payload, status=200, mimetype="application/json")
+        resp.headers["X-Cache"] = cache_state
+        return resp
+
     # Return cached payload if still fresh
     cached = _PORTFOLIO_SCORES_CACHE.get(org_key) if org_key else None
     if cached:
         cached_at, payload = cached
         if time.time() - cached_at < _PORTFOLIO_SCORES_TTL:
-            resp = current_app.response_class(
-                payload, status=200, mimetype="application/json"
-            )
-            resp.headers["X-Cache"] = "HIT"
-            return resp
+            return _reply(payload, "HIT")
 
     try:
         # Select only the columns needed for the TIME quadrant scatter plot —
@@ -3964,21 +4126,16 @@ def rationalization_portfolio_scores():
                 "overall_health_score": r.overall_health_score,
                 "rationalization_action": r.rationalization_action,
                 "disposition_action": r.disposition_action,
-                "estimated_annual_savings": float(r.estimated_annual_savings or 0),
+                "estimated_annual_savings": as_figure(r.estimated_annual_savings),
             }
             for r in rows
         ]
 
-        import json
         payload = json.dumps(results)
         if org_key is not None:
             _PORTFOLIO_SCORES_CACHE[org_key] = (time.time(), payload)
 
-        resp = current_app.response_class(
-            payload, status=200, mimetype="application/json"
-        )
-        resp.headers["X-Cache"] = "MISS"
-        return resp
+        return _reply(payload, "MISS")
 
     except Exception as exc:
         logger.exception("RATA-009 portfolio-scores failed: %s", exc)
@@ -4004,7 +4161,7 @@ def rationalization_export():
 
     try:
         if fmt == "csv":
-            data = RationalizationExportService.generate_csv(scope)
+            data = RationalizationExportService.generate_csv(scope, show_costs=costs_visible(current_user))
             return send_file(
                 io.BytesIO(data),
                 mimetype="text/csv",
@@ -4012,7 +4169,7 @@ def rationalization_export():
                 download_name="rationalization_export.csv",
             )
         elif fmt == "excel":
-            data = RationalizationExportService.generate_excel(scope)
+            data = RationalizationExportService.generate_excel(scope, show_costs=costs_visible(current_user))
             return send_file(
                 io.BytesIO(data),
                 mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -4020,7 +4177,7 @@ def rationalization_export():
                 download_name="rationalization_business_case.xlsx",
             )
         elif fmt == "pdf":
-            data = RationalizationExportService.generate_pdf(scope)
+            data = RationalizationExportService.generate_pdf(scope, show_costs=costs_visible(current_user))
             return send_file(
                 io.BytesIO(data),
                 mimetype="text/html",
@@ -4190,6 +4347,60 @@ def api_check_duplicate_element(app_id):
         ), 500
 
 
+# ── Gap findings: the AI gap analysis, one list at a time ────────────────
+
+_AI_GAP_SECTIONS = {
+    "summary": "get_comprehensive_gap_summary",
+    "critical-gaps": "find_critical_gaps",
+    "uncovered": "find_uncovered_capabilities",
+    "rationalization": "find_rationalization_opportunities",
+    "vendor-lifecycle": "find_vendor_lifecycle_risks",
+}
+_GAP_TABS = [("critical-gaps", "Critical gaps"), ("uncovered", "Capabilities no application covers"),
+             ("rationalization", "Rationalization opportunities"),
+             ("vendor-lifecycle", "Vendor lifecycle risks")]
+# the summary figure behind each list, in the order the page shows them
+_GAP_TAB_COUNTS = [("critical-gaps", "critical_gaps"), ("uncovered", "no_coverage_count"),
+                   ("rationalization", "rationalization_opportunities"),
+                   ("vendor-lifecycle", "vendor_lifecycle_risks")]
+
+
+def _ai_gap_section(key):
+    """One section of the AI gap analysis, or {'error': True} when it cannot be read."""
+    try:
+        from app.modules.ai_chat.services.ai_gap_detection_service import AIGapDetectionService
+
+        return {"data": getattr(AIGapDetectionService(), _AI_GAP_SECTIONS[key])()}
+    except Exception as exc:
+        current_app.logger.warning("AI gap section %s could not be read: %s", key, exc)
+        try:
+            db.session.rollback()
+        except Exception as rollback_exc:
+            logger.debug("suppressed rollback error in _ai_gap_section: %s", rollback_exc)
+        return {"error": True}
+
+
+@unified_applications_bp.route("/rationalization/gaps")
+@login_required
+def rationalization_gaps():
+    """Gap findings: the four headline counts, and the list behind the one the person opens."""
+    summary = _ai_gap_section("summary")
+    gap_tab = request.args.get("gaps")
+    if gap_tab not in dict(_GAP_TABS):
+        # With no list asked for, open the first one that has something in it.
+        counts = (summary or {}).get("data") or {} if not (summary or {}).get("error") else {}
+        gap_tab = next((key for key, count_key in _GAP_TAB_COUNTS if counts.get(count_key)), "critical-gaps")
+    return render_template(
+        "applications/rationalization/gaps.html",
+        active_tab="gaps",
+        gap_tabs=_GAP_TABS,
+        gap_tab=gap_tab,
+        gap_label=dict(_GAP_TABS)[gap_tab],
+        summary=summary,
+        gaps=_ai_gap_section(gap_tab),
+    )
+
+
 # ── RAT-001: Bulk data enrichment page and API ───────────────────────────
 
 
@@ -4236,12 +4447,15 @@ def rationalization_enrich_candidates():
                 "name": app_obj.name or "Unknown",
                 "health_score": score.overall_health_score if score else None,
                 "disposition": score.disposition_action if score else None,
-                "total_cost_of_ownership": float(app_obj.total_cost_of_ownership or 0),
+                "total_cost_of_ownership": as_figure(app_obj.total_cost_of_ownership),
                 "application_owner": app_obj.application_owner or "",
                 "business_criticality": app_obj.business_criticality or "",
             })
 
-        return jsonify({"success": True, "applications": results})
+        reply = {"success": True, "applications": results}
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except Exception as exc:
         current_app.logger.error("Enrich candidates failed: %s", exc, exc_info=True)
         return jsonify({"success": False, "error": str(exc)}), 500
@@ -4251,17 +4465,22 @@ def rationalization_enrich_candidates():
     "/rationalization/api/enrich/<int:app_id>", methods=["POST"]
 )
 @login_required
+@require_permission("edit", "application")
 def rationalization_enrich_app(app_id):
-    """RAT-001: Update enrichment fields for a single application."""
+    """Update enrichment fields for a single application of the signed-in organisation."""
     try:
-        app_obj = ApplicationComponent.query.get(app_id)
+        app_obj = _verify_app_in_org(app_id, g.current_org_id)
         if not app_obj:
             return jsonify({"success": False, "error": "Application not found"}), 404
 
         payload = request.get_json(silent=True) or {}
         changed = []
 
-        if "total_cost_of_ownership" in payload:
+        cost_not_saved = None
+        if "total_cost_of_ownership" in payload and not costs_visible(current_user):
+            cost_not_saved = (
+                "The cost was not saved. Only a person who may set costs can record one.")
+        elif "total_cost_of_ownership" in payload:
             val = payload["total_cost_of_ownership"]
             if val is not None:
                 try:
@@ -4285,6 +4504,8 @@ def rationalization_enrich_app(app_id):
                 changed.append("business_criticality")
 
         if not changed:
+            if cost_not_saved:
+                return jsonify({"success": False, "error": cost_not_saved}), 403
             return jsonify({"success": False, "error": "No valid fields provided"}), 400
 
         db.session.commit()
@@ -4297,11 +4518,14 @@ def rationalization_enrich_app(app_id):
             current_user.email if hasattr(current_user, "email") else "unknown",
         )
 
-        return jsonify({
+        body = {
             "success": True,
             "updated_fields": changed,
             "app_id": app_id,
-        })
+        }
+        if cost_not_saved:
+            body["cost_not_saved"] = cost_not_saved
+        return jsonify(body)
     except Exception as exc:
         db.session.rollback()
         current_app.logger.error("Enrich app %s failed: %s", app_id, exc, exc_info=True)

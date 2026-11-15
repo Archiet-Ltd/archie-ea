@@ -12,6 +12,7 @@ Renders HTML pages for the batch import UI.
 import logging
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from werkzeug.exceptions import HTTPException
 from flask_login import current_user, login_required
 
 from app.models.batch_import import BatchImportBatch, BatchImportJob, BatchJobStatus, BatchStatus
@@ -229,7 +230,7 @@ def job_detail(job_id: int):
 
         # Check access
         if job.user_id != current_user.id:
-            abort(403, description="You don't have permission to view this job")
+            abort(404)
 
         # Get progress information
         progress = import_service.get_job_progress(job_id)
@@ -282,6 +283,8 @@ def job_detail(job_id: int):
             show_preview=show_preview,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error loading job detail {job_id}: {e}", exc_info=True)
         flash("Error loading job. Please try again.", "error")
@@ -307,7 +310,7 @@ def batch_review(batch_id: int):
 
         # Check access
         if batch.job.user_id != current_user.id:
-            abort(403, description="You don't have permission to review this batch")
+            abort(404, description="Batch not found")
 
         # Get batch summary
         summary = approval_service.get_batch_summary(batch_id)
@@ -372,6 +375,8 @@ def batch_review(batch_id: int):
             can_commit=can_commit,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error loading batch review {batch_id}: {e}", exc_info=True)
         flash("Error loading batch. Please try again.", "error")

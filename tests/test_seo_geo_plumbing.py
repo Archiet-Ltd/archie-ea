@@ -20,22 +20,35 @@ from app.services.public_pages import (
 # ── www -> apex redirect ────────────────────────────────────────────────────
 
 
+def _own_host(app):
+    from app.services.origin import site_host
+
+    with app.app_context():
+        return site_host()
+
+
 def test_www_host_redirects_to_apex(app):
-    """A request to www.entelim.org 301s to the same path on entelim.org."""
+    """A request to www. plus the site's configured host 301s to the same path without it."""
+    host = _own_host(app)
     with app.test_client() as client:
-        rv = client.get("/pricing", headers={"Host": "www.entelim.org"})
+        rv = client.get("/pricing", headers={"Host": "www." + host})
         assert rv.status_code == 301
-        assert rv.location == "https://entelim.org/pricing" or rv.location.endswith(
-            "entelim.org/pricing"
-        )
+        assert rv.location.endswith("//%s/pricing" % host)
 
 
 def test_www_host_redirect_preserves_path_and_query(app):
     """The www redirect keeps the exact path requested, not just the root."""
+    host = _own_host(app)
     with app.test_client() as client:
-        rv = client.get("/modules/applications", headers={"Host": "www.entelim.org"})
+        rv = client.get("/modules/applications?plan=team", headers={"Host": "www." + host})
         assert rv.status_code == 301
-        assert "/modules/applications" in rv.location
+        assert rv.location.endswith("//%s/modules/applications?plan=team" % host)
+
+
+def test_www_of_an_unrelated_host_is_not_redirected(app):
+    with app.test_client() as client:
+        rv = client.get("/pricing", headers={"Host": "www.unrelated-host.example"})
+        assert rv.status_code != 301
 
 
 def test_non_www_host_is_not_redirected(app):

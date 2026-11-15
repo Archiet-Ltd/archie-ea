@@ -5,17 +5,21 @@ import logging
 import re
 from datetime import datetime
 
-from flask import abort, current_app, g, jsonify, redirect, render_template, request, url_for
+from flask import abort, current_app, g, jsonify, render_template, request
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from app import db
+from app.core.auth.permissions import can
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
+from app.utils.recorded_figures import as_figure
 from app.main.views import main
+from app.core.auth.permissions import can_change_model
 from app.models.roadmap import RoadmapTask
 from app.models.implementation_migration import Deliverable
 from app.models.unified_capability import BusinessDomain, UnifiedCapability
 from app.models.unified_work_package import UnifiedWorkPackage
-from app.services import work_package_service
+from app.services import result_footer_service, work_package_service
 from app.utils.tenant import current_organization_id
 from app.utils.tenant_users import escape_like_literal
 
@@ -29,6 +33,22 @@ def _require_wp(wp_id):
     return work_package
 
 logger = logging.getLogger(__name__)
+
+_READ_ONLY_REFUSAL = "Your role may read the roadmap but not change it."
+
+
+def _refuse_unless_may_change():
+    """The plain refusal for a role that may read the roadmap but not change it."""
+    if not can_change_model(current_user):
+        return jsonify({"error": _READ_ONLY_REFUSAL}), 403
+    return None
+
+
+def _refuse_unless_may_do_work_package(action):
+    """The plain refusal when the organisation's permission matrix bars this work-package action."""
+    if not can(current_user, action, "work_package"):
+        return jsonify({"error": _READ_ONLY_REFUSAL}), 403
+    return None
 
 # ============================================================================
 # CAPABILITY MANAGEMENT API - Grouped Selection and User-Driven Addition
@@ -180,6 +200,12 @@ def list_users_for_assignment():
                 db.or_(
                     User.first_name.ilike(like, escape="\\"),
                     User.last_name.ilike(like, escape="\\"),
+                    # The name as shown in the list, so typing it in full finds the person.
+                    (
+                        func.coalesce(User.first_name, "")
+                        + " "
+                        + func.coalesce(User.last_name, "")
+                    ).ilike(like, escape="\\"),
                     User.email.ilike(like, escape="\\"),
                 )
             )
@@ -230,6 +256,9 @@ def list_capabilities():
 @login_required
 def create_capability():
     """Create a new capability with duplicate prevention"""
+    refusal = _refuse_unless_may_change()
+    if refusal:
+        return refusal
     try:
         data = request.get_json()
 
@@ -307,13 +336,14 @@ def create_capability():
             try:
                 parent_capability_id = int(parent_capability_id)
                 # Verify parent exists
-                parent_cap = UnifiedCapability.query.get(parent_capability_id)
+                parent_cap = UnifiedCapability.visible_to_organization(
+                    parent_capability_id, current_organization_id())
                 if not parent_cap:
                     return (
                         jsonify(
                             {"error": f"Parent capability with ID {parent_capability_id} not found"}
                         ),
-                        400,
+                        404,
                     )
                 # Validate hierarchy: L2 can only have L1 parent, L3 can have L1 or L2 parent
                 if level == 2 and parent_cap.level != 1:
@@ -358,7 +388,7 @@ def create_capability():
         # Get domain name directly to avoid lazy loading issues
         domain_name = None
         if domain_id:
-            domain = BusinessDomain.query.get(domain_id)
+            domain = BusinessDomain.query.filter_by(id=domain_id).first()
             domain_name = domain.name if domain else None
 
         return (
@@ -409,28 +439,57 @@ def capability_roadmap():
 
     Most data is loaded client-side via the API endpoints below.
     Server-side: capability_count, domain_count for stat cards (FAR-011 fix).
+    Server-side: plateau_count, work_package_count for initial tile values so tiles
+    never show a figure that disagrees with the evidence line while loading.
     """
-    capability_count = UnifiedCapability.query.count()
-    domain_count = BusinessDomain.query.count()
+    org_id = current_organization_id()
+    figures = result_footer_service.roadmap_figures(org_id)
+    capability_count = figures["capability_count"]
+    domain_count = figures["domain_count"]
+    plateau_count = figures["plateau_count"]
+    work_package_count = figures["work_package_count"]
+    domain_basis = None
+    if domain_count is None:
+        domain_basis = (
+            "No capability has a health score yet, so no domain is listed. Assess a capability to list its domain." if capability_count
+            else "No capabilities are recorded yet, so no domain is listed. Add a capability to list its domain."
+        )
+    # The signals the "Gap signals" figure counts, listed from the one computation that counts them.
+    from app.modules.capabilities.routes.roadmap_routes import compute_gap_signals
+
+    try:
+        gap_signals = compute_gap_signals()
+        gap_signals_error = False
+    except Exception as exc:
+        current_app.logger.warning("Gap signals unavailable: %s", exc)
+        gap_signals, gap_signals_error = [], True
     return render_template(
         "capability_roadmap/capability_roadmap.html",
         capability_count=capability_count,
         domain_count=domain_count,
+        domain_basis=domain_basis,
+        plateau_count=plateau_count,
+        work_package_count=work_package_count,
+        gap_signals=gap_signals,
+        gap_signals_error=gap_signals_error,
+        recorded_gaps=figures["recorded_gaps"],
+        ai_generated=figures["ai_generated"],
+        evidence_line_html=figures["footer_html"],
     )
 
 
 @main.route("/hybrid-roadmap")
 @login_required
 def hybrid_roadmap_redirect():
-    """Consolidated into /capability-roadmap (Feb 2026)."""
-    return redirect(url_for("main.capability_roadmap"))
+    """The hybrid roadmap is the one roadmap, Capability view."""
+    return redirect_to_roadmap("capability")
 
 
 @main.route("/technology-roadmap")
 @login_required
 def technology_roadmap_redirect():
-    """Consolidated into /capability-roadmap (Feb 2026)."""
-    return redirect(url_for("main.capability_roadmap"))
+    """The technology roadmap is the one roadmap, Technology view."""
+    return redirect_to_roadmap("technology")
 
 
 
@@ -579,8 +638,8 @@ def get_capability_work_packages():
                     "status": wp.status,
                     "start_date": wp.start_date.isoformat() if wp.start_date else None,
                     "end_date": wp.end_date.isoformat() if wp.end_date else None,
-                    "progress_percentage": wp.progress_percentage or 0,
-                    "estimated_cost": wp.estimated_cost or 0,
+                    "progress_percentage": as_figure(wp.progress_percentage),
+                    "estimated_cost": as_figure(wp.estimated_cost),
                     "priority": wp.priority,
                     "risk_level": wp.risk_level,
                     "layer": wp.layer,
@@ -590,7 +649,9 @@ def get_capability_work_packages():
                 }
             )
 
-        return jsonify({"work_packages": work_packages_list})
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply({"work_packages": work_packages_list}))
     except HTTPException:
         raise
     except Exception:
@@ -601,6 +662,9 @@ def get_capability_work_packages():
 @login_required
 def create_capability_work_package():
     """Create new capability work package with multi-capability support"""
+    refusal = _refuse_unless_may_do_work_package("create")
+    if refusal:
+        return refusal
     try:
         data = request.get_json()
 
@@ -688,6 +752,9 @@ def create_capability_work_package():
 @login_required
 def update_capability_work_package(wp_id):
     """Update capability work package"""
+    refusal = _refuse_unless_may_do_work_package("edit")
+    if refusal:
+        return refusal
     try:
         data = request.get_json()
 
@@ -759,6 +826,9 @@ def update_capability_work_package(wp_id):
 @login_required
 def delete_capability_work_package(wp_id):
     """Delete capability work package"""
+    refusal = _refuse_unless_may_do_work_package("delete")
+    if refusal:
+        return refusal
     try:
         work_package_service.delete_work_package(
             wp_id, organization_id=current_organization_id()
@@ -826,6 +896,9 @@ def get_work_package_tasks(wp_id):
 @login_required
 def create_work_package_task(wp_id):
     """Create a new task for a work package"""
+    refusal = _refuse_unless_may_do_work_package("edit")
+    if refusal:
+        return refusal
     try:
         # Verify work package exists
         _require_wp(wp_id)
@@ -875,6 +948,9 @@ def create_work_package_task(wp_id):
 @login_required
 def update_work_package_task(wp_id, task_id):
     """Update a task"""
+    refusal = _refuse_unless_may_do_work_package("edit")
+    if refusal:
+        return refusal
     try:
         # Verify work package and task exist
         _require_wp(wp_id)
@@ -928,6 +1004,9 @@ def update_work_package_task(wp_id, task_id):
 @login_required
 def delete_work_package_task(wp_id, task_id):
     """Delete a task"""
+    refusal = _refuse_unless_may_do_work_package("delete")
+    if refusal:
+        return refusal
     try:
         # Verify work package and task exist
         _require_wp(wp_id)
@@ -989,6 +1068,9 @@ def get_work_package_deliverables(wp_id):
 @login_required
 def create_work_package_deliverable(wp_id):
     """Create a new deliverable for a work package"""
+    refusal = _refuse_unless_may_do_work_package("create")
+    if refusal:
+        return refusal
     try:
         # Verify work package exists
         _require_wp(wp_id)
@@ -1034,6 +1116,9 @@ def create_work_package_deliverable(wp_id):
 @login_required
 def update_work_package_deliverable(wp_id, deliverable_id):
     """Update a deliverable"""
+    refusal = _refuse_unless_may_do_work_package("edit")
+    if refusal:
+        return refusal
     try:
         # Verify work package and deliverable exist
         _require_wp(wp_id)
@@ -1071,6 +1156,9 @@ def update_work_package_deliverable(wp_id, deliverable_id):
 @login_required
 def delete_work_package_deliverable(wp_id, deliverable_id):
     """Delete a deliverable"""
+    refusal = _refuse_unless_may_do_work_package("delete")
+    if refusal:
+        return refusal
     try:
         # Verify work package and deliverable exist
         _require_wp(wp_id)
@@ -1137,7 +1225,10 @@ def get_work_package_details(wp_id):
         delivered_count = len([d for d in deliverables if d.delivery_status == "delivered"])
         approved_count = len([d for d in deliverables if d.approval_status == "approved"])
 
+        from app.services.cost_visibility import withhold_reply
+
         return jsonify(
+            withhold_reply(
             {
                 "success": True,
                 "work_package": {
@@ -1162,9 +1253,9 @@ def get_work_package_details(wp_id):
                     "end_date": work_package.end_date.isoformat()
                     if work_package.end_date
                     else None,
-                    "progress_percentage": work_package.progress_percentage or 0,
-                    "estimated_cost": work_package.estimated_cost or 0,
-                    "actual_cost": work_package.actual_cost or 0,
+                    "progress_percentage": as_figure(work_package.progress_percentage),
+                    "estimated_cost": as_figure(work_package.estimated_cost),
+                    "actual_cost": as_figure(work_package.actual_cost),
                     "priority": work_package.priority,
                     "risk_level": work_package.risk_level,
                     "layer": work_package.layer,
@@ -1196,7 +1287,8 @@ def get_work_package_details(wp_id):
                     if total_deliverables > 0
                     else 0,
                 },
-            }
+            },
+            )
         )
 
     except HTTPException:

@@ -220,7 +220,7 @@ def test_pages_define_list_and_fence_by_organisation(app, db_session, make_org, 
     login_as(client, architect)
     detail = client.get("/metamodel/properties/%d" % definition.id).get_data(as_text=True)
     assert "Needs a value" in detail
-    assert "1 ApplicationComponent element without Data owner sign-off." in detail
+    assert "1 Application record without Data owner sign-off." in detail
 
     login_as(client, solution)
     index = client.get("/metamodel/properties").get_data(as_text=True)
@@ -231,3 +231,36 @@ def test_pages_define_list_and_fence_by_organisation(app, db_session, make_org, 
     assert client.get("/metamodel/properties/%d" % definition.id).status_code == 404
     login_as(client, outsider)
     assert "Data owner sign-off" not in client.get("/metamodel/properties").get_data(as_text=True)
+
+
+def test_usage_count_is_the_records_carrying_a_value_and_stays_within_the_organisation(
+    db_session, make_org, tenant_ctx
+):
+    from app.modules.architecture_assistant.property_service import (
+        GovernedPropertyService,
+        element_type_name,
+        grouped_element_types,
+    )
+
+    org_a = make_org("mm-use-a")
+    org_b = make_org("mm-use-b")
+    service = GovernedPropertyService()
+    with tenant_ctx(org_a.id):
+        definition = _define(org_a)
+        _element(db_session, org_a, "A with value", props={"recovery_time_hours": {"value": 4}})
+        _element(db_session, org_a, "A without value")
+        _element(db_session, org_a, "A blank value", props={"recovery_time_hours": {"value": ""}})
+        _element(db_session, org_a, "A other type", element_type="BusinessProcess",
+                 props={"recovery_time_hours": {"value": 9}})
+    # Organisation B has a record carrying the same key; it must not be counted for A.
+    with tenant_ctx(org_b.id):
+        _element(db_session, org_b, "B with value", props={"recovery_time_hours": {"value": 7}})
+        assert service.usage_count(definition, org_b.id) == 0
+    with tenant_ctx(org_a.id):
+        assert service.usage_count(definition, org_a.id) == 1
+        assert len(service.missing_values(definition, org_a.id)) == 2
+
+    assert element_type_name("ApplicationComponent") == "Application"
+    groups = dict(grouped_element_types())
+    assert ("BusinessProcess", "Business process") in groups["Business"]
+    assert all(key != label for _layer, items in groups.items() for key, label in items if " " in label)

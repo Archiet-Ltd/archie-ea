@@ -19,33 +19,49 @@ logger = logging.getLogger(__name__)
 # Shared LLM refinement helper
 # ---------------------------------------------------------------------------
 
-def _get_llm_client():
-    """Get an OpenAI client using API key from the database.
+def _default_model(provider):
+    """Model name configured on the caller's organisation row; never a key."""
+    from app.services.llm_service import LLMService
+    rows = LLMService._org_rows()
+    row = rows.filter_by(provider=provider, enabled=True).first() if rows is not None else None
+    return row.default_model if row and row.default_model else None
 
-    Returns (client, model_name) or (None, None) if unavailable.
+
+def _resolve_llm():
+    """An LLM client, its model and provider, and who pays; (None, None, None, None) when none may be used.
+
+    Order of choice, decided by LLMService: the organisation's own OpenAI or Anthropic key, then the
+    platform's key for either, only while the platform is under its ceiling.
     """
     try:
-        from app.models.models import APISettings
-        setting = APISettings.query.filter_by(provider='openai', enabled=True).first()
-        if not setting or not setting.api_key:
-            # Fallback to anthropic
-            setting = APISettings.query.filter_by(provider='anthropic', enabled=True).first()
-            if setting and setting.api_key:
-                import anthropic
-                client = anthropic.Anthropic(api_key=setting.api_key)
-                model = setting.default_model or 'claude-sonnet-4-20250514'
-                return client, model, 'anthropic'
-            return None, None, None
+        from app.services.llm_service import LLMService
+
+        resolved = LLMService.resolve_key_for(("openai", "anthropic"))
+        if not resolved.key:
+            return None, None, None, None
+        if resolved.provider == 'anthropic':
+            import anthropic
+            client = anthropic.Anthropic(api_key=resolved.key)
+            return client, _default_model('anthropic') or 'claude-sonnet-4-20250514', 'anthropic', resolved
         import openai
-        client = openai.OpenAI(api_key=setting.api_key)
-        model = setting.default_model or 'gpt-4o'
+        client = openai.OpenAI(api_key=resolved.key)
+        model = _default_model('openai') or 'gpt-4o'
         # Handle comma-separated model lists
         if ',' in model:
             model = model.split(',')[0].strip()
-        return client, model, 'openai'
+        return client, model, 'openai', resolved
     except Exception as e:
         logger.warning("Failed to initialize LLM client: %s", e)
-        return None, None, None
+        return None, None, None, None
+
+
+def _get_llm_client():
+    """Get an LLM client for the caller.
+
+    Returns (client, model_name, provider) or (None, None, None) if unavailable.
+    """
+    client, model, provider, _resolved = _resolve_llm()
+    return client, model, provider
 
 
 def _llm_refine_element(element_type: str, current_name: str,
@@ -55,7 +71,7 @@ def _llm_refine_element(element_type: str, current_name: str,
 
     Returns {"name": str, "description": str} or None on failure.
     """
-    client, model, provider_type = _get_llm_client()
+    client, model, provider_type, resolved = _resolve_llm()
     if not client:
         logger.debug("No LLM client available for refinement")
         return None
@@ -100,6 +116,10 @@ Return ONLY valid JSON:
                 messages=[{"role": "user", "content": prompt}],
             )
             text = response.content[0].text.strip()
+            LLMService.record_platform_call(
+                resolved, model, getattr(response, "usage", None),
+                prompt_chars=len(prompt), output_chars=len(text),
+            )
         else:
             response = client.chat.completions.create(
                 model=model,
@@ -108,6 +128,10 @@ Return ONLY valid JSON:
                 temperature=0.3,
             )
             text = response.choices[0].message.content.strip()
+            LLMService.record_platform_call(
+                resolved, model, getattr(response, "usage", None),
+                prompt_chars=len(prompt), output_chars=len(text),
+            )
 
         # Parse JSON from response (handle markdown code blocks)
         if text.startswith("```"):

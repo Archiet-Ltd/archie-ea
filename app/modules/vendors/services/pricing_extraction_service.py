@@ -20,6 +20,8 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
+PLAIN_EXTRACTION_ERROR = "We couldn't read this document. Try a CSV or XLSX file instead."
+
 # Imported at module level so tests can patch it
 try:
     from app.modules.ai_chat.services.llm_service import LLMService
@@ -139,7 +141,7 @@ class PricingExtractionService:
 
         except Exception as e:
             logger.error("Pricing extraction failed: %s", e)
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": PLAIN_EXTRACTION_ERROR}
 
     def extract_from_file(self, file_storage) -> Dict[str, Any]:
         """

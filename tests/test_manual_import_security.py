@@ -125,7 +125,7 @@ def test_real_parser_preserves_manual_grid_fields_and_import_description():
     }], 'duplicate_mode': 'update'})
     assert mode == 'merge'
     assert rows == [{'application_code': 'APP-1', 'name': 'Accounts', 'component_type': 'ERP',
-                     'deployment_status': 'planned', 'description': 'Source description'}]
+                     'deployment_status': 'design', 'description': 'Source description'}]
 
 
 def test_blank_optional_fields_preserve_merge_values():

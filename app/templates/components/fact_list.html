@@ -1,0 +1,23 @@
+{# The fact list: the one way a page shows the facts about one record, label on the left and
+   value on the right (data-type register: record-facts; pattern P25).
+
+   The caller renders each value, so a date can be formatted and a missing value can say what
+   to do; the macro owns the layout and the test ids.
+
+   {% from 'components/fact_list.html' import fact_list %}
+   {% call(p) fact_list(items=properties, testid='record-properties') %}
+     {% if p.value %}{{ p.value }}{% else %}<a href="/edit" class="text-muted-foreground hover:underline">Not set</a>{% endif %}
+   {% endcall %}
+
+   items: dicts with label and key; the value cell's test id is property-<key>. #}
+{% macro fact_list(items, testid='record-facts') %}
+{%- set value = caller -%}
+<dl class="space-y-2 text-sm" data-component="fact-list" data-testid="{{ testid }}">
+  {% for p in items %}
+  <div class="flex items-start justify-between gap-3">
+    <dt class="shrink-0 text-muted-foreground">{{ p.label }}</dt>
+    <dd class="min-w-0 text-right text-foreground" data-testid="property-{{ p.key }}">{{ value(p) }}</dd>
+  </div>
+  {% endfor %}
+</dl>
+{% endmacro %}

@@ -25,6 +25,33 @@
 version: 1
 entries:
 
+  - id: result-footer
+    concept: The evidence, source, confidence and date footer under every ranked or computed result
+    status: active
+    canonical:
+      path: app/services/result_footer_service.py
+      symbols: [build_footer, risk_footer, element_facts, page_link, fact]
+    reuse: >
+      Build a result's footer with result_footer_service.build_footer from its input facts and draw it with the
+      result_footer macro in components/provenance.html. Do not compute confidence, source or date in a
+      template, and do not write a second footer, "Source:" line or confidence label beside it.
+      The rule is in the service docstring and in docs/adr/0013-result-footer.md.
+
+  - id: cost-visibility
+    concept: Withholding a figure in pounds from a person who may not see spend (cost, budget, TCO, licence cost, investment estimate, savings, financial risk)
+    status: active
+    canonical:
+      path: app/services/cost_visibility.py
+      symbols: [costs_visible, withhold_costs, COSTS_WITHHELD, COST_KEYS, INVESTMENT_MONEY_KEYS]
+    reuse: >
+      The rule is may_see_spend_pages (app/decorators/requires_role.py), asked through costs_visible. When it
+      says no, pass the result through withhold_costs before the reply is built, with keys= when the money sits
+      under other keys than a simulation's. The masker sets costs_withheld; a template reads that flag and prints
+      COSTS_WITHHELD, "Cost figures are withheld for your role.", and never blanks a cell. Do not call
+      can_see_costs outside requires_role.py and role_access.py, do not write a second masker or walker, do not
+      write another sentence or flag for the same case, and do not mask in the browser: the figure must not
+      leave the server. The static test tests/test_one_cost_rule.py enforces it.
+
   - id: design-tokens
     concept: Colour, radius and type tokens for every page (one token file; the public marketing
       palette is a scoped class in it)
@@ -58,11 +85,7 @@ entries:
         reason: self-contained error page that must render without the application stylesheet
       - path: app/templates/errors/401.html
         reason: self-contained error page that must render without the application stylesheet
-      - path: app/templates/errors/403.html
-        reason: self-contained error page that must render without the application stylesheet
       - path: app/templates/errors/404.html
-        reason: self-contained error page that must render without the application stylesheet
-      - path: app/templates/errors/429.html
         reason: self-contained error page that must render without the application stylesheet
       - path: app/templates/errors/500.html
         reason: self-contained error page that must render without the application stylesheet
@@ -76,6 +99,8 @@ entries:
         reason: standalone document rendered server-side to PDF (WeasyPrint) with its own styles, the same
           category as export_blueprint.html and export_sad.html; not named in the task that added this
           entry, found by running the gate
+      - path: app/static/css/basecoat_ui.css
+        reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
   - id: badge
     concept: Badges, status pills and the category pill above a public-page heading
     status: active
@@ -96,6 +121,75 @@ entries:
       - path: app/templates/capability_maturity/line_of_sight.html
         reason: authenticated page's local pill macro, predates the register; repointing it is outside the
           public-page scope
+      - path: app/templates/basecoat/
+        reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
+
+  - id: element-table
+    concept: A list of ArchiMate elements on a record page (a solution's design or requirements, a programme's
+      elements, an element's related elements) as dense rows, the name a link to the element's own record,
+      paged by 25
+    status: active
+    canonical:
+      path: app/templates/components/element_table.html
+      symbols: [element_table]
+    reuse: >
+      import `element_table` from components/element_table.html and render the other cells in its
+      call block (design-system lead ruling R30, 25 Oct 2026); do not define another element or elements
+      table macro, and do not hand-roll a table whose first column is an element name linking to its record
+    must_not_create:
+      - id: element-table-macro
+        regex: '{%-?\s*macro\s+(\w*element_table\w*|\w*elements_table\w*|\w*element_list_table\w*)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+
+  - id: list-table
+    concept: A list of records on any page, built on the library Table, paged by 25 (data-type register
+      record-list; ruling R31, 26 Oct 2026)
+    status: active
+    canonical:
+      path: app/templates/components/list_table.html
+      symbols: [list_table]
+    reuse: >
+      import `list_table` from components/list_table.html and render one row's cells in its call block;
+      a list of ArchiMate elements uses `element_table`, which is this table with the element link first.
+      dense_table, data_table and workbench_table are retired for new lists (docs/data-type-register.yml)
+    must_not_create:
+      - id: list-table-macro
+        regex: '{%-?\s*macro\s+\w*(?:list|record|records|item|items)_table\w*\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+
+  - id: risk-matrix
+    concept: Risks by probability and impact as a five by five grid that counts the risks in each cell
+      (data-type register risks; ruling R31)
+    status: active
+    canonical:
+      path: app/templates/components/risk_matrix.html
+      symbols: [risk_matrix]
+    reuse: >
+      import `risk_matrix` from components/risk_matrix.html and pass the grid the service builds; do not
+      draw another heat map or risk grid
+    must_not_create:
+      - id: risk-matrix-macro
+        regex: '{%-?\s*macro\s+\w*(?:risk_matrix|risk_grid|heat_?map)\w*\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+
+  - id: fact-list
+    concept: The facts about one record, label left and value right (data-type register record-facts;
+      pattern P25; ruling R31)
+    status: active
+    canonical:
+      path: app/templates/components/fact_list.html
+      symbols: [fact_list]
+    reuse: >
+      import `fact_list` from components/fact_list.html and render each value in its call block; do not
+      hand-build another definition list of record properties
+    must_not_create:
+      - id: fact-list-macro
+        regex: '{%-?\s*macro\s+\w*(?:fact_list|key_value|kv_list|property_list)\w*\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
 
   - id: capability-visibility
     concept: A capability looked up by id and caller's organisation
@@ -110,6 +204,23 @@ entries:
     must_not_create:
       - id: visibility-helper
         regex: 'def\s+_?(get_|find_|load_)?(visible|accessible)_(capabilit\w*|to_org\w*)\s*\('
+
+  - id: title-case-label
+    concept: Title-casing a stored label or key for display (categories, types, enum keys)
+    status: active
+    canonical:
+      path: app/utils/template_utils.py
+      symbols: [title_keep_caps, ENUM_LABEL_OVERRIDES]
+    reuse: >
+      Use the title_keep_caps template filter (also registered as humanize_key). It maps a known key to its
+      hand-written label in ENUM_LABEL_OVERRIDES, reads underscores as spaces, and keeps acronyms as typed
+      (SaaS, IoT, API, AI). Do not write another title-case helper or chain replace and title in a template.
+    must_not_create:
+      - id: title-case-helper
+        regex: 'def\s+_?(titleize|title_case|title_keep_caps|humanize_key)\w*\s*\('
+    known_exceptions:
+      - path: app/utils/template_utils.py
+        reason: the canonical helper's own module
 
   - id: name-matching
     concept: Name and code matching for duplicates (normaliser, SQL folding, duplicate lookup)
@@ -176,17 +287,29 @@ entries:
           follow-up: route through ApplicationOwner.display_rows_for_owner_rows
 
   - id: ai-chat-approval
-    concept: Approving or rejecting an AI chat change request (the approval gate)
+    concept: Settling an AI chat change request (checked, reviewed, then applied or declined by the server)
     status: active
     canonical:
       path: app/modules/ai_chat/services/ai_chat_approval_service.py
       symbols:
+        - AIChatApprovalService.settle_after_review
         - AIChatApprovalService.approve_and_execute
         - AIChatApprovalService.reject_approval
     reuse: >
-      Every approval goes through AIChatApprovalService.approve_and_execute / reject_approval so the approver is
-      recorded, the audit log is written, only a PENDING request can be claimed and self-approval is refused.
-      Never call approval.approve(...) or approval.reject(...) on the model from a route or another service.
+      A requested change is settled by AIChatApprovalService.settle_after_review, which runs the checks and the
+      model review in app/modules/ai_chat/services/change_review.py (the only caller of that module) and then
+      applies the change through approve_and_execute as the system, or declines it with reasons. Every apply
+      and every decline goes through approve_and_execute / reject_approval so the audit log is written and only
+      a PENDING request can be claimed. No second queue, no second reviewer, no route or service that writes the
+      status itself. Never call approval.approve(...) or approval.reject(...) on the model from a route or
+      another service. A person's Approve (the route, the inbox button and "approve it" in the chat) is a request
+      to settle: approve_and_execute sends a change the review settles through settle_after_review and applies
+      it only after a passing review; the settled_by_review flag is checked against the record's own passing
+      round. The charter rule is AgentCharter.tool_allowed, called from change_review.run_checks. A prompt that
+      leaves the server for a review or a revision goes through LLMModelRouter.call_model, which applies
+      llm_service_impl._scrub_prompt, and its data blocks are wrapped by architect_persona_charters.fence_untrusted
+      (no second fence). Who may act is the one sign-in rule, User.is_active (disabled_at), read in
+      AIChatApprovalService._acting_user. The address of a record is change_review.record_path.
     must_not_create:
       - id: approval-path
         regex: 'def\s+_?(approve_and_execute|reject_approval|approve_and_run|execute_approval\w*|approve_pending\w*)\s*\('
@@ -253,6 +376,24 @@ entries:
       - path: app/modules/solutions_strategic/v2/services/roadmap_automation.py
         reason: retired-store legacy copy, to be removed with the store
 
+  - id: work-package-write-permission
+    concept: Whether a person may create, change or delete a work package
+    status: active
+    canonical:
+      path: app/core/auth/permissions.py
+      symbols: [can, can_change_model]
+    reuse: >
+      Two helpers, two questions. can(user, action, "work_package") is the organisation's permission matrix and
+      the only rule for writing a work package: every work-package writer and every button that offers one reads
+      it, so the Permissions tab changes what the server allows. can_change_model(user) answers whether the role
+      may change the architecture model at all (capabilities, gaps, plateaus) and is the rule for those writers
+      only. A writer never runs both on one request: the roadmap API names its work-package endpoints in
+      _WORK_PACKAGE_WRITES and sends every other write to can_change_model. Do not add a role list, a
+      require_roles tuple or a second helper for work packages.
+    must_not_create:
+      - id: work-package-role-check
+        regex: 'def\s+_?(may|can)_(write|change|edit)_work_packages?\s*\('
+
   - id: entity-matching
     concept: Matching an incoming record to an existing one by identifier or name
     status: active
@@ -268,6 +409,26 @@ entries:
     known_exceptions:
       - path: app/utils/duplicate_guard.py
         reason: find_duplicate_by_name is the canonical duplicate lookup of the name-matching entry
+
+  # Searched before adding: "name", "resolve" and "matcher". name-matching (normaliser and duplicate lookup) and
+  # entity-matching (imports and proposals) both exist; neither says which element a shared name means in an answer.
+  - id: answer-name-resolution
+    concept: Which element a name means in any answer (typed question, catalogue, assistant tools, slash commands)
+    status: active
+    canonical:
+      path: app/modules/dashboard/services/overview_figures.py
+      symbols: [element_each_name_means, element_named]
+    reuse: >
+      element_named(org_id, name) finds the elements a name matches ignoring case, spacing, "-" and "_", and
+      element_each_name_means picks one: the most recorded relationships, then the application's own element, then
+      the one recorded first. Every answer path calls it so card, answer and tools agree. Never pick an element
+      with .first() or an ilike lookup in answer code; MatcherService stays the matcher for imports and proposals.
+    must_not_create:
+      - id: answer-name-picker
+        regex: 'ArchiMateElement\.name\.ilike\([^)]*\)\s*\)\s*\.first\('
+    known_exceptions:
+      - path: app/modules/genome/patch/grounding.py
+        reason: grounds a patch against one element for the genome, not an answer to a person; moves to the rule in a later round
 
   - id: impact-answer
     concept: What breaks if this element changes or fails (impact answer)
@@ -286,6 +447,23 @@ entries:
         reason: delegates to cross_layer_impact and reshapes the rows for its callers
       - path: app/services/architecture_change_impact_service.py
         reason: delegates the walk to cross_layer_impact
+
+  - id: product-page
+    concept: What makes up one Product (its elements by ArchiMate layer, linked material, cost, gaps and risks)
+    status: active
+    canonical:
+      path: app/modules/architecture/routes/archimate_crud/product_page.py
+      symbols: [members, build, linked_material, cost_of, gaps_and_risks, export_payload]
+    reuse: >
+      A Product's page is the element page (archimate_crud/detail.html) extended; the Products list is the element
+      list for the Product type. The members come from impact_graph.build_impact_graph, owners from the one owner
+      record, cost from application_cost_accessor and technology_cost, decisions from ArchitectureDecision,
+      diagrams from SavedDiagram, the footer from result_footer_service.product_footer. Searched before writing:
+      element page, impact answer, owner, cost, export, search. Do not write a second product page, product table
+      or product walk; see docs/adr/0015-product-page.md.
+    must_not_create:
+      - id: product-walk
+        regex: 'def\s+_?(walk|collect|gather|list)_product_(members|elements|graph)\w*\s*\('
 
   - id: capability-maturity
     concept: A capability's current and target maturity
@@ -325,20 +503,24 @@ entries:
     concept: Empty state shown when a list or page has no data
     status: active
     canonical:
-      path: app/templates/components/empty_state.html
-      symbols: [empty_state]
+      path: app/templates/basecoat/empty.html
+      symbols: [empty, empty_header, empty_icon, empty_title, empty_description, empty_content]
     reuse: >
-      {% from 'components/empty_state.html' import empty_state %} (see DESIGN.md). Do not define another
-      empty_state macro or inline an empty-state block; two macros with incompatible signatures 500 the page
-      that imports the wrong one.
+      {% import 'basecoat/index.html' as ui %} (see DESIGN.md). ui.empty holds ui.empty_header with an
+      icon, a title and a description, then ui.empty_content with the next-step button: every empty state
+      says why the area is empty and offers the next step. Do not define another empty-state macro or
+      inline an empty-state block; two macros with incompatible signatures 500 the page that imports the
+      wrong one.
     must_not_create:
       - id: empty-state-macro
         regex: '{%-?\s*macro\s+(empty_state\w*|render_empty\w*|no_data\w*)\s*\('
         scope: [app/templates]
         suffixes: [.html]
     known_exceptions:
+      - path: app/templates/components/empty_state.html
+        reason: legacy empty_state macro kept as a compatibility wrapper; new and touched empty states migrate to the ui.empty block (basecoat/empty.html) instead
       - path: app/templates/macros/page_shell.html
-        reason: second empty_state macro (icon, headline, body) predating the register; to be merged into the canonical one
+        reason: second empty_state macro (icon, headline, body) predating the register; migrate from it to the ui.empty block (basecoat/empty.html)
 
   - id: loading-state
     concept: Loading and skeleton states
@@ -357,6 +539,8 @@ entries:
     known_exceptions:
       - path: app/templates/components/skeleton.html
         reason: the skeleton family (table, list, card, text, avatar) is the companion canonical file
+      - path: app/templates/basecoat/
+        reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
 
   - id: outbox-test-cleanup
     concept: Purging outbox events between tests
@@ -411,19 +595,22 @@ entries:
       symbols:
         - set_element_owner
         - set_application_owner
+        - set_named_person_owner
         - application_owner_text
         - application_owner_expression
         - application_is_owned_expression
         - application_is_owned
         - resolve_user_by_name
     reuse: >
-      An owner is a person recorded as an ApplicationOwner row, written only through set_element_owner (an
-      application is element_type "application"). The business_owner, technical_owner and application_owner
-      fields on an application are attributes that read and assign through that service, so assigning them
-      is allowed and records the owner; in SQL use the same attributes, which carry the matching expression.
-      The legacy_* columns behind them hold only a name that matched no user and are written by the service and
-      the backfill alone. Do not write a second owner row, a second name-to-user lookup, or read an owner text
-      column directly. The retirement of those columns is a named follow-up, not part of this entry.
+      An owner is a person recorded as an ApplicationOwner row. A user owner is written through
+      set_element_owner (an application is element_type "application") or set_application_owner. A named
+      person without an account is written through set_named_person_owner (aichatapp01). The business_owner,
+      technical_owner and application_owner fields on an application are attributes that read and assign
+      through that service, so assigning them is allowed and records the owner; in SQL use the same
+      attributes, which carry the matching expression. The legacy_* columns behind them hold only a name
+      that matched no user and are written by the service and the backfill alone. Do not write a second
+      owner row, a second name-to-user lookup, or read an owner text column directly. The retirement of
+      those columns is a named follow-up, not part of this entry.
       "Owned" (an application has an accountable owner: a primary or business owner record, or a legacy
       application or business owner text) is defined once, by application_is_owned_expression and
       application_is_owned; the dashboard owner coverage and the Ask question on applications with no owner
@@ -461,10 +648,44 @@ entries:
         regex: '(?i)(?:let|const|var|function|class)\s+\w*archimate\w*(?:renderer|diagramengine)\b'
         scope: [app/static/js, app/templates]
         suffixes: [.js, .html]
-    known_exceptions:
-      - path: app/static/js/intelligence/graph.js
-        reason: known duplicate pending migration -- pull request 701 ports Twin Map onto this renderer and
-          removes this file; not a fresh violation until that migration lands
+
+  - id: composer-radial-arrangement
+    concept: Arranging the elements of a view round one element, each step away on its own ring (the Composer's neighbourhood view)
+    status: active
+    canonical:
+      path: app/static/js/archimate/composer.js
+      symbols: [applyRadialLayout, applyLayerBanding]
+    reuse: >
+      applyRadialLayout is the one radial arrangement, beside applyLayerBanding, which arranges by layer. It shares
+      LAYER_Y_ORDER with layer banding, and the drawing is then fitted by the one fitCanvas. A view about one element
+      calls it; do not write a second radial, circular or ring layout or a second fit or zoom routine in the Composer.
+
+  - id: diagram-editor-shell
+    concept: The editor chrome around an ArchiMate diagram (toolbar, element palette, finder, relationship legend, minimap, status line, header, properties sheet)
+    status: active
+    canonical:
+      path: app/templates/components/diagram/toolbar.html
+      symbols: [diagram_toolbar]
+    reuse: >
+      A diagram page draws its chrome with the macros under app/templates/components/diagram/ (diagram_toolbar,
+      diagram_palette, diagram_finder, diagram_legend, diagram_status_line, diagram_minimap, diagram_header,
+      diagram_properties_sheet) and drives the one engine through composerApp. The state those macros read lives in
+      app/static/js/archimate/composer_shell.js; the notation icons are one sprite at
+      app/static/img/archimate-notation.svg and the layer colours are the --notation-* tokens. Do not build a second
+      toolbar or palette on a page, and do not write a layer colour in a template or script.
+
+  - id: data-model-diagram
+    concept: The logical data model of a data domain (entities, their attributes, relationships with a cardinality at each end) as an entity relationship diagram
+    status: active
+    canonical:
+      path: app/modules/architecture/services/data_erd_service.py
+      symbols: [domain_diagram, create_entity, update_entity, relate]
+    reuse: >
+      An entity is the existing DataEntity record (linked to its ArchiMate data object by archimate_element_id);
+      its attributes are DataEntityAttribute rows and its relationships are DataEntityRelationship rows. Read and
+      write them through data_erd_service and the /architecture/api/data-erd routes, and draw them with
+      app/static/js/data/erd.js on the shared diagram components. Do not add a second store of entities or
+      attributes, and do not draw an entity relationship diagram with another renderer.
 
   - id: public-button
     concept: The public site button (primary and outline, 40px, 2px solid focus outline)
@@ -493,6 +714,12 @@ entries:
         scope: [app/static/css, app/templates]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
+      - path: app/static/css/basecoat_ui.css
+        reason: "the flask-basecoat component rules (.cn-*) for every page but the Overview, the styles behind basecoat/table.html and the other library macros (ruling R32)"
+      - path: app/static/css/archimate_composer.css
+        reason: authenticated-app composer toolbar and search buttons, moved unchanged out of the composer page where the baseline already recorded them; not a public-site button
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
@@ -520,10 +747,16 @@ entries:
         scope: [app/static/css, app/templates/public, app/templates/main, app/templates/layouts]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
+      - path: app/static/css/basecoat_ui.css
+        reason: "the flask-basecoat component rules (.cn-*) for every page but the Overview, the styles behind basecoat/table.html and the other library macros (ruling R32)"
       - path: app/static/css/accessibility.css
         reason: authenticated-app skip-link and focus styles, not the public inline link
       - path: app/static/css/app.css
         reason: authenticated-app link styles, not the public inline link
+      - path: app/static/css/archimate_composer.css
+        reason: the .joint-link rules style the diagram library's own link elements on the composer canvas, not an inline text link
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
@@ -556,6 +789,10 @@ entries:
         scope: [app/static/css, app/templates]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
+      - path: app/static/css/basecoat_ui.css
+        reason: "the flask-basecoat component rules (.cn-*) for every page but the Overview, the styles behind basecoat/table.html and the other library macros (ruling R32)"
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
@@ -588,6 +825,10 @@ entries:
         scope: [app/static/css, app/templates]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
+      - path: app/static/css/basecoat_ui.css
+        reason: "the flask-basecoat component rules (.cn-*) for every page but the Overview, the styles behind basecoat/table.html and the other library macros (ruling R32)"
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
@@ -633,6 +874,8 @@ entries:
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
         reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+      - path: app/static/css/basecoat_ui.css
+        reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
 
   - id: public-stepper
     concept: The public site roadmap stepper (a row of stages with a line and a dot)
@@ -671,13 +914,13 @@ entries:
     status: active
     canonical:
       path: scripts/component_inventory.py
-      symbols: [build_inventory, main]
+      symbols: [build_inventory, main, route_entries, handler_place, controls_for_template]
     reuse: >
       The component inventory is generated by scripts/component_inventory.py. It reads every Jinja template,
       walks the Jinja AST for macro calls and url_for references, reconstructs HTML from lex tokens,
       and maps each route to its rendered template with all interactive elements. Do not write a second
       generator or a second route-to-template mapper; reuse the canonical script and its build_inventory()
-      function. The output docs/component-inventory.json is the single source of truth for Phase 1 click audits.
+      function. The output docs/component-inventory.json is the single source of truth for Phase 1 click audits, and the one reader of routes (with each handler file and line) and forms (with line, id, action and button formaction) that scripts/sysml/as_built.py takes them from.
     must_not_create:
       - id: second-inventory-generator
         regex: 'def\s+build_inventory\s*\('
@@ -739,3 +982,553 @@ entries:
     must_not_create:
       - id: type-table-class
         regex: 'class\s+\w*TypeTable\s*\('
+
+  - id: decision-table
+    concept: A DMN decision table (hit policy, input and output columns, numbered rules), its link to a business
+      process, its evaluation, and its DMN XML import and export
+    status: active
+    canonical:
+      path: app/modules/architecture/services/decision_table_service.py
+      symbols: [create_decision, save_rule, evaluate, link_process, decisions_applied_by]
+    reuse: >
+      A decision is an ArchiMate business function carrying a dmn entry in custom_properties; its rules are
+      DecisionRule rows; its link to a process is a serving relationship written by ArchiMateRelationshipService.
+      Read and write through decision_table_service, and take DMN files in and out through
+      decision_exchange_service (the model import screen already routes DMN files to it). Do not add a second
+      table for decisions or rules, a second hit-policy evaluator, or a second upload screen for DMN.
+    must_not_create:
+      - id: decision-rule-model
+        regex: 'class\s+\w*(Decision|Dmn)\w*Rule\w*\s*\('
+      - id: hit-policy-evaluator
+        regex: 'def\s+_?(evaluate|apply)_hit_policy\s*\('
+    known_exceptions:
+      - path: app/models/decision_rule.py
+        reason: the one rule-rows table the decision-table entry names
+
+  - id: kanban-board
+    concept: The Kanban board shell — columns in one sideways-scrolling row, colour-coded and
+      WIP-limited headers, drag-and-drop plus a keyboard "Move to" move (the SAFe portfolio board
+      and the ADM architecture board share one board)
+    status: active
+    canonical:
+      path: app/templates/macros/kanban_board.html
+      symbols: ["kanban_board", "kanban_card", "kanban_move_menu"]
+    reuse: >
+      Render every Kanban board through the kanban_board macro in
+      app/templates/macros/kanban_board.html, and move cards with the shared kanbanBoard() Alpine
+      component in app/static/js/components/kanban_board.js (onDragStart / onDrop / onDragEnd,
+      moveCard for the keyboard "Move to" select, wipAtLimit / wipNearLimit for the WIP treatment).
+      A board whose columns come from the server as data renders them with the macro's
+      columns='client' mode and supplies its own card body; it does not hand-roll a second
+      board. An item is kanban_card (a Card with a grip, Space/Enter pick-up and arrow keys) and
+      the pointer-free route is its kanban_move_menu (a DropdownMenu); a column's move is saved
+      on the server, never in localStorage. The composer, the capability network and the codegen
+      workflow designer are diagram canvases, not boards, and are the only other files that drag. Do not write a new class="kanban-board" wrapper, a new "kanban-column" grid, or a
+      second board macro anywhere else: one board shell means the SAFe board and the ADM board
+      stay the same shape and move cards the same way.
+    must_not_create:
+      - id: kanban-board-markup
+        regex: 'class="[^"]*\bkanban-board\b'
+        scope: [app/templates]
+        suffixes: [.html]
+      - id: kanban-board-macro
+        regex: '{%-?\s*macro\s+(\w*kanban\w*board\w*|\w*board\w*kanban\w*)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+      - id: kanban-column-markup
+        regex: 'class="[^"]*\bkanban-column\b'
+        scope: [app/templates]
+        suffixes: [.html]
+      - id: board-drag-hooks
+        regex: '@dragstart|:draggable|draggable="true"'
+        scope: [app/templates]
+        suffixes: [.html]
+    known_exceptions:
+      - path: app/static/js/adm_kanban/board.js
+        reason: ADM board v1 renderer, superseded by board_v2 and the shared component; carries its
+          own removal brief and is not wired into any template
+      - path: app/templates/archimate/composer.html
+        reason: a diagram canvas whose palette items are dragged onto a drawing, not a board of columns
+      - path: app/templates/codegen/workflow_designer.html
+        reason: a diagram canvas whose nodes are dragged onto a flow, not a board of columns
+      - path: app/templates/business_architecture/process_diagram.html
+        reason: a diagram canvas whose shapes are dragged from the shapes list into a process lane, not a board of columns
+
+  - id: public-site-registry
+    concept: The public navbar, its menus, the footer and the roles hub link lists (one registry file, one reader)
+    status: active
+    canonical:
+      path: app/services/site_registry.py
+      symbols: [site_registry, items_needing_own_page]
+    reuse: >
+      Add, move or relabel a public navbar, menu or footer link in content/site/registry.yml only; the navbar
+      (components/public_navbar.html), the menu rows (components/public_menu.html), the footer
+      (components/public_footer.html) and the roles hub read it through site_registry(). Labels and one-line
+      descriptions are the reviewed ones; do not reword them in a template. Do not write a second link list,
+      a second reader or a literal href in those templates (the public-shell gate fails on it).
+    must_not_create:
+      - id: second-site-registry
+        regex: 'def\s+_?(public_|site_)(nav|menu|footer|registry)\w*\s*\('
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/services/site_registry.py
+        reason: the canonical reader
+
+  - id: app-shell-sidebar
+    concept: The signed-in shell's sidebar (the library's sidebar-07 parts, its icon rail, its drawer on a phone)
+    status: active
+    canonical:
+      path: app/templates/components/ui_sidebar.html
+      symbols: [sidebar_wrapper, sidebar, sidebar_menu_button, sidebar_menu_sub_button, sidebar_inset, sidebar_trigger]
+    reuse: >
+      Build the sidebar from these parts only: components/admin_sidebar.html is the one call (its entries come
+      from app/navigation/registry.py), and the layouts wrap the page in sidebar_wrapper and sidebar_inset.
+      Collapse, Ctrl+B, the cookie and the drawer are js/sidebar/sidebar_shell.js; the rules behind the cn-sidebar-*
+      classes are styles/sidebar-shell.css. Do not write a second sidebar element, a second collapse store or a
+      second drawer.
+    must_not_create:
+      - id: second-sidebar-parts
+        regex: '\{%-?\s*macro\s+sidebar_(group|item|subitem|collapsible|menu_button|wrapper)\b'
+        scope: [app/templates]
+        suffixes: [.html]
+    known_exceptions:
+      - path: app/templates/components/ui_sidebar.html
+        reason: the canonical parts
+      - path: app/templates/basecoat/
+        reason: "the vendored flask-basecoat library (shadcn/ui components ported to Jinja), copied verbatim by scripts/vendor_basecoat_ui.py and never edited by hand (ruling R32)"
+
+  - id: compliance-score
+    concept: The compliance percentage of a capability or an application, and the organisation-wide average
+    status: active
+    canonical:
+      path: app/services/compliance/compliance_inheritance_service.py
+      symbols: [ComplianceInheritanceService.assess_capabilities, ComplianceInheritanceService.assess_applications, ComplianceInheritanceService.portfolio_score, ComplianceInheritanceService.format_score]
+    reuse: >
+      Read assess_capabilities or assess_applications for a figure, portfolio_score for the average and
+      format_score to print one. An unassessed capability has a score of None, never 100 or 0. Do not write a
+      second formula (such as 100 minus a penalty per violation) or a second compliance tracking service.
+    must_not_create:
+      - id: second-compliance-tracking-service
+        regex: '^class ComplianceTrackingService\b'
+        scope: [app]
+      - id: penalty-compliance-score
+        regex: '100\s*-\s*\(?\s*critical_violations'
+        scope: [app]
+    known_exceptions:
+      - path: app/modules/solutions_strategic/v2/services/compliance_tracking_service.py
+        reason: the page service that reads the one scorer for the tracking screen
+
+  - id: coverage-formatter
+    concept: Formatting a percentage figure for display (capability coverage or compliance score)
+    status: active
+    canonical:
+      path: app/utils/recorded_figures.py
+      symbols: [coverage_text]
+    reuse: >
+      Capability coverage uses coverage_text (recorded_figures.py): "40%", "0%", or "Not recorded" for None.
+      Compliance score uses ComplianceInheritanceService.format_score (compliance_inheritance_service.py):
+      "62.5%", "50%", or "Not assessed" for None. They differ because coverage is a recorded figure
+      (a person may have entered 0%) while compliance is computed (None means no controls mapped).
+      Do not write a second percentage formatter; call the one for your domain.
+    must_not_create:
+      - id: second-coverage-formatter
+        regex: 'def\s+_?(format|print|render)_(coverage|score|percentage)\s*\('
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/services/compliance/compliance_inheritance_service.py
+        reason: format_score is the canonical compliance formatter; coverage_text is the canonical capability coverage formatter
+
+  - id: application-control-link-writer
+    concept: Writing the link between an application and a control of an adopted framework
+    status: active
+    canonical:
+      path: app/modules/compliance/services/applicability_service.py
+      symbols: [ApplicabilityService.link_requirement]
+    reuse: >
+      Call ApplicabilityService.link_requirement(organization_id, application_id, control_id, ...). It refuses an
+      application of another organisation and a framework the organisation has not adopted. Do not construct
+      ApplicationComplianceControl with an application_id anywhere else, and do not define a second
+      link_requirement.
+    must_not_create:
+      - id: second-link-requirement
+        regex: 'def link_requirement\b'
+        scope: [app]
+    known_exceptions:
+      - path: app/services/adm_requirement_service.py
+        reason: links an ADM requirement to a solution, a different concept with the same verb
+
+  - id: may-change-the-model
+    concept: Whether a person may change the model (the write guard, the AI chat and routes that ask the write rule themselves)
+    status: active
+    canonical:
+      path: app/core/auth/permissions.py
+      symbols: [may_write, can, can_change_model]
+    reuse: >
+      Ask may_write(user) for "may this person change the model", or may_write(user, object_type=..., action=...) for
+      one kind of record; it reads the permission matrix through can(). The write guard in app/_bootstrap/write_access.py
+      and user_can_write in the AI tool executor both call it. A route that must give its own answer calls
+      refuse_read_only() after its own lookup; a read that saves a derived figure calls commit_unless_read_only().
+      Do not write a second answer from Permission.GENERAL, a role name or a persona.
+    must_not_create:
+      - id: second-write-answer
+        regex: 'def\s+(may_write|user_can_write|can_write_model)\s*\('
+        reason: one rule answers whether a person may change the model
+    known_exceptions:
+      - path: app/modules/ai_chat/tools/executor.py
+        reason: user_can_write loads the acting user by id and calls may_write; it holds no rule of its own
+
+  - id: chat-turn-budget
+    concept: How long a chat request may wait, whatever a provider sends, and what a Retry says of a change already recorded
+    status: active
+    canonical:
+      path: app/modules/ai_chat/services/model_defaults.py
+      symbols: [PROVIDER_FIRST_TOKEN_SECONDS, CHAT_TURN_BUDGET_SECONDS, CHAT_TURN_MARGIN_SECONDS]
+    reuse: >
+      The chat has one budget (CHAT_TURN_BUDGET_SECONDS), one margin (CHAT_TURN_MARGIN_SECONDS) and one first-token
+      limit, all in model_defaults. A provider call under the agent ends by that wall clock through
+      AgentRunner._read_within_turn (plain, text-only and streamed reads alike); a call with a time_limit ends by it
+      through read_before; the page aborts the stored-answer lookup at the lookup limit plus the
+      margin, read from the page's own settings. Do not add a second timeout constant or rely on a client timeout,
+      which is a gap between bytes. What a Retry tells the model and the person is read from the approval record
+      through AIChatApprovalService.recorded_changes and same_change, filtered by organisation, person and
+      conversation; never trust a list the browser sends.
+    must_not_create:
+      - id: second-chat-timeout-constant
+        regex: '^(CHAT|LOOKUP|ESTATE)_\w*(TIMEOUT|BUDGET|MARGIN)\w*\s*='
+        scope: [app]
+    known_exceptions:
+      - path: app/modules/ai_chat/services/model_defaults.py
+        reason: the canonical file
+
+  - id: force-graph
+    concept: The force-directed node-link graph (the impact graph and the whole-model map)
+    status: active
+    canonical:
+      path: app/static/js/impact_graph.js
+      symbols: [modelMap]
+    reuse: >
+      Draw a force-directed graph of model elements with app/static/js/impact_graph.js: its impact mode centres on one
+      element and its whole-model mode (the svg carries data-mode="model") draws every element, coloured by the layer
+      tokens, from app/services/model_map.py. Give the page a mode of this renderer; do not write a second d3 force
+      layout. app/templates/capability_map/network.html still draws its own inline force graph and is a known exception
+      to migrate in a later brief. The composer's diagram engine (JointJS) draws diagrams people compose and is a
+      different concept.
+    must_not_create:
+      - id: second-force-simulation
+        regex: 'd3\.forceSimulation\('
+        scope: [app]
+        suffixes: [.js, .html]
+    known_exceptions:
+      - path: app/templates/capability_map/network.html
+        reason: its own inline force graph, to be migrated onto impact_graph.js in a later brief
+      - path: app/static/js/archimate_diagram_renderer.js
+        reason: an older force layout inside the diagram renderer, to be moved onto impact_graph.js in a later brief
+      - path: app/templates/solutions/program_view.html
+        reason: the programme view's own inline force graph, to be moved onto impact_graph.js in a later brief
+      - path: app/templates/stakeholders/map.html
+        reason: the stakeholder map's own inline force graph, to be moved onto impact_graph.js in a later brief
+
+  - id: diagram
+    concept: Drawing a notation of the model (ArchiMate, BPMN 2.0, UML sequence, use case and class, ERD) on a screen
+    status: active
+    canonical:
+      path: app/static/js/archimate/composer_renderer.js
+      symbols: [ComposerRenderer]
+    reuse: >
+      Decided in docs/adr/0016-one-drawing-engine.md. JointJS is the one drawing library and ComposerRenderer is
+      the engine; a notation ArchiMate cannot draw is a sibling module on the same library and the shared chrome
+      in app/templates/components/diagram/ (siblings today: app/static/js/bpmn/bpmn_editor.js for BPMN and
+      app/static/js/data/erd.js for the ERD; class diagrams keep app/static/js/codegen/uml_shapes.js). The model
+      is the store: a BPMN flow lives on BusinessProcess.bpmn_flow, entities on DataEntity (register entry
+      data-model-diagram), and sequence, use case and class views are derived at read time, never stored. Do not
+      add a library, a diagram table, a second flow column or an inline svg drawing. Frozen, with the pattern that
+      stops new use named below: workflow_designer.js (code workflows), workflow_builder.js,
+      archimate_diagram_renderer.js and solution_composer_cytoscape.js (loaded by no template; to be deleted, each
+      in its own change), mermaid_diagram_generator.py (one test only), Mermaid on screen, and UMLModel.
+    must_not_create:
+      - id: frozen-diagram-script-loaded
+        regex: '(?:workflow_builder|archimate_diagram_renderer|solution_composer_cytoscape)\.js'
+        scope: [app/templates]
+        suffixes: [.html]
+      - id: frozen-workflow-designer-loaded
+        regex: 'workflow_(?:designer|shapes)\.js'
+        scope: [app/templates]
+        suffixes: [.html]
+      - id: second-diagram-library
+        regex: '(?i)(?:vendor/|from\s+|import\s+|require\()[\w/.-]*(?:cytoscape|mxgraph|bpmn-js|bpmn-moddle|gojs|konva|plantuml)'
+        scope: [app]
+        suffixes: [.html, .js, .py]
+      - id: mermaid-on-screen
+        regex: 'mermaid\.(?:initialize|render|run|contentLoaded)\s*\(|vendor/mermaid'
+        scope: [app/templates, app/static/js]
+        suffixes: [.html, .js]
+      - id: mermaid-diagram-generator-use
+        regex: '(?:from|import)\s+[\w.]*mermaid_diagram_generator'
+        scope: [app]
+        suffixes: [.py]
+      - id: second-bpmn-flow-store
+        regex: '^\s*\w*(?:bpmn|flow_doc|process_flow|flow_json)\w*\s*=\s*(?:db\.)?(?:Column|mapped_column)\('
+        scope: [app/models, app/modules]
+        suffixes: [.py]
+      - id: chat-visual-or-generator-diagram-on-a-page
+        regex: 'VisualGenerationService|visual_generation_service|structured_deliverable_service|_build_mermaid_diagram|SequenceDiagramDef'
+        scope: [app/modules/architecture, app/modules/business_architecture, app/modules/solutions_product/routes, app/templates, app/static/js]
+        suffixes: [.py, .html, .js]
+      - id: new-d3-chart-layout
+        regex: 'd3\.(?:sankey|tree|cluster)\('
+        scope: [app/static/js, app/templates]
+        suffixes: [.html, .js]
+      - id: uml-model-row-for-product-diagram
+        regex: '\bUMLModel\s*\('
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/models/process_data.py
+        reason: BusinessProcess.bpmn_flow is the one BPMN flow store named in docs/adr/0016-one-drawing-engine.md
+      - path: app/models/archimate_technology.py
+        reason: process_flow is an older text description of automation steps on a technology element; nothing
+          draws it, and it must not be used as a BPMN flow store
+      - path: app/templates/codegen/workflow_designer.html
+        reason: the frozen code workflow designer loads its own scripts; nothing new may load them
+      - path: app/templates/applications/dashboard.html
+        reason: frozen Mermaid use (mermaid_diagrams is passed empty); no new Mermaid on screen
+      - path: app/models/models.py
+        reason: UMLModel is defined here, frozen for codegen only
+      - path: app/static/js/archimate_views/traceability_sankey.js
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+      - path: app/static/js/solutions/traceability_sankey.js
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+      - path: app/templates/solutions/partials/_layer_sankey.html
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+      - path: app/static/js/organization/org_chart.js
+        reason: frozen chart, not a notation; moves follow register entry force-graph
+    note: >
+      Searched before writing: joint, d3, mermaid, plantuml, cytoscape, dagre, bpmn, UMLModel, SavedDiagram across
+      app/. dagre is a layout helper that composer.js and erd.js already use and is not a drawing library.
+
+  - id: application-model-links
+    concept: What the architecture model links to an application (technology, suppliers, every other element), and the
+      type spelling those links are read by
+    status: active
+    canonical:
+      path: app/services/application_model_links.py
+      symbols: [normalised_type, linked_elements, linked_technology, recorded_technology, linked_suppliers, linked_suppliers_by_application]
+    reuse: >
+      Read the elements linked to an application, its linked technology and its linked suppliers only through
+      application_model_links, so the application's tabs, its completeness banner and the Vendors portfolio state one
+      count. Compare element types through normalised_type ("Business Actor", "business_actor" and "BusinessActor"
+      read alike); do not write a second type normaliser or query the application's relationships beside it.
+    must_not_create:
+      - id: second-type-normaliser
+        regex: 'def\s+_?normali[sz]ed_type\s*\('
+        scope: [app]
+        suffixes: [.py]
+
+  - id: connector-framework
+    concept: How a connector changes its configuration, keeps its credentials, and makes the inventory row for an element it reads
+    status: active
+    canonical:
+      path: app/services/connector_framework.py
+      symbols: [propose_connector_change, apply_connector_change, BaseConnector.persist_records, propose_connector_sync, MULTI_CONNECTION_CREDENTIAL_TYPES, OWN_PAGE_CONNECTOR_TYPES, ensure_application_row]
+    reuse: >
+      A connector changes its configuration only through the change path (propose_connector_change,
+      apply_connector_change). A connector type that keeps one credential for each connection is named in
+      MULTI_CONNECTION_CREDENTIAL_TYPES; do not write a second per-connection credential scheme. The inventory row
+      of a connector element is made by ensure_application_row; do not write a second one.
+    must_not_create:
+      - id: second-multi-connection-list
+        regex: 'MULTI_CONNECTION_CREDENTIAL_TYPES\s*='
+        scope: [app]
+        suffixes: [.py]
+      - id: second-application-row-helper
+        regex: 'def\s+ensure_application_row\s*\('
+        scope: [app]
+        suffixes: [.py]
+
+  - id: outbound-address-guard
+    concept: The check that an address a customer or a customer's server supplied is one the server may call
+    status: active
+    canonical:
+      path: app/utils/ssrf_guard.py
+      symbols: [validate_user_supplied_url, validate_outbound_url, clamp_timeout]
+    reuse: >
+      Every address a connector requests that a customer or a customer's server supplied passes
+      validate_connector_url, which calls the guard. Do not write a second address check.
+    must_not_create:
+      - id: second-address-check-function
+        regex: 'def\s+_?(is_private_ip|is_internal_ip|is_internal_url|is_internal_host|is_blocked_ip|is_blocked_url|is_safe_url|validate_url_safe|is_public_ip)\s*\('
+        scope: [app]
+        suffixes: [.py]
+      - id: hand-rolled-private-range-test
+        regex: '\.(is_private|is_loopback|is_link_local)\b'
+        scope: [app]
+        suffixes: [.py]
+
+  - id: capability-strategic-score
+    concept: A capability's strategic score on the investment pages, recorded or worked out from the model
+    status: active
+    canonical:
+      path: app/modules/solutions_strategic/v2/services/investment_prioritization_service.py
+      symbols: [InvestmentPrioritizationService.analyze_investment_priorities, InvestmentPrioritizationService._derive_importance]
+    reuse: >
+      The recorded importance wins. Where none is recorded, _derive_importance works one out from the criticality
+      of the applications that support the capability, then its links to goals, drivers, outcomes or principles,
+      then the value streams it serves, then its open risks, and the footer says it was derived. Read the score
+      from the service result; do not write a second derivation or a stand-in score for an unrated capability.
+  - id: capability-support
+    concept: An application supporting a capability (the one relationship, its projected facts and the readers of both)
+    status: active
+    canonical:
+      path: app/services/capability_support.py
+      symbols: [record_capability_support, update_support_facts, remove_capability_support, support_rows, capabilities_of_application, applications_of_capability, unsupported_capabilities, support_summary, resolve_support_ends]
+    reuse: >
+      Support is one Realization or Serving relationship from the application's element to the capability's
+      element. Record, change or remove it with record_capability_support, update_support_facts and
+      remove_capability_support; read it with support_rows, capabilities_of_application,
+      applications_of_capability, unsupported_capabilities and support_summary. The projected row is made by the
+      projector inside the module, never by hand. Do not construct a mapping row, a coverage row or a
+      capability-application row anywhere else, and do not write a second reader.
+    must_not_create:
+      - id: unified-mapping-row
+        regex: 'UnifiedApplicationCapabilityMapping\('
+      - id: legacy-mapping-row
+        regex: '\bApplicationCapabilityMapping\('
+      - id: coverage-row
+        regex: '\bApplicationCapabilityCoverage\('
+      - id: capability-application-row
+        regex: '\bUnifiedCapabilityApplicationMapping\('
+    known_exceptions:
+      - path: app/models/unified_application_capability_mapping.py
+        reason: the model's own definition
+      - path: app/models/application_capability.py
+        reason: the model's own definition
+      - path: app/models/business_capabilities.py
+        reason: the coverage model's own definition
+      - path: app/models/capability_to_vendor_mapping.py
+        reason: the capability-application model's own definition
+
+  - id: canvas-store
+    concept: What a framework canvas (Business Model Canvas, Lean Canvas and the rest) shows in each box, and the one writer of a box entry
+    status: active
+    canonical:
+      path: app/modules/business_model_canvas/model_service.py
+      symbols: [canvas_contents, organisation_canvas, box_across_canvases, entries, place, add_entry]
+    reuse: >
+      A canvas entry is an element listed on the canvas's view with its box on that view row. Read what a canvas
+      shows with model_service.canvas_contents (the page, GET /business-model/api/<id>, the chat's get_canvas and
+      the chat's canvas answer all do) and write an entry with model_service.add_entry. Do not read the nine
+      block text columns, the profile an older canvas wrote on an element, or the box an imported model names in
+      its properties, and do not construct a view row with a box anywhere else. The text columns are kept only as
+      earlier text.
+    must_not_create:
+      - id: view-row-constructor
+        regex: 'SavedDiagramElement\('
+        scope: [app]
+        suffixes: [.py]
+      - id: block-accessor
+        regex: '\.(get_block|set_block)\('
+        scope: [app]
+        suffixes: [.py]
+      - id: block-text-read
+        regex: '\bcanvas\.(key_partners|key_activities|key_resources|value_propositions|customer_relationships|channels|customer_segments|cost_structure|revenue_streams)\b'
+        scope: [app]
+        suffixes: [.py]
+      - id: legacy-profile-read
+        regex: 'acm_properties.*profile'
+        scope: [app]
+        suffixes: [.py]
+      - id: imported-box-read
+        regex: 'custom_properties.*canvas_block'
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/models/business_model.py
+        reason: the model that owns the block text columns
+      - path: app/models/archimate_core.py
+        reason: the model that defines the view row
+      - path: app/services/archimate_import_service.py
+        reason: the import that writes the box an imported model names; its placement moves to the canonical writer in a later change
+
+  - id: canvas-view
+    concept: The page that draws a framework canvas and the function that says which element is in which box
+    status: active
+    canonical:
+      path: app/templates/components/canvas/_frame.html
+      symbols: [frame]
+    reuse: >
+      The canvas page is business_model/detail.html drawing the components/canvas frame, fed by
+      model_service.canvas_contents through routes._canvas_boxes. Do not add a second canvas page template, and
+      do not write a second function that decides which element is in which box.
+    must_not_create:
+      - id: second-canvas-membership
+        regex: 'def\s+(canvas_membership|box_members|elements_in_box|canvas_box_elements)\s*\('
+        scope: [app]
+        suffixes: [.py]
+      - id: second-canvas-page
+        regex: '{%-?\s*macro\s+(draw_canvas|render_canvas|canvas_page)\s*\('
+
+  - id: risk-store
+    concept: Where a risk is recorded, what it touches, and which risks touch an element
+    status: active
+    canonical:
+      path: app/services/risk_service.py
+      symbols: [create_risk, get_risk, add_risk_link, risks_linked_to, risk_ids_touching_elements, ranked_risks]
+    reuse: >
+      A risk is a row of risks and what it touches is a row of risk_entity_links, both written by
+      risk_service (create_risk takes the links and the organisation and writes them in one transaction).
+      Ask which risks touch an element with risk_ids_touching_elements, and which risks a record has with
+      risks_linked_to. Do not add a row to solution_risks or risk_assessments, build a risk or a link
+      outside risk_service, or read Risk.archimate_element_id as what the risk touches: it is the risk's
+      own mirror.
+    known_exceptions:
+      - path: app/commands/backfill_solution_risk_merge.py
+        reason: the one-off copy of the old table into the register
+      - path: app/commands/seed_demo_company.py
+        reason: demonstration data
+      - path: app/services/sample_company_service.py
+        reason: demonstration data
+      - path: app/models/
+        reason: the model definitions themselves
+    must_not_create:
+      - id: second-solution-risk-row
+        regex: '\bSolutionRisk\('
+        scope: [app]
+        suffixes: [.py]
+      - id: second-risk-assessment-row
+        regex: '\bRiskAssessment\('
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-link-built-outside-the-service
+        regex: '\bRiskEntityLink\('
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-built-outside-the-service
+        regex: '(?<![A-Za-z_.])Risk\('
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-solution-pointer-read
+        regex: 'Risk\.solution_id'
+        scope: [app]
+        suffixes: [.py]
+      - id: risk-element-pointer-read
+        regex: 'Risk\.archimate_element_id\s*(==|\.in_\()'
+        scope: [app]
+        suffixes: [.py]
+
+  - id: risk-link-picker
+    concept: The control that links a risk to an application, capability, solution or programme
+    status: active
+    canonical:
+      path: app/templates/components/risk_link_picker.html
+      symbols: [risk_link_picker, risk_link_picker_script]
+    reuse: >
+      The register's slide-over and the Add Risk dialog both draw risk_link_picker and spread
+      riskLinkPicker() into their Alpine state. Do not write a second search box, type select or chip list
+      for linking a risk.
+    must_not_create:
+      - id: second-link-search
+        regex: 'searchLinkEntities'
+        scope: [app/templates]
+        suffixes: [.html]

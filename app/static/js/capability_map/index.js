@@ -146,7 +146,7 @@
     
         // Standard colors for common domains
         const standardColors = {
-            'CUST': 'bg-primary/10 text-primary/90',
+            'CUST': 'bg-primary/10 text-info-emphasis',
             'PROD': 'bg-sky-100 text-sky-800',
             'OPER': 'bg-amber-500/10 text-yellow-800',
             'FIN': 'bg-purple-100 text-purple-800',
@@ -157,7 +157,7 @@
             'TECH': 'bg-muted text-foreground',
             'MFG': 'bg-orange-100 text-orange-800',
             'Manufacturing': 'bg-orange-100 text-orange-800',
-            'Enterprise': 'bg-primary/10 text-primary/90',
+            'Enterprise': 'bg-primary/10 text-info-emphasis',
             'Experience': 'bg-sky-100 text-sky-800',
             'Engineering': 'bg-amber-500/10 text-yellow-800',
             'Integration': 'bg-purple-100 text-purple-800',
@@ -175,7 +175,7 @@
     
         // Generate consistent color for unknown domains
         const colors = [
-            'bg-primary/10 text-primary/90',
+            'bg-primary/10 text-info-emphasis',
             'bg-sky-100 text-sky-800',
             'bg-amber-500/10 text-yellow-800',
             'bg-purple-100 text-purple-800',
@@ -195,7 +195,7 @@
     
     function getTypeColor(type) {
         const colors = {
-            'core': 'bg-primary/10 text-primary/90',
+            'core': 'bg-primary/10 text-info-emphasis',
             'supporting': 'bg-muted text-foreground',
             'differentiating': 'bg-sky-100 text-sky-800'
         };
@@ -461,29 +461,29 @@
         }
     
         const domainColorSets = [
-            { bg: 'bg-primary/5', border: 'border-primary/20', textBold: 'text-primary', textHead: 'text-primary/90', badge: 'bg-primary/10' },
-            { bg: 'bg-sky-50', border: 'border-sky-200', textBold: 'text-sky-600', textHead: 'text-sky-800', badge: 'bg-sky-100' },
-            { bg: 'bg-purple-50', border: 'border-purple-200', textBold: 'text-primary', textHead: 'text-purple-800', badge: 'bg-purple-100' },
-            { bg: 'bg-orange-50', border: 'border-orange-200', textBold: 'text-orange-600', textHead: 'text-orange-800', badge: 'bg-orange-100' },
-            { bg: 'bg-teal-50', border: 'border-teal-200', textBold: 'text-teal-600', textHead: 'text-teal-800', badge: 'bg-teal-100' },
-            { bg: 'bg-indigo-50', border: 'border-indigo-200', textBold: 'text-primary', textHead: 'text-indigo-800', badge: 'bg-indigo-100' },
-            { bg: 'bg-pink-50', border: 'border-pink-200', textBold: 'text-pink-600', textHead: 'text-pink-800', badge: 'bg-pink-100' },
-            { bg: 'bg-cyan-50', border: 'border-cyan-200', textBold: 'text-cyan-600', textHead: 'text-cyan-800', badge: 'bg-cyan-100' },
-            { bg: 'bg-amber-50', border: 'border-amber-200', textBold: 'text-amber-600', textHead: 'text-amber-800', badge: 'bg-amber-100' },
+            { bg: 'bg-primary/5', border: 'border-primary/20', textBold: 'text-info-emphasis', textHead: 'text-info-emphasis', badge: 'bg-primary/10' },
+            { bg: 'bg-layer-implementation/5', border: 'border-layer-implementation/30', textBold: 'text-layer-implementation-emphasis', textHead: 'text-layer-implementation-emphasis', badge: 'bg-layer-implementation/10' },
+            { bg: 'bg-layer-motivation/5', border: 'border-layer-motivation/30', textBold: 'text-layer-motivation-emphasis', textHead: 'text-layer-motivation-emphasis', badge: 'bg-layer-motivation/10' },
+            { bg: 'bg-layer-strategy/5', border: 'border-layer-strategy/30', textBold: 'text-layer-strategy-emphasis', textHead: 'text-layer-strategy-emphasis', badge: 'bg-layer-strategy/10' },
+            { bg: 'bg-layer-business/5', border: 'border-layer-business/30', textBold: 'text-layer-business-emphasis', textHead: 'text-layer-business-emphasis', badge: 'bg-layer-business/10' },
+            { bg: 'bg-layer-application/5', border: 'border-layer-application/30', textBold: 'text-layer-application-emphasis', textHead: 'text-layer-application-emphasis', badge: 'bg-layer-application/10' },
+            { bg: 'bg-layer-risk/5', border: 'border-layer-risk/30', textBold: 'text-layer-risk-emphasis', textHead: 'text-layer-risk-emphasis', badge: 'bg-layer-risk/10' },
+            { bg: 'bg-layer-technology/5', border: 'border-layer-technology/30', textBold: 'text-layer-technology-emphasis', textHead: 'text-layer-technology-emphasis', badge: 'bg-layer-technology/10' },
+            { bg: 'bg-warning/5', border: 'border-warning/30', textBold: 'text-warning-emphasis', textHead: 'text-warning-emphasis', badge: 'bg-warning/10' },
         ];
     
         safeHTML(grid, domains.map((domain, index) => {
             const cs = domainColorSets[index % domainColorSets.length];
             const coverage = domain.total > 0 ? Math.round((domain.mapped / domain.total) * 100) : 0;
-            const coverageColor = coverage >= 70 ? 'text-sky-600' : coverage >= 40 ? 'text-amber-600' : 'text-rose-600';
-            const barColor = coverage >= 70 ? 'bg-sky-500' : coverage >= 40 ? 'bg-amber-500' : 'bg-rose-500';
-            const statusColor = coverage >= 70 ? 'bg-sky-400' : coverage >= 40 ? 'bg-amber-400' : 'bg-rose-400';
+            const coverageColor = coverage >= 70 ? 'text-layer-implementation-emphasis' : coverage >= 40 ? 'text-warning-emphasis' : 'text-destructive-emphasis';
+            const barColor = coverage >= 70 ? 'bg-layer-implementation-emphasis' : coverage >= 40 ? 'bg-warning' : 'bg-destructive';
+            const statusColor = coverage >= 70 ? 'bg-layer-implementation-emphasis' : coverage >= 40 ? 'bg-warning' : 'bg-destructive';
     
             return `
                 <button type="button"
                      class="${cs.bg} border-2 ${cs.border} rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer text-left w-full"
                      data-domain-filter="${escapeAttr(domain.key)}"
-                     aria-label="Filter capabilities to ${escapeHtml(domain.name)}">
+                     title="Filter capabilities to ${escapeHtml(domain.name)}">
                     <div class="flex items-start justify-between mb-3">
                         ${domain.code && domain.code !== 'N/A'
                             ? `<span class="text-xs font-bold ${cs.textBold} ${cs.badge} px-2 py-0.5 rounded">${escapeHtml(domain.code)}</span>`
@@ -725,6 +725,7 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                     <div class="font-medium text-foreground">${escapeHtml(item.name || item.capability_name || 'Unknown')}</div>
+                    ${item.source && item.source.indexOf('starter:') === 0 ? `<div class="text-xs font-normal text-muted-foreground" data-testid="capability-source">Starter capability from ${escapeHtml(item.source.slice(8))}, chosen at sign-up</div>` : ''}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     <span class="px-2 py-1 text-xs rounded-full ${domainColor}">
@@ -765,7 +766,7 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     <div class="flex items-center">
                         <div class="w-16 bg-border rounded-full h-2 mr-2">
-                            <div class="${isMapped ? 'bg-sky-600' : 'bg-rose-600'} h-2 rounded-full" style="width: ${item.coverage_percentage || (isMapped ? 100 : 0)}%"></div>
+                            <div class="${isMapped ? 'bg-layer-implementation-emphasis' : 'bg-destructive'} h-2 rounded-full" style="width: ${item.coverage_percentage || (isMapped ? 100 : 0)}%"></div>
                         </div>
                         <span class="text-xs">${item.coverage_percentage || (isMapped ? 100 : 0)}%</span>
                     </div>
@@ -1009,6 +1010,8 @@
                     setTimeout(() => loadBusinessDomainCards(), 100);
                 } else if (tab === 'capability-model') {
                     setTimeout(() => loadCapabilityModelTab(), 100);
+                } else if (tab === 'flow') {
+                    setTimeout(() => window.dispatchEvent(new CustomEvent('load-sankey-0')), 100);
                 } else if (tab === 'manufacturing') {
                     setTimeout(() => loadManufacturingDomainStats(), 100);
                 } else if (tab === 'gaps') {
@@ -1051,13 +1054,24 @@
     let currentEditGapId = null;
     let currentEditWPId = null;
     
-    // Gap type colors
-    const GAP_TYPE_COLORS = {
-        'coverage': '#6B7280',      // Gray
-        'quality': '#EAB308',       // Yellow
-        'retirement': '#EF4444',    // Red
-        'modernization': '#A855F7'  // Purple
+    // A design token as a #rrggbb string, for colours that are saved on a record or
+    // handed to <input type="color">. Resolved when used so it follows the theme.
+    function tokenHex(token) {
+        return window.ArchieColorTokens.cssHex(token, 'muted-foreground');
+    }
+
+    // Gap type colors (token names, resolved by gapTypeColors())
+    const GAP_TYPE_TOKENS = {
+        'coverage': 'muted-foreground',
+        'quality': 'warning',
+        'retirement': 'destructive',
+        'modernization': 'layer-motivation'
     };
+    function gapTypeColors() {
+        const out = {};
+        Object.keys(GAP_TYPE_TOKENS).forEach(k => { out[k] = tokenHex(GAP_TYPE_TOKENS[k]); });
+        return out;
+    }
     
     // Initialize roadmap tab when clicked
     // MEASURED, 31 Aug 2026: this whole roadmap renderer no longer reaches the
@@ -1172,12 +1186,13 @@
     
     // Get color based on primary gap type
     function getGapTypeColor(gapTypes) {
-        if (!gapTypes || gapTypes.length === 0) return '#6B7280';
+        const colors = gapTypeColors();
+        if (!gapTypes || gapTypes.length === 0) return colors.coverage;
         // Priority: retirement > modernization > quality > coverage
-        if (gapTypes.includes('retirement')) return GAP_TYPE_COLORS.retirement;
-        if (gapTypes.includes('modernization')) return GAP_TYPE_COLORS.modernization;
-        if (gapTypes.includes('quality')) return GAP_TYPE_COLORS.quality;
-        return GAP_TYPE_COLORS.coverage;
+        if (gapTypes.includes('retirement')) return colors.retirement;
+        if (gapTypes.includes('modernization')) return colors.modernization;
+        if (gapTypes.includes('quality')) return colors.quality;
+        return colors.coverage;
     }
     
     // Get gap type badge HTML
@@ -1824,7 +1839,7 @@
             // Visual hierarchy: connecting lines
             let hierarchyLines = '';
             for (let i = 1; i < level; i++) {
-                hierarchyLines += `<div class="absolute" style="left: ${12 + (i * 28)}px; top: 0; bottom: 0; width: 1px; background-color: #d1d5db;"></div>`;
+                hierarchyLines += `<div class="absolute bg-border" style="left: ${12 + (i * 28)}px; top: 0; bottom: 0; width: 1px;"></div>`;
             }
     
             html += `
@@ -1834,8 +1849,8 @@
                      data-level="${level}">
                     ${hierarchyLines}
                     ${level > 0 ? `
-                        <div class="absolute" style="left: ${12 + ((level - 1) * 28)}px; top: 0; width: 24px; height: 50%; border-left: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db;"></div>
-                        ${!isLastChild ? `<div class="absolute" style="left: ${12 + ((level - 1) * 28)}px; top: 50%; bottom: 0; width: 1px; background-color: #d1d5db;"></div>` : ''}
+                        <div class="absolute border-l border-b border-border" style="left: ${12 + ((level - 1) * 28)}px; top: 0; width: 24px; height: 50%;"></div>
+                        ${!isLastChild ? `<div class="absolute bg-border" style="left: ${12 + ((level - 1) * 28)}px; top: 50%; bottom: 0; width: 1px;"></div>` : ''}
                     ` : ''}
                     <div class="flex items-center gap-2.5 w-full relative z-10">
                         ${hasChildren ? `
@@ -1907,7 +1922,7 @@
                 <!-- Grid columns -->
                 <div class="absolute inset-0 flex">
                     ${roadmapData.timelinePeriods.map(() =>
-                        `<div style="width: ${columnWidth}px; min-width: ${columnWidth}px; border-right: 1px solid #f3f4f6;"></div>`
+                        `<div class="border-r border-border/50" style="width: ${columnWidth}px; min-width: ${columnWidth}px;"></div>`
                     ).join('')}
                 </div>
                 <!-- Bar -->
@@ -1971,13 +1986,13 @@
                     <!-- Grid columns -->
                     <div class="absolute inset-0 flex">
                         ${roadmapData.timelinePeriods.map(() =>
-                            `<div style="width: ${columnWidth}px; min-width: ${columnWidth}px; border-right: 1px solid #f3f4f6;"></div>`
+                            `<div class="border-r border-border/50" style="width: ${columnWidth}px; min-width: ${columnWidth}px;"></div>`
                         ).join('')}
                     </div>
                     <!-- Work Package Bar with indentation -->
                     <div class="absolute rounded-md flex items-center cursor-pointer hover:opacity-90 transition-opacity group"
                          style="left: calc(${wpBarStyle.left} + ${indentPx}px); width: calc(${wpBarStyle.width} - ${indentPx}px); top: 50%; transform: translateY(-50%); height: ${barHeight}px; background: linear-gradient(135deg, ${wpColor} 0%, ${wpDarkerColor} 100%); box-shadow: 0 1px 3px rgba(0,0,0,0.1);"
-                         title="Level ${level}: ${escapeHtml(wp.name)}\nStatus: ${escapeHtml(wp.status || 'Not Started')}\nProgress: ${wp.percent_complete || 0}%\nOwner: ${escapeHtml(wp.owner_name || 'Unassigned')}"
+                         title="Level ${level}: ${escapeHtml(wp.name)}\nStatus: ${escapeHtml(wp.status || 'Not Started')}\nProgress: ${Platform.figure.percent(wp.percent_complete)}\nOwner: ${escapeHtml(wp.owner_name || 'Unassigned')}"
                          role="button" tabindex="0"
                          data-cm-action="open-edit-wp" data-wp-id="${escapeAttr(wp.id)}"
                          aria-label="Edit work package ${escapeAttr(wp.name)}">
@@ -2002,14 +2017,14 @@
     
     // Get color based on hierarchy level
     function getColorByLevel(level) {
-        const colors = {
-            1: '#60A5FA', // Blue - L1 (Major phases)
-            2: '#34D399', // Green - L2 (Tasks)
-            3: '#F59E0B', // Amber - L3 (Subtasks)
-            4: '#A78BFA', // Purple - L4 (Activities)
-            5: '#EC4899'  // Pink - L5 (Steps)
+        const tokens = {
+            1: 'layer-application', // L1 (Major phases)
+            2: 'success',           // L2 (Tasks)
+            3: 'warning',           // L3 (Subtasks)
+            4: 'layer-motivation',  // L4 (Activities)
+            5: 'layer-risk'         // L5 (Steps)
         };
-        return colors[level] || '#6B7280'; // Gray fallback
+        return tokenHex(tokens[level] || 'muted-foreground');
     }
     
     // Toggle work package expansion
@@ -2633,7 +2648,7 @@
         if (filters.length > 0) {
             activeFiltersDisplay.classList.remove('hidden');
             safeHTML(activeFiltersTags, filters.map(f => `
-                <span class="inline-flex items-center px-3 py-1 bg-primary/10 text-primary/90 rounded-full text-sm">
+                <span class="inline-flex items-center px-3 py-1 bg-primary/10 text-info-emphasis rounded-full text-sm">
                     ${f.label}
                     <button type="button" data-cm-action="clear-filter" data-field="${escapeAttr(f.field)}" aria-label="Clear filter" class="ml-2 hover:text-blue-900">
                         <i data-lucide="x" class="w-3 h-3"></i>
@@ -3082,11 +3097,11 @@
     // which breaks Tailwind purge (e.g. bg-${color}-600 won't be found at build time)
     function getProgressBarClass(progress) {
         if (progress === 0) return 'bg-muted-foreground/20';
-        if (progress < 25) return 'bg-rose-600';
+        if (progress < 25) return 'bg-destructive';
         if (progress < 50) return 'bg-orange-600';
         if (progress < 75) return 'bg-yellow-600';
         if (progress < 100) return 'bg-primary';
-        return 'bg-sky-600';
+        return 'bg-layer-implementation-emphasis';
     }
 
     function getProgressTextClass(progress) {
@@ -3479,7 +3494,7 @@
                 useCORS: true,
                 allowTaint: true,
                 logging: false,
-                backgroundColor: '#ffffff',
+                backgroundColor: tokenHex('background'),
                 scrollY: -window.scrollY,
                 scrollX: -window.scrollX,
                 windowWidth: document.documentElement.scrollWidth,
@@ -3545,7 +3560,7 @@
                 useCORS: true,
                 allowTaint: true,
                 logging: false,
-                backgroundColor: '#ffffff',
+                backgroundColor: tokenHex('background'),
                 scrollY: -window.scrollY,
                 scrollX: -window.scrollX,
                 windowWidth: document.documentElement.scrollWidth,
@@ -3874,7 +3889,7 @@
         getEl('edit-gap-status').value = gap.resolution_status || 'identified';
         getEl('edit-gap-start-date').value = gap.start_date || '';
         getEl('edit-gap-end-date').value = gap.end_date || '';
-        getEl('edit-gap-color').value = gap.color || '#6B7280';
+        getEl('edit-gap-color').value = gap.color || tokenHex('muted-foreground');
         getEl('edit-gap-owner').value = gap.business_owner || '';
         getEl('edit-gap-effort').value = gap.estimated_effort_days || '';
         getEl('edit-gap-cost').value = gap.estimated_cost || '';
@@ -3899,10 +3914,19 @@
         currentEditGapId = null;
     }
     
-    function setGapColor(color) {
-        getEl('edit-gap-color').value = color;
+    function setGapColor(token) {
+        getEl('edit-gap-color').value = tokenHex(token);
     }
     
+    function setRoadmapColor(token) {
+        getEl('add-roadmap-color').value = tokenHex(token);
+    }
+
+    window.addEventListener('load', () => {
+        const addColor = document.getElementById('add-roadmap-color');
+        if (addColor) addColor.value = tokenHex('muted-foreground');
+    });
+
     async function loadGapWorkPackages(gapId) {
         const container = getEl('edit-gap-work-packages');
         safeHTML(container, '<p class="text-sm text-muted-foreground">Loading work packages...</p>');
@@ -3918,7 +3942,7 @@
                     safeHTML(container, wps.map(wp => `
                         <div class="flex items-center justify-between p-2 bg-muted/50 rounded border border-border">
                             <div class="flex items-center space-x-2">
-                                <span class="w-3 h-3 rounded" style="background-color: ${wp.color || '#3B82F6'}"></span>
+                                <span class="w-3 h-3 rounded" style="background-color: ${wp.color || tokenHex('layer-application')}"></span>
                                 <span class="text-sm font-medium">${escapeHtml(wp.name)}</span>
                                 <span class="text-xs text-muted-foreground">${escapeHtml(wp.status)}</span>
                             </div>
@@ -4058,10 +4082,10 @@
                 getEl('edit-wp-description').value = wp.description || '';
                 getEl('edit-wp-status').value = wp.status || 'planned';
                 getEl('edit-wp-priority').value = wp.priority || 'medium';
-                getEl('edit-wp-progress').value = wp.percent_complete || 0;
+                getEl('edit-wp-progress').value = wp.percent_complete ?? '';
                 getEl('edit-wp-start-date').value = wp.start_date || '';
                 getEl('edit-wp-end-date').value = wp.end_date || '';
-                getEl('edit-wp-color').value = wp.color || '#3B82F6';
+                getEl('edit-wp-color').value = wp.color || tokenHex('layer-application');
                 getEl('edit-wp-est-hours').value = wp.estimated_effort_hours || '';
                 getEl('edit-wp-act-hours').value = wp.actual_effort_hours || '';
                 getEl('edit-wp-est-cost').value = wp.estimated_cost || '';
@@ -4080,12 +4104,12 @@
                     cancelled: 'Cancelled'
                 };
                 getEl('wp-stat-status').textContent = statusLabels[wp.status] || 'Planned';
-                getEl('wp-stat-progress').textContent = (wp.percent_complete || 0) + '%';
+                getEl('wp-stat-progress').textContent = Platform.figure.percent(wp.percent_complete);
                 getEl('wp-stat-owner').textContent = wp.owner_name || 'Unassigned';
                 getEl('wp-stat-children').textContent = wp.child_count || 0;
     
                 // Update progress display
-                updateWPProgressDisplay(wp.percent_complete || 0);
+                updateWPProgressDisplay(wp.percent_complete);
     
                 // Load children data
                 loadWPChildren(wp.children || []);
@@ -4211,9 +4235,9 @@
     }
     
     function updateWPProgressDisplay(value) {
-        getEl('edit-wp-progress-value').textContent = value + '%';
-        getEl('edit-wp-progress-bar').style.width = value + '%';
-        getEl('wp-stat-progress').textContent = value + '%';
+        getEl('edit-wp-progress-value').textContent = Platform.figure.percent(value);
+        getEl('edit-wp-progress-bar').style.width = Platform.figure.barWidth(value) + '%';
+        getEl('wp-stat-progress').textContent = Platform.figure.percent(value);
     }
     
     // Store children data for filtering
@@ -4311,7 +4335,7 @@
                                 <div class="flex items-center space-x-3 text-xs text-muted-foreground">
                                     <span>Priority: ${escapeHtml(child.priority || 'medium')}</span>
                                     <span>•</span>
-                                    <span>Progress: ${child.percent_complete || 0}%</span>
+                                    <span>Progress: ${Platform.figure.percent(child.percent_complete)}</span>
                                     ${child.owner_name ? `<span>•</span><span>Owner: ${escapeHtml(child.owner_name)}</span>` : ''}
                                 </div>
                             </div>
@@ -4572,7 +4596,7 @@
                         priority: priority,
                         start_date: today.toISOString().split('T')[0],
                         end_date: endDate.toISOString().split('T')[0],
-                        color: '#6B7280',
+                        color: tokenHex('muted-foreground'),
                         create_work_packages: false
                     },
                     silent: true
@@ -4977,8 +5001,8 @@
             getEl('process-total-count').textContent = stats.total_processes || 0;
             getEl('process-unmapped-count').textContent = stats.unmapped_processes || 0;
             getEl('process-critical-count').textContent = stats.critical_gaps || 0;
-            getEl('process-coverage-pct').textContent = (stats.coverage_percentage || 0) + '%';
-            getEl('process-automation-pct').textContent = (stats.automation_coverage || 0) + '%';
+            getEl('process-coverage-pct').textContent = Platform.figure.percent(stats.coverage_percentage);
+            getEl('process-automation-pct').textContent = Platform.figure.percent(stats.automation_coverage);
     
             // Update table
             updateProcessGapTable();
@@ -5108,7 +5132,7 @@
         // Process type badge colors
         const typeColors = {
             'core': 'bg-purple-100 text-purple-800',
-            'support': 'bg-primary/10 text-primary/90',
+            'support': 'bg-primary/10 text-info-emphasis',
             'management': 'bg-muted text-foreground'
         };
         const typeColor = typeColors[item.process_type] || 'bg-muted text-foreground';
@@ -5687,7 +5711,7 @@
                             type="number"
                             min="0"
                             max="100"
-                            value="${mappingData.coverage_percentage || 0}"
+                            value="${mappingData.coverage_percentage ?? ''}"
                             aria-label="Coverage %"
                             class="w-full text-sm border border-input rounded px-2 py-1"
                             data-cm-change="update-app-mapping" data-app-id="${escapeAttr(appId)}" data-field="coverage_percentage" data-parse="int"
@@ -6077,6 +6101,7 @@
     if (typeof closeDeleteConfirmModal !== 'undefined') window.closeDeleteConfirmModal = closeDeleteConfirmModal;
     if (typeof confirmDelete !== 'undefined') window.confirmDelete = confirmDelete;
     if (typeof setGapColor !== 'undefined') window.setGapColor = setGapColor;
+    window.setRoadmapColor = setRoadmapColor;
     
     // Work Package Functions
     if (typeof addWorkPackageToGap !== 'undefined') window.addWorkPackageToGap = addWorkPackageToGap;

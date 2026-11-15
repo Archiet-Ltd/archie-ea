@@ -11,13 +11,23 @@ from pathlib import Path
 from flask import Flask, render_template
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-from component_inventory import build_inventory  # noqa: E402
+from component_inventory import build_inventory, view_guards  # noqa: E402
 
 FIX = Path(__file__).parent / "fixtures" / "component_inventory_pages"
 
 
 def login_required(f):
     return f
+
+
+def _require_admin():
+    """Guard function that checks auth and aborts."""
+    from flask import abort
+    from flask_login import current_user
+    if not current_user or not current_user.is_authenticated:
+        abort(401)
+    if not getattr(current_user, "is_admin", False):
+        abort(403)
 
 
 def make_app():
@@ -44,6 +54,26 @@ def make_app():
     def item(item_id):
         return "x"
 
+    # Route with in-function guard call (like run-record routes)
+    @app.route("/guarded-in-function")
+    def guarded_in_function():
+        _require_admin()
+        return "guarded"
+
+    # Route with in-function guard call that returns error tuple
+    def _require_org_admin_tuple():
+        from flask import jsonify
+        from flask_login import current_user
+        if not current_user or not current_user.is_authenticated:
+            return jsonify({"error": "unauthorized"}), 401
+        if not getattr(current_user, "is_org_admin", False):
+            return jsonify({"error": "forbidden"}), 403
+
+    @app.route("/guarded-in-function-tuple")
+    def guarded_in_function_tuple():
+        _require_org_admin_tuple()
+        return "guarded"
+
     return app
 
 
@@ -64,7 +94,7 @@ def test_one_route_per_url_map_rule():
     rules = {(r["rule"], tuple(r["methods"])) for r in inv["routes"]}
     assert ("/page", ("GET",)) in rules and ("/change", ("POST",)) in rules
     assert ("/item/<int:item_id>", ("DELETE", "GET")) in rules
-    assert inv["counts"]["routes"] == len(inv["routes"]) == 6  # five rules plus static
+    assert inv["counts"]["routes"] == len(inv["routes"]) == 8  # seven rules plus static
 
 
 def test_route_carries_methods_endpoint_blueprint_and_login():
@@ -75,6 +105,46 @@ def test_route_carries_methods_endpoint_blueprint_and_login():
     home = next(r for r in inv["routes"] if r["rule"] == "/")
     assert home["login_required"] is False
     assert page["page"] is True and next(r for r in inv["routes"] if r["rule"] == "/change")["page"] is False
+
+
+def test_in_function_guard_is_detected():
+    """Routes guarded by a call at the top of the function are marked login_required with the guard named."""
+    inv = _build()
+    
+    # Route with abort-based guard
+    guarded = next(r for r in inv["routes"] if r["rule"] == "/guarded-in-function")
+    assert guarded["login_required"] is True, "Route with in-function abort guard should be login_required"
+    assert "_require_admin" in guarded["guards"], f"Guard _require_admin should be named, got {guarded['guards']}"
+    
+    # Route with tuple-return guard
+    guarded_tuple = next(r for r in inv["routes"] if r["rule"] == "/guarded-in-function-tuple")
+    assert guarded_tuple["login_required"] is True, "Route with in-function tuple guard should be login_required"
+    assert "_require_org_admin_tuple" in guarded_tuple["guards"], f"Guard _require_org_admin_tuple should be named, got {guarded_tuple['guards']}"
+
+
+def test_view_guards_detects_in_function_calls():
+    """Unit test for view_guards function with in-function guard calls."""
+    app = make_app()
+    with app.app_context():
+        # Test abort-based guard
+        guarded_view = app.view_functions["guarded_in_function"]
+        guards = view_guards(guarded_view)
+        assert "_require_admin" in guards, f"Expected _require_admin in guards, got {guards}"
+        
+        # Test tuple-return guard
+        guarded_tuple_view = app.view_functions["guarded_in_function_tuple"]
+        guards = view_guards(guarded_tuple_view)
+        assert "_require_org_admin_tuple" in guards, f"Expected _require_org_admin_tuple in guards, got {guards}"
+        
+        # Test decorator-only guard
+        page_view = app.view_functions["page"]
+        guards = view_guards(page_view)
+        assert "login_required" in guards, f"Expected login_required in guards, got {guards}"
+        
+        # Test unguarded route
+        home_view = app.view_functions["home"]
+        guards = view_guards(home_view)
+        assert guards == [], f"Expected no guards for home, got {guards}"
 
 
 def test_page_controls_come_through_extends_and_include():

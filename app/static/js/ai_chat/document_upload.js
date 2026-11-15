@@ -43,11 +43,22 @@ function aiChatDocumentUploader() {
             claude: { name: 'Claude', icon: 'bot' },
             openai: { name: 'GPT-4', icon: 'sparkles' },
             gemini: { name: 'Gemini', icon: 'zap' },
-            deepseek: { name: 'DeepSeek', icon: 'cpu' },
+            nvidia: { name: 'NVIDIA', icon: 'cpu' },
             huggingface: { name: 'Hugging Face', icon: 'brain' }
         },
 
         init() {
+            // A vendor record links here with ?vendor=<id>: preselect that vendor.
+            const preVendor = new URLSearchParams(window.location.search).get('vendor');
+            if (preVendor && /^\d+$/.test(preVendor)) {
+                this.analysisContext = 'vendor';
+                this.targetVendorId = preVendor;
+                // The options render after the list arrives; set the value again once they exist.
+                this.loadVendors().then(() => {
+                    this.targetVendorId = '';
+                    this.$nextTick(() => { this.targetVendorId = preVendor; });
+                });
+            }
             // Get current domain and persona from parent scope
             this.currentDomain = this.$el.closest('[x-data]')?.currentDomain || 'general';
             this.currentPersona = this.$el.closest('[x-data]')?.currentPersona || '';

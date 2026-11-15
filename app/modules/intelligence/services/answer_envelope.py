@@ -47,7 +47,8 @@ from app.modules.intelligence.services.query_service import (
 KIND_IMPACT = "impact"
 KIND_SET_IMPACT = "set_impact"
 KIND_RISK_PROPAGATION = "risk_propagation"
-ANSWER_KINDS = (KIND_IMPACT, KIND_SET_IMPACT, KIND_RISK_PROPAGATION)
+KIND_DATA_FLOW = "data_flow"
+ANSWER_KINDS = (KIND_IMPACT, KIND_SET_IMPACT, KIND_RISK_PROPAGATION, KIND_DATA_FLOW)
 
 CONFIDENCE_LOWEST_DERIVED = "lowest_derived_row"
 CONFIDENCE_DRAWN_ONLY = "drawn_facts_only"
@@ -117,19 +118,79 @@ def as_whole_number(raw: Any, name: str = "value") -> Any:
 # assistant uses it to tell an estate question (which must be answered from a
 # stored answer) from general conversation.
 _QUESTION_CUES = (
+    (
+        KIND_DATA_FLOW,
+        re.compile(r"\bdata\s+(flows?|lineage)\b|\bwhere does\b.+\bdata\b.+\b(flow|go)\b|\blineage\b", re.I),
+    ),
     (KIND_RISK_PROPAGATION, re.compile(r"\b(risks?)\b.*\b(reach|affect|touch|expos|propagat)", re.I)),
     (KIND_SET_IMPACT, re.compile(r"\b(fail|fails|go down|are down|outage)\b.*\btogether\b|\btogether\b.*\b(fail|down)", re.I)),
     (
         KIND_IMPACT,
         re.compile(
             r"what\s+(breaks|stops|fails|is affected|would break|depends)|"
-            r"\bblast radius\b|\bimpact (of|if)\b|\bif\b.+\b(fails?|goes down|is retired|is decommissioned)\b|"
-            r"\b(depends?|depend) on\b|\bwhat (calls|uses)\b|\bwho owns\b|"
+            r"\bblast radius\b|\bimpact (of|if)\b|"
+            r"\bif\b.+\b(fails?|goes down|is retired|is decommissioned|is removed|is replaced|was retired|was decommissioned|was removed|was replaced)\b|"
+            r"\bwhat\s+(if|happens if)\b.*\b(retire|decommission|remove|replace)\b|"
+            r"\b(depends?|depend) on\b|\bwhat (calls|uses)\b|"
             r"\b(relies|rely|relied) on\b|\bconnected to\b|\b(everything|anything|which|what|list)\b.*\b(uses?|relies|connected)\b",
             re.I,
         ),
     ),
 )
+
+
+# The parts of a question about one element that the chat answers separately, in
+# the words people use. "who owns" is answered by the accountability lens; "what
+# does it run on" and "what does it depend on" by the impact walk upstream; "what
+# breaks" by the same walk downstream.
+PART_OWNER = "owner"
+PART_RUNS_ON = "runs_on"
+PART_DEPENDS_ON = "depends_on"
+PART_BREAKS = "breaks"
+UPSTREAM_PARTS = (PART_RUNS_ON, PART_DEPENDS_ON)
+
+OWNER_CUE = re.compile(
+    r"\bwho\s+owns\b|\bwho(?:'s|\u2019s| is) responsible\b|\bowned by\b|\b\w+(?:'s|\u2019s)\s+owners?\b|\bowners? of\b",
+    re.I,
+)
+_RUNS_ON_CUE = re.compile(
+    r"\b(?:does|do|did|will)\b[^?,;]*?\b(?:run|runs)\s+on\b|\bwhere\s+(?:is|are|does|do)\b[^?]*?\b(?:hosted|run|runs)\b|\bhosted\b",
+    re.I,
+)
+_DEPENDS_ON_CUE = re.compile(
+    r"\b(?:does|do|did|will|would)\b[^?,;]*?\b(?:depend|rely)\s+on\b|\b(?:is|are)\b[^?,;]*?\bdependent on\b",
+    re.I,
+)
+
+
+def classify_estate_parts(message: Any) -> List[str]:
+    """The parts a message asks about one element, each once, in the order they are
+    asked: ``owner``, ``runs_on``, ``depends_on`` and ``breaks``. A phrase that asks
+    what the element depends on or runs on is not also read as asking what breaks."""
+    if not isinstance(message, str) or not message.strip():
+        return []
+    found: List[tuple] = []
+    claimed: List[tuple] = []
+    for part, pattern in (
+        (PART_OWNER, OWNER_CUE),
+        (PART_RUNS_ON, _RUNS_ON_CUE),
+        (PART_DEPENDS_ON, _DEPENDS_ON_CUE),
+    ):
+        match = pattern.search(message)
+        if match:
+            found.append((match.start(), part))
+        for each in pattern.finditer(message):
+            claimed.append(each.span())
+    # What breaks is read from the words that no other part has already used.
+    rest = list(message)
+    for start, end in claimed:
+        for index in range(start, end):
+            rest[index] = " "
+    match = _QUESTION_CUES[-1][1].search("".join(rest))
+    if match:
+        found.append((match.start(), PART_BREAKS))
+    found.sort()
+    return [part for _position, part in found]
 
 
 def classify_estate_question(message: Any) -> Optional[str]:
@@ -139,6 +200,8 @@ def classify_estate_question(message: Any) -> Optional[str]:
     for kind, pattern in _QUESTION_CUES:
         if pattern.search(message):
             return kind
+    if _RUNS_ON_CUE.search(message) or _DEPENDS_ON_CUE.search(message):
+        return KIND_IMPACT
     return None
 
 
@@ -171,6 +234,14 @@ def normalise_params(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
             "element_id": _as_int(raw.get("element_id"), "element_id"),
             "max_depth": max_depth,
             "include_derived": include_derived,
+        }
+
+    if kind == KIND_DATA_FLOW:
+        # The data object asked about; readers under a writer are always worked
+        # out, so there is no include_derived switch.
+        return {
+            "element_id": _as_int(raw.get("element_id"), "element_id"),
+            "max_depth": max_depth,
         }
 
     element_ids_raw = raw.get("element_ids")
@@ -246,7 +317,7 @@ def _jsonable(value: Any) -> Any:
 
 
 def _relations_of(kind: str, row: Dict[str, Any]) -> List[Dict[str, Any]]:
-    if kind == KIND_IMPACT:
+    if kind in (KIND_IMPACT, KIND_DATA_FLOW):
         return [row["relation"]]
     if kind == KIND_SET_IMPACT:
         return list(row["relations"])
@@ -260,6 +331,84 @@ def _row_truth_class(kind: str, row: Dict[str, Any]) -> str:
         return TRUTH_CLASS_DERIVED if row.get("path_kind") == "derived" else TRUTH_CLASS_DRAWN
     kinds = {rel.get("kind") for rel in _relations_of(kind, row)}
     return TRUTH_CLASS_DRAWN if "explicit" in kinds else TRUTH_CLASS_DERIVED
+
+
+SOURCE_PEOPLE = "recorded by people"
+SOURCE_DERIVED = "worked out from recorded links"
+SOURCE_IMPORT = "imported"
+SOURCE_SAMPLE = "sample data"
+_SYSTEM_NAMES = {"github": "GitHub", "gitlab": "GitLab", "azure_devops": "Azure DevOps"}
+
+
+def connector_system(origin: Dict[str, Any]) -> str:
+    """The system a connector read a link from, in words: the origin's own system, or
+    the system its label names ("GitHub acme/shop" names GitHub) when a link was written
+    with a label and no reference. Empty when neither says."""
+    system = str(origin.get("system") or "").strip().lower()
+    if system:
+        return _SYSTEM_NAMES.get(system, system.replace("_", " ").title())
+    first_word = str(origin.get("label") or "").strip().split(" ", 1)[0]
+    for name in _SYSTEM_NAMES.values():
+        if first_word.lower() == name.lower():
+            return name
+    return ""
+
+
+def row_source(kind: str, row: Dict[str, Any]) -> str:
+    """Where the connection a row rests on came from, in the words a person reads.
+
+    A worked-out row says so; a recorded row names the system a connector read it
+    from, or how it was entered. A row with several relations is credited to the
+    first recorded one, as ``_row_truth_class`` does."""
+    if kind == KIND_RISK_PROPAGATION:
+        return SOURCE_DERIVED if row.get("path_kind") == "derived" else SOURCE_PEOPLE
+    relations = _relations_of(kind, row)
+    recorded = [rel for rel in relations if rel.get("kind") == "explicit"]
+    if not recorded:
+        return SOURCE_DERIVED
+    relation = recorded[0]
+    origins = [o for o in (relation.get("origins") or {}).values() if isinstance(o, dict)]
+    if origins:
+        system = connector_system(origins[0])
+        if system:
+            return "read from " + system
+        return "read from a connected system"
+    origin = relation.get("provenance") if isinstance(relation.get("provenance"), dict) else {}
+    basis = origin.get("kind")
+    if basis == "import":
+        return SOURCE_IMPORT
+    if basis == "sample":
+        return SOURCE_SAMPLE
+    if basis == "derived":
+        return SOURCE_DERIVED
+    if basis == "connector":
+        # A connector's link whose origin was not attached to the row (the
+        # stamp says a connector wrote it) is still not a person's.
+        return "read from a connected system"
+    # Links drawn by people are stamped "manual"; an unstamped older link was
+    # drawn in the Composer too, so it is a person's.
+    return SOURCE_PEOPLE
+
+
+def connection_sources(answer: Dict[str, Any]) -> Dict[str, Any]:
+    """How many of an answer's connections came from each source, computed from the
+    rows themselves so the sentence above them can never disagree with them.
+
+    Returns ``counts`` (source phrase to number, biggest first), ``sentence`` (for
+    example "9 recorded by people, 4 read from GitHub"), ``all_people`` (every row
+    was entered by a person) and ``shown`` (rows counted)."""
+    kind = answer.get("question_kind")
+    counts: Dict[str, int] = {}
+    for row in answer.get("rows") or []:
+        source = row_source(kind, row)
+        counts[source] = counts.get(source, 0) + 1
+    ordered = dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+    return {
+        "counts": ordered,
+        "sentence": ", ".join("%d %s" % (n, label) for label, n in ordered.items()),
+        "all_people": bool(ordered) and set(ordered) == {SOURCE_PEOPLE},
+        "shown": sum(ordered.values()),
+    }
 
 
 def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -286,6 +435,8 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 # A link a connector wrote cites the repository and commit it was read at.
                 cite("relationship", relationship_id, connector_sources.get(str(relationship_id)))
             cite("derived_relationship", relation.get("derived_id"))
+            # A copy rests on the lineage row that records it.
+            cite("data_lineage", relation.get("lineage_id"))
             # The relationship a recorded row rests on carries its origin and
             # date, so the citation says where the fact came from.
             origin = relation.get("provenance")
@@ -386,7 +537,33 @@ def build_envelope(
 # --------------------------------------------------------------------------- #
 
 
+def _name_the_element_asked_about(result: Dict[str, Any], element_id: int) -> None:
+    """Add the asked-about element to the answer's names when no row named it.
+
+    The walk's identity map holds only what its rows name, so an element nothing
+    depends on yet would be stored without its own name and the answer would
+    read "What breaks if — fails". The name is read through the walk's own
+    tenant-fenced resolver.
+    """
+    from app.modules.intelligence.services.query_service import _resolve_elements_batch
+
+    elements = dict(result.get("elements") or {})
+    if str(element_id) in elements:
+        return
+    org_id = current_org_id()
+    if org_id is None:
+        return
+    elements.update(_resolve_elements_batch([element_id], org_id))
+    result["elements"] = elements
+
+
 def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    if kind == KIND_DATA_FLOW:
+        result = IntelligenceQueryService.data_flow(params["element_id"], max_depth=params["max_depth"])
+        if ELEMENT_NOT_FOUND_REASON in result["reasons"]:
+            raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
+        _name_the_element_asked_about(result, params["element_id"])
+        return result
     if kind == KIND_IMPACT:
         result = IntelligenceQueryService.cross_layer_impact(
             params["element_id"],
@@ -398,6 +575,7 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
         )
         if ELEMENT_NOT_FOUND_REASON in result.get("reasons", []):
             raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
+        _name_the_element_asked_about(result, params["element_id"])
         if result.get("next_cursor") is not None:
             result["truncated"] = True
             result["reasons"] = list(result.get("reasons") or []) + [ROWS_TRUNCATED_REASON]
@@ -425,9 +603,20 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def ask_and_store(kind: str, raw_params: Dict[str, Any], *, user_id: Optional[int] = None):
+def ask_and_store(
+    kind: str,
+    raw_params: Dict[str, Any],
+    *,
+    user_id: Optional[int] = None,
+    store: bool = True,
+):
     """Compute the answer for the caller's active organisation, wrap it and
     store it at a new permanent address. Returns the stored ``AnswerRecord``.
+
+    With ``store=False`` the same walk runs and the same record is built, but it
+    is not added to the session: nothing is written, and the returned record is
+    transient (its address is not one that can be opened). A page that only
+    shows an answer on GET uses this; a run is stored only when the person saves.
 
     The organisation is the active one (``current_org_id``); with none the
     question is refused and nothing is written.
@@ -457,8 +646,9 @@ def ask_and_store(kind: str, raw_params: Dict[str, Any], *, user_id: Optional[in
         computed_at=envelope["computed_at"],
         created_by_id=user_id,
     )
-    db.session.add(record)
-    db.session.commit()
+    if store:
+        db.session.add(record)
+        db.session.commit()
     return record
 
 
@@ -479,20 +669,21 @@ def open_answer(address: str):
     ).scalar_one_or_none()
 
 
-def recent_answers(limit: int = 50) -> List[Any]:
+def recent_answers(limit: int = 50, kind: Optional[str] = None) -> List[Any]:
     """The caller's organisation's most recent answers, newest first (an empty
-    list with no active organisation)."""
+    list with no active organisation). *kind* filters in the query, so the
+    limit counts answers of that kind only."""
     from app.models.answer_record import AnswerRecord
 
     org_id = current_org_id()
     if org_id is None:
         return []
+    query = db.select(AnswerRecord).where(AnswerRecord.organization_id == org_id)
+    if kind is not None:
+        query = query.where(AnswerRecord.question_kind == kind)
     return list(
         db.session.execute(
-            db.select(AnswerRecord)
-            .where(AnswerRecord.organization_id == org_id)
-            .order_by(AnswerRecord.created_at.desc(), AnswerRecord.id.desc())
-            .limit(limit)
+            query.order_by(AnswerRecord.created_at.desc(), AnswerRecord.id.desc()).limit(limit)
         ).scalars()
     )
 

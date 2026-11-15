@@ -1,4 +1,5 @@
 ---
+wave: 4
 page_family: function-per-segment
 use_case_id: UC-S2-05
 segment_id: S2
@@ -25,8 +26,8 @@ which record is authoritative.
 An identifier crosswalk that matches records across your connected tools automatically, routing
 anything it isn't confident about to a review queue instead of guessing.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 
-- [How do I stop typing every system into Entelim by hand?](/use-cases/import-from-jira-and-github)
+- [Connect GitHub and ask what breaks, without typing every system in](/use-cases/import-from-jira-and-github)

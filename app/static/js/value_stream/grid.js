@@ -107,6 +107,21 @@
                 return label;
             },
 
+            // Health score, the same figure the capability health screen shows
+            // for this capability. Unscored renders as an em dash, never 0.
+            healthLabel(cap) {
+                var score = cap && cap.health_score;
+                return (score === null || score === undefined) ? '—' : score + '%';
+            },
+
+            healthTitle(cap) {
+                var score = cap && cap.health_score;
+                if (score === null || score === undefined) {
+                    return 'Not scored yet: open the capability to assess it.';
+                }
+                return 'Health of ' + cap.name + ', as on the capability health screen';
+            },
+
             // Capabilities mapped to one stage, for the swimlane card.
             capabilitiesForStage(stageId) {
                 var self = this;

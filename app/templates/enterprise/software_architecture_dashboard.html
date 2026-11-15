@@ -1,19 +1,9 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
-{% block title %}Application Architecture{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Application Architecture', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Application Architecture{% endblock %}{% block content %}
 <div class="space-y-6">
 
     <!-- Page Header -->
@@ -90,7 +80,7 @@
                 View all
             </a>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Software architecture components">
             <table class="dense-table w-full text-sm text-left">
                 <thead class="bg-muted/50 text-muted-foreground font-medium border-b border-input">
                     <tr>

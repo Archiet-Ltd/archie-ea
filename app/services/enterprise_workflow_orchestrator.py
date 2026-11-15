@@ -116,8 +116,13 @@ class EnterpriseWorkflowOrchestrator:
             if capability:
                 application.capabilities.append(capability)
 
+        from app.services.application_status import canonical_status
+
         # Auto-generate roadmap work package (REUSE existing infrastructure)
-        if create_roadmap and deployment_status in ["planned", "development"]:
+        if create_roadmap and canonical_status(deployment_status) in (
+            "design",
+            "development",
+        ):
             work_package = self._create_roadmap_work_package_for_application(
                 application, governance_score
             )

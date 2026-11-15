@@ -66,7 +66,10 @@ def get_capabilities():
         level = request.args.get("level", "", type=str)
 
         # Build query
-        query = UnifiedCapability.query
+        # A capability retired into another is not offered (ADR 0008 rule 4).
+        query = UnifiedCapability.query.filter(
+            UnifiedCapability.retired_into_id.is_(None)
+        )
 
         # Apply filters
         if search:

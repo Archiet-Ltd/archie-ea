@@ -75,12 +75,17 @@ def test_architect_links_a_gap_to_a_work_package_and_sees_it_everywhere(browser,
         # The page reloads itself once the link is saved.
         expect(page.get_by_test_id("wp-gaps")).to_contain_text(gap_name, timeout=PAGE_TIMEOUT)
 
-        # After a reload of our own the work package page lists the gap, with a dash for the
-        # owner it does not have.
+        # After a reload of our own the work package page lists the gap, and says in words that
+        # the package has no owner yet, with the way to name one.
         page.reload(wait_until="domcontentloaded")
         expect(page.get_by_test_id("wp-gaps")).to_contain_text(gap_name)
-        expect(page.get_by_test_id("wp-owner")).to_have_text("—")
+        expect(page.get_by_test_id("wp-owner")).to_have_text(re.compile(r"^\s*No owner yet\s+Assign owner\s*$"))
         expect(page.get_by_test_id("wp-plateaus")).to_contain_text(plateau_name)
+        # The link lands on this package's form, at the field that names the owner.
+        page.get_by_test_id("wp-assign-owner").click()
+        page.wait_for_url(re.compile(r"/implementation/work-packages/%d/edit$" % wp_id), timeout=PAGE_TIMEOUT)
+        expect(page.locator("#assigned_to")).to_be_visible()
+        expect(page.locator("#name")).to_have_value(wp_name)
 
         # The gap analysis page shows the package against the gap, and the gap is
         # no longer on the "not addressed" list.

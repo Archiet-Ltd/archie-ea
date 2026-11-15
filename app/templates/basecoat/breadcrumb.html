@@ -1,0 +1,43 @@
+{# breadcrumb: port of shadcn/ui breadcrumb.tsx (pinned in compliance/upstream). Macros: breadcrumb, breadcrumb_list, breadcrumb_item, breadcrumb_link, breadcrumb_page, breadcrumb_separator, breadcrumb_ellipsis #}
+
+{#- Breadcrumb -#}
+{% macro breadcrumb(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('breadcrumb', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- BreadcrumbList -#}
+{% macro breadcrumb_list(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('breadcrumb-list', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- BreadcrumbItem -#}
+{% macro breadcrumb_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('breadcrumb-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- BreadcrumbLink -#}
+{% macro breadcrumb_link(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('breadcrumb-link', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- BreadcrumbPage -#}
+{% macro breadcrumb_page(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('breadcrumb-page', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- BreadcrumbSeparator -#}
+{% macro breadcrumb_separator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('breadcrumb-separator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- BreadcrumbEllipsis -#}
+{% macro breadcrumb_ellipsis(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('breadcrumb-ellipsis', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

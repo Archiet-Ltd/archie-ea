@@ -289,7 +289,8 @@ class BatchImportJob(db.Model):
         """Calculate overall progress percentage."""
         if self.total_batches == 0:
             return 0.0
-        return round((self.batches_completed / self.total_batches) * 100, 1)
+        completed = self.batches_completed or 0
+        return round((completed / self.total_batches) * 100, 1)
 
     @property
     def batches_ready_for_review(self) -> int:
@@ -355,11 +356,11 @@ class BatchImportJob(db.Model):
             "batch_size": self.batch_size,
             "total_batches": self.total_batches,
             "status": self.status.value if self.status else None,
-            "batches_completed": self.batches_completed,
-            "processed_batches": self.batches_completed,  # Frontend expects 'processed_batches'
-            "batches_approved": self.batches_approved,
-            "batches_rejected": self.batches_rejected,
-            "batches_committed": self.batches_committed,
+            "batches_completed": self.batches_completed or 0,
+            "processed_batches": self.batches_completed or 0,  # Frontend expects 'processed_batches'
+            "batches_approved": self.batches_approved or 0,
+            "batches_rejected": self.batches_rejected or 0,
+            "batches_committed": self.batches_committed or 0,
             "batches_ready_for_review": self.batches_ready_for_review,
             "progress": self.progress_percentage,  # Frontend expects 'progress'
             "progress_percentage": self.progress_percentage,
@@ -480,7 +481,8 @@ class BatchImportBatch(db.Model):
         """Calculate batch progress percentage."""
         if self.total_applications == 0:
             return 0.0
-        return round((self.processed_applications / self.total_applications) * 100, 1)
+        processed = self.processed_applications or 0
+        return round((processed / self.total_applications) * 100, 1)
 
     @property
     def can_retry(self) -> bool:
@@ -499,17 +501,17 @@ class BatchImportBatch(db.Model):
             "batch_number": self.batch_number,
             "status": self.status.value if self.status else None,
             "total_applications": self.total_applications,
-            "processed_applications": self.processed_applications,
-            "successful_applications": self.successful_applications,
-            "failed_applications": self.failed_applications,
+            "processed_applications": self.processed_applications or 0,
+            "successful_applications": self.successful_applications or 0,
+            "failed_applications": self.failed_applications or 0,
             "progress_percentage": self.progress_percentage,
             "current_application_name": self.current_application_name,
-            "total_elements_generated": self.total_elements_generated,
-            "elements_approved": self.elements_approved,
-            "elements_rejected": self.elements_rejected,
+            "total_elements_generated": self.total_elements_generated or 0,
+            "elements_approved": self.elements_approved or 0,
+            "elements_rejected": self.elements_rejected or 0,
             "batch_cost_usd": float(self.batch_cost_usd) if self.batch_cost_usd else 0,
             "error_message": self.error_message,
-            "retry_count": self.retry_count,
+            "retry_count": self.retry_count or 0,
             "can_retry": self.can_retry,
             "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
             "review_notes": self.review_notes,

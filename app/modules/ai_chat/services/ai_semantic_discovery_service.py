@@ -155,17 +155,17 @@ class AISemanticDiscoveryService:
         """Check if LLM API is available for recommendations."""
         try:
             # Check if OpenAI API key is configured
-            import os
-            api_key = os.environ.get('OPENAI_API_KEY') or os.environ.get('LLM_API_KEY')
-            if not api_key:
-                return False
-            
-            # Try a simple API call to verify connectivity
-            import openai
             from app.modules.ai_chat.services.llm_service_impl import LLMService
 
+            resolved = LLMService.resolve_key("openai")
+            if not resolved.key:
+                return False
+
+            # Try a simple API call to verify connectivity
+            import openai
+
             LLMService._guard_provider_call("openai", None, prompt="semantic discovery availability check")
-            openai.api_key = api_key
+            openai.api_key = resolved.key
             # Make a minimal request to check availability
             openai.Model.list()
             return True
@@ -579,18 +579,21 @@ class AISemanticDiscoveryService:
 
         # Try LLM API call for enhanced recommendations
         try:
-            import os
             import openai
 
-            api_key = os.environ.get('OPENAI_API_KEY') or os.environ.get('LLM_API_KEY')
-            if not api_key:
-                logger.warning("No LLM API key configured — cannot generate recommendations")
+            from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+            resolved = LLMService.resolve_key("openai")
+            if not resolved.key:
+                logger.warning("No LLM key may be used — cannot generate recommendations")
                 return self._empty_recommendations(
                     capability_requirements, organization_context, budget_range,
-                    error="No LLM API key configured",
+                    error=(
+                        "Answers are paused for now" if resolved.paused else "No LLM API key configured"
+                    ),
                 )
 
-            openai.api_key = api_key
+            openai.api_key = resolved.key
 
             # Prepare prompt for vendor recommendation
             prompt = f"""Recommend the best vendor solution based on:
@@ -618,6 +621,10 @@ Format as JSON."""
 
             # Parse LLM response
             llm_content = response.choices[0].message.content
+            LLMService.record_platform_call(
+                resolved, "gpt-4", getattr(response, "usage", None),
+                prompt_chars=len(prompt), output_chars=len(llm_content or ""),
+            )
             import json
             try:
                 llm_result = json.loads(llm_content)

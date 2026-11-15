@@ -18,11 +18,11 @@ Pages:
 
 import logging
 
-from flask import Blueprint, Response, current_app, flash, jsonify, redirect, render_template, request, url_for  # noqa: F401
+from flask import Blueprint, Response, current_app, flash, g, jsonify, redirect, render_template, request, url_for  # noqa: F401
 from flask_login import current_user, login_required
 
 from app import db
-from app.core.auth.decorators import require_permission
+from app.core.auth.decorators import admit_model_changers, require_permission
 from app.utils.pagination import safe_int_arg
 from app.models.archimate_element_types import is_application_kind
 # ArchiMateHealthService import removed — architecture_health route deleted
@@ -42,12 +42,75 @@ def _check_llm_available() -> bool:
         return False
 
 
+def _layer_order_of(viewpoint_key):
+    """The bands a viewpoint's diagram is drawn in, from the one table of viewpoints (the layered one when the
+    named viewpoint sets none), so the page keeps no order of its own."""
+    from app.services.archimate_viewpoint_service import STANDARD_VIEWPOINTS
+
+    own = STANDARD_VIEWPOINTS.get(viewpoint_key, {}).get("layer_order")
+    return list(own or STANDARD_VIEWPOINTS["layered"]["layer_order"])
+
+
 def _has_aligned_traceability_rows(matrix) -> bool:
     matrix = _normalize_traceability_matrix(matrix)
     return any(
         row.get("strategy") or row.get("business") or row.get("technology")
         for row in (matrix or [])
     )
+
+
+def _traceability_store_counts():
+    """Counts of the two record stores the matrix's model counts sit beside.
+
+    The matrix counts ArchiMate elements. The capability map counts the
+    capability store and the requirements backlog counts solution requirements;
+    the page shows all of them side by side, each read from the same function
+    those screens use. None means the count could not be read.
+    """
+    from app.models.solution_architect_models import SolutionRequirement
+    from app.modules.capabilities.services.capability_count_service import count_capabilities
+
+    counts = {}
+    try:
+        counts['capabilities'] = count_capabilities()
+    except Exception:
+        logger.exception("Could not count capabilities for the traceability page")
+        counts['capabilities'] = None
+    try:
+        counts['requirements'] = SolutionRequirement.query.filter(
+            SolutionRequirement.deleted_at == None  # noqa: E711
+        ).count()
+    except Exception:
+        logger.exception("Could not count requirements for the traceability page")
+        counts['requirements'] = None
+    return counts
+
+
+def _link_model_cells(matrix):
+    """Give every element in a model-built row the page that opens it.
+
+    Rows built from the ArchiMate model carry ArchiMate element ids, so each
+    cell entry opens that element's chain. Rows built from the solution
+    fallback carry ids from other stores and are left unlinked.
+    """
+    for row in matrix or []:
+        for layer in ('motivation', 'strategy', 'business', 'technology', 'data'):
+            for entry in row.get(layer) or []:
+                if entry.get('id'):
+                    entry['href'] = url_for('architect_ui.element_traceability', element_id=entry['id'])
+
+
+def _traceability_goals(limit=10):
+    """The goals in the model, for the line that says how many trace to an application."""
+    from app.models.archimate_core import ArchiMateElement
+
+    rows = ArchiMateElement.query.filter(
+        ArchiMateElement.type == 'Goal', ~ArchiMateElement.name.like('tmp-%')
+    ).order_by(ArchiMateElement.name).all()
+    return {
+        'total': len(rows),
+        'items': [{'id': g.id, 'name': g.name} for g in rows[:limit]],
+    }
 
 
 def _normalize_traceability_matrix(matrix):
@@ -188,8 +251,10 @@ def _build_solution_traceability_fallback_matrix(limit=50):
 @architect_ui_bp.route("/roadmap-builder/")
 @login_required
 def roadmap_builder():
-    """Redirect to Enterprise Roadmap (capability-roadmap). Roadmap Builder is retired."""
-    return redirect(url_for("main.capability_roadmap"))
+    """Roadmap Builder is retired: the one roadmap replaces it."""
+    from app.modules.genome.services.roadmap_links import redirect_to_roadmap
+
+    return redirect_to_roadmap("strategic")
 
 
 # =============================================================================
@@ -302,7 +367,7 @@ def _oef_wants_json():
 
 @architect_ui_bp.route("/architecture/import/oef", methods=["GET", "POST"])
 @login_required
-@require_permission("create", "relationship")
+@admit_model_changers(require_permission("create", "relationship"))
 def import_oef():
     """The model-import screen, over the one OEF import engine.
 
@@ -373,7 +438,7 @@ def import_oef():
 
 @architect_ui_bp.route("/architecture/import/oef/preview", methods=["POST"])
 @login_required
-@require_permission("create", "relationship")
+@admit_model_changers(require_permission("create", "relationship"))
 def import_oef_preview():
     """What an import of this document would do, writing nothing (JSON).
 
@@ -441,6 +506,171 @@ def _user_labels(user_ids, org_id):
         return {}
     rows = User.query.filter(User.id.in_(ids), User.organization_id == org_id).all()
     return {u.id: u.email for u in rows}
+
+
+@architect_ui_bp.route("/architecture/sample-company/load", methods=["POST"])
+@login_required
+@admit_model_changers(require_permission("create", "relationship"))
+def load_sample_company():
+    """Load the sample company into the current organisation.
+
+    Imports app/data/sample_company/sample-company.oef.xml into the active
+    organisation. Idempotent: a second press says it is already loaded and
+    redirects to the first screen. Only an Architect or
+    Administrator can load it; a Viewer sees an explanation instead.
+
+    After import, redirects to the first screen, which now shows the sample
+    company's figures. Returns JSON {"already_loaded": true} or
+    {"success": true, "redirect": "..."} depending on state.
+    """
+    wants_json = request.headers.get("Accept", "").startswith("application/json") or request.is_json
+
+    # One load at a time per organisation. A second press while the first is still
+    # working (a double tap on a phone) waits for it, then finds the sample loaded and
+    # says so, instead of importing the file twice or racing it for the same rows.
+    # A wait that does not end becomes a plain "try again" message, never a page that
+    # never answers.
+    from app.services import sample_company_service as _sample
+
+    try:
+        with _sample.one_load_at_a_time(g.current_org_id):
+            return _load_sample_company_locked(wants_json)
+    except _sample.LoadBusy:
+        error = "The sample company is still loading. Wait a moment, then press See a sample company again."
+        if wants_json:
+            return jsonify({"success": False, "error": error}), 503
+        flash(error, "error")
+        return redirect(url_for("dashboard.overview"))
+
+
+def _load_sample_company_locked(wants_json):
+    import os
+    from app.services import sample_company_service
+    from app.services.archimate_import_service import ArchiMateImportService, ImportRequestError
+
+    # Check if sample is already loaded (by looking for the model name)
+    from app.models.archimate_core import ArchiMateElement
+    sample_marker = ArchiMateElement.query.filter(
+        ArchiMateElement.name == "Payments service",
+        ArchiMateElement.type == "ApplicationComponent"
+    ).first()
+
+    if sample_marker:
+        # Sample already loaded, redirect to the answer
+        answer_url = url_for("dashboard.overview")
+
+        if wants_json:
+            return jsonify({"already_loaded": True, "redirect": answer_url}), 200
+        flash("The sample company is already loaded.", "info")
+        return redirect(answer_url)
+
+    # The sample is fiction: it only goes into an organisation with nothing of its own in it.
+    if ArchiMateElement.query.filter_by(organization_id=g.current_org_id).first() is not None:
+        error = "This organisation already holds its own systems, so the sample company is not loaded into it."
+        if wants_json:
+            return jsonify({"success": False, "error": error}), 409
+        flash(error, "info")
+        return redirect(url_for("dashboard.overview"))
+
+    # Load the sample file
+    sample_path = os.path.join(
+        current_app.root_path, "data", "sample_company", "sample-company.oef.xml"
+    )
+
+    if not os.path.exists(sample_path):
+        error = "Sample company file not found."
+        if wants_json:
+            return jsonify({"success": False, "error": error}), 404
+        flash(error, "error")
+        return redirect(url_for("dashboard.overview"))
+
+    try:
+        with open(sample_path, "r", encoding="utf-8") as f:
+            xml_content = f.read()
+    except Exception as exc:
+        error = f"Could not read sample company file: {exc}"
+        if wants_json:
+            return jsonify({"success": False, "error": error}), 500
+        flash(error, "error")
+        return redirect(url_for("dashboard.overview"))
+
+    elements_before = ArchiMateElement.query.count()
+
+    # The sample's records are written with their dates spread over the last 90 days, so the
+    # Overview's chart has a shape and the change history is sealed once, in order.
+    from app.services.history_spread import dated_history
+
+    with dated_history(rest=("import", sample_company_service.SOURCE_LABEL), connected=None):
+        # Import the sample
+        try:
+            result = ArchiMateImportService().import_xml(
+                xml_content,
+                strategy="skip_duplicates",
+                source_label=sample_company_service.SOURCE_LABEL,
+                promote_top_level=False,
+            )
+        except ImportRequestError as exc:
+            error = f"Could not import sample company: {exc}"
+            if wants_json:
+                return jsonify({"success": False, "error": error}), 500
+            flash(error, "error")
+            return redirect(url_for("dashboard.overview"))
+
+        # The elements alone count no applications and score no health; add the
+        # applications, owners, costs, capabilities and risks a real estate carries.
+        point = sample_company_service.find_restore_point(g.current_org_id)
+        if point is not None:
+            try:
+                sample_company_service.add_working_data(g.current_org_id, current_user, point)
+                db.session.commit()
+                sample_company_service.work_out_connections(g.current_org_id)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception("sample company working data not added")
+                error = "The sample company's elements loaded, but its applications could not be added."
+                if wants_json:
+                    return jsonify({"success": False, "error": error}), 500
+                flash(error, "error")
+                return redirect(url_for("dashboard.overview"))
+
+    # The first screen now shows the loaded sample: its counts, applications and the
+    # "You are looking at the sample company" bar with the way to remove it.
+    answer_url = url_for("dashboard.overview")
+    # Everything the load put in the model, as the first screen counts it: the
+    # file's elements and the ones the added capabilities and applications mirror.
+    created = ArchiMateElement.query.count() - elements_before
+
+    if wants_json:
+        return jsonify({
+            "success": True,
+            "redirect": answer_url,
+            "elements_created": created,
+            "relationships_created": result.get("relationships_created", 0)
+        }), 200
+
+    flash(f"Sample company loaded: {created} elements created.", "success")
+    return redirect(answer_url)
+
+
+@architect_ui_bp.route("/architecture/sample-company/remove", methods=["POST"])
+@login_required
+@admit_model_changers(require_permission("create", "relationship"))
+def remove_sample_company():
+    """Remove the sample company from the current organisation, then return to setup."""
+    from app.services import import_restore_service, sample_company_service
+
+    try:
+        result = sample_company_service.remove(g.current_org_id, current_user.id)
+    except import_restore_service.RestoreError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("dashboard.overview")), 303
+    if result is None:
+        flash("There is no sample company to remove.", "info")
+    else:
+        sample_company_service.work_out_connections(g.current_org_id)
+        flash("Sample company removed.", "success")
+    return redirect(url_for("dashboard.overview")), 303
 
 
 @architect_ui_bp.route("/architecture/import/oef/restore-points", methods=["GET"])
@@ -669,6 +899,11 @@ def traceability_matrix():
     """Cross-layer traceability matrix across Strategy/Business/Application/Technology."""
     from app.services.archimate_traceability_service import ArchiMateTraceabilityService, get_archimate_gap_analysis
 
+    from app.modules.intelligence.services.traceability_check_service import (
+        TraceabilityCheckService,
+        broken_chains,
+    )
+
     service = ArchiMateTraceabilityService()
     direction = request.args.get('direction', 'forward')
     pivot_type = request.args.get('pivot_type', 'ApplicationComponent')
@@ -697,16 +932,29 @@ def traceability_matrix():
     # dropdown read (archimate_elements + archimate_relationships), so the three
     # surfaces on this page agree instead of counting three different stores.
     gap_analysis = get_archimate_gap_analysis()
+    _link_model_cells(matrix)
     if direction == 'forward' and is_application_kind(pivot_type) and not plateau and not search and page == 1 and (
         not matrix or not _has_aligned_traceability_rows(matrix)
     ):
         fallback_matrix = _build_solution_traceability_fallback_matrix(limit=50)
         if fallback_matrix:
             matrix = fallback_matrix
+    element_id = request.args.get('element', type=int)
+    element_check = None
+    broken = None
+    if element_id is not None:
+        element_check = TraceabilityCheckService.check(element_id, getattr(g, 'current_org_id', None))
+    else:
+        broken = broken_chains(getattr(g, 'current_org_id', None))
     return render_template(
         "archimate_views/traceability.html",
+        element_id=element_id,
+        element_check=element_check,
+        broken=broken,
         matrix=matrix,
         gap_analysis=gap_analysis,
+        store_counts=_traceability_store_counts(),
+        goals=_traceability_goals(),
         pivot_types=pivot_types,
         current_pivot_type=pivot_type,
         current_plateau=plateau,
@@ -899,6 +1147,54 @@ def elements_by_viewpoint(viewpoint_key):
     )
 
 
+def _connected_slice(base_query, allowed_rel_types, max_elements):
+    """The elements a viewpoint diagram draws when nothing was searched for.
+
+    Starts from the most connected element in the viewpoint's pool and grows outward along real relationships,
+    most connected neighbour first, until ``max_elements`` are chosen, so what is drawn is one connected piece of
+    the model and not an alphabetical slice with a coincidental few relationships among it. A pool with no
+    relationships at all falls back to name order.
+    """
+    import heapq
+
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    pool = base_query.with_entities(ArchiMateElement.id).subquery()
+    rel_query = ArchiMateRelationship.query.filter(
+        ArchiMateRelationship.source_id.in_(db.select(pool.c.id)),
+        ArchiMateRelationship.target_id.in_(db.select(pool.c.id)),
+    )
+    if allowed_rel_types:
+        rel_query = rel_query.filter(ArchiMateRelationship.type.in_(allowed_rel_types))
+    neighbours = {}
+    for rel in rel_query.with_entities(ArchiMateRelationship.source_id, ArchiMateRelationship.target_id).all():
+        if rel.source_id == rel.target_id:
+            continue
+        neighbours.setdefault(rel.source_id, set()).add(rel.target_id)
+        neighbours.setdefault(rel.target_id, set()).add(rel.source_id)
+    if not neighbours:
+        return base_query.order_by(ArchiMateElement.name).limit(max_elements).all()
+
+    chosen = []
+    seen = set()
+    for seed in sorted(neighbours, key=lambda i: (-len(neighbours[i]), i)):
+        if len(chosen) >= max_elements:
+            break
+        if seed in seen:
+            continue
+        frontier = [(-len(neighbours[seed]), seed)]
+        seen.add(seed)
+        while frontier and len(chosen) < max_elements:
+            _, current = heapq.heappop(frontier)
+            chosen.append(current)
+            for other in neighbours[current]:
+                if other not in seen:
+                    seen.add(other)
+                    heapq.heappush(frontier, (-len(neighbours[other]), other))
+    return (ArchiMateElement.query.filter(ArchiMateElement.id.in_(chosen))
+            .order_by(ArchiMateElement.name).all())
+
+
 @architect_ui_bp.route("/api/archimate/viewpoints/<viewpoint_key>/diagram")
 @login_required
 def viewpoint_diagram_data(viewpoint_key):
@@ -981,7 +1277,7 @@ def viewpoint_diagram_data(viewpoint_key):
         else:
             elements = []
     else:
-        elements = base_query.order_by(ArchiMateElement.name).limit(max_elements).all()
+        elements = _connected_slice(base_query, allowed_rel_types, max_elements)
 
     element_ids = {e.id for e in elements}
 
@@ -997,6 +1293,7 @@ def viewpoint_diagram_data(viewpoint_key):
         "success": True,
         "viewpoint": viewpoint_key,
         "viewpoint_name": vp_def["name"],
+        "layer_order": _layer_order_of(viewpoint_key),
         "elements": [
             {"id": e.id, "name": e.name, "type": e.type or "ApplicationComponent",
              "layer": (e.layer or "application").lower()}

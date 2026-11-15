@@ -133,7 +133,7 @@ function getCoverageClass(coverage) {
 function filterMatrix() {
     const vendorSearch = document.getElementById('vendorSearch').value.toLowerCase();
     const capabilitySearch = document.getElementById('capabilitySearch').value.toLowerCase();
-    const minCoverage = parseInt(document.getElementById('minCoverage').value) || 0;
+    const minCoverage = parseInt(document.getElementById('minCoverage').value) || 0; // zero-fallback-ok: a blank filter box means no minimum, it is not a measured figure
     const categoryFilter = document.getElementById('categoryFilter').value;
 
     filteredData = matrixData.filter(function(item) {
@@ -177,11 +177,11 @@ function showDetails(capability, vendor, product) {
                 '<div class="grid grid-cols-2 gap-4">' +
                     '<div>' +
                         '<span class="text-sm text-muted-foreground">Out-of-Box:</span> ' +
-                        '<span class="font-medium">' + (data.out_of_box_percentage || 0) + '%</span>' +
+                        '<span class="font-medium">' + Platform.figure.percent(data.out_of_box_percentage) + '</span>' +
                     '</div>' +
                     '<div>' +
                         '<span class="text-sm text-muted-foreground">Customization:</span> ' +
-                        '<span class="font-medium">' + (data.coverage_percentage - (data.out_of_box_percentage || 0)) + '%</span>' +
+                        '<span class="font-medium">' + (Platform.figure.missing(data.coverage_percentage) || Platform.figure.missing(data.out_of_box_percentage) ? Platform.figure.NOT_SCORED : (data.coverage_percentage - data.out_of_box_percentage) + '%') + '</span>' +
                     '</div>' +
                     '<div>' +
                         '<span class="text-sm text-muted-foreground">Maturity Level:</span> ' +

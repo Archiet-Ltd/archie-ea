@@ -40,13 +40,17 @@ DENIED = "denied"
 # and test_no_archetype_reaches_another_personas_section_unauthenticated now also
 # covers it, which matters because the chat sees the whole portfolio.
 POLICY = {
-    "/procurement/contracts":  {"procurement", "portfolio_manager"},
-    # R1-B36 (TB-0146): finance added via requires_procurement_or_finance --
-    # licences/spend are a finance persona's own numbers. Deliberately NOT
-    # extended to contracts/renewals/compliance below, which stay
-    # requires_procurement-only.
-    "/procurement/licenses":   {"procurement", "portfolio_manager", "finance"},
-    "/procurement/spend":      {"procurement", "portfolio_manager", "finance"},
+    # The contract, licence and spend pages follow the one cost-visibility rule:
+    # whoever may see cost figures (cto, portfolio_manager, platform_admin) may
+    # read them, besides the procurement roles (contracts) and the spend roles
+    # (licences, spend: procurement, portfolio_manager, finance). So the CTO is
+    # expected to reach all three. Creating and editing stay with procurement.
+    # An organisation's Administrator (is_org_admin) may also read its own
+    # organisation's contracts; this is not an archetype in the matrix but is
+    # covered by journey tests.
+    "/procurement/contracts":  {"procurement", "portfolio_manager", "cto"},
+    "/procurement/licenses":   {"procurement", "portfolio_manager", "finance", "cto"},
+    "/procurement/spend":      {"procurement", "portfolio_manager", "finance", "cto"},
     "/procurement/compliance": {"procurement", "portfolio_manager"},
     # R1-B34 (TB-0135): viewing the register is @login_required only (every
     # archetype can see a formula's active version); activating a new one
@@ -60,6 +64,14 @@ POLICY = {
     # risk.risk_register and risk.risk_page (/risks/<id>, 404 for another
     # organisation's risk, pinned in tests/test_risk_ranking.py) are @login_required only.
     "/risks/":                 set(ARCHETYPES),
+    # The Business Model Canvas list and each canvas (and its Value Proposition
+    # Canvas) are @login_required only: every archetype reads them, and a canvas
+    # of another organisation answers 404 (tests/test_business_model_canvas_model.py).
+    # The writes carry require_roles("admin", "architect", "business_architect").
+    "/business-model/":        set(ARCHETYPES),
+    # The business process list is @login_required only: every archetype reads it. Each
+    # process drawn as a diagram is checked below with a real id (test_process_diagram_authorisation).
+    "/business-architecture/processes": set(ARCHETYPES),
     # My Applications is gated by the permission matrix (read on application),
     # which every archetype holds; the detail page keeps its own ownership check.
     "/my-applications/":       set(ARCHETYPES),
@@ -73,13 +85,20 @@ POLICY = {
     # Viewer role, which is refused, is pinned in tests/test_application_registration_check.py.
     "/applications/api/registration-check": set(ARCHETYPES),
     "/ai-chat":                set(ARCHETYPES),
-    # Ask and Twin map: both pages carry @login_required and no role gate, so
-    # every archetype is expected to reach them. Stating that in two rows is
-    # what makes a role gate added later show up here as a row change, and what
-    # keeps them in test_no_archetype_reaches_another_personas_section_
-    # unauthenticated below. The data they show is fenced per tenant by the
-    # impact endpoint they read, not by the page.
-    "/intelligence/ask":       set(ARCHETYPES),
+    # The applications the chat offers first questions about: @login_required only, like the page,
+    # and read through the signed-in person's own organisation.
+    "/ai-chat/first-questions": set(ARCHETYPES),
+    # The RACI matrix page is @login_required only, so every archetype reads it; setting,
+    # clearing and adding a stakeholder carry the same require_roles("admin", "architect",
+    # "business_architect") and are pinned in tests/smoke/test_raci_clear_journey.py.
+    "/organization/raci":      set(ARCHETYPES),
+    # Twin map: the page carries @login_required and no role gate, so every
+    # archetype is expected to reach it (it redirects to the Composer). Stating
+    # that in a row is what makes a role gate added later show up here as a row
+    # change, and what keeps it in test_no_archetype_reaches_another_personas_
+    # section_unauthenticated below. Ask is no longer a page: its address
+    # redirects into /ai-chat, which has its own row above, and that redirect is
+    # checked in tests/test_ai_chat_estate_answer.py.
     "/intelligence/twin-map":  set(ARCHETYPES),
     # R1-B30 (TB-0106): the Answers page (ask a set or risk question, list the
     # organisation's stored answers). @login_required and no role gate, like Ask
@@ -109,12 +128,20 @@ POLICY = {
     # operational fact about the platform, not a per-org one -- so gated by
     # platform_admin_required rather than the ordinary admin_required.
     "/admin/errors":           set(),
+    # Blueprint consolidation progress: the product's own internals, the same for every
+    # organisation, so platform_admin_required and no seeded archetype but platform_admin.
+    "/admin/consolidation":    set(),
     # Team page (invitations by e-mail): gated to the organisation's own
     # administrators (an org_admin OrgRole row) or a platform admin. No seeded
     # archetype except platform_admin holds org_admin, so every other persona
     # is refused -- inviting people into an organisation is not a persona's
     # job, it is its administrator's.
     "/admin/team":             set(),
+    # Rate limits: the refused-request log is for an organisation's own administrators (its
+    # people's refusals only) and the platform administrator; the allow and deny lists are the
+    # platform administrator's. No seeded archetype but platform_admin is an administrator, so
+    # every plain member is refused, signed in.
+    "/admin/rate-limits":      set(),
     # R1-B56: Agent Registry (owner/charter/delegated-limits per agent) is
     # gated to platform_admin via @requires_role / _guard in
     # agent_registry_routes.py -- registering and activating an agent is
@@ -132,6 +159,17 @@ POLICY = {
     # no ordinary persona role carries; only the administrator can buy, change
     # or cancel the organisation's plan.
     "/admin/billing/":         set(),
+    # Setting up two-factor sign-in from a signed-in session is @login_required only:
+    # every persona may reach their own set-up screen (a person who does not need
+    # it is sent on to the dashboard, which is still a served page). The routes
+    # that make an administrator who has not enrolled come here first are the
+    # organisation-administrator pages below (invite, single sign-on); the real
+    # enrol-first behaviour is driven in test_mfa_first_week_journey.py and
+    # tests/test_mfa_first_week.py because this suite signs in with the
+    # administrator rule switched off.
+    "/account/mfa-enrol":      set(ARCHETYPES),
+    "/admin/invite-user":      set(),
+    "/admin/sso":              set(),
     # Interface Register (SAP S/4HANA Interface Register, Task 02): gated by
     # can_access_section(current_user, "data_integration") -- the same
     # section-based predicate the sidebar uses, not a requires_role()-style
@@ -198,6 +236,14 @@ POLICY = {
         "solution_architect", "enterprise_architect", "business_architect",
         "security_architect", "data_architect",
     },
+    "/data-governance/no-steward": {
+        "solution_architect", "enterprise_architect", "business_architect",
+        "security_architect", "data_architect",
+    },
+    "/data-governance/retention-breaches": {
+        "solution_architect", "enterprise_architect", "business_architect",
+        "security_architect", "data_architect",
+    },
     # CTO scorecard (supported estate, open exceptions, end-of-support
     # exposure): gated on the "governance" section via can_access_section --
     # the same section-based predicate shape as the Interface Register rows
@@ -223,9 +269,9 @@ POLICY = {
     "/compliance/data-subject-requests": {"security_architect"},
     "/compliance/personal-data-trace":   {"security_architect"},
     # Service status: current platform health, incident history and a
-    # subscribe action. @login_required and no role gate -- every signed-in
-    # persona reaches it from the sidebar footer. The state it shows is
-    # platform-wide; the only thing a user changes is their own subscription.
+    # subscribe action. The page is public (lead's ruling, 31 Oct 2026), so
+    # every persona reaches it, signed in or not; see PUBLIC_PATHS. The state
+    # it shows is platform-wide and carries no organisation data.
     "/status":                 set(ARCHETYPES),
     # Gap register: @login_required and no role gate on the
     # implementation_planning blueprint, so every signed-in persona reaches
@@ -267,6 +313,18 @@ GAP_WORK_PACKAGE_LINK_POST_POLICY = {
 }
 
 for _allowed in GAP_WORK_PACKAGE_LINK_POST_POLICY.values():
+    _allowed.add("platform_admin")
+
+# Recording a cost against a technology is role-gated like the other model writes: every seeded
+# archetype holds the Architect role and reaches the handler (404 for the id 0 used here); a
+# read-only Viewer is refused before it (pinned with a real Viewer in
+# tests/smoke/test_technology_cost_journey.py).
+TECHNOLOGY_COST_POST_POLICY = {
+    "/architecture/technology-costs/0": set(ARCHETYPES),
+    "/architecture/technology-costs/0/remove": set(ARCHETYPES),
+}
+
+for _allowed in TECHNOLOGY_COST_POST_POLICY.values():
     _allowed.add("platform_admin")
 
 OVERSIGHT_POST_POLICY = {
@@ -463,10 +521,16 @@ def test_platform_admin_passes_every_gate(page, live_server, seeded):
         % denied)
 
 
+# Paths a signed-out visitor is meant to reach. The service status page is
+# public, as status pages are for every SaaS product: a buyer checks it before
+# signing in. It shows platform-wide state only, which the test below pins.
+PUBLIC_PATHS = {"/status"}
+
+
 def test_no_archetype_reaches_another_personas_section_unauthenticated(page, live_server):
     """The gates must not be the only thing standing between anonymous and data."""
     leaked = []
-    for path in sorted(POLICY):
+    for path in sorted(set(POLICY) - PUBLIC_PATHS):
         response = page.goto(live_server + path, wait_until="domcontentloaded",
                              timeout=PAGE_TIMEOUT)
         # Anonymous must be redirected to login or refused - never served.
@@ -474,6 +538,75 @@ def test_no_archetype_reaches_another_personas_section_unauthenticated(page, liv
         if served:
             leaked.append(path)
     assert not leaked, "these are reachable without signing in at all: %s" % leaked
+
+
+def test_public_status_page_shows_no_organisation_data(page, live_server, seeded):
+    """/status is open to signed-out visitors, so it must stay platform-wide.
+
+    Two organisations are seeded, each with an organisation name, an element name
+    and a member email carrying a random tag, so no ordinary word on the page can
+    match them. None may appear in the visible text or the markup of the signed-out page,
+    matched on word boundaries. The members and elements are removed by key
+    afterwards.
+    """
+    import html
+    import re
+    import uuid
+
+    from app import create_app, db
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    tag = uuid.uuid4().hex[:12]
+    sentinels = []
+    created = {"orgs": [], "elements": [], "users": []}
+    app = create_app("testing")
+    try:
+        with app.app_context():
+            for n in (1, 2):
+                org = Organization(name="Sentinel & <org> %s %d" % (tag, n),
+                                   slug="sentinel-%s-%d" % (tag, n))
+                db.session.add(org)
+                db.session.flush()
+                element = ArchiMateElement(
+                    name="Sentinel element %s %d" % (tag, n), type="application_component",
+                    layer="application", organization_id=org.id)
+                user = User(email="sentinel.%s.%d@example.com" % (tag, n),
+                            first_name="Sentinel", last_name="Member",
+                            organization_id=org.id, confirmed=True)
+                user.password = PASSWORD
+                db.session.add_all([element, user])
+                db.session.commit()
+                created["orgs"].append(org.id)
+                created["elements"].append(element.id)
+                created["users"].append(user.id)
+                sentinels += [org.name, element.name, user.email]
+
+        response = page.goto(live_server + "/status", wait_until="domcontentloaded",
+                             timeout=PAGE_TIMEOUT)
+        assert response and response.status == 200 and "/account/login" not in page.url
+        text = page.inner_text("body")
+        assert text.strip(), "the status page must render visible text"
+        # Names are searched in the visible text and in the markup, in both their plain and
+        # their HTML-escaped form, so a name carrying & or < is found as well.
+        markup = page.content()
+        haystack = text + "\n" + markup
+        leaked = [s for s in sentinels
+                  if any(re.search(r"(?<!\w)%s(?!\w)" % re.escape(form), haystack, re.IGNORECASE)
+                         for form in (s, html.escape(s)))]
+        assert not leaked, "the signed-out status page shows organisation data: %s" % leaked
+    finally:
+        with app.app_context():
+            # The organisations stay: their audit and outbox rows are append-only
+            # by design, so the database refuses to delete them.
+            for model, ids in ((User, created["users"]),
+                               (ArchiMateElement, created["elements"])):
+                for row_id in ids:
+                    row = db.session.get(model, row_id)
+                    if row is not None:
+                        db.session.delete(row)
+                db.session.commit()
 
 
 @pytest.mark.parametrize("archetype", ARCHETYPES)
@@ -576,8 +709,80 @@ def test_data_entity_page_authorisation(archetype, page, live_server, seeded, se
     assert actual == ALLOWED, "%s could not reach %s: expected ALLOWED" % (archetype, path)
 
 
+CAPABILITY_CHOICES_PATH = "/architecture/api/capability-choices?q=a"
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_capability_choices_are_listed_to_every_signed_in_archetype(archetype, page, live_server, seeded):
+    """The capability picker on the Create form reads this list; every persona that can open the form can read it."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.get(live_server + CAPABILITY_CHOICES_PATH)
+    assert response.status == 200, "%s could not read the capability choices: %s" % (archetype, response.status)
+    assert isinstance(response.json(), list)
+
+
+def test_capability_choices_reject_anonymous(page, live_server):
+    response = page.request.get(live_server + CAPABILITY_CHOICES_PATH, max_redirects=0)
+    assert response.status in (301, 302, 401, 403), "capability choices were served without signing in"
+
+
 def test_data_entity_page_rejects_anonymous(page, live_server, seeded_data_entity):
     path = "/architecture/data-entities/%d" % seeded_data_entity
+    response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert "/account/login" in page.url or (response is not None and response.status >= 400), (
+        "%s was served without signing in" % path)
+
+
+@pytest.fixture(scope="module")
+def seeded_processes(seeded):
+    """A process in the seeded organisation and one in another organisation, for the diagram's <id> path."""
+    import uuid
+
+    from app import create_app, db
+    from app.models.organization import Organization
+    from app.models.process_data import BusinessProcess
+
+    app = create_app("testing")
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        other = Organization(name="Matrix other %s" % suffix, slug="matrix-other-%s" % suffix)
+        db.session.add(other)
+        db.session.flush()
+        own = BusinessProcess(name="Matrix own process %s" % suffix, organization_id=org_id, level=2)
+        foreign = BusinessProcess(name="Matrix foreign process %s" % suffix, organization_id=other.id, level=2)
+        db.session.add_all([own, foreign])
+        db.session.commit()
+        ids = {"own": own.id, "foreign": foreign.id, "other_org": other.id}
+    try:
+        yield ids
+    finally:
+        with app.app_context():
+            BusinessProcess.query.filter(BusinessProcess.id.in_([ids["own"], ids["foreign"]])).delete(
+                synchronize_session=False)
+            # Creating the processes wrote audit rows naming this organisation; they are this fixture's own
+            # rows, removed by its organisation id so the organisation can then be deleted.
+            db.session.execute(db.text("DELETE FROM soc2_audit_log WHERE organization_id = :org"),
+                               {"org": ids["other_org"]})
+            Organization.query.filter_by(id=ids["other_org"]).delete(synchronize_session=False)
+            db.session.commit()
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_process_diagram_authorisation(archetype, page, live_server, seeded, seeded_processes):
+    """GET /business-architecture/processes/<id>/diagram carries @login_required and no role gate, like the
+    list it is opened from: every archetype reaches its own organisation's process and none reaches
+    another organisation's (404)."""
+    _login(page, live_server, seeded["emails"][archetype])
+    own = "/business-architecture/processes/%d/diagram" % seeded_processes["own"]
+    foreign = "/business-architecture/processes/%d/diagram" % seeded_processes["foreign"]
+    assert _observe(page, live_server, own) == ALLOWED, "%s could not reach %s" % (archetype, own)
+    response = page.goto(live_server + foreign, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert response.status == 404, "%s got %s for another organisation's process" % (archetype, response.status)
+
+
+def test_process_diagram_rejects_anonymous(page, live_server, seeded_processes):
+    path = "/business-architecture/processes/%d/diagram" % seeded_processes["own"]
     response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert "/account/login" in page.url or (response is not None and response.status >= 400), (
         "%s was served without signing in" % path)
@@ -616,6 +821,37 @@ def test_risk_page_rejects_anonymous(page, live_server, seeded_risk):
     response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert "/account/login" in page.url or (response is not None and response.status >= 400), (
         "%s was served without signing in" % path)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_risk_loss_save_authorisation(archetype, page, live_server, seeded, seeded_risk):
+    """POST /risks/<id>/loss is open to whoever may change a model element, the
+    same helper that decides whether the risk page shows the form. Every archetype
+    here holds the Architect platform role (or Administrator), so none is refused;
+    the refusal for a read-only person is pinned in
+    tests/smoke/test_risk_yearly_loss_journey.py. An empty form is answered with a
+    redirect and a message, never a 403."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/risks/%d" % seeded_risk, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    response = page.request.post(
+        live_server + "/risks/%d/loss" % seeded_risk,
+        form={"csrf_token": _csrf_token(page)},
+        max_redirects=0,
+    )
+    assert response.status != 403, "%s was refused POST /risks/%d/loss" % (archetype, seeded_risk)
+    assert response.status < 400, "%s: POST /risks/%d/loss answered %s" % (archetype, seeded_risk, response.status)
+
+
+def test_risk_loss_save_rejects_anonymous(live_server, seeded_risk, browser):
+    context = browser.new_context()
+    try:
+        response = context.request.post(
+            live_server + "/risks/%d/loss" % seeded_risk, form={}, max_redirects=0)
+        assert response.status in (302, 401, 400, 403), response.status
+        if response.status == 302:
+            assert "/account/login" in (response.headers.get("location") or "")
+    finally:
+        context.close()
 
 
 @pytest.fixture(scope="module")
@@ -865,6 +1101,28 @@ def test_gap_work_package_link_post_authorisation(
         assert response.status == 404, (archetype, path, response.status)
 
 
+@pytest.mark.parametrize("path,allowed", TECHNOLOGY_COST_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_technology_cost_post_authorisation(
+    archetype, path, allowed, page, live_server, seeded
+):
+    """The cost route is role-gated: a role that may write reaches the handler
+    (404 for a technology that does not exist), anyone else is refused before it."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + path, form={"csrf_token": csrf}, max_redirects=0
+    )
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, response.status)
+    )
+    if actual == ALLOWED:
+        assert response.status == 404, (archetype, path, response.status)
+
+
 @pytest.mark.parametrize("path,allowed", OVERSIGHT_POST_POLICY.items())
 @pytest.mark.parametrize("archetype", ARCHETYPES)
 def test_oversight_post_routes_authorisation(
@@ -884,6 +1142,148 @@ def test_oversight_post_routes_authorisation(
     actual = ALLOWED if response.status < 400 else DENIED
     assert actual == expected, (
         "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
+    )
+
+
+# Writing an allow or deny entry is for the platform administrator alone. The delete route is
+# probed with an entry that does not exist, so nothing is changed: a refused person gets 403, the
+# platform administrator reaches the handler (which redirects back with a notice).
+RATE_LIMIT_POST_POLICY = {"/admin/rate-limits/rules/2147483646/delete": {"platform_admin"}}
+
+
+@pytest.mark.parametrize("path,allowed", RATE_LIMIT_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_rate_limit_writes_refuse_a_signed_in_plain_member(archetype, path, allowed, page, live_server, seeded):
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(live_server + path, data={"csrf_token": csrf}, max_redirects=0)
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, "%s reached %s: expected %s, got %s" % (archetype, path, expected, response.status)
+
+
+# Saved simulation scenarios: every signed-in person lists the organisation's scenarios, and only the
+# roles the require_role gate maps to an architect (or an administrator) save one. An empty body is
+# refused with a 400 after the role is asked, so a role the route admits reaches the handler and
+# anyone else is refused with a 403 before it, and nothing is written either way.
+SCENARIO_SAVE_ARCHETYPES = {
+    "solution_architect", "enterprise_architect", "arb_member", "portfolio_manager", "platform_admin",
+}
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_saved_scenarios_are_listed_by_everyone_and_saved_by_architects(archetype, page, live_server, seeded):
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    listed = page.request.get(live_server + "/strategic/api/scenarios")
+    assert listed.status == 200, "%s could not list scenarios: %s" % (archetype, listed.status)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + "/strategic/api/scenarios", data={}, headers={"X-CSRFToken": csrf}, max_redirects=0)
+    expected = ALLOWED if archetype in SCENARIO_SAVE_ARCHETYPES else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, "%s saving a scenario: expected %s, got %s" % (archetype, expected, response.status)
+
+
+# Renaming and deleting a saved scenario take the same roles as saving one. A scenario that does not exist
+# answers 404 to a role the route admits, after the role is asked; anyone else is refused with a 403 first.
+# The export is a read, open to every signed-in person, and refuses an empty choice with a 400.
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_saved_scenarios_are_renamed_and_deleted_by_architects_and_exported_by_everyone(archetype, page, live_server, seeded):
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    expected = ALLOWED if archetype in SCENARIO_SAVE_ARCHETYPES else DENIED
+    address = live_server + "/strategic/api/scenarios/scenario-999999999"
+    for verb, response in (
+        ("rename", page.request.patch(address, data={"name": "x"}, headers={"X-CSRFToken": csrf}, max_redirects=0)),
+        ("delete", page.request.delete(address, headers={"X-CSRFToken": csrf}, max_redirects=0)),
+    ):
+        actual = DENIED if response.status in (401, 403) else ALLOWED
+        assert actual == expected, "%s trying to %s a scenario: expected %s, got %s" % (archetype, verb, expected, response.status)
+        if expected == ALLOWED:
+            assert response.status == 404, (archetype, verb, response.status)
+    exported = page.request.get(live_server + "/strategic/api/scenarios/export.csv?ids=scenario-999999999")
+    assert exported.status == 400, "%s export of nothing: %s" % (archetype, exported.status)
+
+
+# Role-gated ARB writes. Each is probed with an id that does not exist, except
+# the four decisions, which use a real submitted review (a missing id answers
+# 404 to everyone before the role is asked): a role the route admits reaches
+# the handler, anyone else is refused before it.
+ARB_APPROVER_ARCHETYPES = {"enterprise_architect", "arb_member", "cto", "platform_admin"}
+ARB_WRITE_POLICY = {
+    ("POST", "/arb/sessions/999999999/complete"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/sessions/999999999/cancel"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/sessions/999999999/delete"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/reviews/999999999/assign"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/reviews/999999999/delete"): ARB_APPROVER_ARCHETYPES,
+    ("PUT", "/arb/api/exceptions/999999999/approve"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/review"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/approve"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/reject"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/arb/{review}/request-changes"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/initialize_standards"): {"platform_admin"},
+    # A change request: whoever may write to ARB governance assesses its impact (the raiser does);
+    # the disposition and the change notice are the board's alone.
+    ("POST", "/arb/api/change-requests/999999999/assess-impact"): set(ARCHETYPES),
+    ("POST", "/arb/api/change-requests/999999999/set-disposition"): ARB_APPROVER_ARCHETYPES,
+    ("POST", "/arb/api/change-requests/999999999/issue-notice"): ARB_APPROVER_ARCHETYPES,
+}
+
+
+@pytest.fixture(scope="module")
+def seeded_arb_review(seeded):
+    """A submitted review of the seeded organisation whose submitter is a
+    persona outside the approver set."""
+    from app import create_app, db
+    from app.models.architecture_review_board import ARBReviewItem
+    from app.models.user import User
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        number = "REV-MATRIX-%s" % org_id
+        item = ARBReviewItem.query.filter_by(review_number=number).first()
+        if item is None:
+            submitter = User.query.filter_by(
+                email=seeded["emails"]["solution_architect"]
+            ).one()
+            item = ARBReviewItem(
+                review_number=number,
+                title="Auth-matrix probe review",
+                review_type="architecture",
+                status="submitted",
+                submitter_id=submitter.id,
+                organization_id=org_id,
+            )
+            db.session.add(item)
+            db.session.commit()
+        return item.id
+
+
+@pytest.mark.parametrize("method,path", list(ARB_WRITE_POLICY))
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_arb_write_routes_authorisation(
+    archetype, method, path, page, live_server, seeded, seeded_arb_review
+):
+    """Complete, cancel, delete, assign, exception approval, the four decisions and
+    standards setup are refused to every persona outside the approver set."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.fetch(
+        live_server + path.format(review=seeded_arb_review),
+        method=method,
+        headers={"X-CSRFToken": csrf, "Content-Type": "application/json"},
+        data="{}",
+        max_redirects=0,
+    )
+    expected = ALLOWED if archetype in ARB_WRITE_POLICY[(method, path)] else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, (
+        "%s %s %s: expected %s, got %s" % (archetype, method, path, expected, response.status)
     )
 
 
@@ -1673,3 +2073,213 @@ def test_ai_chat_entity_matching_rejects_anonymous(page, live_server):
         max_redirects=0,
     )
     assert response.status in (302, 401)
+
+
+# Decision tables (DMN): every signed-in member reads the list and a decision's table, and exports it;
+# writing needs the permission to change the model, the answer the model screens use. The seeded archetypes
+# all hold the Administrator platform role, so each is admitted; the refused case, a viewer persona, is pinned
+# in tests/test_decision_table_routes.py.
+# An empty name is refused with a redirect and a message by a caller the gate admitted, and with 403 before it
+# by one it did not.
+DECISION_TABLES_WRITERS = set(ARCHETYPES)
+
+
+@pytest.fixture(scope="module")
+def seeded_decision_table(seeded):
+    from app import create_app, db
+    from app.modules.architecture.services import decision_table_service as tables
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        name = "Auth-matrix probe decision"
+        found = tables.find_decision_by_name(name, org_id)
+        if found is None:
+            found = tables.create_decision(name, "U", org_id=org_id)
+            db.session.commit()
+        return found.id
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_decision_tables_read_authorisation(archetype, page, live_server, seeded, seeded_decision_table):
+    _login(page, live_server, seeded["emails"][archetype])
+    for path in (
+        "/architecture/decision-tables/",
+        "/architecture/decision-tables/%d" % seeded_decision_table,
+    ):
+        assert _observe(page, live_server, path) == ALLOWED, "%s could not reach %s" % (archetype, path)
+    exported = page.request.get(
+        live_server + "/architecture/decision-tables/%d/export.dmn" % seeded_decision_table
+    )
+    assert exported.status == 200, "%s could not export the decision: %s" % (archetype, exported.status)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_decision_tables_write_authorisation(archetype, page, live_server, seeded, seeded_decision_table):
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/architecture/decision-tables/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    token = _csrf_token(page)
+    for route, path in (
+        ("create", "/architecture/decision-tables/"),
+        ("delete", "/architecture/decision-tables/%d/delete" % (seeded_decision_table + 10_000_000)),
+        ("rule", "/architecture/decision-tables/%d/rules" % (seeded_decision_table + 10_000_000)),
+    ):
+        response = page.request.post(live_server + path, form={"csrf_token": token}, max_redirects=0)
+        _expect_gate(response, archetype, DECISION_TABLES_WRITERS, route)
+
+
+def test_decision_tables_reject_anonymous(page, live_server):
+    response = page.goto(
+        live_server + "/architecture/decision-tables/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT
+    )
+    assert "/account/login" in page.url or (response is not None and response.status >= 400)
+
+
+# Every write on the roadmap API is refused to a read-only account before the handler reads the body.
+ROADMAP_WRITE_PATHS = [
+    ("POST", "/api/roadmap/plateaus"),
+    ("POST", "/api/roadmap/work-packages"),
+    ("PUT", "/api/roadmap/work-packages/1"),
+    ("DELETE", "/api/roadmap/work-packages/1"),
+    ("POST", "/api/roadmap/deliverables"),
+    ("PUT", "/api/roadmap/deliverables/1"),
+    ("DELETE", "/api/roadmap/deliverables/1"),
+    ("POST", "/api/roadmap/gaps"),
+    ("POST", "/api/roadmap/automation/generate-work-packages"),
+    ("POST", "/api/roadmap/sync/capabilities"),
+    ("POST", "/api/roadmap/archimate/generate-roadmap"),
+]
+
+
+@pytest.fixture(scope="module")
+def roadmap_viewer(seeded):
+    """A Viewer-role account whose persona is Viewer too, so no persona grants it model editing."""
+    import uuid
+
+    from app import create_app, db
+    from app.models.user import Role, User
+
+    app = create_app("testing")
+    with app.app_context():
+        Role.insert_roles()
+        user = User(
+            email="smoke.roadmap.viewer.%s@example.com" % uuid.uuid4().hex[:8],
+            first_name="Smoke", last_name="Viewer",
+            organization_id=seeded["ids"]["org"], enterprise_role="viewer", confirmed=True,
+        )
+        user.role = Role.query.filter_by(name="Viewer").one()
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.commit()
+        return user.email
+
+
+@pytest.mark.parametrize("method,path", ROADMAP_WRITE_PATHS)
+def test_roadmap_write_routes_refuse_a_read_only_account(method, path, page, live_server, roadmap_viewer):
+    _login(page, live_server, roadmap_viewer)
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.fetch(
+        live_server + path, method=method, data={}, headers={"X-CSRFToken": csrf_token}, max_redirects=0
+    )
+    assert response.status == 403, "a Viewer reached %s %s: %s" % (method, path, response.status)
+
+
+# ── Changing the model: a read-only account is refused and nothing changes; a write role acts ───────────────────
+#
+# Observed on a Viewer and an Architect, each in an organisation of its own with a Goal, and a gap, plus a second
+# real organisation whose Goal must stay as it was whoever acts.
+
+def _model_change_setup(platform_role):
+    persona = "enterprise_architect" if platform_role == "Architect" else "data_analyst"
+    import uuid
+
+    from app import create_app, db
+    from app.models.implementation_migration import Gap
+    from .fresh_org import create_fresh_org
+    from .test_element_number_links_journey import _seed
+
+    org = create_fresh_org(persona, platform_role=platform_role)
+    other = create_fresh_org("enterprise_architect")
+    tag = uuid.uuid4().hex[:6]
+    goals = {
+        key: _seed(o, "Goal", "%s goal %s" % (key, tag), "%s second goal %s" % (key, tag), with_solution=False)
+        for key, o in (("mine", org), ("theirs", other))
+    }
+    with create_app("testing").app_context():
+        gap = Gap(organization_id=org["org_id"], name="Matrix gap " + tag, gap_type="coverage",
+                  priority="medium", severity="medium")
+        db.session.add(gap)
+        db.session.commit()
+        gap_id = gap.id
+        db.session.remove()
+    return org, other, goals, gap_id, tag
+
+
+def _model_state(org, other, goals, gap_id):
+    from app import create_app
+    from app.models.implementation_migration import Gap
+    from app.modules.architecture.routes.archimate_crud.routes import MODEL_REGISTRY
+
+    with create_app("testing").app_context():
+        model = MODEL_REGISTRY["Goal"]
+        field = "name" if hasattr(model, "name") else "title"
+        gap = Gap.query.filter_by(id=gap_id).first()
+        return {
+            "goal": getattr(model.query.filter_by(id=goals["mine"]["a"]).first(), field, None),
+            "other goal": getattr(model.query.filter_by(id=goals["theirs"]["a"]).first(), field, None),
+            "gap": (gap.name, gap.priority) if gap else None,
+        }
+
+
+@pytest.mark.parametrize("platform_role,writes", [("Viewer", False), ("Architect", True)])
+@pytest.mark.parametrize("change", ["element edit", "gap edit", "element delete", "bulk delete"])
+def test_model_changes_are_refused_to_a_read_only_account_and_made_by_a_write_role(
+    change, platform_role, writes, browser, live_server,
+):
+    from .fresh_org import sign_in
+
+    org, other, goals, gap_id, tag = _model_change_setup(platform_role)
+    before = _model_state(org, other, goals, gap_id)
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1280, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, next(iter(org["emails"].values())))
+        page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+        record = goals["mine"]["a"]
+        headers = {"X-CSRFToken": csrf, "Content-Type": "application/json"}
+        import json
+        if change == "element edit":
+            response = page.request.post(
+                live_server + "/architecture/motivation/Goal/%d/edit" % record,
+                data=json.dumps({"name": "Renamed " + tag, "title": "Renamed " + tag}), headers=headers, max_redirects=0)
+        elif change == "gap edit":
+            response = page.request.post(
+                live_server + "/architecture/implementation/Gap/%d/edit" % gap_id,
+                data=json.dumps({"name": "Renamed " + tag, "priority": "high"}), headers=headers, max_redirects=0)
+        elif change == "element delete":
+            response = page.request.post(
+                live_server + "/architecture/motivation/Goal/%d/delete" % record, headers=headers, max_redirects=0)
+        else:
+            response = page.request.post(
+                live_server + "/architecture/motivation/Goal/bulk-delete",
+                data=json.dumps({"ids": [record, goals["theirs"]["a"]]}), headers=headers, max_redirects=0)
+        after = _model_state(org, other, goals, gap_id)
+        assert after["other goal"] == before["other goal"], "another organisation's Goal changed"
+        if not writes:
+            assert response.status == 403, "%s by a read-only account: expected 403, got %s" % (change, response.status)
+            assert after == before, "a refused %s still changed the record: %s -> %s" % (change, before, after)
+        else:
+            assert response.status < 400, "%s by a write role was refused: %s" % (change, response.status)
+            assert after != before, "%s by a write role changed nothing" % change
+            expected = {
+                "element edit": ("goal", lambda v: v == "Renamed " + tag),
+                "gap edit": ("gap", lambda v: v == ("Renamed " + tag, "high")),
+                "element delete": ("goal", lambda v: v is None),
+                "bulk delete": ("goal", lambda v: v is None),
+            }[change]
+            assert expected[1](after[expected[0]]), (change, after)
+    finally:
+        context.close()

@@ -44,10 +44,9 @@ _NO_TENANT_CONTEXT_REASON = validate_reason_code("no_tenant_context")
 _ELEMENT_NOT_FOUND_REASON = validate_reason_code("element_not_found")
 _FINANCIAL_DATA_RESTRICTED_REASON = validate_reason_code("financial_data_restricted")
 
-# The single cost-visibility rule lives in role_access.py so every
-# surface that redacts financial figures shares one authority.  Import it;
-# do not define a second list.
-from app.utils.role_access import COST_VISIBILITY_ROLES, can_see_costs  # noqa: F401 - one shared set; can_see_costs applies it
+# The one cost rule (may_see_spend_pages) is asked through app/services/cost_visibility.py,
+# so every surface that redacts financial figures shares one authority.
+from app.services.cost_visibility import costs_visible
 
 intelligence_api = Blueprint(
     "intelligence_api", __name__, url_prefix="/api/v1/intelligence"
@@ -69,7 +68,7 @@ def _redact_financial_fields(rows: list, fields: tuple[str, ...], reason_field: 
     can't see this." A caller with budget authority sees the real value and
     this function is a no-op for them.
     """
-    if can_see_costs(current_user):
+    if costs_visible(current_user):
         return
     for row in rows:
         for field in fields:
@@ -661,6 +660,9 @@ def portfolio_component_for_element(element_id: int):
             "application_component_id": result.get("application_component_id"),
             "reasons": result.get("reasons") or [],
             "component": component,
+            "resolved_through": result.get("resolved_through"),
+            "part_of": result.get("part_of"),
+            "message": result.get("message"),
         }
     )
 
@@ -1010,7 +1012,13 @@ def query_catalogue_run(entry_id):
         return not_found_response(f"no catalogue entry named '{entry_id}'")
 
     params = {name: request.args.get(name) for name in entry.params if request.args.get(name) is not None}
-    result = run_entry(entry_id, organization_id, **params)
+    run_params = dict(params)
+    if entry_id == "canvas_box_entries":
+        # cost lines follow the one cost rule the canvas page and the chat follow
+        from app.services.cost_visibility import costs_visible
+
+        run_params["show_costs"] = costs_visible(current_user)
+    result = run_entry(entry_id, organization_id, **run_params)
     return success_response({"entry_id": entry_id, "title": entry.title, "params": params, **result})
 
 
@@ -1087,7 +1095,7 @@ def ask_nl_question():
             "title": entry.title if entry is not None else None,
         }
     else:
-        interpretation = interpret(question)
+        interpretation = interpret(question, organization_id)
 
     entry_id = interpretation["entry_id"]
     if entry_id is None or entry_id not in CATALOGUE:

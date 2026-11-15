@@ -102,6 +102,47 @@ def client_error():
 csrf.exempt(client_error)
 
 
+# Fields that differ on every repeat of one problem (who asked, which request); the dashboard groups on the rest.
+_VOLATILE_FIELDS = ("actor", "request_id", "user", "user_id", "session")
+
+
+def _group_error_events(events):
+    """One row per distinct problem: events whose message differs only in actor or request id are one group.
+
+    A structured message ("event_name key=value key=value") is split so the row leads with the part that
+    tells problems apart (endpoint, organisation, reason) and names the event underneath."""
+    groups = {}
+    order = []
+    for e in events:
+        parts = (e.message or "").split()
+        fields = [p for p in parts[1:] if "=" in p]
+        structured = len(parts) > 1 and len(fields) == len(parts) - 1
+        if structured:
+            kept = [f for f in fields if f.split("=", 1)[0] not in _VOLATILE_FIELDS]
+            key = (e.source, parts[0], tuple(kept))
+            values = dict(f.split("=", 1) for f in kept)
+            lead = " · ".join(
+                ("organisation " + v) if k == "organization" else v.replace("_", " ") if k == "reason" else v
+                for k, v in values.items()
+            ) or parts[0]
+            name = parts[0].replace("_", " ").capitalize()
+        else:
+            key = (e.source, e.message, e.location)
+            lead, name = e.message, None
+        g = groups.get(key)
+        if g is None:
+            g = groups[key] = {"lead": lead, "name": name, "message": e.message, "source": e.source,
+                               "location": e.location, "count": 0, "last_seen_at": e.last_seen_at,
+                               "events": [], "resolved": True}
+            order.append(key)
+        g["count"] += e.occurrence_count or 0
+        g["events"].append(e)
+        g["resolved"] = g["resolved"] and bool(e.resolved)
+        if e.last_seen_at and (g["last_seen_at"] is None or e.last_seen_at > g["last_seen_at"]):
+            g["last_seen_at"] = e.last_seen_at
+    return [groups[k] for k in order]
+
+
 @error_events_bp.route("/admin/errors", methods=["GET"])
 @platform_admin_required
 def errors_dashboard():
@@ -125,6 +166,7 @@ def errors_dashboard():
     return render_template(
         "monitoring/errors_dashboard.html",
         events=events,
+        groups=_group_error_events(events),
         show_resolved=show_resolved,
         source_filter=source_filter,
     )

@@ -1,135 +1,146 @@
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'components/input.html' import input, textarea, label %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/button.html' import button %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'components/card.html' import card, card_header, card_content %}
+{% from 'components/badge.html' import badge %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
 {% block title %}Technology Standards{% endblock %}
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-  {{ page_header(title='Technology Standards', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Technology Standards'}], description='Approved technologies per domain, with their radar ring and sunset date') }}
+<div class="flex-1 overflow-auto">
+  {{ page_shell(
+      title='Technology Standards',
+      subtitle='Approved technologies per domain, with their radar ring and sunset date',
+      breadcrumb=[('Home', url_for('main.index')), ('Technology Standards', None)]
+  ) }}
 
-  <section class="rounded-lg border border-border bg-card p-4 sm:p-6" aria-labelledby="standard-form-title">
-    <h2 id="standard-form-title" class="text-base font-semibold">Publish a standard</h2>
-    <p class="text-sm text-muted-foreground mt-0.5">The radar ring is recorded on the Tech Radar for the technology element you choose.</p>
-    <form method="POST" action="{{ url_for('governance.standards') }}" class="mt-4 grid grid-cols-1 gap-4" data-testid="standard-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label class="block text-sm font-medium text-muted-foreground mb-1">
-        <span class="block font-medium mb-1">Technology <span class="text-destructive-emphasis" aria-hidden="true">*</span></span>
-        <input type="text" name="technology_name" required maxlength="255" value="{{ form.get('technology_name', '') }}"
-          class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-      </label>
-      <label class="block text-sm font-medium text-muted-foreground mb-1">
-        <span class="block font-medium mb-1">Domain <span class="text-destructive-emphasis" aria-hidden="true">*</span></span>
-        <input type="text" name="category" required maxlength="100" list="standard-domains" value="{{ form.get('category', '') }}"
-          placeholder="e.g. Messaging, Database, Runtime"
-          class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-        <datalist id="standard-domains">
-          {% for domain in grouped.keys() if domain %}<option value="{{ domain }}"></option>{% endfor %}
-        </datalist>
-      </label>
-      <label class="block text-sm font-medium text-muted-foreground mb-1">
-        <span class="block font-medium mb-1">Status <span class="text-destructive-emphasis" aria-hidden="true">*</span></span>
-        <select name="status" required class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-          <option value="">Select…</option>
-          {% for s in statuses %}
-          <option value="{{ s }}" {% if form.get('status') == s %}selected{% endif %}>{{ s.replace('_', ' ') | capitalize }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label class="block text-sm font-medium text-muted-foreground mb-1">
-        <span class="block font-medium mb-1">Approved version</span>
-        <input type="text" name="approved_version" maxlength="50" value="{{ form.get('approved_version', '') }}"
-          class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-      </label>
-      <div class="relative text-sm" x-data="standardElementPicker()">
-        <label for="standard-element" class="block text-sm font-medium text-muted-foreground mb-1">Technology element</label>
-        <input type="hidden" name="archimate_element_id" :value="picked ? picked.id : ''">
-        <input id="standard-element" type="text" autocomplete="off" role="combobox" aria-autocomplete="list"
-          :aria-expanded="results.length > 0 ? 'true' : 'false'" aria-controls="standard-element-results"
-          x-model="query" @input.debounce.300ms="search()" placeholder="Search the technology layer"
-          class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-        <ul id="standard-element-results" role="listbox" x-show="results.length" x-cloak
-          class="absolute z-10 mt-1 w-full rounded-md border border-border bg-popover max-h-56 overflow-auto">
-          <template x-for="item in results" :key="item.id">
-            <li role="option" aria-selected="false">
-              <button type="button" @click="choose(item)" class="w-full text-left px-3 py-2 hover:bg-muted">
-                <span x-text="item.name"></span> <span class="text-xs text-muted-foreground" x-text="item.type"></span>
-              </button>
-            </li>
-          </template>
-        </ul>
-        <p class="mt-1 text-xs text-muted-foreground" x-show="!picked">Needed for a radar ring.</p>
-        <p class="mt-1 text-xs" x-show="picked" x-cloak>Selected: <span class="font-medium" x-text="picked ? picked.name : ''"></span></p>
-        <p class="mt-1 text-xs text-destructive-emphasis" x-show="error" x-cloak x-text="error"></p>
-      </div>
-      <label class="block text-sm font-medium text-muted-foreground mb-1">
-        <span class="block font-medium mb-1">Radar ring</span>
-        <select name="ring" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-          <option value="">Not placed on the radar</option>
-          {% for r in rings %}
-          <option value="{{ r }}" {% if form.get('ring') == r %}selected{% endif %}>{{ ring_labels[r] }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label class="block text-sm font-medium text-muted-foreground mb-1">
-        <span class="block font-medium mb-1">Sunset date</span>
-        <input type="date" name="sunset_date" value="{{ form.get('sunset_date', '') }}"
-          class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-      </label>
-      <label class="block text-sm font-medium text-muted-foreground mb-1">
-        <span class="block font-medium mb-1">Replacement technology</span>
-        <input type="text" name="replacement_technology" maxlength="255" value="{{ form.get('replacement_technology', '') }}"
-          class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-      </label>
-      <label class="block text-sm font-medium text-muted-foreground mb-1">
-        <span class="block font-medium mb-1">Rationale</span>
-        <textarea name="rationale" rows="3" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">{{ form.get('rationale', '') }}</textarea>
-      </label>
-      <div class="flex justify-end">
-        <button type="submit" data-testid="standard-submit"
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-          Publish standard
-        </button>
-      </div>
-    </form>
-  </section>
+  <div class="p-6 space-y-6">
 
-  {% if not grouped %}
-  <div class="rounded-lg border border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground" data-testid="standards-empty">
-    No technology standards defined yet.
+      <div class="px-4 lg:px-6">
+        {% call card() %}
+          {% call card_header() %}
+            <h2 id="standard-form-title" class="text-base font-semibold">Publish a standard</h2>
+            <p class="text-sm text-muted-foreground mt-0.5">The radar ring is recorded on the Tech Radar for the technology element you choose.</p>
+          {% endcall %}
+          {% call card_content() %}
+            <form method="POST" action="{{ url_for('governance.standards') }}" class="grid grid-cols-1 gap-4" data-testid="standard-form">
+              {{ input(id='csrf-token', name='csrf_token', type='hidden', value=csrf_token()) }}
+              <div>
+                {% call label(for='technology-name', required=true) %}Technology{% endcall %}
+                {{ input(id='technology-name', name='technology_name', required=true, maxlength='255', value=form.get('technology_name', ''), size='sm') }}
+              </div>
+              <div>
+                {% call label(for='standards-category', required=true) %}Domain{% endcall %}
+                {{ input(id='standards-category', name='category', required=true, maxlength='100', value=form.get('category', ''), size='sm', placeholder='e.g. Messaging, Database, Runtime', attrs_dict={'list': 'standard-domains'}) }}
+                <datalist id="standard-domains">
+                  {% for domain in grouped.keys() if domain %}<option value="{{ domain }}"></option>{% endfor %}
+                </datalist>
+              </div>
+              <div>
+                {% call label(for='standards-status', required=true) %}Status{% endcall %}
+                {% call native_select(id='standards-status', name='status', size='sm', attrs_dict={'required': ''}) %}
+                  <option value="">Select…</option>
+                  {% for s in statuses %}
+                  <option value="{{ s }}" {% if form.get('status') == s %}selected{% endif %}>{{ s.replace('_', ' ') | capitalize }}</option>
+                  {% endfor %}
+                {% endcall %}
+              </div>
+              <div>
+                {% call label(for='standards-version') %}Approved version{% endcall %}
+                {{ input(id='standards-version', name='approved_version', maxlength='50', value=form.get('approved_version', ''), size='sm') }}
+              </div>
+              <div class="relative text-sm" x-data="standardElementPicker()">
+                {% call label(for='standard-element') %}Technology element{% endcall %}
+                {{ input(id='archimate-element-id', name='archimate_element_id', type='hidden', attrs_dict={':value': "picked ? picked.id : ''"}) }}
+                {{ input(id='standard-element', placeholder='Search the technology layer', size='sm', autocomplete='off', attrs_dict={'x-model': 'query', '@input.debounce.300ms': 'search()', ':aria-expanded': "results.length > 0 ? 'true' : 'false'", 'aria-controls': 'standard-element-results', 'role': 'combobox', 'aria-autocomplete': 'list'}) }}
+                <ul id="standard-element-results" role="listbox" x-show="results.length" x-cloak class="absolute z-10 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground max-h-56 overflow-auto">
+                  <template x-for="item in results" :key="item.id">
+                    <li role="option" :aria-selected="false">
+                      {% call button(type='button', variant='ghost', size='bare', class='w-full text-left px-3 py-2', attrs_dict={'@click': 'choose(item)'}) %}
+                        <span x-text="item.name"></span> <span class="text-xs text-muted-foreground" x-text="item.type"></span>
+                      {% endcall %}
+                    </li>
+                  </template>
+                </ul>
+                <p class="mt-1 text-xs text-muted-foreground" x-show="!picked">Needed for a radar ring.</p>
+                <p class="mt-1 text-xs" x-show="picked" x-cloak>Selected: <span class="font-medium" x-text="picked ? picked.name : ''"></span></p>
+                <p class="mt-1 text-xs text-destructive-emphasis" x-show="error" x-cloak x-text="error"></p>
+              </div>
+              <div>
+                {% call label(for='standards-ring') %}Radar ring{% endcall %}
+                {% call native_select(id='standards-ring', name='ring', size='sm') %}
+                  <option value="">Not placed on the radar</option>
+                  {% for r in rings %}
+                  <option value="{{ r }}" {% if form.get('ring') == r %}selected{% endif %}>{{ ring_labels[r] }}</option>
+                  {% endfor %}
+                {% endcall %}
+              </div>
+              <div>
+                {% call label(for='standards-sunset') %}Sunset date{% endcall %}
+                {{ input(id='standards-sunset', name='sunset_date', type='date', value=form.get('sunset_date', ''), size='sm') }}
+              </div>
+              <div>
+                {% call label(for='standards-replacement') %}Replacement technology{% endcall %}
+                {{ input(id='standards-replacement', name='replacement_technology', maxlength='255', value=form.get('replacement_technology', ''), size='sm') }}
+              </div>
+              <div>
+                {% call label(for='standards-rationale') %}Rationale{% endcall %}
+                {% call textarea(id='standards-rationale', name='rationale', rows=3) %}{{ form.get('rationale', '') }}{% endcall %}
+              </div>
+              <div class="flex justify-end">
+                {{ button(text='Publish standard', type='submit', testid='standard-submit') }}
+              </div>
+            </form>
+          {% endcall %}
+        {% endcall %}
+      </div>
+
+      {% if not grouped %}
+      <div class="px-4 lg:px-6">
+        <div class="rounded-lg border border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground" data-testid="standards-empty">
+          No technology standards defined yet.
+        </div>
+      </div>
+      {% endif %}
+
+      {% for domain, rows in grouped.items() %}
+      <div class="px-4 lg:px-6">
+        <section class="rounded-lg border border-border bg-card" data-testid="standards-domain" data-domain="{{ domain }}">
+          <h2 class="px-4 py-3 border-b border-border text-sm font-semibold">{{ domain or '—' }}</h2>
+          {% call table() %}
+            {% call table_header() %}
+              <tr>
+                {% call table_head() %}Technology{% endcall %}
+                {% call table_head() %}Status{% endcall %}
+                {% call table_head() %}Radar ring{% endcall %}
+                {% call table_head() %}Version{% endcall %}
+                {% call table_head() %}Sunset date{% endcall %}
+                {% call table_head() %}Rationale{% endcall %}
+              </tr>
+            {% endcall %}
+            {% call table_body() %}
+              {% for row in rows %}
+              {% set s = row.standard %}
+              <tr class="border-b border-border last:border-0 align-top" data-testid="standard-row-{{ s.id }}">
+                <td class="p-4 align-middle font-medium text-foreground">{{ s.technology_name }}</td>
+                <td class="p-4 align-middle">{% call badge(variant='info') %}{{ (s.status or '—').replace('_', ' ') | capitalize }}{% endcall %}</td>
+                <td class="p-4 align-middle text-muted-foreground" data-testid="standard-ring-{{ s.id }}">{{ ring_labels[row.ring] if row.ring else '—' }}</td>
+                <td class="p-4 align-middle text-muted-foreground">{{ s.approved_version or '—' }}</td>
+                <td class="p-4 align-middle text-muted-foreground" data-testid="standard-sunset-{{ s.id }}">{{ s.sunset_date | format_date if s.sunset_date else '—' }}</td>
+                <td class="p-4 align-middle text-muted-foreground">{{ s.rationale or '—' }}</td>
+              </tr>
+              {% endfor %}
+            {% endcall %}
+          {% endcall %}
+        </section>
+      </div>
+      {% endfor %}
+    </div>
   </div>
-  {% endif %}
-
-  {% for domain, rows in grouped.items() %}
-  <section class="rounded-lg border border-border bg-card overflow-x-auto" data-testid="standards-domain" data-domain="{{ domain }}">
-    <h2 class="px-4 py-3 border-b border-border text-sm font-semibold">{{ domain or '—' }}</h2>
-    <table class="dense-table w-full text-sm">
-      <thead>
-        <tr class="border-b border-border text-left text-muted-foreground">
-          <th class="px-4 py-3 font-medium">Technology</th>
-          <th class="px-4 py-3 font-medium">Status</th>
-          <th class="px-4 py-3 font-medium">Radar ring</th>
-          <th class="px-4 py-3 font-medium">Version</th>
-          <th class="px-4 py-3 font-medium">Sunset date</th>
-          <th class="px-4 py-3 font-medium">Rationale</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-        {% set s = row.standard %}
-        <tr class="border-b border-border last:border-0 align-top" data-testid="standard-row-{{ s.id }}">
-          <td class="px-4 py-3 font-medium text-foreground">{{ s.technology_name }}</td>
-          <td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">{{ (s.status or '—').replace('_', ' ') | capitalize }}</span></td>
-          <td class="px-4 py-3" data-testid="standard-ring-{{ s.id }}">{{ ring_labels[row.ring] if row.ring else '—' }}</td>
-          <td class="px-4 py-3 text-muted-foreground">{{ s.approved_version or '—' }}</td>
-          <td class="px-4 py-3 text-muted-foreground" data-testid="standard-sunset-{{ s.id }}">{{ s.sunset_date | format_date if s.sunset_date else '—' }}</td>
-          <td class="px-4 py-3 text-muted-foreground">{{ s.rationale or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
-  {% endfor %}
-</div>
 <script>
-  // Live-search picker over the organisation's Technology-layer elements.
   window.standardElementPicker = function () {
     return {
       query: '',

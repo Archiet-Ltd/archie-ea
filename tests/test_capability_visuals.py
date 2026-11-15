@@ -28,7 +28,6 @@ INVESTMENT_MATRIX_HTML = REPO_ROOT / "app" / "templates" / "enterprise" / "inves
 
 NESTED_MAP_JS = REPO_ROOT / "app" / "static" / "js" / "capability_map" / "nested_map.js"
 MATURITY_RADAR_JS = REPO_ROOT / "app" / "static" / "js" / "capability_map" / "maturity_radar.js"
-INVESTMENT_BUBBLE_JS = REPO_ROOT / "app" / "static" / "js" / "capability_map" / "investment_bubble.js"
 INDEX_JS = REPO_ROOT / "app" / "static" / "js" / "capability_map" / "index.js"
 
 REUSED_ENDPOINT = "/capability-map/api/unified-capabilities"
@@ -51,12 +50,6 @@ def index_js_text():
     return INDEX_JS.read_text(encoding="utf-8")
 
 
-@pytest.fixture(scope="module")
-def investment_matrix_text():
-    assert INVESTMENT_MATRIX_HTML.exists(), f"missing {INVESTMENT_MATRIX_HTML}"
-    return INVESTMENT_MATRIX_HTML.read_text(encoding="utf-8")
-
-
 class TestNewJsFilesExist:
     def test_nested_map_js_exists(self):
         assert NESTED_MAP_JS.exists()
@@ -64,13 +57,10 @@ class TestNewJsFilesExist:
     def test_maturity_radar_js_exists(self):
         assert MATURITY_RADAR_JS.exists()
 
-    def test_investment_bubble_js_exists(self):
-        assert INVESTMENT_BUBBLE_JS.exists()
-
     def test_new_js_files_compile_as_valid_javascript_braces(self):
         # Not a real JS parser (none is available here) — a cheap sanity check
         # that braces/parens balance, catching obvious syntax breakage.
-        for path in (NESTED_MAP_JS, MATURITY_RADAR_JS, INVESTMENT_BUBBLE_JS):
+        for path in (NESTED_MAP_JS, MATURITY_RADAR_JS):
             text = path.read_text(encoding="utf-8")
             assert text.count("{") == text.count("}"), f"unbalanced braces in {path.name}"
             assert text.count("(") == text.count(")"), f"unbalanced parens in {path.name}"
@@ -117,25 +107,6 @@ class TestMaturityRadarReusesExistingEndpoint:
         assert "maturity-level-select" in text
 
 
-class TestInvestmentBubbleUsesEmbeddedTableData:
-    def test_reads_embedded_data_global_not_a_new_fetch_endpoint(self):
-        text = INVESTMENT_BUBBLE_JS.read_text(encoding="utf-8")
-        assert "window.__investmentBubbleData" in text
-        # The bubble chart must not introduce its own fetch() call — it consumes
-        # data already embedded by the template from the existing `capabilities`
-        # context variable, per the "reuse the data the table already renders" rule.
-        assert "fetch(" not in text
-
-    def test_uses_chartjs_bubble_type(self):
-        text = INVESTMENT_BUBBLE_JS.read_text(encoding="utf-8")
-        assert "type: 'bubble'" in text
-
-    def test_has_time_quadrant_labels(self):
-        text = INVESTMENT_BUBBLE_JS.read_text(encoding="utf-8")
-        for label in ("INVEST", "MIGRATE", "TOLERATE", "ELIMINATE"):
-            assert label in text
-
-
 class TestIndexHtmlNewTabs:
     # shell-overhaul Wave 2 Task 3 replaced the competing 11-button Alpine tab
     # row (one <button role="tab"> per lens, each with its own inline
@@ -162,7 +133,10 @@ class TestIndexHtmlNewTabs:
         # per-tab-button assertion (every <button> declares type=) no longer
         # applies since there is no longer a button row — check the <select>
         # that replaced it is properly labelled instead.
-        assert 'id="capability-lens"' in index_html_text
+        # The select is now drawn by the native_select macro, so the id is a
+        # macro argument (id='capability-lens') rather than a literal attribute.
+        import re
+        assert re.search(r"""id=['"]capability-lens['"]""", index_html_text)
         assert 'for="capability-lens"' in index_html_text
 
     def test_new_scripts_are_included(self, index_html_text):
@@ -184,22 +158,7 @@ class TestIndexHtmlNewTabs:
 
 
 class TestInvestmentMatrixBubbleChart:
-    def test_keeps_existing_table(self, investment_matrix_text):
-        assert "All Capabilities" in investment_matrix_text
-        assert "<table" in investment_matrix_text
-        assert "cap.strategic_importance" in investment_matrix_text
-
-    def test_adds_bubble_canvas_and_script(self, investment_matrix_text):
-        assert 'id="investment-bubble-chart"' in investment_matrix_text
-        assert "js/capability_map/investment_bubble.js" in investment_matrix_text
-
-    def test_embeds_data_from_existing_context_var_not_new_endpoint(self, investment_matrix_text):
-        assert "window.__investmentBubbleData" in investment_matrix_text
-        assert "capabilities|default([])" in investment_matrix_text
-
-    def test_chartjs_cdn_present(self, investment_matrix_text):
-        assert CHART_JS_SRC in investment_matrix_text
-
-    def test_has_quadrant_legend(self, investment_matrix_text):
-        for label in ("Invest", "Migrate", "Tolerate", "Eliminate"):
-            assert label in investment_matrix_text
+    def test_the_earlier_enterprise_page_is_retired_into_the_one_matrix(self):
+        # The enterprise page was a second investment prioritisation; its address
+        # now redirects to the matrix that reads the one scorer.
+        assert not INVESTMENT_MATRIX_HTML.exists()

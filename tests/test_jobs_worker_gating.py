@@ -71,7 +71,16 @@ def test_scheduler_still_starts_when_no_worker_is_configured(app, monkeypatch):
     app.testing = False
     try:
         init_scheduler(app)
-        assert app.extensions.get("ea_workflow_scheduler") is not None
+        scheduler = app.extensions.get("ea_workflow_scheduler")
+        assert scheduler is not None
+        # The daily public-signals refresh must survive _remove_undeclared_jobs
+        # at start-up: if its id is not declared in TENANT_JOBS the job is
+        # stripped before the scheduler starts and no organisation ever gets
+        # its public footprint refreshed.
+        assert scheduler.get_job("company_signals_refresh") is not None, (
+            "company_signals_refresh was removed at start-up — it must be "
+            "declared in TENANT_JOBS in app/jobs/tenant_safe_job.py"
+        )
     finally:
         _shutdown_and_pop(app)
         app.testing = original_testing

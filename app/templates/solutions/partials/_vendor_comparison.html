@@ -93,7 +93,7 @@
                                         <div class="text-sm font-semibold text-foreground" x-text="formatCurrency(product.tco.total_3yr)"></div>
                                         <div class="mt-1 mx-auto w-24 h-1.5 rounded-full bg-border overflow-hidden">
                                             <div class="h-full rounded-full bg-info transition-all"
-                                                 :style="'width:' + (product.tco_score || 0) + '%'"></div>
+                                                 :style="'width:' + Platform.figure.barWidth(product.tco_score) + '%'"></div>
                                         </div>
                                         <div class="text-xs text-muted-foreground mt-0.5" x-text="(product.tco_score != null ? product.tco_score + '/100' : 'N/A')"></div>
                                     </div>

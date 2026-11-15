@@ -7,7 +7,7 @@ Provides unified interface for generating architecture elements, requirements,
 UML diagrams, and code using various LLM providers.
 
 DEFAULT PROVIDER: Hugging Face (free, local models)
-- Priority order: huggingface → anthropic → openai → gemini → deepseek → azure
+- Priority order: huggingface → anthropic → openai → gemini → openrouter → nvidia → azure
 - Hugging Face models run locally, no API costs
 - Other providers require API keys and incur costs
 
@@ -15,7 +15,7 @@ CRITICAL POLICY: NO HARDCODED DATA
 =====================================
 This service strictly enforces a NO HARDCODED DATA policy:
 
-1. MODEL SELECTION: ONLY models configured via API Settings database are used.
+1. MODEL SELECTION: ONLY models configured via AI settings database are used.
    NO hardcoded model names or fallback models are allowed.
 
 2. PROVIDER CONFIGURATION: All provider settings (API keys, models, endpoints)
@@ -41,7 +41,7 @@ DEFAULT PROVIDER ORDER:
 1. anthropic (Claude - requires API key)
 2. openai (GPT - 4 - requires API key)
 3. gemini (requires API key)
-4. deepseek (requires API key)
+4. nvidia (free models; requires API key)
 5. azure (requires API key)
 6. huggingface (free, local models - last due to potential stability issues on some systems)
 
@@ -75,8 +75,70 @@ class ProviderNotAllowed(Exception):
     """Raised when a provider or model is blocked by the provider register."""
     pass
 
+
+# What a person reads when every provider the platform pays for is at its ceiling.
+PAUSED_MESSAGE = "Answers are paused for now. Your model and your data are untouched; try again later."
+
+# The providers the platform itself pays for, in the order they are tried, when LLM_PROVIDER_ORDER is unset.
+DEFAULT_PROVIDER_ORDER = ("gemini", "nvidia")
+
+# Providers that bill per token. A priced provider is never called without a spend ceiling.
+PRICED_PROVIDERS = frozenset({"openai", "anthropic", "azure", "gemini", "deepseek"})
+
+# List prices in USD per million tokens (input, output) used when no price is configured.
+# DeepSeek: every call is counted at the peak list price, whatever the hour, so the ledger may over-count an
+# off-peak call and never under-counts. deepseek-flash: cache-miss input 0.30, output 1.20; deepseek-v4-pro
+# (any name containing "pro"): 1.32 and 3.96. From api-docs.deepseek.com/quick_start/pricing, 10 Nov 2026. Override with
+# LLM_PRICE_PER_MTOK_IN_DEEPSEEK / LLM_PRICE_PER_MTOK_OUT_DEEPSEEK if the page changes.
+_BUILT_IN_PRICES = {
+    "gemini": {"flash": (0.5, 1.5), "": (3.5, 10.5)},
+    "deepseek": {"pro": (1.32, 3.96), "": (0.30, 1.20)},
+    # OpenAI embeddings: text-embedding-3-small list price, USD 0.02 per million input tokens, no output.
+    # Chat models keep a zero list price here until one is configured.
+    "openai": {"embedding": (0.02, 0.0), "": (0.0, 0.0)},
+}
+
+
+_PROVIDER_LABELS = {"nvidia": "NVIDIA", "deepseek": "DeepSeek"}
+
+
+_CALLER = object()  # "the organisation of the current request"
+
+
+class ResolvedKey:
+    """The answer of ``LLMService.resolve_key``: which key a reader may send, and who pays for the call.
+
+    ``key`` is None when nothing may be sent. ``paused`` is True when a platform key exists but the
+    platform is over its ceiling (or the provider is not in the order); ``reason`` then says why, in words.
+    """
+
+    __slots__ = ("provider", "key", "platform_paid", "paused", "reason")
+
+    def __init__(self, provider, key=None, platform_paid=False, paused=False, reason=""):
+        self.provider = provider
+        self.key = key
+        self.platform_paid = platform_paid
+        self.paused = paused
+        self.reason = reason
+
+    def __bool__(self):
+        return self.key is not None
+
+
+class AnswersPaused(ValueError):
+    """Every provider the platform pays for is at its ceiling, or none in the order has one.
+
+    A ValueError, so every surface that already treats "no provider configured" as a settled
+    state (the health probe, the chat banner, the agent's plain reply) treats this one the same
+    way; the message is the one a person reads.
+    """
+
+    def __init__(self, detail: str = ""):
+        self.detail = detail
+        super().__init__(PAUSED_MESSAGE if not detail else "%s (%s)" % (PAUSED_MESSAGE, detail))
+
 # from .llm_validator import LLMValidator  # Temporarily disabled
-from app.services.core.retry_handler import retry_on_transient_error
+from app.services.core.retry_handler import one_attempt, retry_on_transient_error
 from app.services.llm_cost_tracker import LLMCostTracker
 from app.utils.tracing import traced_model_call
 from app.services.llm_model_router import LLMModelRouter, TaskComplexity
@@ -89,39 +151,410 @@ from app.services.core.cache_service import cache_service
 CACHE_TTL_SECONDS = 3600  # fabricated-ok: named config constant (cache TTL), not displayed data
 DEFAULT_TOKEN_COST_MULTIPLIER = 1000  # fabricated-ok: named config constant (token cost multiplier), not displayed data
 
+from app.modules.ai_chat.services.model_defaults import (
+    DEFAULT_MODELS,
+    FREE_ONLY_PROVIDERS,
+    MISTRAL_CHAT_URL,
+    OPENAI_COMPATIBLE_BASE_URLS,
+    PLATFORM_DEFAULT_MODELS,
+    PUBLIC_INPUT_CHAIN,
+    deepseek_request_for,
+    PUBLIC_INPUT_MODELS,
+    fallback_models_for,
+    is_free_model,
+)
+
 # Fallback in-memory cache if Redis is not available
 _llm_cache_fallback = {}  # cache-tenancy-ok: the key is a SHA-256 of the full prompt and model, so only a caller sending the identical prompt can read an entry
 _cache_expiry_fallback = {}  # cache-tenancy-ok: expiry times for the prompt-hash keys above; holds no tenant data
 
-# ENT-040: field patterns that must be scrubbed before prompt transmission.
-# Keys are human-readable labels; values are (pattern, replacement) tuples.
-_SENSITIVE_PATTERNS: List[Tuple[re.Pattern, str]] = [
+# ENT-040: everything that leaves the server for a model goes through scrub_for_model, the one scrub.
+#
+# Structured data is walked before it is written out as text: a value is replaced when its key names a
+# secret. The text that is finally sent is then scrubbed by shape, so a secret pasted into a sentence, or
+# written out as escaped JSON or as a Python repr, is caught as well.
+# one marker for every redacted secret, keyed or by shape (an existing test pins the JSON form of it)
+_CREDENTIAL = "[CREDENTIAL_REDACTED]"
+REDACTED = _CREDENTIAL
+
+# A key is split into word parts (on _ - . spaces and camelCase), lower-cased, trailing digits dropped.
+# It names a secret when it is one of the closed names below: a last part that is a secret word (or its
+# plural), a one-word form such as accesstoken, "key" beside a qualifier, a name ending in password, passwd
+# or secret with no word break (PGPASSWORD), pwd, or pass as the whole key.
+_SECRET_LAST_PARTS = frozenset({
+    "secret", "password", "passwd", "passphrase", "token", "authorization", "credential", "credentials",
+    "bearer", "pwd", "cookie", "secrets", "passwords", "passwds", "passphrases", "cookies",
+})
+_KEY_QUALIFIERS = frozenset({"api", "access", "secret", "private", "client", "signing", "encryption"})
+_SECRET_ONE_WORD = frozenset({
+    "apikey", "accesskey", "secretkey", "privatekey", "clientkey", "signingkey",
+    "accesstoken", "clientsecret", "authtoken", "refreshtoken", "idtoken", "sessiontoken", "bearertoken",
+    "setcookie",
+})
+_NOT_A_SECRET_TOKEN = frozenset({"max", "count", "num", "limit"})
+_KEY_PARTS = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")
+
+
+def is_secret_key(name: Any) -> bool:
+    """True when a field name says its value is a secret (api_key, accessToken, Client-Secret ...)."""
+    if not isinstance(name, str) or not name:
+        return False
+    parts = [re.sub(r"\d+$", "", part.lower()) for part in _KEY_PARTS.findall(name)]
+    parts = [part for part in parts if part]
+    if not parts:
+        return False
+    joined = "".join(parts)
+    if parts[-1] == "token" and len(parts) > 1 and parts[-2] in _NOT_A_SECRET_TOKEN:
+        return False
+    if parts[-1] in _SECRET_LAST_PARTS or joined in _SECRET_ONE_WORD or joined.rstrip("s") in _SECRET_ONE_WORD:
+        return True
+    if parts == ["pass"] or re.search(r"(?:password|passwd|secret)s?$", joined):
+        return True
+    return parts[-1] in ("key", "keys") and len(parts) > 1 and parts[-2] in _KEY_QUALIFIERS
+
+
+_SECRET_SHAPES: List[Tuple[re.Pattern, str]] = [
+    # A secret is recognised by its own shape, with or without a keyword beside it.
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:.*?-----END [A-Z ]*PRIVATE KEY-----|[A-Za-z0-9+/=\\\s]*)",
+                re.S), _CREDENTIAL),
+    (re.compile(r"eyJ[A-Za-z0-9_\-]{5,}\.[A-Za-z0-9_\-]{5,}\.[A-Za-z0-9_\-]*"), _CREDENTIAL),
+    (re.compile(r"\b(?i:authorization)(?:\\*[\"'])?\s*[:=]\s*(?:\\*[\"'])?(?i:bearer|basic|token)\s+[^\s\"',\\}]+"),
+     _CREDENTIAL),
+    # a bearer value is a token, not the word that follows "bearer" in a sentence: it has a digit or a symbol
+    (re.compile(r"\b(?i:bearer)[\s:]+(?=[A-Za-z0-9._~+/=\-]*(?:\d|[_~+/=]|\.[A-Za-z0-9]))[A-Za-z0-9._~+/=\-]{8,}"), _CREDENTIAL),
+    (re.compile(r"(?i:basic)\s+(?=[A-Za-z0-9+/]*\d)[A-Za-z0-9+/]{12,}={0,2}"), _CREDENTIAL),
+    # sk- keys: a long body with a digit; when a letter comes before it ("task-"), it must also mix cases
+    (re.compile(r"sk-(?:ant|proj|svcacct|admin|or-v1)-[A-Za-z0-9_\-]{8,}"), _CREDENTIAL),
+    (re.compile(r"(?<![A-Za-z])sk-(?=[A-Za-z0-9_\-]*\d)[A-Za-z0-9_\-]{20,}"), _CREDENTIAL),
+    (re.compile(r"(?<![A-Za-z])sk-(?=[A-Za-z0-9_\-]*\d{4})(?=[A-Za-z0-9_\-]*[A-Z])[A-Za-z0-9_\-]{12,}"), _CREDENTIAL),
+    (re.compile(r"(?<=[A-Za-z])sk-(?=[A-Za-z0-9_\-]*\d)(?=[A-Za-z0-9_\-]*[A-Z])[A-Za-z0-9_\-]{20,}"), _CREDENTIAL),
+    (re.compile(r"[sprk]k_(?:live|test)_[A-Za-z0-9]{8,}"), _CREDENTIAL),
+    (re.compile(r"(?:AKIA|ASIA)[A-Z0-9]{16}(?![A-Z0-9])"), _CREDENTIAL),
+    (re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"), _CREDENTIAL),
+    (re.compile(r"github_pat_[A-Za-z0-9_]{20,}"), _CREDENTIAL),
+    (re.compile(r"glpat-[A-Za-z0-9_\-]{20,}"), _CREDENTIAL),
+    (re.compile(r"hf_(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{20,}"), _CREDENTIAL),
+    (re.compile(r"SG\.[A-Za-z0-9_\-]{16,}\.[A-Za-z0-9_\-]{16,}"), _CREDENTIAL),
+    (re.compile(r"xapp-\d-[A-Za-z0-9\-]{10,}"), _CREDENTIAL),
+    (re.compile(r"xox[abeprs]-[A-Za-z0-9\-]{10,}"), _CREDENTIAL),
+    (re.compile(r"whsec_[A-Za-z0-9]{16,}"), _CREDENTIAL),
+    (re.compile(r"AIza[0-9A-Za-z_\-]{30,}"), _CREDENTIAL),
+    # user:password@host inside an address
+    (re.compile(r"(?<=://)([^\s:/@\"']+):[^\s/@\"']+(?=@)"), r"\1:" + _CREDENTIAL),
+]
+
+# A secret keyword form: <secret key name> then = or : (a line break may follow) or, for the long names,
+# only spaces. The key is a word, or "<word> key"; it is checked by is_secret_key, so only a closed list of
+# names ever has its value redacted. Any other word is skipped without consuming what follows it, so a
+# secret written inside the value of an ordinary key is still found.
+_KEYWORD_HEAD = re.compile(
+    r"(?<![A-Za-z0-9])(?P<key>[A-Za-z][A-Za-z0-9_.\-]*(?:[ _\-](?i:keys?))?)(?:\\*[\"'])?"
+    r"(?P<sep>[ \t]*[:=][ \t]*(?:\r?\n[ \t]*)?|[ \t]+)"
+)
+_QUOTED_VALUE = re.compile(r"b?(?P<quote>\\*[\"'])(?P<quoted>(?:(?!(?P=quote)).)*)(?P=quote)")
+_BARE_VALUE = re.compile(r"[^\s\"',;&\\}\])]+")
+_PLACEHOLDER_VALUES = frozenset({
+    "required", "optional", "none", "null", "true", "false", "yes", "no", "n/a", "tbd", "unknown", "hidden",
+    "masked", "***",
+})
+_PROSE_KEYS = frozenset({"credential", "credentials", "authorization", "cookie", "cookies"})
+_NO_SPACE_FORM = frozenset({"pass", "pwd", "cookie", "cookies", "authorization"})
+_CARD_NUMBER = re.compile(
+    r"(?<![\d.])(?:\d{13,19}|\d{4}([ .\-])\d{4}\1\d{4}\1\d{4}(?:\1\d{3})?|\d{4}([ .\-])\d{6}\2\d{5})(?![\d]|\.\d)"
+)
+_ZERO_WIDTH = re.compile("[​‌‍⁠﻿]")
+_PROVIDER_RUN = re.compile(
+    r"(?<![A-Za-z0-9])((?:sk-|ghp_|gho_|ghu_|ghs_|ghr_|glpat-|AKIA|ASIA|AIza|xox[abeprs]-|github_pat_|whsec_|hf_)"
+    r"[A-Za-z0-9_\-]+)(?:\r?\n|\\n)([A-Za-z0-9_\-]{6,})"
+)
+_COOKIE_LINE = re.compile(r"(?i)\b((?:set-)?cookie\s*:[ \t]*)[^\r\n]+")
+_CURL_USER = re.compile(r"(\bcurl\b[^\n]*?\s(?:-u|--user)[ =]['\"]?)([^\s:'\"]+):[^\s'\"]+")
+_URL_QUERY_PAIR = re.compile(r"(?<=[?&;])(?P<key>[A-Za-z0-9_.\-]+)=(?P<value>[^&\s\"'#<>]+)")
+_SIGNATURE_KEYS = frozenset({"sig", "signature", "x-amz-signature", "x-amz-security-token"})
+
+
+def _luhn_ok(digits: str) -> bool:
+    total = 0
+    for index, char in enumerate(reversed(digits)):
+        n = int(char)
+        if index % 2:
+            n = n * 2 - 9 if n > 4 else n * 2
+        total += n
+    return total % 10 == 0
+
+
+def _scrub_cards(text: str) -> str:
+    def replace(match: "re.Match") -> str:
+        digits = re.sub(r"\D", "", match.group(0))
+        return "[CARD_REDACTED]" if 13 <= len(digits) <= 19 and _luhn_ok(digits) else match.group(0)
+
+    return _CARD_NUMBER.sub(replace, text)
+
+
+def _glue_broken_keys(text: str) -> str:
+    """Remove zero-width characters, and join a provider-prefixed key that a line break split in two."""
+    text = _ZERO_WIDTH.sub("", text)
+
+    def join(match: "re.Match") -> str:
+        glued = match.group(1) + match.group(2)
+        if len(glued) >= 16 and re.search(r"\d", glued):
+            return glued
+        return match.group(0)
+
+    while True:
+        joined = _PROVIDER_RUN.sub(join, text)
+        if joined == text:
+            return text
+        text = joined
+
+
+# A calendar date (2026-11-10, or 10/11/2026) is neither a credential nor a phone number. This is the one place
+# that says what a date looks like; the secret rule and the phone rule both use it.
+_CALENDAR_DATE = re.compile(
+    r"(?<![\d\-/])(?:(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])"
+    r"|(?:0?[1-9]|[12]\d|3[01])/(?:0?[1-9]|1[0-2])/(?:19|20)\d{2})(?![\d\-/])"
+)
+
+
+def _is_calendar_date(value: str) -> bool:
+    return _CALENDAR_DATE.fullmatch(value.strip()) is not None
+
+
+def _value_is_a_secret(key: str, value: str, spaced: bool, quoted: bool = False) -> bool:
+    plain = value.strip()
+    lowered = plain.lower()
+    if not plain or lowered in _PLACEHOLDER_VALUES or plain.startswith("[") or re.fullmatch(r"<[^<>]*>", plain):
+        return False
+    if plain.isdigit() and len(plain) <= 6:
+        return False  # a count or a limit ("Max token: 4096"), not a secret
+    if not spaced and key.lower() not in _PROSE_KEYS:
+        # <secret word> then = or : gives the value: it is redacted whatever its characters, down to one.
+        return True
+    if spaced and _is_calendar_date(plain):
+        return False
+    marked = bool(re.search(r"[\d!@#$%^&*]", plain))
+    return marked and len(plain) >= 6 and not (quoted and re.search(r"\s", plain))
+
+
+def _structure_value_is_a_secret(key: Any, item: Any) -> bool:
+    """A value under a secret key: a placeholder word is not one, and neither is a sentence under a prose key."""
+    if not isinstance(item, str):
+        return True
+    plain = item.strip()
+    if plain.lower() in _PLACEHOLDER_VALUES or re.fullmatch(r"<[^<>]*>", plain) or plain.startswith("["):
+        return False
+    if plain.isdigit() and len(plain) <= 6:
+        return False
+    parts = [part.lower() for part in _KEY_PARTS.findall(str(key))]
+    if parts and parts[-1] in _PROSE_KEYS:
+        return bool(re.search(r"[\d!@#$%^&*]", plain)) and len(plain) >= 6 and not re.search(r"\s", plain)
+    return True
+
+
+def _scrub_keyword_values(text: str) -> str:
+    out: List[str] = []
+    pos = 0
+    scan = 0
+    while True:
+        head = _KEYWORD_HEAD.search(text, scan)
+        if head is None:
+            break
+        key = head.group("key")
+        scan = head.end("key")
+        if not is_secret_key(key):
+            continue
+        spaced = not re.search(r"[:=]", head.group("sep"))
+        if spaced and key.lower() in _NO_SPACE_FORM:
+            continue
+        start = head.end()
+        quoted = _QUOTED_VALUE.match(text, start)
+        if quoted is not None and not spaced:
+            inner = quoted.group("quoted")
+            if inner and _value_is_a_secret(key, inner, False, quoted=True):
+                out.append(text[pos:quoted.start("quoted")])
+                out.append(REDACTED)
+                pos = scan = quoted.end("quoted")
+            continue
+        bare = _BARE_VALUE.match(text, start)
+        if bare is None or not _value_is_a_secret(key, bare.group(0), spaced):
+            continue
+        out.append(text[pos:start])
+        out.append(REDACTED)
+        pos = scan = bare.end()
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def _scrub_url_queries(text: str) -> str:
+    def replace(match: "re.Match") -> str:
+        key = match.group("key")
+        if (is_secret_key(key) or key.lower() in _SIGNATURE_KEYS) and _value_is_a_secret(key, match.group("value"), False):
+            return key + "=" + REDACTED
+        return match.group(0)
+
+    return _URL_QUERY_PAIR.sub(replace, text)
+
+
+# Masks for personal data that the chat path applies (the reviewer must see names, numbers and dates).
+_PII_PATTERNS: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", re.I), "[EMAIL_REDACTED]"),
     (re.compile(r"\b\+?[\d\s\-().]{7,15}\d\b"), "[PHONE_REDACTED]"),
-    # Match only actual credential values — NOT Python type annotations (token: TokenPayload).
-    # Three accepted value shapes:
-    #   1. Quoted string of >=4 chars:  token="abc..."
-    #   2. Lowercase/digit string >=8 chars (no leading uppercase → not a Python type):
-    #      password=changeme123   api_key=abcdef12
-    #   3. Base64/JWT blob >=16 chars (explicit A-Za-z0-9):
-    #      bearer eyJhbGciOiJSUzI1NiJ9...
-    # Separator is [:=] for key=value, or \s for "bearer <token>" HTTP header style.
-    # re.I applied ONLY to the keyword group via inline flag (?i:...), not to value group,
-    # so [a-z0-9] in the value alternatives stays strictly lowercase-only.
-    (re.compile(
-        r"\b(?i:password|passwd|secret|api[_-]?key|token|bearer)(?:\s*[:=]\s*|\s+)"
-        r"(?:['\"][^'\"]{4,}['\"]"        # quoted string
-        r"|[a-z][a-z0-9_\-]{7,}"          # lowercase >=8 chars (excludes CamelCase types)
-        r"|[A-Za-z0-9+/]{16,}={0,2})"     # base64/JWT >=16 chars
-    ), "[CREDENTIAL_REDACTED]"),
 ]
 
 
-def _scrub_prompt(prompt: str) -> str:
-    """Replace known sensitive patterns in a prompt string before LLM transmission (ENT-040)."""
-    for pattern, replacement in _SENSITIVE_PATTERNS:
-        prompt = pattern.sub(replacement, prompt)
-    return prompt
+def _mask_pii(text: str) -> str:
+    """Mask e-mail addresses and phone numbers; a calendar date between them is left as it is."""
+    pieces = re.split("(%s)" % _CALENDAR_DATE.pattern, text)
+    # re.split with the one capturing group returns text, date, text, date ...
+    for index in range(0, len(pieces), 2):
+        for pattern, replacement in _PII_PATTERNS:
+            pieces[index] = pattern.sub(replacement, pieces[index])
+    return "".join(pieces)
+
+
+# OpenRouter data-policy setting sent with every request.
+OPENROUTER_PROVIDER_POLICY = {"data_collection": "deny"}
+OPENROUTER_PUBLIC_POLICY = {"data_collection": "allow"}  # text a company published on its own website
+
+
+def _scrub_text(text: str, mask_pii: bool) -> str:
+    text = _glue_broken_keys(text)
+    for pattern, replacement in _SECRET_SHAPES:
+        text = pattern.sub(replacement, text)
+    text = _COOKIE_LINE.sub(lambda m: m.group(1) + REDACTED, text)
+    text = _CURL_USER.sub(lambda m: m.group(1) + m.group(2) + ":" + REDACTED, text)
+    text = _scrub_url_queries(text)
+    text = _scrub_keyword_values(text)
+    text = _scrub_cards(text)
+    if mask_pii:
+        text = _mask_pii(text)
+    return text
+
+
+# {"name": "API_KEY", "value": ...}: the label names the secret, the value is the secret
+_LABEL_KEYS = ("name", "key", "header", "field", "variable")
+
+
+def _scrub_structure(value: Any, mask_pii: bool, depth: int = 0) -> Any:
+    if depth > 40:
+        return REDACTED
+    if isinstance(value, dict):
+        cleaned = {}
+        names_a_secret = any(
+            isinstance(value.get(label), str) and is_secret_key(value[label]) for label in _LABEL_KEYS
+        )
+        for key, item in value.items():
+            if (is_secret_key(key) or (names_a_secret and key == "value")) and item is not None \
+                    and not isinstance(item, bool) and _structure_value_is_a_secret(key, item):
+                cleaned[key] = REDACTED
+            else:
+                cleaned[key] = _scrub_structure(item, mask_pii, depth + 1)
+        return {(_scrub_text(k, mask_pii) if isinstance(k, str) else k): v for k, v in cleaned.items()}
+    if isinstance(value, (list, tuple)):
+        return [_scrub_structure(item, mask_pii, depth + 1) for item in value]
+    if isinstance(value, int) and not isinstance(value, bool):
+        digits = str(abs(value))
+        return "[CARD_REDACTED]" if 13 <= len(digits) <= 19 and _luhn_ok(digits) else value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped[:1] in ("{", "[") and stripped[-1:] in ("}", "]"):
+            try:
+                inner = json.loads(stripped)
+            except ValueError:
+                inner = None
+            if isinstance(inner, (dict, list)):
+                return _scrub_text(json.dumps(_scrub_structure(inner, mask_pii, depth + 1), default=str), mask_pii)
+        return _scrub_text(value, mask_pii)
+    return value
+
+
+def scrub_for_model(value: Any, mask_pii: bool = True) -> Any:
+    """The one scrub for anything that leaves the server for a model.
+
+    A dict or list is walked first (a value whose key names a secret becomes ``[CREDENTIAL_REDACTED]``, a string that
+    holds JSON is walked too) and a string is scrubbed by shape. ``mask_pii`` also masks e-mail addresses
+    and phone numbers: the chat path does, a reviewer that has to check names and figures does not.
+    Known limits: base64 or hex encodings are not decoded, and a key split across two fields is not joined.
+    """
+    if isinstance(value, str):
+        return _scrub_structure(value, mask_pii) if value.lstrip()[:1] in ("{", "[") else _scrub_text(value, mask_pii)
+    if value is None:
+        return value
+    return _scrub_structure(value, mask_pii)
+
+
+def _scrub_prompt(prompt: Any, mask_pii: bool = True) -> Any:
+    """Replace secrets (and, on the chat path, personal data) in a prompt before LLM transmission (ENT-040)."""
+    return scrub_for_model(prompt, mask_pii)
+
+
+_REF_MARKER = re.compile(r"(\[ref:[^\]\s]+\])")
+
+
+def scrub_for_transmission(text):
+    """Scrub one string for transmission, leaving ``[ref:<id>]`` citation markers intact."""
+    if not isinstance(text, str) or not text:
+        return text
+    return "".join(
+        part if _REF_MARKER.fullmatch(part) else _scrub_prompt(part)
+        for part in _REF_MARKER.split(text)
+    )
+
+
+def _scrub_tool_arguments(arguments: Any) -> Any:
+    """A tool call's arguments: a dict, or the JSON text a provider returns."""
+    if isinstance(arguments, str):
+        try:
+            parsed = json.loads(arguments)
+        except ValueError:
+            return scrub_for_transmission(arguments)
+        return json.dumps(scrub_for_model(parsed), default=str)
+    return scrub_for_model(arguments)
+
+
+def scrub_chat_messages(messages):
+    """A copy of chat *messages* with every outgoing text scrubbed (the chat path).
+
+    Covers plain string content, the text of content blocks (tool results included), the input of a
+    ``tool_use`` block and the arguments of ``tool_calls``. Roles, tool-call ids and structure are left alone.
+    """
+    cleaned = []
+    for message in messages or []:
+        if not isinstance(message, dict):
+            cleaned.append(message)
+            continue
+        message = dict(message)
+        content = message.get("content")
+        if isinstance(content, str):
+            message["content"] = scrub_for_transmission(content)
+        elif isinstance(content, list):
+            blocks = []
+            for block in content:
+                if isinstance(block, dict):
+                    block = dict(block)
+                    for key in ("text", "content"):
+                        if isinstance(block.get(key), str):
+                            block[key] = scrub_for_transmission(block[key])
+                        elif key == "content" and isinstance(block.get(key), list):
+                            block[key] = scrub_chat_messages([{"content": block[key]}])[0]["content"]
+                    if "input" in block:
+                        block["input"] = scrub_for_model(block["input"])
+                blocks.append(block)
+            message["content"] = blocks
+        if isinstance(message.get("tool_calls"), list):
+            calls = []
+            for call in message["tool_calls"]:
+                if isinstance(call, dict):
+                    call = dict(call)
+                    function = call.get("function")
+                    if isinstance(function, dict) and "arguments" in function:
+                        call["function"] = dict(function, arguments=_scrub_tool_arguments(function["arguments"]))
+                    if "arguments" in call:
+                        call["arguments"] = _scrub_tool_arguments(call["arguments"])
+                calls.append(call)
+            message["tool_calls"] = calls
+        cleaned.append(message)
+    return cleaned
 
 
 class LLMService:
@@ -169,9 +602,9 @@ class LLMService:
             "models": [],  # NO HARDCODED MODELS - Database only
             "base_url": None,  # Set via environment variable
         },
-        "deepseek": {
+        "nvidia": {
             "models": [],  # NO HARDCODED MODELS - Database only
-            "base_url": "https://api.deepseek.com/v1",
+            "base_url": "https://integrate.api.nvidia.com/v1",
         },
         "huggingface": {
             "models": [],  # NO HARDCODED MODELS - Database only
@@ -181,16 +614,352 @@ class LLMService:
             "models": [],  # NO HARDCODED MODELS - Database only
             "base_url": "https://openrouter.ai/api/v1",
         },
+        "deepseek": {
+            "models": [],  # NO HARDCODED MODELS - Database only
+            "base_url": "https://api.deepseek.com/v1",  # DEEPSEEK_API_BASE overrides
+        },
     }
 
     OPENROUTER_VENDOR_PROVIDER_MAP = {
         "anthropic": "anthropic",
-        "deepseek": "deepseek",
         "google": "gemini",
         "meta": "huggingface",
         "mistralai": "huggingface",
         "openai": "openai",
     }
+
+    # ------------------------------------------------------------------
+    # Platform spend: the providers the platform pays for, their order, prices and ceilings.
+    # An organisation's own key (a row in API settings) is the organisation's money and is not
+    # governed here; a key from the environment is the platform's and is.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def provider_order() -> List[str]:
+        """The providers the platform's own keys may be used for, in order of preference.
+
+        ``LLM_PROVIDER_ORDER`` (or the older ``AI_PROVIDER_ORDER``), comma-separated; the
+        default is Gemini on the credit project, then the free NVIDIA models. A key in the
+        environment for a provider outside this order is never used.
+        """
+        raw = (
+            os.environ.get("LLM_PROVIDER_ORDER")
+            or os.environ.get("AI_PROVIDER_ORDER")
+            or ",".join(DEFAULT_PROVIDER_ORDER)
+        )
+        order: List[str] = []
+        for name in raw.split(","):
+            name = name.strip().lower()
+            if name and name not in order:
+                order.append(name)
+        return order
+
+    @staticmethod
+    def _env_number(name: str, default: float = 0.0) -> float:
+        raw = os.environ.get(name)
+        if raw is None or not raw.strip():
+            return default
+        try:
+            return float(raw)
+        except ValueError:
+            logger.warning("%s is not a number; treated as %s", name, default)
+            return default
+
+    @staticmethod
+    def spend_ceiling_usd(provider: str) -> float:
+        """The month's USD ceiling for a priced provider; zero (never called) when unset."""
+        return max(LLMService._env_number("LLM_SPEND_CEILING_USD_" + provider.upper()), 0.0)
+
+    @staticmethod
+    def request_ceiling(provider: str) -> int:
+        """The month's request ceiling for a free provider; zero means no guard."""
+        return max(int(LLMService._env_number("LLM_REQUEST_CEILING_" + provider.upper())), 0)
+
+    @staticmethod
+    def price_per_mtok(provider: str, model: Optional[str] = None) -> Tuple[float, float]:
+        """USD per million input and output tokens: configured prices first, else the list price."""
+        key = provider.upper()
+        configured_in = os.environ.get("LLM_PRICE_PER_MTOK_IN_" + key)
+        configured_out = os.environ.get("LLM_PRICE_PER_MTOK_OUT_" + key)
+        built_in = _BUILT_IN_PRICES.get(provider.lower())
+        listed = (0.0, 0.0)
+        if built_in:
+            name = (model or "").lower()
+            listed = built_in[""]
+            for marker, prices in built_in.items():
+                if marker and marker in name:
+                    listed = prices
+                    break
+        if not (configured_in or configured_out):
+            return listed
+        # Each direction falls back to the list price on its own when only the other is configured.
+        return (
+            LLMService._env_number("LLM_PRICE_PER_MTOK_IN_" + key, listed[0]) if configured_in else listed[0],
+            LLMService._env_number("LLM_PRICE_PER_MTOK_OUT_" + key, listed[1]) if configured_out else listed[1],
+        )
+
+    @staticmethod
+    def is_priced(provider: str) -> bool:
+        """A provider that bills per token, by its name or by a configured price."""
+        provider = (provider or "").lower()
+        return provider in PRICED_PROVIDERS or any(p > 0 for p in LLMService.price_per_mtok(provider))
+
+    @staticmethod
+    def base_url_for(provider: str) -> Optional[str]:
+        """Where the provider is called: ``<PROVIDER>_API_BASE`` (or ``_BASE_URL``) overrides the table.
+
+        ``AI_PROVIDER_BASE_URL_<PROVIDER>`` is the name the container passes: the openai and anthropic
+        packages read ``OPENAI_BASE_URL`` / ``ANTHROPIC_BASE_URL`` themselves, so an empty one breaks them.
+        """
+        key = (provider or "").upper()
+        return (
+            os.environ.get(key + "_API_BASE")
+            or os.environ.get(key + "_BASE_URL")
+            or os.environ.get("AI_PROVIDER_BASE_URL_" + key)
+            or (LLMService.PROVIDERS.get(provider.lower()) or {}).get("base_url")
+        )
+
+    @staticmethod
+    def month_key(now: Optional[datetime] = None) -> str:
+        return (now or datetime.utcnow()).strftime("%Y-%m")
+
+    @staticmethod
+    def spend_this_month(provider: str) -> Optional[Tuple[float, int]]:
+        """(usd, requests) recorded for the provider this month; None when the ledger cannot be read."""
+        from app.models.llm_spend_ledger import LlmSpendLedger
+
+        try:
+            row = LlmSpendLedger.query.filter_by(provider=provider.lower(), month=LLMService.month_key()).first()
+        except Exception as exc:  # noqa: BLE001 - an unreadable ledger is reported, never guessed at
+            logger.warning("spend ledger unreadable for %s: %s", provider, str(exc)[:120])
+            try:
+                db.session.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            return None
+        if row is None:
+            return (0.0, 0)
+        return (float(row.usd_spent or 0), int(row.requests or 0))
+
+    @staticmethod
+    def headroom(provider: str, require_ceiling: bool = True) -> Tuple[bool, str]:
+        """Whether the platform may make one more call to this provider, and if not, why.
+
+        A priced provider needs a spend ceiling (none configured means never called when
+        ``require_ceiling``) and spend under it; a free provider is guarded by a request ceiling
+        only when one is set. An unreadable ledger closes a ceiling, never opens it.
+        """
+        provider = (provider or "").lower()
+        if LLMService.is_priced(provider):
+            ceiling = LLMService.spend_ceiling_usd(provider)
+            if ceiling <= 0:
+                if require_ceiling:
+                    return False, "%s has no spend ceiling configured, so it is never called" % provider
+                return True, ""
+            spent = LLMService.spend_this_month(provider)
+            if spent is None:
+                return False, "%s: the spend ledger could not be read, so the ceiling is treated as reached" % provider
+            if spent[0] >= ceiling:
+                return False, "%s is at its ceiling: USD %.4f spent of USD %.2f this month" % (provider, spent[0], ceiling)
+            return True, ""
+        limit = LLMService.request_ceiling(provider)
+        if limit > 0:
+            spent = LLMService.spend_this_month(provider)
+            if spent is None:
+                return False, "%s: the spend ledger could not be read, so the request ceiling is treated as reached" % provider
+            if spent[1] >= limit:
+                return False, "%s is at its request ceiling: %d of %d requests this month" % (provider, spent[1], limit)
+        return True, ""
+
+    @staticmethod
+    def has_headroom(provider: str) -> bool:
+        return LLMService.headroom(provider)[0]
+
+    @staticmethod
+    def platform_call_allowed(provider: str) -> Tuple[bool, str]:
+        """The stop at the point of call for a key the platform pays for, whoever named the provider.
+
+        A priced provider is called only when it is in the configured order and under its spend ceiling
+        (no ceiling means never); a free provider only within its request ceiling when one is set.
+        """
+        provider = (provider or "").lower()
+        if LLMService.is_priced(provider) and provider not in LLMService.provider_order():
+            return False, "%s is not in the provider order, so the platform never calls it" % provider
+        return LLMService.headroom(provider)
+
+    @staticmethod
+    def platform_keys(provider: str) -> List[str]:
+        """Every key the platform itself holds for a provider: the primary, the numbered backups and the secondary."""
+        name = (provider or "").upper()
+        names = [name + "_API_KEY"] + ["%s_API_KEY_%d" % (name, i) for i in range(1, 10)] + [name + "_API_KEY_SECONDARY"]
+        keys = []
+        for n in names:
+            value = (os.environ.get(n) or "").strip()
+            if value and value not in keys:
+                keys.append(value)
+        return keys
+
+    @staticmethod
+    def platform_pays(provider: str, api_key: Optional[str] = None) -> bool:
+        """Who pays, decided by the key actually sent: the platform when it is one of the platform's own keys.
+
+        With no key given, the platform pays when any key the call would try is the platform's.
+        An organisation's own, different key is that organisation's money; rows never decide it.
+        """
+        platform = LLMService.platform_keys(provider)
+        if not platform:
+            return False
+        if api_key is not None:
+            return api_key.strip() in platform
+        try:
+            return any(k in platform for k in LLMService._get_all_api_keys(provider))
+        except Exception:  # noqa: BLE001 - a platform key exists and nothing says otherwise
+            return True
+
+    @staticmethod
+    def record_spend(provider: str, model: Optional[str], token_input: int, token_output: int) -> float:
+        """Add one call to the provider's row for this month and return its cost in USD.
+
+        The cost is the usage the provider reported at the configured prices, never estimated.
+        Written in its own transaction: the provider has been called, so the spend stands
+        whatever the caller's transaction does next.
+        """
+        from sqlalchemy.dialects.postgresql import insert
+
+        from app.models.llm_spend_ledger import LlmSpendLedger
+
+        price_in, price_out = LLMService.price_per_mtok(provider, model)
+        exact = (token_input or 0) * price_in / 1_000_000 + (token_output or 0) * price_out / 1_000_000
+        usd = round(exact, 6)
+        if exact > 0 and usd == 0:
+            usd = 0.000001  # the column holds micro-dollars: a priced call is never recorded as free
+        month = LLMService.month_key()
+        now = datetime.utcnow()
+        statement = insert(LlmSpendLedger.__table__).values(
+            provider=provider.lower(), month=month, usd_spent=usd, requests=1, updated_at=now,
+        )
+        statement = statement.on_conflict_do_update(
+            constraint="uq_llm_spend_ledger_provider_month",
+            set_={
+                "usd_spent": LlmSpendLedger.__table__.c.usd_spent + usd,
+                "requests": LlmSpendLedger.__table__.c.requests + 1,
+                "updated_at": now,
+            },
+        )
+        try:
+            with db.engine.begin() as connection:
+                connection.execute(statement)
+        except Exception as exc:  # noqa: BLE001 - the answer was given; the ledger failure is logged, not thrown
+            logger.error("spend ledger write failed for %s: %s", provider, str(exc)[:160])
+        return usd
+
+    @staticmethod
+    def resolve_key(provider: str, organization_id=_CALLER) -> "ResolvedKey":
+        """The one gate every reader asks for a provider key.
+
+        The organisation's own key is returned as is (its money, never capped or recorded). The
+        platform's key is returned only when ``platform_call_allowed`` passes; over the ceiling the
+        result carries no key and ``paused`` is set. Nothing configured: no key, not paused.
+        """
+        provider = (provider or "").lower()
+        keys = LLMService._get_all_api_keys(provider, organization_id)
+        if not keys:
+            return ResolvedKey(provider, reason="%s is not configured" % provider)
+        key = keys[0]
+        if not LLMService.platform_pays(provider, key):
+            return ResolvedKey(provider, key=key)
+        allowed, reason = LLMService.platform_call_allowed(provider)
+        if not allowed:
+            return ResolvedKey(provider, platform_paid=True, paused=True, reason=reason)
+        return ResolvedKey(provider, key=key, platform_paid=True)
+
+    @staticmethod
+    def resolve_key_for(providers, organization_id=_CALLER) -> "ResolvedKey":
+        """First usable key among providers a reader can use, in the order of choice.
+
+        1. the organisation's own key for each provider in turn; 2. the platform's key for each
+        provider in turn, if allowed. When nothing is usable the result has no key and, if a
+        platform key was refused at its ceiling, ``paused`` and its ``reason``.
+        """
+        resolved = [LLMService.resolve_key(p, organization_id) for p in providers]
+        for r in resolved:
+            if r.key and not r.platform_paid:
+                return r
+        for r in resolved:
+            if r.key and r.platform_paid:
+                return r
+        for r in resolved:
+            if r.paused:
+                return r
+        return resolved[0] if resolved else ResolvedKey("")
+
+    @staticmethod
+    def record_platform_call(
+        resolved: "ResolvedKey", model: Optional[str], usage=None, prompt_chars: int = 0, output_chars: int = 0
+    ) -> None:
+        """Write one ledger row for a call the platform paid for; nothing for an organisation's own key.
+
+        ``usage`` is whatever the provider reported (an object or dict with prompt/input and
+        completion/output token counts). With none, a priced provider records the characters / 3
+        estimate, never 0. Never breaks the caller's turn.
+        """
+        if resolved is None or not resolved.platform_paid:
+            return
+        provider = resolved.provider
+        try:
+            def _count(*names):
+                for name in names:
+                    value = usage.get(name) if isinstance(usage, dict) else getattr(usage, name, None)
+                    if value:
+                        return int(value)
+                return 0
+
+            tokens_in = _count("prompt_tokens", "input_tokens", "promptTokenCount", "prompt_token_count")
+            tokens_out = _count("completion_tokens", "output_tokens", "candidatesTokenCount", "candidates_token_count")
+            if not (tokens_in or tokens_out) and LLMService.is_priced(provider):
+                tokens_in = max(-(-prompt_chars // 3), 1)
+                tokens_out = -(-output_chars // 3)
+            LLMService.record_spend(provider, model, tokens_in, tokens_out)
+        except Exception:  # noqa: BLE001 - the answer was given; the ledger failure is logged by the service
+            logger.warning("spend was not recorded for %s", provider, exc_info=True)
+
+    @staticmethod
+    def platform_key_present(provider: str) -> bool:
+        """True when the platform's environment holds a key for the provider."""
+        return bool(os.environ.get((provider or "").upper() + "_API_KEY"))
+
+    @staticmethod
+    def spend_ledger_rows() -> List[Dict[str, Any]]:
+        """One row per provider in the order, for the admin API settings page.
+
+        A provider whose key is not stored is reported as not configured, whatever its headroom:
+        it answers nothing until a key is set.
+        """
+        month = LLMService.month_key()
+        rows: List[Dict[str, Any]] = []
+        for provider in LLMService.provider_order():
+            spent = LLMService.spend_this_month(provider) or (0.0, 0)
+            priced = LLMService.is_priced(provider)
+            open_now, reason = LLMService.headroom(provider)
+            row: Dict[str, Any] = {
+                "provider": provider,
+                "label": _PROVIDER_LABELS.get(provider, provider.title()),
+                "month": month,
+                "priced": priced,
+                "configured": LLMService.platform_key_present(provider),
+                "usd_spent": spent[0],
+                "requests": spent[1],
+                "ceiling_usd": LLMService.spend_ceiling_usd(provider) if priced else None,
+                "request_ceiling": LLMService.request_ceiling(provider) if not priced else None,
+                "open": open_now,
+                "reason": reason,
+            }
+            row["remaining_usd"] = max(row["ceiling_usd"] - spent[0], 0.0) if row["ceiling_usd"] else None
+            row["remaining_requests"] = (
+                max(row["request_ceiling"] - spent[1], 0) if row["request_ceiling"] else None
+            )
+            rows.append(row)
+        return rows
 
     @staticmethod
     def _normalize_provider_name(provider: str | None) -> str | None:
@@ -340,23 +1109,24 @@ class LLMService:
         Raises:
             ValueError: If no enabled provider is found
         """
-        from app.models.models import APISettings
         import os
 
         if exclude_providers is None:
             exclude_providers = []
 
         # Provider fallback priority order (used when no preference is set)
-        provider_priority = ["openai", "anthropic", "gemini", "deepseek", "openrouter", "azure", "huggingface"]
+        provider_priority = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "azure", "huggingface"]
+        # Providers the platform pays for come in the one configured order, ahead of the fixed list;
+        # others keep today's order for organisations with their own keys.
+        if os.environ.get("LLM_PROVIDER_ORDER") or os.environ.get("AI_PROVIDER_ORDER"):
+            provider_priority = list(LLMService.provider_order()) + [p for p in provider_priority if p not in LLMService.provider_order()]
 
         # Default models for each provider (used when falling back to .env)
         # Single source of truth - these ids were hardcoded in six places and
         # drifted independently until every Claude id was stale, several to
         # RETIRED models that now 404 (claude-3-sonnet-20240229 went out in  stale-model-ok
         # July 2025).
-        from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
-
-        default_models = dict(DEFAULT_MODELS)
+        default_models = {**DEFAULT_MODELS, **PLATFORM_DEFAULT_MODELS}
 
         # Ensure clean transaction state before query
         try:
@@ -389,7 +1159,8 @@ class LLMService:
         # Try database configuration
         all_enabled_settings = []
         try:
-            all_enabled_settings = APISettings.query.filter_by(enabled=True).all()
+            org_rows = LLMService._org_rows()
+            all_enabled_settings = org_rows.filter_by(enabled=True).all() if org_rows is not None else []
         except Exception as db_error:
             logger.warning(f"Database error getting provider settings: {db_error}")
 
@@ -451,26 +1222,38 @@ class LLMService:
         # Providers that have a DB record but no usable key are intentionally skipped here —
         # falling through to .env would silently bypass the admin's intent.
         providers_with_db_record = set(settings_by_provider.keys())
-        env_only_providers = [p for p in provider_priority if p not in providers_with_db_record]
+        # The platform's own keys are used only for the providers in the configured order, each
+        # within its ceiling; a key in the environment for any other provider is ignored.
+        env_only_providers = [p for p in LLMService.provider_order() if p not in providers_with_db_record]
 
         if env_only_providers:
             logger.info(
                 "No database configuration found for providers %s — checking environment variables (bootstrap path)...",
                 env_only_providers,
             )
+        closed: List[str] = []
         for provider_name in env_only_providers:
             if provider_name in exclude_providers:
                 continue
             env_key = os.getenv(f"{provider_name.upper()}_API_KEY")
-            if env_key and len(env_key) > 0:
-                model = default_models.get(provider_name)
-                if model:
-                    logger.info(
-                        "Using environment-configured provider: %s with default model %s. "
-                        "Migrate this key to Admin > API Settings to suppress this message.",
-                        provider_name, model,
-                    )
-                    return provider_name, model
+            if not (env_key and len(env_key) > 0):
+                continue
+            model = default_models.get(provider_name)
+            if not model:
+                continue
+            open_now, reason = LLMService.headroom(provider_name)
+            if not open_now:
+                logger.warning("Platform provider skipped: %s", reason)
+                closed.append(reason)
+                continue
+            logger.info(
+                "Using environment-configured provider: %s with default model %s. "
+                "Migrate this key to Admin > AI settings to suppress this message.",
+                provider_name, model,
+            )
+            return provider_name, model
+        if closed:
+            raise AnswersPaused("; ".join(closed))
 
         # No configuration found - provide helpful error message
         configured_env_vars = []
@@ -485,12 +1268,12 @@ class LLMService:
                 f"No enabled LLM provider found with a configured model{excluded_msg}. "
                 f"Environment variables detected: {', '.join(configured_env_vars)} but their providers "
                 f"already have DB records — check that the DB record is enabled and has a default_model set. "
-                f"Go to Admin > API Settings to review."
+                f"Go to Admin > AI settings to review."
             )
         else:
             raise ValueError(
                 f"No enabled LLM provider found with a configured model{excluded_msg}. "
-                f"Please configure at least one provider at Admin > API Settings "
+                f"Please configure at least one provider at Admin > AI settings "
                 f"(or set OPENAI_API_KEY / ANTHROPIC_API_KEY in .env as a bootstrap key)."
             )
 
@@ -645,7 +1428,7 @@ class LLMService:
         Get the maximum tokens limit for a provider/model combination.
 
         Args:
-            provider: Provider name ('openai', 'anthropic', 'deepseek', etc.)
+            provider: Provider name ('openai', 'anthropic', 'nvidia', etc.)
             model: Optional model name for provider-specific limits
             requested_max: Optional requested max_tokens value to cap
 
@@ -654,7 +1437,7 @@ class LLMService:
         """
         # Provider-specific limits
         provider_limits = {
-            "deepseek": 8192,  # DeepSeek max is 8192
+            "nvidia": 8192,
             "openai": 16384,  # GPT - 4 Turbo supports up to 16K
             "anthropic": 32000,  # Claude Opus supports up to 32K
             "gemini": 8192,  # Gemini Pro supports up to 8K
@@ -712,8 +1495,8 @@ class LLMService:
             "openai": "OPENAI_API_KEY",
             "anthropic": "ANTHROPIC_API_KEY",
             "gemini": "GEMINI_API_KEY",
-            "deepseek": "DEEPSEEK_API_KEY",
             "openrouter": "OPENROUTER_API_KEY",
+            "nvidia": "NVIDIA_API_KEY",
             "azure": "AZURE_API_KEY",
             "huggingface": "HUGGINGFACE_API_KEY",
         }
@@ -1553,9 +2336,20 @@ Output clean, executable test code."""
         expected_schema: Optional[str] = None,
         job_id: Optional[int] = None,
         timeout: Optional[float] = None,
+        public_input: bool = False,
+        max_tokens: Optional[int] = None,
+        time_limit: Optional[float] = None,
     ) -> str:
         """
         Generic method to generate content from any prompt with caching.
+
+        ``time_limit`` is the most seconds the whole call may take. With it, each provider is tried once
+        (no retries), each attempt is cut to the time left, and no further provider is tried once the time
+        is spent; the call then raises. Without it the call behaves as it always did.
+
+        ``public_input=True`` marks a prompt that carries only public text (a company's own website):
+        it is answered through the public-input chain (free providers first, Gemini Flash last) and is
+        never cached. Never set it for a prompt carrying an organisation's data.
 
         Args:
             prompt: The prompt to send to the LLM
@@ -1574,6 +2368,9 @@ Output clean, executable test code."""
         Returns:
             Generated response text
         """
+        if public_input:
+            return LLMService._call_public_chain(prompt, timeout=timeout, max_tokens=max_tokens)
+
         provider, model = LLMService._get_configured_provider()
 
         # Check cache first
@@ -1584,21 +2381,188 @@ Output clean, executable test code."""
                 return cached_response
 
         # Call LLM if not cached
-        response, interaction = LLMService._call_llm(
-            prompt=prompt,
-            model=model,
-            provider=provider,
-            pipeline_stage_id=pipeline_stage_id,
-            expected_schema=expected_schema,
-            job_id=job_id,
-            timeout=timeout,
-        )
+        if time_limit is None:
+            response, interaction = LLMService._call_llm(
+                prompt=prompt,
+                model=model,
+                provider=provider,
+                pipeline_stage_id=pipeline_stage_id,
+                expected_schema=expected_schema,
+                job_id=job_id,
+                timeout=timeout,
+            )
+        else:
+            deadline = time.monotonic() + max(0.0, float(time_limit))
+
+            def attempt():
+                with one_attempt():
+                    return LLMService._call_llm(
+                        prompt=prompt,
+                        model=model,
+                        provider=provider,
+                        pipeline_stage_id=pipeline_stage_id,
+                        expected_schema=expected_schema,
+                        job_id=job_id,
+                        timeout=timeout,
+                        deadline=deadline,
+                    )
+
+            from app.modules.ai_chat.services.agent_runner import read_before
+
+            def whole_call(read):
+                read.first.set()  # one plain call has no first token: only the deadline limits it
+                return attempt()
+
+            response, interaction = read_before(whole_call, deadline)
 
         # Cache the response
         if use_cache:
             LLMService._cache_response(cache_key, response, cache_ttl)
 
         return response
+
+    # What one attempt at one provider may take, and how long to wait once after a 429 with no Retry-After.
+    PUBLIC_ATTEMPT_SECONDS = 45.0  # one call to one model, measured: a 25,000-character page set takes about 30 seconds
+    PUBLIC_PROVIDER_SECONDS = 90.0  # all the models of one provider together; the chain's own deadline is checked between providers
+    PUBLIC_BACKOFF_SECONDS = 3.0
+    PUBLIC_BACKOFF_MAX_SECONDS = 15.0
+
+    @staticmethod
+    def _sleep(seconds: float) -> None:
+        time.sleep(seconds)
+
+    @staticmethod
+    def _is_rate_limited(error: BaseException) -> bool:
+        text = str(error).lower()
+        if "429" in text or "rate limit" in text:
+            return True
+        while error is not None:
+            if (getattr(error, "status_code", None) or getattr(getattr(error, "response", None), "status_code", None)) == 429:
+                return True
+            error = error.__cause__
+        return False
+
+    @staticmethod
+    def _retry_after(error: BaseException) -> Optional[float]:
+        while error is not None:  # the failover wraps the provider's own error as its cause
+            headers = getattr(getattr(error, "response", None), "headers", None) or {}
+            try:
+                value = headers.get("Retry-After") or headers.get("retry-after")
+                if value is not None:
+                    return float(value)
+            except (TypeError, ValueError):
+                pass
+            error = error.__cause__
+        return None
+
+    @staticmethod
+    def _within(timeout: Optional[float], deadline: Optional[float]) -> Optional[float]:
+        """``timeout``, cut to what is left before ``deadline`` (a time.monotonic() value), never under one second."""
+        if deadline is None:
+            return timeout
+        left = max(1.0, deadline - time.monotonic())
+        return left if timeout is None else min(timeout, left)
+
+    @staticmethod
+    def _call_public_chain(prompt: str, timeout: Optional[float] = None, max_tokens: Optional[int] = None) -> str:
+        """Answer a public-input prompt: each provider in PUBLIC_INPUT_CHAIN that has a key, in order,
+        until one answers. A provider with no key is skipped silently. The whole chain stays inside
+        ``timeout`` seconds and each attempt is short."""
+        prompt = _scrub_prompt(prompt)
+        deadline = time.monotonic() + (float(timeout) if timeout else 120.0)
+        everything = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "huggingface"] + list(PUBLIC_INPUT_CHAIN)
+        last_error: Optional[BaseException] = None
+        for provider in PUBLIC_INPUT_CHAIN:
+            if not LLMService._get_all_api_keys(provider):
+                continue
+            for attempt in (0, 1):
+                remaining = deadline - time.monotonic()
+                if remaining <= 1.0:
+                    break
+                try:
+                    provider_deadline = min(deadline, time.monotonic() + LLMService.PUBLIC_PROVIDER_SECONDS)
+                    text, _interaction = LLMService._call_llm_with_failover(
+                        prompt=prompt,
+                        model=PUBLIC_INPUT_MODELS[provider],
+                        provider=provider,
+                        max_tokens=max_tokens,
+                        timeout=min(LLMService.PUBLIC_ATTEMPT_SECONDS, remaining),
+                        # every provider is named as tried, so a failure moves on along this chain only
+                        _already_tried=list(everything),
+                        public_input=True,
+                        deadline=provider_deadline,
+                    )
+                    return text
+                except ProviderNotAllowed:
+                    break
+                except Exception as error:  # noqa: BLE001 - the next provider in the chain answers instead
+                    last_error = error
+                    logger.warning("public-input provider %s failed: %s", provider, str(error)[:100])
+                    if attempt == 0 and LLMService._is_rate_limited(error):
+                        # honour Retry-After, or back off once, then try this provider one more time
+                        wait = min(LLMService._retry_after(error) or LLMService.PUBLIC_BACKOFF_SECONDS,
+                                   LLMService.PUBLIC_BACKOFF_MAX_SECONDS, max(0.0, deadline - time.monotonic() - 1.0))
+                        if wait > 0:
+                            LLMService._sleep(wait)
+                            continue
+                    break
+        raise RuntimeError(
+            "Every provider in the public-input chain failed: %s" % (str(last_error)[:200] if last_error else "no provider has a key"))
+
+    @staticmethod
+    def _call_openai_compatible(
+        base_url: str, prompt: str, model: str, api_key: str,
+        max_tokens: Optional[int] = None, timeout: Optional[float] = None, extra_body: Optional[dict] = None,
+    ) -> Tuple[str, int, int, float]:
+        """One chat completion from a provider that speaks the OpenAI chat protocol (free tier: no cost)."""
+        from openai import OpenAI
+
+        effective_timeout = timeout if timeout is not None else 60.0
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=effective_timeout, max_retries=0)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=min(max_tokens or 4096, 8192),
+            timeout=effective_timeout,
+            extra_body=extra_body,
+        )
+        usage = response.usage
+        return (response.choices[0].message.content or "",
+                getattr(usage, "prompt_tokens", 0) or 0, getattr(usage, "completion_tokens", 0) or 0, 0.0)
+
+    @staticmethod
+    def _call_deepseek(prompt, model, api_key, max_tokens=None, timeout=None):
+        """DeepSeek speaks the OpenAI chat protocol; the address is DEEPSEEK_API_BASE or its published one."""
+        served, extra_body = deepseek_request_for(model)
+        return LLMService._call_openai_compatible(
+            LLMService.base_url_for("deepseek"), prompt, served, api_key, max_tokens, timeout, extra_body=extra_body)
+
+    @staticmethod
+    def _call_cerebras(prompt, model, api_key, max_tokens=None, timeout=None):
+        return LLMService._call_openai_compatible(
+            OPENAI_COMPATIBLE_BASE_URLS["cerebras"], prompt, model, api_key, max_tokens, timeout)
+
+    @staticmethod
+    def _call_groq(prompt, model, api_key, max_tokens=None, timeout=None):
+        return LLMService._call_openai_compatible(
+            OPENAI_COMPATIBLE_BASE_URLS["groq"], prompt, model, api_key, max_tokens, timeout)
+
+    @staticmethod
+    def _call_mistral(prompt, model, api_key, max_tokens=None, timeout=None):
+        """Mistral's own chat completions endpoint."""
+        response = requests.post(
+            MISTRAL_CHAT_URL,
+            headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
+            json={"model": model, "messages": [{"role": "user", "content": prompt}],
+                  "temperature": 0.0, "max_tokens": min(max_tokens or 4096, 8192)},
+            timeout=timeout if timeout is not None else 60.0,
+        )
+        response.raise_for_status()
+        body = response.json()
+        usage = body.get("usage") or {}
+        return (body["choices"][0]["message"]["content"] or "",
+                usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), 0.0)
 
     @staticmethod
     def review_code(
@@ -1651,7 +2615,21 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             }
 
     @staticmethod
-    def _get_all_api_keys(provider: str) -> List[str]:
+    def _org_rows(organization_id=_CALLER):
+        """APISettings query limited to one organisation, explicitly; None when there is no organisation.
+
+        ``_CALLER`` means the organisation of the current request. Outside a request (or with no
+        organisation) no organisation rows count: only the platform's environment keys are used.
+        """
+        from app.models.models import APISettings
+
+        org_id = LLMService._resolve_org_id() if organization_id is _CALLER else organization_id
+        if org_id is None:
+            return None
+        return APISettings.query.filter(APISettings.organization_id == org_id)
+
+    @staticmethod
+    def _get_all_api_keys(provider: str, organization_id=_CALLER) -> List[str]:
         """
         Get ALL available API keys for a provider.
 
@@ -1671,11 +2649,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
         # 1. Check database for configured keys (canonical source)
         try:
-            from app.models.models import APISettings
-            settings_list = APISettings.query.filter_by(
-                provider=provider,
-                enabled=True,
-            ).all()
+            org_rows = LLMService._org_rows(organization_id)
+            settings_list = (
+                org_rows.filter_by(provider=provider, enabled=True).all() if org_rows is not None else []
+            )
 
             for settings in settings_list:
                 key = settings.api_key  # TypeDecorator decrypts automatically
@@ -1686,7 +2663,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
             # Even disabled rows count as "the admin has touched this provider"
             if not db_has_record:
-                db_has_record = APISettings.query.filter_by(provider=provider).count() > 0
+                db_has_record = org_rows is not None and org_rows.filter_by(provider=provider).count() > 0
         except Exception as e:
             logger.debug("Could not query database API settings: %s", e)
 
@@ -1694,7 +2671,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         if not db_has_record:
             logger.info(
                 "No database record for provider '%s' — falling back to environment variables. "
-                "Consider migrating the key to Admin > API Settings.",
+                "Consider migrating the key to Admin > AI settings.",
                 provider,
             )
 
@@ -1751,9 +2728,16 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         organization_id: Optional[int] = None,
         prompt_version: Optional[str] = None,
         retention_setting: Optional[str] = None,
+        public_input: bool = False,
+        deadline: Optional[float] = None,
     ) -> Tuple[str, LLMInteraction]:
         """
         Call LLM with automatic API key failover.
+
+        ``public_input`` marks a call that carries only public text (a company's own website). Only such
+        a call may use the free-only providers and the curated free backup models; a call carrying an
+        organisation's data is refused them. ``deadline`` is a time.monotonic() value after which no
+        further model is tried.
 
         Tries multiple API keys in sequence until one succeeds.
         This ensures elements are not lost due to API key issues.
@@ -1781,11 +2765,20 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             prompt_version=prompt_version,
             retention_setting=retention_setting,
         )
+        if not public_input and provider in FREE_ONLY_PROVIDERS:
+            raise ProviderNotAllowed(
+                f"Provider '{provider}' reads public input only and is refused for a call carrying organisation data."
+            )
 
         # Track providers already tried across recursive fallback calls to prevent looping
         if _already_tried is None:
             _already_tried = []
         _already_tried = list(_already_tried) + [provider]
+
+        if deadline is not None and not public_input:
+            if time.monotonic() >= deadline:
+                raise TimeoutError("The time allowed for this call is spent.")
+            timeout = LLMService._within(timeout, deadline)
 
         # Get all available API keys
         api_keys = LLMService._get_all_api_keys(provider)
@@ -1796,6 +2789,13 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 f"Please configure at least one API key in database or environment."
             )
         
+        # The platform's own key stops at its configured ceiling; an organisation's own key is its own money.
+        platform_funded = any(LLMService.platform_pays(provider, k) for k in api_keys)
+        if platform_funded:
+            allowed, reason = LLMService.platform_call_allowed(provider)
+            if not allowed:
+                raise AnswersPaused(reason)
+
         logger.info(f"Attempting LLM call with {len(api_keys)} API key(s) available for {provider}")
         
         # Track the last error for reporting
@@ -1804,6 +2804,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         
         # Try each API key in sequence
         for idx, api_key in enumerate(api_keys):
+            if deadline is not None and not public_input and idx:
+                if time.monotonic() >= deadline:
+                    break  # the caller's time is spent: no further key is tried
+                timeout = LLMService._within(timeout, deadline)
             try:
                 logger.info(f"Trying API key #{idx + 1} for {provider}...")
                 
@@ -1820,8 +2824,42 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                     response_text, token_input, token_output, cost = LLMService._call_gemini(
                         prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
                     )
-                elif provider == "deepseek":
-                    response_text, token_input, token_output, cost = LLMService._call_deepseek(
+                elif provider == "nvidia":
+                    nv_models = fallback_models_for("nvidia", model) if public_input else [model]
+                    nv_success = False
+                    nv_last_error = None
+                    for nv_model in nv_models:
+                        if deadline is not None and time.monotonic() > deadline and nv_model != nv_models[0]:
+                            break
+                        try:
+                            _, nv_model, _ = LLMService._guard_provider_call(
+                                provider,
+                                nv_model,
+                                organization_id,
+                                prompt=prompt,
+                                prompt_version=prompt_version,
+                                retention_setting=retention_setting,
+                            )
+                            nv_call = LLMService._call_nvidia_once if public_input else LLMService._call_nvidia
+                            response_text, token_input, token_output, cost = nv_call(
+                                prompt, nv_model, api_key, max_tokens=max_tokens,
+                                timeout=LLMService._within(timeout, deadline)
+                            )
+                            model = nv_model
+                            nv_success = True
+                            if nv_model != nv_models[0]:
+                                logger.info(f"🔄 NVIDIA backup model {nv_model} succeeded (primary was {nv_models[0]})")
+                            break
+                        except ProviderNotAllowed:
+                            raise
+                        except Exception as nv_err:
+                            nv_last_error = nv_err
+                            logger.warning(f"⚠️  NVIDIA model {nv_model} failed: {str(nv_err)[:80]}")
+                            continue
+                    if not nv_success:
+                        raise nv_last_error or RuntimeError("All NVIDIA models failed")
+                elif provider in ("mistral", "cerebras", "groq", "deepseek"):
+                    response_text, token_input, token_output, cost = getattr(LLMService, "_call_" + provider)(
                         prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
                     )
                 elif provider == "huggingface":
@@ -1829,12 +2867,18 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                         prompt, model, api_key, max_tokens=max_tokens
                     )
                 elif provider == "openrouter":
-                    # OpenRouter supports multiple backup models (comma-separated in default_model)
-                    # Try each model in sequence before failing the key
-                    or_models = [m.strip() for m in model.split(",") if m.strip()] if "," in model else [model]
+                    # OpenRouter supports multiple backup models (comma-separated in default_model
+                    # plus the curated free-tier fallback list in model_defaults.FALLBACK_MODELS).
+                    # Try each model in sequence before failing the key.
+                    if public_input:
+                        or_models = fallback_models_for("openrouter", model)
+                    else:
+                        or_models = [m.strip() for m in model.split(",") if m.strip()] or [model]
                     or_success = False
                     or_last_error = None
                     for or_model in or_models:
+                        if deadline is not None and time.monotonic() > deadline and or_model != or_models[0]:
+                            break
                         try:
                             _, or_model, _ = LLMService._guard_provider_call(
                                 provider,
@@ -1844,14 +2888,21 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                                 prompt_version=prompt_version,
                                 retention_setting=retention_setting,
                             )
+                            # The flag is passed only when it is True, so a call that carries
+                            # organisation data keeps the caller's original signature.
+                            or_kwargs = {"max_tokens": max_tokens, "timeout": LLMService._within(timeout, deadline)}
+                            if public_input:
+                                or_kwargs["public_input"] = True
                             response_text, token_input, token_output, cost = LLMService._call_openrouter(
-                                prompt, or_model, api_key, max_tokens=max_tokens, timeout=timeout
+                                prompt, or_model, api_key, **or_kwargs
                             )
                             model = or_model  # Update model for interaction record
                             or_success = True
                             if or_model != or_models[0]:
                                 logger.info(f"🔄 OpenRouter backup model {or_model} succeeded (primary was {or_models[0]})")
                             break
+                        except ProviderNotAllowed:
+                            raise
                         except Exception as or_err:
                             or_last_error = or_err
                             logger.warning(f"⚠️  OpenRouter model {or_model} failed: {str(or_err)[:80]}")
@@ -1879,7 +2930,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                     retention_setting=retention_setting,
                 )
                 LLMService._persist_interaction_record(interaction)
-                
+                if LLMService.platform_pays(provider, api_key):
+                    LLMService.record_spend(provider, model, token_input, token_output)
+
                 return response_text, interaction
 
             except ProviderNotAllowed:
@@ -1910,13 +2963,24 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         # All keys failed for primary provider — try cross-provider fallback
         logger.error(f"❌ All {len(api_keys)} API key(s) failed for {provider}")
 
-        fallback_order = ["openai", "anthropic", "gemini", "deepseek", "openrouter", "huggingface"]
+        # The organisation's own providers (rows in API settings) in the long-standing priority,
+        # then the providers the platform pays for in the configured order, each within its ceiling.
+        own_providers = [
+            p for p in ("openai", "anthropic", "gemini", "openrouter", "nvidia", "deepseek", "huggingface")
+            if any(k and not LLMService.platform_pays(p, k) for k in LLMService._get_all_api_keys(p))
+        ]
+        fallback_order = own_providers + [p for p in LLMService.provider_order() if p not in own_providers]
         for fallback_provider in fallback_order:
             # Skip providers we've already tried in this call chain to prevent infinite loops
             if fallback_provider in _already_tried:
                 continue
+            if deadline is not None and not public_input and time.monotonic() >= deadline:
+                break  # the caller's time is spent: no further provider is asked
             fallback_keys = LLMService._get_all_api_keys(fallback_provider)
             if not fallback_keys:
+                continue
+            if fallback_provider not in own_providers and not LLMService.has_headroom(fallback_provider):
+                logger.warning("Cross-provider fallback skips %s: %s", fallback_provider, LLMService.headroom(fallback_provider)[1])
                 continue
 
             # Get a default model for the fallback provider — DB is source of truth
@@ -1924,8 +2988,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 "openai": "gpt-4o-mini",
                 "anthropic": "claude-haiku-4-5-20251001",
                 "gemini": "gemini-2.0-flash",
-                "deepseek": "deepseek-chat",
-                "openrouter": "deepseek/deepseek-chat",
+                "nvidia": DEFAULT_MODELS["nvidia"],
+                "openrouter": DEFAULT_MODELS["openrouter"],
+                "deepseek": PLATFORM_DEFAULT_MODELS["deepseek"],
                 "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
             }
             try:
@@ -1943,6 +3008,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
             if not fb_model:
                 continue
+            if not public_input and is_free_model(fallback_provider, fb_model):
+                continue  # an organisation's data never falls over to a free model
 
             logger.info(f"🔄 Cross-provider fallback: trying {fallback_provider} ({fb_model})")
             try:
@@ -1957,6 +3024,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                     organization_id=organization_id,
                     prompt_version=prompt_version,
                     retention_setting=retention_setting,
+                    public_input=public_input,
+                    deadline=deadline,
                 )
             except ProviderNotAllowed:
                 logger.info(
@@ -1971,7 +3040,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             f"All API keys failed for {provider} and all fallback providers. "
             f"Failed keys: {failed_keys}. "
             f"Last error: {str(last_error) if last_error else 'Unknown error'}"
-        )
+        ) from last_error
 
     @staticmethod
     @traced_model_call
@@ -1988,6 +3057,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         timeout: Optional[float] = None,
         prompt_version: Optional[str] = None,
         retention_setting: Optional[str] = None,
+        deadline: Optional[float] = None,
     ) -> Tuple[str, LLMInteraction]:
         """
         Internal method to call LLM API and track the interaction.
@@ -2054,6 +3124,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 organization_id=organization_id,
                 prompt_version=prompt_version,
                 retention_setting=retention_setting,
+                deadline=deadline,
             )
         except RuntimeError as e:
             # All API keys failed
@@ -2070,6 +3141,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 or "api usage" in error_str
             )
             
+            if is_credit_error and deadline is not None and time.monotonic() >= deadline:
+                is_credit_error = False  # the caller's time is spent: report the failure, ask nobody else
+
             if is_credit_error:
                 logger.warning(f"🔄 Attempting cross-provider fallback after all {provider} keys failed...")
                 try:
@@ -2095,6 +3169,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                         timeout=timeout,
                         prompt_version=prompt_version,
                         retention_setting=retention_setting,
+                        deadline=deadline,
                     )
                 except ValueError as fallback_error:
                     logger.error(f"❌ No alternative provider available: {fallback_error}")
@@ -2409,7 +3484,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             logger.info(f"Error details: {str(e)}")
             logger.error(f"Anthropic authentication error: {str(e)}")
             raise ValueError(
-                "Authentication failed - Invalid API key. Please check your API settings at /admin/api-settings"
+                "Authentication failed - Invalid API key. Please check your AI settings at /admin/api-settings"
             )
         except anthropic.BadRequestError as e:
             error_str = str(e)
@@ -2473,7 +3548,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         # Use first variation by default
         model_normalized = model_variations[0] if model_variations else model_normalized
 
-        base_url = LLMService.PROVIDERS["gemini"]["base_url"].rstrip("/")
+        base_url = (LLMService.base_url_for("gemini") or LLMService.PROVIDERS["gemini"]["base_url"]).rstrip("/")
         endpoint = f"{base_url}/models/{model_normalized}:generateContent"
 
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -2493,7 +3568,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
             # 404 errors are permanent (wrong model/endpoint) - don't retry
             if status == 404:
-                error_msg = f"Gemini model '{model_normalized}' not found (404). Check model name in API settings."
+                error_msg = f"Gemini model '{model_normalized}' not found (404). Check model name in AI settings."
                 logger.error(error_msg)
                 raise ValueError(error_msg) from exc
 
@@ -2526,22 +3601,27 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             if total is not None:
                 token_output = max(total - token_input, 0)
 
-        # Pricing (USD per 1K tokens)
-        model_name = model.lower()
-        if "flash" in model_name:
-            cost_per_1k_input = 0.0005
-            cost_per_1k_output = 0.0015
-        else:
-            cost_per_1k_input = 0.0035
-            cost_per_1k_output = 0.0105
-
-        cost = (token_input / DEFAULT_TOKEN_COST_MULTIPLIER) * cost_per_1k_input + (token_output / DEFAULT_TOKEN_COST_MULTIPLIER) * cost_per_1k_output
+        # The usage the API reported, at the configured prices (USD per million tokens; the list
+        # prices when none are configured).
+        price_in, price_out = LLMService.price_per_mtok("gemini", model)
+        cost = token_input * price_in / 1_000_000 + token_output * price_out / 1_000_000
 
         return response_text, token_input, token_output, cost
 
     @staticmethod
     @retry_on_transient_error(max_attempts=3, min_wait=2, max_wait=10)
-    def _call_deepseek(
+    def _call_nvidia(
+        prompt: str,
+        model: str,
+        api_key: str,
+        max_tokens: Optional[int] = None,
+        timeout: Optional[float] = None,
+    ) -> Tuple[str, int, int, float]:
+        """NVIDIA, retried on transient failures (for callers that can wait); see ``_call_nvidia_once``."""
+        return LLMService._call_nvidia_once(prompt, model, api_key, max_tokens=max_tokens, timeout=timeout)
+
+    @staticmethod
+    def _call_nvidia_once(
         prompt: str,
         model: str,
         api_key: str,
@@ -2549,9 +3629,10 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         timeout: Optional[float] = None,
     ) -> Tuple[str, int, int, float]:
         """
-        Call DeepSeek API with automatic retry on transient failures.
+        One attempt at NVIDIA's hosted free models, taking at most ``timeout`` seconds: the client does not retry
+        on its own, and nothing around this call does either (the public-input chain moves on to the next model).
 
-        DeepSeek uses OpenAI-compatible API, so we can use the OpenAI client.
+        The API is OpenAI-compatible, so we can use the OpenAI client.
 
         Retries on: Timeout, ConnectionError, RateLimitError
         Max attempts: 3
@@ -2564,18 +3645,19 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             from openai import OpenAI
 
             # NOTE: the OpenAI client has no request timeout by default, which let a
-            # stalled DeepSeek connection hang a worker indefinitely (see Task 4,
+            # stalled NVIDIA connection hang a worker indefinitely (see Task 4,
             # P0 wave). Bound it explicitly at the client level.
             effective_timeout = timeout if timeout is not None else 60.0
             client = OpenAI(
-                api_key=api_key, base_url="https://api.deepseek.com/v1", timeout=effective_timeout
+                api_key=api_key, base_url=LLMService.base_url_for("nvidia"),
+                timeout=effective_timeout, max_retries=0,
             )
 
             # Use model-specific optimal token limits
             if max_tokens is None:
-                max_tokens = 4096  # Default for DeepSeek
+                max_tokens = 4096
 
-            # DeepSeek has a maximum of 8192 tokens - cap any value above that
+            # Cap any value above 8192 tokens
             max_tokens = min(max_tokens, 8192)
 
             # Enforce deterministic output for critical generation tasks
@@ -2594,23 +3676,20 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             )
 
             response_text = response.choices[0].message.content
+            if not response_text:  # a null or empty answer is no answer: the caller moves on to the next model
+                raise RuntimeError("NVIDIA model %s sent an empty answer" % model)
             token_input = response.usage.prompt_tokens
             token_output = response.usage.completion_tokens
 
-            # Calculate cost (DeepSeek pricing - approximate, adjust based on actual pricing)
-            # DeepSeek is typically much cheaper than OpenAI/Anthropic
-            cost_per_1k_input = 0.0001  # Very low input cost
-            cost_per_1k_output = 0.0002  # Very low output cost
-            cost = (token_input / DEFAULT_TOKEN_COST_MULTIPLIER * cost_per_1k_input) + (
-                token_output / DEFAULT_TOKEN_COST_MULTIPLIER * cost_per_1k_output
-            )
+            # The hosted models used here are free: no cost is incurred.
+            cost = 0.0
 
             return response_text, token_input, token_output, cost
 
         except ImportError:
             return "OpenAI library not installed. Run: pip install openai", 0, 0, 0.0
         except Exception as e:
-            logger.error(f"DeepSeek API error after retries: {str(e)}")
+            logger.error(f"NVIDIA API error after retries: {str(e)}")
             raise  # Re-raise for retry logic to handle
 
     @staticmethod
@@ -2793,6 +3872,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         api_key: str,
         max_tokens: Optional[int] = 4096,
         timeout: Optional[float] = None,
+        public_input: bool = False,
     ) -> Tuple[str, int, int, float]:
         """
         Call OpenRouter API (OpenAI-compatible chat completions).
@@ -2802,7 +3882,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
         Args:
             prompt: The prompt text
-            model: Model ID in provider/model format (e.g. "google/gemini-2.5-flash-preview:free")
+            model: Model ID in provider/model format (e.g. "google/gemma-4-31b-it:free")
             api_key: OpenRouter API key
             max_tokens: Maximum response tokens
             timeout: Optional override for the read timeout (seconds) of this
@@ -2829,6 +3909,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": max_tokens,
             "temperature": 0.0,
+            # Only endpoints that neither train on nor log prompts; a public page may go to any endpoint, which
+            # is the only way the free models (they all train) can read it.
+            "provider": OPENROUTER_PUBLIC_POLICY if public_input else OPENROUTER_PROVIDER_POLICY,
         }
 
         read_timeout = timeout if timeout is not None else 80
@@ -2856,7 +3939,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             if not choices:
                 raise RuntimeError(f"OpenRouter returned empty choices for {model}")
 
-            content = choices[0].get("message", {}).get("content", "")
+            content = (choices[0].get("message") or {}).get("content")
+            if not content:  # some models send "content": null; that is no answer, so the next model is tried
+                raise RuntimeError(f"OpenRouter model {model} sent an empty answer")
             usage = data.get("usage", {})
             tokens_in = usage.get("prompt_tokens", 0)
             tokens_out = usage.get("completion_tokens", 0)
@@ -2923,9 +4008,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 "name": "Google (Gemini)",
                 "default_models": ["gemini-2.0-flash", "gemini-2.0-flash-lite"]
             },
-            "deepseek": {
-                "name": "DeepSeek",
-                "default_models": ["deepseek-chat", "deepseek-coder"]
+            "nvidia": {
+                "name": "NVIDIA (free models)",
+                "default_models": [DEFAULT_MODELS["nvidia"]]
             },
             "huggingface": {
                 "name": "Hugging Face (Local Models)",
@@ -2933,7 +4018,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             },
             "openrouter": {
                 "name": "OpenRouter (65+ Models)",
-                "default_models": ["google/gemini-2.5-flash-preview:free", "meta-llama/llama-3-8b-instruct:free"]
+                "default_models": ["google/gemma-4-31b-it:free", "nvidia/nemotron-3-super-120b-a12b:free"]
             }
         }
         
@@ -3293,7 +4378,7 @@ def test_api_key(provider: str, api_key: str, model: str | None = None) -> Dict:
     Test if an API key is valid by making a minimal API call.
 
     Args:
-        provider: Provider name ('openai', 'anthropic', 'gemini', 'azure', 'huggingface', 'deepseek', 'custom')
+        provider: Provider name ('openai', 'anthropic', 'gemini', 'azure', 'huggingface', 'nvidia', 'custom')
         api_key: API key to test
         model: Model to use for the test. When None, reads from the DB row for this provider.
                Always prefer passing the configured model explicitly — hardcoded fallbacks go stale.
@@ -3372,12 +4457,12 @@ def test_api_key(provider: str, api_key: str, model: str | None = None) -> Dict:
                 "message": "Azure OpenAI testing not yet implemented. Configure endpoint and deployment name.",
             }
 
-        elif provider == "deepseek":
-            # DeepSeek uses OpenAI-compatible API
+        elif provider == "nvidia":
+            # NVIDIA's hosted models use an OpenAI-compatible API
             from openai import OpenAI
 
-            test_model = _resolve_model("deepseek", model) or "deepseek-chat"
-            client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+            test_model = _resolve_model("nvidia", model) or DEFAULT_MODELS["nvidia"]
+            client = OpenAI(api_key=api_key, base_url="https://integrate.api.nvidia.com/v1")
             response = client.chat.completions.create(
                 model=test_model, messages=[{"role": "user", "content": "test"}], max_tokens=5
             )
@@ -3502,7 +4587,7 @@ def test_api_key(provider: str, api_key: str, model: str | None = None) -> Dict:
                 model_count = len(data.get("data", []))
 
                 # Resolve configured default model for display
-                default_model = _resolve_model("openrouter", model) or "deepseek/deepseek-chat"
+                default_model = _resolve_model("openrouter", model) or DEFAULT_MODELS["openrouter"]
 
                 return {
                     "success": True,

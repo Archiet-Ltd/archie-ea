@@ -246,6 +246,8 @@
 {% call dense_table(columns=[('APP ID', ''), ('Name *', ''), ('Type', ''), ('Status', ''), ('Actions', '')], id='manual-entry-table', tbody_id='manual-entry-tbody') %}
                   <!-- Rows will be added dynamically -->
                 {% endcall %}
+                {# The deployment-status choices a manual row offers: the one list, read by application_import.js. #}
+                <template id="manual-entry-status-options">{% for value, label in status_options() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</template>
 
             <div class="flex justify-end gap-2">
               <button type="button" @click="closeApplicationImportModal()" class="px-4 py-2 border border-input rounded-md text-sm font-medium text-muted-foreground hover:bg-accent" aria-label="Cancel manual entry">

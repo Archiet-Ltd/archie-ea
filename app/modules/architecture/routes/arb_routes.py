@@ -19,6 +19,7 @@ import uuid as _uuid
 
 from flask import (
     Blueprint,
+    abort,
     current_app,
     flash,
     g,
@@ -35,6 +36,7 @@ from app import db
 from app.models.architecture_review_board import (
     ARBBoardMember,
     ARBCapabilityImpact,
+    ARBException,
     ARBGovernanceStandard,
     ARBReviewComment,
     ARBReviewItem,
@@ -43,6 +45,11 @@ from app.models.architecture_review_board import (
     TOGAFPhase,
 )
 from app.decorators import audit_log, require_roles
+from app.modules.transformation_room.arb_decision_service import (
+    DECISION_ROLES,
+    may_decide_review,
+)
+from app.models.user import User
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.services.arb_analytics_service import ARBAnalyticsService
 from app.services.rate_limiter import rate_limit
@@ -67,6 +74,36 @@ from app.modules.transformation_room.domain import (
 arb_bp = Blueprint("arb", __name__, url_prefix="/arb")
 arb_service = ARBGovernanceService()
 arb_analytics = ARBAnalyticsService()
+
+# Who may run a board or approve an exception: the persona set the typed
+# decision service accepts as a decider (its one source), plus the "admin"
+# name the role check folds Administrator into.
+ARB_APPROVER_ROLES = ("admin", *sorted(DECISION_ROLES))
+
+
+BOARD_SEAT_ROLES = (
+    ("enterprise_architect", "Enterprise architect"),
+    ("solution_architect", "Solution architect"),
+    ("business_architect", "Business architect"),
+    ("data_architect", "Data architect"),
+    ("security_architect", "Security architect"),
+    ("integration_architect", "Integration architect"),
+)
+
+
+def _viewer_may_run_board():
+    """Whether the signed-in user passes the approver role check.
+
+    Asks the one existing role check rather than restating its rules, so the
+    buttons a page shows are the buttons the routes accept.
+    """
+    from werkzeug.exceptions import HTTPException
+
+    try:
+        require_roles(*ARB_APPROVER_ROLES)(lambda: True)()
+    except HTTPException:
+        return False
+    return True
 
 
 # V-03 (S1, 17 Aug 2026 QA register): a Viewer created two ARB reviews
@@ -761,37 +798,9 @@ def dashboard():
         standards_summary = arb_analytics.get_standard_compliance_summary()
 
         # Overdue items: submitted/under_review older than priority thresholds
-        now = datetime.utcnow()
-        overdue_thresholds = {"critical": 7, "high": 14, "medium": 21, "low": 30}
-        overdue_items = []
-        for priority_val, days_threshold in overdue_thresholds.items():
-            cutoff = now - timedelta(days=days_threshold)
-            items = (
-                ARBReviewItem.query.filter(
-                    ARBReviewItem.status.in_(["submitted", "under_review"]),
-                    ARBReviewItem.priority == priority_val,
-                    ARBReviewItem.submitted_at.isnot(None),
-                    ARBReviewItem.submitted_at <= cutoff,
-                )
-                .order_by(ARBReviewItem.submitted_at.asc())
-                .all()
-            )
-            for item in items:
-                overdue_items.append(
-                    {
-                        "review": item,
-                        "days_overdue": (now - item.submitted_at).days,
-                        "threshold": days_threshold,
-                    }
-                )
-        overdue_items.sort(
-            key=lambda x: (
-                {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(
-                    x["review"].priority, 4
-                ),
-                -x["days_overdue"],
-            )
-        )
+        from app.modules.architecture.services.arb_overdue import overdue_reviews
+
+        overdue_items = overdue_reviews()
 
         # Capability impact summary
         from sqlalchemy import func as sa_func
@@ -968,7 +977,9 @@ def dashboard():
         pending_status = "all"
 
     # ARB-101: compute per-row SLA badge data for decisions table
-    _SLA_THRESHOLDS = {"critical": 7, "high": 14, "medium": 21, "low": 30}
+    from app.modules.architecture.services.arb_overdue import (
+        OVERDUE_LIMIT_DAYS as _SLA_THRESHOLDS,
+    )
     sla_data_by_review = {}
     _now = datetime.utcnow()
     for _rev in decisions:
@@ -1069,7 +1080,11 @@ def sessions():
         sessions = EmptyPagination()
 
     return render_template(
-        "arb/sessions.html", sessions=sessions, status=status, users=_chair_candidates()
+        "arb/sessions.html",
+        sessions=sessions,
+        status=status,
+        users=_chair_candidates(),
+        may_run_board=_viewer_may_run_board(),
     )
 
 
@@ -1165,6 +1180,7 @@ def create_session():
 @login_required
 def session_detail(id):
     """View ARB session details."""
+    _own_session_or_404(id)
     session = ArchitectureReviewBoard.query.options(
         joinedload(ArchitectureReviewBoard.review_items),
         joinedload(ArchitectureReviewBoard.board_members).joinedload(
@@ -1174,43 +1190,71 @@ def session_detail(id):
         joinedload(ArchitectureReviewBoard.secretary),
     ).get_or_404(id)
 
-    return render_template("arb/session_detail.html", session=session)
+    may_run_board = _viewer_may_run_board()
+    seated = {m.user_id for m in session.board_members or []}
+    people = []
+    if may_run_board and session.status in ("scheduled", "draft"):
+        people = [
+            u
+            for u in db.session.execute(
+                db.select(User)
+                .where(User.organization_id == session.organization_id)
+                .order_by(User.first_name, User.last_name, User.email)
+            ).scalars()
+            if u.id not in seated
+        ]
+
+    return render_template(
+        "arb/session_detail.html",
+        session=session,
+        may_run_board=may_run_board,
+        people=people,
+        board_roles=BOARD_SEAT_ROLES,
+    )
 
 
 @arb_bp.route("/sessions/<int:id>/complete", methods=["POST"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_session_complete")
 def complete_session(id):
     """Complete an ARB session."""
+    arb_session = _own_session_or_404(id)
+    back = (
+        url_for("arb.sessions")
+        if request.form.get("return_to") == "sessions"
+        else url_for("arb.session_detail", id=id)
+    )
     try:
-        # AUDIT-ARB-002: Quorum validation - require at least 3 board members
-        arb_session = ArchitectureReviewBoard.query.get_or_404(id)
-        member_count = (
-            len(arb_session.board_members) if arb_session.board_members else 0
+        # Quorum: only seats that vote count toward it.
+        voting_count = sum(
+            1 for m in (arb_session.board_members or []) if m.voting_member is not False
         )
         minimum_quorum = 3
 
-        if member_count < minimum_quorum:
+        if voting_count < minimum_quorum:
             flash(
-                f"Cannot complete session: quorum not met. "
-                f"At least {minimum_quorum} board members are required, "
-                f"but only {member_count} member(s) are assigned.",
+                f"This board has {voting_count} of the {minimum_quorum} voting "
+                f"members it needs. Add voting members on the session page, "
+                f"then complete it.",
                 "error",
             )
-            return redirect(url_for("arb.session_detail", id=id))
+            return redirect(back)
 
         minutes = request.form.get("minutes")
         session = arb_service.complete_session(id, minutes)
         flash(f"ARB session {session.board_number} completed successfully", "success")
-        return redirect(url_for("arb.session_detail", id=id))
+        return redirect(back)
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"Error completing ARB session: {e}")
         flash("Error completing session. Please try again.", "error")
-        return redirect(url_for("arb.session_detail", id=id))
+        return redirect(back)
 
 
 @arb_bp.route("/sessions/<int:id>/cancel", methods=["POST"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_session_cancel")
 def cancel_session(id):
     """Cancel a scheduled/draft ARB session.
@@ -1220,8 +1264,8 @@ def cancel_session(id):
     implemented, so every detail page for scheduled/draft sessions 500'd
     on the url_for BuildError.
     """
+    arb_session = _own_session_or_404(id)
     try:
-        arb_session = ArchitectureReviewBoard.query.get_or_404(id)
         if arb_session.status not in ("scheduled", "draft"):
             flash("Only scheduled or draft sessions can be cancelled.", "error")
             return redirect(url_for("arb.session_detail", id=id))
@@ -1238,20 +1282,36 @@ def cancel_session(id):
 
 @arb_bp.route("/sessions/<int:session_id>/add_member", methods=["POST"])
 @login_required
-@require_roles("admin", "enterprise_architect")
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_member_add")
 def add_board_member(session_id):
     """Add a member to an ARB session."""
+    arb_session = _own_session_or_404(session_id)
+    seat = (request.form.get("role") or "").strip()
+    if seat not in {value for value, _label in BOARD_SEAT_ROLES}:
+        flash("Choose a seat for the new member", "error")
+        return redirect(url_for("arb.session_detail", id=session_id))
     try:
         data = request.form.to_dict()
+        member_id = int(data.get("user_id"))
+        member = db.session.execute(
+            db.select(User).where(
+                User.id == member_id,
+                User.organization_id == arb_session.organization_id,
+            )
+        ).scalar_one_or_none()
+        if member is None:
+            flash("That person is not a member of this organisation.", "error")
+            return redirect(url_for("arb.session_detail", id=session_id))
         (arb_service.add_board_member(
             arb_session_id=session_id,
-            user_id=int(data.get("user_id")),
-            role=data.get("role"),
+            user_id=member.id,
+            role=seat,
             voting_member=data.get("voting_member") == "on",
         ))
         flash("Board member added successfully", "success")
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"Error adding board member: {e}")
         flash("Error adding member. Please try again.", "error")
 
@@ -1270,8 +1330,15 @@ def reviews():
     page = request.args.get("page", 1, type=int)
     status = request.args.get("status", "all")
     review_type = request.args.get("review_type", "all")
+    # The dashboard's "not yet in a review cycle" link: pending reviews that sit in no cycle.
+    outside_queue = request.args.get("cycle") == "none"
 
     query = ARBReviewItem.query
+
+    if outside_queue:
+        from app.services.arb_governance_service import pending_outside_queue_conditions
+
+        query = query.filter(*pending_outside_queue_conditions())
 
     if status != "all":
         query = query.filter_by(status=status)
@@ -1291,8 +1358,10 @@ def reviews():
         reviews=pagination.items,
         status=status,
         review_type=review_type,
+        outside_queue=outside_queue,
         is_reviews_view=True,
         users=_chair_candidates(),
+        may_run_board=_viewer_may_run_board(),
     )
 
 
@@ -1521,18 +1590,7 @@ def create_review():
 @login_required
 def review_detail(id):
     """View review item details."""
-    review = ARBReviewItem.query.options(
-        joinedload(ARBReviewItem.submitter),
-        joinedload(ARBReviewItem.reviewer),
-        joinedload(ARBReviewItem.decided_by),
-        joinedload(ARBReviewItem.solution),
-        joinedload(ARBReviewItem.adr),
-        joinedload(ARBReviewItem.architecture_model),
-        joinedload(ARBReviewItem.capability_links).joinedload(
-            ARBCapabilityImpact.capability
-        ),
-        joinedload(ARBReviewItem.comments).joinedload(ARBReviewComment.user),
-    ).get_or_404(id)
+    review = _own_review_or_404(id)
 
     # Resolve application names from capability_impacts.application_ids
     application_names = []
@@ -1571,7 +1629,9 @@ def review_detail(id):
             logger.exception("ARB impact enrichment failed for app_id=%s", app_ids[0])
 
     # ARB-101: compute SLA banner info for review detail
-    _SLA_THRESHOLDS = {"critical": 7, "high": 14, "medium": 21, "low": 30}
+    from app.modules.architecture.services.arb_overdue import (
+        OVERDUE_LIMIT_DAYS as _SLA_THRESHOLDS,
+    )
     sla_info = None
     if review.submitted_at and review.status in ("submitted", "under_review", "pending_info"):
         _sla_days = _SLA_THRESHOLDS.get(review.priority or "low", 30)
@@ -1669,7 +1729,7 @@ def review_audit_trail_csv(id):
 
     from flask import Response
 
-    review = ARBReviewItem.query.get_or_404(id)
+    review = _own_review_or_404(id)
 
     from app.services.arb_audit_service import ARBAuditService
 
@@ -1719,7 +1779,7 @@ def review_typed_history_csv(id):
 
     from flask import Response
 
-    review = ARBReviewItem.query.get_or_404(id)
+    review = _own_review_or_404(id)
 
     actor = _typed_actor()
     history = []
@@ -1758,14 +1818,69 @@ def review_typed_history_csv(id):
     )
 
 
+def _own_review_or_404(review_item_id):
+    """The review item of the signed-in organisation, or a 404.
+
+    Resolved with an explicit (id, organization_id) predicate through
+    ``TypedARBDecisionAdapter.load_review``: ``Query.get_or_404`` is tenant
+    scoped only on an identity-map miss, and a 404 raised inside a route's
+    own ``try`` block is swallowed by its ``except Exception``.
+    """
+    review = TypedARBDecisionAdapter.load_review(review_item_id)
+    if review is None:
+        abort(404)
+    return review
+
+
+def _untyped_decision_refusal(item):
+    """A 403 response when the viewer may not decide this untyped review.
+
+    Same two rules the typed decision service applies: its decision-authority
+    rule (deciding role or a voting seat on the review's board), and a
+    submitter never decides their own submission. The approver role check
+    still admits the "admin" name it folds Administrator into.
+    """
+    if not _viewer_may_run_board() and not may_decide_review(
+        db.session, current_user, item
+    ):
+        return jsonify({
+            "success": False,
+            "error": "Your role cannot make ARB decisions.",
+            "reason_codes": ["arb_decision_not_authorised"],
+        }), 403
+    if item.submitter_id == current_user.id:
+        return jsonify({
+            "success": False,
+            "error": "You cannot decide a review you submitted.",
+            "reason_codes": ["arb_decision_separation_of_duties"],
+        }), 403
+    return None
+
+
+def _own_session_or_404(session_id):
+    """The ARB session of the signed-in organisation, or a 404 (see above)."""
+    organization_id = TypedARBDecisionAdapter.current_organization_id()
+    session = None
+    if organization_id is not None:
+        session = db.session.execute(
+            db.select(ArchitectureReviewBoard).where(
+                ArchitectureReviewBoard.id == session_id,
+                ArchitectureReviewBoard.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+    if session is None:
+        abort(404)
+    return session
+
+
 @arb_bp.route("/reviews/<int:id>/submit", methods=["POST"])
 @login_required
 @audit_log("arb_review_submit")
 @rate_limit(10, "1h")
 def submit_review(id):
     """Submit a draft review item for ARB consideration."""
+    review = _own_review_or_404(id)
     try:
-        review = ARBReviewItem.query.get_or_404(id)
         if review.solution_id or review.adr_id or review.architecture_model_id:
             flash(
                 "Typed reviews must be submitted from their governed evidence dossier.",
@@ -1783,12 +1898,19 @@ def submit_review(id):
 
 @arb_bp.route("/reviews/<int:id>/assign", methods=["POST"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_review_assign")
 def assign_to_session(id):
     """Assign review item to an ARB session."""
+    _own_review_or_404(id)
+    data = request.form.to_dict()
     try:
-        data = request.form.to_dict()
-        arb_service.assign_to_session(id, int(data.get("arb_session_id")))
+        target_id = int(data.get("arb_session_id"))
+    except (TypeError, ValueError):
+        target_id = 0
+    target_session = _own_session_or_404(target_id)
+    try:
+        arb_service.assign_to_session(id, target_session.id)
         flash("Review item assigned to ARB session", "success")
         return redirect(url_for("arb.review_detail", id=id))
     except Exception as e:
@@ -2068,11 +2190,13 @@ def reopen_decision(id):
 @audit_log("arb_comment_add")
 def add_comment(id):
     """Add comment to review item."""
+    review = _own_review_or_404(id)
     try:
         data = request.form.to_dict()
 
         comment = ARBReviewComment(
-            review_item_id=id,
+            review_item_id=review.id,
+            organization_id=review.organization_id,
             user_id=current_user.id,
             comment_type=data.get("comment_type", "general"),
             content=data.get("content"),
@@ -2155,11 +2279,29 @@ def change_request_list():
 def change_request_detail(cr_id):
     """Detail view for a single change request (wires arb/change_request_detail.html)."""
     from app.models.architecture_decision import ArchitectureChangeRequest
-    change_request = ArchitectureChangeRequest.query.get_or_404(cr_id)
+    from app.models.architecture_decision import ChangeImpactAssessment, VALID_DISPOSITIONS
+    change_request = ArchitectureChangeRequest.query.filter_by(id=cr_id).first_or_404()
+    # Impacts carry no organisation of their own; they are reached only through
+    # the organisation-scoped request loaded above.
+    impacts = (
+        ChangeImpactAssessment.query.filter_by(change_request_id=change_request.id)
+        .order_by(ChangeImpactAssessment.id)
+        .all()
+    )
     # The template refers to this as `cr` throughout; passing it as
     # `change_request` raised UndefinedError, so every row of the change-request
     # list at arb/change_requests.html:106 linked to a 500.
-    return render_template("arb/change_request_detail.html", cr=change_request)
+    # The options are the ones the set-disposition route accepts, so a choice made here is never refused.
+    valid_dispositions = list(VALID_DISPOSITIONS)
+    return render_template(
+        "arb/change_request_detail.html",
+        cr=change_request,
+        valid_dispositions=valid_dispositions,
+        disposition_options=[('', 'Select disposition\u2026')] + [(d, d.replace('_', ' ').title()) for d in valid_dispositions],
+        impacts=impacts,
+        notices=[],
+        may_run_board=_viewer_may_run_board(),
+    )
 
 
 @arb_bp.route("/change-requests/new", methods=["GET", "POST"])
@@ -2191,6 +2333,7 @@ def change_request_new():
         "arb/change_request_form.html",
         change_request=None,
         valid_trigger_types=VALID_TRIGGER_TYPES,
+        trigger_options=[('', 'Select trigger type\u2026')] + [(tt, tt.replace('_', ' ').title()) for tt in VALID_TRIGGER_TYPES],
     )
 
 
@@ -2199,10 +2342,18 @@ def change_request_new():
 def capability_governance_page(capability_id):
     """Governance panel page for a capability (wires arb/capability_governance.html)."""
     from app.models.unified_capability import UnifiedCapability
-    cap = UnifiedCapability.query.get_or_404(capability_id)
+    cap = UnifiedCapability.query.filter_by(id=capability_id).first_or_404()
+    # Decisions are linked to the business capability this one was projected from; the
+    # governance data is read under that number. A capability with no such source has no
+    # decisions to read, and the page says so instead of asking for a record that is not there.
+    business_id = None
+    if cap.source_table == "business_capability" and str(cap.source_id or "").isdigit():
+        business_id = int(cap.source_id)
     return render_template(
         "arb/capability_governance.html",
         capability_id=capability_id,
+        governance_url=(url_for("arb.capability_governance_panel", capability_id=business_id)
+                        if business_id is not None else None),
         capability_name=cap.name or "Capability",
         capability_description=getattr(cap, "description", None) or "",
     )
@@ -2250,7 +2401,7 @@ def api_update_checklist(id):
         data = request.get_json()
         checklist_items = data.get("checklist", {})
 
-        review = db.session.get(ARBReviewItem, id)
+        review = TypedARBDecisionAdapter.load_review(id)
         if not review:
             return jsonify({"success": False, "error": "Review not found"}), 404
 
@@ -2527,7 +2678,10 @@ def api_form_data():
             ArchitectureModel.query.order_by(ArchitectureModel.name).limit(200).all()
         )
         capabilities = (
-            UnifiedCapability.query.order_by(UnifiedCapability.name).limit(500).all()
+            UnifiedCapability.query.filter(UnifiedCapability.retired_into_id.is_(None))
+            .order_by(UnifiedCapability.name)
+            .limit(500)
+            .all()
         )
         applications = (
             ApplicationComponent.query.order_by(ApplicationComponent.name)
@@ -2780,7 +2934,7 @@ def api_adm_kanban_move_card():
                 {"success": False, "error": f"Invalid phase: {target_phase}"}
             ), 400
 
-        review = db.session.get(ARBReviewItem, review_id)
+        review = TypedARBDecisionAdapter.load_review(review_id)
         if not review:
             return jsonify({"success": False, "error": "Review item not found"}), 404
 
@@ -2808,12 +2962,12 @@ def api_adm_kanban_move_card():
 
 @arb_bp.route("/sessions/<int:id>/delete", methods=["POST"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_session_delete")
 def delete_session(id):
     """Delete an ARB session. Only draft/cancelled sessions can be deleted."""
+    session = _own_session_or_404(id)
     try:
-        session = ArchitectureReviewBoard.query.get_or_404(id)
-
         # Only allow deletion of draft or cancelled sessions
         if session.status not in ("draft", "cancelled"):
             flash(
@@ -2855,12 +3009,12 @@ def delete_session(id):
 
 @arb_bp.route("/reviews/<int:id>/delete", methods=["POST"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 @audit_log("arb_review_delete")
 def delete_review(id):
     """Delete an ARB review item. Only draft/withdrawn items can be deleted."""
+    review = _own_review_or_404(id)
     try:
-        review = ARBReviewItem.query.get_or_404(id)
-
         # Only allow deletion of draft or withdrawn reviews
         if review.status not in ("draft", "withdrawn"):
             flash(
@@ -2914,6 +3068,7 @@ logger = logging.getLogger(__name__)
 
 @arb_bp.route("/initialize_standards", methods=["POST"])
 @login_required
+@require_roles("admin", "platform_admin")
 def initialize_standards():
     """Initialize default governance standards."""
     try:
@@ -2985,7 +3140,10 @@ def api_arb_begin_review(item_id: int):
     if typed_result.typed:
         return _typed_decision_json(typed_result)
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status not in ("submitted", "draft", "pending"):
         return jsonify({
@@ -3027,7 +3185,10 @@ def api_arb_approve(item_id: int):
     if typed_result.typed:
         return _typed_decision_json(typed_result)
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status != "under_review":
         return jsonify({
@@ -3087,7 +3248,10 @@ def api_arb_reject(item_id: int):
             extra={"rejection_reason": data.get("reason")},
         )
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status != "under_review":
         return jsonify({
@@ -3150,7 +3314,10 @@ def api_arb_request_changes(item_id: int):
     if typed_result.typed:
         return _typed_decision_json(typed_result)
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
+    refusal = _untyped_decision_refusal(item)
+    if refusal is not None:
+        return refusal
     current_status = item.status or "draft"
     if current_status != "under_review":
         return jsonify({
@@ -3208,7 +3375,7 @@ def api_arb_get_implementation_status(item_id: int):
     except NotFound:
         return jsonify({"success": False, "reason_codes": ["review_not_found"]}), 404
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
     return jsonify({
         "success": True,
         "item_id": item.id,
@@ -3253,7 +3420,7 @@ def api_arb_update_implementation_status(item_id: int):
     except NotFound:
         return jsonify({"success": False, "reason_codes": ["review_not_found"]}), 404
 
-    item = ARBReviewItem.query.get_or_404(item_id)
+    item = _own_review_or_404(item_id)
     if item.status not in ("approved", "approved_with_conditions"):
         return jsonify({
             "success": False,
@@ -3301,48 +3468,164 @@ def api_arb_update_implementation_status(item_id: int):
 
 
 # ===================================================================
-# FRAG-037: ARB exception management routes
+# ARB exception management routes
 # ===================================================================
+
+_EXCEPTION_CREATE_FIELDS = {
+    "standard_id": int,
+    "exception_reason": str,
+    "review_item_id": int,
+    "exception_type": str,
+    "business_justification": str,
+    "risk_mitigation": str,
+    "scope": str,
+    "requested_duration_days": int,
+}
+_EXCEPTION_CREATE_REQUIRED = ("standard_id", "exception_reason")
+_EXCEPTION_APPROVE_FIELDS = {"approval_notes": str, "new_expires_at": str}
+
+
+def _exception_refusal(message, status=400, code="INVALID_REQUEST", **extra):
+    return jsonify({"success": False, "error": message, "code": code, **extra}), status
+
+
+def _exception_body_problem(body, accepted, required=()):
+    """Plain sentence naming what is wrong with a JSON body, or ``None``.
+
+    The accepted names are the service's own parameters; the person making the
+    request is taken from the session, never from the body.
+    """
+    if not isinstance(body, dict):
+        return "Send the request as a JSON object."
+    unknown = sorted(str(key) for key in body if key not in accepted)
+    if unknown:
+        return "These fields are not accepted: " + ", ".join(unknown) + "."
+    missing = [name for name in required if body.get(name) in (None, "")]
+    if missing:
+        return "These fields are required: " + ", ".join(missing) + "."
+    wrong = []
+    for name, kind in accepted.items():
+        value = body.get(name)
+        if value is None:
+            continue
+        if kind is int:
+            ok = isinstance(value, int) and not isinstance(value, bool)
+        else:
+            ok = isinstance(value, str)
+        if not ok:
+            wrong.append(f"{name} must be {'a whole number' if kind is int else 'text'}")
+    if wrong:
+        return "; ".join(wrong) + "."
+    return None
+
 
 @arb_bp.route("/api/exceptions")
 @login_required
 def api_list_exceptions():
-    """FRAG-037: List ARB exceptions."""
+    """List ARB exceptions."""
     try:
         from app.services.arb_exception_service import ARBExceptionService
         service = ARBExceptionService()
         exceptions = service.list_exceptions()
         return jsonify({"success": True, "exceptions": exceptions})
-    except Exception as e:
-        current_app.logger.error(f"List exceptions error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+    except Exception:
+        current_app.logger.exception("List exceptions error")
+        return _exception_refusal(
+            "The exception requests could not be loaded. Try again.", 500, "SERVER_ERROR"
+        )
 
 
 @arb_bp.route("/api/exceptions", methods=["POST"])
 @login_required
 def api_create_exception():
-    """FRAG-037: Create ARB exception request."""
+    """Create ARB exception request."""
     try:
+        from app.models.architecture_review_board import (
+            ARBGovernanceStandard,
+            ARBReviewItem,
+        )
         from app.services.arb_exception_service import ARBExceptionService
+
         service = ARBExceptionService()
-        data = request.get_json()
-        result = service.create_exception_request(**data)
-        return jsonify(result)
-    except Exception as e:
-        current_app.logger.error(f"Create exception error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        data = request.get_json(silent=True)
+        problem = _exception_body_problem(
+            data, _EXCEPTION_CREATE_FIELDS, _EXCEPTION_CREATE_REQUIRED
+        )
+        if problem is None and data.get("exception_type") not in (
+            None, *service.DEFAULT_DURATIONS
+        ):
+            problem = "exception_type must be one of: " + ", ".join(service.DEFAULT_DURATIONS) + "."
+        if problem is None and (data.get("requested_duration_days") or 1) < 1:
+            problem = "requested_duration_days must be at least 1."
+        if problem:
+            return _exception_refusal(problem)
+        organization_id = getattr(g, "current_org_id", None)
+        if data.get("review_item_id") is not None:
+            review_item = db.session.execute(
+                db.select(ARBReviewItem).where(
+                    ARBReviewItem.id == data["review_item_id"],
+                    ARBReviewItem.organization_id == organization_id,
+                )
+            ).scalar_one_or_none()
+            if review_item is None:
+                return _exception_refusal("Review item not found.", 404, "NOT_FOUND")
+        standard = db.session.execute(
+            db.select(ARBGovernanceStandard).where(
+                ARBGovernanceStandard.id == data["standard_id"]
+            )
+        ).scalar_one_or_none()
+        if standard is None:
+            return _exception_refusal("Governance standard not found.", 404, "NOT_FOUND")
+        result = service.create_exception_request(**data, requested_by_id=current_user.id)
+        if not result.get("success"):
+            return _exception_refusal(result.get("error") or "The request was refused.", 400)
+        return jsonify(result), 201
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Create exception error")
+        return _exception_refusal(
+            "The exception request could not be saved. Try again.", 500, "SERVER_ERROR"
+        )
 
 
 @arb_bp.route("/api/exceptions/<int:exception_id>/approve", methods=["PUT"])
 @login_required
+@require_roles(*ARB_APPROVER_ROLES)
 def api_approve_exception(exception_id):
-    """FRAG-037: Approve ARB exception."""
+    """Approve ARB exception (approver roles, own organisation only)."""
+    organization_id = TypedARBDecisionAdapter.current_organization_id()
+    owned = None
+    if organization_id is not None:
+        owned = db.session.execute(
+            db.select(ARBException.id).where(
+                ARBException.id == exception_id,
+                ARBException.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+    if owned is None:
+        return jsonify({"success": False, "error": "Exception not found"}), 404
     try:
         from app.services.arb_exception_service import ARBExceptionService
+
         service = ARBExceptionService()
-        data = request.get_json() or {}
-        result = service.approve_exception(exception_id, **data)
+        data = request.get_json(silent=True) if request.data else {}
+        problem = _exception_body_problem(data, _EXCEPTION_APPROVE_FIELDS)
+        if problem is None and data.get("new_expires_at") is not None:
+            try:
+                data["new_expires_at"] = datetime.fromisoformat(data["new_expires_at"])
+            except ValueError:
+                problem = "new_expires_at must be a date such as 2027-01-31."
+        if problem:
+            return _exception_refusal(problem)
+        result = service.approve_exception(exception_id, approved_by_id=current_user.id, **data)
+        if not result.get("success"):
+            return _exception_refusal(
+                result.get("error") or "The request was refused.", 409, "CONFLICT"
+            )
         return jsonify(result)
-    except Exception as e:
-        current_app.logger.error(f"Approve exception error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Approve exception error")
+        return _exception_refusal(
+            "The approval could not be saved. Try again.", 500, "SERVER_ERROR"
+        )

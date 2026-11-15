@@ -285,7 +285,7 @@ class ArchiMateLLMService:
             # Check if response contains API error
             if "authentication_error" in response_text:
                 error_msg = (
-                    "Authentication failed - Invalid API key. Please check your API settings."
+                    "Authentication failed - Invalid API key. Please check your AI settings."
                 )
             elif "rate_limit" in response_text.lower():
                 error_msg = "Rate limit exceeded. Please try again later."

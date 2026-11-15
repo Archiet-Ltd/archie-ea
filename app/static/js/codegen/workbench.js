@@ -628,7 +628,7 @@
                         if (this.hasLlm) {
                             this.patchOpen = true;
                         } else {
-                            this._addError('Configure an LLM in Admin → API Settings to use patch mode.');
+                            this._addError('Configure an LLM in Admin → AI settings to use patch mode.');
                         }
                         break;
                     case 'journey_tips':
@@ -2814,7 +2814,7 @@
             async runCodegenIntelligence(action) {
                 const needsLlm = !['journey_copilot_tips', 'regeneration_copilot'].includes(action);
                 if (needsLlm && !this.hasLlm) {
-                    this._addError('Configure an LLM in Admin → API Settings to use this intelligence.');
+                    this._addError('Configure an LLM in Admin → AI settings to use this intelligence.');
                     return;
                 }
                 if (action === 'traceability_explainer') {

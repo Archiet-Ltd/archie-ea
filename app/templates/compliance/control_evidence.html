@@ -1,0 +1,46 @@
+{# design-block: record-detail #}
+{% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
+{% from 'components/fact_list.html' import fact_list %}
+
+{% block title %}Evidence for {{ control.code }}{% endblock %}
+
+{% block breadcrumb %}
+{% call ui.breadcrumb(attrs={'aria-label': 'Breadcrumb', 'class': 'mb-3'}) %}{% call ui.breadcrumb_list() %}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Home', attrs={'href': url_for('main.index')}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_link(text='Regulatory Compliance', attrs={'href': register_href}) }}{% endcall %}{{ ui.breadcrumb_separator() }}
+  {% call ui.breadcrumb_item() %}{{ ui.breadcrumb_page(text=control.code) }}{% endcall %}
+{% endcall %}{% endcall %}
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div class="min-w-0">
+            <h1 class="text-3xl font-bold tracking-tight text-foreground">Evidence for {{ control.code }}: {{ control.title }}</h1>
+            <p class="mt-1 text-sm text-muted-foreground">{{ control.framework or 'Framework not recorded' }}{% if application_name %} · {{ application_name }}{% endif %}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 xl:shrink-0">{{ ui.button(text='Back to the register', href=register_href, variant='outline') }}</div>
+    </div>
+
+    <div class="bg-card text-card-foreground rounded-lg border border-border p-5 space-y-4" data-testid="control-evidence">
+        <h2 class="text-base font-semibold text-foreground">What this shows</h2>
+        {% call(p) fact_list(items=[
+            {'label': 'Control', 'key': 'control'},
+            {'label': 'What it asks', 'key': 'asks'},
+            {'label': 'Application', 'key': 'application'},
+            {'label': 'Status', 'key': 'status'},
+            {'label': 'Evidence', 'key': 'evidence'},
+            {'label': 'Source', 'key': 'source'},
+            {'label': 'Recorded', 'key': 'recorded'}], testid='evidence-facts') %}
+          {% if p.key == 'control' %}{{ control.code }}: {{ control.title }}
+          {% elif p.key == 'asks' %}{{ control.description or 'No description is recorded for this control.' }}
+          {% elif p.key == 'application' %}{% if application_href %}<a href="{{ application_href }}" class="text-primary hover:underline">{{ application_name }}</a>{% else %}No application is recorded.{% endif %}
+          {% elif p.key == 'status' %}<span class="capitalize">{{ status }}</span>
+          {% elif p.key == 'evidence' %}{{ evidence or 'No evidence text is recorded for this control yet.' }}
+          {% elif p.key == 'source' %}The control record kept for {{ application_name or 'the application' }}
+          {% else %}{{ recorded or 'No date is recorded.' }}{% endif %}
+        {% endcall %}
+    </div>
+</div>
+{% endblock %}

@@ -1,5 +1,8 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Retention breaches — {{ config.APP_NAME }}{% endblock %}
 
@@ -12,30 +15,25 @@
       tabs=tabs
   ) }}
   {% if breaches %}
-  <table class="dense-table w-full rounded-lg border border-border bg-card text-sm" data-testid="retention-breaches">
-    <thead>
-      <tr class="border-b border-border text-left text-muted-foreground">
-        <th class="p-3">Entity</th>
-        <th class="p-3">Policy</th>
-        <th class="p-3">Age (days)</th>
-        <th class="p-3">Allowed (days)</th>
-        <th class="p-3">Owner</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for b in breaches %}
-      <tr class="border-b border-border" data-testid="breach-{{ b.entity_id }}">
-        <td class="p-3 font-medium text-foreground">{{ b.entity_name }}</td>
-        <td class="p-3">{{ b.policy_name }}</td>
-        <td class="p-3">{{ b.age_days }}</td>
-        <td class="p-3">{{ b.retention_period_days }}</td>
-        <td class="p-3">{{ b.owner }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  {% call dense_table(
+      columns=[('Entity', ''), ('Policy', ''), ('Age (days)', 'text-right'), ('Allowed (days)', 'text-right'), ('Owner', '')],
+      rows=breaches|length,
+      empty_text='No retention breaches.',
+      caption='Retention breaches',
+      testid='retention-breaches'
+  ) %}
+    {% for b in breaches %}
+    <tr data-testid="breach-{{ b.entity_id }}">
+      <td class="px-2 align-middle font-medium text-foreground">{{ b.entity_name }}</td>
+      <td class="px-2 align-middle">{{ b.policy_name }}</td>
+      <td class="px-2 align-middle text-right tabular-nums">{{ b.age_days }}</td>
+      <td class="px-2 align-middle text-right tabular-nums">{{ b.retention_period_days }}</td>
+      <td class="px-2 align-middle">{{ b.owner }}</td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
   {% else %}
-  {{ empty_state(icon='shield-check', headline='No retention breaches', body='No data entity exceeds its retention policy right now.') }}
+  {{ empty_state(icon='shield-check', title='No retention breaches', description='No data entity exceeds its retention policy right now.') }}
   {% endif %}
 </div>
 {% endblock %}

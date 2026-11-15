@@ -1,112 +1,270 @@
+{# design-block: data-table #}
+{# shadcn-reference: example:tasks@e55b60b #}
 {% extends "layouts/admin_base.html" %}
-{% from 'macros/page_shell.html' import page_shell %}
-<!-- modal-a11y-ok -->
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
+{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Definition of Done Templates{% endblock %}
 
+{% block head %}
+<meta name="shadcn-nearest" content="dashboard-01">
+{% endblock %}
+
 {% block content %}
-<div class="p-6 max-w-4xl mx-auto" x-data="dodTemplates()" x-init="init()">
-  {{ page_shell(title='Definition of Done Templates', breadcrumb=[('Home', '/'), ('Definition of Done Templates', none)]) }}
+<div x-data="dodTemplates()" x-init="init()">
+  {{ page_header(
+    title='Definition of Done Templates',
+    breadcrumbs=[
+      {'label': 'Home', 'href': '/'},
+      {'label': 'Definition of Done Templates'}
+    ]
+  ) }}
 
   <!-- Scope Tabs -->
-  <div class="flex border-b border-border mb-6" role="tablist" aria-label="DoD scope tabs">
-    <template x-for="scope in scopes" :key="scope.key">
-      <button type="button"
-        role="tab"
-        :id="`tab-${scope.key}`"
-        :aria-selected="activeScope === scope.key"
-        :aria-controls="`panel-${scope.key}`"
-        @click="activeScope = scope.key"
-        :class="activeScope === scope.key
-          ? 'border-b-2 border-primary text-primary font-semibold'
-          : 'text-muted-foreground hover:text-foreground'"
-        class="px-5 py-3 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-t"
-        x-text="scope.label">
-      </button>
-    </template>
-  </div>
+  {% call tabs(id='scope-tabs', default_value='story') %}
+    {% call tabs_list(class='mb-6') %}
+      {% call tabs_trigger(value='story') %}Story{% endcall %}
+      {% call tabs_trigger(value='sprint') %}Sprint{% endcall %}
+      {% call tabs_trigger(value='epic') %}Epic{% endcall %}
+    {% endcall %}
 
-  <!-- Tab Panels -->
-  <template x-for="scope in scopes" :key="scope.key">
-    <div
-      role="tabpanel"
-      :id="`panel-${scope.key}`"
-      :aria-labelledby="`tab-${scope.key}`"
-      x-show="activeScope === scope.key" x-cloak>
-
-      <template x-if="getTemplate(scope.key)">
-        <div class="bg-card border border-border rounded-lg p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-foreground"
-                x-text="getTemplate(scope.key).name"></h2>
-            <span class="text-xs text-muted-foreground">scope: <span x-text="scope.key"></span></span>
-          </div>
-
-          <!-- Criteria list -->
-          <ul class="space-y-3 mb-4" role="list" aria-label="DoD criteria">
-            <template x-for="(criterion, idx) in getTemplate(scope.key).criteria" :key="criterion.id">
-              <li class="flex items-center gap-3 py-2 border-b border-border/50 last:border-0">
-                <span class="flex-1 text-sm text-foreground" x-text="criterion.text"></span>
-                <span
-                  x-show="criterion.mandatory" x-cloak
-                  class="px-2 py-0.5 text-xs font-medium bg-destructive/10 text-destructive-emphasis rounded-full">
-                  mandatory
-                </span>
-                <span
-                  x-show="!criterion.mandatory" x-cloak
-                  class="px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground rounded-full">
-                  optional
-                </span>
-              </li>
-            </template>
-          </ul>
-
-          <!-- Add criterion form -->
-          <div x-show="addingTo === scope.key" x-cloak class="mt-4 p-3 bg-muted/50 rounded-lg">
-            <div class="flex gap-2 mb-2">
-              <input
-                x-model="newCriterionText"
-                type="text"
-                placeholder="Criterion text"
-                class="flex-1 px-3 py-2 border border-input bg-background rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                @keydown.enter="addCriterion(scope.key)"
-                :aria-label="`New criterion for ${scope.label}`"
-              />
-              <label class="flex items-center gap-1 text-sm text-muted-foreground">
-                <input type="checkbox" x-model="newCriterionMandatory" class="rounded" />
-                Mandatory
-              </label>
+    {% call tabs_content(value='story') %}
+      <template x-if="getTemplate('story')">
+        {% call card() %}
+          {% call card_header() %}
+            <div class="flex items-center justify-between">
+              {% call card_title() %}
+                <span x-text="getTemplate('story').name"></span>
+              {% endcall %}
+              <span class="text-xs text-muted-foreground">scope: story</span>
             </div>
-            <div class="flex gap-2">
-              <button type="button"
-                @click="addCriterion(scope.key)"
-                class="px-3 py-1.5 bg-primary text-primary-foreground text-sm rounded hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary">
-                Add
-              </button>
-              <button type="button"
-                @click="addingTo = null; newCriterionText = ''; newCriterionMandatory = false"
-                class="px-3 py-1.5 bg-muted text-muted-foreground text-sm rounded hover:bg-muted/80">
-                Cancel
-              </button>
+          {% endcall %}
+
+          {% call card_content() %}
+            <ul class="space-y-3 mb-4" role="list" aria-label="DoD criteria">
+              <template x-for="(criterion, idx) in getTemplate('story').criteria" :key="criterion.id">
+                <li class="flex items-center gap-3 py-2 border-b border-border/50 last:border-0">
+                  <span class="flex-1 text-sm text-foreground" x-text="criterion.text"></span>
+                  <span x-show="criterion.mandatory" x-cloak>
+                    {% call badge(variant='destructive') %}mandatory{% endcall %}
+                  </span>
+                  <span x-show="!criterion.mandatory" x-cloak>
+                    {% call badge(variant='neutral') %}optional{% endcall %}
+                  </span>
+                </li>
+              </template>
+            </ul>
+
+            <div x-show="addingTo === 'story'" x-cloak class="mt-4 p-3 bg-muted/50 rounded-lg">
+              <div class="flex gap-2 mb-2">
+                {{ input(
+                  attrs_dict={
+                    'x-model': 'newCriterionText',
+                    'placeholder': 'Criterion text',
+                    ':aria-label': "'New criterion for Story'",
+                    '@keydown.enter': "addCriterion('story')"
+                  }
+                ) }}
+                {{ checkbox(
+                  attrs_dict={
+                    'x-model': 'newCriterionMandatory'
+                  },
+                  label='Mandatory'
+                ) }}
+              </div>
+              <div class="flex gap-2">
+                {{ button(
+                  text='Add',
+                  on_click="addCriterion('story')",
+                  variant='default'
+                ) }}
+                {{ button(
+                  text='Cancel',
+                  on_click="addingTo = null; newCriterionText = ''; newCriterionMandatory = false",
+                  variant='ghost'
+                ) }}
+              </div>
             </div>
-          </div>
 
-          <button type="button"
-            x-show="addingTo !== scope.key" x-cloak
-            @click="addingTo = scope.key; newCriterionText = ''"
-            class="mt-3 px-3 py-1.5 text-sm text-primary border border-primary/30 rounded hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary">
-            + Add criterion
-          </button>
-        </div>
+            <div x-show="addingTo !== 'story'" x-cloak class="mt-3">
+              {{ button(
+                text='+ Add criterion',
+                on_click="addingTo = 'story'; newCriterionText = ''",
+                variant='outline'
+              ) }}
+            </div>
+          {% endcall %}
+        {% endcall %}
       </template>
+      <template x-if="!getTemplate('story')">
+        {{ empty_state(
+          icon='file-x',
+          title='No template found',
+          description='No template found for this scope.'
+        ) }}
+      </template>
+    {% endcall %}
 
-      <template x-if="!getTemplate(scope.key)">
-        <div class="bg-muted border border-dashed border-border rounded-lg p-8 text-center">
-          <p class="text-muted-foreground text-sm">No template found for this scope.</p>
-        </div>
+    {% call tabs_content(value='sprint') %}
+      <template x-if="getTemplate('sprint')">
+        {% call card() %}
+          {% call card_header() %}
+            <div class="flex items-center justify-between">
+              {% call card_title() %}
+                <span x-text="getTemplate('sprint').name"></span>
+              {% endcall %}
+              <span class="text-xs text-muted-foreground">scope: sprint</span>
+            </div>
+          {% endcall %}
+
+          {% call card_content() %}
+            <ul class="space-y-3 mb-4" role="list" aria-label="DoD criteria">
+              <template x-for="(criterion, idx) in getTemplate('sprint').criteria" :key="criterion.id">
+                <li class="flex items-center gap-3 py-2 border-b border-border/50 last:border-0">
+                  <span class="flex-1 text-sm text-foreground" x-text="criterion.text"></span>
+                  <span x-show="criterion.mandatory" x-cloak>
+                    {% call badge(variant='destructive') %}mandatory{% endcall %}
+                  </span>
+                  <span x-show="!criterion.mandatory" x-cloak>
+                    {% call badge(variant='neutral') %}optional{% endcall %}
+                  </span>
+                </li>
+              </template>
+            </ul>
+
+            <div x-show="addingTo === 'sprint'" x-cloak class="mt-4 p-3 bg-muted/50 rounded-lg">
+              <div class="flex gap-2 mb-2">
+                {{ input(
+                  attrs_dict={
+                    'x-model': 'newCriterionText',
+                    'placeholder': 'Criterion text',
+                    ':aria-label': "'New criterion for Sprint'",
+                    '@keydown.enter': "addCriterion('sprint')"
+                  }
+                ) }}
+                {{ checkbox(
+                  attrs_dict={
+                    'x-model': 'newCriterionMandatory'
+                  },
+                  label='Mandatory'
+                ) }}
+              </div>
+              <div class="flex gap-2">
+                {{ button(
+                  text='Add',
+                  on_click="addCriterion('sprint')",
+                  variant='default'
+                ) }}
+                {{ button(
+                  text='Cancel',
+                  on_click="addingTo = null; newCriterionText = ''; newCriterionMandatory = false",
+                  variant='ghost'
+                ) }}
+              </div>
+            </div>
+
+            <div x-show="addingTo !== 'sprint'" x-cloak class="mt-3">
+              {{ button(
+                text='+ Add criterion',
+                on_click="addingTo = 'sprint'; newCriterionText = ''",
+                variant='outline'
+              ) }}
+            </div>
+          {% endcall %}
+        {% endcall %}
       </template>
-    </div>
-  </template>
+      <template x-if="!getTemplate('sprint')">
+        {{ empty_state(
+          icon='file-x',
+          title='No template found',
+          description='No template found for this scope.'
+        ) }}
+      </template>
+    {% endcall %}
+
+    {% call tabs_content(value='epic') %}
+      <template x-if="getTemplate('epic')">
+        {% call card() %}
+          {% call card_header() %}
+            <div class="flex items-center justify-between">
+              {% call card_title() %}
+                <span x-text="getTemplate('epic').name"></span>
+              {% endcall %}
+              <span class="text-xs text-muted-foreground">scope: epic</span>
+            </div>
+          {% endcall %}
+
+          {% call card_content() %}
+            <ul class="space-y-3 mb-4" role="list" aria-label="DoD criteria">
+              <template x-for="(criterion, idx) in getTemplate('epic').criteria" :key="criterion.id">
+                <li class="flex items-center gap-3 py-2 border-b border-border/50 last:border-0">
+                  <span class="flex-1 text-sm text-foreground" x-text="criterion.text"></span>
+                  <span x-show="criterion.mandatory" x-cloak>
+                    {% call badge(variant='destructive') %}mandatory{% endcall %}
+                  </span>
+                  <span x-show="!criterion.mandatory" x-cloak>
+                    {% call badge(variant='neutral') %}optional{% endcall %}
+                  </span>
+                </li>
+              </template>
+            </ul>
+
+            <div x-show="addingTo === 'epic'" x-cloak class="mt-4 p-3 bg-muted/50 rounded-lg">
+              <div class="flex gap-2 mb-2">
+                {{ input(
+                  attrs_dict={
+                    'x-model': 'newCriterionText',
+                    'placeholder': 'Criterion text',
+                    ':aria-label': "'New criterion for Epic'",
+                    '@keydown.enter': "addCriterion('epic')"
+                  }
+                ) }}
+                {{ checkbox(
+                  attrs_dict={
+                    'x-model': 'newCriterionMandatory'
+                  },
+                  label='Mandatory'
+                ) }}
+              </div>
+              <div class="flex gap-2">
+                {{ button(
+                  text='Add',
+                  on_click="addCriterion('epic')",
+                  variant='default'
+                ) }}
+                {{ button(
+                  text='Cancel',
+                  on_click="addingTo = null; newCriterionText = ''; newCriterionMandatory = false",
+                  variant='ghost'
+                ) }}
+              </div>
+            </div>
+
+            <div x-show="addingTo !== 'epic'" x-cloak class="mt-3">
+              {{ button(
+                text='+ Add criterion',
+                on_click="addingTo = 'epic'; newCriterionText = ''",
+                variant='outline'
+              ) }}
+            </div>
+          {% endcall %}
+        {% endcall %}
+      </template>
+      <template x-if="!getTemplate('epic')">
+        {{ empty_state(
+          icon='file-x',
+          title='No template found',
+          description='No template found for this scope.'
+        ) }}
+      </template>
+    {% endcall %}
+  {% endcall %}
 
   <!-- Status message -->
   <p x-show="statusMsg" x-text="statusMsg" x-cloak
@@ -117,12 +275,6 @@
 <script>
 function dodTemplates() {
   return {
-    scopes: [
-      { key: 'story', label: 'Story' },
-      { key: 'sprint', label: 'Sprint' },
-      { key: 'epic', label: 'Epic' },
-    ],
-    activeScope: 'story',
     templates: {{ templates | tojson }},
     addingTo: null,
     newCriterionText: '',

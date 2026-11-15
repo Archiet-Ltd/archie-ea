@@ -859,7 +859,7 @@ def test_archimate_roadmap_plateau_counts_include_new_work_packages(
     template_rendered.connect(capture, app)
     try:
         login_as(client, user)
-        assert client.get("/archimate-roadmap").status_code == 200
+        assert client.get("/archimate-roadmap", follow_redirects=True).status_code == 200
     finally:
         template_rendered.disconnect(capture, app)
     plateaus = {p["id"]: p for ctx in seen for p in ctx.get("plateaus", [])}

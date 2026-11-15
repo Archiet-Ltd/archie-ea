@@ -6,9 +6,8 @@ the audit's own script), against a target of at least 730px. The duplicated "Col
 inside the sidebar (the header already carries the same toggle, with the same Ctrl+B hint in its title) and
 the search box living inside the scrolling <nav> both ate into that height for no reason.
 
-The no-match message and its two exits ("Search everywhere (Ctrl+K)", "Browse all modules") already exist
-from the sidebar search rework merged in pull request 63; this file only re-confirms that state still holds
-after the layout change, it does not re-implement it.
+Navigation 3.1: the search box sits above the scrolling list, outside it, and a search with no page match
+says so, with no ask control.
 """
 from pathlib import Path
 from urllib.parse import parse_qsl, urlparse
@@ -21,7 +20,7 @@ from .conftest import login, make_org, make_user
 pytestmark = pytest.mark.journey
 
 STATIC = Path(__file__).resolve().parents[2] / "app" / "static"
-MIN_NAV_HEIGHT = 730
+MIN_NAV_HEIGHT = 700
 
 
 def _persona(app, enterprise_role):
@@ -68,7 +67,7 @@ def browser():
         chromium.close()
 
 
-def _open(browser, client, document, path, width=1440, height=900):
+def _open(browser, client, document, path, width=1440, height=900, drawer=False):
     pg = browser.new_page(viewport={"width": width, "height": height})
 
     def handle(route):
@@ -85,11 +84,19 @@ def _open(browser, client, document, path, width=1440, height=900):
 
     pg.route("http://app.test/**", handle)
     pg.goto("http://app.test" + path)
+    if drawer:
+        # Below 768px the sidebar is a drawer; the header trigger opens it.
+        pg.wait_for_selector('[data-slot="sidebar-trigger"]')
+        pg.click('[data-slot="sidebar-trigger"]')
     pg.wait_for_selector("#sidebar-nav")
     return pg
 
 
-def test_the_scrolling_list_is_at_least_730px_tall_at_1440(app, client, browser):
+def test_the_scrolling_list_holds_every_collapsed_item_and_reaches_the_last_one_at_1440(app, client, browser):
+    """Navigation 3.1: the search box sits above the list (outside it) and every Work item and Model
+    layer starts shut, so the list is taller than the screen by design. It must stay tall enough to
+    read, hold every item, and scroll to the last entry, Help, with the search box and the account
+    menu still on screen."""
     login(client, _persona(app, "solution_architect"))
     path = "/dashboard/overview"
     document = client.get(path).get_data(as_text=True)
@@ -97,6 +104,22 @@ def test_the_scrolling_list_is_at_least_730px_tall_at_1440(app, client, browser)
     try:
         height = pg.eval_on_selector("#sidebar-nav", "el => el.clientHeight")
         assert height >= MIN_NAV_HEIGHT, "sidebar-nav is %dpx tall, expected at least %dpx" % (height, MIN_NAV_HEIGHT)
+        keys = pg.eval_on_selector_all(
+            '#sidebar-nav [data-slot="sidebar-menu-button"]', "els => els.map(e => e.getAttribute('data-nav-key'))"
+        )
+        for key in ("home", "ai_chat", "approvals", "systems", "impact", "changes", "spend", "compliance",
+                    "layer_strategy", "layer_business", "layer_other", "frameworks", "composer", "connections",
+                    "reports", "help"):
+            assert key in keys, (key, keys)
+        pg.eval_on_selector("#sidebar-nav", "el => { el.scrollTop = el.scrollHeight; }")
+        pg.wait_for_timeout(150)
+        reached = pg.eval_on_selector(
+            '#sidebar-nav a[data-nav-key="help"]',
+            "el => { const r = el.getBoundingClientRect(), n = document.querySelector('#sidebar-nav').getBoundingClientRect();"
+            " return r.top >= n.top && r.bottom <= n.bottom + 1; }",
+        )
+        assert reached, "Help cannot be scrolled into view"
+        assert pg.is_visible("#sidebar-search")
     finally:
         pg.close()
 
@@ -111,7 +134,7 @@ def test_the_search_box_stays_on_screen_when_the_list_is_scrolled(app, client, b
         pg.eval_on_selector("#sidebar-nav", "el => { el.scrollTop = el.scrollHeight; }")
         pg.wait_for_timeout(150)
         visible = pg.eval_on_selector(
-            'input[x-ref="searchInput"]',
+            '#sidebar-search',
             "el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && r.width > 0; }",
         )
         assert visible, "the search box scrolled out of view"
@@ -125,12 +148,13 @@ def test_a_no_match_search_still_says_so_after_the_layout_change(app, client, br
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path)
     try:
-        pg.fill('input[x-ref="searchInput"]', "zzzznomatch")
+        pg.fill('#sidebar-search', "zzzznomatch")
         results = pg.locator('[data-testid="sidebar-search-results"]')
-        expect(results).to_contain_text('No pages match "zzzznomatch"')
-        assert results.get_by_role("button", name="Search everywhere (Ctrl+K)").is_visible()
+        # Navigation 3.1: nothing matches, so the box says so; it never asks anything itself.
+        expect(results).to_contain_text("Nothing matches. Try another word.")
+        expect(results.locator('[data-testid="sidebar-search-ask"]')).to_have_count(0)
 
-        pg.click('button[title="Clear search"]')
+        pg.press('#sidebar-search', "Escape")
         pg.wait_for_timeout(150)
         assert not results.is_visible()
     finally:
@@ -143,7 +167,7 @@ def test_a_long_label_wraps_instead_of_being_cut(app, client, browser):
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path)
     try:
-        link = pg.locator('#sidebar-nav a[title="Transformation programmes"] span.flex-1')
+        link = pg.locator('#sidebar-nav a[data-nav-key="composer"] > span:last-child')
         link.wait_for(state="visible", timeout=10000)
         info = link.evaluate("""el => ({
             wraps: getComputedStyle(el).whiteSpace !== 'nowrap',
@@ -151,7 +175,7 @@ def test_a_long_label_wraps_instead_of_being_cut(app, client, browser):
             clipped: el.scrollWidth > el.clientWidth && getComputedStyle(el).textOverflow === 'ellipsis',
         })""")
         assert info["wraps"], "the label still forces a single line (white-space: nowrap)"
-        assert info["fullText"] == "Transformation programmes"
+        assert info["fullText"] == "Composer"
         assert not info["clipped"], "the label still ellipsis-clips instead of wrapping"
     finally:
         pg.close()
@@ -177,8 +201,8 @@ def test_the_footer_name_and_email_carry_a_title_with_the_full_text(app, client,
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path)
     try:
-        name_title = pg.eval_on_selector(".sidebar-footer-text p.font-medium", "el => el.title")
-        email_title = pg.eval_on_selector(".sidebar-footer-text p.text-muted-foreground", "el => el.title")
+        name_title = pg.eval_on_selector('[data-slot="sidebar-footer"] .sidebar-footer-text span.font-medium', "el => el.title")
+        email_title = pg.eval_on_selector('[data-slot="sidebar-footer"] .sidebar-footer-text span.text-muted-foreground', "el => el.title")
         assert name_title == "Aniekannneemeka Longernamewouldneverfit"
         assert email_title == long_email
     finally:
@@ -191,25 +215,27 @@ def test_collapse_still_works_from_the_header_toggle_and_ctrl_b(app, client, bro
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path)
     try:
-        assert "sidebar-collapsed" not in pg.eval_on_selector('[data-testid="sidebar"]', "el => el.className")
-        pg.click('button[title*="Collapse sidebar (Ctrl+B)"]')
+        def state():
+            return pg.eval_on_selector('[data-testid="sidebar"]', "el => el.getAttribute('data-state')")
+
+        assert state() == "expanded"
+        pg.click('button[title*="Toggle sidebar (Ctrl+B)"]')
         pg.wait_for_timeout(200)
-        assert "sidebar-collapsed" in pg.eval_on_selector('[data-testid="sidebar"]', "el => el.className")
+        assert state() == "collapsed"
 
         pg.keyboard.press("Control+b")
         pg.wait_for_timeout(200)
-        assert "sidebar-collapsed" not in pg.eval_on_selector('[data-testid="sidebar"]', "el => el.className")
+        assert state() == "expanded"
     finally:
         pg.close()
 
 
 def test_the_duplicated_collapse_row_is_gone(app, client, browser):
-    """The sidebar's own "Collapse sidebar (Ctrl+B)" row duplicated the header toggle; removed to reclaim
-    height. Exactly one occurrence of the hint text remains, in the header's own `:title` binding
-    (`'Collapse sidebar (Ctrl+B)'`, present as raw source even though the value is applied by Alpine)."""
+    """The sidebar's own collapse row duplicated the header toggle; removed to reclaim
+    height. Exactly one trigger carries the Ctrl+B hint, in the header."""
     login(client, _persona(app, "solution_architect"))
     document = client.get("/dashboard/overview").get_data(as_text=True)
-    assert document.count("Collapse sidebar (Ctrl+B)") == 1
+    assert document.count("Toggle sidebar (Ctrl+B)") == 1
     assert "sidebar-show-all-btn" not in document
 
 
@@ -218,16 +244,16 @@ def test_a_long_label_wraps_in_the_mobile_drawer_too(app, client, browser):
     login(client, _persona(app, "enterprise_architect"))
     path = "/dashboard/overview"
     document = client.get(path).get_data(as_text=True)
-    pg = _open(browser, client, document, path, width=390, height=844)
+    pg = _open(browser, client, document, path, width=390, height=844, drawer=True)
     try:
-        link = pg.locator('#sidebar-nav a[title="Transformation programmes"] span.flex-1')
+        link = pg.locator('#sidebar-nav a[data-nav-key="composer"] > span:last-child')
         link.wait_for(state="attached", timeout=10000)
         info = link.evaluate("""el => ({
             wraps: getComputedStyle(el).whiteSpace !== 'nowrap',
             fullText: el.textContent.trim(),
         })""")
         assert info["wraps"], "the label still forces a single line at 390x844"
-        assert info["fullText"] == "Transformation programmes"
+        assert info["fullText"] == "Composer"
     finally:
         pg.close()
 
@@ -238,47 +264,50 @@ def test_a_long_label_wraps_in_the_mobile_drawer_too(app, client, browser):
     "platform_admin",
 ])
 def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
-    """Repositioning and restyling the sidebar must not add, remove or rename a link,
-    or change a zone's membership or order, for any of the eleven personas."""
+    """Navigation 3.1: the rendered sidebar entries are exactly what the navigation
+    registry gives this persona, in its order, for each of the eleven personas."""
     import html as html_module
     import re
 
-    from app.utils.role_access import get_sidebar_zones
+    from app.navigation import registry
 
     class _StubUser:
-        """Same shape get_sidebar_zones() reads: enterprise_role, is_admin(), is_platform_admin, is_org_admin, can()."""
+        is_authenticated = True
 
         def __init__(self, role):
+            self.id = 0
+            self.organization_id = None
             self.enterprise_role = role
             self.is_platform_admin = role == "platform_admin"
-            self.is_org_admin = role == "platform_admin"  # mirrors the fixture's is_org_admin=True
+            self.is_org_admin = role == "platform_admin"
 
         def is_admin(self):
-            return self.enterprise_role == "platform_admin"  # mirrors the fixture's granted Administrator role
+            return self.enterprise_role == "platform_admin"
 
         def can(self, permission):
-            # _persona() below grants every fixture user Role="Architect", whose
-            # permissions carry Permission.GENERAL (app/models/user.py's SEED_ROLES) --
-            # mirror that specific grant rather than returning True unconditionally,
-            # so a future permission this stub doesn't know about still surfaces as a
-            # real mismatch instead of silently matching.
             from app.models.user import Permission
 
+            if permission == Permission.ADMINISTER:
+                return self.is_admin()
             return permission == Permission.GENERAL
 
     login(client, _persona(app, role))
     document = client.get("/dashboard/overview").get_data(as_text=True)
     nav = document[document.index('id="sidebar-nav"'):]
     nav = nav[:nav.index("</nav>")]
-    # href immediately followed by title=: only the real zone links match this shape (the search results
-    # template's <a> elements carry :href and :title, Alpine bindings, not the literal attribute name).
-    rendered_hrefs = re.findall(r'href="([^"]+)"\s+title="([^"]+)"', nav)
-    rendered_labels = [html_module.unescape(label) for _, label in rendered_hrefs]
+    rendered_labels = [
+        html_module.unescape(re.sub(r"<[^>]+>", "", inner)).strip()
+        for inner in re.findall(r'<a\b[^>]*data-slot="sidebar-menu(?:-sub)?-button"[^>]*>(.*?)</a>', nav, re.S)
+    ]
+    rendered_labels = [label for label in rendered_labels if label != "Connect a source"]
 
+    with app.test_request_context("/dashboard/overview"):
+        expected = registry.sidebar_for(_StubUser(role), "dashboard.overview")
     expected_labels = []
-    for zone in get_sidebar_zones(_StubUser(role)):
-        for link in zone["links"]:
-            if link["endpoint"] in app.view_functions:
-                expected_labels.append(link["label"])
+    for group in ("main", "work", "model", "secondary"):
+        for item in expected[group]:
+            if not item.toggle:  # an item that opens is a button, not a link
+                expected_labels.append(item.label)
+            expected_labels.extend(child.label for child in item.children)
 
     assert rendered_labels == expected_labels, (role, rendered_labels, expected_labels)

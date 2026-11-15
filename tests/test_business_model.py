@@ -131,7 +131,7 @@ class TestBusinessModelCanvasModule:
         assert hasattr(service, "get_canvas_or_none")
         assert hasattr(service, "create_canvas")
         assert hasattr(service, "update_canvas_meta")
-        assert hasattr(service, "save_block")
+        assert not hasattr(service, "save_block"), "block text is no longer written"
         assert hasattr(service, "delete_canvas")
 
 
@@ -161,16 +161,11 @@ class TestBusinessModelBlueprintRoutes:
 
             assert url_for("business_model.detail", canvas_id=1) == "/business-model/1"
 
-    def test_block_api_endpoint_registered_with_post_and_put(self, bare_app):
-        methods = set()
-        found = False
-        for r in bare_app.url_map.iter_rules():
-            if r.endpoint == "business_model.save_block":
-                found = True
-                methods |= set(r.methods or [])
-        assert found, "business-model/<id>/api/block route not registered"
-        assert "POST" in methods
-        assert "PUT" in methods
+    def test_block_text_write_route_is_gone_and_entry_routes_exist(self, bare_app):
+        endpoints = {r.endpoint for r in bare_app.url_map.iter_rules()}
+        assert "business_model.save_block" not in endpoints
+        for name in ("add_entry", "remove_entry", "rename_entry", "add_price", "remove_price", "value_proposition"):
+            assert f"business_model.{name}" in endpoints, name
 
     def test_create_update_delete_routes_registered(self, bare_app):
         endpoints = {r.endpoint for r in bare_app.url_map.iter_rules()}

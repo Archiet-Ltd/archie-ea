@@ -13,8 +13,11 @@ state instead of a 500.
 import logging
 from typing import Any, Dict, List, Optional
 
+from flask import url_for
+
 from app import db
 from app.datetime_helpers import utcnow
+from app.modules.capabilities.services import stage_time_service
 from app.models.unified_capability import (
     CapabilityValueStreamMapping,
     UnifiedCapability,
@@ -124,6 +127,8 @@ def get_value_stream_with_stages(value_stream_id: int) -> Optional[Dict[str, Any
         "quality_target": vs.quality_target,
         "current_quality": vs.current_quality,
         "stages": [_stage_to_dict(s) for s in stages],
+        "stage_times": stage_time_service.describe_stages(stages),
+        "jira_connected": stage_time_service.jira_connection(vs.organization_id) is not None,
     }
 
 
@@ -261,7 +266,9 @@ def _clean_text(value) -> Optional[str]:
     return text or None
 
 
-def create_stage(value_stream_id: int, data: Dict[str, Any]) -> Optional[ValueStreamStage]:
+def create_stage(
+    value_stream_id: int, data: Dict[str, Any], user_name: Optional[str] = None
+) -> Optional[ValueStreamStage]:
     """Create a stage within a value stream. Auto-assigns the next stage_order if omitted."""
     vs = get_value_stream(value_stream_id)
     if not vs:
@@ -289,16 +296,20 @@ def create_stage(value_stream_id: int, data: Dict[str, Any]) -> Optional[ValueSt
         stage_type=data.get("stage_type"),
         customer_facing=bool(data.get("customer_facing")),
         target_duration=_to_int(data.get("target_duration")),
-        current_duration=_to_int(data.get("current_duration")),
         quality_gate=bool(data.get("quality_gate")),
         **{field: _clean_text(data.get(field)) for field in STAGE_TEXT_FIELDS},
     )
+    typed = _to_int(data.get("current_duration"))
+    if typed is not None:
+        stage_time_service.record_typed(stage, typed, None, user_name)
     db.session.add(stage)
     db.session.commit()
     return stage
 
 
-def update_stage(stage_id: int, data: Dict[str, Any]) -> Optional[ValueStreamStage]:
+def update_stage(
+    stage_id: int, data: Dict[str, Any], user_name: Optional[str] = None
+) -> Optional[ValueStreamStage]:
     """Update an existing stage."""
     try:
         stage = ValueStreamStage.query.filter_by(id=stage_id).first()
@@ -320,7 +331,11 @@ def update_stage(stage_id: int, data: Dict[str, Any]) -> Optional[ValueStreamSta
     if "target_duration" in data:
         stage.target_duration = _to_int(data.get("target_duration"))
     if "current_duration" in data:
-        stage.current_duration = _to_int(data.get("current_duration"))
+        typed = _to_int(data.get("current_duration"))
+        # A figure that came back unchanged is not a new typing; only a changed
+        # one is recorded as typed, so a measurement keeps saying it was measured.
+        if typed != stage.current_duration:
+            stage_time_service.record_typed(stage, typed, None, user_name)
     for field in STAGE_TEXT_FIELDS:
         if field in data:
             setattr(stage, field, _clean_text(data.get(field)))
@@ -350,6 +365,37 @@ def delete_stage(stage_id: int) -> bool:
 # ---------------------------------------------------------------------------
 # BIZBOK Capability x Value-Stream-Stage Grid
 # ---------------------------------------------------------------------------
+
+
+def _business_capability_ids(capabilities) -> Dict[int, int]:
+    """Map unified capability id -> business capability id, by recorded provenance."""
+    out: Dict[int, int] = {}
+    for cap in capabilities:
+        if cap.source_table == "business_capability" and str(cap.source_id or "").isdigit():
+            out[cap.id] = int(cap.source_id)
+    return out
+
+
+def _fact_sheet_url(business_capability_id: Optional[int]) -> Optional[str]:
+    if business_capability_id is None:
+        return None
+    return url_for("enterprise_crud.capability_fact_sheet", capability_id=business_capability_id)
+
+
+def _health_scores(business_ids) -> Dict[int, Optional[int]]:
+    """Health score per business capability id, from the service the capability health screen reads."""
+    if not business_ids:
+        return {}
+    try:
+        from app.modules.capabilities.services.capability_health_service import (
+            CapabilityHealthService,
+        )
+
+        metrics = CapabilityHealthService().get_capability_health_metrics()
+        return {h["id"]: h["score"] for h in metrics.get("health_by_capability", [])}
+    except Exception:
+        logger.error("Failed to read capability health for the value stream grid", exc_info=True)
+        return {}
 
 
 def build_bizbok_grid(value_stream_id: int) -> Dict[str, Any]:
@@ -434,9 +480,17 @@ def build_bizbok_grid(value_stream_id: int) -> Dict[str, Any]:
             "stage_criticality": m.stage_criticality,
         }
 
+    business_ids = _business_capability_ids(capabilities_by_id.values())
+    health_by_source = _health_scores(business_ids.values())
+
     capability_rows = [
         {
             "id": cap.id,
+            # The capability's own page, and the health score the capability
+            # health screen shows for it. None when it has no business
+            # capability record or has not been scored: the grid says so.
+            "fact_sheet_url": _fact_sheet_url(business_ids.get(cap.id)),
+            "health_score": health_by_source.get(business_ids.get(cap.id)),
             "name": cap.name,
             "code": cap.code,
             "level": cap.level,
@@ -497,6 +551,8 @@ def list_unmapped_capabilities(
         )
         caps = []
 
+    business_ids = _business_capability_ids(caps)
+    health_by_source = _health_scores(business_ids.values())
     return [
         {
             "id": c.id,
@@ -505,6 +561,8 @@ def list_unmapped_capabilities(
             "level": c.level,
             "current_maturity_level": c.current_maturity_level,
             "target_maturity_level": c.target_maturity_level,
+            "fact_sheet_url": _fact_sheet_url(business_ids.get(c.id)),
+            "health_score": health_by_source.get(business_ids.get(c.id)),
         }
         for c in caps
     ]

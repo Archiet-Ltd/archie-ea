@@ -293,6 +293,12 @@ def download_document_file(doc_id):
         return redirect(url_for("unified_applications.application_list"))
     
     if file_path.exists():
+        if request.args.get("view") and (doc.file_extension or "").upper() == "TXT":
+            # plain text opens on the page, so an evidence link shows the document instead of saving it
+            response = send_file(doc.file_path, as_attachment=False, mimetype="text/plain")
+            response.headers["Content-Type"] = "text/plain; charset=utf-8"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            return response
         return send_file(doc.file_path, as_attachment=True, download_name=doc.file_name)
 
     flash("Document file not found on server.", "warning")

@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: comparison
 competitor: ServiceNow Application Portfolio Management
 url_slug: archiet.ai/vs/servicenow-apm

@@ -196,7 +196,7 @@ def get_archimate_models():
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
-@enterprise_api_bp.route("/archimate/models/<model_id>", methods=["GET"])
+@enterprise_api_bp.route("/archimate/models/<int:model_id>", methods=["GET"])
 @login_required
 @require_permission(ResourceDomain.ARCHITECTURE, Permission.READ)
 def get_archimate_model(model_id):
@@ -208,7 +208,8 @@ def get_archimate_model(model_id):
         if not model:
             return jsonify({"success": False, "error": "Model not found"}), 404
 
-        return jsonify({"success": True, "data": model.to_dict()})
+        data = {column.name: getattr(model, column.name) for column in model.__table__.columns}
+        return jsonify({"success": True, "data": data})
 
     except Exception as e:
         logger.error(f"ArchiMate model retrieval failed: {e}")
@@ -439,7 +440,7 @@ def get_application_portfolio():
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
-@enterprise_api_bp.route("/applications/capabilities/<app_id>", methods=["GET"])
+@enterprise_api_bp.route("/applications/capabilities/<int:app_id>", methods=["GET"])
 @login_required
 @require_permission(ResourceDomain.APPLICATIONS, Permission.READ)
 def get_application_capabilities(app_id):
@@ -447,6 +448,13 @@ def get_application_capabilities(app_id):
     Get capabilities mapped to specific application
     """
     try:
+        from app.models.application_portfolio import ApplicationComponent
+
+        # The mapping table carries no organisation of its own, so the
+        # application is resolved first: another organisation's id answers 404.
+        if db.session.get(ApplicationComponent, app_id) is None:
+            return jsonify({"success": False, "error": "Application not found"}), 404
+
         capabilities = application_service.get_application_capabilities(app_id)
 
         return jsonify({"success": True, "data": capabilities, "count": len(capabilities)})

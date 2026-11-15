@@ -480,8 +480,8 @@ class ArchitectureAnalytics {
               <div class="flex-1">
                 <p class="font-medium text-sm text-foreground">${this.escapeHtml(cap.capability_name)}</p>
                 <div class="flex items-center gap-4 mt-2 text-xs">
-                  <span>Coverage: <strong>${cap.coverage_percentage || 0}%</strong></span>
-                  <span>Maturity: <strong>${cap.maturity_level || 0}/5</strong></span>
+                  <span>Coverage: <strong>${Platform.figure.percent(cap.coverage_percentage)}</strong></span>
+                  <span>Maturity: <strong>${Platform.figure.score(cap.maturity_level, '/5')}</strong></span>
                   <span class="px-2 py-1 bg-primary/10 text-primary/90 rounded">${cap.coverage_type}</span>
                 </div>
               </div>

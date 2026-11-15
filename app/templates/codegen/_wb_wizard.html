@@ -279,6 +279,11 @@
                                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="sparkles" class="h-3 w-3"></i> AI Enrich
                         </button>
+                        <button type="button" @click="skipEnrichment()" :disabled="enriching"
+                                class="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors">
+                            <i data-lucide="skip-forward" class="h-3 w-3"></i>
+                            Skip enrichment — choose the engine and generate directly
+                        </button>
                     </div>
                 </div>
                 {% else %}

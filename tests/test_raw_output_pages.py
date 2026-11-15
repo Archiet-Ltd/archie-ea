@@ -59,16 +59,13 @@ def _forecast_area(html):
     return body[:end] if end > 0 else body
 
 
-def _row_counts(html, label):
-    """(value, denominator) printed beside a labelled workbench row."""
-    pattern = (
-        re.escape(label)
-        + r".*?tabular-nums text-foreground\">\s*(\d+)\s*</span>"
-        + r"\s*<span[^>]*>\s*of (\d+)"
-    )
-    match = re.search(pattern, html, re.DOTALL)
-    assert match, f"row {label!r} not found with a count"
-    return int(match.group(1)), int(match.group(2))
+def _row_counts(body, label):
+    """(value, denominator) the workbench answer gives for a labelled row."""
+    for lens in body["enterprise"]["lenses"]:
+        for row in lens["missing"]:
+            if row["label"] == label:
+                return row["value"], row["of"]
+    raise AssertionError(f"row {label!r} not found with a count")
 
 
 # -- consolidation opportunities ------------------------------------------------
@@ -139,26 +136,6 @@ def _seed(db_session, tenant_ctx, org, *, capabilities, applications):
         db_session.flush()
 
 
-def test_synthesis_page_has_no_database_predicates(
-    db_session, client, login_as, tenant_ctx
-):
-    org = _org(db_session, "syn-text")
-    _seed(db_session, tenant_ctx, org, capabilities=3, applications=2)
-    with tenant_ctx(org.id):
-        user = _user(db_session, org)
-    login_as(client, user)
-
-    response = client.get(WORKBENCH)
-
-    assert response.status_code == 200
-    html = _visible(response.get_data(as_text=True))
-    assert " IS NULL" not in html
-    assert "BusinessCapability." not in html
-    assert "ApplicationComponent." not in html
-    assert "No business owner recorded" in html
-    assert "No end-of-life date recorded" in html
-
-
 def test_synthesis_counts_equal_the_organisation_records(
     db_session, client, login_as, tenant_ctx
 ):
@@ -179,15 +156,15 @@ def test_synthesis_counts_equal_the_organisation_records(
         ).count()
     login_as(client, user)
 
-    html = client.get(WORKBENCH).get_data(as_text=True)
+    body = client.get(WORKBENCH + "/api").get_json()
 
     # The signed-in organisation's own records, not the other organisation's.
     assert (apps_in_list, caps_total, caps_without_owner) == (4, 3, 2)
-    assert _row_counts(html, "Capabilities with no business owner") == (
+    assert _row_counts(body, "Capabilities with no business owner") == (
         caps_without_owner,
         caps_total,
     )
-    assert _row_counts(html, "Applications with no end-of-life date") == (
+    assert _row_counts(body, "Applications with no end-of-life date") == (
         apps_in_list,
         apps_in_list,
     )

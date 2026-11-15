@@ -39,7 +39,7 @@
                                 Would create <span x-text="generatePreview.count"></span> elements
                             </h4>
                             <span class="text-xs text-muted-foreground"
-                                  x-text="'Completeness: ' + Math.round((generatePreview.completeness_before || 0) * 100) + '% → ' + Math.round((generatePreview.completeness_after || 0) * 100) + '%'"></span>
+                                  x-text="'Completeness: ' + Platform.figure.percent(generatePreview.completeness_before, 100) + ' → ' + Platform.figure.percent(generatePreview.completeness_after, 100)"></span>
                         </div>
                         <div class="space-y-1.5 max-h-48 overflow-y-auto">
                             <template x-for="item in (generatePreview.would_create || [])" :key="item.type + item.name">

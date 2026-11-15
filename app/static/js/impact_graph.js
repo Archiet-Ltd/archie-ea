@@ -1,4 +1,11 @@
-/* Impact / dependency graph — interactive blast-radius view.
+/* Impact / dependency graph — interactive blast-radius view, and the whole-model map.
+ *
+ * Whole-model mode (the svg carries data-mode="model"): every element of the organisation's model is
+ * drawn at once, coloured by ArchiMate layer from the layer tokens. Hovering or focusing a node shows its
+ * name, type, source and date; clicking it opens that element's page. Over the node limit the server
+ * sends one node per layer with its count, and a click opens that layer.
+ *
+ * Impact mode:
  *
  * Renders the nodes+edges from /archimate/api/element/<id>/impact-graph as a
  * d3 force-directed graph: the chosen element at the centre, everything that
@@ -12,12 +19,295 @@
 
     var ENDPOINT = svgEl.getAttribute('data-endpoint');
     var PAGE_TMPL = svgEl.getAttribute('data-page');   // …/elements/0/impact
-    var LAYER = {
-        business: '#B9770E', application: '#1E7FB4', technology: '#2E8B57',
-        motivation: '#7C5CBF', strategy: '#C2683A', implementation: '#B4487F',
-        physical: '#2E8B57', other: '#64748B'
-    };
-    function colour(layer) { return LAYER[(layer || 'other').toLowerCase()] || LAYER.other; }
+    // A layer is drawn in its ArchiMate notation tokens (fill and stroke): the same tokens the composer and
+    // the legend use, so the dark theme is the same palette on dark tokens. The layer name is the token name.
+    var LAYERS = ['strategy', 'business', 'application', 'technology', 'physical', 'motivation', 'implementation', 'other'];
+    function notation(layer, part) {
+        var key = (layer || 'other').toLowerCase();
+        if (LAYERS.indexOf(key) < 0) key = 'other';
+        return 'hsl(var(--notation-' + key + part + '))';
+    }
+    function tokenFill(layer) { return notation(layer, ''); }
+    function tokenStroke(layer) { return notation(layer, '-stroke'); }
+
+    // The one force simulation, used by the whole-model map and by the impact graph. Besides keeping circles
+    // apart it keeps labels apart: where two labels would overlap it nudges the two elements up and down.
+    function startSimulation(nodes, edges, o) {
+        var ROW = 14;
+        function labels(alpha) {
+            if (!o.label) return;
+            for (var i = 0; i < nodes.length; i++) {
+                var a = nodes[i], la = o.label(a);
+                for (var j = i + 1; j < nodes.length; j++) {
+                    var b = nodes[j], lb = o.label(b);
+                    var dy = b.y - a.y;
+                    if (Math.abs(dy) >= ROW) continue;
+                    if (a.x + la.dx >= b.x + lb.dx + lb.w || b.x + lb.dx >= a.x + la.dx + la.w) continue;
+                    var push = (ROW - Math.abs(dy)) * 0.5 * alpha * 2;
+                    var dir = dy === 0 ? (i % 2 ? 1 : -1) : (dy > 0 ? 1 : -1);
+                    a.vy -= dir * push; b.vy += dir * push;
+                }
+            }
+        }
+        var sim = d3.forceSimulation(nodes)
+            .force('link', d3.forceLink(edges).id(function (d) { return d.id; }).distance(o.distance).strength(o.linkStrength))
+            .force('charge', d3.forceManyBody().strength(o.charge))
+            .force('center', d3.forceCenter(o.width / 2, o.height / 2))
+            .force('collide', d3.forceCollide().radius(o.collide))
+            .force('labels', labels)
+            .on('tick', o.tick);
+        if (o.gravity) {
+            // gravity keeps elements in view instead of drifting off the canvas; the ones nothing connects to
+            // are drawn on their own outer ring, so the pull to the centre does not apply to them
+            var pull = function (d) { return o.outerRing && d.connected === false ? 0 : o.gravity; };
+            sim.force('x', d3.forceX(o.width / 2).strength(pull)).force('y', d3.forceY(o.height / 2).strength(pull));
+        }
+        if (o.outerRing) {
+            sim.force('ring', d3.forceRadial(o.outerRing, o.width / 2, o.height / 2)
+                .strength(function (d) { return d.connected === false ? 0.9 : 0; }));
+        }
+        if (o.alphaDecay) sim.alphaDecay(o.alphaDecay);
+        if (o.end) sim.on('end', o.end);
+        return sim;
+    }
+    function labelBox(d, offset, shown) {
+        var n = shown ? shown(d).length : 0;
+        return { dx: offset, w: Math.min(n, 26) * 6.2 };
+    }
+
+    function modelMap() {
+        var svg = d3.select(svgEl);
+        var width = svgEl.clientWidth || 800;
+        var height = svgEl.clientHeight || 600;
+        var started = (window.performance && performance.now) ? performance.now() : Date.now();
+        var root = svg.append('g');
+        var linkG = root.append('g');
+        var nodeG = root.append('g');
+        // The wheel zooms the map only once the map has been clicked (or a pinch, which arrives with ctrl held),
+        // so the page scrolls normally while the cursor passes over it.
+        var zoomer = d3.zoom().scaleExtent([0.1, 6])
+            .filter(function (ev) {
+                if (ev.type === 'wheel') return ev.ctrlKey || svgEl === document.activeElement || svgEl.contains(document.activeElement);
+                return !ev.ctrlKey && !ev.button;
+            })
+            .on('zoom', function (ev) { root.attr('transform', ev.transform); });
+        svg.call(zoomer);
+        svg.on('pointerdown.focus', function () { svgEl.focus({ preventScroll: true }); });
+
+        function text(id, t) { var e = document.getElementById(id); if (e) e.textContent = t; }
+        function hide(id) { var e = document.getElementById(id); if (e) e.classList.add('hidden'); }
+        function show(id) { var e = document.getElementById(id); if (e) e.classList.remove('hidden'); }
+
+        function selected(d) {
+            var box = document.getElementById('impact-selected');
+            if (!box) return;
+            while (box.firstChild) box.removeChild(box.firstChild);
+            function line(cls, t) {
+                var p = document.createElement('p'); p.className = cls; p.textContent = t; box.appendChild(p);
+            }
+            if (d.cluster) {
+                line('font-medium', d.name);
+                line('text-xs text-muted-foreground', d.count + ' elements. Click to draw this layer.');
+                return;
+            }
+            line('font-medium break-words', d.name);
+            line('text-xs text-muted-foreground', d.type);
+            line('text-xs text-muted-foreground mt-1', 'Source: ' + d.source);
+            line('text-xs text-muted-foreground', d.as_of ? 'Recorded: ' + d.as_of : 'No date recorded.');
+            var a = document.createElement('a');
+            a.href = d.href; a.className = 'mt-2 inline-flex text-xs font-medium text-primary hover:underline';
+            a.textContent = 'Open ' + d.name;
+            box.appendChild(a);
+        }
+
+        function describe(d) {
+            if (d.cluster) return d.name + ', ' + d.count + ' elements. Press Enter to draw this layer.';
+            return d.name + ', ' + d.type + '. Source: ' + d.source + '. ' + (d.as_of ? 'Recorded ' + d.as_of + '.' : 'No date recorded.');
+        }
+
+        function open(d) {
+            window.location.href = d.cluster
+                ? PAGE_TMPL + '?layer=' + encodeURIComponent(d.layer)
+                : d.href;
+        }
+
+        function render(data) {
+            hide('impact-loading');
+            var nodes = data.nodes || [];
+            if (!nodes.length) { show('impact-empty'); text('impact-counts', 'No elements in this layer.'); return; }
+            var clusters = data.mode === 'clusters';
+            var edges = data.edges || [];
+            var ringLabel = null;
+            var isolated = clusters ? [] : nodes.filter(function (d) { return d.connected === false; });
+            var cx = width / 2, cy = height / 2;
+            var ringRadius = Math.min(width, height) * 0.44;
+
+            if (clusters) {
+                text('impact-counts', data.total + ' elements, drawn one circle per layer. Click a layer to open it.');
+            } else {
+                text('impact-counts', nodes.length + ' elements · ' + edges.length + ' relationships'
+                    + (data.truncated ? ' · first ' + data.max_nodes + ' shown, pick a layer to narrow it' : ''));
+            }
+
+            // The elements nothing connects to sit on an outer ring, and the ring says so.
+            if (isolated.length) {
+                var ring = root.insert('g', ':first-child').attr('data-testid', 'model-map-unconnected-ring');
+                ring.append('circle').attr('cx', cx).attr('cy', cy).attr('r', ringRadius + 22).attr('fill', 'none')
+                    .attr('stroke', 'currentColor').attr('class', 'text-border').attr('stroke-width', 1)
+                    .attr('stroke-dasharray', '4 4');
+                ringLabel = ring.append('text').attr('x', cx).attr('y', cy - ringRadius - 32).attr('text-anchor', 'middle')
+                    .attr('font-size', 13).attr('fill', 'currentColor').attr('class', 'text-muted-foreground')
+                    .attr('data-testid', 'model-map-unconnected-label')
+                    .text('Not connected to anything (' + isolated.length + ')');
+                text('model-map-unconnected', 'Not connected to anything (' + isolated.length
+                    + '): the elements on the outer ring have no relationship to any other element.');
+                show('model-map-unconnected');
+            }
+
+            var link = linkG.selectAll('line').data(edges).enter().append('line')
+                .attr('stroke', 'currentColor').attr('class', 'text-border').attr('stroke-width', 1);
+
+            var radius = function (d) { return d.cluster ? 18 + Math.sqrt(d.count) : 7; };
+            var labelText = function (d) {
+                var n = d.cluster ? d.name + ' · ' + d.count : d.name;
+                return n.length > 26 ? n.slice(0, 25) + '…' : n;
+            };
+            var many = nodes.length > 150;
+            var node = nodeG.selectAll('g').data(nodes).enter().append('g')
+                .attr('tabindex', 0).attr('role', 'link').attr('data-node-id', function (d) { return d.id; })
+                .attr('data-layer', function (d) { return d.layer; })
+                .attr('aria-label', describe)
+                .style('cursor', 'pointer')
+                .call(d3.drag()
+                    .on('start', function (ev, d) { if (!ev.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+                    .on('drag', function (ev, d) { d.fx = ev.x; d.fy = ev.y; })
+                    .on('end', function (ev, d) { if (!ev.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+            node.append('title').text(describe);
+            node.append('circle').attr('r', radius)
+                .style('fill', function (d) { return tokenFill(d.layer); })
+                .style('stroke', function (d) { return tokenStroke(d.layer); }).attr('stroke-width', 2);
+            if (clusters || !many) {
+                node.append('text')
+                    .text(labelText)
+                    .attr('x', function (d) { return radius(d) + 4; }).attr('y', 4).attr('font-size', 11)
+                    .attr('fill', 'currentColor').attr('class', 'text-foreground')
+                    .style('paint-order', 'stroke').attr('stroke', 'var(--card)').attr('stroke-width', 3);
+            }
+
+            node.on('mouseover focus', function (ev, d) { selected(d); })
+                .on('click', function (ev, d) { open(d); })
+                .on('keydown', function (ev, d) {
+                    var all = node.nodes(), i = all.indexOf(this);
+                    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(d); }
+                    else if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') { ev.preventDefault(); all[Math.min(i + 1, all.length - 1)].focus(); }
+                    else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') { ev.preventDefault(); all[Math.max(i - 1, 0)].focus(); }
+                });
+
+            // Place the nodes on a ring before the first paint so the map is readable at once; the
+            // simulation then settles them while the person is already hovering and clicking.
+            var inner = nodes.filter(function (d) { return !(isolated.length && d.connected === false); });
+            function onRing(list, r) {
+                list.forEach(function (d, i) {
+                    var a = (i / list.length) * 2 * Math.PI;
+                    d.x = cx + r * Math.cos(a); d.y = cy + r * Math.sin(a);
+                });
+            }
+            onRing(inner, isolated.length ? ringRadius * 0.45 : Math.min(width, height) * 0.4);
+            onRing(isolated, ringRadius);
+            function paint() {
+                link.attr('x1', function (d) { return d.source.x; }).attr('y1', function (d) { return d.source.y; })
+                    .attr('x2', function (d) { return d.target.x; }).attr('y2', function (d) { return d.target.y; });
+                node.attr('transform', function (d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+            }
+            sim = startSimulation(nodes, edges, {
+                width: width, height: height, tick: paint,
+                distance: clusters ? 120 : 40, linkStrength: 0.5,
+                charge: clusters ? -400 : (many ? -30 : -120),
+                collide: function (d) { return radius(d) + 2; },
+                gravity: 0.06, alphaDecay: many ? 0.06 : 0.04,
+                outerRing: isolated.length ? ringRadius : 0,
+                label: (clusters || !many) ? function (d) { return labelBox(d, radius(d) + 4, labelText); } : null,
+                end: function () { placeRingLabel(); if (!touched) fit(nodes); svgEl.setAttribute('data-settled', '1'); }
+            });
+            paint();
+            // The ring's label sits above the highest dot of the settled map, so no dot or dot name can lie on it.
+            function placeRingLabel() {
+                if (!ringLabel) return;
+                var top = cy - ringRadius - 32;
+                nodes.forEach(function (d) { top = Math.min(top, d.y - radius(d) - 14); });
+                ringLabel.attr('y', top);
+            }
+            // When the layout settles, zoom to show every element with a margin.
+            function fit(list) {
+                var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+                list.forEach(function (d) {
+                    var r = radius(d);
+                    x0 = Math.min(x0, d.x - r); y0 = Math.min(y0, d.y - r);
+                    x1 = Math.max(x1, d.x + r + (many ? 0 : 150)); y1 = Math.max(y1, d.y + r);
+                });
+                if (ringLabel) { y0 = Math.min(y0, parseFloat(ringLabel.attr('y')) - 18); }
+                var w = x1 - x0, h = y1 - y0;
+                if (!(w > 0 && h > 0)) return;
+                var k = Math.max(0.1, Math.min(1, 0.92 * Math.min(width / w, height / h)));
+                var t = d3.zoomIdentity.translate(width / 2 - k * (x0 + x1) / 2, height / 2 - k * (y0 + y1) / 2).scale(k);
+                svg.transition().duration(250).call(zoomer.transform, t);
+            }
+
+            // What the search box and the zoom buttons drive: the page's own controls call these.
+            var located = null;
+            function zoomBy(factor) { touched = true; svg.transition().duration(200).call(zoomer.scaleBy, factor); }
+            function locate(id) {
+                var d = nodes.filter(function (n) { return String(n.id) === String(id); })[0];
+                if (!d) return false;
+                touched = true;
+                if (located) {
+                    located.select('[data-located-ring]').remove();
+                    located.attr('data-located', null);
+                    if (many) located.select('[data-located-label]').remove();
+                }
+                located = node.filter(function (n) { return n === d; });
+                located.attr('data-located', 'true').raise();
+                located.append('circle').attr('data-located-ring', '1').attr('r', radius(d) + 7).attr('fill', 'none')
+                    .attr('stroke', 'currentColor').attr('class', 'text-primary').attr('stroke-width', 3);
+                if (many) {
+                    located.append('text').attr('data-located-label', '1').text(labelText(d))
+                        .attr('x', radius(d) + 10).attr('y', 4).attr('font-size', 13).attr('fill', 'currentColor')
+                        .attr('class', 'text-foreground').style('paint-order', 'stroke')
+                        .attr('stroke', 'var(--card)').attr('stroke-width', 3);
+                }
+                var k = Math.max(1.6, d3.zoomTransform(svgEl).k);
+                var t = d3.zoomIdentity.translate(width / 2 - k * d.x, height / 2 - k * d.y).scale(k);
+                svg.transition().duration(250).call(zoomer.transform, t);
+                selected(d);
+                return true;
+            }
+            window.modelMapView = {
+                nodes: nodes,
+                locate: locate,
+                zoomIn: function () { zoomBy(1.4); },
+                zoomOut: function () { zoomBy(1 / 1.4); },
+                fit: function () { touched = true; fit(nodes); }
+            };
+            var done = function () {
+                var ms = ((window.performance && performance.now) ? performance.now() : Date.now()) - started;
+                svgEl.setAttribute('data-rendered-ms', String(Math.round(ms)));
+                svgEl.setAttribute('data-node-count', String(nodes.length));
+            };
+            if (window.requestAnimationFrame) window.requestAnimationFrame(done); else done();
+        }
+
+        var sim = null;
+        var touched = false;
+        var layer = svgEl.getAttribute('data-layer');
+        Platform.fetch(ENDPOINT + (layer ? '?layer=' + encodeURIComponent(layer) : ''))
+            .then(render)
+            .catch(function () {
+                hide('impact-loading');
+                text('impact-counts', 'Could not load the model map.');
+            });
+    }
+    if (svgEl.getAttribute('data-mode') === 'model') { modelMap(); return; }
 
     var svg = d3.select(svgEl);
     var width = svgEl.clientWidth || 800;
@@ -118,9 +408,9 @@
 
         node.append('circle')
             .attr('r', function (d) { return d.is_center ? 13 : 8; })
-            .attr('fill', function (d) { return colour(d.layer); })
-            .attr('stroke', function (d) { return d.is_center ? '#111827' : '#ffffff'; })
-            .attr('stroke-width', function (d) { return d.is_center ? 3 : 1.5; });
+            .style('fill', function (d) { return tokenFill(d.layer); })
+            .style('stroke', function (d) { return tokenStroke(d.layer); })
+            .attr('stroke-width', function (d) { return d.is_center ? 3 : 2; });
 
         node.append('text')
             .text(function (d) { return d.name.length > 26 ? d.name.slice(0, 25) + '…' : d.name; })
@@ -137,16 +427,17 @@
             window.location.href = PAGE_TMPL.replace(/\/0\/impact$/, '/' + d.id + '/impact');
         });
 
-        sim = d3.forceSimulation(data.nodes)
-            .force('link', d3.forceLink(data.edges).id(function (d) { return d.id; }).distance(90).strength(0.6))
-            .force('charge', d3.forceManyBody().strength(-260))
-            .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('collide', d3.forceCollide().radius(function (d) { return d.is_center ? 26 : 16; }))
-            .on('tick', function () {
-                link.attr('x1', function (d) { return d.source.x; }).attr('y1', function (d) { return d.source.y; })
-                    .attr('x2', function (d) { return d.target.x; }).attr('y2', function (d) { return d.target.y; });
-                node.attr('transform', function (d) { return 'translate(' + d.x + ',' + d.y + ')'; });
-            });
+        function paint() {
+            link.attr('x1', function (d) { return d.source.x; }).attr('y1', function (d) { return d.source.y; })
+                .attr('x2', function (d) { return d.target.x; }).attr('y2', function (d) { return d.target.y; });
+            node.attr('transform', function (d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+        }
+        sim = startSimulation(data.nodes, data.edges, {
+            width: width, height: height, tick: paint,
+            distance: 90, linkStrength: 0.6, charge: -260,
+            collide: function (d) { return d.is_center ? 26 : 16; },
+            label: function (d) { return labelBox(d, d.is_center ? 17 : 12, function (n) { return n.name; }); }
+        });
     }
 
     function load(depth) {

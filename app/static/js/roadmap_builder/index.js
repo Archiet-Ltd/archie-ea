@@ -115,7 +115,7 @@ let RoadmapBuilder = {
                     document.getElementById('total-packages').textContent = data.data.total_work_packages || 0;
                     document.getElementById('completed-packages').textContent = data.data.completed_count || 0;
                     document.getElementById('total-plateaus').textContent = data.data.total_plateaus || 0;
-                    document.getElementById('total-cost').textContent = '$' + (data.data.total_estimated_cost || 0).toLocaleString();
+                    document.getElementById('total-cost').textContent = (data.data.total_estimated_cost == null ? Platform.figure.NOT_RECORDED : '$' + data.data.total_estimated_cost.toLocaleString());
                 }
             })
             .catch(function(err) {
@@ -212,7 +212,7 @@ let RoadmapBuilder = {
 
         safeHTML(container, filtered.map(function(wp) {
             let priorityBadge = wp.priority === 'high' ? 'bg-destructive/10 text-destructive' : wp.priority === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-500/10 text-emerald-700';
-            let costDisplay = wp.estimated_cost ? wp.estimated_cost.toLocaleString() : '0';
+            let costDisplay = wp.estimated_cost == null ? Platform.figure.NOT_RECORDED : wp.estimated_cost.toLocaleString();
             return '<div class="p-4 hover:bg-accent/50">' +
 
                 '<div class="flex justify-between items-start">' +
@@ -337,7 +337,7 @@ let RoadmapBuilder = {
             priority: document.getElementById('wp-priority').value,
             status: document.getElementById('wp-status').value,
             assigned_to: document.getElementById('wp-assigned-to').value || null,
-            estimated_cost: parseFloat(document.getElementById('wp-cost').value) || 0
+            estimated_cost: Number.isNaN(parseFloat(document.getElementById('wp-cost').value)) ? null : parseFloat(document.getElementById('wp-cost').value)
         };
 
         let isEdit = Boolean(self.editingWorkPackageId);
@@ -406,7 +406,7 @@ let RoadmapBuilder = {
                 document.getElementById('wp-priority').value = wp.priority || 'medium';
                 document.getElementById('wp-status').value = wp.status || 'planned';
                 document.getElementById('wp-assigned-to').value = wp.assigned_to || '';
-                document.getElementById('wp-cost').value = wp.estimated_cost || 0;
+                document.getElementById('wp-cost').value = wp.estimated_cost ?? '';
                 self.showDialog('add-wp-dialog');
             })
             .catch(function(err) {

@@ -11,7 +11,6 @@ from app.modules.enterprise_genome.services.security_matrix_emitter import (
 )
 from app.modules.genome.emit.coverage_matrix import emit_coverage_matrix_html
 from app.modules.genome.emit.drift_report import emit_drift_report_html
-from app.modules.genome.emit.roadmap_gantt import emit_roadmap_gantt_html
 
 
 ATTACK = '<script>alert(1)</script><img src=x onerror="alert(2)">'
@@ -143,34 +142,6 @@ def test_drift_fragment_escapes_modelled_text():
                 }
             ],
             "uncomputable_signals": {},
-        }
-    )
-    _assert_inert_fragment(fragment)
-
-
-def test_roadmap_fragment_escapes_modelled_text():
-    fragment = emit_roadmap_gantt_html(
-        {
-            "spec_hash": ATTACK,
-            "domain": ATTACK,
-            "plateaus": [],
-            "work_packages": [
-                {
-                    "id": 1,
-                    "name": ATTACK,
-                    "status": ATTACK,
-                    "percent_complete": 0,
-                    "start_date": None,
-                    "target_date": None,
-                    "plateau_id": None,
-                    "closed_gap_ids": [],
-                    "provenance": {
-                        "origin": ATTACK,
-                        "archimate_element_id": None,
-                        "archimate_type": ATTACK,
-                    },
-                }
-            ],
         }
     )
     _assert_inert_fragment(fragment)

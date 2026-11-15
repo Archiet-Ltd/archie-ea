@@ -5,12 +5,14 @@ from datetime import datetime
 
 from flask import current_app, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from app.core.auth.permissions import can
 
 from app import db
 
 # Import blueprint after other imports to avoid circular import
 from app.main.views import main
 from app.models.application_layer import ApplicationComponent
+from app.services.gap_register_service import severity_order_expr
 from app.models.archimate_core import ArchiMateElement
 from app.models.implementation_migration import Gap, Plateau, WorkPackage
 from app.models.unified_work_package import UnifiedWorkPackage
@@ -35,7 +37,7 @@ def application_roadmap(id):
         # Get gaps related to this application
         gaps = (
             Gap.query.filter(Gap.application_component_id == id)
-            .order_by(Gap.priority.desc(), Gap.created_at.desc())
+            .order_by(severity_order_expr(), Gap.created_at.desc())
             .all()
         )
 
@@ -201,6 +203,8 @@ def application_roadmap(id):
 @login_required
 def create_application_work_package(id):
     """Create new work package for specific application"""
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         data = request.get_json()
 
@@ -302,6 +306,8 @@ def create_application_work_package(id):
 @login_required
 def update_application_work_package(id, wp_id):
     """Update work package for specific application"""
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         data = request.get_json()
 
@@ -418,6 +424,8 @@ def update_application_work_package(id, wp_id):
 @login_required
 def delete_application_work_package(id, wp_id):
     """Delete work package for specific application"""
+    if not can(current_user, "delete", "work_package"):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         work_package = WorkPackage.query.get_or_404(wp_id)
 

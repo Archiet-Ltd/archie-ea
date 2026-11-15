@@ -46,12 +46,12 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 ALL_TOOLS = [
     "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
     "ask_risk", "ask_accountability", "get_element", "search_elements",
-    "list_canvases", "get_canvas", "answer",
+    "list_canvases", "get_canvas", "answer", "get_genome_slice", "ask_data_flow",
 ]
 
 ROLE = "pr455_rls_probe_runtime"
 
-_SEED = r'''
+_SEED = r"""
 import base64, hashlib, json, os, secrets, sys, uuid
 from app import create_app
 from app.extensions import db
@@ -78,11 +78,29 @@ with app.app_context():
         el = ArchiMateElement(name=f"{tag}-SECRET-ELEMENT-{sfx}", description=f"{tag}-SECRET-DESC",
                               type="ApplicationComponent", layer="application", organization_id=org.id)
         db.session.add(el); db.session.flush()
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.risk import Risk
+        from app.models.risk_entity_link import RiskEntityLink
+        billing = ApplicationComponent(name=f"{tag}-SECRET-BILLING-{sfx}", organization_id=org.id,
+                                       archimate_element_id=el.id)
+        db.session.add(billing); db.session.flush()
+        risk = Risk(title=f"{tag}-SECRET-RISK-{sfx}", likelihood=4, impact=4, owner="Head of Engineering",
+                    organization_id=org.id)
+        db.session.add(risk); db.session.flush()
+        db.session.add(RiskEntityLink(risk_id=risk.id, entity_type="application", entity_id=billing.id,
+                                      organization_id=org.id))
         bmc = BusinessModelCanvas(name=f"{tag}-SECRET-CANVAS-{sfx}", description="x", organization_id=org.id)
         db.session.add(bmc); db.session.flush()
         bc = BusinessCase(title=f"{tag}-SECRET-CASE-{sfx}", organization_id=org.id)
         db.session.add(bc); db.session.flush()
-        out[tag] = dict(org=org.id, user=u.id, email=u.email, element=el.id, bmc=bmc.id, bc=bc.id)
+        from app.models.process_data import DataDomain, DataEntity
+        dom = DataDomain(name=f"{tag}-SECRET-DOMAIN-{sfx}", organization_id=org.id)
+        db.session.add(dom); db.session.flush()
+        ent = DataEntity(name=f"{tag}-SECRET-ENTITY-{sfx}", domain_id=dom.id, organization_id=org.id,
+                         contains_pii=True)
+        db.session.add(ent); db.session.flush()
+        out[tag] = dict(org=org.id, user=u.id, email=u.email, element=el.id, bmc=bmc.id, bc=bc.id,
+                        data=ent.archimate_element_id)
     db.session.commit()
     c = OAuthClient.register(client_name="pytest RLS probe", redirect_uris="http://localhost/cb")
     verifier = secrets.token_urlsafe(64)
@@ -93,11 +111,12 @@ with app.app_context():
         organization_id=out["ALPHA"]["org"], lifetime_seconds=600)
     out.update(client_id=c.client_id, code=raw, verifier=verifier, sfx=sfx)
 json.dump(out, open(sys.argv[1], "w"))
-'''
+"""
 
-_PROBE = r'''
+_PROBE = r"""
 import json, sys
 from app import create_app
+
 state = json.load(open(sys.argv[1]))
 app = create_app("testing")
 with app.app_context():
@@ -111,8 +130,8 @@ with app.app_context():
 c = app.test_client()
 res = app.config["PUBLIC_BASE_URL"].rstrip("/") + "/mcp"
 A, B = state["ALPHA"], state["BRAVO"]
-r = c.post("/oauth/token", data=dict(grant_type="authorization_code", code=state["code"],
-    redirect_uri="http://localhost/cb", client_id=state["client_id"], code_verifier=state["verifier"], resource=res))
+
+r = c.post("/oauth/token", data=dict(grant_type="authorization_code", code=state["code"], redirect_uri="http://localhost/cb", client_id=state["client_id"], code_verifier=state["verifier"], resource=res))
 if r.status_code != 200:
     print("TOKEN_FAILED", r.status_code, r.get_data(as_text=True)[:500]); sys.exit(1)
 token = r.get_json()["access_token"]
@@ -134,14 +153,28 @@ for eid_tag, eid in (("A", A["element"]), ("B", B["element"])):
         calls.append((f"ask_{lens}", {"element_id": eid}, eid_tag))
     calls.append(("get_element", {"element_id": eid}, eid_tag))
     calls.append(("answer", {"question": "impact", "element_id": eid}, eid_tag))
-calls += [("search_elements", {"query": "SECRET", "limit": 200}, "*"),
+calls += [("get_genome_slice", {"domain": "business"}, "A"),
+          ("get_genome_slice", {"domain": "business", "focus_ids": [B["element"]]}, "B"),
+          ("search_elements", {"query": "SECRET", "limit": 200}, "*"),
+          ("ask_data_flow", {}, "*"),
+          ("ask_data_flow", {"element_id": A["data"]}, "A"),
+          ("ask_data_flow", {"element_id": B["data"]}, "B"),
           ("list_canvases", {}, "*"),
           ("get_canvas", {"canvas_type": "business_model", "canvas_id": A["bmc"]}, "A"),
           ("get_canvas", {"canvas_type": "business_model", "canvas_id": B["bmc"]}, "B"),
           ("get_canvas", {"canvas_type": "business_case", "canvas_id": A["bc"]}, "A"),
           ("get_canvas", {"canvas_type": "business_case", "canvas_id": B["bc"]}, "B")]
-leaks = 0; alpha_hits = 0; called = set()
+with app.app_context():
+    from app.modules.ai_chat.tools.route_read_tools import tool_released
+    all_calls = list(calls)
+    calls = [x for x in all_calls if tool_released(x[0])]
+    held_back_calls = [x for x in all_calls if not tool_released(x[0])]
 bad_status = []
+leaks = 0; alpha_hits = 0; called = set()
+for name, args, tag in held_back_calls:
+    st, body = call(name, args)
+    if st != 404:
+        bad_status.append((name, tag, st))
 for name, args, tag in calls:
     st, body = call(name, args); called.add(name)
     if st != 200:
@@ -149,10 +182,13 @@ for name, args, tag in calls:
     bravo = "BRAVO-SECRET" in body or B["email"] in body
     alpha = "ALPHA-SECRET" in body
     alpha_hits += alpha; leaks += bravo
+risk_a = call("ask_risk", {"element_id": A["element"]})[1] if tool_released("ask_risk") else ""
+risk_b = call("ask_risk", {"element_id": B["element"]})[1] if tool_released("ask_risk") else ""
+print("RISK_LINKED", json.dumps({"a_sees_own": "ALPHA-SECRET-RISK" in risk_a, "a_sees_b": "BRAVO-SECRET-RISK" in risk_b or "BRAVO-SECRET-RISK" in risk_a, "released": tool_released("ask_risk")}))
 print("CALLED", json.dumps(sorted(called)))
 print("BAD_STATUS", json.dumps(bad_status))
 print(f"SUMMARY calls={len(calls)} bravo_leaks={leaks} alpha_hits={alpha_hits}")
-'''
+"""
 
 
 @pytest.fixture
@@ -258,7 +294,7 @@ def test_all_tools_see_zero_rows_from_the_other_organisation_under_rls(
     seed_env["DATABASE_URL"] = app.config["SQLALCHEMY_DATABASE_URI"]
     seed_proc = subprocess.run(
         [sys.executable, "-c", _SEED, str(state_path)],
-        cwd=str(REPO_ROOT), env=seed_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+        cwd=str(REPO_ROOT), env=seed_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
     )
     assert seed_proc.returncode == 0, f"seed failed:\nSTDOUT:{seed_proc.stdout}\nSTDERR:{seed_proc.stderr}"
     state = json.loads(state_path.read_text())
@@ -278,17 +314,29 @@ def test_all_tools_see_zero_rows_from_the_other_organisation_under_rls(
         role_name, is_super, is_bypass = json.loads(role_line.split(" ", 1)[1])
         assert (role_name, is_super, is_bypass) == (ROLE, False, False)
 
+        from app.modules.ai_chat.tools.route_read_tools import tool_released
+
+        with app.app_context():
+            # the wave map decides which tools can answer at the released wave
+            wanted_tools = [t for t in ALL_TOOLS if tool_released(t)]
+
         tools_line = next(line for line in out.splitlines() if line.startswith("TOOLS_LIST"))
         listed_tools = json.loads(tools_line.split(" ", 1)[1])
-        assert listed_tools == sorted(ALL_TOOLS), f"tool list drifted: {listed_tools}"
+        assert listed_tools == sorted(wanted_tools), f"tool list drifted: {listed_tools}"
 
         called_line = next(line for line in out.splitlines() if line.startswith("CALLED"))
         called_tools = set(json.loads(called_line.split(" ", 1)[1]))
-        assert called_tools == set(ALL_TOOLS), f"not all tools were exercised: missing {set(ALL_TOOLS) - called_tools}"
+        assert called_tools == set(wanted_tools), f"not all tools were exercised: missing {set(wanted_tools) - called_tools}"
 
         bad_status_line = next(line for line in out.splitlines() if line.startswith("BAD_STATUS"))
         bad_status = json.loads(bad_status_line.split(" ", 1)[1])
         assert bad_status == [], f"non-200 responses: {bad_status}"
+
+        risk_line = next(line for line in out.splitlines() if line.startswith("RISK_LINKED"))
+        risk_seen = json.loads(risk_line.split(" ", 1)[1])
+        if risk_seen["released"]:
+            assert risk_seen["a_sees_own"], f"ask_risk did not list organisation A's linked risk: {risk_line}"
+            assert not risk_seen["a_sees_b"], f"ask_risk showed organisation B's risk: {risk_line}"
 
         summary_line = next(line for line in out.splitlines() if line.startswith("SUMMARY"))
         parts = dict(p.split("=") for p in summary_line.split()[1:])

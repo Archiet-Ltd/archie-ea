@@ -395,6 +395,11 @@ class ArchitectureChangeRequest(TenantMixin, db.Model):
     # FK to Phase H change management board (optional)
     board_id = db.Column(db.Integer, db.ForeignKey('kanban_boards.id', ondelete='SET NULL'), nullable=True)
 
+    # What the request is about: both optional, both checked against the
+    # caller's own organisation before they are stored.
+    capability_id = db.Column(db.Integer, db.ForeignKey('unified_capabilities.id', ondelete='SET NULL'), nullable=True)
+    solution_id = db.Column(db.Integer, db.ForeignKey('solutions.id', ondelete='SET NULL'), nullable=True)
+
     # Ownership
     raised_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     raised_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -404,6 +409,8 @@ class ArchitectureChangeRequest(TenantMixin, db.Model):
     escalated_at = db.Column(db.DateTime, nullable=True)
 
     raised_by = db.relationship('User', foreign_keys=[raised_by_id])
+    capability = db.relationship('UnifiedCapability', foreign_keys=[capability_id])
+    solution = db.relationship('Solution', foreign_keys=[solution_id])
     impact_assessments = db.relationship('ChangeImpactAssessment', backref='change_request', lazy='dynamic', cascade='all, delete-orphan')
     change_notices = db.relationship('ArchitectureChangeNotice', backref='change_request', lazy='dynamic', cascade='all, delete-orphan')
 
@@ -419,6 +426,8 @@ class ArchitectureChangeRequest(TenantMixin, db.Model):
             'disposition': self.disposition,
             'affected_domains': self.affected_domains or [],
             'board_id': self.board_id,
+            'capability_id': self.capability_id,
+            'solution_id': self.solution_id,
             'raised_by_id': self.raised_by_id,
             'raised_at': self.raised_at.isoformat() if self.raised_at else None,
             'closed_at': self.closed_at.isoformat() if self.closed_at else None,
@@ -459,7 +468,8 @@ class ChangeImpactAssessment(db.Model):
 
     # Polymorphic affected entity
     affected_entity_type = db.Column(db.String(30), nullable=True)  # capability/application_component/business_service
-    affected_capability_id = db.Column(db.Integer, db.ForeignKey('capabilities.id', ondelete='SET NULL'), nullable=True)
+    # unified_capabilities: the record a change request's own capability_id names.
+    affected_capability_id = db.Column(db.Integer, db.ForeignKey('unified_capabilities.id', ondelete='SET NULL'), nullable=True)
     affected_decision_id = db.Column(db.Integer, db.ForeignKey('architecture_decisions.id', ondelete='SET NULL'), nullable=True)
 
     # Assessment
@@ -470,6 +480,7 @@ class ChangeImpactAssessment(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     assessed_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
 
+    affected_capability = db.relationship('UnifiedCapability', foreign_keys=[affected_capability_id])
     affected_decision = db.relationship('ArchitectureDecision', foreign_keys=[affected_decision_id])
 
     def to_dict(self):

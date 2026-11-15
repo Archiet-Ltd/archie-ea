@@ -135,7 +135,7 @@ def test_stream_carries_error_and_message_from_agent_fallback(
 
     persisted = (
         "The AI request couldn't be completed. See the error detail below "
-        "or check Admin → API Settings."
+        "or check Admin → AI settings."
     )
 
     class FallbackRunner:

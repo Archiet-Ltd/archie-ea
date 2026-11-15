@@ -1,4 +1,4 @@
-"""Service helpers for the Business Model Canvas module.
+"""Service helpers for the canvas module (the Business Model Canvas and the other framework canvases).
 
 Kept deliberately thin — the model already carries most of the logic
 (get_block/set_block/to_dict). This module exists for the small pieces of
@@ -9,7 +9,6 @@ from flask_login import current_user
 
 from app import db
 from app.models.business_model import (
-    CANVAS_BLOCKS,
     OPERATING_MODEL_TYPES,
     BusinessModelCanvas,
 )
@@ -33,13 +32,20 @@ def get_canvas_or_none(canvas_id):
     ).first()
 
 
-def create_canvas(name, description=None, operating_model_type=None):
+def create_canvas(name, description=None, operating_model_type=None, canvas_type=None):
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+
+    if canvas_type == "business_model_canvas":
+        canvas_type = None
+    if canvas_type and (canvas_type not in CANVAS_TEMPLATES or CANVAS_TEMPLATES[canvas_type]["record"] != "business_model_canvas"):
+        raise ValueError(f"Invalid canvas_type: {canvas_type}")
     if operating_model_type and operating_model_type not in OPERATING_MODEL_TYPES:
         raise ValueError(f"Invalid operating_model_type: {operating_model_type}")
     canvas = BusinessModelCanvas(
         name=name or "Untitled Canvas",
         description=description,
         operating_model_type=operating_model_type,
+        canvas_type=canvas_type,
     )
     db.session.add(canvas)
     db.session.commit()
@@ -55,14 +61,6 @@ def update_canvas_meta(canvas, name=None, description=None, operating_model_type
         if operating_model_type and operating_model_type not in OPERATING_MODEL_TYPES:
             raise ValueError(f"Invalid operating_model_type: {operating_model_type}")
         canvas.operating_model_type = operating_model_type or None
-    db.session.commit()
-    return canvas
-
-
-def save_block(canvas, block_key, content):
-    if block_key not in CANVAS_BLOCKS:
-        raise ValueError(f"Unknown canvas block: {block_key}")
-    canvas.set_block(block_key, content)
     db.session.commit()
     return canvas
 

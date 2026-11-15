@@ -1,11 +1,10 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}AI Chat Analytics - {{ config.APP_NAME }}{% endblock %}
 
 {% block content %}
-{% include 'components/admin_sidebar.html' %}
-
 <div class="flex-1 overflow-y-auto p-6 bg-background" role="region" aria-label="AI Chat Analytics Content" x-data="aiChatAnalytics()" x-init="init()">
   <!-- Page header -->
   {% macro _ps_actions() %}

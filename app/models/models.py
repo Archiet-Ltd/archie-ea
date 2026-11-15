@@ -5,7 +5,7 @@ from datetime import datetime
 
 from flask import current_app  # dead-code-ok
 from flask_login import current_user  # dead-code-ok
-from sqlalchemy import types
+from sqlalchemy import event, types
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import validates
 
@@ -356,7 +356,7 @@ else:
         last_confirmed = db.Column(db.DateTime, nullable=True)
 
         # Provenance origin: where this element came from.
-        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_kind: 'manual', 'import', 'connector', 'derived', 'sample'
         # source_ref: import batch id, connector run id, or user id as text
         # source_label: file name, connector name, or person's display name
         # source_recorded_at: when the origin was recorded
@@ -584,7 +584,7 @@ else:
         sequence_order = db.Column(db.Integer, nullable=True)
 
         # Provenance origin: where this relationship came from.
-        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_kind: 'manual', 'import', 'connector', 'derived', 'sample'
         # source_ref: import batch id, connector run id, or user id as text
         # source_label: file name, connector name, or person's display name
         # source_recorded_at: when the origin was recorded
@@ -632,6 +632,19 @@ else:
                     val = float(val)
                 out[col.name] = val
             return out
+
+
+from .relationship_guard import (  # noqa: E402,F401
+    _RELATIONSHIP_END_TABLES,
+    CrossOrganisationRelationship,
+    assert_relationship_same_organisation,
+    register_relationship_guard,
+)
+
+if not _FAST_INIT:
+    # Under APP_FAST_INIT=1 the class is the twin in archimate_core, which
+    # registers the guard itself.
+    register_relationship_guard(ArchiMateRelationship)
 
 
 class WorkflowInstanceArchiMateElement(db.Model):
@@ -735,30 +748,38 @@ class Requirement(TenantMixin, db.Model):
     # MoSCoW prioritisation (TPM-006)
     moscow_priority = db.Column(db.String(16), nullable=True)  # MUST/SHOULD/COULD/WONT
 
-    # WSJF components — SAFe: score = CoD / Job Size (TPM-006)
-    business_value = db.Column(db.Integer, default=1)
-    time_criticality = db.Column(db.Integer, default=1)
-    risk_reduction = db.Column(db.Integer, default=1)
-    job_size = db.Column(db.Integer, default=1)
+    # A row made from another record names it, so the writer that made it only ever touches its own.
+    source_table = db.Column(db.String(64), nullable=True)
+    source_id = db.Column(db.Integer, nullable=True)
 
-    # RICE components (TPM-006)
-    reach = db.Column(db.Integer, default=0)
-    impact = db.Column(db.Integer, default=1)   # 1=minimal … 5=massive
-    confidence = db.Column(db.Integer, default=100)  # percentage
+    # WSJF components — SAFe: score = CoD / Job Size. Empty until a person records them.
+    business_value = db.Column(db.Integer)
+    time_criticality = db.Column(db.Integer)
+    risk_reduction = db.Column(db.Integer)
+    job_size = db.Column(db.Integer)
+
+    # RICE components. Empty until a person records them.
+    reach = db.Column(db.Integer)
+    impact = db.Column(db.Integer)   # 1=minimal … 5=massive
+    confidence = db.Column(db.Integer)  # percentage
 
     @property
     def wsjf_score(self):
-        cod = (self.business_value or 1) + (self.time_criticality or 1) + (self.risk_reduction or 1)
-        return round(cod / max(self.job_size or 1, 1), 2)
+        """None until all four WSJF inputs are recorded: a missing input is not worth 1."""
+        from app.services.wsjf_service import compute_wsjf_score
+
+        parts = (self.business_value, self.time_criticality, self.risk_reduction, self.job_size)
+        if any(part is None for part in parts) or self.job_size < 1:
+            return None
+        return compute_wsjf_score(*parts)
 
     @property
     def rice_score(self):
-        sp = self.story_points or 1
-        return round(
-            ((self.reach or 0) * (self.impact or 1) * ((self.confidence or 100) / 100))
-            / max(sp, 1),
-            2,
-        )
+        """None until reach, impact, confidence and story points are all recorded."""
+        parts = (self.reach, self.impact, self.confidence, self.story_points)
+        if any(part is None for part in parts) or self.story_points < 1:
+            return None
+        return round((self.reach * self.impact * (self.confidence / 100)) / self.story_points, 2)
 
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
@@ -1808,6 +1829,7 @@ class Principle(TenantMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     statement = db.Column(db.Text, nullable=False)  # The principle statement
+    description = db.Column(db.Text)  # Free-text description entered on the form
     rationale = db.Column(db.Text)  # Why this principle exists
     implications = db.Column(db.Text)  # What this means for implementation
 

@@ -138,9 +138,23 @@ def test_history_is_the_last_ninety_days_newest_first(app, db_session, quiet_obj
 # --------------------------------------------------------------- the page
 
 
-def test_page_needs_a_signed_in_user(client):
+def test_page_is_public_and_carries_no_sign_in_or_organisation(client, db_session, make_org, quiet_objectives):
+    org = make_org("status-public-org")
+    db_session.commit()
     response = client.get("/status")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "<form" not in body
+    assert 'type="password"' not in body
+    assert org.name not in body
+
+
+def test_subscribing_without_a_session_is_refused(client):
+    response = client.post("/status/subscription", data={"subscribe": "1"})
     assert response.status_code in (302, 401)
+    if response.status_code == 302:
+        assert "login" in response.headers["Location"] or "sign" in response.headers["Location"]
 
 
 def test_page_shows_state_history_and_footer_link(
@@ -151,18 +165,34 @@ def test_page_shows_state_history_and_footer_link(
     incident = _incident(db_session, "Imports delayed", impact="degraded")
     db_session.commit()
 
+    def _assert_history(body):
+        assert 'data-state="degraded"' in body
+        assert "Degraded performance" in body
+        assert "Imports delayed" in body
+        assert f'data-testid="service-incident-{incident.id}"' in body
+        assert "Ongoing" in body
+
+    signed_out = client.get("/status")
+    assert signed_out.status_code == 200
+    _assert_history(signed_out.get_data(as_text=True))
+    assert 'data-testid="service-status-subscribe"' not in signed_out.get_data(as_text=True)
+
     login_as(client, user)
     response = client.get("/status")
     body = response.get_data(as_text=True)
-
     assert response.status_code == 200
-    assert 'data-state="degraded"' in body
-    assert "Degraded performance" in body
-    assert "Imports delayed" in body
-    assert f'data-testid="service-incident-{incident.id}"' in body
-    assert "Ongoing" in body
-    assert 'data-testid="footer-service-status"' in body
-    assert 'data-testid="service-status-subscribe"' in body
+    _assert_history(body)
+    # The page itself is the public shell; the signed-in footer link sits on the app layout.
+    # The page offers no subscribe control; the POST route stays signed-in only.
+    assert 'data-testid="service-status-subscribe"' not in body
+
+    overview = client.get("/dashboard/overview")
+    assert overview.status_code == 200
+    overview_body = overview.get_data(as_text=True)
+    assert 'data-testid="footer-service-status"' in overview_body
+    assert 'href="/status"' in overview_body
+    landed = client.get("/status")
+    assert landed.status_code == 200 and "Imports delayed" in landed.get_data(as_text=True)
 
 
 def test_empty_history_says_so(app, client, db_session, make_org, login_as, quiet_objectives):
@@ -192,16 +222,15 @@ def test_subscribing_is_one_users_own_choice_across_two_organisations(
     response = client.post("/status/subscription", data={"subscribe": "1"})
     assert response.status_code == 302
 
-    login_as(client, user_a)
-    assert 'data-testid="service-status-subscribed"' in client.get("/status").get_data(as_text=True)
     assert is_subscribed(user_a.id) is True
     assert is_subscribed(colleague_a.id) is False
     assert is_subscribed(user_b.id) is False
 
     login_as(client, user_b)
     body_b = client.get("/status").get_data(as_text=True)
-    assert 'data-testid="service-status-subscribe"' in body_b
+    assert client.get("/status").status_code == 200
     assert 'data-testid="service-status-subscribed"' not in body_b
+    assert is_subscribed(user_b.id) is False
 
     login_as(client, user_a)
     client.post("/status/subscription", data={"subscribe": "0"})

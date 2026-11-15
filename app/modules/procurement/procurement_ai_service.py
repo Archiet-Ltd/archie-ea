@@ -24,7 +24,9 @@ from typing import Any, Dict, List
 
 from app.services.llm_service import LLMService
 
-from .services import get_days_until_renewal, get_spend_by_category, get_spend_summary
+from app.services.vendor_register import get_days_until_renewal, get_renewal_urgency, renewal_date_of
+
+from .services import get_spend_by_category, get_spend_summary
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +90,7 @@ def _as_str_list(data: Dict[str, Any], key: str) -> List[str]:
 
 def _build_renewal_brief_context(contract) -> Dict[str, Any]:
     days_to_expiry = get_days_until_renewal(contract)
+    renews_on = renewal_date_of(contract)
 
     context: Dict[str, Any] = {
         "contract_name": contract.contract_name,
@@ -101,8 +104,9 @@ def _build_renewal_brief_context(contract) -> Dict[str, Any]:
         "currency": contract.currency,
         "start_date": contract.start_date.isoformat() if contract.start_date else None,
         "end_date": contract.end_date.isoformat() if contract.end_date else None,
-        "renewal_date": contract.renewal_date.isoformat() if contract.renewal_date else None,
+        "renewal_date": renews_on.isoformat() if renews_on else None,
         "days_to_expiry": days_to_expiry,
+        "renewal_urgency": get_renewal_urgency(contract),
         "auto_renewal": contract.auto_renewal,
         "notice_period_days": contract.notice_period_days,
         "vendor_risk": contract.vendor_risk,
@@ -201,11 +205,12 @@ def _build_remediation_context(license_entitlement) -> Dict[str, Any]:
         "compliance_status": license_entitlement.compliance_status,
     }
     if contract is not None:
+        renews_on = renewal_date_of(contract)
         context["contract"] = {
             "contract_name": contract.contract_name,
             "vendor_name": contract.vendor.name if contract.vendor else None,
             "end_date": contract.end_date.isoformat() if contract.end_date else None,
-            "renewal_date": contract.renewal_date.isoformat() if contract.renewal_date else None,
+            "renewal_date": renews_on.isoformat() if renews_on else None,
         }
     return context
 
@@ -369,18 +374,18 @@ def _build_spend_context(organization_id: int) -> Dict[str, Any]:
     # Reuses the exact aggregates the spend_analytics page itself computes
     # (get_spend_by_category / get_spend_summary in services.py) rather than
     # running a third parallel query over the same VendorContract rows.
-    spend_summary = get_spend_summary()
+    spend_summary = get_spend_summary(organization_id)
     spend_by_category = get_spend_by_category(organization_id)
 
     return {
-        "total_contracts": spend_summary["total_contracts"],
-        "total_value": spend_summary["total_value"],
-        "total_annual_cost": spend_summary["total_annual_cost"],
-        "spend_by_category": spend_by_category,
-        "spend_by_type": {
+        "active_contracts_counted": spend_summary["total_contracts"],
+        "total_contract_value_of_active_contracts": spend_summary["total_value"],
+        "total_annual_cost_of_systems_plus_active_contracts": spend_summary["total_annual_cost"],
+        "annual_cost_of_active_contracts_by_category": spend_by_category,
+        "annual_cost_of_active_contracts_by_type": {
             k: v["annual_cost"] for k, v in spend_summary["by_type"].items()
         },
-        "top_vendors": [
+        "annual_cost_by_vendor_systems_plus_active_contracts": [
             {"vendor_name": name, "annual_cost": data["annual_cost"]}
             for name, data in spend_summary["top_vendors"]
         ],
@@ -390,8 +395,10 @@ def _build_spend_context(organization_id: int) -> Dict[str, Any]:
 def _build_spend_prompt(context: Dict[str, Any]) -> str:
     return (
         "You are assisting a Procurement lead reviewing vendor spend. Below "
-        "is the real, verified spend aggregate context - do not invent facts "
-        "not present in it.\n\n"
+        "is the spend context the platform counts: contracts that have lapsed, "
+        "are not active, or sit on a decommissioned system are left out, and "
+        "each figure is named for what it counts. Do not invent facts not "
+        "present in it, and do not add one figure to another.\n\n"
         f"Spend context (JSON):\n{json.dumps(context, indent=2, default=str)}\n\n"
         "Produce spend recommendations. Respond ONLY with a single JSON "
         "object with exactly these keys:\n"

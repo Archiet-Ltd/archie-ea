@@ -190,10 +190,14 @@ class TestStreamCarriesTheFailureMessage:
             "done event carries no response text for the UI to render - this "
             "is the exact server-side shape that produced 15s+ of dead air"
         )
-        assert "Admin" in response_text and "API Settings" in response_text, (
-            "the fallback message should point the user at Admin -> API "
-            "Settings, not a bare failure"
-        )
+        # The text is the one plain sentence, and it names no settings page: where to fix a provider is a
+        # link only an administrator is shown (asserted in the browser by
+        # tests/smoke/test_chat_failure_wording_journey.py), never words in the text.
+        from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
+
+        assert response_text == ASSISTANT_UNAVAILABLE, response_text
+        assert "Admin" not in response_text and "Settings" not in response_text, response_text
+        assert "error detail below" not in response_text, response_text
 
     def test_no_provider_configured_also_streams_a_visible_response(self, app, client):
         """A second, distinct _fallback() branch (no API key at all) - same
@@ -234,6 +238,11 @@ class TestStreamCarriesTheFailureMessage:
         done = done_events[0]
         assert (done.get("response") or "").strip(), "no response text to render"
         assert done.get("error"), "no error reason recorded for the missing API key case"
+        # A missing key reads the "not set up" sentence, with no settings words in the text.
+        from app.modules.ai_chat.services.failure_messages import FEATURE_INTROS
+
+        assert done["response"] == FEATURE_INTROS["chat"], done["response"]
+        assert done.get("not_set_up") is True
 
 
 class TestKeepaliveKeepsTheStreamGenuinelyBusy:

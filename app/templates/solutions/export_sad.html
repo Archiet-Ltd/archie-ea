@@ -181,9 +181,9 @@
             <div class="meta-item">
                 <div class="meta-label">Document Maturity</div>
                 <div class="meta-value">
-                    {% set mat = maturity_score|default(0) %}
-                    <span class="maturity-badge {% if mat >= 70 %}maturity-high{% elif mat >= 40 %}maturity-medium{% else %}maturity-low{% endif %}">
-                        {{ mat }} / 100
+                    {% set mat = maturity_score if maturity_score is defined and maturity_score is not none else none %}
+                    <span class="maturity-badge {% if mat is none %}maturity-low{% elif mat >= 70 %}maturity-high{% elif mat >= 40 %}maturity-medium{% else %}maturity-low{% endif %}">
+                        {{ (mat ~ ' / 100') if mat is not none else 'Not scored' }}
                     </span>
                 </div>
             </div>
@@ -389,7 +389,7 @@
                 <td>{{ t.cost_category or '—' }}</td>
                 <td>Year {{ t.year or '—' }}</td>
                 <td>{{ 'Recurring' if t.is_recurring else 'One-time' }}</td>
-                <td>{{ "{:,.0f}".format(t.amount or 0) }}</td>
+                <td>{{ "{:,.0f}".format(t.amount) if t.amount is not none else 'Not recorded' }}</td>
             </tr>
             {% endfor %}
         </tbody>

@@ -73,9 +73,25 @@ def test_pill_href_is_escaped(render):
     assert "&#34;&gt;&lt;script&gt;" in html
 
 
-def test_home_hero_uses_the_pill(client):
+def test_home_hero_carries_no_licence_pill(client):
+    """The licence line left the fold: one headline, one sentence, two buttons."""
     html = client.get("/").get_data(as_text=True)
     assert "home-hero__chip" not in html
+    assert "Self-host free" not in html
+    assert 'data-testid="home-hero"' in html
+
+
+def test_hero_partial_renders_a_given_label_as_the_pill(app):
+    hero = {
+        "testid": "home-hero",
+        "badge_long": "Open source under AGPL-3.0 &middot; Self-host free, forever",
+        "badge_short": "Open source &middot; Self-host free",
+        "title": "T",
+        "primary": ("A", "/a"),
+        "secondary": ("B", "/b"),
+        "figure": None,
+    }
+    html = app.jinja_env.get_template("public/_partials/_hero.html").render(hero=hero)
     assert "Open source &middot; Self-host free" in html
     assert "Open source under AGPL-3.0 &middot; Self-host free, forever" in html
     pill = re.search(r'<span class="[^"]*rounded-full[^"]*">\s*<span class="sm:hidden">Open source', html)

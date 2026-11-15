@@ -15,38 +15,36 @@ from .conftest import PAGE_TIMEOUT, PASSWORD
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
-def test_pricing_buy_button_leads_a_visitor_to_that_plans_checkout(browser, live_server, seeded):
+def test_pricing_with_payment_closed_leads_a_visitor_to_start_free_or_to_talk_to_us(browser, live_server, seeded):
     context = browser.new_context()
     page = context.new_page()
     try:
         page.goto(live_server + "/pricing", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        buy = page.get_by_test_id("buy-startup")
-        expect(buy).to_be_visible(timeout=PAGE_TIMEOUT)
-        # Routed through the click-tracking redirect (app/main/views.py::
-        # track_plan_click) before landing on /contact.
+        start = page.get_by_test_id("buy-startup")
+        expect(start).to_have_text("Start free")
+        # Routed through the click-tracking redirect (app/main/views.py::track_plan_click).
         expect(page.get_by_test_id("buy-enterprise")).to_have_attribute(
             "href", "/t/plan-click?plan=enterprise&next=/contact")
+        expect(page.get_by_test_id("talk-startup")).to_have_attribute(
+            "href", "/t/plan-click?plan=startup&next=/contact")
 
-        buy.click()
-        # Not signed in yet: the button opens registration and keeps the plan;
-        # someone with an account signs in from there and keeps it too.
-        page.wait_for_url(lambda url: "/account/register" in url and "plan=startup" in url,
-                          timeout=PAGE_TIMEOUT)
+        start.click()
+        page.wait_for_url(lambda url: "/account/register" in url, timeout=PAGE_TIMEOUT)
         page.get_by_test_id("register-signin").get_by_role("link", name="Sign in").click()
-        page.wait_for_url(lambda url: "/account/login" in url and "plan=startup" in url,
-                          timeout=PAGE_TIMEOUT)
+        page.wait_for_url(lambda url: "/account/login" in url, timeout=PAGE_TIMEOUT)
         page.fill("#email", seeded["emails"]["platform_admin"])
         page.fill("#password", PASSWORD)
         page.locator("#submit").click()
-        page.wait_for_url(lambda url: "/admin/billing" in url and "plan=startup" in url,
-                          timeout=PAGE_TIMEOUT)
+        page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
 
+        page.goto(live_server + "/admin/billing/?plan=startup", wait_until="domcontentloaded",
+                  timeout=PAGE_TIMEOUT)
         checkout = page.locator("#checkout")
-        expect(checkout.get_by_role("heading", name="Buy Startup")).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(checkout.get_by_role("heading", name="Startup", exact=True)).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("plan-card-startup")).to_be_visible()
         # No keys on this server: say so, and offer no payment button that cannot work.
         expect(page.get_by_test_id("checkout-unavailable")).to_contain_text(
-            "Online payment is not set up on this installation")
+            "Payment opens soon, so Startup cannot be bought here yet.")
         expect(page.get_by_test_id("checkout-submit")).to_have_count(0)
     finally:
         context.close()
@@ -63,7 +61,7 @@ def test_administrator_sees_plan_limits_and_can_choose_a_plan(browser, live_serv
                              timeout=PAGE_TIMEOUT)
         assert response.status == 200
 
-        expect(page.get_by_role("heading", name="Billing & plan", level=1)).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="Plan and billing", level=1)).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("billing-not-configured")).to_be_visible()
         plan_name = page.get_by_test_id("billing-current-plan").inner_text().strip()
         assert plan_name in {"Community", "Startup", "Team", "Enterprise"}
@@ -73,17 +71,21 @@ def test_administrator_sees_plan_limits_and_can_choose_a_plan(browser, live_serv
 
         page.get_by_test_id("plan-card-team").get_by_role("link", name="Choose Team").click()
         page.wait_for_url(lambda url: "plan=team" in url, timeout=PAGE_TIMEOUT)
-        expect(page.locator("#checkout").get_by_role("heading", name="Buy Team")).to_be_visible(
+        expect(page.locator("#checkout").get_by_role("heading", name="Team", exact=True)).to_be_visible(
             timeout=PAGE_TIMEOUT)
         expect(page.get_by_test_id("checkout-unavailable")).to_be_visible()
 
         # The state survives a reload: the chosen plan is in the address.
         page.reload(wait_until="domcontentloaded")
-        expect(page.locator("#checkout").get_by_role("heading", name="Buy Team")).to_be_visible(
+        expect(page.locator("#checkout").get_by_role("heading", name="Team", exact=True)).to_be_visible(
             timeout=PAGE_TIMEOUT)
 
-        # Invoices and billing details say why they are empty instead of showing zeros.
-        expect(page.get_by_text("Invoices are not available")).to_be_visible()
+        # Invoices say why they are empty and what to do next, instead of showing zeros.
+        expect(page.get_by_text("No invoices yet")).to_be_visible()
+        expect(page.get_by_text("We send an invoice when a paid plan is set up with you")).to_be_visible()
+        page.get_by_role("link", name="Contact us").last.click()
+        page.wait_for_url(lambda url: "/contact" in url, timeout=PAGE_TIMEOUT)
+        expect(page.locator("main").first).not_to_be_empty()
     finally:
         context.close()
 
@@ -207,8 +209,9 @@ def test_administrator_saves_billing_details_and_they_survive_a_reload(browser, 
         form.get_by_label("Purchase-order number").fill(po_number)
         form.get_by_role("button", name="Save billing details").click()
         page.wait_for_load_state("domcontentloaded")
-        expect(page.get_by_test_id("billing-page").get_by_text(
-            "Billing details saved. Future invoices carry them.")).to_be_visible(timeout=PAGE_TIMEOUT)
+        # The confirmation is the layout's toast, which sits outside the billing section.
+        expect(page.get_by_text("Billing details saved. Future invoices carry them.").first).to_be_visible(
+            timeout=PAGE_TIMEOUT)
 
         page.reload(wait_until="domcontentloaded")
         form = page.get_by_test_id("billing-details-form")
@@ -216,5 +219,84 @@ def test_administrator_saves_billing_details_and_they_survive_a_reload(browser, 
         expect(form.get_by_label("Purchase-order number")).to_have_value(po_number)
         # Held by the provider, not only echoed by the page.
         assert any(c.get("email") == invoice_email for c in stub.customers.values())
+    finally:
+        context.close()
+
+
+def _ask_questions(app, email, questions):
+    """Give the person *questions* AI questions asked this month, as kept in their conversations."""
+    import uuid
+    from datetime import datetime
+
+    from app import db
+    from app.models.conversation import ConversationMessageRecord, ConversationThreadRecord
+    from app.models.user import User
+
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        now = datetime.utcnow()
+        thread = ConversationThreadRecord(id=str(uuid.uuid4()), user_id=user.id, organization_id=user.organization_id, title="Plan usage", model="m",
+                                          created_at=now, updated_at=now)
+        db.session.add(thread)
+        db.session.flush()
+        for i in range(questions):
+            db.session.add(ConversationMessageRecord(id=str(uuid.uuid4()), thread_id=thread.id, role="user",
+                                                     content="question %d" % i, created_at=now))
+        db.session.commit()
+        db.session.remove()
+
+
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
+def test_administrator_finds_plan_people_and_ai_from_the_account_menu(browser, live_server, app, tmp_path, width, scheme):
+    import os
+
+    from .test_archetype_journeys import _login
+
+    _org_id, admin_email = _community_org(app, members=1)
+    _ask_questions(app, admin_email, 4)
+    _other_id, other_email = _community_org(app, members=0)
+    _ask_questions(app, other_email, 1)
+    shots = os.environ.get("JOURNEY_SHOT_DIR") or str(tmp_path)
+    os.makedirs(shots, exist_ok=True)
+
+    context = browser.new_context(viewport={"width": width, "height": 900 if width > 500 else 844},
+                                  color_scheme=scheme)
+    page = context.new_page()
+    try:
+        page.add_init_script(_SKIP_WELCOME)
+        _login(page, live_server, admin_email)
+        page.goto(live_server + "/dashboard", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        if width < 500:
+            page.get_by_test_id("sidebar-trigger").click()
+        page.get_by_test_id("user-menu").click()
+        entry = page.get_by_test_id("user-menu-billing")
+        expect(entry).to_have_text("Plan and billing")
+        entry.click()
+        page.wait_for_url(lambda url: "/admin/billing" in url, timeout=PAGE_TIMEOUT)
+
+        assert page.get_by_test_id("billing-current-plan").inner_text().strip() == "Community"
+        # Two people in this organisation (the administrator and one member), of the three Community admits.
+        assert page.get_by_test_id("billing-people-limit").inner_text().strip() == "2 of 3 people"
+        expect(page.get_by_test_id("property-ai-used")).to_have_text("4")
+        expect(page.get_by_test_id("property-ai-allowance")).to_have_text("No limit on your plan")
+        expect(page.get_by_test_id("property-ai-provider")).to_contain_text("The built-in AI")
+        page.screenshot(path=os.path.join(shots, "plan-and-billing-%d-%s.png" % (width, scheme)))
+
+        # The AI settings link lands on a page with content.
+        page.get_by_test_id("property-ai-provider").get_by_role("link", name="AI settings").click()
+        page.wait_for_url(lambda url: "/admin/billing" not in url, timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="AI settings", level=1)).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert len(page.locator("main").first.inner_text().strip()) > 40
+    finally:
+        context.close()
+
+    # A second organisation's administrator reads that organisation's own figures.
+    context = browser.new_context()
+    page = context.new_page()
+    try:
+        _login(page, live_server, other_email)
+        page.goto(live_server + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("property-ai-used")).to_have_text("1")
+        assert page.get_by_test_id("billing-people-limit").inner_text().strip() == "1 of 3 people"
     finally:
         context.close()

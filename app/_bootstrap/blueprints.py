@@ -91,6 +91,7 @@ def _init_blueprints(app):
     # --- Core blueprints (always registered) ---
     _register_main(app)
     _register_account(app)
+    _register_account_oauth(app)
     _register_application_mgmt(app)
     _register_admin(app, csrf)
     _register_vendors(app, csrf)
@@ -103,6 +104,9 @@ def _init_blueprints(app):
     
     # --- North Star Phase 2: ArchiMate Layer Navigation (NORTH-STAR-002) ---
     _register_archimate_layer_navigation(app)
+
+    # --- SAFe Portfolio Kanban (SAFE-3A) ---
+    _register_safe_portfolio(app)
 
     # --- Enterprise Genome (ADR 0010) — deterministic, provenance-carrying
     # emitter slices; each registers non-fatally so one broken slice degrades
@@ -218,8 +222,13 @@ def _register_optional_standalone(app):
         # every tier. Registered here (not in admin v1/v2) because it is
         # tier-independent, like billing and team below.
         ("app.modules.admin.security_routes", "admin_security_bp", None),
+        ("app.modules.admin.rate_limit_routes", "rate_limits_bp", "/admin"),
         ("app.modules.admin.billing_routes", "billing_bp", "/admin/billing"),
         ("app.modules.admin.team_routes", "team_bp", "/admin"),
+        # Education eligibility: the free plan for a confirmed university or college address.
+        ("app.modules.education", "education_bp", "/education"),
+        # Navigation v3: the platform administration tools, out of the customer sidebar.
+        ("app.modules.admin.platform_area_routes", "platform_area_bp", "/admin"),
         ("app.modules.business_model_canvas.routes", "business_model_bp", "/business-model"),
         ("app.modules.organization.routes", "organization_bp", "/organization"),
         ("app.modules.business_case.routes", "business_case_bp", "/business-case"),
@@ -383,6 +392,16 @@ def _register_main(app):
         app.register_blueprint(main_blueprint)
     except Exception as e:
         app.logger.warning("Failed to register main blueprint: %s", e)
+
+
+def _register_account_oauth(app):
+    """Continue with Google / Microsoft: one blueprint, whichever account blueprint copy is active."""
+    try:
+        from app.modules.account.oauth_routes import oauth_bp
+
+        app.register_blueprint(oauth_bp)
+    except Exception as e:
+        app.logger.error(f"[MODULE] Account sign-in with Google/Microsoft failed to register: {e}")
 
 
 def _register_account(app):
@@ -626,8 +645,8 @@ def _register_always_on_apis(app, csrf):
             raise RuntimeError(
                 "MCP_ENABLED is true but PUBLIC_BASE_URL is empty. The OAuth "
                 "issuer, every metadata URL and the MCP 'resource' identifier "
-                "are built from PUBLIC_BASE_URL — set it to this server's "
-                "externally-reachable origin (e.g. https://app.example.com) "
+                "are built from PUBLIC_BASE_URL, so set PUBLIC_BASE_URL to this "
+                "server's externally-reachable origin (e.g. https://app.example.com) "
                 "before enabling MCP_ENABLED."
             )
 
@@ -838,6 +857,15 @@ def _register_always_on_apis(app, csrf):
         app.logger.info("[BLUEPRINT] Stakeholder Map registered at /stakeholders/map")
     except Exception as e:
         app.logger.warning(f"[BLUEPRINT] Failed to register Stakeholder Map routes: {e}")
+
+    # DMN decision tables: list, table, rules, process link, evaluate, export
+    try:
+        from app.modules.architecture.routes.decision_table_routes import decision_tables_bp
+
+        app.register_blueprint(decision_tables_bp)
+        app.logger.info("[BLUEPRINT] Decision tables registered at /architecture/decision-tables")
+    except Exception as e:
+        app.logger.warning(f"[BLUEPRINT] Failed to register decision table routes: {e}")
 
     # Technical Debt Dashboard — REMOVED (depended on non-existent artifacts/*.json)
 
@@ -2342,9 +2370,31 @@ def _register_archimate_layer_navigation(app):
     """
     try:
         from app.modules.architecture.routes.archimate_layer_nav_routes import archimate_layer_nav_bp
-        
+
         app.register_blueprint(archimate_layer_nav_bp)
         app.logger.info("[BLUEPRINT] ArchiMate Layer Navigation registered at /architecture/* (NORTH-STAR-002)")
     except Exception as e:
         app.logger.warning(f"[BLUEPRINT] ArchiMate Layer Navigation registration failed: {e}")
         # Non-fatal - navigation will fall back to main composer
+
+
+def _register_safe_portfolio(app):
+    """Register SAFe Portfolio Kanban board.
+
+    Provides Portfolio Epic workflow visualization organized by state columns
+    (Funnel, Reviewing, Analyzing, Portfolio Backlog, Implementing, Done),
+    with cards ordered by WSJF priority within each column.
+
+    Routes:
+    - GET   /safe/portfolio - Kanban board view
+    - GET   /api/safe/portfolio - JSON API
+    - PATCH /api/safe/portfolio/<id> - Move state / edit WSJF
+    """
+    try:
+        from app.modules.safe_portfolio import safe_portfolio_bp, safe_portfolio_api_bp
+
+        app.register_blueprint(safe_portfolio_bp)
+        app.register_blueprint(safe_portfolio_api_bp)
+        app.logger.info("[BLUEPRINT] SAFe Portfolio Kanban registered at /safe/portfolio and /api/safe/portfolio")
+    except Exception as e:
+        app.logger.warning(f"[BLUEPRINT] SAFe Portfolio Kanban registration failed: {e}")

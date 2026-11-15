@@ -13,7 +13,7 @@ import json
 import logging
 import time
 
-from flask import Blueprint, Response, jsonify, request, stream_with_context
+from flask import Blueprint, Response, abort, jsonify, request, stream_with_context, url_for
 from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException
 from werkzeug.utils import secure_filename
@@ -22,6 +22,7 @@ from app import db
 from app.models.audit_log import AuditLog
 from app.models.batch_import import BatchImportJob, BatchJobStatus
 from app.services.batch_approval_service import BatchApprovalService
+from app.modules.import_batch.services.batch_import_service import ActiveJobExists, ImportRefused
 from app.services.batch_import_service import BatchImportService
 from app.services.import_audit_service import log_batch_approval  # dead-code-ok
 from app.services.batch_processor_service import BatchProcessorService
@@ -207,6 +208,17 @@ def create_job():
             }
         )
 
+    except ActiveJobExists as e:
+        return jsonify(
+            {
+                "success": False,
+                "error": str(e),
+                "existing_job_id": e.job_id,
+                "existing_job_url": url_for("batch_import_view.job_detail", job_id=e.job_id),
+            }
+        ), 409
+    except ImportRefused as e:
+        return jsonify({"success": False, "error": str(e)}), 400
     except ValueError as e:
         ErrorSanitizer.log_sanitized_warning(
             error=e,
@@ -352,15 +364,19 @@ def list_jobs():
             "totalCost": float(stats_query.total_cost or 0),
         }
 
+        from app.services.cost_visibility import withhold_reply
+
         return jsonify(
-            {
-                "success": True,
-                "jobs": [job.to_dict() for job in jobs],
-                "stats": stats,
-                "total": total,
-                "limit": limit,
-                "offset": offset,
-            }
+            withhold_reply(
+                {
+                    "success": True,
+                    "jobs": [job.to_dict() for job in jobs],
+                    "stats": stats,
+                    "total": total,
+                    "limit": limit,
+                    "offset": offset,
+                },
+            )
         )
 
     except HTTPException:
@@ -388,7 +404,7 @@ def get_job(job_id):
         job = BatchImportJob.query.get_or_404(job_id)
 
         if job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         job_data = job.to_dict()
         batches = [b.to_dict() for b in job.batches]
@@ -427,7 +443,7 @@ def get_job_progress(job_id):
         job = BatchImportJob.query.get_or_404(job_id)
 
         if job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         progress = import_service.get_job_progress(job_id)
 
@@ -538,7 +554,7 @@ def get_task_status(job_id, task_id):
         job = BatchImportJob.query.get_or_404(job_id)
 
         if job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         from app.tasks.import_tasks import get_import_status
 
@@ -594,6 +610,17 @@ def stream_job_progress(job_id):
     # Refuse before the stream opens: a 200 text/event-stream for a job that does
     # not exist is a stream of invented progress.
     require_entity(BatchImportJob, job_id, description="Job not found")
+    # Another person's job is answered as not found, with no event about it.
+    if BatchImportJob.query.get(job_id).user_id != current_user.id:
+        abort(404, description="Job not found")
+
+    # The stream processes the job and stores what it imports, so it is a write that the browser's
+    # event source can only ask for with GET: the one write rule is asked here, before it opens.
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
 
     def generate():
         """Generator function for SSE events."""
@@ -1242,7 +1269,7 @@ def list_batches(job_id):
         job = BatchImportJob.query.get_or_404(job_id)
 
         if job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         batches = [b.to_dict() for b in job.batches]
         return jsonify(
@@ -1272,7 +1299,7 @@ def get_batch(batch_id):
 
         batch = BatchImportBatch.query.get_or_404(batch_id)
         if batch.job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         return jsonify(
             {
@@ -1298,7 +1325,7 @@ def get_batch_elements(batch_id):
 
         batch = BatchImportBatch.query.get_or_404(batch_id)
         if batch.job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         status = request.args.get("status")
         layer = request.args.get("layer")
@@ -1341,7 +1368,7 @@ def approve_batch(batch_id):
 
         batch = BatchImportBatch.query.get_or_404(batch_id)
         if batch.job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         data = request.json or {}
         notes = data.get("notes")
@@ -1391,7 +1418,7 @@ def reject_batch(batch_id):
 
         batch = BatchImportBatch.query.get_or_404(batch_id)
         if batch.job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         data = request.json or {}
         reason = data.get("reason", "Rejected by user")
@@ -1428,9 +1455,11 @@ def commit_batch(batch_id):
 
         batch = BatchImportBatch.query.get_or_404(batch_id)
         if batch.job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
-        batch = approval_service.commit_batch(batch_id, current_user.id)
+        batch, status_refusals = approval_service.commit_batch_with_refusals(
+            batch_id, current_user.id
+        )
 
         batch_data = batch.to_dict()
         return jsonify(
@@ -1438,6 +1467,7 @@ def commit_batch(batch_id):
                 "success": True,
                 "data": batch_data,
                 "batch": batch_data,
+                "status_refusals": status_refusals,
                 "committed_count": batch_data.get("elements_approved", 0),
                 "message": "Batch committed",
             }
@@ -1461,7 +1491,7 @@ def retry_batch(batch_id):
 
         batch = BatchImportBatch.query.get_or_404(batch_id)
         if batch.job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         batch = processor_service.recover_batch(batch_id)
 
@@ -1491,7 +1521,7 @@ def auto_approve_batch(batch_id):
 
         batch = BatchImportBatch.query.get_or_404(batch_id)
         if batch.job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         data = request.json or {}
         threshold = data.get("threshold", 0.85)
@@ -1531,7 +1561,7 @@ def get_element(element_id):
 
         element = BatchImportElement.query.get_or_404(element_id)
         if element.batch.job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         return jsonify(
             {
@@ -1557,7 +1587,7 @@ def update_element(element_id):
 
         element = BatchImportElement.query.get_or_404(element_id)
         if element.batch.job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         data = request.json
         if not data:
@@ -1595,7 +1625,7 @@ def approve_element(element_id):
 
         element = BatchImportElement.query.get_or_404(element_id)
         if element.batch.job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         element = approval_service.approve_element(element_id, current_user.id)
 
@@ -1627,7 +1657,7 @@ def reject_element(element_id):
 
         element = BatchImportElement.query.get_or_404(element_id)
         if element.batch.job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         data = request.json or {}
         reason = data.get("reason", "Rejected by user")
@@ -1674,7 +1704,7 @@ def process_single_batch(job_id, batch_id):
 
         job = BatchImportJob.query.get_or_404(job_id)
         if job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         batch = BatchImportBatch.query.get_or_404(batch_id)
         if batch.job_id != job_id:
@@ -1720,7 +1750,7 @@ def get_job_preview(job_id):
 
         job = BatchImportJob.query.get_or_404(job_id)
         if job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         from app.services.import_preview_service import ImportPreviewService
 
@@ -1755,7 +1785,7 @@ def resolve_import_conflicts(job_id):
 
         job = BatchImportJob.query.get_or_404(job_id)
         if job.user_id != current_user.id:
-            return jsonify({"success": False, "error": "Access denied"}), 403
+            return jsonify({"success": False, "error": "Not found"}), 404
 
         data = request.json
         if not data or "resolutions" not in data:

@@ -14,17 +14,32 @@
             newSprint: { name: "", startDate: "", endDate: "", capacityPoints: 0 },
 
             async init() {
-                await this._resolveBoardId();
+                try {
+                    await this._resolveBoardId();
+                } catch (e) {
+                    if (this._isNotOpen(e)) return;
+                    throw e;
+                }
                 if (this.boardId) {
                     await this.loadSprints();
                 }
             },
 
+            // The server answers a feature the released waves keep closed with an early_access error.
+            _isNotOpen(e) {
+                return !!(e && e.data && e.data.error === "early_access");
+            },
+
             async _resolveBoardId() {
                 try {
-                    const data = await Platform.fetch("/api/sprints/default-board");
+                    const data = await Platform.fetch.get("/api/sprints/default-board", null, { silent: true });
                     this.boardId = data.board_id;
                 } catch (e) {
+                    // Not open yet is not a failure: leave the panel without a board and say nothing.
+                    if (this._isNotOpen(e)) {
+                        this.boardId = null;
+                        throw e;
+                    }
                     // Could not resolve board_id; surface the failure to the user.
                     if (window.Platform && Platform.toast) {
                         Platform.toast.error("Could not load the sprint board");

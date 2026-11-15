@@ -83,7 +83,7 @@ class RequirementGeneratorService:
                 logger.error(f"LLM API error: {str(llm_error)}")
                 return {
                     "status": "error",
-                    "error": f"LLM API error: {str(llm_error)}. Please configure API settings at /admin/api-settings",
+                    "error": f"LLM API error: {str(llm_error)}. Please check AI settings at /admin/api-settings",
                 }
 
             # Parse LLM response

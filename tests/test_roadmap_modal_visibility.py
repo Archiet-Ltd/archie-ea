@@ -10,6 +10,8 @@ import pytest
 from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
 from playwright.sync_api import expect, sync_playwright
 
+from app.basecoat_kit import register_basecoat_helpers
+
 ROOT = Path(__file__).resolve().parents[1]
 BASE = 'http://roadmap.test'
 MODAL = '#roadmap-work-package-modal'
@@ -32,6 +34,7 @@ def page_html():
     env = Environment(loader=ChoiceLoader([
         DictLoader({'layouts/admin_base.html': base}), FileSystemLoader(ROOT / 'app/templates')
     ]), autoescape=True)
+    register_basecoat_helpers(env)
     return env.get_template('applications/roadmap.html').render(
         application={'id': 32, 'name': 'Payments'},
         work_packages=[{'id': 7, 'name': 'Existing migration', 'description': 'Move application',
@@ -104,6 +107,9 @@ def test_initial_and_dismissed_dialog_have_no_layout_or_pointer_surface(page):
 
 
 def test_edit_opens_with_existing_values_and_keyboard_stays_in_dialog(page):
+    # The Edit control lives in the List view; the Timeline bars open the
+    # editor too, but the row controls follow the List layout.
+    page.get_by_role('tab', name='List').click()
     row = page.get_by_role('row').filter(has_text='Existing migration')
     row.get_by_role('button', name='Edit', exact=True).click(timeout=3000)
     modal = page.locator(MODAL)

@@ -7,6 +7,8 @@ No field is authorized merely because a model acquires a new column.
 """
 import math
 
+from app.services.application_status import status_for_write
+
 
 def validate_manual_application_import(data, *, rich=False):
     options = {"applications", "duplicate_mode"}
@@ -94,6 +96,10 @@ def validate_manual_application_import(data, *, rich=False):
                 limit = text_fields[field]
                 if limit is not None and len(value) > limit:
                     raise ValueError(f"Row {index}: {field} exceeds {limit} characters")
+                if field == "deployment_status":
+                    value, refusal = status_for_write(value)
+                    if refusal:
+                        raise ValueError(f"Row {index}: {refusal}")
             elif field in booleans:
                 if isinstance(value, str) and value.lower() in ("true", "false", "yes", "no", "1", "0"):
                     value = value.lower() in ("true", "yes", "1")

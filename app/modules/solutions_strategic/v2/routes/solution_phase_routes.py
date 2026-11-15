@@ -1,8 +1,9 @@
 from app.services.archimate_backbone import sync_archimate_element
+from app.services.cost_visibility import ROLLUP_FIGURE_KEYS
 import csv
 import io
 import logging
-from flask import abort, jsonify, request, url_for
+from flask import abort, jsonify, redirect, request, url_for
 from flask_login import current_user, login_required
 from app import db
 from app.models.solution_models import Solution
@@ -160,12 +161,15 @@ def get_solution_risks(solution_id):
     its replacement already exists on the canonical side, so it is never
     shown twice.
     """
+    if request.accept_mimetypes.best_match(["application/json", "text/html"]) == "text/html":
+        # A person's browser lands on the record's Risks tab; scripts keep the data.
+        return redirect(url_for("solution_design.view_solution", solution_id=solution_id, tab="risks"))
     Solution.query.get_or_404(solution_id)
     from datetime import datetime as _datetime
 
-    from app.models.solution_lifecycle_models import SolutionRisk
     from app.services import risk_service
 
+    canonical, legacy = risk_service.solution_risk_sources(solution_id)
     canonical_rows = [
         (risk.created_at or _datetime.min, _solution_risk_dict(
             risk,
@@ -176,14 +180,9 @@ def get_solution_risks(solution_id):
             mitigation=risk.mitigation_plan,
             owner=risk.owner,
         ))
-        for risk in risk_service.risks_linked_to("solution", solution_id)
+        for risk in canonical
     ]
-    legacy_rows = [
-        (risk.created_at or _datetime.min, risk.to_dict())
-        for risk in SolutionRisk.query.filter_by(solution_id=solution_id)
-        .filter(SolutionRisk.retired_into_risk_id.is_(None))
-        .all()
-    ]
+    legacy_rows = [(risk.created_at or _datetime.min, risk.to_dict()) for risk in legacy]
     rows = sorted(canonical_rows + legacy_rows, key=lambda pair: pair[0], reverse=True)
     return jsonify({"success": True, "data": [row[1] for row in rows]})
 
@@ -674,6 +673,11 @@ def get_solution_stakeholders(solution_id):
 def create_solution_stakeholder(solution_id):
     """Add a stakeholder (Phase A — Motivation layer)."""
     Solution.query.get_or_404(solution_id)
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
     from app.models.solution_sad_models import SolutionStakeholderSAD
     data = request.get_json() or {}
     err_response, err_status = _validate_entity(data, ["name"])
@@ -705,6 +709,11 @@ def delete_solution_stakeholder(solution_id, row_id):
     # The solution is tenant-fenced: a solution id from another organisation is a 404,
     # so its stakeholder rows are never reached through the URL.
     require_entity(Solution, solution_id, description="Solution not found")
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
     row = SolutionStakeholderSAD.query.filter_by(id=row_id, solution_id=solution_id).first_or_404()
     db.session.delete(row)
     db.session.commit()
@@ -2140,16 +2149,23 @@ def phase_h_review(solution_id: int):
             "owner": r.owner,
         })
 
-    # Sync outcomes to ArchiMate
+    # Sync outcomes to ArchiMate. Reading the review never stores anything for a person whose
+    # organisation role is viewer: the sync is skipped for them and the page reports reads only.
     archimate_outcomes = []
     try:
-        from app.services.solution_archimate_sync_service import sync_phase_h_outcomes
-        archimate_outcomes = sync_phase_h_outcomes(solution_id)
-        db.session.commit()
+        from app.core.auth.permissions import is_read_only_member
+        if not is_read_only_member(current_user):
+            from app.services.solution_archimate_sync_service import sync_phase_h_outcomes
+            archimate_outcomes = sync_phase_h_outcomes(solution_id)
+            db.session.commit()
     except Exception as e:
         logger.warning(f"Phase H outcome sync failed: {e}")
 
-    return jsonify({
+    from app.services.cost_visibility import withhold_reply
+
+    return jsonify(
+        withhold_reply(
+        {
         "success": True,
         "metrics": metric_results,
         "cost_variance": cost_variance,
@@ -2160,7 +2176,10 @@ def phase_h_review(solution_id: int):
                   / max(1, len([m for m in metric_results if m["achievement_pct"] is not None])), 1)
             if any(m["achievement_pct"] is not None for m in metric_results) else None
         ),
-    })
+    },
+        keys=ROLLUP_FIGURE_KEYS
+        )
+    )
 
 
 @solution_design_bp.route("/<int:solution_id>/phase-h/new-cycle", methods=["POST"])

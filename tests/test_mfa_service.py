@@ -36,11 +36,14 @@ def _make_plain_user(db_session, org):
     return user
 
 
-def test_required_for_is_false_for_an_ordinary_user(app, db_session, make_org):
-    # required_for consults the database (is_org_admin_anywhere), so an
-    # ordinary user must be a real row inside an application context.
+def test_required_for_is_true_for_an_ordinary_user_and_false_for_a_service_account(app, db_session, make_org):
+    # Every human account has a first week and then sets up two-factor sign-in;
+    # an ordinary user is not an administrator, though.
     user = _make_plain_user(db_session, make_org("mfa-ordinary"))
 
+    assert mfa_service.required_for(user) is True
+    assert mfa_service.is_administrator(user) is False
+    user.is_service_user = True
     assert mfa_service.required_for(user) is False
 
 

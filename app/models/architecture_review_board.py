@@ -239,6 +239,25 @@ class ARBException(TenantMixin, db.Model):
     approver = db.relationship("User", foreign_keys=[approved_by_id], backref="approved_exceptions")
     denier = db.relationship("User", foreign_keys=[denied_by_id], backref="denied_exceptions")
     parent = db.relationship("ARBException", remote_side=[id], backref="renewals")
+    standard = db.relationship(
+        "ARBGovernanceStandard",
+        primaryjoin="foreign(ARBException.standard_id) == ARBGovernanceStandard.id",
+        viewonly=True,
+    )
+    review_item = db.relationship(
+        "ARBReviewItem",
+        primaryjoin="foreign(ARBException.review_item_id) == ARBReviewItem.id",
+        viewonly=True,
+    )
+
+    @staticmethod
+    def generate_exception_number():
+        """Next exception number, unique across every organisation (see ``next_reference``)."""
+        from app.utils.reference_numbers import next_reference
+
+        return next_reference(
+            "arb_exceptions", "exception_number", f"EXC-{datetime.utcnow().year}-", width=3
+        )
 
 
 # Default workflow stages and lightweight ARBWorkflowStage model

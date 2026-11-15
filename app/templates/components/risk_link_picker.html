@@ -1,0 +1,94 @@
+{#
+  The one picker that links a risk to what it touches: an Application, Capability, Solution, Programme, Product, Goal, Driver or Business actor.
+  Used by the register's slide-over (one link at a time, saved at once) and by the Add Risk dialog
+  (several links kept as removable chips, saved with the risk in one request).
+
+  Import the script with context:
+    {% from 'components/risk_link_picker.html' import risk_link_picker, risk_link_picker_script with context %}
+  The Alpine component that hosts the picker spreads `riskLinkPicker()` into its state and defines the
+  method named by `pick` (it receives the chosen {id, name, type}).
+#}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/select.html' import native_select %}
+
+{% macro risk_link_picker(pick, chips=false, testid='risk-link-picker') %}
+<div class="space-y-2" data-testid="{{ testid }}">
+    <div class="flex gap-2">
+        {% call native_select(size='sm', aria_label='Entity type to link', options=[('application','Application'),('capability','Capability'),('solution','Solution'),('programme','Programme'),('product','Product'),('goal','Goal'),('driver','Driver'),('actor','Business actor')], attrs_dict={'x-model': 'linkType', 'class': 'h-8 text-xs'}) %}{% endcall %}
+        {{ input(type='text', size='xs', aria_label='Search entities to link', attrs_dict={'x-model': 'linkSearch', '@input.debounce.300ms': 'searchLinkEntities()', ':placeholder': "'Search ' + linkKinds[linkType].plural + '…'"}) }}
+    </div>
+    <div x-show="linkResults.length > 0" x-cloak class="max-h-40 overflow-y-auto rounded-md border border-border divide-y divide-border">
+        <template x-for="entity in linkResults" :key="entity.id">
+            {% call button(type='button', variant='ghost', size='bare', class='w-full text-left px-2.5 py-1.5 text-xs', attrs_dict={'@click': pick, 'x-text': 'entity.name', 'data-testid': 'risk-link-choice'}) %}{% endcall %}
+        </template>
+    </div>
+    <p x-show="linkSearch.trim().length >= 2 && linkResults.length === 0 && !linkSearching && !linkFailed" x-cloak class="text-xs text-muted-foreground">Nothing matches that search. Try part of the name.</p>
+    <p x-show="linkFailed && !linkSearching" x-cloak class="text-xs text-destructive" data-testid="risk-link-search-failed" role="alert">The search could not run.
+        {% call button(type='button', variant='link', size='bare', class='text-xs', attrs_dict={'@click': 'searchLinkEntities()'}) %}Try again{% endcall %}</p>
+    {% if chips %}
+    <ul class="flex flex-wrap gap-2" data-testid="risk-link-chips" x-show="pendingLinks.length > 0" x-cloak>
+        <template x-for="chip in pendingLinks" :key="chip.type + ':' + chip.id">
+            <li class="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-1 text-xs text-foreground" data-testid="risk-link-chip">
+                <span class="text-muted-foreground" x-text="chip.kind + ':'"></span>
+                <span x-text="chip.name"></span>
+                {{ button(text='', icon='x', variant='bare', size='bare', aria_label='Remove this link', class='text-muted-foreground hover:text-destructive-emphasis', attrs_dict={'@click': 'removeChip(chip)', 'x-bind:aria-label': "'Remove ' + chip.name"}) }}
+            </li>
+        </template>
+    </ul>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro risk_link_picker_script() %}
+<script>
+// State and search shared by every host of the risk link picker.
+function riskLinkPicker() {
+    return {
+        linkType: 'application',
+        // What each kind in the list is. Product, Goal, Driver and Business actor are ArchiMate elements: they
+        // are saved as an element link and searched by element type.
+        linkKinds: {
+            application: { label: 'application', plural: 'applications', saves: 'application' },
+            capability: { label: 'capability', plural: 'capabilities', saves: 'capability' },
+            solution: { label: 'solution', plural: 'solutions', saves: 'solution' },
+            programme: { label: 'programme', plural: 'programmes', saves: 'programme' },
+            product: { label: 'product', plural: 'products', saves: 'archimate_element', element: 'Product' },
+            goal: { label: 'goal', plural: 'goals', saves: 'archimate_element', element: 'Goal' },
+            driver: { label: 'driver', plural: 'drivers', saves: 'archimate_element', element: 'Driver' },
+            actor: { label: 'business actor', plural: 'business actors', saves: 'archimate_element', element: 'BusinessActor' }
+        },
+        linkSearch: '',
+        linkResults: [],
+        linkSearching: false,
+        linkFailed: false,
+
+        searchLinkEntities() {
+            const q = this.linkSearch.trim();
+            if (q.length < 2) { this.linkResults = []; this.linkFailed = false; return; }
+            const self = this;
+            const endpoints = {
+                application: '/applications/api/list?search=' + encodeURIComponent(q) + '&limit=10',
+                capability: '/solutions/capabilities/search?limit=10&q=' + encodeURIComponent(q),
+                solution: '/api/solutions/search?q=' + encodeURIComponent(q),
+                programme: '/api/programmes/search?q=' + encodeURIComponent(q)
+            };
+            const type = this.linkType;
+            const kind = this.linkKinds[type];
+            if (kind.element) {
+                endpoints[type] = '/archimate/api/elements/search?limit=10&type=' + kind.element + '&q=' + encodeURIComponent(q);
+            }
+            this.linkSearching = true;
+            this.linkFailed = false;
+            Platform.fetch.get(endpoints[type], null, { silent: true })
+                .then(function (data) {
+                    const rows = data.applications || data.items || data.capabilities || data.data || data || [];
+                    self.linkResults = rows.map(function (r) { return { id: r.id, name: r.name, type: kind.saves, kind: kind.label }; });
+                })
+                .catch(function () { self.linkResults = []; self.linkFailed = true; })
+                .finally(function () { self.linkSearching = false; });
+        }
+    };
+}
+</script>
+{% endmacro %}

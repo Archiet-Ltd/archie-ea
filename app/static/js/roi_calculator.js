@@ -120,12 +120,28 @@ function getAllScenarios() {
  */
 function formatCurrency(value) {
     if (value === null || value === undefined) return 'N/A';
-    return new Intl.NumberFormat('en-US', { 
-        style: 'currency', 
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(value);
+    const symbol = currencySymbol();
+    const digits = Math.abs(value).toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return (value < 0 ? '-' : '') + symbol + digits;
+}
+
+/**
+ * The organisation's currency symbol, from the one currency manager.
+ *
+ * @returns {string} Currency symbol
+ */
+function currencySymbol() {
+    return window.currencyManager ? window.currencyManager.getSymbol() : '';
+}
+
+/**
+ * Format a value in millions with the organisation's currency symbol
+ *
+ * @param {number|string} millions - Value already expressed in millions
+ * @returns {string} For example "£0.1M"
+ */
+function formatCurrencyMillions(millions) {
+    return currencySymbol() + millions + 'M';
 }
 
 /**
@@ -219,14 +235,14 @@ function exportToCSV(scenarios, filename = 'scenario_comparison.csv') {
     // CSV rows
     const rows = scenarios.map(scenario => [
         scenario.name || 'Unknown',
-        scenario.investment || 0,
-        scenario.annualBenefit || 0,
+        scenario.investment ?? 'Not estimated',
+        scenario.annualBenefit ?? 'Not recorded',
         scenario.roi?.toFixed(2) || 'N/A',
         scenario.paybackPeriod?.toFixed(1) || 'N/A',
         scenario.npv?.toFixed(0) || 'N/A',
-        scenario.strategic_score || 0,
-        scenario.risk_score || 0,
-        scenario.priority || 'MEDIUM'
+        scenario.strategic_score == null ? 'Not scored' : `${scenario.strategic_score} / 25`,
+        scenario.risk_count ? `${scenario.risk_score} / 25` : 'No risks linked',
+        scenario.priority || 'Not scored'
     ]);
 
     // Build CSV content

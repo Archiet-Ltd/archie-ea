@@ -39,6 +39,8 @@
      ) }}
 #}
 
+{% from 'basecoat/dropdown-menu.html' import dropdown_menu, dropdown_menu_trigger, dropdown_menu_content, dropdown_menu_item %}
+
 {# ── Script-only macro: call this OUTSIDE any <template x-if/x-for> ── #}
 {% macro data_table_script() %}
 <script>
@@ -392,22 +394,16 @@ if (!window._dataTableEngine) {
                                isn't already mitigated or closed. Each action is
                                {label, click, show_when (optional), variant (optional 'danger')}
                                with `row` in scope for both `click` and `show_when` JS expressions. #}
-                            <div class="flex items-center justify-end gap-1 whitespace-nowrap">
+                            {% call dropdown_menu() %}
+                              {% call dropdown_menu_trigger(variant='ghost', size='icon', class='size-8 data-[state=open]:bg-muted') %}{{ lucide('ellipsis') }}<span class="sr-only">Row actions</span>{% endcall %}
+                              {% call dropdown_menu_content(align='end', class='w-[180px]') %}
                                 {% for action in col.get('actions', []) %}
                                 <template x-if="{{ action.get('show_when', 'true') }}">
-                                    <button type="button" @click="{{ action.click }}"
-                                            {% if action.get('disabled_when') %}:disabled="{{ action.disabled_when }}"{% endif %}
-                                            class="inline-flex items-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50 {{ 'text-destructive-emphasis' if action.get('variant') == 'danger' else '' }}">
-                                        {{ action.label }}
-                                    </button>
+                                  {{ dropdown_menu_item(text=action.label, variant=('destructive' if action.get('variant') == 'danger' else none), attrs={'@click': action.click, ':aria-disabled': action.get('disabled_when', 'false')}) }}
                                 </template>
                                 {% endfor %}
-                                {% if col.get('else_text') %}
-                                <template x-if="!({{ col.get('actions', []) | map(attribute='show_when', default='true') | join(' || ') }})">
-                                    <span class="text-xs text-muted-foreground">{{ col.else_text }}</span>
-                                </template>
-                                {% endif %}
-                            </div>
+                              {% endcall %}
+                            {% endcall %}
                             {% else %}
                             <span x-text="row['{{ col.key }}'] || '—'"></span>
                             {% endif %}

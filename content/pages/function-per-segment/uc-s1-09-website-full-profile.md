@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: function-per-segment
 use_case_id: UC-S1-09
 segment_id: S1
@@ -26,7 +27,7 @@ Canvas candidates drafted directly from your own public pages, each shown with t
 came from and the passage that supports it — a draft to confirm or correct, never a blank page you
 have to fill alone.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Early access. Join the waiting list and we'll email you when you can use it.
 
 ## Related
 

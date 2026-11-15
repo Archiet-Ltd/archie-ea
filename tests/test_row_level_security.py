@@ -44,8 +44,9 @@ REPO = Path(__file__).resolve().parents[1]
 MIGRATION_PATH = REPO / "migrations" / "versions" / "20261008_row_level_security.py"
 NOTIF_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261011_notif_rls.py"
 TECHDEBT_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261016_technical_debt_rls.py"
-RUNTIME_ROLE = "archie_rls_test_runtime"
-RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run
+DECISION_RULES_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261102_decision_rules_rls.py"
+RUNTIME_ROLE_BASE = "archie_rls_test_runtime"
+RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run per worker process
 
 
 def _load_migration(path, name):
@@ -58,6 +59,9 @@ def _load_migration(path, name):
 MIGRATION = _load_migration(MIGRATION_PATH, "rls_migration_under_test")
 NOTIF_MIGRATION = _load_migration(NOTIF_MIGRATION_PATH, "notif_rls_migration_under_test")
 TECHDEBT_MIGRATION = _load_migration(TECHDEBT_MIGRATION_PATH, "techdebt_rls_migration_under_test")
+DECISION_RULES_MIGRATION = _load_migration(
+    DECISION_RULES_MIGRATION_PATH, "decision_rules_rls_migration_under_test"
+)
 
 
 def _apply_policies(engine):
@@ -91,12 +95,21 @@ def _apply_techdebt_policies(engine):
             TECHDEBT_MIGRATION.upgrade()
 
 
+def _apply_decision_rules_policies(engine):
+    """Run the decision-rules fence upgrade() on ``engine`` (idempotent)."""
+    with engine.begin() as connection:
+        context = MigrationContext.configure(connection)
+        with Operations.context(context):
+            DECISION_RULES_MIGRATION.upgrade()
+
+
 class RlsEnv:
     """Two engines on the test database: the owner/superuser and the runtime role."""
 
-    def __init__(self, owner, runtime):
+    def __init__(self, owner, runtime, role_name):
         self.owner = owner
         self.runtime = runtime
+        self.role_name = role_name
 
     @contextlib.contextmanager
     def runtime_tx(self, org_id=None, *, platform=False, commit=False, app=None):
@@ -125,40 +138,52 @@ class RlsEnv:
 
 
 @pytest.fixture(scope="module")
-def rls(app, _schema):
+def rls(app, _schema, request, run_id):
     from app import db
 
     with app.app_context():
         url = db.engine.url
+    
+    # Roles are cluster-level, not database-level: the name carries the worker id and
+    # this run's id so concurrent runs never share one, and teardown drops it.
+    worker_id = getattr(request.config, "workerinput", {}).get("workerid", "master")
+    role_name = f"{RUNTIME_ROLE_BASE}_{worker_id}_{run_id}"
+
     owner = create_engine(url, poolclass=NullPool)
     with owner.begin() as connection:
         exists = connection.execute(
-            text("SELECT 1 FROM pg_roles WHERE rolname = :r"), {"r": RUNTIME_ROLE}
+            text("SELECT 1 FROM pg_roles WHERE rolname = :r"), {"r": role_name}
         ).scalar()
         if not exists:
-            connection.execute(text(f"CREATE ROLE {RUNTIME_ROLE}"))  # nosec B608 - module constant
+            connection.execute(text(f"CREATE ROLE {role_name}"))  # nosec B608 - test-only role
         connection.execute(
             text(
-                f"ALTER ROLE {RUNTIME_ROLE} WITH LOGIN PASSWORD '{RUNTIME_PASSWORD}' "  # nosec B608 - test-only role, generated password
+                f"ALTER ROLE {role_name} WITH LOGIN PASSWORD '{RUNTIME_PASSWORD}' "  # nosec B608 - test-only role, generated password
                 "NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS"
             )
         )
-        connection.execute(text(f"GRANT USAGE ON SCHEMA public TO {RUNTIME_ROLE}"))
+        connection.execute(text(f"GRANT USAGE ON SCHEMA public TO {role_name}"))
         connection.execute(
-            text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {RUNTIME_ROLE}")
+            text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {role_name}")
         )
         connection.execute(
-            text(f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {RUNTIME_ROLE}")
+            text(f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {role_name}")
         )
     _apply_policies(owner)
     _apply_notif_policies(owner)
     _apply_techdebt_policies(owner)
+    _apply_decision_rules_policies(owner)
     runtime = create_engine(
-        url.set(username=RUNTIME_ROLE, password=RUNTIME_PASSWORD), poolclass=NullPool
+        url.set(username=role_name, password=RUNTIME_PASSWORD), poolclass=NullPool
     )
-    yield RlsEnv(owner, runtime)
-    runtime.dispose()
-    owner.dispose()
+    try:
+        yield RlsEnv(owner, runtime, role_name)
+    finally:
+        runtime.dispose()
+        with owner.begin() as connection:
+            connection.execute(text(f"DROP OWNED BY {role_name}"))  # nosec B608 - test-only role
+            connection.execute(text(f"DROP ROLE IF EXISTS {role_name}"))  # nosec B608 - test-only role
+        owner.dispose()
 
 
 # --------------------------------------------------------------------------- #
@@ -307,10 +332,10 @@ def test_runtime_role_is_not_superuser_not_bypassrls_and_not_owner(rls):
                 "WHERE rolname = current_user"
             )
         ).one()
-    assert user == RUNTIME_ROLE
+    assert user == rls.role_name
     assert is_super is False
     assert bypass is False
-    assert owner != RUNTIME_ROLE
+    assert owner != rls.role_name
     assert tuple(attrs) == (False, False, False, False)
 
 
@@ -430,6 +455,10 @@ def test_a_later_fencing_revision_covers_a_table_the_first_one_does_not():
 
 
 def test_every_present_table_has_four_policies_enabled_not_forced(rls):
+    """Asserts every fenced table has row-level security enabled AND forced, with
+    its four policies. The name is kept from the time the tables were only
+    enabled; since 20261104_force_rls the owner is bound too, so "not forced"
+    in the name no longer describes what is asserted."""
     tenant = _fenced(rls, MIGRATION.TENANT_TABLES)
     hybrid = _fenced(rls, MIGRATION.HYBRID_TABLES)
     assert len(tenant) > 200 and len(hybrid) >= 13
@@ -446,11 +475,11 @@ def test_every_present_table_has_four_policies_enabled_not_forced(rls):
     by_name = {r[0]: r for r in rows}
     for table in tenant:
         _, enabled, forced, policies = by_name[table]
-        assert enabled and not forced, table
+        assert enabled and forced, table  # forced since 20261104_force_rls: the owner is bound too
         assert policies == sorted(MIGRATION.TENANT_POLICIES), table
     for table in hybrid:
         _, enabled, forced, policies = by_name[table]
-        assert enabled and not forced, table
+        assert enabled and forced, table  # forced since 20261104_force_rls: the owner is bound too
         assert policies == sorted(MIGRATION.HYBRID_POLICIES), table
 
 
@@ -793,6 +822,49 @@ def test_technical_debt_is_scoped_to_the_session_organisation(rls, world):
         assert _count(connection, "technical_debt") == 0
 
 
+def test_decision_rules_of_another_organisation_are_not_readable(rls, world):
+    a, b = world.org("a"), world.org("b")
+    with rls.owner.begin() as connection:
+        elements = [
+            connection.execute(
+                text(
+                    "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                    "VALUES (:n, 'BusinessObject', 'Business', :o) RETURNING id"
+                ),
+                {"n": f"Decision {o}", "o": o},
+            ).scalar_one()
+            for o in (a, b)
+        ]
+        ids = [
+            connection.execute(
+                text(
+                    "INSERT INTO decision_rules (organization_id, element_id, position, input_entries, "
+                    "output_entries) VALUES (:o, :e, 1, '[]', '[]') RETURNING id"
+                ),
+                {"o": o, "e": e},
+            ).scalar_one()
+            for o, e in zip((a, b), elements)
+        ]
+    world.extra_deletes.append(("decision_rules", "id", ids))
+    world.extra_deletes.append(("archimate_elements", "id", elements))
+    with rls.runtime_tx(a) as connection:
+        seen = {r[0] for r in connection.execute(text("SELECT id FROM decision_rules"))}
+        deleted = connection.execute(text("DELETE FROM decision_rules")).rowcount
+    assert ids[0] in seen and ids[1] not in seen
+    assert deleted == 1
+    with rls.runtime_tx(a) as connection:
+        with pytest.raises(DBAPIError):
+            connection.execute(
+                text(
+                    "INSERT INTO decision_rules (organization_id, element_id, position, input_entries, "
+                    "output_entries) VALUES (:o, :e, 2, '[]', '[]')"
+                ),
+                {"o": b, "e": elements[1]},
+            )
+    with rls.runtime_tx(None) as connection:
+        assert _count(connection, "decision_rules") == 0
+
+
 def test_event_log_partitioned_parent_is_filtered(rls, world):
     """event_log is partitioned by month in production; the policies sit on the
     parent only. Postgres applies a partitioned table's own policies when the
@@ -837,7 +909,7 @@ def test_partitioned_table_policies_apply_to_the_parent_when_queried_directly(rl
                 f"(organization_id = {MIGRATION._ORG})"
             )
         )
-        connection.execute(text(f"GRANT SELECT ON {parent}, {child}, {default} TO {RUNTIME_ROLE}"))  # nosec B608
+        connection.execute(text(f"GRANT SELECT ON {parent}, {child}, {default} TO {rls.role_name}"))  # nosec B608
         connection.execute(text(f"INSERT INTO {parent} (organization_id) VALUES (1), (2)"))  # nosec B608
     try:
         with rls.runtime_tx(2) as connection:
@@ -1272,26 +1344,44 @@ def test_platform_admin_installs_an_extension_and_runs_a_migration_as_the_runtim
 def test_platform_admin_seeds_the_shared_industry_frameworks_as_the_runtime_role(app, rls, world, client, login_as):
     home = world.org("home")
     admin_id = _make_user(world, home, "padm", role="Administrator", platform=True)
+    from app.modules.industry_apqc.framework_data import FRAMEWORKS
+
+    # The shared database already holds every default framework, so the route would have nothing
+    # to write. Set one aside under a held code (its processes stay attached) and restore it after.
+    target = FRAMEWORKS[0]["industry_code"]
+    held = f"H{uuid.uuid4().hex[:8]}".upper()
     with rls.owner.begin() as connection:
-        # Remove the default frameworks that carry no processes so the route has rows to write.
-        removed = connection.execute(
-            text(
-                "DELETE FROM industry_apqc_framework f WHERE NOT EXISTS "
-                "(SELECT 1 FROM industry_apqc_process p WHERE p.industry_framework_id = f.id) "
-                "RETURNING industry_code"
+        connection.execute(
+            text("UPDATE industry_apqc_framework SET industry_code = :h WHERE industry_code = :c AND organization_id IS NULL"),
+            {"h": held, "c": target},
+        )
+    try:
+        with _app_runs_as(app, rls.runtime):
+            response = _logged_in_post(app, client, login_as, admin_id, "post", "/industry-apqc/api/seed-frameworks")
+            assert response.status_code == 200, response.get_data(as_text=True)
+        body = response.get_json()
+        created = [row["industry_code"] for row in body["created_frameworks"]]
+        assert body["total_created"] == len(created)
+        assert created == [target]
+        with rls.owner.connect() as connection:
+            row = connection.execute(
+                text("SELECT organization_id FROM industry_apqc_framework WHERE industry_code = :c"), {"c": target}
+            ).one()
+        assert row.organization_id is None
+    finally:
+        with rls.owner.begin() as connection:
+            connection.execute(
+                text(
+                    "DELETE FROM industry_apqc_process WHERE industry_framework_id IN "
+                    "(SELECT id FROM industry_apqc_framework WHERE industry_code = :c)"
+                ),
+                {"c": target},
             )
-        ).scalars().all()
-    with _app_runs_as(app, rls.runtime):
-        response = _logged_in_post(app, client, login_as, admin_id, "post", "/industry-apqc/api/seed-frameworks")
-        assert response.status_code == 200, response.get_data(as_text=True)
-    body = response.get_json()
-    created = [row["industry_code"] for row in body["created_frameworks"]]
-    world.extra_deletes.append(("industry_apqc_framework", "industry_code", created))
-    assert body["total_created"] == len(created) > 0
-    assert set(removed) <= set(created)
-    with rls.owner.connect() as connection:
-        present = set(connection.execute(text("SELECT industry_code FROM industry_apqc_framework")).scalars())
-    assert set(created) <= present
+            connection.execute(text("DELETE FROM industry_apqc_framework WHERE industry_code = :c"), {"c": target})
+            connection.execute(
+                text("UPDATE industry_apqc_framework SET industry_code = :c WHERE industry_code = :h"),
+                {"h": held, "c": target},
+            )
 
 
 def _service_calls(world):
@@ -2015,3 +2105,109 @@ def test_next_reference_concurrent_allocations_in_one_family_never_collide(
     assert len(results) == thread_count
     assert len(set(results)) == thread_count, "two threads were handed the same reference"
     assert sorted(results) == [f"{prefix}{n:03d}" for n in range(1, thread_count + 1)]
+
+
+# --------------------------------------------------------------------------- #
+# Agent charters: a new organisation is given its own, and no other organisation
+# can read or change them
+# --------------------------------------------------------------------------- #
+
+
+def test_a_new_organisations_default_charters_are_written_under_the_runtime_role(app, rls, world):
+    """Giving a just-created organisation its charters works before anybody is signed in.
+
+    Fails without the fix: the insert ran with no session organisation, so the
+    database refused it ("new row violates row-level security policy for table
+    agent_charters") and the sign-up failed.
+    """
+    from app import db
+    from app.commands.seed_agent_charters import ensure_charters
+    from app.modules.ai_chat.services.architect_persona_charters import ARCHITECT_PERSONAS
+
+    a = world.org("a")
+    world.extra_deletes.append(("agent_charters", "organization_id", [a]))
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        made, kept = ensure_charters(a)
+        db.session.commit()
+        assert kept == 0 and made > 0
+        again = ensure_charters(a)
+        db.session.commit()
+        assert again == (0, made)
+
+    with rls.runtime_tx(a) as connection:
+        personas = {r[0] for r in connection.execute(text("SELECT persona FROM agent_charters"))}
+    assert personas == set(ARCHITECT_PERSONAS)
+
+
+def test_one_organisation_cannot_read_insert_update_or_delete_anothers_charters(app, rls, world):
+    from app import db
+    from app.commands.seed_agent_charters import ensure_charters
+
+    a, b = world.org("a"), world.org("b")
+    world.extra_deletes.append(("agent_charters", "organization_id", [a, b]))
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        ensure_charters(a)
+        ensure_charters(b)
+        db.session.commit()
+
+    with rls.runtime_tx(a) as connection:
+        a_rows = connection.execute(text("SELECT id FROM agent_charters")).scalars().all()
+        assert a_rows and _count(connection, "agent_charters") == len(a_rows)
+        assert connection.execute(
+            text("SELECT count(*) FROM agent_charters WHERE organization_id = :b"), {"b": b}
+        ).scalar_one() == 0
+
+    with rls.runtime_tx(b) as connection:
+        assert connection.execute(
+            text("SELECT count(*) FROM agent_charters WHERE id = ANY(:ids)"), {"ids": a_rows}
+        ).scalar_one() == 0
+        updated = connection.execute(
+            text("UPDATE agent_charters SET purpose = 'taken over' WHERE id = ANY(:ids)"), {"ids": a_rows}
+        )
+        assert updated.rowcount == 0
+        deleted = connection.execute(text("DELETE FROM agent_charters WHERE id = ANY(:ids)"), {"ids": a_rows})
+        assert deleted.rowcount == 0
+
+    insert = (
+        "INSERT INTO agent_charters (organization_id, persona, version, purpose, readable_entities, "
+        "proposable_actions, forbidden_actions, charter_text) "
+        "VALUES (:o, 'planted', 9, 'x', '[]', '[]', '[]', 'x')"
+    )
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(b) as connection:
+            connection.execute(text(insert), {"o": a})
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(b) as connection:
+            connection.execute(text(insert), {"o": None})
+
+    assert _owner_value(rls, "SELECT purpose FROM agent_charters WHERE id = :i", i=a_rows[0]) != "taken over"
+    assert _owner_value(rls, "SELECT count(*) FROM agent_charters WHERE organization_id = :a", a=a) == len(a_rows)
+
+
+def test_industry_processes_under_the_runtime_role_are_shared_plus_own(rls, world):
+    """industry_apqc_process: each organisation reads the shared row and its own, never another's."""
+    a, b = world.org("a"), world.org("b")
+    code = f"RLS{uuid.uuid4().hex[:8].upper()}"
+    with rls.owner.begin() as connection:
+        fw = connection.execute(
+            text("INSERT INTO industry_apqc_framework (industry_code, industry_name, is_active) "
+                 "VALUES (:c, 'RLS industry', true) RETURNING id"),
+            {"c": code},
+        ).scalar_one()
+        ids = {}
+        for label, owner_id in (("shared", None), ("a", a), ("b", b)):
+            ids[label] = connection.execute(
+                text("INSERT INTO industry_apqc_process (industry_framework_id, industry_process_code, "
+                     "industry_process_name, organization_id) VALUES (:f, :n, :n, :o) RETURNING id"),
+                {"f": fw, "n": f"{label}-{code}", "o": owner_id},
+            ).scalar_one()
+    world.extra_deletes.append(("industry_apqc_process", "industry_framework_id", [fw]))
+    world.extra_deletes.append(("industry_apqc_framework", "id", [fw]))
+    for org, mine, theirs in ((a, "a", "b"), (b, "b", "a")):
+        with rls.runtime_tx(org) as connection:
+            seen = {r[0] for r in connection.execute(
+                text("SELECT id FROM industry_apqc_process WHERE industry_framework_id = :f"), {"f": fw})}
+        assert seen == {ids["shared"], ids[mine]}, (seen, ids)
+        assert ids[theirs] not in seen

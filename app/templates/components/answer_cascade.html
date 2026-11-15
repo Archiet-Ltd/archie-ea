@@ -75,16 +75,17 @@
                     {% endif %}
                     <button type="button"
                             class="relative h-1.5 w-1.5 shrink-0 rounded-full bg-primary focus-visible:outline-offset-4"
-                            @mouseenter="tip = node.key" @mouseleave="tip = null"
-                            @focus="tip = node.key" @blur="tip = null"
-                            @click.stop="tip = tip === node.key ? null : node.key"
+                            @mouseenter="tip = node.key" @mouseleave="node.sourceHref || (tip = null)"
+                            @focus="tip = node.key" @blur="node.sourceHref || (tip = null)"
+                            @click.stop="tip = (node.sourceHref || tip !== node.key) ? node.key : null"
                             :aria-expanded="tip === node.key ? 'true' : 'false'"
                             aria-label="Source of this connection"></button>
-                    <div x-show="tip === node.key" x-cloak role="tooltip"
+                    <div x-show="tip === node.key" x-cloak role="tooltip" @keydown.escape.window="tip = null"
                          class="absolute left-0 top-full z-20 mt-1 w-72 rounded-md border border-border bg-popover p-2 text-xs leading-5 text-popover-foreground">
                         <p class="font-medium" x-text="node.source_name || node.sourceName || (node.derived ? (node.kindLabel || 'Worked out from the model') : 'Recorded in the model')"></p>
                         <p class="text-muted-foreground" x-show="node.source_timestamp || node.sourceTimestamp || node.staleLine" x-text="node.source_timestamp || node.sourceTimestamp || node.staleLine"></p>
                         <p class="text-muted-foreground" x-show="node.source_confidence != null || node.sourceConfidence != null" x-text="node.source_confidence != null ? 'Confidence ' + node.source_confidence : (node.sourceConfidence != null ? 'Confidence ' + node.sourceConfidence : '')"></p>
+                        <a x-show="node.sourceHref" :href="node.sourceHref" class="text-info hover:underline" data-testid="cascade-source-link">Open the record</a>
                     </div>
                     {% if rich %}
                     <div class="ml-auto flex flex-wrap items-center gap-x-6 gap-y-1">

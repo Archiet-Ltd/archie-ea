@@ -1,72 +1,99 @@
+{# design-block: data-table #}
+{# shadcn-reference: example:tasks@e55b60b #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
+{% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from "components/input.html" import input %}
+{% from "components/button.html" import button %}
+{% from "components/empty_state.html" import empty_state %}
+{% from "components/badge.html" import badge %}
 
 {% block title %}Precedent Search{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {{ page_header(
-        title='Precedent Search',
-        description='What did we decide last time something like this came up?',
-        breadcrumbs=[
-            {'label': 'Dashboard', 'href': url_for('main.index')},
-            {'label': 'Governance'},
-            {'label': 'Architecture Decisions', 'href': url_for('arch_decisions.list_decisions')},
-            {'label': 'Precedent Search'}
-        ]
-    ) }}
-
-    <form method="GET" action="{{ url_for('arch_decisions.precedent_search') }}"
-          class="bg-card border border-border rounded-lg p-4 mb-6 flex gap-3">
-        {% if element_id %}<input type="hidden" name="element_id" value="{{ element_id }}">{% endif %}
-        <input type="text" name="q" value="{{ query_text }}" placeholder="Search title, context, decision, rationale..."
-               class="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        <button type="submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            Search
-        </button>
-    </form>
-
-    <div class="bg-card border border-border rounded-lg overflow-hidden">
-        {% if not query_text and not element_id %}
-        <div class="text-center py-16">
-            <i data-lucide="search" class="h-10 w-10 text-muted-foreground mx-auto mb-3" aria-hidden="true"></i>
-            <h3 class="text-lg font-semibold text-foreground mb-1">Search for precedent</h3>
-            <p class="text-sm text-muted-foreground">Enter a term to find decisions already made on a similar question.</p>
+<meta name="shadcn-nearest" content="dashboard-01">
+<div class="@container/main flex flex-1 flex-col gap-2">
+    <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+        <div class="px-4 lg:px-6">
+            {{ page_header(
+                title='Precedent Search',
+                description='What did we decide last time something like this came up?',
+                breadcrumbs=[
+                    {'label': 'Dashboard', 'href': url_for('main.index')},
+                    {'label': 'Governance'},
+                    {'label': 'Architecture Decisions', 'href': url_for('arch_decisions.list_decisions')},
+                    {'label': 'Precedent Search'}
+                ]
+            ) }}
         </div>
-        {% elif results %}
-        <table class="dense-table w-full text-sm">
-            <thead class="bg-muted/50 border-b border-border">
-                <tr>
-                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Decision ID</th>
-                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Title</th>
-                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Decided</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
-                {% for d in results %}
-                <tr class="hover:bg-muted/30 transition-colors">
-                    <td class="px-4 py-3">
-                        <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
-                           class="font-mono text-primary hover:underline text-sm font-semibold">{{ d.decision_id }}</a>
-                    </td>
-                    <td class="px-4 py-3">
-                        <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
-                           class="text-foreground hover:text-primary font-medium">{{ d.title }}</a>
-                    </td>
-                    <td class="px-4 py-3 text-muted-foreground">{{ d.status|title }}</td>
-                    <td class="px-4 py-3 text-muted-foreground">{{ d.created_at.strftime('%Y-%m-%d') if d.created_at else '—' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="text-center py-16">
-            <h3 class="text-lg font-semibold text-foreground mb-1">No precedent found</h3>
-            <p class="text-sm text-muted-foreground">No existing decision matches "{{ query_text }}".</p>
+
+        <div class="px-4 lg:px-6">
+<form method="GET" action="{{ url_for('arch_decisions.precedent_search') }}"
+      class="bg-card border border-border rounded-lg p-4 flex gap-3">
+                {% if element_id %}{{ input(type='hidden', name='element_id', value=element_id) }}{% endif %}
+                <div class="flex-1">
+                    {{ input(
+                        name='q',
+                        placeholder='Search title, context, decision, rationale...',
+                        value=query_text or '',
+                        size='sm'
+                    ) }}
+                </div>
+                {{ button(
+                    text='Search',
+                    type='submit',
+                    variant='default'
+                ) }}
+            </form>
         </div>
-        {% endif %}
+
+        <div class="px-4 lg:px-6">
+            {% if not query_text and not element_id %}
+            {{ empty_state(
+                icon='search',
+                title='Search for precedent',
+                description='Enter a term to find decisions already made on a similar question.'
+            ) }}
+            {% elif results %}
+            {% call table() %}
+                {% call table_header() %}
+                    <tr>
+                        {% call table_head() %}Decision ID{% endcall %}
+                        {% call table_head() %}Title{% endcall %}
+                        {% call table_head() %}Status{% endcall %}
+                        {% call table_head() %}Decided{% endcall %}
+                    </tr>
+                {% endcall %}
+                {% call table_body() %}
+                    {% for d in results %}
+                    {% call table_row() %}
+                        {% call table_cell() %}
+                            <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
+                               class="font-mono text-primary hover:underline font-semibold">{{ d.decision_id }}</a>
+                        {% endcall %}
+                        {% call table_cell() %}
+                            <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
+                               class="text-foreground hover:text-primary font-medium">{{ d.title }}</a>
+                        {% endcall %}
+                        {% call table_cell() %}
+                            {% set status_map = {'proposed': 'warning', 'accepted': 'success', 'deprecated': 'neutral', 'superseded': 'danger'} %}
+                            {% call badge(variant=status_map.get(d.status, 'neutral')) %}{{ d.status|title }}{% endcall %}
+                        {% endcall %}
+                        {% call table_cell() %}
+                            <span class="text-muted-foreground">{{ d.created_at.strftime('%Y-%m-%d') if d.created_at else '' }}</span>
+                        {% endcall %}
+                    {% endcall %}
+                    {% endfor %}
+                {% endcall %}
+            {% endcall %}
+            {% else %}
+            {{ empty_state(
+                icon='search-x',
+                title='No precedent found',
+                description='No existing decision matches "' ~ (query_text or '') ~ '".'
+            ) }}
+            {% endif %}
+        </div>
     </div>
 </div>
 {% endblock %}

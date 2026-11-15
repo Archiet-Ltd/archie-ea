@@ -28,10 +28,12 @@ Helpers (3):
 """
 
 from app.services.archimate_backbone import sync_archimate_element
+from app.services.gap_register_service import effective_severity, gap_register_query
 from datetime import datetime
 
 from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
+from app.core.auth.permissions import can, can_change_model
 from app.middleware.tenant_context import current_org_id
 
 from app.decorators import audit_log, require_roles
@@ -40,13 +42,22 @@ from app.services.rate_limiter import rate_limit
 from app import db
 
 from . import capability_map
+import json
 import logging
+import re
 logger = logging.getLogger(__name__)
 
 # Roles that may change what a gap, a work package and a plateau are linked to.
 _LINK_WRITE_ROLES = (
     "admin", "architect", "business_architect", "cto", "portfolio_manager", "application_manager",
 )
+
+
+def _refuse_unless_may_work_package(action):
+    """The one rule for writing a work package: the organisation's permission matrix. None when allowed."""
+    if can(current_user, action, 'work_package'):
+        return None
+    return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
 
 
 @capability_map.route("/api/roadmap/capabilities")
@@ -200,6 +211,452 @@ def api_roadmap_capabilities():
 # =============================================================================
 
 
+def compute_gap_signals(capability_type_filter="business", gap_type_filter=None):
+    """The capability gap signals: coverage, quality, retirement and modernisation findings, not yet recorded.
+
+    The one place the signal list is computed; the roadmap list, its statistics and every figure that
+    counts the signals read it.
+    """
+    from datetime import datetime, timedelta
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.apqc_process import APQCProcess
+    from app.models.technical_capability import TechnicalCapability
+    from app.models.business_capabilities import (
+        ApplicationCapabilityCoverage,
+        BusinessCapability,
+    )
+
+    # C1 fix: default to "business" when no capability_type is requested.
+    # Technical capabilities and APQC processes are SHARED reference taxonomies
+    # (no organization_id / TenantMixin) with no per-tenant coverage mapping in
+    # most tenants, so leaving this unfiltered counted nearly the entire shared
+    # taxonomy as a "gap" for every tenant regardless of whether that tenant owns
+    # any capabilities at all -- producing a large, tenant-independent number
+    # (e.g. 352) that "Detect Gaps" (which only scans BusinessCapability, see
+    # api_roadmap_detect_gaps below) can never create/update records for. That
+    # mismatch -- a big tile next to "0 gap(s) created/updated" -- is the C1
+    # defect. Business capabilities are the system of record Detect Gaps acts
+    # on, so they are now also the default population this tile counts.
+    # Explicit ?capability_type=technical|process is still honoured for callers
+    # that want to inspect the shared-taxonomy coverage gaps separately.
+
+    gaps = []
+    today = datetime.now().date()
+
+    # =====================================================================
+    # 1. Business Capabilities (from real APQC data)
+    # =====================================================================
+    if not capability_type_filter or capability_type_filter == "business":
+        from app.models.application_layer import ApplicationComponent
+
+        biz_caps = BusinessCapability.query.all()
+        gap_unified_caps_by_id = {c.id: c for c in biz_caps}
+
+        # Batch-prefetch coverage mappings
+        all_coverage = ApplicationCapabilityCoverage.query.all()
+        coverage_by_cap = {}
+        for cov in all_coverage:
+            coverage_by_cap.setdefault(cov.capability_id, []).append(cov)
+
+        # Batch-prefetch applications
+        all_app_ids = {cov.application_component_id for cov in all_coverage}
+        all_apps = ApplicationComponent.query.filter(ApplicationComponent.id.in_(all_app_ids)).all() if all_app_ids else []
+        apps_by_id = {a.id: a for a in all_apps}
+
+        for cap in biz_caps:
+            cap_mappings = coverage_by_cap.get(cap.id, [])
+            apps = [apps_by_id.get(m.application_component_id) for m in cap_mappings if apps_by_id.get(m.application_component_id)]
+            app_count = len(apps)
+
+            gap_types = []
+            gap_details = []
+
+            # Coverage Gap: No applications
+            if app_count == 0:
+                gap_types.append("coverage")
+                gap_details.append("No applications mapped")
+
+            if apps:
+                # Quality Gap: Only tactical/low strategic apps
+                strategic_apps = [
+                    a for a in apps if a.strategic_importance in ("critical", "high")
+                ]
+                tactical_apps = [
+                    a
+                    for a in apps
+                    if a.strategic_importance in ("low", "medium") or not a.strategic_importance
+                ]
+
+                if len(strategic_apps) == 0 and len(tactical_apps) > 0:
+                    gap_types.append("quality")
+                    gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
+
+                # Retirement Gap: Apps marked for retirement
+                retiring_apps = [
+                    a
+                    for a in apps
+                    if a.lifecycle_status in ("deprecated", "retired", "sunset")
+                    or (
+                        a.planned_retirement_date
+                        and a.planned_retirement_date <= today + timedelta(days=365)
+                    )
+                ]
+                if retiring_apps:
+                    gap_types.append("retirement")
+                    gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
+
+                # Modernization Gap: Apps with high risk or obsolescence
+                modernization_apps = [
+                    a
+                    for a in apps
+                    if a.technical_risk in ("high", "critical")
+                    or a.obsolescence_risk in ("high", "critical")
+                    or (a.technology_age_years and a.technology_age_years > 10)
+                ]
+                if modernization_apps:
+                    gap_types.append("modernization")
+                    gap_details.append(f"{len(modernization_apps)} apps need modernization")
+
+            if gap_types:
+                # Determine priority based on gap severity
+                priority = "low"
+                if "coverage" in gap_types:
+                    priority = (
+                        "high" if cap.strategic_importance in ("critical", "high") else "medium"
+                    )
+                if "retirement" in gap_types:
+                    priority = (
+                        "critical"
+                        if any(
+                            a.planned_retirement_date
+                            and a.planned_retirement_date <= today + timedelta(days=180)
+                            for a in apps
+                        )
+                        else "high"
+                    )
+                if "modernization" in gap_types and any(
+                    a.technical_risk == "critical" for a in apps
+                ):
+                    priority = "critical"
+
+                # Get parent info for hierarchy filtering (use prefetched lookup)
+                parent_id = getattr(cap, "parent_id", None)
+                parent_cap = None
+                if parent_id:
+                    parent_cap = gap_unified_caps_by_id.get(parent_id)
+
+                # Build hierarchy path for filtering descendants
+                hierarchy_path = f"business-{cap.id}"
+                if parent_id:
+                    hierarchy_path = f"business-{parent_id}," + hierarchy_path
+
+                gaps.append(
+                    {
+                        "id": f"business-{cap.id}",
+                        "capability_id": cap.id,
+                        "capability_type": "business",
+                        "name": cap.name,
+                        "domain": getattr(cap, "business_domain", None) or "Unknown",
+                        "level": cap.level or 1,
+                        "parent_id": parent_id,
+                        "parent_name": parent_cap.name if parent_cap else None,
+                        "hierarchy_path": hierarchy_path,
+                        "gap_types": gap_types,
+                        "gap_details": gap_details,
+                        "primary_gap": gap_types[0] if gap_types else None,
+                        "priority": priority,
+                        "app_count": app_count,
+                        "strategic_importance": cap.strategic_importance or "medium",
+                        "business_owner": getattr(cap, "business_owner", None) or "Unassigned",
+                        # Timeline dates - use app retirement dates if available, else generate
+                        "start_date": _get_gap_start_date(gap_types, apps, priority),
+                        "end_date": _get_gap_end_date(gap_types, apps, priority),
+                        "applications": [
+                            {
+                                "id": a.id,
+                                "name": a.name,
+                                "strategic_importance": a.strategic_importance,
+                                "lifecycle_status": a.lifecycle_status,
+                                "planned_retirement_date": a.planned_retirement_date.isoformat()
+                                if a.planned_retirement_date
+                                else None,
+                                "technical_risk": a.technical_risk,
+                                "obsolescence_risk": a.obsolescence_risk,
+                            }
+                            for a in apps[:5]
+                        ],  # Limit to 5 for performance
+                    }
+                )
+
+    # =====================================================================
+    # 2. Technical Capabilities (ACM)
+    # =====================================================================
+    if not capability_type_filter or capability_type_filter == "technical":
+        tech_caps = TechnicalCapability.query.all()
+
+        # OPTIMIZATION: Batch-prefetch tech capability -> application mappings to avoid N+1 queries
+        from app.models.technical_capability import application_technical_capability_mapping as _atcm
+        tech_cap_ids = [c.id for c in tech_caps]
+        _tech_app_rows = db.session.query(
+            _atcm.c.technical_capability_id, _atcm.c.application_id
+        ).filter(_atcm.c.technical_capability_id.in_(tech_cap_ids)).all() if tech_cap_ids else []
+        _tech_app_ids_by_cap = {}
+        for row in _tech_app_rows:
+            _tech_app_ids_by_cap.setdefault(row[0], []).append(row[1])
+        _all_tech_app_ids = {row[1] for row in _tech_app_rows}
+        _tech_apps_all = ApplicationComponent.query.filter(ApplicationComponent.id.in_(_all_tech_app_ids)).all() if _all_tech_app_ids else []
+        _tech_apps_by_id = {a.id: a for a in _tech_apps_all}
+        # Prefetch tech caps by ID for parent lookups
+        gap_tech_caps_by_id = {c.id: c for c in tech_caps}
+
+        for cap in tech_caps:
+            # Use prefetched application data instead of lazy-loading cap.applications
+            _cap_app_ids = _tech_app_ids_by_cap.get(cap.id, [])
+            apps = [_tech_apps_by_id[aid] for aid in _cap_app_ids if aid in _tech_apps_by_id]
+            app_count = len(apps)
+
+            gap_types = []
+            gap_details = []
+
+            # Coverage Gap
+            if app_count == 0:
+                gap_types.append("coverage")
+                gap_details.append("No applications mapped")
+
+            if apps:
+                # Quality Gap
+                strategic_apps = [
+                    a for a in apps if a.strategic_importance in ("critical", "high")
+                ]
+                tactical_apps = [
+                    a
+                    for a in apps
+                    if a.strategic_importance in ("low", "medium") or not a.strategic_importance
+                ]
+
+                if len(strategic_apps) == 0 and len(tactical_apps) > 0:
+                    gap_types.append("quality")
+                    gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
+
+                # Retirement Gap
+                retiring_apps = [
+                    a
+                    for a in apps
+                    if a.lifecycle_status in ("deprecated", "retired", "sunset")
+                    or (
+                        a.planned_retirement_date
+                        and a.planned_retirement_date <= today + timedelta(days=365)
+                    )
+                ]
+                if retiring_apps:
+                    gap_types.append("retirement")
+                    gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
+
+                # Modernization Gap
+                modernization_apps = [
+                    a
+                    for a in apps
+                    if a.technical_risk in ("high", "critical")
+                    or a.obsolescence_risk in ("high", "critical")
+                    or (a.technology_age_years and a.technology_age_years > 10)
+                ]
+                if modernization_apps:
+                    gap_types.append("modernization")
+                    gap_details.append(f"{len(modernization_apps)} apps need modernization")
+
+            if gap_types:
+                priority = _calculate_gap_priority(gap_types, apps, cap, today)
+
+                # Get parent info for technical capabilities
+                parent_id = getattr(cap, "parent_id", None)
+                parent_cap = None
+                if parent_id:
+                    parent_cap = gap_tech_caps_by_id.get(parent_id)
+
+                # Build hierarchy path
+                hierarchy_path = f"technical-{cap.id}"
+                if parent_id:
+                    hierarchy_path = f"technical-{parent_id}," + hierarchy_path
+
+                gaps.append(
+                    {
+                        "id": f"technical-{cap.id}",
+                        "capability_id": cap.id,
+                        "capability_type": "technical",
+                        "name": cap.name,
+                        "domain": cap.acm_domain or "Unknown",
+                        "level": cap.level_number or 1,
+                        "parent_id": parent_id,
+                        "parent_name": parent_cap.name if parent_cap else None,
+                        "hierarchy_path": hierarchy_path,
+                        "gap_types": gap_types,
+                        "gap_details": gap_details,
+                        "primary_gap": gap_types[0] if gap_types else None,
+                        "priority": priority,
+                        "app_count": app_count,
+                        "strategic_importance": getattr(cap, "is_differentiating", False)
+                        and "high"
+                        or "medium",
+                        "business_owner": "Unassigned",
+                        "start_date": _get_gap_start_date(gap_types, apps, priority),
+                        "end_date": _get_gap_end_date(gap_types, apps, priority),
+                        "applications": [
+                            {
+                                "id": a.id,
+                                "name": a.name,
+                                "strategic_importance": a.strategic_importance,
+                                "lifecycle_status": a.lifecycle_status,
+                                "planned_retirement_date": a.planned_retirement_date.isoformat()
+                                if a.planned_retirement_date
+                                else None,
+                                "technical_risk": a.technical_risk,
+                                "obsolescence_risk": a.obsolescence_risk,
+                            }
+                            for a in apps[:5]
+                        ],
+                    }
+                )
+
+    # =====================================================================
+    # 3. Process Capabilities (APQC)
+    # =====================================================================
+    if not capability_type_filter or capability_type_filter == "process":
+        try:
+            # Note: APQCProcess may not have direct applications relationship
+            # Get all processes and filter by apqc_level property
+            all_processes = APQCProcess.query.limit(500).all()
+            # Filter to top 3 levels using the apqc_level property
+            processes = [p for p in all_processes if p.apqc_level and p.apqc_level <= 3]
+
+            # OPTIMIZATION: Batch-prefetch all processes by ID for parent lookups
+            gap_processes_by_id = {p.id: p for p in all_processes}
+
+            for proc in processes:
+                # APQCProcess doesn't have direct applications relationship
+                # We'll mark all processes as coverage gaps for now
+                apps = []
+                if hasattr(proc, "applications"):
+                    try:
+                        apps = list(proc.applications)
+                    except Exception:
+                        apps = []
+                app_count = len(apps)
+
+                gap_types = []
+                gap_details = []
+
+                # Coverage Gap
+                if app_count == 0:
+                    gap_types.append("coverage")
+                    gap_details.append("No applications mapped")
+
+                if apps:
+                    # Quality Gap
+                    strategic_apps = [
+                        a for a in apps if a.strategic_importance in ("critical", "high")
+                    ]
+                    tactical_apps = [
+                        a
+                        for a in apps
+                        if a.strategic_importance in ("low", "medium")
+                        or not a.strategic_importance
+                    ]
+
+                    if len(strategic_apps) == 0 and len(tactical_apps) > 0:
+                        gap_types.append("quality")
+                        gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
+
+                    # Retirement Gap
+                    retiring_apps = [
+                        a
+                        for a in apps
+                        if a.lifecycle_status in ("deprecated", "retired", "sunset")
+                        or (
+                            a.planned_retirement_date
+                            and a.planned_retirement_date <= today + timedelta(days=365)
+                        )
+                    ]
+                    if retiring_apps:
+                        gap_types.append("retirement")
+                        gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
+
+                    # Modernization Gap
+                    modernization_apps = [
+                        a
+                        for a in apps
+                        if a.technical_risk in ("high", "critical")
+                        or a.obsolescence_risk in ("high", "critical")
+                    ]
+                    if modernization_apps:
+                        gap_types.append("modernization")
+                        gap_details.append(f"{len(modernization_apps)} apps need modernization")
+
+                if gap_types:
+                    priority = "medium"
+                    if "retirement" in gap_types:
+                        priority = "high"
+                    proc_level = proc.apqc_level or 1
+                    if "coverage" in gap_types and proc_level <= 2:
+                        priority = "high"
+
+                    # Get parent info for APQC processes
+                    parent_id = getattr(proc, "parent_process_id", None)
+                    parent_proc = None
+                    if parent_id:
+                        parent_proc = gap_processes_by_id.get(parent_id)
+
+                    # Build hierarchy path
+                    hierarchy_path = f"process-{proc.id}"
+                    if parent_id:
+                        hierarchy_path = f"process-{parent_id}," + hierarchy_path
+
+                    gaps.append(
+                        {
+                            "id": f"process-{proc.id}",
+                            "capability_id": proc.id,
+                            "capability_type": "process",
+                            "name": proc.process_name,
+                            "domain": proc.process_code.split(".")[0] + ".0"
+                            if proc.process_code
+                            else "Unknown",
+                            "level": proc_level,
+                            "parent_id": parent_id,
+                            "parent_name": parent_proc.process_name if parent_proc else None,
+                            "hierarchy_path": hierarchy_path,
+                            "gap_types": gap_types,
+                            "gap_details": gap_details,
+                            "primary_gap": gap_types[0] if gap_types else None,
+                            "priority": priority,
+                            "app_count": app_count,
+                            "strategic_importance": "medium",
+                            "business_owner": "Unassigned",
+                            "start_date": _get_gap_start_date(gap_types, apps, priority),
+                            "end_date": _get_gap_end_date(gap_types, apps, priority),
+                            "applications": [
+                                {
+                                    "id": a.id,
+                                    "name": a.name,
+                                    "strategic_importance": a.strategic_importance,
+                                    "lifecycle_status": a.lifecycle_status,
+                                    "planned_retirement_date": a.planned_retirement_date.isoformat()
+                                    if a.planned_retirement_date
+                                    else None,
+                                    "technical_risk": a.technical_risk,
+                                }
+                                for a in apps[:5]
+                            ],
+                        }
+                    )
+        except Exception as proc_error:
+            current_app.logger.warning(f"Error loading process gaps: {proc_error}")
+
+    # Filter by gap type if specified
+    if gap_type_filter:
+        gaps = [g for g in gaps if gap_type_filter in g["gap_types"]]
+    return gaps
+
+
 @capability_map.route("/api/roadmap/gaps")
 @login_required
 @rate_limit(60, "1m")
@@ -232,445 +689,7 @@ def api_roadmap_gaps():
         description: Comprehensive gap analysis data
     """
     try:
-        from datetime import datetime, timedelta
-
-        from app.models.application_portfolio import ApplicationComponent
-        from app.models.apqc_process import APQCProcess
-        from app.models.technical_capability import TechnicalCapability
-        from app.models.business_capabilities import (
-            ApplicationCapabilityCoverage,
-            BusinessCapability,
-        )
-
-        # C1 fix: default to "business" when no capability_type is requested.
-        # Technical capabilities and APQC processes are SHARED reference taxonomies
-        # (no organization_id / TenantMixin) with no per-tenant coverage mapping in
-        # most tenants, so leaving this unfiltered counted nearly the entire shared
-        # taxonomy as a "gap" for every tenant regardless of whether that tenant owns
-        # any capabilities at all -- producing a large, tenant-independent number
-        # (e.g. 352) that "Detect Gaps" (which only scans BusinessCapability, see
-        # api_roadmap_detect_gaps below) can never create/update records for. That
-        # mismatch -- a big tile next to "0 gap(s) created/updated" -- is the C1
-        # defect. Business capabilities are the system of record Detect Gaps acts
-        # on, so they are now also the default population this tile counts.
-        # Explicit ?capability_type=technical|process is still honoured for callers
-        # that want to inspect the shared-taxonomy coverage gaps separately.
-        capability_type_filter = request.args.get("capability_type") or "business"
-        gap_type_filter = request.args.get("gap_type")
-
-        gaps = []
-        today = datetime.now().date()
-
-        # =====================================================================
-        # 1. Business Capabilities (from real APQC data)
-        # =====================================================================
-        if not capability_type_filter or capability_type_filter == "business":
-            from app.models.application_layer import ApplicationComponent
-
-            biz_caps = BusinessCapability.query.all()
-            gap_unified_caps_by_id = {c.id: c for c in biz_caps}
-
-            # Batch-prefetch coverage mappings
-            all_coverage = ApplicationCapabilityCoverage.query.all()
-            coverage_by_cap = {}
-            for cov in all_coverage:
-                coverage_by_cap.setdefault(cov.capability_id, []).append(cov)
-
-            # Batch-prefetch applications
-            all_app_ids = {cov.application_component_id for cov in all_coverage}
-            all_apps = ApplicationComponent.query.filter(ApplicationComponent.id.in_(all_app_ids)).all() if all_app_ids else []
-            apps_by_id = {a.id: a for a in all_apps}
-
-            for cap in biz_caps:
-                cap_mappings = coverage_by_cap.get(cap.id, [])
-                apps = [apps_by_id.get(m.application_component_id) for m in cap_mappings if apps_by_id.get(m.application_component_id)]
-                app_count = len(apps)
-
-                gap_types = []
-                gap_details = []
-
-                # Coverage Gap: No applications
-                if app_count == 0:
-                    gap_types.append("coverage")
-                    gap_details.append("No applications mapped")
-
-                if apps:
-                    # Quality Gap: Only tactical/low strategic apps
-                    strategic_apps = [
-                        a for a in apps if a.strategic_importance in ("critical", "high")
-                    ]
-                    tactical_apps = [
-                        a
-                        for a in apps
-                        if a.strategic_importance in ("low", "medium") or not a.strategic_importance
-                    ]
-
-                    if len(strategic_apps) == 0 and len(tactical_apps) > 0:
-                        gap_types.append("quality")
-                        gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
-
-                    # Retirement Gap: Apps marked for retirement
-                    retiring_apps = [
-                        a
-                        for a in apps
-                        if a.lifecycle_status in ("deprecated", "retired", "sunset")
-                        or (
-                            a.planned_retirement_date
-                            and a.planned_retirement_date <= today + timedelta(days=365)
-                        )
-                    ]
-                    if retiring_apps:
-                        gap_types.append("retirement")
-                        gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
-
-                    # Modernization Gap: Apps with high risk or obsolescence
-                    modernization_apps = [
-                        a
-                        for a in apps
-                        if a.technical_risk in ("high", "critical")
-                        or a.obsolescence_risk in ("high", "critical")
-                        or (a.technology_age_years and a.technology_age_years > 10)
-                    ]
-                    if modernization_apps:
-                        gap_types.append("modernization")
-                        gap_details.append(f"{len(modernization_apps)} apps need modernization")
-
-                if gap_types:
-                    # Determine priority based on gap severity
-                    priority = "low"
-                    if "coverage" in gap_types:
-                        priority = (
-                            "high" if cap.strategic_importance in ("critical", "high") else "medium"
-                        )
-                    if "retirement" in gap_types:
-                        priority = (
-                            "critical"
-                            if any(
-                                a.planned_retirement_date
-                                and a.planned_retirement_date <= today + timedelta(days=180)
-                                for a in apps
-                            )
-                            else "high"
-                        )
-                    if "modernization" in gap_types and any(
-                        a.technical_risk == "critical" for a in apps
-                    ):
-                        priority = "critical"
-
-                    # Get parent info for hierarchy filtering (use prefetched lookup)
-                    parent_id = getattr(cap, "parent_id", None)
-                    parent_cap = None
-                    if parent_id:
-                        parent_cap = gap_unified_caps_by_id.get(parent_id)
-
-                    # Build hierarchy path for filtering descendants
-                    hierarchy_path = f"business-{cap.id}"
-                    if parent_id:
-                        hierarchy_path = f"business-{parent_id}," + hierarchy_path
-
-                    gaps.append(
-                        {
-                            "id": f"business-{cap.id}",
-                            "capability_id": cap.id,
-                            "capability_type": "business",
-                            "name": cap.name,
-                            "domain": getattr(cap, "business_domain", None) or "Unknown",
-                            "level": cap.level or 1,
-                            "parent_id": parent_id,
-                            "parent_name": parent_cap.name if parent_cap else None,
-                            "hierarchy_path": hierarchy_path,
-                            "gap_types": gap_types,
-                            "gap_details": gap_details,
-                            "primary_gap": gap_types[0] if gap_types else None,
-                            "priority": priority,
-                            "app_count": app_count,
-                            "strategic_importance": cap.strategic_importance or "medium",
-                            "business_owner": getattr(cap, "business_owner", None) or "Unassigned",
-                            # Timeline dates - use app retirement dates if available, else generate
-                            "start_date": _get_gap_start_date(gap_types, apps, priority),
-                            "end_date": _get_gap_end_date(gap_types, apps, priority),
-                            "applications": [
-                                {
-                                    "id": a.id,
-                                    "name": a.name,
-                                    "strategic_importance": a.strategic_importance,
-                                    "lifecycle_status": a.lifecycle_status,
-                                    "planned_retirement_date": a.planned_retirement_date.isoformat()
-                                    if a.planned_retirement_date
-                                    else None,
-                                    "technical_risk": a.technical_risk,
-                                    "obsolescence_risk": a.obsolescence_risk,
-                                }
-                                for a in apps[:5]
-                            ],  # Limit to 5 for performance
-                        }
-                    )
-
-        # =====================================================================
-        # 2. Technical Capabilities (ACM)
-        # =====================================================================
-        if not capability_type_filter or capability_type_filter == "technical":
-            tech_caps = TechnicalCapability.query.all()
-
-            # OPTIMIZATION: Batch-prefetch tech capability -> application mappings to avoid N+1 queries
-            from app.models.technical_capability import application_technical_capability_mapping as _atcm
-            tech_cap_ids = [c.id for c in tech_caps]
-            _tech_app_rows = db.session.query(
-                _atcm.c.technical_capability_id, _atcm.c.application_id
-            ).filter(_atcm.c.technical_capability_id.in_(tech_cap_ids)).all() if tech_cap_ids else []
-            _tech_app_ids_by_cap = {}
-            for row in _tech_app_rows:
-                _tech_app_ids_by_cap.setdefault(row[0], []).append(row[1])
-            _all_tech_app_ids = {row[1] for row in _tech_app_rows}
-            _tech_apps_all = ApplicationComponent.query.filter(ApplicationComponent.id.in_(_all_tech_app_ids)).all() if _all_tech_app_ids else []
-            _tech_apps_by_id = {a.id: a for a in _tech_apps_all}
-            # Prefetch tech caps by ID for parent lookups
-            gap_tech_caps_by_id = {c.id: c for c in tech_caps}
-
-            for cap in tech_caps:
-                # Use prefetched application data instead of lazy-loading cap.applications
-                _cap_app_ids = _tech_app_ids_by_cap.get(cap.id, [])
-                apps = [_tech_apps_by_id[aid] for aid in _cap_app_ids if aid in _tech_apps_by_id]
-                app_count = len(apps)
-
-                gap_types = []
-                gap_details = []
-
-                # Coverage Gap
-                if app_count == 0:
-                    gap_types.append("coverage")
-                    gap_details.append("No applications mapped")
-
-                if apps:
-                    # Quality Gap
-                    strategic_apps = [
-                        a for a in apps if a.strategic_importance in ("critical", "high")
-                    ]
-                    tactical_apps = [
-                        a
-                        for a in apps
-                        if a.strategic_importance in ("low", "medium") or not a.strategic_importance
-                    ]
-
-                    if len(strategic_apps) == 0 and len(tactical_apps) > 0:
-                        gap_types.append("quality")
-                        gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
-
-                    # Retirement Gap
-                    retiring_apps = [
-                        a
-                        for a in apps
-                        if a.lifecycle_status in ("deprecated", "retired", "sunset")
-                        or (
-                            a.planned_retirement_date
-                            and a.planned_retirement_date <= today + timedelta(days=365)
-                        )
-                    ]
-                    if retiring_apps:
-                        gap_types.append("retirement")
-                        gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
-
-                    # Modernization Gap
-                    modernization_apps = [
-                        a
-                        for a in apps
-                        if a.technical_risk in ("high", "critical")
-                        or a.obsolescence_risk in ("high", "critical")
-                        or (a.technology_age_years and a.technology_age_years > 10)
-                    ]
-                    if modernization_apps:
-                        gap_types.append("modernization")
-                        gap_details.append(f"{len(modernization_apps)} apps need modernization")
-
-                if gap_types:
-                    priority = _calculate_gap_priority(gap_types, apps, cap, today)
-
-                    # Get parent info for technical capabilities
-                    parent_id = getattr(cap, "parent_id", None)
-                    parent_cap = None
-                    if parent_id:
-                        parent_cap = gap_tech_caps_by_id.get(parent_id)
-
-                    # Build hierarchy path
-                    hierarchy_path = f"technical-{cap.id}"
-                    if parent_id:
-                        hierarchy_path = f"technical-{parent_id}," + hierarchy_path
-
-                    gaps.append(
-                        {
-                            "id": f"technical-{cap.id}",
-                            "capability_id": cap.id,
-                            "capability_type": "technical",
-                            "name": cap.name,
-                            "domain": cap.acm_domain or "Unknown",
-                            "level": cap.level_number or 1,
-                            "parent_id": parent_id,
-                            "parent_name": parent_cap.name if parent_cap else None,
-                            "hierarchy_path": hierarchy_path,
-                            "gap_types": gap_types,
-                            "gap_details": gap_details,
-                            "primary_gap": gap_types[0] if gap_types else None,
-                            "priority": priority,
-                            "app_count": app_count,
-                            "strategic_importance": getattr(cap, "is_differentiating", False)
-                            and "high"
-                            or "medium",
-                            "business_owner": "Unassigned",
-                            "start_date": _get_gap_start_date(gap_types, apps, priority),
-                            "end_date": _get_gap_end_date(gap_types, apps, priority),
-                            "applications": [
-                                {
-                                    "id": a.id,
-                                    "name": a.name,
-                                    "strategic_importance": a.strategic_importance,
-                                    "lifecycle_status": a.lifecycle_status,
-                                    "planned_retirement_date": a.planned_retirement_date.isoformat()
-                                    if a.planned_retirement_date
-                                    else None,
-                                    "technical_risk": a.technical_risk,
-                                    "obsolescence_risk": a.obsolescence_risk,
-                                }
-                                for a in apps[:5]
-                            ],
-                        }
-                    )
-
-        # =====================================================================
-        # 3. Process Capabilities (APQC)
-        # =====================================================================
-        if not capability_type_filter or capability_type_filter == "process":
-            try:
-                # Note: APQCProcess may not have direct applications relationship
-                # Get all processes and filter by apqc_level property
-                all_processes = APQCProcess.query.limit(500).all()
-                # Filter to top 3 levels using the apqc_level property
-                processes = [p for p in all_processes if p.apqc_level and p.apqc_level <= 3]
-
-                # OPTIMIZATION: Batch-prefetch all processes by ID for parent lookups
-                gap_processes_by_id = {p.id: p for p in all_processes}
-
-                for proc in processes:
-                    # APQCProcess doesn't have direct applications relationship
-                    # We'll mark all processes as coverage gaps for now
-                    apps = []
-                    if hasattr(proc, "applications"):
-                        try:
-                            apps = list(proc.applications)
-                        except Exception:
-                            apps = []
-                    app_count = len(apps)
-
-                    gap_types = []
-                    gap_details = []
-
-                    # Coverage Gap
-                    if app_count == 0:
-                        gap_types.append("coverage")
-                        gap_details.append("No applications mapped")
-
-                    if apps:
-                        # Quality Gap
-                        strategic_apps = [
-                            a for a in apps if a.strategic_importance in ("critical", "high")
-                        ]
-                        tactical_apps = [
-                            a
-                            for a in apps
-                            if a.strategic_importance in ("low", "medium")
-                            or not a.strategic_importance
-                        ]
-
-                        if len(strategic_apps) == 0 and len(tactical_apps) > 0:
-                            gap_types.append("quality")
-                            gap_details.append(f"{len(tactical_apps)} tactical apps, no strategic")
-
-                        # Retirement Gap
-                        retiring_apps = [
-                            a
-                            for a in apps
-                            if a.lifecycle_status in ("deprecated", "retired", "sunset")
-                            or (
-                                a.planned_retirement_date
-                                and a.planned_retirement_date <= today + timedelta(days=365)
-                            )
-                        ]
-                        if retiring_apps:
-                            gap_types.append("retirement")
-                            gap_details.append(f"{len(retiring_apps)} apps retiring/deprecated")
-
-                        # Modernization Gap
-                        modernization_apps = [
-                            a
-                            for a in apps
-                            if a.technical_risk in ("high", "critical")
-                            or a.obsolescence_risk in ("high", "critical")
-                        ]
-                        if modernization_apps:
-                            gap_types.append("modernization")
-                            gap_details.append(f"{len(modernization_apps)} apps need modernization")
-
-                    if gap_types:
-                        priority = "medium"
-                        if "retirement" in gap_types:
-                            priority = "high"
-                        proc_level = proc.apqc_level or 1
-                        if "coverage" in gap_types and proc_level <= 2:
-                            priority = "high"
-
-                        # Get parent info for APQC processes
-                        parent_id = getattr(proc, "parent_process_id", None)
-                        parent_proc = None
-                        if parent_id:
-                            parent_proc = gap_processes_by_id.get(parent_id)
-
-                        # Build hierarchy path
-                        hierarchy_path = f"process-{proc.id}"
-                        if parent_id:
-                            hierarchy_path = f"process-{parent_id}," + hierarchy_path
-
-                        gaps.append(
-                            {
-                                "id": f"process-{proc.id}",
-                                "capability_id": proc.id,
-                                "capability_type": "process",
-                                "name": proc.process_name,
-                                "domain": proc.process_code.split(".")[0] + ".0"
-                                if proc.process_code
-                                else "Unknown",
-                                "level": proc_level,
-                                "parent_id": parent_id,
-                                "parent_name": parent_proc.process_name if parent_proc else None,
-                                "hierarchy_path": hierarchy_path,
-                                "gap_types": gap_types,
-                                "gap_details": gap_details,
-                                "primary_gap": gap_types[0] if gap_types else None,
-                                "priority": priority,
-                                "app_count": app_count,
-                                "strategic_importance": "medium",
-                                "business_owner": "Unassigned",
-                                "start_date": _get_gap_start_date(gap_types, apps, priority),
-                                "end_date": _get_gap_end_date(gap_types, apps, priority),
-                                "applications": [
-                                    {
-                                        "id": a.id,
-                                        "name": a.name,
-                                        "strategic_importance": a.strategic_importance,
-                                        "lifecycle_status": a.lifecycle_status,
-                                        "planned_retirement_date": a.planned_retirement_date.isoformat()
-                                        if a.planned_retirement_date
-                                        else None,
-                                        "technical_risk": a.technical_risk,
-                                    }
-                                    for a in apps[:5]
-                                ],
-                            }
-                        )
-            except Exception as proc_error:
-                current_app.logger.warning(f"Error loading process gaps: {proc_error}")
-
-        # Filter by gap type if specified
-        if gap_type_filter:
-            gaps = [g for g in gaps if gap_type_filter in g["gap_types"]]
+        gaps = compute_gap_signals(request.args.get("capability_type") or "business", request.args.get("gap_type"))
 
         # Calculate statistics. total_gaps is the count of the population
         # listed in this response (the filtered `gaps` list), so it stays
@@ -691,11 +710,20 @@ def api_roadmap_gaps():
             },
         }
 
+        # The one gap count is the recorded gaps; the list above is signals
+        # computed from capability coverage, and is counted separately.
+        from app.services import result_footer_service
+
+        figures = result_footer_service.roadmap_figures(current_org_id())
+
         return jsonify(
             {
                 "success": True,
                 "gaps": gaps,
                 "statistics": stats,
+                "recorded_gaps": figures["recorded_gaps"],
+                "signal_count": len(gaps),
+                "figures": figures,
             }
         )
 
@@ -722,8 +750,12 @@ def api_roadmap_create_gap():
     }
     Returns 201 with gap dict on success.
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Gap, Plateau
+        from app.modules.architecture.services.gap_archimate_service import apply_rating_rule
+        from app.services.gap_register_service import normalise_priority
 
         data = request.get_json() or {}
         if not data.get("name"):
@@ -734,14 +766,19 @@ def api_roadmap_create_gap():
         if gap_type not in valid_gap_types:
             gap_type = "custom"
 
-        valid_priorities = ["critical", "high", "medium", "low"]
-        priority = data.get("priority", "medium")
-        if priority not in valid_priorities:
-            priority = "medium"
+        try:
+            priority = normalise_priority(data.get("priority")) or "medium"
+        except ValueError as error:
+            return jsonify({"success": False, "error": str(error)}), 400
 
         plateau_id = data.get("plateau_id")
         if plateau_id:
-            plateau = Plateau.query.get(plateau_id)
+            # Only this organisation's own plateau: a lookup that always reaches the
+            # database, so another organisation's row is never handed back from cache.
+            plateau = Plateau.query.filter(
+                Plateau.id == plateau_id,
+                Plateau.organization_id == current_org_id(),
+            ).first()
             if not plateau:
                 return jsonify({"success": False, "error": "Plateau not found"}), 404
 
@@ -750,6 +787,8 @@ def api_roadmap_create_gap():
             description=data.get("description", ""),
             gap_type=gap_type,
             priority=priority,
+            # The register counts and lists by severity, so a gap marked Critical is critical there too.
+            severity=apply_rating_rule(None, None, {"priority": priority}).get("severity") or "medium",
             resolution_status="identified",
         )
         if plateau_id:
@@ -766,6 +805,7 @@ def api_roadmap_create_gap():
                 "description": gap.description,
                 "gap_type": gap.gap_type,
                 "priority": gap.priority,
+                "severity": gap.rated_severity,
                 "resolution_status": gap.resolution_status,
                 "target_plateau_id": gap.target_plateau_id,
             },
@@ -934,6 +974,8 @@ def api_roadmap_convert_gaps():
         "work_package_template": "auto"
     }
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services.gap_archimate_service import gap_archimate_service
 
@@ -994,6 +1036,8 @@ def api_roadmap_add_from_capability():
         "create_work_packages": true
     }
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services.gap_archimate_service import gap_archimate_service
 
@@ -1086,7 +1130,9 @@ def api_roadmap_get_gap(gap_id):
     try:
         from app.models.implementation_migration import Gap
 
-        gap = Gap.query.get(gap_id)
+        # A query, not .get(): .get() answers from the session's identity map
+        # without SQL, which would skip the organisation filter on a cache hit.
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             return jsonify({"success": False, "error": "Gap not found"}), 404
 
@@ -1115,11 +1161,17 @@ def api_roadmap_update_gap(gap_id):
 
     Request body: Fields to update (name, description, color, priority, dates, etc.)
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services.gap_archimate_service import gap_archimate_service
 
         data = request.get_json()
-        gap = gap_archimate_service.update_gap(gap_id, data)
+        try:
+            gap = gap_archimate_service.update_gap(gap_id, data)
+        except ValueError as error:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(error)}), 400
 
         if not gap:
             return jsonify({"success": False, "error": "Gap not found"}), 404
@@ -1142,6 +1194,8 @@ def api_roadmap_update_gap(gap_id):
 @audit_log("roadmap_gap_delete")
 def api_roadmap_delete_gap(gap_id):
     """Delete an ArchiMate Gap."""
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services.gap_archimate_service import gap_archimate_service
 
@@ -1159,7 +1213,6 @@ def api_roadmap_delete_gap(gap_id):
 
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/work-packages", methods=["POST"])
 @login_required
-@require_roles(*_LINK_WRITE_ROLES)
 @rate_limit(30, "1m")
 @audit_log("roadmap_work_package_create")
 def api_roadmap_create_work_package(gap_id):
@@ -1175,6 +1228,9 @@ def api_roadmap_create_work_package(gap_id):
         "template": "auto"  // Or: default, vendor_selection, modernization, retirement
     }
     """
+    refusal = _refuse_unless_may_work_package('create')
+    if refusal:
+        return refusal
     try:
         from app.models.implementation_migration import Gap
         from app.services.gap_archimate_service import gap_archimate_service
@@ -1298,18 +1354,17 @@ def api_roadmap_work_packages():
         root_only = request.args.get("root_only", "true").lower() == "true"
         include_children = request.args.get("include_children", "true").lower() == "true"
 
-        try:
-            query = work_package_service.query_for(org_id)
-            if root_only:
-                query = query.filter(UWP.parent_id.is_(None))
-            if gap_id:
-                # The one reader of a work package's gap links (the relationships).
-                query = query.filter(UWP.id.in_(
-                    work_package_service.work_package_ids_for_gap(gap_id, org_id)))
-            work_packages = query.order_by(UWP.start_date, UWP.id).all()
-        except Exception as qe:
-            current_app.logger.warning(f"Work packages query failed: {qe}", exc_info=True)
-            work_packages = []
+        query = work_package_service.query_for(org_id)
+        if gap_id:
+            # The one reader of a work package's gap links (the relationships).
+            query = query.filter(UWP.id.in_(
+                work_package_service.work_package_ids_for_gap(gap_id, org_id)))
+        # Every package of the organisation (parts included): the figure the roadmap
+        # board and the headline count give, whatever rows this answer lists.
+        all_count = query.count()
+        if root_only:
+            query = query.filter(UWP.parent_id.is_(None))
+        work_packages = query.order_by(UWP.start_date, UWP.id).all()
 
         serialized = []
         for wp in work_packages:
@@ -1323,12 +1378,26 @@ def api_roadmap_work_packages():
                 current_app.logger.warning(f"WorkPackage {wp.id} serialization failed: {se}")
                 serialized.append({"id": wp.id, "name": wp.name, "status": wp.status})
 
+        # Always include footer data for the evidence line
+        from app.services import result_footer_service
+
+        figures = result_footer_service.roadmap_figures(org_id)
+        for wp, item in zip(work_packages, serialized):
+            item["footer_html"] = result_footer_service.render_footer(
+                result_footer_service.work_package_footer(wp, name_shown=True))
+
+        from app.services.cost_visibility import withhold_reply
+
         return jsonify(
-            {
-                "success": True,
-                "work_packages": serialized,
-                "total_count": len(serialized),
-            }
+            withhold_reply(
+                {
+                    "success": True,
+                    "work_packages": serialized,
+                    "total_count": len(serialized),
+                    "all_count": all_count,
+                    "figures": figures,
+                },
+            )
         )
 
     except Exception as e:
@@ -1368,7 +1437,7 @@ def _resolve_roadmap_gap_id(raw_gap_id):
 
     # A plain integer is a stored Gap: the original path, unchanged.
     try:
-        return_gap = Gap.query.get(int(raw_gap_id))
+        return_gap = Gap.query.filter_by(id=int(raw_gap_id)).first()
     except (TypeError, ValueError):
         return_gap = None
     else:
@@ -1459,6 +1528,8 @@ def api_roadmap_create_standalone_work_package():
     }
     Returns 201 with work_package dict on success.
     """
+    if not can(current_user, 'create', 'work_package'):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Plateau
         from app.services import work_package_service
@@ -1489,7 +1560,12 @@ def api_roadmap_create_standalone_work_package():
 
         plateau = None
         if plateau_id:
-            plateau = Plateau.query.get(plateau_id)
+            # Only this organisation's own plateau: a lookup that always reaches the
+            # database, so another organisation's row is never handed back from cache.
+            plateau = Plateau.query.filter(
+                Plateau.id == plateau_id,
+                Plateau.organization_id == current_org_id(),
+            ).first()
             if not plateau:
                 return jsonify({"success": False, "error": "Plateau not found"}), 404
 
@@ -1542,18 +1618,14 @@ def api_roadmap_create_standalone_work_package():
 
         db.session.commit()
 
-        return jsonify({
-            "success": True,
-            "work_package": {
-                "id": wp.id,
-                "name": wp.name,
-                "description": wp.description,
-                "status": wp.status,
-                "priority": wp.priority,
-                "start_date": wp.start_date.date().isoformat() if wp.start_date else None,
-                "target_date": wp.end_date.date().isoformat() if wp.end_date else None,
-            },
-        }), 201
+        from app.services import result_footer_service
+
+        org_id = current_organization_id()
+        # The same row the list draws (linked gaps, footer), so the new package reads like its neighbours.
+        wp_dict = work_package_service.to_roadmap_dict(wp, org_id)
+        wp_dict["footer_html"] = result_footer_service.render_footer(
+            result_footer_service.work_package_footer(wp, name_shown=True))
+        return jsonify({"success": True, "work_package": wp_dict}), 201
 
     except Exception as e:
         db.session.rollback()
@@ -1575,10 +1647,16 @@ def api_roadmap_get_work_package(wp_id):
         if not wp:
             return jsonify({"success": False, "error": "Work package not found"}), 404
 
-        return jsonify({
-            "success": True,
-            "work_package": work_package_service.to_roadmap_dict(wp, org_id, include_children=True),
-        })
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(
+            withhold_reply(
+                {
+                    "success": True,
+                    "work_package": work_package_service.to_roadmap_dict(wp, org_id, include_children=True),
+                },
+            )
+        )
 
     except Exception as e:
         current_app.logger.error(f"Error getting work package: {e}", exc_info=True)
@@ -1595,6 +1673,8 @@ def api_roadmap_update_work_package(wp_id):
 
     Request body: Fields to update (name, dates, status, color, percent_complete, etc.)
     """
+    if not can(current_user, 'edit', 'work_package'):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from datetime import date as date_type
 
@@ -1666,6 +1746,8 @@ def api_roadmap_update_work_package(wp_id):
 @audit_log("roadmap_work_package_delete")
 def api_roadmap_delete_work_package(wp_id):
     """Delete a WorkPackage (and optionally its children)."""
+    if not can(current_user, 'delete', 'work_package'):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services import work_package_service
         from app.utils.tenant import current_organization_id
@@ -1704,6 +1786,8 @@ def api_roadmap_create_child_work_package(wp_id):
         "estimated_effort_hours": 80
     }
     """
+    if not can(current_user, 'create', 'work_package'):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.services import work_package_service
         from app.utils.tenant import current_organization_id
@@ -1783,20 +1867,37 @@ def api_roadmap_get_plateaus():
     try:
         from app.models.implementation_migration import Plateau
 
-        plateaus = Plateau.query.order_by(Plateau.sequence_order.asc()).all()
-        return jsonify({
-            "success": True,
-            "plateaus": [
-                {
-                    "id": p.id,
-                    "name": p.name,
-                    "description": p.description,
-                    "sequence_order": p.sequence_order,
-                    "target_date": p.target_date.isoformat() if p.target_date else None,
-                }
-                for p in plateaus
-            ],
-        })
+        from app.services import work_package_service
+        from app.services.gap_register_service import get_plateau_gap_rows
+        from app.utils.tenant import current_organization_id
+
+        org_id = current_organization_id()
+        from app.services import result_footer_service
+
+        plateaus = result_footer_service.plateaus_for(org_id).order_by(
+            Plateau.sequence_order.asc(), Plateau.id.asc()).all()
+        ids = [p.id for p in plateaus]
+        # The one rule for what a plateau holds: the gaps linked to it or closed
+        # by its packages, and the packages that realise it.
+        gaps_by_plateau = get_plateau_gap_rows(ids, org_id)
+        wps_by_plateau = work_package_service.plateau_work_package_ids(ids, org_id)
+        from app.services import result_footer_service
+
+        shown = [
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "sequence_order": p.sequence_order,
+                "target_date": p.target_date.isoformat() if p.target_date else None,
+                "gaps": gaps_by_plateau.get(p.id, []),
+                "work_package_ids": sorted(wps_by_plateau.get(p.id, ())),
+                "footer_html": result_footer_service.render_footer(result_footer_service.plateau_footer(p)),
+            }
+            for p in plateaus
+        ]
+        return jsonify({"success": True, "plateaus": shown,
+                        "figures": result_footer_service.roadmap_figures(org_id)})
     except Exception as e:
         current_app.logger.error(f"Error fetching plateaus: {e}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -1813,6 +1914,8 @@ def api_roadmap_create_plateau():
     Request body: { name (required), description, sequence_order (required), target_date }
     Returns 201 with plateau dict on success.
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Plateau
 
@@ -1871,6 +1974,8 @@ def api_roadmap_detect_gaps():
     Returns:
         JSON: { created: N, updated: M, gaps: [ gap dicts ] }
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.business_capabilities import BusinessCapability
         from app.models.unified_capability import UnifiedCapability
@@ -1995,17 +2100,44 @@ def api_roadmap_detect_gaps():
 
         db.session.commit()
 
+        from app.services import result_footer_service
+        from app.utils.tenant import current_organization_id
+
         return jsonify({
             "success": True,
             "created": created_count,
             "updated": updated_count,
             "gaps": gap_results,
+            "figures": result_footer_service.roadmap_figures(current_organization_id()),
         })
 
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error detecting gaps: {e}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
+
+
+_GAP_NUMBER_MAX = 2147483647  # the largest number the gap id column holds
+
+
+def _gap_numbers(raw):
+    """The gap numbers in a request body, or (None, a plain sentence naming the bad value). The body must be a
+    list; each item is a JSON whole number or a string of digits, from 1 to the column's largest number."""
+    if not isinstance(raw, list):
+        return None, "gap_ids must be a list of gap numbers."
+    numbers = []
+    for item in raw:
+        if isinstance(item, bool) or not isinstance(item, (int, str)):
+            number = None
+        elif isinstance(item, int):
+            number = item
+        else:
+            number = int(item) if re.fullmatch(r"[0-9]{1,30}", item) else None
+        if number is None or not 1 <= number <= _GAP_NUMBER_MAX:
+            return None, "%s is not a gap number: gap_ids must be whole numbers from 1 to %d." % (
+                json.dumps(item), _GAP_NUMBER_MAX)
+        numbers.append(number)
+    return numbers, None
 
 
 @capability_map.route("/api/roadmap/ai-generate", methods=["POST"])
@@ -2023,6 +2155,8 @@ def api_roadmap_ai_generate():
     Request body: { gap_ids: [1, 2, 3] }
     Returns: { preview: [ { gap_id, gap_name, suggested_work_package, suggested_plateau } ] }
     """
+    if not can_change_model(current_user):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         from app.models.implementation_migration import Gap
         from app.modules.architecture.services.gap_archimate_service import PRIORITY_TIMEFRAMES
@@ -2033,7 +2167,12 @@ def api_roadmap_ai_generate():
         if not gap_ids:
             return jsonify({"success": False, "error": "gap_ids is required and must be non-empty"}), 400
 
-        gaps = Gap.query.filter(Gap.id.in_(gap_ids)).all()
+        gap_ids, bad = _gap_numbers(gap_ids)
+        if bad is not None:
+            return jsonify({"success": False, "error": bad}), 400
+
+        # The register's own selection: this organisation's gaps, a plateau transition never one of them.
+        gaps = gap_register_query(current_org_id()).filter(Gap.id.in_(gap_ids)).all()
         if not gaps:
             return jsonify({"success": False, "error": "No gaps found for the provided IDs"}), 404
 
@@ -2042,19 +2181,21 @@ def api_roadmap_ai_generate():
 
         preview = []
         for gap in gaps:
-            timeframe_days = PRIORITY_TIMEFRAMES.get(gap.priority or "medium", 365)
+            # The one rating, with no second fallback: a gap with none is unrated and goes in the last plateau.
+            rating = (effective_severity(gap) or "").strip().lower() or None
+            timeframe_days = PRIORITY_TIMEFRAMES.get(rating, 365)
             start_offset = (
-                0 if gap.priority == "critical"
-                else 30 if gap.priority == "high"
+                0 if rating == "critical"
+                else 30 if rating == "high"
                 else 60
             )
             estimated_start = today + timedelta(days=start_offset)
             target_resolution = today + timedelta(days=start_offset + timeframe_days)
 
             # Plateau assignment: critical/high → Plateau 1, medium → Plateau 2, low → Plateau 3
-            if gap.priority in ("critical", "high"):
+            if rating in ("critical", "high"):
                 suggested_plateau = "Plateau 1 — Immediate"
-            elif gap.priority == "medium":
+            elif rating == "medium":
                 suggested_plateau = "Plateau 2 — Near Term"
             else:
                 suggested_plateau = "Plateau 3 — Long Term"
@@ -2063,15 +2204,15 @@ def api_roadmap_ai_generate():
                 "gap_id": gap.id,
                 "gap_name": gap.name,
                 "gap_type": gap.gap_type,
-                "gap_priority": gap.priority,
+                "gap_priority": rating or "unrated",
                 "suggested_work_package": {
                     "name": f"Resolve: {gap.name}",
                     "description": (
                         f"Work package to close gap '{gap.name}'. "
                         f"Gap type: {gap.gap_type or 'coverage'}. "
-                        f"Priority: {gap.priority or 'medium'}."
+                        + (f"Priority: {rating}." if rating else "The gap is not rated.")
                     ),
-                    "priority": gap.priority or "medium",
+                    "priority": rating,
                     "estimated_start_date": estimated_start.isoformat(),
                     "target_resolution_date": target_resolution.isoformat(),
                     "element_type": "WorkPackage",
@@ -2272,7 +2413,6 @@ def _link_error(exc):
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/link-work-package/<int:wp_id>", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")
-@require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_gap_link_work_package")
 def api_roadmap_gap_link_work_package(gap_id: int, wp_id: int):
     """Link a gap to a work package of the active organisation (both ways at once:
@@ -2281,6 +2421,9 @@ def api_roadmap_gap_link_work_package(gap_id: int, wp_id: int):
     Response 200: {"success": true, "gap_id": int, "work_package": {...}}
     Response 404: the gap or the work package is not in this organisation.
     """
+    refusal = _refuse_unless_may_work_package('edit')
+    if refusal:
+        return refusal
     from app.services import work_package_service
 
     org_id = current_org_id()
@@ -2301,10 +2444,12 @@ def api_roadmap_gap_link_work_package(gap_id: int, wp_id: int):
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/unlink-work-package/<int:wp_id>", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")
-@require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_gap_unlink_work_package")
 def api_roadmap_gap_unlink_work_package(gap_id: int, wp_id: int):
     """Remove the link between a gap and a work package of the active organisation."""
+    refusal = _refuse_unless_may_work_package('edit')
+    if refusal:
+        return refusal
     from app.services import work_package_service
 
     org_id = current_org_id()
@@ -2370,7 +2515,7 @@ def api_roadmap_gaps_not_addressed():
                 "id": g.id,
                 "name": g.name,
                 "description": g.description,
-                "severity": g.severity,
+                "severity": g.rated_severity,
                 "priority": g.priority,
                 "resolution_status": g.resolution_status,
                 "gap_type": g.gap_type,

@@ -154,8 +154,8 @@
             return;
         }
 
-        var primaryLine = cssHSL('--primary') || '#3b82f6';
-        var primaryFill = cssHSL('--primary', 0.22) || 'rgba(59, 130, 246, 0.22)';
+        var primaryLine = cssHSL('--primary') || 'currentColor';
+        var primaryFill = cssHSL('--primary', 0.22) || 'transparent';
 
         _chart = new Chart(ctx, {
             type: 'radar',
@@ -174,9 +174,9 @@
                         label: 'Target Maturity',
                         data: targetData,
                         backgroundColor: 'transparent',
-                        borderColor: '#10b981',
+                        borderColor: cssHSL('--success') || 'currentColor',
                         borderDash: [6, 4],
-                        pointBackgroundColor: '#10b981',
+                        pointBackgroundColor: cssHSL('--success') || 'currentColor',
                         borderWidth: 2
                     }
                 ]

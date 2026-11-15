@@ -226,12 +226,6 @@ NAVIGATION_REGISTRY = {
                 "url_fallback": "/architecture-assistant/",
             },
             {
-                "label": "Gap Discovery",
-                "icon": "search",
-                "endpoint": "main.agentic_gaps_ui",
-                "url_fallback": "/agentic-gaps",
-            },
-            {
                 "label": "Market Intelligence",
                 "icon": "trending-up",
                 "endpoint": "architect_ui.market_intelligence",
@@ -267,8 +261,8 @@ NAVIGATION_REGISTRY = {
             {
                 "label": "Roadmap Builder",
                 "icon": "route",
-                "endpoint": "architect_ui.roadmap_builder",
-                "url_fallback": "/roadmap-builder/",
+                "endpoint": "genome_roadmap.index",
+                "url_fallback": "/genome/roadmap/",
             },
         ],
     },
@@ -397,7 +391,7 @@ NAVIGATION_REGISTRY = {
                 "url_fallback": "/admin/users",
             },
             {
-                "label": "API Settings",
+                "label": "AI settings",
                 "icon": "key",
                 "endpoint": "admin.api_settings",
                 "url_fallback": "/admin/api-settings",

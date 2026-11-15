@@ -440,18 +440,11 @@ class RecommendationsEngineService:
                 contract_end = getattr(vendor, "contract_end_date", None)  # model-safety-ok: optional field
                 if contract_end:
                     try:
-                        # Handle both date and datetime objects
-                        from datetime import date
+                        from app.services.vendor_register import days_until, renewal_is_due
 
-                        if isinstance(contract_end, date) and not isinstance(
-                            contract_end, datetime
-                        ):
-                            # It's a date object, compare with today's date
-                            days_until_expiry = (contract_end - datetime.utcnow().date()).days
-                        else:
-                            # It's a datetime object, compare with current datetime
-                            days_until_expiry = (contract_end - datetime.utcnow()).days
-                        if 0 < days_until_expiry <= 90:
+                        end_day = contract_end.date() if isinstance(contract_end, datetime) else contract_end
+                        days_until_expiry = days_until(end_day)
+                        if days_until_expiry > 0 and renewal_is_due(days_until_expiry):
                             expiring_soon += 1
                     except (TypeError, AttributeError) as e:
                         logger.warning(

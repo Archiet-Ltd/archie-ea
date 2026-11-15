@@ -11,8 +11,10 @@ short-circuits the chat endpoints with
 
     503 {"error": "service_unavailable",
          "feature": "chat",
-         "message": "AI feature 'chat' is not available. LLM provider must be
-                     configured."}
+         "message": "<the plain sentence from
+                     app.modules.ai_chat.services.failure_messages.ai_unavailable_message,
+                     naming the remedy in the reader's own words, never a
+                     quoted code name or 'LLM provider'>"}
 
 That is correct and actionable, and it fires *before* the model allow-list
 check in `send_message`, so the no-provider condition is never misreported as
@@ -43,6 +45,7 @@ from pathlib import Path
 
 import pytest
 
+from app.modules.ai_chat.services.llm_service_impl import LLMService
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -110,7 +113,15 @@ def test_no_provider_turn_is_an_actionable_administrative_state(
         "the client renders body['message']; without it the user sees only "
         f"the machine code. got: {body!r}"
     )
-    assert "provider must be configured" in body["message"].lower(), (
+    # T-ai-plain-01: the sentence moved from a bare "AI feature 'chat' is not
+    # available. LLM provider must be configured." to the one plain sentence
+    # app/modules/ai_chat/services/failure_messages.ai_unavailable_message
+    # produces for every AI control, never a quoted code name or the words
+    # "LLM provider". chat_user is an enterprise_architect, not an
+    # organisation administrator, so this is the ask-one-to-add-it wording.
+    from app.modules.ai_chat.services.failure_messages import ai_unavailable_message
+
+    assert body["message"] == ai_unavailable_message("chat", is_admin=False), (
         f"the 503 must name the remedy, got: {body['message']!r}"
     )
 
@@ -142,7 +153,11 @@ def test_no_provider_streaming_turn_is_also_an_administrative_state(
     assert resp.status_code == 503, resp.get_data(as_text=True)
     body = resp.get_json()
     assert body["error"] == "service_unavailable"
-    assert "provider must be configured" in body["message"].lower()
+    # See test_no_provider_turn_is_an_actionable_administrative_state above:
+    # the wording moved to the shared T-ai-plain-01 sentence.
+    from app.modules.ai_chat.services.failure_messages import ai_unavailable_message
+
+    assert body["message"] == ai_unavailable_message("chat", is_admin=False)
 
 
 def test_client_only_classifies_an_explicit_chat_provider_configuration_fault():
@@ -161,10 +176,23 @@ def test_client_only_classifies_an_explicit_chat_provider_configuration_fault():
 
 
 def test_model_catalogue_includes_the_environment_provider_for_a_tenant_without_rows(
-    client, login_as, chat_user, monkeypatch
+    app, client, login_as, chat_user, monkeypatch
 ):
-    """The picker and the runtime must resolve the same usable provider."""
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek-key")
+    """The picker, the endpoint and the resolver must name the same provider.
+
+    Commit 1d2bd1e81 (``app/modules/ai_chat/services/llm_service_impl.py``) made the platform's
+    own keys (keys in the environment) usable only for a provider named in ``LLM_PROVIDER_ORDER``
+    and within a spend ceiling (``LLM_SPEND_CEILING_USD_<PROVIDER>``); a bare key with no order
+    and no ceiling now resolves to nothing, which a previous draft of this test did not assert
+    under. OpenAI stands in as the environment-configured provider, placed in the order with a
+    ceiling, as the rule requires: DeepSeek left the provider set on 24 Oct 2026, so a DeepSeek
+    key configures nothing and an even earlier draft asserted a provider that no longer exists.
+    """
+    monkeypatch.delenv("LLM_PROVIDER_ORDER", raising=False)
+    monkeypatch.delenv("AI_PROVIDER_ORDER", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER_ORDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("LLM_SPEND_CEILING_USD_OPENAI", "5.00")
     login_as(client, chat_user)
 
     response = client.get("/ai-chat/models")
@@ -172,19 +200,47 @@ def test_model_catalogue_includes_the_environment_provider_for_a_tenant_without_
     assert response.status_code == 200
     body = response.get_json()
     assert body["success"] is True
-    assert body["current_provider"] == "deepseek"
-    assert body["current_model"] == "deepseek-chat"
-    assert any(
-        model["provider"] == "deepseek" and model["model"] == "deepseek-chat"
-        for model in body["models"]
-    )
+    assert body["current_provider"] == "openai"
+    assert body["current_model"] == "gpt-4o"
+    assert [(m["provider"], m["model"]) for m in body["models"]] == [("openai", "gpt-4o")]
+
+    with app.app_context():
+        resolved_provider, resolved_model = LLMService._get_configured_provider()
+    assert (resolved_provider, resolved_model) == (body["current_provider"], body["current_model"])
+
+
+def test_model_catalogue_names_no_provider_for_a_platform_key_outside_the_order(
+    app, client, login_as, chat_user, monkeypatch
+):
+    """Under the same rule, a platform key for a provider the order never calls configures
+    nothing on the picker, the endpoint and the resolver alike -- never a stale "configured"
+    state on one surface while another has moved on. See the docstring above for the commit
+    and the environment names the rule reads.
+    """
+    monkeypatch.delenv("LLM_PROVIDER_ORDER", raising=False)
+    monkeypatch.delenv("AI_PROVIDER_ORDER", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    login_as(client, chat_user)
+
+    response = client.get("/ai-chat/models")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["current_provider"] is None
+    assert body["current_model"] is None
+    assert body["models"] == []
+
+    with app.app_context():
+        with pytest.raises(ValueError):
+            LLMService._get_configured_provider()
 
 
 def test_chat_page_does_not_claim_an_environment_provider_is_unavailable(
     client, login_as, chat_user, monkeypatch
 ):
     """The first painted health state must use the runtime provider resolver."""
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     login_as(client, chat_user)
 
     response = client.get("/ai-chat/")

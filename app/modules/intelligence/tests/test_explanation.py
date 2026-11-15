@@ -124,6 +124,7 @@ def test_the_explanation_names_each_drawn_link_who_drew_it_when_and_the_rule(
     assert why["derived_id"] == row_id
     assert why["rule"] == "A serving link followed by a serving link gives a serving link, by the ArchiMate derivation table."
     assert why["complete"] is True
+    assert why["plain"] == f"{names['mainframe']} reaches {names['portal']} through {names['gateway']}."
     links = why["links"]
     assert [link["relationship_id"] for link in links] == [ids["second"], ids["first"]]
     assert [link["position"] for link in links] == [1, 2]
@@ -317,7 +318,7 @@ def test_a_link_sentence_follows_the_one_wording_table_and_never_has_a_gap():
         "CRM accesses Customer."
     )
     assert link_sentence(source_name=None, target_name="Portal", relation_type="Serving") is None
-    assert link_sentence(source_name="A", target_name="B", relation_type="Unknown") is None
+    assert link_sentence(source_name="A", target_name="B", relation_type="Unknown") == "A and B are linked."
 
 
 def test_every_absence_code_an_explanation_carries_is_in_the_one_vocabulary():
@@ -375,3 +376,28 @@ def test_the_explanation_names_where_an_imported_and_a_drawn_link_came_from(
     assert second["drawn_at"].startswith("2026-10-02T09:00")
     assert first["drawn_by"] == "Imported from archiet-model-v1.oef.xml" and first["drawn_by_reason"] is None
     assert first["drawn_at"].startswith("2026-10-01T09:00")
+
+
+def test_the_explanation_does_not_prefix_drawn_by_to_a_kind_of_source(
+    app, db_session, make_org, client, login_as
+):
+    w = _two_organisations(db_session, make_org)
+    org_id = w["org_a"].id
+    by_team = _relationship(
+        db_session, org_id, w["mainframe"], w["gateway"], created_by=w["ada"],
+        source_kind="manual", source_label="Entered by the team",
+    )
+    row = _insert_derived_row(
+        db_session, org_id, w["mainframe"], w["portal"],
+        chain=[by_team.id],
+        chain_element_ids=[w["mainframe"].id, w["gateway"].id],
+        depth=1, derived_type="Serving", rule_id="table:Serving:Serving",
+    )
+    db_session.commit()
+    row_id = row.id
+
+    login_as(client, w["ada"])
+    resp = client.get(f"/api/v1/intelligence/derived/{row_id}")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    (link,) = resp.get_json()["data"]["explanation"]["links"]
+    assert link["drawn_by"] == "Entered by the team"

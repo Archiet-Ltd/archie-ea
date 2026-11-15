@@ -384,6 +384,49 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # Company signals: each organisation that agreed to its public footprint being read has its
+        # sources refreshed once a day. It declares its organisation per run through
+        # run_for_each_tenant (public_signals.refresh_all), which scopes every organisation in turn.
+        def run_company_signals():
+            with app.app_context():
+                try:
+                    from app.modules.organization.public_signals import refresh_all
+
+                    refresh_all(app)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error("APScheduler company-signals error: %s", exc)
+
+        scheduler.add_job(
+            func=run_company_signals,
+            trigger=CronTrigger(hour=3, minute=30),
+            id="company_signals_refresh",
+            name="Company public signals refresh",
+            replace_existing=True,
+            max_instances=1,
+        )
+
+        # Startup credit: the reminders 14 and 3 days before a credit ends, once a day. Declares its
+        # organisation per run through run_for_each_tenant (billing_offers.send_offer_reminders).
+        def run_offer_reminders():
+            with app.app_context():
+                try:
+                    from app.services.billing_offers import send_offer_reminders
+
+                    send_offer_reminders(app)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error("APScheduler offer-reminders error: %s", exc)
+
+        scheduler.add_job(
+            func=run_offer_reminders,
+            trigger=CronTrigger(hour=9, minute=0),
+            id="offer_reminders",
+            name="Startup credit reminders",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # PLT-031: Weekly executive summary (Monday 7am UTC). Declares its
         # organisation per run via run_for_each_tenant / tenant_scope, same as
         # the maturity digest above.
@@ -439,6 +482,44 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # Sign-ups (founder, 26 Oct 2026): mail the founder once when a new account has no first answer 30
+        # minutes after sign-up (checked every five minutes), and a report of the last day's sign-ups each
+        # morning. Both are platform jobs, not per-organisation, and send nothing without FOUNDER_ALERT_EMAIL.
+        def run_signup_alerts():
+            with app.app_context():
+                try:
+                    from app.services.signup_attribution import alert_stuck_accounts
+                    alert_stuck_accounts(app)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error("APScheduler signup-alert error: %s", exc)
+
+        def run_signup_report():
+            with app.app_context():
+                try:
+                    from app.services.signup_attribution import send_daily_report
+                    send_daily_report(app)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error("APScheduler signup-report error: %s", exc)
+
+        scheduler.add_job(
+            func=run_signup_alerts,
+            trigger=IntervalTrigger(minutes=5),
+            id="signup_alerts",
+            name="Stuck Sign-up Alert",
+            replace_existing=True,
+            max_instances=1,
+        )
+        scheduler.add_job(
+            func=run_signup_report,
+            trigger=CronTrigger(hour=8, minute=0),
+            id="signup_report",
+            name="Daily Sign-up Report",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # Per-owner in-app notification digest: email each opted-in user their
         # own unread in-app notifications. Daily, like the maturity/summary
         # digests; per-day idempotency and weekly_digest / digest_frequency
@@ -461,6 +542,39 @@ def init_scheduler(app):
             trigger=CronTrigger(hour=7, minute=30),
             id="owner_digest",
             name="Per-Owner Notification Digest",
+            replace_existing=True,
+            max_instances=1,
+        )
+
+        # The alerts a date raises without an edit (a support date within 180
+        # days, an overdue review condition), once a day per organisation,
+        # before the 07:30 email so that day's email carries them.
+        def run_date_alerts():
+            with app.app_context():
+                import logging
+
+                from app.jobs.tenant_safe_job import run_for_each_tenant
+                from app.services.date_alerts import scan_date_alerts
+
+                log = logging.getLogger(__name__)
+
+                def _log_result(result):
+                    if not result.ok:
+                        log.error(
+                            "date alerts failed for org %s: %s",
+                            result.organization_id, result.error,
+                        )
+
+                try:
+                    run_for_each_tenant(app, "date-alerts", scan_date_alerts, on_result=_log_result)
+                except Exception as exc:
+                    log.error("APScheduler date-alerts error: %s", exc)
+
+        scheduler.add_job(
+            func=run_date_alerts,
+            trigger=CronTrigger(hour=7, minute=0),
+            id="date_alerts",
+            name="Date Alerts",
             replace_existing=True,
             max_instances=1,
         )
@@ -494,6 +608,51 @@ def init_scheduler(app):
             trigger=IntervalTrigger(minutes=15),
             id="approval_escalation",
             name="Overdue Approval Escalation",
+            replace_existing=True,
+            max_instances=1,
+        )
+
+        # A change that could not be reviewed in its own turn (no independent reviewer reachable, or the
+        # run's review limit spent) stays in review. Every SWEEP_INTERVAL_MINUTES the server tries again, one
+        # organisation at a time (a change is retried by every sweep: its quiet window is shorter than the
+        # interval); after 12 attempts, about 55 minutes, with no reviewer the change is declined with that
+        # reason. Only a change that is in the review loop is swept. Nothing here asks a person to approve
+        # anything.
+        def _sweep_interval_minutes():
+            from app.modules.ai_chat.services.change_review import SWEEP_INTERVAL_MINUTES
+
+            return SWEEP_INTERVAL_MINUTES
+
+        def run_change_review_sweep():
+            with app.app_context():
+                import logging
+
+                from app.jobs.tenant_safe_job import run_for_each_tenant
+                from app.modules.ai_chat.services.change_review import ReviewBudget, sweep_organisation
+
+                log = logging.getLogger(__name__)
+                budget = ReviewBudget()
+
+                def _log_result(result):
+                    if not result.ok:
+                        log.error(
+                            "change review sweep failed for org %s: %s", result.organization_id, result.error
+                        )
+
+                try:
+                    run_for_each_tenant(
+                        app, "change_review_sweep",
+                        lambda organization_id: sweep_organisation(organization_id, budget),
+                        on_result=_log_result,
+                    )
+                except Exception as exc:
+                    log.error("APScheduler change-review-sweep error: %s", exc)
+
+        scheduler.add_job(
+            func=run_change_review_sweep,
+            trigger=IntervalTrigger(minutes=_sweep_interval_minutes()),
+            id="change_review_sweep",
+            name="Change Review Sweep",
             replace_existing=True,
             max_instances=1,
         )
@@ -783,6 +942,48 @@ def init_scheduler(app):
             trigger=IntervalTrigger(seconds=30),
             id="change_feed_consumer",
             name="Change Feed Consumer",
+            replace_existing=True,
+            max_instances=1,
+        )
+
+        # Connection re-read: every active GitHub and Jira connection is read
+        # again by the same sync the connectors page runs, per organisation,
+        # when its hour is up (app/services/connector_schedule.py). The tick is
+        # ten minutes; each connection decides for itself whether it is due.
+        def run_connector_reread():
+            with app.app_context():
+                import logging
+
+                from app.jobs.tenant_safe_job import run_for_each_tenant
+
+                log = logging.getLogger(__name__)
+
+                def _reread_one_tenant(organization_id):
+                    from app.services.connector_schedule import reread_due_connectors
+                    return reread_due_connectors(organization_id)
+
+                def _log_result(result):
+                    if not result.ok:
+                        log.error(
+                            "connection re-read failed for org %s: %s",
+                            result.organization_id, result.error,
+                        )
+
+                try:
+                    run_for_each_tenant(
+                        app,
+                        "connector-reread",
+                        _reread_one_tenant,
+                        on_result=_log_result,
+                    )
+                except Exception as exc:
+                    log.error("connection re-read error: %s", exc)
+
+        scheduler.add_job(
+            func=run_connector_reread,
+            trigger=IntervalTrigger(minutes=10),
+            id="connector_reread",
+            name="GitHub and Jira Connection Re-read",
             replace_existing=True,
             max_instances=1,
         )

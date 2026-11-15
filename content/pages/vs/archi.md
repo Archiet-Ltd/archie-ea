@@ -1,4 +1,5 @@
 ---
+wave: 1
 page_family: comparison
 competitor: Archi (archimatetool.com)
 url_slug: archiet.ai/vs/archi

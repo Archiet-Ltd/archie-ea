@@ -8044,7 +8044,7 @@ def _get_github_service():
         from app.modules.codegen.services.github_service import GitHubService
         gh_settings = APISettings.query.filter_by(provider="github").first()
         if not gh_settings or not gh_settings.api_key:
-            return None, "No GitHub token configured — go to Admin > API Settings"
+            return None, "No GitHub token configured — go to Admin > AI settings"
         return GitHubService(gh_settings.api_key), None
     except Exception as e:
         return None, str(e)

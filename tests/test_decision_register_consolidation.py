@@ -613,6 +613,9 @@ def test_solution_teardown_deletes_the_paired_canonical_row_too(app):
                 db.text("DELETE FROM solutions WHERE id = :i"), {"i": solution_id}
             )
             db.session.execute(
+                db.text("DELETE FROM soc2_audit_log WHERE organization_id = :i"), {"i": org_id}
+            )
+            db.session.execute(
                 db.text("DELETE FROM organizations WHERE id = :i"), {"i": org_id}
             )
             db.session.commit()

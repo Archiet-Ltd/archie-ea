@@ -100,18 +100,38 @@ def test_admin_role_page_still_sets_a_role_and_it_carries_the_ability(app, db_se
 
 
 def test_admin_set_personas_keep_what_they_always_carried(app, db_session, make_org):
+    """A persona never grants authority; authority is the account's role.
+
+    This replaces the earlier rule that a persona an administrator set kept
+    what it always carried. That rule let an administrator hand the widest
+    persona, platform_admin, to an account that is not a platform
+    administrator, which is the defect this branch closes. Every other persona
+    keeps its abilities. platform_admin carries them only for an account that
+    is a platform administrator, and nothing for an account that is not,
+    whoever set the persona.
+    """
     expect = {
         "solution_architect": (False, True, False, False),
         "enterprise_architect": (True, True, True, True),
         "business_architect": (True, True, True, True),
         "arb_member": (True, False, False, False),
         "portfolio_manager": (False, False, False, True),
-        "platform_admin": (True, True, True, True),
         "cto": (False, False, False, False),
     }
     for persona, want in expect.items():
         u = _viewer(db_session, make_org("perm-defaults-" + persona), persona)
         assert _abilities(u) == want, persona
+
+    # An account that is not a platform administrator gains nothing from the persona.
+    plain = _viewer(db_session, make_org("perm-defaults-platform-plain"), "platform_admin")
+    assert _abilities(plain) == (False, False, False, False)
+
+    # A platform administrator (flag and Administrator role) carrying the persona keeps every ability.
+    holder = _admin(db_session, make_org("perm-defaults-platform-holder"))
+    holder.enterprise_role = "platform_admin"
+    holder.is_platform_admin = True
+    db_session.flush()
+    assert _abilities(holder) == (True, True, True, True)
 
 
 def test_a_new_account_has_no_persona_by_default(app, db_session, make_org):

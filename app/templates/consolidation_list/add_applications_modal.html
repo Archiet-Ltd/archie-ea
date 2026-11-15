@@ -62,7 +62,8 @@
                         <option value="">All Status</option>
                     </select>
                 </div>
-                <div>
+                {% if not costs_withheld %}
+                <div id="app-filter-cost-field">
                     <label for="app-filter-cost" class="block text-xs font-medium text-muted-foreground mb-1">Cost Range</label>
                     <select id="app-filter-cost" class="w-full h-9 px-2 py-1 border rounded-md text-sm bg-background">
                         <option value="">All Costs</option>
@@ -72,7 +73,10 @@
                         <option value="500000-999999999">&pound;500k+</option>
                     </select>
                 </div>
+                {% endif %}
             </div>
+
+            <p id="app-costs-withheld" {% if costs_withheld %}role="status" class="mb-4 text-sm text-muted-foreground">{{ costs_withheld_sentence }}{% else %}hidden role="status" class="mb-4 text-sm text-muted-foreground"{% endif %}></p>
 
             <!-- Applications List -->
             <div id="app-list-container" class="border rounded-lg max-h-80 overflow-y-auto">
@@ -194,6 +198,13 @@ function loadAvailableApplications() {
             showError('No application data returned.');
             return;
         }
+        if (data.costs_withheld) {
+            // The cost rule withholds figures from this person: no cost filter, no cost line, the reason once.
+            const note = document.getElementById('app-costs-withheld');
+            if (note) { note.textContent = data.costs_withheld_sentence; note.hidden = false; }
+            const costField = document.getElementById('app-filter-cost-field');
+            if (costField) costField.hidden = true;
+        }
         // Exclude apps already in the consolidation list
         allAvailableApps = data.applications.filter(function (app) {
             return currentAppIds.indexOf(app.id) === -1;
@@ -310,9 +321,9 @@ window.filterApplications = function () {
         if (crit && app.criticality !== crit) return false;
         if (status && app.status !== status) return false;
         if (cost) {
-            const c = parseFloat(app.total_cost_of_ownership) || 0;
+            const c = parseFloat(app.total_cost_of_ownership);
             const parts = cost.split('-').map(Number);
-            if (c < parts[0] || c > parts[1]) return false;
+            if (Number.isNaN(c) || c < parts[0] || c > parts[1]) return false;
         }
         return true;
     });

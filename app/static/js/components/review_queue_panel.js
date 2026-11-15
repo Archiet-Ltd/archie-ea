@@ -68,8 +68,8 @@ function buildReviewItemsFromPreview(previewData) {
         if (app.capabilities) {
             app.capabilities.forEach(function(cap) {
                 totalMappings++;
-                let confidence = cap.confidence_score || 0;
-                if (confidence < LOW_CONFIDENCE_THRESHOLD) {
+                let confidence = cap.confidence_score ?? null;
+                if (confidence === null || confidence < LOW_CONFIDENCE_THRESHOLD) {
                     lowConfidenceMappings++;
                     items.push({
                         id: itemId++,
@@ -89,8 +89,8 @@ function buildReviewItemsFromPreview(previewData) {
         if (app.processes) {
             app.processes.forEach(function(proc) {
                 totalMappings++;
-                let confidence = proc.similarity_score || 0;
-                if (confidence < LOW_CONFIDENCE_THRESHOLD) {
+                let confidence = proc.similarity_score ?? null;
+                if (confidence === null || confidence < LOW_CONFIDENCE_THRESHOLD) {
                     lowConfidenceMappings++;
                     items.push({
                         id: itemId++,
@@ -139,7 +139,7 @@ function renderReviewQueue(items) {
     }
 
     let html = items.map(function(item) {
-        let confidencePercent = Math.round(item.confidence_score * 100);
+        let confidencePercent = Platform.figure.missing(item.confidence_score) ? null : Math.round(item.confidence_score * 100);
         let confidenceColor = confidencePercent >= 80 ? 'text-emerald-600' :
                              confidencePercent >= 60 ? 'text-amber-600' : 'text-destructive';
         let confidenceBg = confidencePercent >= 80 ? 'bg-emerald-500/5' :

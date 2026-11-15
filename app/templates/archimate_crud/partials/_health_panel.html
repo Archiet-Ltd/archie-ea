@@ -19,7 +19,7 @@
             <div class="text-center py-4">
                 <div class="text-5xl font-bold"
                      :class="health.overall_score >= 70 ? 'text-success-emphasis' : (health.overall_score >= 30 ? 'text-warning-emphasis' : 'text-destructive')"
-                     x-text="Math.round(health.overall_score || 0)"></div>
+                     x-text="Platform.figure.score(health.overall_score)"></div>
                 <p class="text-sm text-muted-foreground mt-1">Repository Health Score</p>
             </div>
             {# /api/health-scorecard returns `tests` as an OBJECT keyed by test id

@@ -1,0 +1,49 @@
+{# navigation-menu: port of shadcn/ui navigation-menu.tsx (pinned in compliance/upstream). Macros: navigation_menu, navigation_menu_list, navigation_menu_item, navigation_menu_trigger, navigation_menu_content, navigation_menu_viewport, navigation_menu_link, navigation_menu_indicator #}
+
+{#- NavigationMenu -#}
+{% macro navigation_menu(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('navigation-menu', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- NavigationMenuList -#}
+{% macro navigation_menu_list(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('navigation-menu-list', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- NavigationMenuItem -#}
+{% macro navigation_menu_item(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('navigation-menu-item', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- NavigationMenuTrigger -#}
+{% macro navigation_menu_trigger(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('navigation-menu-trigger', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- NavigationMenuContent -#}
+{% macro navigation_menu_content(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('navigation-menu-content', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- NavigationMenuViewport -#}
+{% macro navigation_menu_viewport(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('navigation-menu-viewport', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- NavigationMenuLink -#}
+{% macro navigation_menu_link(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('navigation-menu-link', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}
+
+{#- NavigationMenuIndicator -#}
+{% macro navigation_menu_indicator(text='', class='', id=none, attrs={}) -%}
+{%- set s = slot('navigation-menu-indicator', kwargs, class, id, attrs) -%}
+{%- if s.void %}<{{ s.tag }}{{ s.attributes }}>{%- else %}<{{ s.tag }}{{ s.attributes }}>{{ s.inner }}{{ text }}{{ caller() if caller }}</{{ s.tag }}>{%- endif %}{# raw-repr-ok: attributes is the attribute string slot() builds, not a model column #}
+{%- endmacro %}

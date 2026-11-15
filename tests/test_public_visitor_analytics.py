@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
+
 from app.services.visitor_hash import compute_visitor_hash, current_utc_day
 
 
@@ -174,6 +176,19 @@ class TestSignupFunnelLogging:
         assert resp.status_code == 200
         assert PublicVisitorEvent.query.filter_by(event_type="signup_started").count() == before + 1
 
+    @pytest.mark.parametrize("agent", [
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+        "Mozilla/5.0 AppleWebKit/537.36 (compatible; ClaudeBot/1.0)",
+    ])
+    def test_a_crawler_reading_the_register_page_is_served_it_and_not_counted(self, client, db_session, agent):
+        from app.models.public_visitor_event import PublicVisitorEvent
+
+        before = PublicVisitorEvent.query.filter_by(event_type="signup_started").count()
+        resp = client.get("/account/register", headers={"User-Agent": agent})
+        assert resp.status_code == 200 and b"<form" in resp.data
+        assert PublicVisitorEvent.query.filter_by(event_type="signup_started").count() == before
+
     def test_failed_register_post_does_not_log_a_second_started_event(self, client, db_session):
         """Started = reaching the form, not every retry after a validation error."""
         from app.models.public_visitor_event import PublicVisitorEvent
@@ -198,8 +213,14 @@ class TestSignupFunnelLogging:
                 "password": "test-password-123",
                 "password2": "test-password-123",
             },
-            follow_redirects=True,
         )
+        assert resp.status_code == 302
+        # This test holds one app context across requests, so the tenant cached for the anonymous POST
+        # would answer the signed-in page too; a browser starts each request with none.
+        from app.middleware.tenant_context import clear_tenant_context_cache
+
+        clear_tenant_context_cache()
+        resp = client.get(resp.headers["Location"])
         assert resp.status_code == 200
         assert (
             PublicVisitorEvent.query.filter_by(event_type="signup_completed").count()

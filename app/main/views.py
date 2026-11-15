@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+from types import SimpleNamespace
 
 from email_validator import EmailNotValidError, validate_email
 from flask import (
@@ -17,6 +18,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from app import db
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 
 # D-5 (admin-rbac-active-org continuation): repointed from
 # app.core.auth.decorators.admin_required (one of three duplicate
@@ -33,6 +35,7 @@ from app.services.rate_limiter import rate_limit
 from app.services.vendor_analysis.capability_based_vendor_selector import (
     CapabilityBasedVendorSelector,
 )
+from app.utils.plain_errors import render_plain_error
 
 main = Blueprint("main", __name__)
 
@@ -43,16 +46,17 @@ main.register_blueprint(framework_management_bp)
 
 @main.before_app_request
 def _redirect_www_to_apex():
-    """301 any request to www.entelim.org to the same path on entelim.org.
+    """301 any request to www. plus one of the site's own hosts to the same path without it.
 
     A host check, not server config -- the app owns this redirect the same
     way it owns every other canonicalisation decision in this module. Only
-    ever fires for that exact host, so local/dev/test requests (localhost,
+    ever fires for those exact hosts, so local/dev/test requests (localhost,
     127.0.0.1, the test client's default "localhost") are untouched.
     """
-    host = (request.host or "").split(":", 1)[0].lower()
-    if host == "www.entelim.org":
-        target = request.url.replace("www.entelim.org", "entelim.org", 1)
+    from app.services.origin import www_redirect_target
+
+    target = www_redirect_target(request.host, request.url)
+    if target:
         return redirect(target, code=301)
     return None
 
@@ -124,6 +128,16 @@ def _home_use_case_highlights():
     return groups
 
 
+def _plan_context():
+    """The plan record and its display prices, for the pages that describe plans."""
+    from app.services import billing_plans
+
+    return {
+        "plans": {p.key: p for p in billing_plans.PLANS},
+        "plan_prices": {p.key: billing_plans.price_lines(p) for p in billing_plans.PLANS},
+    }
+
+
 @main.route("/", methods=["GET", "POST"])
 @rate_limit(10, "1m", methods=("POST",))
 def index():
@@ -153,6 +167,7 @@ def index():
                     thanks=False,
                     error=error,
                     use_case_highlights=use_case_highlights,
+                    **_plan_context(),
                 )
 
             from app.models.waitlist_signup import WaitlistSignup
@@ -173,6 +188,7 @@ def index():
         thanks=thanks,
         error=error,
         use_case_highlights=use_case_highlights,
+        **_plan_context(),
     )
 
 
@@ -277,7 +293,7 @@ def product_inquiry_submit():
         abort(404)
 
     if page.cta == "inquiry":
-        offer = page.front_matter.get("offer")
+        offer = page.enquiry_offer(page.enquiry_source(request.form.get("source")))
         consent_text = page.front_matter.get("inquiry_consent_text")
     else:
         offer = page.feature_interest_offer
@@ -378,8 +394,8 @@ def login_redirect():
 
 @main.route("/roadmaps")
 def roadmaps_redirect():
-    """Redirect /roadmaps to canonical /capability-roadmap."""
-    return redirect(url_for("main.capability_roadmap"), code=301)
+    """Redirect /roadmaps to the one roadmap."""
+    return redirect_to_roadmap("strategic")
 
 
 @main.route("/favicon.ico")
@@ -459,8 +475,15 @@ def vendor_templates_redirect(subpath=None):
 
 @main.route("/robots.txt")
 def robots_txt():
-    """Serve robots.txt for SEO"""
-    return send_from_directory("static", "robots.txt")
+    """robots.txt for crawlers: everything is allowed except what is not a public page.
+
+    Generated from the routes and the public-site registry (app/services/crawl_rules.py), so a public page
+    added later is crawlable without a line being written for it."""
+    from flask import Response
+
+    from app.services.crawl_rules import robots_text
+
+    return Response(robots_text(), mimetype="text/plain")
 
 
 @main.route("/sitemap.xml")
@@ -475,19 +498,42 @@ def sitemap_xml():
     (front matter ``state: not_planned``) -- see
     app/services/public_pages.py::load_feed_pages / feed_page_paths.
     """
-    from html import escape
-
-    from app.services.public_pages import feed_page_paths
-
-    base_url = "https://entelim.org"
-    urls = []
-    for path in feed_page_paths():
-        # Homepage is not a content page but is the most important URL.
-        priority = "<priority>1.0</priority>" if path == "/" else ""
-        urls.append(f"  <url><loc>{base_url}{escape(path)}</loc>{priority}</url>")
-    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
     from flask import Response
-    return Response(xml, mimetype="application/xml")
+
+    from app.services.crawl_rules import sitemap_text
+
+    return Response(sitemap_text(), mimetype="application/xml")
+
+
+@main.route("/sitemap-<code>.xml")
+def language_sitemap_xml(code):
+    """One language's sitemap, listing only that language's addresses; 404 for a language with no pages."""
+    from flask import Response, abort
+
+    from app.services.crawl_rules import language_for_sitemap, language_sitemap_text
+
+    language = language_for_sitemap(f"sitemap-{code}.xml")
+    text = language_sitemap_text(language) if language else None
+    if text is None:
+        abort(404)
+    return Response(text, mimetype="application/xml")
+
+
+@main.route("/<any('pt-br', 'es', 'fr'):language>/<path:rest>")
+def translated_page(language, rest):
+    """A translated public page at its language's address (/pt-br/about); 404 when that translation does not exist."""
+    from flask import abort
+
+    from app.services.public_pages import _pages_by_url, build_jsonld, translation_page
+
+    page = translation_page(f"/{language}/{rest}")
+    if page is None:
+        abort(404)
+    english = _pages_by_url().get(f"/{rest}")
+    closed = _wave_closed_response(english) if english is not None else None
+    if closed is not None:
+        return closed
+    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 
 @main.route("/<key>.txt")
@@ -514,9 +560,10 @@ def llms_txt():
     section. Held, merged and withdrawn pages are excluded, same as
     sitemap.xml -- see app/services/public_pages.py::load_feed_pages."""
     from app.services.public_pages import load_feed_pages
+    from app.services.origin import canonical_origin
 
     pages = load_feed_pages()
-    base_url = "https://entelim.org"
+    base_url = canonical_origin()
     lines = ["# Entelim"]
     lines.append("")
     lines.append(
@@ -552,9 +599,10 @@ def llms_full_txt():
     excluded, same as sitemap.xml -- see
     app/services/public_pages.py::load_feed_pages."""
     from app.services.public_pages import load_feed_pages
+    from app.services.origin import canonical_origin
 
     pages = load_feed_pages()
-    base_url = "https://entelim.org"
+    base_url = canonical_origin()
     lines = ["# Entelim — Full Content"]
     lines.append("")
     lines.append(
@@ -695,6 +743,32 @@ def public_vision():
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 
+def _wave_closed_response(page):
+    """While RELEASE_WAVE is set, a content page of a later wave answers its early-access page, not its body.
+
+    A page that is already a waiting-list page (``cta: waiting_list``) keeps its own page."""
+    if not page.wave_closed or page.cta == "waiting_list":
+        return None
+    from app.release_waves import GENERIC_GROUP, code_slug, entry_for, group_for, has_page
+    from app.release_waves.routes import early_access_page
+
+    endpoint = page.front_matter.get("endpoint")
+    rule = next(iter(current_app.url_map.iter_rules(endpoint)), None) if endpoint in current_app.view_functions else None
+    entry = entry_for(rule.rule, rule.endpoint) if rule is not None else None
+    title = page.front_matter.get("module_label") or page.title
+    code, info = group_for(entry)
+    if not has_page(info):
+        # the page's own group has no early-access page (public pages never close): it speaks for itself
+        code, info = GENERIC_GROUP, None
+    return early_access_page(code_slug(code), title=title, blurb=page.description if info is None else None)
+
+
+# Modules whose public page a signed-in person is sent past to the working screen, and the query that asks for the
+# public page itself (the share page's links use it, so "Read about" and "Back to" land on the page they name).
+SIGNED_IN_SCREEN_MODULES = frozenset({"digital-twin"})
+PUBLIC_VIEW_PARAM = "public"
+
+
 @main.route("/modules/<slug>")
 def public_module(slug):
     """A module content page.
@@ -707,6 +781,7 @@ def public_module(slug):
         MERGED_PAGES,
         build_jsonld,
         build_landing,
+        get_module_recording,
         get_page_screenshot,
         load_page,
     )
@@ -715,14 +790,65 @@ def public_module(slug):
     if merge_target:
         return redirect(merge_target, code=301)
 
+    # The product menu's "Digital twin" entry opens the working screen for a
+    # signed-in person; the public feature page is for visitors.
+    if slug in SIGNED_IN_SCREEN_MODULES and current_user.is_authenticated and not request.args.get(PUBLIC_VIEW_PARAM):
+        return redirect(url_for("intelligence_ui.twin_map"), code=302)
+
     page = load_page("module", slug=slug)
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
+    # a module whose screen is released opens that screen for a signed-in person, as the menus do
+    if page.front_matter.get("signed_in_redirect") and current_user.is_authenticated:
+        return redirect(page.front_matter["signed_in_redirect"], code=302)
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
+        recording=get_module_recording(page),
         landing=build_landing(page),
+        social=_recording_social(slug),
+    )
+
+
+def _recording_social(slug):
+    """The link-preview fields of a module's recording, or None for a module without one."""
+    from app.services.public_pages import get_share, share_social
+
+    share = get_share(slug)
+    return share_social(share) if share else None
+
+
+@main.route("/see/<slug>")
+def public_share(slug):
+    """The page one module recording is shared from: public, signed out, nothing beyond the recording itself."""
+    from app.services.public_pages import (
+        build_landing,
+        get_module_recording,
+        get_share,
+        load_page,
+        share_social,
+    )
+
+    share = get_share(slug)
+    page = load_page("module", slug=slug) if share else None
+    recording = get_module_recording(page) if page else None
+    if recording is None:
+        from flask import abort
+        abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
+    module_href = page.url
+    if slug in SIGNED_IN_SCREEN_MODULES and current_user.is_authenticated:
+        module_href = "%s?%s=1" % (page.url, PUBLIC_VIEW_PARAM)
+    return render_template(
+        "public/page.html", page=page, recording=recording,
+        landing=build_landing(page), share=share, share_view=share_social(share),
+        module_href=module_href,
     )
 
 
@@ -737,6 +863,7 @@ def public_use_cases_index():
     app/services/public_pages.py::load_feed_pages.
     """
     from app.services.public_pages import USE_CASE_SEGMENT_LABELS, family_hub_groups
+    from app.services.origin import canonical_origin
 
     groups = family_hub_groups(
         "function-per-segment",
@@ -746,7 +873,7 @@ def public_use_cases_index():
     return render_template(
         "public/hub_index.html",
         title="Use cases",
-        canonical_url="https://entelim.org/use-cases",
+        canonical_url=f"{canonical_origin()}/use-cases",
         description=(
             "What Entelim answers for startup founders, scale-up CTOs, "
             "enterprise architecture teams and operations leads."
@@ -788,12 +915,27 @@ def _render_family_hub(family: str, path: str, fallback_title: str, extra_entrie
             if p.url not in seen:
                 seen.add(p.url)
                 listed.append(p)
+    role_cards = None
+    if family == "role":
+        # The cards are the one list: the structured data names exactly these
+        # pages, in this order.
+        from app.services.public_pages import role_hub_cards
+        from app.services.site_registry import site_registry
+
+        role_cards = role_hub_cards(site_registry()["roles"]["cards"])
+        listed = [
+            SimpleNamespace(url=card["href"], title=card["title"])
+            for group in role_cards for card in group["cards"]
+        ]
+    from app.services.origin import canonical_origin
+
     return render_template(
         "public/hub_index.html",
         title=title,
-        canonical_url=f"https://entelim.org{path}",
+        canonical_url=f"{canonical_origin()}{path}",
         description=description,
         intro_html=intro.body_html if live_intro else None,
+        role_cards=role_cards,
         groups=groups,
         extra_groups=extra_groups,
         show_descriptions=True,
@@ -810,6 +952,8 @@ def public_roles_index():
     """The /roles hub: every live role page, grouped, from the feed."""
     from app.services.public_pages import ROLE_HUB_EXTRA_ENTRIES
 
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard.overview"))
     return _render_family_hub("role", "/roles", "Roles", ROLE_HUB_EXTRA_ENTRIES)
 
 
@@ -819,9 +963,11 @@ def public_role(slug):
     from app.services.public_pages import (
         MERGED_PAGES,
         build_jsonld,
+        build_landing,
         get_page_screenshot,
         load_page,
         role_siblings,
+        get_role_more_screens,
     )
 
     merge_target = MERGED_PAGES.get(f"/roles/{slug}")
@@ -832,9 +978,14 @@ def public_role(slug):
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page), siblings=role_siblings(page),
+        more_screens=get_role_more_screens(page),
+        landing=build_landing(page),
     )
 
 
@@ -866,6 +1017,9 @@ def public_connector(slug):
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
@@ -903,6 +1057,9 @@ def public_use_case(slug):
             return redirect(redirect_target, code=301)
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
@@ -918,7 +1075,7 @@ def public_comparison_hub():
     Reuses the same page loader as every other public page (no second loader):
     a comparison page's own front-matter `routing` decides its real address — most
     carry an archiet.ai canonical URL, so the hub links there rather than assuming
-    every comparison page lives on entelim.org.
+    every comparison page lives on entelim.tech.
 
     load_feed_pages(), not load_all_pages(): a comparison page withdrawn from
     discovery (state: not_planned) still renders at its own URL but must drop
@@ -926,15 +1083,16 @@ def public_comparison_hub():
     /use-cases index.
     """
     from app.services.public_pages import load_feed_pages
+    from app.services.origin import canonical_origin
 
-    site_url = "https://entelim.org"
+    site_url = canonical_origin()
     pages = [p for p in load_feed_pages() if p.family == "comparison"]
     entries = [
         {
             "competitor": p.front_matter.get("competitor", p.title),
             "real_url": p.external_url or f"{site_url}{p.url}",
-            # The entelim.org page itself, so a visitor who stays on this
-            # site (and a crawler following only entelim.org links) can
+            # The entelim.tech page itself, so a visitor who stays on this
+            # site (and a crawler following only entelim.tech links) can
             # still reach it even when real_url points at archiet.ai --
             # only shown when it differs from real_url, to avoid a second,
             # identical link.
@@ -955,6 +1113,9 @@ def public_comparison(slug):
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         landing=build_landing(page),
@@ -986,6 +1147,9 @@ def public_dogfood():
     if page is None:
         from flask import abort
         abort(404)
+    closed = _wave_closed_response(page)
+    if closed is not None:
+        return closed
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 
@@ -1000,6 +1164,7 @@ def public_site_page(slug):
         build_jsonld,
         load_feed_pages,
         load_page,
+        share_page_paths,
     )
 
     page = load_page("site", slug=slug)
@@ -1017,6 +1182,16 @@ def public_site_page(slug):
         connectors = sorted(
             (p for p in feed if p.family == "connector"), key=lambda p: p.title.lower()
         )
+        import dataclasses
+
+        from app.services.site_registry import (
+            available_capabilities, coming_capabilities, hold_back_unreleased_capabilities, open_signed_in_links, signed_in_target,
+        )
+
+        coming_soon = coming_capabilities()
+        body_html, _described = hold_back_unreleased_capabilities(page.body_html)
+        page = dataclasses.replace(page, body_html=open_signed_in_links(body_html))
+        modules = [dataclasses.replace(m, url=signed_in_target(m.url)) for m in modules]
         hub_groups = [
             group for group in (
                 {"label": "Every module", "pages": modules},
@@ -1025,6 +1200,8 @@ def public_site_page(slug):
         ]
         return render_template(
             "public/page.html", page=page, hub_groups=hub_groups,
+            coming_soon=coming_soon, available=available_capabilities(),
+            share_paths=set(share_page_paths()),
             jsonld=build_hub_jsonld(
                 page.title, page.url, page.description, modules + connectors,
                 page.body_html,
@@ -1035,6 +1212,7 @@ def public_site_page(slug):
     template = "public/page.html"
     if page.front_matter.get("template") == "pricing":
         template = "public/pricing.html"
+        return render_template(template, page=page, jsonld=build_jsonld(page), **_plan_context())
     return render_template(template, page=page, jsonld=build_jsonld(page))
 
 
@@ -1097,18 +1275,18 @@ def track_plan_click():
 
 @main.errorhandler(404)
 def not_found_error(error):
-    return render_template("errors/404.html"), 404
+    return render_plain_error(404)
 
 
 @main.errorhandler(500)
 def internal_error(error):
     db.session.rollback()
-    return render_template("errors/500.html"), 500
+    return render_plain_error(500)
 
 
 @main.errorhandler(403)
 def forbidden_error(error):
-    return render_template("errors/403.html"), 403
+    return render_plain_error(403)
 
 
 # ============================================================================
@@ -1160,13 +1338,15 @@ def get_widget_metrics():
     """
     try:
         # Sample metrics data - in production, this would come from database
+        from app.services.cost_visibility import withhold_reply
+
         metrics = {
             "total_users": 1234,
             "active_sessions": 89,
             "revenue": 45678.90,
             "conversion_rate": 3.45,
         }
-        return jsonify(metrics)
+        return jsonify(withhold_reply(metrics))
 
     except Exception as e:
         current_app.logger.error(f"Widget metrics fetch failed: {e}")
@@ -1331,7 +1511,7 @@ def integrations():
 
 @main.route("/settings")
 @login_required
-@platform_admin_required
+@platform_admin_required(hide=True)
 @admin_required
 def settings():
     """System Settings - Application configuration and user preferences.
@@ -1425,6 +1605,9 @@ def save_system_settings():
                 {"key": str(key), "value": json.dumps(value)},
             )
         db.session.commit()
+        from app.services import activity_record
+
+        activity_record.clear_setting_cache()
         return jsonify({"status": "saved", "count": len(settings_data)})
     except Exception as e:
         db.session.rollback()

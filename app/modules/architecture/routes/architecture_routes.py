@@ -15,7 +15,7 @@ import logging
 
 from flask import Blueprint, current_app, flash, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 
@@ -56,7 +56,9 @@ def api_solutions():
     """Get all solutions."""
     try:
         solutions = Solution.query.limit(500).all()
-        return jsonify(
+        from app.services.cost_visibility import withhold_reply
+
+        return jsonify(withhold_reply(
             [
                 {
                     "id": s.id,
@@ -82,7 +84,7 @@ def api_solutions():
                 }
                 for s in solutions
             ]
-        )
+        ))
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
@@ -356,16 +358,18 @@ def solutions_architecture_dashboard():
     """Solutions architecture dashboard."""
     try:
         from app import db
-        from app.models.truly_missing_models import (
-            Solution,
-            SolutionContract,
-            SolutionPattern,
-        )
+        from app.decorators.requires_role import may_see_contract_pages
+        from app.models.truly_missing_models import Solution, SolutionPattern
+        from app.services.cost_visibility import COSTS_WITHHELD, costs_visible
+        from app.services.vendor_register import register_contracts
 
         # Get counts for metrics cards
         solution_count = Solution.query.count()
         pattern_count = SolutionPattern.query.count()
-        contract_count = SolutionContract.query.count()
+        # The Contracts register's own reader, shown only to people who may open that register.
+        contract_count = (
+            len(register_contracts(current_user.organization_id)) if may_see_contract_pages(current_user) else None
+        )
 
         # Get solutions with their capability counts
         solutions_objs = Solution.query.limit(500).all()
@@ -445,6 +449,7 @@ def solutions_architecture_dashboard():
                 "Failed to query ArchiMate application layer counts", exc_info=True
             )
 
+        costs_withheld = not costs_visible(current_user)
         return render_template(
             "enterprise/solutions_architecture_dashboard.html",
             solutions=solutions_list,
@@ -453,6 +458,8 @@ def solutions_architecture_dashboard():
             contract_count=contract_count,
             archimate_app_count=archimate_app_count,
             relationship_count=relationship_count,
+            costs_withheld=costs_withheld,
+            costs_withheld_sentence=COSTS_WITHHELD,
         )
     except Exception as e:
         from app import db
@@ -481,6 +488,8 @@ def api_solutions_architecture_analyze():
     """Run AI-powered Buy/Build/Reuse analysis via SolutionArchitectOrchestrator."""
     from decimal import Decimal
 
+    from app.services.cost_visibility import costs_visible
+
     try:
         data = request.get_json(force=True) or {}
         problem = (data.get("problem_description") or "").strip()
@@ -492,6 +501,7 @@ def api_solutions_architecture_analyze():
         )
 
         orchestrator = SolutionArchitectOrchestrator()
+        # The one cost rule decides inside the orchestrator, the one place both analyse callers share.
         result = orchestrator.analyze_problem(
             problem_description=problem,
             budget_min=Decimal(str(data["budget_min"])) if data.get("budget_min") else None,
@@ -503,7 +513,9 @@ def api_solutions_architecture_analyze():
             industry_vertical=data.get("industry_vertical", "general"),
             existing_constraints=data.get("existing_constraints") or [],
             compliance_requirements=data.get("compliance_requirements") or [],
+            show_costs=costs_visible(current_user),
         )
+
         # Serialize Decimal fields for JSON
         for rec in result.get("recommendations", []):
             if rec.get("estimated_cost") is not None:
@@ -678,6 +690,39 @@ def _assemble_investment_priorities_context():
     return analysis, mapping_count
 
 
+def investment_scores_unavailable_response(currency_symbol):
+    """The matrix page for a scorer that failed: an error with a retry, never an empty organisation."""
+    return render_template(
+        "strategic/investment_matrix.html",
+        scores_error=True,
+        capability_scores=[],
+        critical_investments=[],
+        high_investments=[],
+        medium_investments=[],
+        low_investments=[],
+        portfolio_metrics={
+            "total_capabilities": None,
+            "critical_priorities": None,
+            "high_priorities": None,
+            "total_estimated_investment": None,
+            "investment_costed_count": None,
+            "scored_count": None,
+            "derived_count": None,
+            "critical_investment": None,
+            "high_investment": None,
+            "medium_investment": None,
+            "low_investment": None,
+            "average_strategic_score": None,
+            "average_coverage_score": None,
+            "average_maturity_score": None,
+            "average_risk_score": None,
+            "investment_currency": currency_symbol,
+        },
+        recommendations=[],
+        currency_symbol=currency_symbol,
+    ), 503
+
+
 @architecture_bp.route("/investment-priorities")
 @login_required
 def investment_priorities():
@@ -688,49 +733,40 @@ def investment_priorities():
     budget data where available (via RoadmapItem.linked_capabilities linkage).
     Canonical URL under /architecture/ for ArchiMate architects.
     """
-    # DEF-051, Capgemini dry-run: this rendered a literal "$" regardless of
-    # tenant currency, while Spend Analytics/Contracts on the same tenant
-    # show £ — use the tenant's real configured currency, matching the
-    # currency_symbol pattern the rest of the codebase already uses.
-    from config import CurrencyConfig
-    try:
-        currency_symbol = CurrencyConfig.get_currency_config().get("symbol", "£")
-    except Exception:
-        currency_symbol = "£"
+    # The tenant's configured currency, never a literal "$".
+    from flask_login import current_user
+
+    from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
+        currency_symbol as _currency_symbol,
+    )
+    from app.services.cost_visibility import (
+        COSTS_WITHHELD,
+        INVESTMENT_MONEY_KEYS,
+        costs_visible,
+        withhold_costs,
+    )
+
+    currency_symbol = _currency_symbol()
 
     try:
         analysis, mapping_count = _assemble_investment_priorities_context()
     except Exception as e:
         current_app.logger.error(f"Error loading investment priorities: {e}")
-        return render_template(
-            "strategic/investment_matrix.html",
-            capability_scores=[],
-            critical_investments=[],
-            high_investments=[],
-            medium_investments=[],
-            low_investments=[],
-            portfolio_metrics={
-                "total_capabilities": 0,
-                "critical_priorities": 0,
-                "high_priorities": 0,
-                "total_estimated_investment": 0,
-                "critical_investment": 0,
-                "high_investment": 0,
-                "average_strategic_score": 0,
-                "average_coverage_score": 0,
-                "average_maturity_score": 0,
-                "average_risk_score": 0,
-                "investment_currency": currency_symbol,
-            },
-            recommendations=[],
-            currency_symbol=currency_symbol,
-        )
+        return investment_scores_unavailable_response(currency_symbol)
 
     if analysis is None:
         return render_template(
             "strategic/investment_matrix_prereq.html",
             mapping_count=mapping_count,
         )
+
+    from app.middleware.tenant_context import current_org_id
+    from app.services import result_footer_service
+
+    result_footer_service.attach_capability_footers(current_org_id(), analysis["capability_scores"])
+    # After the footers, which read the figures to say where each came from.
+    if not costs_visible(current_user):
+        analysis = withhold_costs(analysis, keys=INVESTMENT_MONEY_KEYS)
 
     return render_template(
         "strategic/investment_matrix.html",
@@ -742,6 +778,7 @@ def investment_priorities():
         portfolio_metrics=analysis["portfolio_metrics"],
         recommendations=analysis["recommendations"],
         currency_symbol=currency_symbol,
+        costs_withheld_sentence=COSTS_WITHHELD,
     )
 
 
@@ -834,6 +871,13 @@ def ai_investment_suggestions():
 
     # analysis spans every organization on the install (see
     # _org_scoped_investment_context) — never hand it to the LLM as-is.
+    # A person without spend authority gets suggestions drawn from an analysis with the money out.
+    from flask_login import current_user
+
+    from app.services.cost_visibility import INVESTMENT_MONEY_KEYS, costs_visible, withhold_costs
+
+    if not costs_visible(current_user):
+        analysis = withhold_costs(analysis, keys=INVESTMENT_MONEY_KEYS)
     org_context = _org_scoped_investment_context(analysis)
     if org_context is None:
         return jsonify({

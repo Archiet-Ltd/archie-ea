@@ -19,8 +19,7 @@
             <div class="flex items-center gap-2">
                 <button type="button"
                     @click="resolveAllAsNew()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                 aria-label="Action">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Resolve All as New
                 </button>
                 <button type="button"
@@ -62,7 +61,7 @@
  'bg-warning/10 text-warning-emphasis': conflict.matches[0]?.similarity >= 0.6 && conflict.matches[0]?.similarity < 0.8
  }"
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                    x-text="Math.round((conflict.matches[0]?.similarity || 0) * 100) + '% match'"
+                                    x-text="Platform.figure.percent(conflict.matches[0]?.similarity, 100) + ' match'"
                                 ></span>
                             </div>
                             <p class="font-medium text-sm" x-text="conflict.matches[0]?.app_name"></p>

@@ -2,6 +2,8 @@
 Retry handler with exponential backoff for transient failures.
 Prevents pipeline/workflow failures due to temporary API issues.
 """
+import contextlib
+import contextvars
 import logging
 from functools import wraps
 
@@ -17,6 +19,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from tenacity.stop import stop_base
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,26 @@ TRANSIENT_ERRORS = (
     AnthropicError,
     AnthropicRateLimitError,
 )
+
+
+_one_attempt = contextvars.ContextVar("retry_one_attempt", default=False)
+
+
+@contextlib.contextmanager
+def one_attempt():
+    """Inside this block every call decorated with ``retry_on_transient_error`` is tried once.
+
+    A caller that has a time limit uses it so the retries do not multiply the limit."""
+    token = _one_attempt.set(True)
+    try:
+        yield
+    finally:
+        _one_attempt.reset(token)
+
+
+class _stop_when_one_attempt(stop_base):
+    def __call__(self, retry_state):
+        return _one_attempt.get()
 
 
 def retry_on_transient_error(max_attempts=3, min_wait=2, max_wait=10):
@@ -76,7 +99,7 @@ def retry_on_transient_error(max_attempts=3, min_wait=2, max_wait=10):
         return isinstance(exception, TRANSIENT_ERRORS)
 
     return retry(
-        stop=stop_after_attempt(max_attempts),
+        stop=stop_after_attempt(max_attempts) | _stop_when_one_attempt(),
         wait=wait_exponential(multiplier=1, min=min_wait, max=max_wait),
         retry=should_retry,
         before_sleep=before_sleep_log(logger, logging.WARNING),

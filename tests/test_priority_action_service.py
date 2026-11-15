@@ -88,7 +88,7 @@ def test_row_wording_and_em_dash_for_unrecorded_values(db_session, make_org, ten
         _wp(db_session, org, "No progress recorded", end=datetime(2026, 10, 7), progress=None, priority="high")
         result = svc.prioritised_actions(org.id, today=TODAY)
     by_name = {r["name"]: r for r in result["rows"]}
-    assert by_name["Data quality gap"]["action"] == "Convert the Data quality gap to a work package"
+    assert by_name["Data quality gap"]["action"] == "Convert the gap \u201cData quality gap\u201d to a work package"
     assert by_name["Deploy mobile field app"]["action"] == (
         "Finish Deploy mobile field app: due 7 Oct, 58 percent done"
     )
@@ -151,7 +151,7 @@ def test_covered_gaps_follow_uncovered_ones_and_closed_gaps_drop_out(db_session,
             organization_id=org.id, name="Linked wp", gap_id=covered.id)
         result = svc.prioritised_actions(org.id, today=TODAY)
     assert _names(result) == [uncovered.name, covered.name]
-    assert result["rows"][1]["action"].startswith("Close the Covered gap")
+    assert result["rows"][1]["action"].startswith("Close the gap \u201cCovered gap\u201d")
 
 
 def test_unlinking_through_the_writer_uncovers_the_gap(db_session, make_org, tenant_ctx):
@@ -165,8 +165,8 @@ def test_unlinking_through_the_writer_uncovers_the_gap(db_session, make_org, ten
         linked = svc.prioritised_actions(org.id, today=TODAY)
         work_package_service.update_work_package(wp.id, organization_id=org.id, gap_id=None)
         unlinked = svc.prioritised_actions(org.id, today=TODAY)
-    assert linked["rows"][0]["action"].startswith("Close the Gap to unlink")
-    assert unlinked["rows"][0]["action"].startswith("Convert the Gap to unlink to a work package")
+    assert linked["rows"][0]["action"].startswith("Close the gap \u201cGap to unlink\u201d")
+    assert unlinked["rows"][0]["action"].startswith("Convert the gap \u201cGap to unlink\u201d to a work package")
 
 
 def test_another_organisations_link_does_not_cover_a_gap(db_session, make_org, tenant_ctx):
@@ -181,7 +181,7 @@ def test_another_organisations_link_does_not_cover_a_gap(db_session, make_org, t
         own = _gap(db_session, org, "Own gap", "high")
         result = svc.prioritised_actions(org.id, today=TODAY)
     assert _names(result) == [own.name]
-    assert result["rows"][0]["action"].startswith("Convert the Own gap to a work package")
+    assert result["rows"][0]["action"].startswith("Convert the gap \u201cOwn gap\u201d to a work package")
 
 
 @pytest.mark.parametrize("done", ["Completed", "completed", "Cancelled", "Canceled"])
@@ -310,7 +310,7 @@ def test_both_screens_render_the_rule_and_only_own_rows(path, client, login_as, 
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert svc.RANKING_RULE in body
-    assert "Convert the Own visible gap to a work package" in body
+    assert "Convert the gap \u201cOwn visible gap\u201d to a work package" in body
     assert "Foreign hidden gap" not in body
 
 
@@ -322,3 +322,67 @@ def test_foreign_gap_record_answers_404(client, login_as, db_session, make_org, 
     db_session.expunge_all()  # .get() answers from the identity map on a hit, which a request never has
     response = client.get("/architecture/implementation/Gap/%d" % foreign_id)
     assert response.status_code == 404
+
+
+def test_each_gap_is_named_once_and_listed_once(db_session, make_org, tenant_ctx):
+    org, other = make_org("a"), make_org("b")
+    with tenant_ctx(other.id):
+        _gap(db_session, other, "Gap: Billing", "high")
+    with tenant_ctx(org.id):
+        _gap(db_session, org, "Gap: Gap: Asset Lifecycle Management", "medium")
+        _gap(db_session, org, "Gap: Asset Lifecycle Management", "critical")
+        _gap(db_session, org, "Asset Lifecycle Management", "low")
+        _gap(db_session, org, "Gap: Data Analytics", "high")
+        result = svc.prioritised_actions(org.id, today=TODAY)
+    actions = [r["action"] for r in result["rows"]]
+    assert actions == [
+        "Convert the gap \u201cAsset Lifecycle Management\u201d to a work package",
+        "Convert the gap \u201cData Analytics\u201d to a work package",
+    ]
+    assert result["total"] == 2
+    assert not any("Gap:" in a for a in actions)
+    first = result["rows"][0]
+    assert first["severity"] == "Critical"
+    assert "3 open gap records share this name" in first["why"]
+    assert len({(r["action"]) for r in result["rows"]}) == len(result["rows"])
+
+
+def test_an_action_footer_links_to_its_inputs_never_to_its_own_address(app, db_session, make_org, tenant_ctx):
+    org = make_org("a")
+    with app.test_request_context(), tenant_ctx(org.id):
+        _gap(db_session, org, "Open gap", "high")
+        wp = _wp(db_session, org, "Late work", end=datetime(2026, 10, 7), progress=40, priority="high")
+        _risk(db_session, org, "Some risk", 3, 3)
+        rows = svc.prioritised_actions(org.id, today=TODAY)["rows"]
+    assert len(rows) == 3
+    for row in rows:
+        own = row["href"]
+        assert own
+        assert own not in [e["href"] for e in row["footer"]["evidence"]], row["name"]
+        assert "in the register" not in " ".join(e["label"] for e in row["footer"]["evidence"])
+    work = next(r for r in rows if r["kind"] == "work_package")
+    assert [e["href"] for e in work["footer"]["evidence"]] == ["/implementation/work-packages/%d" % wp.id]
+
+
+def test_every_endpoint_the_service_names_is_registered(app):
+    """A link built from an endpoint name nobody registered falls back to a list page."""
+    import inspect
+    import re
+
+    named = set(re.findall(r"""["']([a-z_]+\.[a-z_]+)["']""", inspect.getsource(svc)))
+    endpoints = {n for n in named if n.split(".")[0] in {b for b in app.blueprints} or n.startswith("enterprise.")}
+    assert "implementation_planning.work_package_detail" in endpoints
+    assert not sorted(endpoints - set(app.view_functions)), sorted(endpoints - set(app.view_functions))
+
+
+def test_a_work_package_action_links_to_that_package_in_its_own_organisation(app, db_session, make_org, tenant_ctx):
+    mine, theirs = make_org("wpa"), make_org("wpb")
+    with app.test_request_context():
+        with tenant_ctx(mine.id):
+            late = _wp(db_session, mine, "Late work", end=datetime(2026, 10, 7), progress=40, priority="high")
+            rows = svc.prioritised_actions(mine.id, today=TODAY)["rows"]
+        with tenant_ctx(theirs.id):
+            _wp(db_session, theirs, "Rival work", end=datetime(2026, 10, 7), progress=10, priority="high")
+            others = svc.prioritised_actions(theirs.id, today=TODAY)["rows"]
+    assert [r["href"] for r in rows] == ["/implementation/work-packages/%d#work-package" % late.id]
+    assert all(r["href"] != rows[0]["href"] for r in others)

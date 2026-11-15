@@ -21,6 +21,8 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
+from scripts.capture.github_fixture import SITECUSTOMIZE as _SITECUSTOMIZE
+from tests.smoke.chat_ask import ask, role_of
 from tests.smoke.conftest import PAGE_TIMEOUT, boot_live_server
 from tests.smoke.fresh_org import create_fresh_org, sign_in
 
@@ -30,39 +32,6 @@ TOKEN = "test-token-not-real"
 SKIP_WELCOME = "localStorage.setItem('archie_onboarding_ts', Date.now().toString());"
 OWNER_EMAIL = "owner.one@example.test"
 SHOTS = os.environ.get("JOB0_JOURNEY_SHOTS")
-
-# Runs inside the server process, before the application: every request to api.github.com is
-# answered from the recorded organisation by the fixtures the service tests use; anything else
-# goes where it would have gone.
-_SITECUSTOMIZE = '''
-def _install():
-    import requests
-
-    original = requests.Session.request
-    state = {}
-
-    def dispatch(self, method=None, url=None, *args, **kwargs):
-        if isinstance(url, str) and url.startswith("https://api.github.com/"):
-            if "fake" not in state:
-                from types import SimpleNamespace
-
-                import pytest
-
-                from tests import test_github_builds_the_model as job0
-                from tests import test_github_connector as connector
-
-                recorded = connector.github._get_wrapped_function()(SimpleNamespace(config={}), pytest.MonkeyPatch())
-                job0.extend_with_job0(recorded.bundle)
-                state["fake"] = requests.Session.request
-                requests.Session.request = dispatch
-            return state["fake"](self, method, url, *args, **kwargs)
-        return original(self, method, url, *args, **kwargs)
-
-    requests.Session.request = dispatch
-
-
-_install()
-'''
 
 
 @pytest.fixture(scope="module")
@@ -131,13 +100,33 @@ def remove_organisations(app, org_ids):
         db.session.rollback()
         ids = {"ids": list(org_ids)}
         # Rows that point at an organisation's rows through no organisation column of their own.
-        for statement in (
+        # The server may still be writing one when the clean-up starts (an answer being recorded, a
+        # background pass finishing), so these run again before the organisations go.
+        keyed = (
             "DELETE FROM sync_logs WHERE connector_id IN (SELECT id FROM connector_configs WHERE organization_id = ANY(:ids))",
+            # The chat messages carry no organisation column, so the threads (which do) cannot go
+            # until the messages that point at them have.
+            "DELETE FROM conversation_messages WHERE thread_id IN "
+            "(SELECT id FROM conversation_threads WHERE organization_id = ANY(:ids))",
             "DELETE FROM ai_chat_approval_audit_log WHERE approval_id IN "
             "(SELECT id FROM ai_chat_crud_approvals WHERE organization_id = ANY(:ids))",
-        ):
-            with db.session.begin_nested():
-                db.session.execute(text(statement), ids)
+            # An import maps applications to capabilities; the mapping carries no organisation column.
+            "DELETE FROM unified_application_capability_mapping WHERE application_component_id IN "
+            "(SELECT id FROM application_components WHERE organization_id = ANY(:ids))",
+            "DELETE FROM application_capability_coverage WHERE application_component_id IN "
+            "(SELECT id FROM application_components WHERE organization_id = ANY(:ids))",
+            "DELETE FROM saved_diagram_elements WHERE diagram_id IN "
+            "(SELECT id FROM saved_diagrams WHERE organization_id = ANY(:ids))",
+            # Mapping a capability is audited against the person who did it, with no organisation.
+            "DELETE FROM soc2_audit_log WHERE user_id IN (SELECT id FROM users WHERE organization_id = ANY(:ids))",
+        )
+
+        def clear_keyed_rows():
+            for statement in keyed:
+                with db.session.begin_nested():
+                    db.session.execute(text(statement), ids)
+
+        clear_keyed_rows()
         # Append-only tables refuse every delete; the switch that stops their triggers firing
         # lasts for this one transaction (the same way tests/_outbox_cleanup.py does it).
         db.session.execute(text("SET LOCAL session_replication_role = replica"))
@@ -153,6 +142,7 @@ def remove_organisations(app, org_ids):
             ).scalar_one(), "the journey wrote evidence rows it cannot remove"
         pending = [name for name in tables if name not in evidence]
         for _ in range(8):
+            clear_keyed_rows()
             still = []
             for name in pending:
                 try:
@@ -249,7 +239,7 @@ def test_2_the_administrator_pastes_a_token_and_submits(admin, world):
 
 def test_3_the_status_moves_to_done_with_counts(admin, world):
     line = admin.locator("#github-progress-line")
-    expect(line).to_have_text(re.compile(r"Read 16 repositories\. 22 proposals are ready for you to review\."), timeout=PAGE_TIMEOUT)
+    expect(line).to_have_text(re.compile(r"Read 16 repositories\. 23 proposals are ready for you to review\."), timeout=PAGE_TIMEOUT)
     # Nothing is in the model until it is approved.
     expect(admin.locator("#github-count-applications")).to_have_text("0")
     remember(world, admin)
@@ -261,7 +251,7 @@ def test_4_the_review_groups_the_proposals_each_with_a_reason_and_the_owners(adm
     admin.wait_for_url("**/admin/connectors/github/review")
     expect(admin.get_by_role("heading", name="Review what GitHub showed")).to_be_visible()
     expect(admin.get_by_test_id("github-review-actions")).to_contain_text(
-        "8 applications, 3 parts, 5 links and 6 repositories that stay out of the model."
+        "8 applications, 3 parts, 6 links and 6 repositories that stay out of the model."
     )
 
     apps = admin.locator("section[aria-labelledby^='group-'] tbody tr")
@@ -278,7 +268,7 @@ def test_4_the_review_groups_the_proposals_each_with_a_reason_and_the_owners(adm
 
     expect(apps.filter(has_text="Payments Service")).to_contain_text("owner.one@example.test")
     expect(apps.filter(has_text="Customer Portal")).to_contain_text("acme/web-team")
-    expect(admin.get_by_role("button", name="Approve all (22)")).to_be_visible()
+    expect(admin.get_by_role("button", name="Approve all (23)")).to_be_visible()
     # What the review shows as the owner of three things the answer will name later.
     shown = {}
     for name, rows_, column in (("Billing Api", apps, 2), ("Customer Portal", apps, 2), ("Payments Worker", parts, 3)):
@@ -308,9 +298,9 @@ def test_4_the_review_groups_the_proposals_each_with_a_reason_and_the_owners(adm
 
 
 def test_5_approve_all_adds_everything_to_the_model(admin, world):
-    admin.get_by_role("button", name="Approve all (22)").click()
+    admin.get_by_role("button", name="Approve all (23)").click()
     main = admin.locator("#main-content")
-    expect(main.get_by_text("Added 22 items to your model.")).to_be_visible()
+    expect(main.get_by_text("Added 23 items to your model.")).to_be_visible()
     expect(admin.locator("#main-content").get_by_text("Nothing is waiting for review.", exact=False)).to_be_visible()
     remember(world, admin)
 
@@ -322,17 +312,26 @@ def test_6_the_applications_are_listed_and_payments_service_shows_its_parts_and_
         expect(table.get_by_role("row", name=re.compile(r"^Select %s " % name))).to_have_count(1)
     rows = table.locator("tbody tr")
     assert rows.count() == 8
+    # Cells are found by the column header a person reads, not by position: the table gained and
+    # lost columns and a positional index silently pointed at the wrong one.
+    headers = [h.strip().lower() for h in table.locator("thead th").all_inner_texts()]
+    for needed in ("type", "archimate", "capability"):
+        assert needed in headers, "the applications table has no %r column: %r" % (needed, headers)
+    kind, linked, capability = (headers.index(n) for n in ("type", "archimate", "capability"))
     for row in rows.all():
         # every application shows what it is and why anything unknown is unknown: no bare dash or dot
         cells = row.locator("td")
-        assert cells.nth(3).inner_text().strip() == "Application", row.inner_text()
-        assert cells.nth(4).inner_text().strip() in ("Linked", "Not linked"), "the AM dot has no stated meaning: " + row.inner_text()
-        assert cells.nth(6).inner_text().strip() not in ("", "—", "-", "Not mapped"), "the capability says nothing: " + row.inner_text()
-        for cell in (cells.nth(3), cells.nth(6)):
+        assert cells.nth(kind).inner_text().strip() == "Application", row.inner_text()
+        assert cells.nth(linked).inner_text().strip() in ("Linked", "Not linked"), "the AM dot has no stated meaning: " + row.inner_text()
+        assert cells.nth(capability).inner_text().strip() not in ("", "—", "-", "Not mapped"), "the capability says nothing: " + row.inner_text()
+        assert cells.nth(capability).inner_text().strip() == "No capability mapped yet: map it", "the capability cell names no next step: " + row.inner_text()
+        for cell in (cells.nth(kind), cells.nth(capability)):
             assert cell.inner_text().strip() not in ("—", "-", "–")
     expect(table.get_by_role("button", name="No capability mapped yet: map it").first).to_be_visible()
     shoot(admin, "6-applications")
-    table.get_by_role("row", name=re.compile(r"^Select Payments Service ")).get_by_role("link", name=re.compile("Fact sheet")).click()
+    # The fact sheet is in the row's menu (the Record ring links to its missing fields): open the menu, as a person does.
+    table.get_by_role("row", name=re.compile(r"^Select Payments Service ")).get_by_role("button", name="Actions for Payments Service").click()
+    admin.get_by_role("menuitem", name=re.compile("Fact sheet")).click()
     admin.wait_for_load_state("domcontentloaded")
     expect(admin.get_by_role("heading", name="Payments Service").first).to_be_visible()
     expect(admin.get_by_text("Payments Worker").first).to_be_visible()
@@ -341,23 +340,70 @@ def test_6_the_applications_are_listed_and_payments_service_shows_its_parts_and_
     shoot(admin, "6-application")
 
 
+CAPABILITY = "Take card payments"
+
+
+def test_6a_an_editor_maps_a_capability_from_the_cell_and_it_stays_after_a_reload(admin, world, app):
+    from app import db
+    from app.models.business_capabilities import BusinessCapability
+
+    with app.app_context():
+        capability = BusinessCapability(
+            name=CAPABILITY, code="JRN-" + uuid.uuid4().hex[:8], organization_id=world["one"]["org_id"], level=1
+        )
+        db.session.add(capability)
+        db.session.commit()
+        db.session.remove()
+    admin.goto(world["base"] + "/applications/", wait_until="domcontentloaded")
+    table = admin.get_by_role("region", name="Applications table")
+    row = table.get_by_role("row", name=re.compile(r"^Select Payments Service "))
+    row.get_by_role("button", name="No capability mapped yet: map it").click()
+    dialog = admin.locator("#unified-mapping-modal")
+    expect(dialog).to_be_visible()
+    # The dialog is about this application's capabilities, not about applications of a capability.
+    expect(dialog.locator("#unified-modal-target-name")).to_have_text("Payments Service")
+    expect(dialog).to_contain_text("Map Capabilities to:")
+    dialog.locator("#unified-targets-list").get_by_text(CAPABILITY).first.click()
+    expect(dialog.get_by_role("button", name="Save mappings").locator("visible=true")).to_contain_text("1 selected")
+    dialog.get_by_role("button", name="Save mappings").locator("visible=true").click()
+    expect(dialog).to_be_hidden()
+    admin.goto(world["base"] + "/applications/", wait_until="domcontentloaded")
+    table = admin.get_by_role("region", name="Applications table")
+    row = table.get_by_role("row", name=re.compile(r"^Select Payments Service "))
+    expect(row.locator("[data-testid^='app-capability-']")).to_have_text(CAPABILITY)
+    expect(row).not_to_contain_text("map it")
+    assert table.get_by_role("button", name="No capability mapped yet: map it").count() == 7  # the others still say what to do
+    remember(world, admin)
+    shoot(admin, "6a-capability-mapped")
+
+
+def test_6b_a_viewer_sees_plain_text_and_no_control_in_the_capability_cell(browser, world):
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.add_init_script(SKIP_WELCOME)
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        sign_in(page, world["base"], world["one"]["emails"]["non_technical_owner"])
+        page.goto(world["base"] + "/applications/", wait_until="domcontentloaded")
+        table = page.get_by_role("region", name="Applications table")
+        expect(table.get_by_role("button", name="No capability mapped yet: map it")).to_have_count(0)
+        expect(table.get_by_text("No capability mapped yet", exact=True).first).to_be_visible()
+        expect(table.get_by_text(CAPABILITY, exact=True).first).to_be_visible()
+    finally:
+        context.close()
+
+
 def ask_what_breaks_if_payments_service_fails(page, base):
-    """On the Ask page, the way a person does: choose the question, type the name, pick it."""
-    page.goto(base + "/intelligence/ask", wait_until="domcontentloaded")
-    page.wait_for_function(
-        "() => { const el = document.querySelector('[x-data=\"askSurface()\"]'); return !!(el && el._x_dataStack); }"
-    )
-    page.locator("#ask-question-impact").click()
-    box = page.locator("#ask-picker-input")
-    expect(box).to_be_focused()
-    box.press_sequentially("Payments Service", delay=15)
-    page.locator("#ask-picker-listbox [role=option]", has_text="Payments Service").first.click()
-    rows = page.locator("[data-ask-row]")
-    expect(rows.first).to_be_visible()
-    return rows
+    """In the AI chat, the way a person does: type the question and press Enter. Returns the
+    connection cards of the answer."""
+    answer = ask(page, base, "What breaks if Payments Service fails")
+    cards = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]"))
+    expect(cards.first).to_be_visible()
+    return cards
 
 
 def test_7_asking_what_breaks_names_the_dependents(admin, world):
+    assert role_of(world["one"]["emails"]["solution_architect"]) == "solution_architect"  # the persona, not an administrator
     rows = ask_what_breaks_if_payments_service_fails(admin, world["base"])
     for name in ("Billing Api", "Customer Portal", "Payments Worker"):
         expect(rows.filter(has_text=name).first).to_be_visible()
@@ -404,11 +450,12 @@ def shoot_on_a_phone(browser, world, name):
     page = context.new_page()
     try:
         sign_in(page, world["base"], world["one"]["emails"]["solution_architect"])
-        ask_what_breaks_if_payments_service_fails(page, world["base"])
-        page.wait_for_timeout(1200)  # the smooth scroll to the answer's heading has settled
-        heading = page.locator("#ask-results-heading").bounding_box()
-        bar = page.evaluate("(() => { const b = document.querySelector('header'); return b ? b.getBoundingClientRect().bottom : 0; })()")
-        assert heading and heading["y"] >= bar - 1, "the answer's heading sits under the top bar: heading %s, bar bottom %s" % (heading, bar)
+        cards = ask_what_breaks_if_payments_service_fails(page, world["base"])
+        page.wait_for_timeout(1200)  # the smooth scroll to the answer has settled
+        box = cards.first.bounding_box()
+        assert box and box["x"] >= 0 and box["x"] + box["width"] <= 390, "the answer overflows a phone: %s" % box
+        composer = page.locator("#user-input").bounding_box()
+        assert composer and composer["y"] + composer["height"] <= 844, "the question box is off screen: %s" % composer
         if SHOTS:
             os.makedirs(SHOTS, exist_ok=True)
             shoot_whole_answer(page, os.path.join(SHOTS, "%s-390.png" % name))
@@ -433,9 +480,6 @@ def test_7b_each_dependent_is_cited_with_its_repository_and_file(admin, world, b
             continue
         assert owner in row_text, "review showed %r as the owner of %s, the answer shows: %s" % (owner, name, row_text)
         assert "Owner\nNot recorded" not in row_text, row_text
-    # The question line sits inside the card's padding, not flush with its edge.
-    padding = admin.evaluate("parseFloat(getComputedStyle(document.querySelector('#ask-results .question-line')).paddingLeft)")
-    assert padding >= 12, "the question line has %spx of padding" % padding
     if SHOTS:
         os.makedirs(SHOTS, exist_ok=True)
         shoot_whole_answer(admin, os.path.join(SHOTS, "7b-answer-cited-1440.png"))
@@ -455,12 +499,36 @@ def test_7c_a_citation_link_opens_on_content(admin, world):
     # The citation's short commit is the start of the commit in the address.
     short = re.search(r"@ ([0-9a-f]{7})", rows.filter(has_text="Billing Api").first.inner_text()).group(1)
     assert "/blob/" + short in href
-    # Inside the product, the same row leads to the element on the twin map, which has content.
-    inside = rows.filter(has_text="Billing Api").first.get_by_role("link", name="View on twin map")
+    # Inside the product, the same row leads to the element in the Composer, which draws it.
+    inside = rows.filter(has_text="Billing Api").first.get_by_role("link", name="Billing Api", exact=True)
     inside.click()
     admin.wait_for_load_state("domcontentloaded")
-    assert admin.locator("#main-content").inner_text().strip()
-    expect(admin.locator("#main-content").get_by_text("Billing Api").first).to_be_visible()
+    assert "/archimate/composer?element=" in admin.url
+    expect(admin.locator("#composer-focus-title")).to_contain_text("Billing Api", timeout=15000)
+
+
+def test_7e_a_citation_link_still_opens_in_a_new_tab_after_the_connections_are_worked_out(admin, world):
+    answer = ask(admin, world["base"], "What breaks if Payments Service fails")
+    work_out = answer.get_by_role("button", name="Work them out now")
+    expect(work_out).to_be_visible()
+    # Working out a whole organisation's connections takes minutes on a loaded machine and is not what is
+    # under test: the request is answered at once, and the question is then asked again for real.
+    admin.route("**/api/v1/intelligence/derivation/recompute", lambda route: route.fulfill(status=200, content_type="application/json", body="{}"))
+    answer.locator("[data-answer-cards]").evaluate("el => el.setAttribute('data-first-draw', '')")
+    work_out.click()
+    # The answer is drawn again in place of the first one; its citations are the same links.
+    chat_address = admin.url
+    expect(admin.locator("[data-first-draw]")).to_have_count(0)
+    again = admin.get_by_test_id("estate-answer").locator("[data-answer-cards]").first
+    cards = again.locator("[data-slot='card']").filter(has=admin.locator("[data-answer-row]"))
+    link = cards.filter(has_text="Billing Api").first.get_by_role("link", name="View file on GitHub").first
+    expect(link).to_be_visible()
+    assert re.fullmatch(r"https://github\.com/acme/billing-api/blob/[0-9a-f]{40}/pom\.xml", link.get_attribute("href"))
+    assert link.get_attribute("target") == "_blank", "the citation would take the person out of the conversation"
+    rel = link.get_attribute("rel") or ""
+    assert "noopener" in rel and "noreferrer" in rel, rel
+    assert admin.url == chat_address
+    admin.unroute("**/api/v1/intelligence/derivation/recompute")
 
 
 def test_7d_the_saved_answer_cites_each_dependent_with_a_link(admin, world):

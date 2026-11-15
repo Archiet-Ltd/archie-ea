@@ -72,7 +72,15 @@ class TestBusinessArchitectSectionAccess:
         from app.utils.role_access import get_visible_sections
 
         ea_visible = get_visible_sections(self._StubUser("enterprise_architect"))
-        admin_visible = get_visible_sections(self._StubUser("platform_admin"))
+
+        class _PlatformAdminStub(self._StubUser):
+            # Authority comes from the account's flag and role, not the persona.
+            is_platform_admin = True
+
+            def can(self, permission):
+                return True
+
+        admin_visible = get_visible_sections(_PlatformAdminStub("platform_admin"))
 
         assert "business_architecture" in ea_visible
         assert "business_architecture" in admin_visible

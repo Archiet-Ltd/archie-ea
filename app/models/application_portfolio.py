@@ -15,6 +15,7 @@ Features:
 """
 
 import logging
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional  # dead-code-ok
 
@@ -71,6 +72,36 @@ APPLICATION_LIFECYCLE_STAGES = [
     "4.4 stopped",
     "5. decommissioned",
 ]
+
+# The plain words a person reads for a lifecycle stage ("2.2 tactical" is read "Tactical"). A stage written
+# in another vocabulary ("operational", "in_process") reads as its own words, first letter capitalised.
+_LIFECYCLE_WORDS = {
+    "4.1 decom decided": "Decommission decided",
+    "4.2 decom planned": "Decommission planned",
+}
+
+
+# The one definition of "in its sunset stage": the stage written as "3. sunset", "3 sunset" or "sunset".
+# Python code asks is_sunset_stage(); a query filters with the same pattern, so the two cannot drift apart.
+SUNSET_STAGE_PATTERN = r"^(\d+(\.\d+)*\.?\s*)?sunset$"
+
+
+def is_sunset_stage(stage):
+    """True when the recorded stage is the sunset stage."""
+    return re.match(SUNSET_STAGE_PATTERN, (stage or "").strip(), re.IGNORECASE) is not None
+
+
+def lifecycle_label(stage):
+    """The stage in plain words, or None when none is recorded."""
+    text = (stage or "").strip()
+    if not text:
+        return None
+    key = text.casefold()
+    if key in _LIFECYCLE_WORDS:
+        return _LIFECYCLE_WORDS[key]
+    words = re.sub(r"^\d+(\.\d+)*\.?\s*", "", text).replace("_", " ").strip() or text
+    return words[:1].upper() + words[1:]
+
 
 # Canonical assessed-value vocabularies. Null and any value outside these sets
 # mean "not assessed"; consumers must not present arbitrary strings as facts.
@@ -163,7 +194,7 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
     # is NULL, and NULL renders as an em dash / no badge.
     deployment_status = Column(
         db.String(50)
-    )  # development, testing, staging, production, done
+    )  # a value from app/services/application_status.py; the validator below refuses any other
     criticality = Column(
         db.String(20)
     )  # mission_critical, important, supporting, optional
@@ -192,7 +223,7 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
     # Strategic alignment
     strategic_importance = Column(db.String(20))  # critical, high, medium, low
     business_value = Column(db.String(20))  # high, medium, low
-    competitive_advantage = Column(db.Boolean, default=False)
+    competitive_advantage = Column(db.Boolean, nullable=True)  # None: not recorded, True: yes, False: no
     differentiation_level = Column(db.String(20))  # core, differentiating, commodity
 
     # Technology stack
@@ -253,6 +284,21 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
             ondelete="SET NULL",
             use_alter=True,
             name="fk_application_components_vendor_product_id",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    # The vendor that supplies this application: the one link every vendor
+    # screen reads (app/services/vendor_register.py). ``vendor_name`` above is
+    # the text it was named by; setting the name writes this link.
+    vendor_organization_id = Column(
+        db.Integer,
+        ForeignKey(
+            "vendor_organizations.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_application_components_vendor_organization_id",
         ),
         nullable=True,
         index=True,
@@ -577,6 +623,13 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
         {"extend_existing": True},
     )
 
+    @validates("deployment_status")
+    def validate_deployment_status(self, key, value):
+        """Store only a status on the one list; the value already stored passes as it is."""
+        from app.services.application_status import status_to_store
+
+        return status_to_store(self.deployment_status, value)
+
     def __repr__(self):
         return f"<ApplicationComponent {self.name}>"
 
@@ -845,7 +898,7 @@ class VendorContract(TenantMixin, db.Model):
     # Financial terms
     contract_value = Column(db.Float)  # Total contract value
     annual_cost = Column(db.Float)  # Annual recurring cost
-    currency = Column(db.String(10), default="USD")
+    currency = Column(db.String(10))
     payment_terms = Column(db.String(50))  # net_30, net_60, quarterly, annually
 
     # Contract period

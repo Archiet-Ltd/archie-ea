@@ -154,7 +154,7 @@ def _render_finding(f: Dict[str, Any]) -> str:
         '<div class="flex items-start gap-2">'
         f'<span class="mt-1 inline-block w-2 h-2 rounded-full shrink-0" '
         f'style="background-color: rgba({_ACCENT_RGB}, {alpha:.2f});" '
-        f'aria-label="{escape(severity)} severity"></span>'
+        f'role="img" aria-label="{escape(severity)} severity"></span>'
         '<div class="min-w-0">'
     )
     item.append(f'<p class="text-sm text-foreground">{escape(why)}</p>')

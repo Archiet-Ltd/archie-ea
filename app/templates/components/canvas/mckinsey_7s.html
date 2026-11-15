@@ -1,0 +1,30 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ mckinsey-7s.html. Adapted only to Entelim macro names. #}
+{# McKinsey 7S, C2. After Waterman, Peters and Phillips, "Structure Is Not Organization" (Business Horizons, 1980). Shared Values in the centre, the other six on a hexagon, clockwise from the top: Strategy, Structure, Systems, Staff, Style, Skills, every element joined to its neighbours and to the centre by a line. Hard S: Strategy, Structure, Systems. Soft S: Skills, Style, Staff and Shared Values. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% import 'components/canvas/_ui.html' as ui with context %}
+{% set SPEC = {
+  'form': 'C2', 'name': 'McKinsey 7S', 'grid': 'relative auto-rows-fr grid-cols-6 gap-x-10 gap-y-8', 'width': 'min-w-240',
+  'hint': 'Scroll sideways on a narrow screen to see the whole hexagon.',
+  'credit': '7-S framework after Robert Waterman, Tom Peters and Julien Phillips, "Structure Is Not Organization", Business Horizons, 1980.',
+  'boxes': [
+    {'key': 'shared-values', 'title': 'Shared Values', 'icon': 'heart', 'question': 'Soft S, at the centre. What do we stand for and believe in?', 'empty': 'No shared values yet. Add the principles the organisation stands on.', 'area': 'col-span-2 col-start-3 row-start-3'},
+    {'key': 'strategy', 'title': 'Strategy', 'icon': 'target', 'question': 'Hard S. How will we build and keep our advantage?', 'empty': 'No strategy yet. Add the courses of action and goals that set the direction.', 'area': 'col-span-2 col-start-3 row-start-1'},
+    {'key': 'structure', 'title': 'Structure', 'icon': 'layout-grid', 'question': 'Hard S. How is the company organised and who reports to whom?', 'empty': 'No structure yet. Add the organisation units and roles.', 'area': 'col-span-2 col-start-5 row-start-2'},
+    {'key': 'systems', 'title': 'Systems', 'icon': 'server', 'question': 'Hard S. Which processes and tools run the daily work?', 'empty': 'No systems yet. Add the processes and applications that run the work.', 'area': 'col-span-2 col-start-5 row-start-4'},
+    {'key': 'skills', 'title': 'Skills', 'icon': 'award', 'question': 'Soft S. What are we distinctively good at?', 'empty': 'No skills yet. Add the capabilities you are good at.', 'area': 'col-span-2 col-start-1 row-start-2'},
+    {'key': 'style', 'title': 'Style', 'icon': 'messages-square', 'question': 'Soft S. How do leaders behave and decide?', 'empty': 'No findings yet. Add the assessments of how leaders behave.', 'area': 'col-span-2 col-start-1 row-start-4'},
+    {'key': 'staff', 'title': 'Staff', 'icon': 'users', 'question': 'Soft S. Who works here and how do we develop them?', 'empty': 'No staff yet. Add the people resources and the work to develop them.', 'area': 'col-span-2 col-start-3 row-start-5'},
+  ]} %}
+{% set AT = {'shared-values': (50, 50), 'strategy': (50, 10), 'structure': (83.3, 30), 'systems': (83.3, 70),
+             'staff': (50, 90), 'style': (16.7, 70), 'skills': (16.7, 30)} %}
+{% set RING = ['strategy', 'structure', 'systems', 'staff', 'style', 'skills'] %}
+{% macro mckinsey_7s(data, id='mckinsey-7s') -%}
+{% call f.grid_canvas(SPEC, data, id) %}
+      <svg class="absolute inset-0 size-full stroke-muted-foreground" aria-hidden="true">
+        {% for k in RING %}{% set n = RING[(loop.index0 + 1) % 6] %}
+        <line x1="{{ AT[k][0] }}%" y1="{{ AT[k][1] }}%" x2="{{ AT[n][0] }}%" y2="{{ AT[n][1] }}%" stroke-width="2"/>
+        <line x1="{{ AT[k][0] }}%" y1="{{ AT[k][1] }}%" x2="{{ AT['shared-values'][0] }}%" y2="{{ AT['shared-values'][1] }}%" stroke-width="2"/>
+        {% endfor %}
+      </svg>
+{% endcall %}
+{%- endmacro %}

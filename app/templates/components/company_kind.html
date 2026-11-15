@@ -1,0 +1,33 @@
+{# Company kind picker — the one place the Startup / Scale-up / Enterprise choice is made.
+
+   Used by the dashboard's setup block and by Account settings, so both save the same way
+   (POST /dashboard/api/company-kind, via app/static/js/dashboard/company_kind.js) and both
+   say plainly when the choice is saved.
+
+   Usage:
+     {% from "components/company_kind.html" import company_kind_picker %}
+     {{ company_kind_picker(kind='startup') }}
+   and load js/dashboard/company_kind.js on the page.
+#}
+{% from 'components/button.html' import button %}
+{% macro company_kind_picker(kind='startup') %}
+{% set options = [
+    ('startup', 'Startup', 'Validating product-market fit'),
+    ('scaleup', 'Scale-up', 'Rapid growth and expansion'),
+    ('enterprise', 'Enterprise', 'Established organisation at scale'),
+] %}
+<div data-company-kind-picker data-testid="company-kind-picker" class="space-y-2">
+    <div role="group" aria-label="Company kind" class="flex flex-wrap items-center gap-2">
+        {% for value, label, hint in options %}
+        {% set selected = (kind or 'startup') == value %}
+        {% call button(
+            variant='default' if selected else 'outline',
+            size='sm',
+            testid='company-kind-' ~ value,
+            attrs_dict={'data-company-kind': value, 'aria-pressed': 'true' if selected else 'false', 'title': hint}
+        ) %}{{ label }}<span class="ml-1.5 hidden text-xs font-normal sm:inline">— {{ hint }}</span>{% endcall %}
+        {% endfor %}
+    </div>
+    <p data-company-kind-status data-testid="company-kind-status" role="status" aria-live="polite" class="min-h-4 text-xs text-muted-foreground"></p>
+</div>
+{% endmacro %}

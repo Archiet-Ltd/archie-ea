@@ -19,6 +19,12 @@ from typing import Dict, List, Optional, Tuple
 
 from app import db
 from app.models.implementation_migration import Gap, WorkPackage
+from app.services.gap_register_service import (
+    normalise_priority,
+    normalise_severity,
+    priority_filter_clause,
+    severity_order_expr,
+)
 
 # Gap type color mapping (consistent with UI)
 GAP_TYPE_COLORS = {
@@ -36,6 +42,19 @@ PRIORITY_SEVERITY_MAP = {
     "medium": "medium",
     "low": "low",
 }
+
+
+def apply_rating_rule(current_priority, current_severity, updates: Dict) -> Dict:
+    """The one rule for a gap's rating, used by create and by edit: choosing a priority sets the severity
+    to match, a severity chosen on its own moves a critical priority to match, and a save that leaves the
+    priority as it was never touches the severity. A new gap has no current priority."""
+    current_priority = (current_priority or "").strip().lower()
+    if updates.get("priority") and updates["priority"] != current_priority and "severity" not in updates:
+        return {**updates, "severity": PRIORITY_SEVERITY_MAP.get(updates["priority"], current_severity)}
+    if updates.get("severity") and "priority" not in updates and current_priority == "critical":
+        return {**updates, "priority": updates["severity"]}
+    return updates
+
 
 # Default resolution timeframes by priority (days)
 PRIORITY_TIMEFRAMES = {
@@ -142,7 +161,7 @@ class GapArchiMateService:
             source_capability_type=data.get("capability_type"),
             source_capability_id=data.get("capability_id"),
             priority=priority,
-            severity=PRIORITY_SEVERITY_MAP.get(priority, "medium"),
+            severity=apply_rating_rule(None, None, {"priority": priority}).get("severity") or "medium",
             impact=data.get("strategic_importance", "medium"),
             resolution_status="identified",
             estimated_start_date=start_date,
@@ -162,8 +181,10 @@ class GapArchiMateService:
             gap.color = GAP_TYPE_COLORS.get(gap_types[0], gap.color)
 
         if data.get("priority"):
-            gap.priority = data["priority"]
-            gap.severity = PRIORITY_SEVERITY_MAP.get(data["priority"], gap.severity)
+            chosen = normalise_priority(data["priority"]) or data["priority"]
+            rated = apply_rating_rule(gap.priority, gap.severity, {"priority": chosen})
+            gap.priority = rated["priority"]
+            gap.severity = rated.get("severity", gap.severity)
 
         if data.get("strategic_importance"):
             gap.impact = data["strategic_importance"]
@@ -217,7 +238,9 @@ class GapArchiMateService:
         Returns:
             Updated Gap or None if not found
         """
-        gap = Gap.query.get(gap_id)
+        # A query, not .get(): .get() answers from the session's identity map without SQL, which would
+        # skip the organisation filter on a cache hit.
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             return None
 
@@ -239,6 +262,23 @@ class GapArchiMateService:
             "business_value",
         }
 
+        # The priority is stored trimmed and lower case; a word that is not a priority is refused.
+        if "priority" in updates:
+            updates = {**updates, "priority": normalise_priority(updates["priority"])}
+            if updates["priority"] is None:
+                del updates["priority"]
+
+        # The severity is stored the same way; a word that is not a severity is refused.
+        if "severity" in updates:
+            updates = {**updates, "severity": normalise_severity(updates["severity"])}
+            if updates["severity"] is None:
+                del updates["severity"]
+
+        # Critical is held in both fields, so choosing or removing it moves them together. An edit that
+        # leaves the priority as it was never touches the severity, and an explicit severity always wins:
+        # a severity chosen on its own moves a critical priority to match, so the gap is rated as chosen.
+        updates = apply_rating_rule(gap.priority, gap.severity, updates)
+
         for field, value in updates.items():
             if field in allowed_fields and hasattr(gap, field):
                 # Handle date fields
@@ -254,7 +294,7 @@ class GapArchiMateService:
 
     def delete_gap(self, gap_id: int) -> bool:
         """Delete a gap and its associations."""
-        gap = Gap.query.get(gap_id)
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             return False
 
@@ -554,7 +594,7 @@ class GapArchiMateService:
             if filters.get("gap_type"):
                 query = query.filter(Gap.gap_type == filters["gap_type"])
             if filters.get("priority"):
-                query = query.filter(Gap.priority == filters["priority"])
+                query = query.filter(priority_filter_clause(filters["priority"]))
             if filters.get("resolution_status"):
                 query = query.filter(Gap.resolution_status == filters["resolution_status"])
             if filters.get("source_capability_type"):
@@ -562,11 +602,11 @@ class GapArchiMateService:
                     Gap.source_capability_type == filters["source_capability_type"]
                 )
 
-        return query.order_by(Gap.priority.desc(), Gap.estimated_start_date).all()
+        return query.order_by(severity_order_expr(), Gap.estimated_start_date).all()
 
     def get_work_packages_for_gap(self, gap_id: int) -> List[WorkPackage]:
         """Get all work packages for a gap."""
-        gap = Gap.query.get(gap_id)
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             return []
         return list(gap.work_packages)

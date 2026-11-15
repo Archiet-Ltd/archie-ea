@@ -53,6 +53,7 @@ else:
         )
         name = db.Column(db.String(255), nullable=False)
         statement = db.Column(db.Text, nullable=True)
+        description = db.Column(db.Text, nullable=True)
         rationale = db.Column(db.Text, nullable=True)
         implications = db.Column(db.Text, nullable=True)
         category = db.Column(db.String(50), nullable=True)

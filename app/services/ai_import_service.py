@@ -11,6 +11,8 @@ Integrates all AI services to provide comprehensive AI-powered import:
 This replaces the basic pattern-matching with sophisticated AI analysis.
 """
 
+from app.services.capability_support import record_support_for_records
+from app.services.change_source import records_changes_as
 import json
 import logging
 from dataclasses import dataclass
@@ -1819,21 +1821,23 @@ Provide analysis in JSON format:
                         # - this constructor call raised TypeError on every
                         # invocation, so no capability mapping this wrote ever
                         # actually persisted. Use the columns that exist.
+                        target_app = ApplicationComponent.query.filter_by(id=application_id).first()
                         existing = UnifiedApplicationCapabilityMapping.query.filter_by(
                             application_component_id=application_id,
                             unified_capability_id=mapping["capability_id"],
                         ).first()
 
-                        if not existing:
+                        if not existing and target_app is not None:
                             confidence = mapping.get("confidence_score", 0.5)
-                            new_mapping = UnifiedApplicationCapabilityMapping(
-                                application_component_id=application_id,
-                                unified_capability_id=mapping["capability_id"],
-                                support_quality=max(1, min(5, round(confidence * 5))),
-                                notes=(mapping.get("rationale") or "")
-                                + f" (AI mapping, confidence {confidence:.2f}, by {created_by})",
+                            record_support_for_records(
+                                target_app.organization_id,
+                                application_id,
+                                mapping["capability_id"],
+                                facts={
+                                    "notes": (mapping.get("rationale") or "")
+                                    + f" (AI mapping, confidence {confidence:.2f}, by {created_by})",
+                                },
                             )
-                            db.session.add(new_mapping)
                             results["capability_mappings_created"] += 1
                     except Exception as e:
                         results["errors"].append(f"Capability mapping error: {str(e)}")
@@ -2067,6 +2071,7 @@ Provide analysis in JSON format:
                 "validation_method": "error",
             }
 
+    @records_changes_as("import")
     def import_with_ai_analysis(
         self,
         app_data: Dict[str, Any],
@@ -2143,17 +2148,13 @@ Provide analysis in JSON format:
                     for m in caps:
                         if m.get("confidence_score", 0) >= confidence_threshold:
                             if not UnifiedApplicationCapabilityMapping.query.filter_by(
-                                application_id=app.id, capability_id=m["capability_id"]
+                                application_component_id=app.id, unified_capability_id=m["capability_id"]
                             ).first():
-                                db.session.add(
-                                    UnifiedApplicationCapabilityMapping(
-                                        application_id=app.id,
-                                        capability_id=m["capability_id"],
-                                        confidence_score=m.get("confidence_score", 0.5),
-                                        mapping_method="ai_import_integrated",
-                                        rationale=m.get("rationale", ""),
-                                        created_by=created_by,
-                                    )
+                                record_support_for_records(
+                                    app.organization_id,
+                                    app.id,
+                                    m["capability_id"],
+                                    facts={"notes": m.get("rationale", "")},
                                 )
                                 result["mappings_created"]["capabilities"] += 1
                 except Exception as e:
@@ -2268,6 +2269,7 @@ Provide analysis in JSON format:
 
         return result
 
+    @records_changes_as("import")
     def bulk_import_with_ai(self, applications_data: List[Dict], **kwargs) -> Dict:
         """Bulk import with AI - calls import_with_ai_analysis for each app."""
         results = {

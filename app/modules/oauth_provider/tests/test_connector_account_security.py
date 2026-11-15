@@ -37,8 +37,8 @@ def _issue(app, user, org, scope="mcp:read"):
     return oc, access, refresh, row
 
 
-def _list_canvases_status(client, access):
-    status, _body = _mcp_call(client, access, "list_canvases", {})
+def _probe_status(client, access):
+    status, _body = _mcp_call(client, access, "search_elements", {"query": "probe", "limit": 5})
     return status
 
 
@@ -57,7 +57,7 @@ def connected(client, db_session, make_org, app):
     org = make_org("connector")
     user = _make_user(db_session, org, "connector-user@example.com")
     oc, access, refresh, row = _issue(app, user, org)
-    assert _list_canvases_status(client, access) == 200
+    assert _probe_status(client, access) == 200
     return {"org": org, "user": user, "oc": oc, "access": access, "refresh": refresh, "row": row}
 
 
@@ -66,14 +66,14 @@ class TestAccountChangesEndTheToken:
         from app.modules.admin.services.admin_user_service import AdminUserService
 
         AdminUserService.set_user_password(connected["user"], "a-new-Passw0rd!")
-        assert _list_canvases_status(client, connected["access"]) == 401
+        assert _probe_status(client, connected["access"]) == 401
         assert _refresh(app, connected["oc"], connected["refresh"]).status_code == 400
 
     def test_administrator_reset_through_the_session_revocation_path(self, client, app, connected):
         from app.services import session_registry
 
         session_registry.revoke_all_for_user(connected["user"].id, "admin")
-        assert _list_canvases_status(client, connected["access"]) == 401
+        assert _probe_status(client, connected["access"]) == 401
         assert _refresh(app, connected["oc"], connected["refresh"]).status_code == 400
 
     def test_own_password_change_keeps_the_session_but_not_the_assistant(self, client, app, connected):
@@ -82,27 +82,27 @@ class TestAccountChangesEndTheToken:
         with app.test_request_context():
             ok, _msg, _n = AccountService.change_password(connected["user"], "test", "another-Passw0rd!")
         assert ok
-        assert _list_canvases_status(client, connected["access"]) == 401
+        assert _probe_status(client, connected["access"]) == 401
         assert _refresh(app, connected["oc"], connected["refresh"]).status_code == 400
 
     def test_deactivated_account(self, client, app, db_session, connected):
         connected["user"].confirmed = False
         db_session.flush()
-        assert _list_canvases_status(client, connected["access"]) == 401
+        assert _probe_status(client, connected["access"]) == 401
         assert _refresh(app, connected["oc"], connected["refresh"]).status_code == 400
 
     def test_multi_factor_enrolment(self, client, app, db_session, connected):
         connected["user"].mfa_enabled = True
         connected["user"].mfa_secret = "JBSWY3DPEHPK3PXP"
         db_session.flush()
-        assert _list_canvases_status(client, connected["access"]) == 401
+        assert _probe_status(client, connected["access"]) == 401
         assert _refresh(app, connected["oc"], connected["refresh"]).status_code == 400
 
     def test_single_sign_on_link(self, client, app, db_session, connected):
         connected["user"].sso_provider = "oidc"
         connected["user"].external_id = "subject-1"
         db_session.flush()
-        assert _list_canvases_status(client, connected["access"]) == 401
+        assert _probe_status(client, connected["access"]) == 401
         assert _refresh(app, connected["oc"], connected["refresh"]).status_code == 400
 
     def test_move_to_another_organisation_and_back_does_not_revive_the_token(
@@ -113,16 +113,16 @@ class TestAccountChangesEndTheToken:
         home = user.organization_id
         user.organization_id = other.id
         db_session.flush()
-        assert _list_canvases_status(client, connected["access"]) == 401
+        assert _probe_status(client, connected["access"]) == 401
         user.organization_id = home
         db_session.flush()
-        assert _list_canvases_status(client, connected["access"]) == 401
+        assert _probe_status(client, connected["access"]) == 401
         assert _refresh(app, connected["oc"], connected["refresh"]).status_code == 400
 
     def test_unrelated_profile_change_leaves_the_token_working(self, client, db_session, connected):
         connected["user"].first_name = "Renamed"
         db_session.flush()
-        assert _list_canvases_status(client, connected["access"]) == 200
+        assert _probe_status(client, connected["access"]) == 200
 
 
 class TestDeletingAUser:
@@ -152,12 +152,12 @@ class TestRefreshTokenReuse:
         first = _refresh(app, connected["oc"], connected["refresh"])
         assert first.status_code == 200, first.get_json()
         rotated = first.get_json()
-        assert _list_canvases_status(client, rotated["access_token"]) == 200
+        assert _probe_status(client, rotated["access_token"]) == 200
 
         replay = _refresh(app, connected["oc"], connected["refresh"])
         assert replay.status_code == 400
 
-        assert _list_canvases_status(client, rotated["access_token"]) == 401
+        assert _probe_status(client, rotated["access_token"]) == 401
         assert _refresh(app, connected["oc"], rotated["refresh_token"]).status_code == 400
 
     def test_replay_by_another_client_does_not_touch_the_grant(self, client, app, connected):
@@ -165,7 +165,7 @@ class TestRefreshTokenReuse:
         rotated = first.get_json()
         stranger = _register_client()
         assert _refresh(app, stranger, connected["refresh"]).status_code == 400
-        assert _list_canvases_status(client, rotated["access_token"]) == 200
+        assert _probe_status(client, rotated["access_token"]) == 200
 
     def test_refresh_stops_when_the_client_is_deactivated(self, client, app, db_session, connected):
         connected["oc"].is_active = False
@@ -185,7 +185,7 @@ class TestConnectedAssistantsScreens:
         login_as(client, connected["user"])
         resp = client.post(f"/account/manage/connected-assistants/{grant_id}/revoke")
         assert resp.status_code == 302
-        assert _list_canvases_status(client, connected["access"]) == 401
+        assert _probe_status(client, connected["access"]) == 401
 
         login_as(client, connected["user"])
         assert b"No assistants are connected" in client.get("/account/manage/connected-assistants").data
@@ -195,7 +195,7 @@ class TestConnectedAssistantsScreens:
         login_as(client, other)
         resp = client.post(f"/account/manage/connected-assistants/{connected['row'].grant_id}/revoke")
         assert resp.status_code == 302
-        assert _list_canvases_status(client, connected["access"]) == 200
+        assert _probe_status(client, connected["access"]) == 200
 
     def test_administrator_disconnects_a_users_assistants(self, client, db_session, login_as, connected):
         admin = _make_user(db_session, connected["org"], "connector-admin@example.com")
@@ -207,7 +207,7 @@ class TestConnectedAssistantsScreens:
         login_as(client, admin)
         resp = client.post(f"/admin/user/{connected['user'].id}/connected-assistants/revoke")
         assert resp.status_code == 302
-        assert _list_canvases_status(client, connected["access"]) == 401
+        assert _probe_status(client, connected["access"]) == 401
 
     def test_administrator_of_another_organisation_cannot_reach_the_user(
         self, client, db_session, make_org, login_as, connected
@@ -217,7 +217,7 @@ class TestConnectedAssistantsScreens:
         login_as(client, foreign_admin)
         resp = client.post(f"/admin/user/{connected['user'].id}/connected-assistants/revoke")
         assert resp.status_code in (403, 404)
-        assert _list_canvases_status(client, connected["access"]) == 200
+        assert _probe_status(client, connected["access"]) == 200
 
     def test_consent_screen_links_to_the_revocation_screen(self, client, db_session, login_as, connected, app):
         from urllib.parse import urlencode

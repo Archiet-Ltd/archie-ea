@@ -96,6 +96,8 @@ PLATFORM_JOBS: frozenset[str] = frozenset({
     "abacus_incremental_sync", # ExternalSystem has no organisation predicate
     "approval_escalation",     # groups overdue rows by their own organization_id internally
     "event_log_partition_maintenance",  # partitions are shared across all orgs
+    "signup_alerts",           # founder alert across all sign-ups, no organisation predicate
+    "signup_report",           # founder daily sign-up report, no organisation predicate
 })
 
 TENANT_JOBS: frozenset[str] = frozenset({
@@ -110,6 +112,11 @@ TENANT_JOBS: frozenset[str] = frozenset({
     "graph_projection_refresh",     # per-org projection snapshot, visited via run_for_each_tenant
     "owner_digest",                 # per-owner notification digest, visited via run_for_each_tenant
     "change_feed_consumer",         # owner notifications from the event log, visited via run_for_each_tenant
+    "date_alerts",                  # support dates and overdue conditions, visited via run_for_each_tenant
+    "company_signals_refresh",      # visited via run_for_each_tenant
+    "connector_reread",             # GitHub and Jira connections, visited via run_for_each_tenant
+    "change_review_sweep",          # changes still in review, retried one organisation at a time
+    "offer_reminders",              # Startup credit reminders, visited via run_for_each_tenant
 })
 
 

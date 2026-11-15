@@ -81,33 +81,10 @@ def application_gap_analysis_api(application_id):
 @application_mgmt.route("/portfolio/gap-analysis")
 @login_required
 def portfolio_gap_analysis():
-    """
-    Display portfolio-wide gap analysis.
-
-    Shows enterprise-wide gaps including unsupported capabilities,
-    single points of failure, compliance risks, and orphaned applications.
-    """
-    try:
-        from app.modules.solutions_strategic.v2.services.gap_analysis_service import ArchitecturalGapAnalyzer
-
-        analyzer = ArchitecturalGapAnalyzer()
-        portfolio_gaps = analyzer.analyze_portfolio_gaps()
-
-        # Get application count for context
-        total_applications = (
-            ApplicationComponent.query.count()
-        )  # Use count() instead of .all() for performance
-
-        return render_template(
-            "applications/dashboard.html",
-            portfolio_gaps=portfolio_gaps,
-            total_applications=total_applications,
-        )
-
-    except Exception as e:
-        current_app.logger.error(f"Error in portfolio gap analysis: {str(e)}")
-        flash("Error analyzing portfolio gaps. Please try again.", "error")
-        return redirect(url_for("application_mgmt.dashboard"))
+    """Old address: the enterprise gap register lives under /enterprise/implementation."""
+    target = url_for("enterprise.gap_analysis")
+    query = request.query_string.decode("utf-8", errors="replace")
+    return redirect(target + ("?" + query if query else ""), code=301)
 
 @application_mgmt.route("/portfolio/gap-analysis/api")
 @login_required

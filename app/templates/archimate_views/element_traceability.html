@@ -1,9 +1,15 @@
-{# smoke-coverage-ok: plain-language filter wiring — el.type display now uses |plain_name filter #}
+{# shadcn-reference: element_traceability@e55b60b #}
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
+{% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Traceability: {{ element.name }}{% endblock %}
-{% block page_title %}Traceability: {{ element.name }}{% endblock %}
 
 {% block content %}
 {% set rel_abbrev = {
@@ -15,404 +21,183 @@
     'AssociationRelationship': 'Asc',
     'AccessRelationship': 'Acc'
 } %}
-<div class="space-y-6">
-    {{ page_header(
-        title="Traceability: ", breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': "Traceability: "}] ~ element.name,
-        description="Cross-layer traceability chain for this ArchiMate element"
+{% set all_els = chain.upward + chain.downward %}
+{% set layer_order = ['Motivation', 'Strategy', 'Business', 'Application', 'Technology', 'Data', 'Implementation'] %}
+{% set layer_info = {
+    'Motivation': {bg: 'bg-layer-motivation/10', border: 'border-layer-motivation', text: 'text-layer-motivation-emphasis', dot: 'bg-layer-motivation'},
+    'Strategy': {bg: 'bg-layer-strategy/10', border: 'border-layer-strategy', text: 'text-layer-strategy-emphasis', dot: 'bg-layer-strategy'},
+    'Business': {bg: 'bg-layer-business/10', border: 'border-layer-business', text: 'text-layer-business-emphasis', dot: 'bg-layer-business'},
+    'Application': {bg: 'bg-layer-application/10', border: 'border-layer-application', text: 'text-layer-application-emphasis', dot: 'bg-layer-application'},
+    'Technology': {bg: 'bg-layer-technology/10', border: 'border-layer-technology', text: 'text-layer-technology-emphasis', dot: 'bg-layer-technology'},
+    'Data': {bg: 'bg-layer-implementation/10', border: 'border-layer-implementation', text: 'text-layer-implementation-emphasis', dot: 'bg-layer-implementation'},
+    'Implementation': {bg: 'bg-layer-implementation/10', border: 'border-layer-implementation', text: 'text-layer-implementation-emphasis', dot: 'bg-layer-implementation'},
+} %}
+
+<div class="flex-1 overflow-auto">
+    {% macro _ps_actions() %}
+        {{ button(text='Impact Analysis', variant='outline', icon='activity', href=url_for('architect_ui.impact_analysis', element_id=element.id)) }}
+        {{ button(text='Back to Traceability Matrix', variant='ghost', icon='arrow-left', href=url_for('architect_ui.traceability_matrix')) }}
+    {% endmacro %}
+
+    {{ page_shell(
+        title='Traceability: ' ~ element.name,
+        subtitle='Cross-layer traceability chain for this ArchiMate element',
+        breadcrumb=[
+            ('Home', url_for('main.index')),
+            ('Architecture Traceability', url_for('architect_ui.traceability_matrix')),
+            ('Traceability: ' ~ element.name, None)
+        ],
+        actions_caller=_ps_actions
     ) }}
 
-    <!-- Back link -->
-    <a href="{{ url_for('architect_ui.traceability_matrix') }}"
-       class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <i data-lucide="arrow-left" class="h-4 w-4"></i>
-        Back to Traceability Matrix
-    </a>
-
-    <!-- TRC-013: link traceability detail to impact analysis -->
-    {% if impact_summary %}
-    <section class="rounded-lg border border-primary/20 bg-card p-4">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                    <h2 class="text-sm font-semibold text-foreground">Impact Summary</h2>
-                    <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-info-emphasis">
-                        {{ impact_summary.total_affected }} affected
-                    </span>
+    <div class="p-6 space-y-6">
+        {% if impact_summary and impact_summary.total_affected > 0 %}
+        {% call card() %}
+            {% call card_header() %}
+                <div class="flex items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        {% call card_title() %}Impact Summary{% endcall %}
+                        {% call card_description() %}Preview of impacted elements across layers before opening the full impact analysis view.{% endcall %}
+                    </div>
+                    {% call badge(variant='info') %}{{ impact_summary.total_affected }} affected{% endcall %}
                 </div>
-                <p class="text-sm text-muted-foreground">
-                    Preview of impacted elements across layers before opening the full impact analysis view.
-                </p>
-            </div>
-            <a
-                href="{{ url_for('architect_ui.impact_analysis', element_id=element.id) }}"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-            >
-                <i data-lucide="activity" class="h-4 w-4"></i>
-                Impact Analysis
-            </a>
-        </div>
-
-        {% if impact_summary.by_layer %}
-        <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {% for layer, count in impact_summary.by_layer | dictsort %}
-            <div class="rounded-md border border-border/60 bg-background px-3 py-2">
-                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ layer }}</p>
-                <p class="mt-1 text-lg font-semibold text-foreground">{{ count }}</p>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="mt-4 rounded-md border border-dashed border-border bg-background px-3 py-3 text-sm text-muted-foreground">
-            No downstream impact detected for this element.
-        </div>
+            {% endcall %}
+            {% call card_content() %}
+                {% if impact_summary.by_layer %}
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {% for layer, count in impact_summary.by_layer | dictsort %}
+                    <div class="rounded-lg border border-border bg-card px-3 py-2">
+                        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ layer }}</p>
+                        <p class="mt-1 text-lg font-semibold text-foreground tabular-nums">{{ count }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-muted-foreground">No downstream impact detected for this element.</p>
+                {% endif %}
+            {% endcall %}
+        {% endcall %}
         {% endif %}
-    </section>
-    {% endif %}
 
-    <!-- Chain visualization -->
-    <div id="tree-container" class="rounded-lg border border-border bg-card p-4 overflow-x-auto mb-4"></div>
-    <div id="static-chain" class="space-y-4">
+        <!-- Layer chain: every linked element, one card per layer -->
+        <div id="static-chain" class="space-y-4" aria-label="Layer traceability chain">
+            {% for layer in layer_order %}
+            {% if layer != 'Application' %}
+            {% set els = all_els | selectattr('layer', 'equalto', layer) | list %}
+            {% set li = layer_info[layer] %}
+            {% call card(class=li.border ~ ' ' ~ li.bg) %}
+                {% call card_header(class='pb-2') %}
+                    <div class="flex items-center gap-2">
+                        <span class="h-3 w-3 rounded-full {{ li.dot }}"></span>
+                        <h3 class="text-sm font-semibold {{ li.text }}">{{ layer }} Layer</h3>
+                        <span class="text-xs text-muted-foreground">({{ els | length }} linked)</span>
+                    </div>
+                {% endcall %}
+                {% call card_content() %}
+                    {% if els %}
+                    <div class="flex flex-wrap gap-2">
+                        {% for el in els %}
+                        <div class="rounded-md border {{ li.border }} bg-background px-3 py-2">
+                            <p class="text-sm font-medium">
+                                <a href="{{ url_for('architect_ui.element_traceability', element_id=el.id) }}"
+                                   class="hover:underline">{{ el.name }}</a>
+                            </p>
+                            <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                {% if el.type %}
+                                <span class="inline-flex items-center rounded-full {{ li.bg }} px-1.5 py-0.5 text-xs font-semibold {{ li.text }}">
+                                    {{ el.type | plain_name(current_user) }}
+                                </span>
+                                {% endif %}
+                                <span>hop {{ el.hop }}</span>
+                            </div>
+                            {% if el.relationship_type %}
+                            <div class="mt-2 inline-flex items-center gap-1 rounded-full {{ li.bg }} px-2 py-0.5 text-xs font-medium {{ li.text }}">
+                                <span aria-hidden="true">→</span>
+                                <span>via {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-muted-foreground">No {{ layer }} elements linked</p>
+                    {% endif %}
+                {% endcall %}
+            {% endcall %}
+            {% endif %}
+            {% endfor %}
 
-        <!-- Motivation Layer -->
-        {% set motivation_els = (chain.upward + chain.downward) | selectattr('layer', 'equalto', 'Motivation') | list %}
-        <div class="rounded-lg border border-fuchsia-200 bg-fuchsia-50/50 p-4">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-            <div class="flex items-center gap-2 mb-3">
-                <span class="h-3 w-3 rounded-full bg-fuchsia-500"></span>  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                <span class="text-sm font-semibold text-fuchsia-700">Motivation Layer</span>  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                <span class="text-xs text-muted-foreground">({{ motivation_els | length }} linked)</span>
-            </div>
-            {% if motivation_els %}
-            <div class="flex flex-wrap gap-2">
-                {% for el in motivation_els %}
-                <div class="rounded-md border border-fuchsia-200 bg-background px-3 py-2">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                    <p class="text-sm font-medium">{{ el.name }}</p>
+            <!-- The element itself -->
+            <div class="rounded-lg border-2 border-primary bg-primary/5 px-3 py-2">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="h-3 w-3 rounded-full bg-primary"></span>
+                    <span class="text-sm font-semibold text-primary">{{ (element.layer or 'Application') | title }} Layer</span>
+                    <span class="text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">THIS</span>
+                </div>
+                <div class="rounded-md border border-primary/30 bg-background px-3 py-2 inline-block">
+                    <p class="text-sm font-semibold">{{ element.name }}</p>
                     <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                        {% if el.type %}
-                        <span class="inline-flex items-center rounded-full bg-fuchsia-500/10 px-1.5 py-0.5 text-xs font-semibold text-fuchsia-700">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                            {{ el.type | plain_name(current_user) }}
+                        {% if element.type %}
+                        <span class="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
+                            {{ element.type | plain_name(current_user) }}
                         </span>
                         {% endif %}
-                        <span>hop {{ el.hop }}</span>
+                        <span>{{ element.layer }}</span>
                     </div>
-                    {% if el.relationship_type %}
-                    <div class="mt-2 inline-flex items-center gap-1 rounded-full bg-fuchsia-500/10 px-2 py-0.5 text-2xs font-medium text-fuchsia-700">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                        <span aria-hidden="true">→</span>
-                        <span>via {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-sm text-muted-foreground">No Motivation elements linked</p>
-            {% endif %}
-        </div>
-
-        <!-- Arrow down -->
-        <div class="flex justify-center">
-            <i data-lucide="chevron-down" class="h-6 w-6 text-muted-foreground"></i>
-        </div>
-
-        <!-- Strategy Layer -->
-        {% set strategy_els = (chain.upward + chain.downward) | selectattr('layer', 'equalto', 'Strategy') | list %}
-        <div class="rounded-lg border border-violet-200 bg-violet-50/50 p-4">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-            <div class="flex items-center gap-2 mb-3">
-                <span class="h-3 w-3 rounded-full bg-violet-500"></span>  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                <span class="text-sm font-semibold text-violet-700">Strategy Layer</span>  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                <span class="text-xs text-muted-foreground">({{ strategy_els | length }} linked)</span>
-            </div>
-            {% if strategy_els %}
-            <div class="flex flex-wrap gap-2">
-                {% for el in strategy_els %}
-                <div class="rounded-md border border-violet-200 bg-background px-3 py-2">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                    <p class="text-sm font-medium">{{ el.name }}</p>
-                    <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                        {% if el.type %}
-                        <span class="inline-flex items-center rounded-full bg-violet-500/10 px-1.5 py-0.5 text-xs font-semibold text-violet-700">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                            {{ el.type | plain_name(current_user) }}
-                        </span>
-                        {% endif %}
-                        <span>hop {{ el.hop }}</span>
-                    </div>
-                    {% if el.relationship_type %}
-                    <div class="mt-2 inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-2xs font-medium text-violet-700">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                        <span aria-hidden="true">→</span>
-                        <span>via {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-sm text-muted-foreground">No Strategy elements linked</p>
-            {% endif %}
-        </div>
-
-        <!-- Arrow down -->
-        <div class="flex justify-center">
-            <i data-lucide="chevron-down" class="h-6 w-6 text-muted-foreground"></i>
-        </div>
-
-        <!-- Business Layer -->
-        {% set business_els = (chain.upward + chain.downward) | selectattr('layer', 'equalto', 'Business') | list %}
-        <div class="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-            <div class="flex items-center gap-2 mb-3">
-                <span class="h-3 w-3 rounded-full bg-emerald-500"></span>  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                <span class="text-sm font-semibold text-emerald-700">Business Layer</span>  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                <span class="text-xs text-muted-foreground">({{ business_els | length }} linked)</span>
-            </div>
-            {% if business_els %}
-            <div class="flex flex-wrap gap-2">
-                {% for el in business_els %}
-                <div class="rounded-md border border-emerald-200 bg-background px-3 py-2">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                    <p class="text-sm font-medium">{{ el.name }}</p>
-                    <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                        {% if el.type %}
-                        <span class="inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                            {{ el.type | plain_name(current_user) }}
-                        </span>
-                        {% endif %}
-                        <span>hop {{ el.hop }}</span>
-                    </div>
-                    {% if el.relationship_type %}
-                    <div class="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-2xs font-medium text-emerald-700">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                        <span aria-hidden="true">→</span>
-                        <span>via {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-sm text-muted-foreground">No Business elements linked</p>
-            {% endif %}
-        </div>
-
-        <!-- Arrow down -->
-        <div class="flex justify-center">
-            <i data-lucide="chevron-down" class="h-6 w-6 text-muted-foreground"></i>
-        </div>
-
-        <!-- Pivot element — "THIS" box shows the element's actual layer -->
-        <div class="border rounded-md border-2 border-primary bg-primary/10 px-3 py-2">
-            <div class="flex items-center gap-2 mb-3">
-                <span class="h-3 w-3 rounded-full bg-primary"></span>
-                <span class="text-sm font-semibold text-primary">{{ (element.layer or 'Application') | title }} Layer</span>
-                <span class="text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">THIS</span>
-            </div>
-            <div class="rounded-md border border-primary/30 bg-background px-3 py-2 inline-block">
-                <p class="text-sm font-semibold">{{ element.name }}</p>
-                <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    {% if element.type %}
-                    <span class="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-info-emphasis">
-                        {{ element.type | plain_name(current_user) }}
-                    </span>
-                    {% endif %}
-                    <span>{{ element.layer }}</span>
                 </div>
             </div>
         </div>
 
-        <!-- Arrow down -->
-        <div class="flex justify-center">
-            <i data-lucide="chevron-down" class="h-6 w-6 text-muted-foreground"></i>
-        </div>
-
-        <!-- Technology Layer -->
-        {% set tech_els = (chain.upward + chain.downward) | selectattr('layer', 'equalto', 'Technology') | list %}
-        <div class="rounded-lg border border-amber-200 bg-amber-50/50 p-4">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-            <div class="flex items-center gap-2 mb-3">
-                <span class="h-3 w-3 rounded-full bg-amber-500"></span>  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                <span class="text-sm font-semibold text-amber-700">Technology Layer</span>  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                <span class="text-xs text-muted-foreground">({{ tech_els | length }} linked)</span>
-            </div>
-            {% if tech_els %}
-            <div class="flex flex-wrap gap-2">
-                {% for el in tech_els %}
-                <div class="rounded-md border border-amber-200 bg-background px-3 py-2">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                    <p class="text-sm font-medium">{{ el.name }}</p>
-                    <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                        {% if el.type %}
-                        <span class="inline-flex items-center rounded-full bg-amber-500/10 px-1.5 py-0.5 text-xs font-semibold text-amber-700">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                            {{ el.type | plain_name(current_user) }}
-                        </span>
-                        {% endif %}
-                        <span>hop {{ el.hop }}</span>
-                    </div>
-                    {% if el.relationship_type %}
-                    <div class="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-2xs font-medium text-amber-700">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                        <span aria-hidden="true">→</span>
-                        <span>via {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}</span>
-                    </div>
-                    {% endif %}
+        <!-- Every linked element, as a table -->
+        {% call card() %}
+            {% call card_header() %}
+                <div class="flex items-center justify-between gap-4">
+                    {% call card_title() %}Linked Elements{% endcall %}
+                    {% call card_description() %}{{ all_els | length }} element{% if all_els | length != 1 %}s{% endif %} traced from and to this element.{% endcall %}
                 </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-sm text-muted-foreground">No Technology elements linked</p>
-            {% endif %}
-        </div>
-
-        <!-- Arrow down -->
-        <div class="flex justify-center">
-            <i data-lucide="chevron-down" class="h-6 w-6 text-muted-foreground"></i>
-        </div>
-
-        <!-- Data Layer -->
-        {% set data_els = (chain.upward + chain.downward) | selectattr('layer', 'equalto', 'Data') | list %}
-        <div class="rounded-lg border border-sky-200 bg-sky-50/50 p-4">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-            <div class="flex items-center gap-2 mb-3">
-                <span class="h-3 w-3 rounded-full bg-sky-500"></span>  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                <span class="text-sm font-semibold text-sky-700">Data Layer</span>  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                <span class="text-xs text-muted-foreground">({{ data_els | length }} linked)</span>
-            </div>
-            {% if data_els %}
-            <div class="flex flex-wrap gap-2">
-                {% for el in data_els %}
-                <div class="rounded-md border border-sky-200 bg-background px-3 py-2">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                    <p class="text-sm font-medium">{{ el.name }}</p>
-                    <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                        {% if el.type %}
-                        <span class="inline-flex items-center rounded-full bg-sky-500/10 px-1.5 py-0.5 text-xs font-semibold text-sky-700">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                            {{ el.type | plain_name(current_user) }}
-                        </span>
-                        {% endif %}
-                        <span>hop {{ el.hop }}</span>
-                    </div>
-                    {% if el.relationship_type %}
-                    <div class="mt-2 inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2 py-0.5 text-2xs font-medium text-sky-700">  <!-- design-tokens-ok: ArchiMate layer chain, distinct hue per layer -->
-                        <span aria-hidden="true">→</span>
-                        <span>via {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-sm text-muted-foreground">No Data elements linked</p>
-            {% endif %}
-        </div>
-
+            {% endcall %}
+            {% call card_content() %}
+                {% if all_els %}
+                {% call table() %}
+                    {% call table_header() %}
+                    <tr>
+                        {% call table_head() %}Element{% endcall %}
+                        {% call table_head() %}Layer{% endcall %}
+                        {% call table_head() %}Type{% endcall %}
+                        {% call table_head() %}Via{% endcall %}
+                        {% call table_head() %}Hop{% endcall %}
+                    </tr>
+                    {% endcall %}
+                    {% call table_body() %}
+                        {% for el in all_els | sort(attribute='hop') %}
+                        {% call table_row() %}
+                            {% call table_cell() %}
+                                <a href="{{ url_for('architect_ui.element_traceability', element_id=el.id) }}"
+                                   class="font-medium text-primary hover:underline">{{ el.name }}</a>
+                            {% endcall %}
+                            {% call table_cell() %}
+                                {% set li = layer_info.get(el.layer, layer_info['Application']) %}
+                                <span class="inline-flex items-center rounded-full {{ li.bg }} px-1.5 py-0.5 text-xs font-semibold {{ li.text }}">
+                                    {{ el.layer }}
+                                </span>
+                            {% endcall %}
+                            {% call table_cell() %}<span class="text-muted-foreground">{{ el.type | plain_name(current_user) }}</span>{% endcall %}
+                            {% call table_cell() %}<span class="text-muted-foreground">{{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}</span>{% endcall %}
+                            {% call table_cell() %}<span class="tabular-nums">{{ el.hop }}</span>{% endcall %}
+                        {% endcall %}
+                        {% endfor %}
+                    {% endcall %}
+                {% endcall %}
+                {% else %}
+                {{ empty_state(
+                    icon='network',
+                    title='No linked elements yet',
+                    description='This element has no traced relationships. Link it to other ArchiMate elements to build the chain.',
+                    padding='py-8'
+                ) }}
+                {% endif %}
+            {% endcall %}
+        {% endcall %}
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="/static/vendor/d3.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const LAYER_COLORS = {
-        motivation: '#9575CD', strategy: '#F06292', business: '#FFB74D',
-        application: '#4FC3F7', technology: '#81C784', implementation: '#64B5F6'
-    };
-
-    const element = {"id": {{ element.id }}, "name": {{ element.name | tojson }}, "type": {{ (element.type or '') | tojson }}, "layer": {{ (element.layer or 'Application') | tojson }}};
-    const upward = {{ chain.upward | tojson }};
-    const downward = {{ chain.downward | tojson }};
-
-    // Build tree: root = selected element, branches = layers
-    let root = {
-        id: element.id, name: element.name, type: element.type || '',
-        layer: (element.layer || 'application').toLowerCase(), children: []
-    };
-
-    // Combine all connected elements for layer grouping
-    const allEls = upward.concat(downward);
-
-    // Group upward elements by layer (Motivation/Strategy/Business = higher rank than pivot)
-    ['Motivation', 'Strategy', 'Business'].forEach(function(layerName) {
-        let els = allEls.filter(function(e) { return e.layer === layerName; });
-        if (els.length > 0) {
-            let branch = {id: 'up-' + layerName, name: layerName + ' Layer', layer: layerName.toLowerCase(), children: []};
-            els.forEach(function(e) {
-                branch.children.push({id: e.id, name: e.name, type: e.type || '', layer: layerName.toLowerCase(), children: []});
-            });
-            root.children.push(branch);
-        }
-    });
-
-    // Group downward elements by layer (Technology/Data = lower rank than pivot)
-    ['Technology', 'Data', 'Implementation'].forEach(function(layerName) {
-        const mapLayer = layerName === 'Data' ? 'implementation' : layerName.toLowerCase();
-        let els = allEls.filter(function(e) { return e.layer === layerName; });
-        if (els.length > 0) {
-            let branch = {id: 'down-' + layerName, name: layerName + ' Layer', layer: mapLayer, children: []};
-            els.forEach(function(e) {
-                branch.children.push({id: e.id, name: e.name, type: e.type || '', layer: mapLayer, children: []});
-            });
-            root.children.push(branch);
-        }
-    });
-
-    // Only render tree if there are relationships
-    if (root.children.length === 0) return;
-
-    // Hide static card view
-    const staticChain = document.getElementById('static-chain');
-    if (staticChain) staticChain.style.display = 'none';
-
-    // Create D3 tree
-    const container = d3.select('#tree-container');
-    const width = container.node().getBoundingClientRect().width || 900;
-    const hierarchy = d3.hierarchy(root);
-    const treeHeight = Math.max(400, hierarchy.descendants().length * 35);
-
-    const treeLayout = d3.tree().size([treeHeight, width - 200]);
-    treeLayout(hierarchy);
-
-    const svg = container.append('svg')
-        .attr('width', width)
-        .attr('height', treeHeight + 40)
-        .append('g')
-        .attr('transform', 'translate(100, 20)');
-
-    // Links
-    svg.selectAll('.link')
-        .data(hierarchy.links())
-        .enter().append('path')
-        .attr('class', 'link')
-        .attr('fill', 'none')
-        .attr('stroke', '#e2e8f0')
-        .attr('stroke-width', 1.5)
-        .attr('d', d3.linkHorizontal().x(function(d) { return d.y; }).y(function(d) { return d.x; }));
-
-    // Nodes
-    const node = svg.selectAll('.node')
-        .data(hierarchy.descendants())
-        .enter().append('g')
-        .attr('transform', function(d) { return 'translate(' + d.y + ',' + d.x + ')'; })
-        .style('cursor', function(d) { return typeof d.data.id === 'number' ? 'pointer' : 'default'; })
-        .on('click', function(event, d) {
-            if (typeof d.data.id === 'number') {
-                window.location.href = '/architecture/traceability/' + d.data.id;
-            }
-        });
-
-    node.append('circle')
-        .attr('r', function(d) { return d.children ? 6 : 8; })
-        .attr('fill', function(d) { return LAYER_COLORS[d.data.layer] || '#94a3b8'; })
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 2);
-
-    node.append('text')
-        .attr('dx', function(d) { return d.children ? -10 : 12; })
-        .attr('dy', 4)
-        .attr('text-anchor', function(d) { return d.children ? 'end' : 'start'; })
-        .style('font-size', '11px')
-        .style('fill', 'currentColor')
-        .text(function(d) { return d.data.name.length > 35 ? d.data.name.substring(0, 35) + '...' : d.data.name; });
-
-    // Hover path highlighting
-    node.on('mouseover', function(event, d) {
-        const ancestors = d.ancestors().map(function(a) { return a.data.id; });
-        svg.selectAll('.link').attr('stroke', function(l) {
-            return ancestors.indexOf(l.source.data.id) >= 0 && ancestors.indexOf(l.target.data.id) >= 0 ? (LAYER_COLORS[d.data.layer] || '#4FC3F7') : '#e2e8f0';
-        }).attr('stroke-width', function(l) {
-            return ancestors.indexOf(l.source.data.id) >= 0 && ancestors.indexOf(l.target.data.id) >= 0 ? 3 : 1.5;
-        });
-    }).on('mouseout', function() {
-        svg.selectAll('.link').attr('stroke', '#e2e8f0').attr('stroke-width', 1.5);
-    });
-});
-</script>
 {% endblock %}

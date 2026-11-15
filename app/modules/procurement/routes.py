@@ -7,24 +7,35 @@ All queries are scoped by current user's organization_id.
 ADR Reference: docs/adr/0010-procurement-persona.md
 """
 
-from datetime import date, timedelta
+from datetime import date
 
 from flask import render_template, request
 from flask_login import current_user, login_required
 
-from app.decorators import requires_procurement, requires_procurement_or_finance
+from app.decorators import (
+    requires_contract_visibility,
+    requires_licence_visibility,
+    requires_procurement,
+    requires_spend_visibility,
+)
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
+
+from app.services.application_cost_accessor import get_reporting_currency
 
 from . import procurement_bp
 
 # As in my_applications, services.py held the summary shapes these templates
 # read and was never imported, so every dashboard raised jinja2.UndefinedError.
+from app.services.vendor_register import (
+    get_days_until_renewal,
+    get_renewal_urgency,
+    renewal_date_of,
+    renewal_state,
+)
 from .services import (
     get_contract_amounts,
-    get_days_until_renewal,
     get_renewal_summary,
-    get_renewal_urgency,
     get_spend_by_category,
     get_spend_summary,
 )
@@ -60,19 +71,27 @@ def _compliance_summary(licenses):
 
 @procurement_bp.route("/contracts")
 @login_required
-@requires_procurement
+@requires_contract_visibility
 def contracts_list():
     """List all vendor contracts for current organization."""
     org_id = current_user.organization_id
 
-    contracts = VendorContract.query.filter_by(organization_id=org_id).all()
+    from app.services.vendor_register import contract_renewal_due, is_active, register_contracts
+
+    contracts = register_contracts(org_id)
+
+    # The page's status filter: the stats below still count every contract. "Active" is the ledger's one
+    # definition (status active, no end date or one not yet past), so a contract that ended is never listed
+    # as active here while every cost figure leaves it out.
+    status = (request.args.get("status") or "").strip().lower()
+    if status == "active":
+        listed = [c for c in contracts if is_active(c)]
+    else:
+        listed = [c for c in contracts if (c.status or "").lower() == status] if status else contracts
 
     # Summary stats
-    active_count = sum(1 for c in contracts if c.status == "active")
-    expiring_soon = sum(
-        1 for c in contracts
-        if c.end_date and c.end_date <= date.today() + timedelta(days=90)
-    )
+    active_count = sum(1 for c in contracts if is_active(c))
+    expiring_soon = sum(1 for c in contracts if contract_renewal_due(c))
 
     # contracts_list.html iterates item.contract.* plus item.days_until_renewal
     # and item.urgency - it wants each contract wrapped with its renewal state,
@@ -80,20 +99,11 @@ def contracts_list():
     # item.contract for every line, so the page 500'd the moment a single
     # contract existed. An empty portfolio never enters the loop, which is why it
     # looked healthy until the first record was created.
-    today = date.today()
-
     def _wrap(contract):
-        days = (contract.end_date - today).days if contract.end_date else None
-        if days is None:
-            urgency = "unknown"
-        elif days < 0:
-            urgency = "expired"
-        elif days <= 30:
-            urgency = "critical"
-        elif days <= 90:
-            urgency = "warning"
-        else:
-            urgency = "ok"
+        # The renewal state is the one rule the renewals page and the vendor pages read.
+        renewal = renewal_state(contract)
+        days = renewal.days
+        urgency = get_renewal_urgency(contract)
         # The row's amounts come from the same function the spend totals read,
         # so a contract with no annual cost is a dash here and is left out of
         # the total there, never a zero on either.
@@ -101,16 +111,21 @@ def contracts_list():
             "contract": contract,
             "days_until_renewal": days,
             "urgency": urgency,
+            "renewal": renewal,
             **get_contract_amounts(contract),
         }
 
     return render_template(
         "procurement/contracts_list.html",
-        contracts=[_wrap(c) for c in contracts],
+        contracts=[_wrap(c) for c in listed],
+        status=status,
+        search=None,
+        # The renewal column shows only when some contract has a date; otherwise the page says so once.
+        any_renewal=any(renewal_date_of(c) for c in contracts),
         # The pagination footer reads both. It is guarded by `total > 20`, so on a
         # small portfolio the block never renders and their absence went unnoticed
         # until a real dataset existed.
-        total=len(contracts),
+        total=len(listed),
         page=1,
         active_count=active_count,
         expiring_soon=expiring_soon,
@@ -119,9 +134,11 @@ def contracts_list():
 
 @procurement_bp.route("/contracts/<int:contract_id>")
 @login_required
-@requires_procurement
+@requires_contract_visibility
 def contract_detail(contract_id):
     """View contract details (scoped to org)."""
+    from app.services import vendor_register
+
     org_id = current_user.organization_id
 
     contract = VendorContract.query.filter_by(
@@ -139,12 +156,19 @@ def contract_detail(contract_id):
         "procurement/contract_detail.html",
         contract=contract,
         licenses=licenses,
+        renews_on=renewal_date_of(contract),
+        days_until_renewal=get_days_until_renewal(contract),
+        urgency=get_renewal_urgency(contract),
+        renewal=renewal_state(contract),
+        system_retired=vendor_register.on_retired_system(contract.id, vendor_register.contract_ledger(org_id)),
+        retired_note=vendor_register.RETIRED_SYSTEM_RENEWAL,
+        organisation_currency=get_reporting_currency(org_id),
     )
 
 
 @procurement_bp.route("/renewals")
 @login_required
-@requires_procurement
+@requires_contract_visibility
 def renewals_dashboard():
     """Dashboard showing upcoming contract renewals."""
     org_id = current_user.organization_id
@@ -160,34 +184,65 @@ def renewals_dashboard():
     else:
         days_filter = 30
 
-    all_contracts = VendorContract.query.filter_by(organization_id=org_id).all()
+    # The same contracts the tiles count: the active ones. A contract still marked active whose end date
+    # has passed is in neither the tiles nor this list; the page says how many there are.
+    all_contracts = VendorContract.query.filter_by(organization_id=org_id, status="active").all()
+    from app.services import vendor_register
+
+    retired = {c.id for c in vendor_register.contract_ledger(org_id)["retired_system"]}
     items = []
     for c in all_contracts:
-        days = get_days_until_renewal(c)
-        if days is None:
+        renewal = renewal_state(c)
+        if renewal.kind not in ("overdue", "ahead"):
             continue
-        if days <= days_filter:  # includes expired (negative days)
+        if renewal.days <= days_filter:
             items.append({
                 "contract": c,
                 "urgency": get_renewal_urgency(c),
-                "days_until_renewal": days,
+                "renewal": renewal,
+                "days_until_renewal": renewal.days,
+                "renews_on": renewal.on,
+                "system_retired": c.id in retired,
             })
     items.sort(key=lambda i: i["days_until_renewal"])
+
+    # A renewal brief is generated on request (?brief=<contract id>) for a
+    # contract in this list, and rendered on the page, so the page needs no
+    # inline script to show it.
+    from app.services.feature_flag_service import FeatureFlagService
+
+    ai_available = FeatureFlagService.is_ai_enabled(FeatureFlagService.FEATURE_SUGGESTIONS)
+    brief = brief_contract = brief_error = None
+    brief_id = request.args.get("brief", "")
+    if ai_available and brief_id.isdigit():
+        brief_contract = next((i["contract"] for i in items if i["contract"].id == int(brief_id)), None)
+        if brief_contract is not None:
+            try:
+                from .procurement_ai_service import generate_renewal_brief
+
+                brief = generate_renewal_brief(brief_contract)
+            except Exception:  # noqa: BLE001 - the page still renders and says so
+                brief_error = "The renewal brief could not be prepared just now. Try again in a minute."
 
     return render_template(
         "procurement/renewals_dashboard.html",
         contracts=items,
         days_filter=days_filter,
+        ai_available=ai_available,
+        brief=brief,
+        brief_contract=brief_contract,
+        brief_error=brief_error,
         today=today,
+        retired_note=vendor_register.RETIRED_SYSTEM_RENEWAL,
         # Template reads summary.{critical,warning,ok,unknown,upcoming,total} -
         # precisely get_renewal_summary()'s return shape.
-        summary=get_renewal_summary(),
+        summary=get_renewal_summary(org_id),
     )
 
 
 @procurement_bp.route("/licenses")
 @login_required
-@requires_procurement_or_finance
+@requires_licence_visibility
 def licenses_list():
     """List all license entitlements for current organization."""
     org_id = current_user.organization_id
@@ -218,7 +273,7 @@ def licenses_list():
 
 @procurement_bp.route("/licenses/<int:license_id>")
 @login_required
-@requires_procurement
+@requires_licence_visibility
 def license_detail(license_id):
     """View license details (scoped to org)."""
     org_id = current_user.organization_id
@@ -277,7 +332,7 @@ def compliance_dashboard():
 
 @procurement_bp.route("/spend")
 @login_required
-@requires_procurement_or_finance
+@requires_spend_visibility
 def spend_analytics():
     """Spend analytics dashboard."""
     org_id = current_user.organization_id
@@ -287,11 +342,29 @@ def spend_analytics():
     # second parallel loop over the same rows.
     spend_by_category = get_spend_by_category(org_id)
 
+    # The spend suggestions are generated on request (?recommendations=1) and
+    # rendered on the page, so the page needs no inline script to show them.
+    from app.services.feature_flag_service import FeatureFlagService
+
+    ai_available = FeatureFlagService.is_ai_enabled(FeatureFlagService.FEATURE_SUGGESTIONS)
+    recommendations = None
+    recommendations_error = False
+    if ai_available and request.args.get("recommendations"):
+        try:
+            from .procurement_ai_service import generate_spend_recommendations
+
+            recommendations = generate_spend_recommendations(org_id)
+        except Exception:  # noqa: BLE001 - the page still renders; it says the suggestions failed
+            recommendations_error = True
+
     return render_template(
         "procurement/spend_analytics.html",
         spend_by_category=spend_by_category,
+        ai_available=ai_available,
+        recommendations=recommendations,
+        recommendations_error=recommendations_error,
         # Every figure on the page comes from this one summary. Total contract
         # value and annual cost are each summed here and nowhere else, so the
         # page cannot state two different totals or add a missing amount as 0.
-        summary=get_spend_summary(),
+        summary=get_spend_summary(org_id),
     )

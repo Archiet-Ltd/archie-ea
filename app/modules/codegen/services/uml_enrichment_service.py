@@ -1159,7 +1159,7 @@ RULES:
             provider, model = LLMService._get_configured_provider()
         except Exception as e:
             logger.error("No LLM provider configured for UML enrichment: %s", e)
-            return {"success": False, "error": "No LLM provider configured. Go to Admin > API Settings to add one."}
+            return {"success": False, "error": "No LLM provider configured. Go to Admin > AI settings to add one."}
 
         # Cap total elements to prevent OOM on large solutions.
         # Priority: DataObjects (become classes) → AppComponents (become services) →

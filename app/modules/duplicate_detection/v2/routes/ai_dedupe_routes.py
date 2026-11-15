@@ -19,6 +19,7 @@ from flask_login import login_required
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
 from app.utils.api_response import error_response
+from app.utils.plain_errors import render_plain_error
 
 try:
     from app.modules.duplicate_detection.services.ai_duplicate_detection_service import (
@@ -184,7 +185,7 @@ def ai_insights(run_id):
         raise
     except Exception as e:
         logger.error(f"Error loading AI insights: {e}")
-        return render_template("errors/500.html"), 500
+        return render_plain_error(500)
 
 
 @ai_dedupe_bp_v2.route("/api/detect", methods=["POST"])

@@ -15,6 +15,11 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+SCHEMA_MISSING_MESSAGE = (
+    "The genome rules file is missing from this installation, so the genome cannot be checked. "
+    "Choose Quick Generate instead, or ask your administrator to restore the installation and try again."
+)
+
 # Lazy-loaded schema
 _SCHEMA: Optional[dict] = None
 _SCHEMA_PATH = Path(__file__).resolve().parents[4] / "agents" / "schemas" / "architectural_genome_schema.json"
@@ -57,7 +62,11 @@ def _validate_json_schema(genome: dict) -> list[str]:
 
     try:
         import jsonschema
-        schema = _load_schema()
+        try:
+            schema = _load_schema()
+        except FileNotFoundError:
+            logger.error("Genome schema missing at %s", _SCHEMA_PATH)
+            return [SCHEMA_MISSING_MESSAGE]
         validator = jsonschema.Draft202012Validator(schema)
         for error in validator.iter_errors(genome):
             path = ".".join(str(p) for p in error.absolute_path) or "(root)"

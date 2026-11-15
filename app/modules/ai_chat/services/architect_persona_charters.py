@@ -61,6 +61,7 @@ ARCHITECT_PERSONAS = (
     "arb_member",
     "portfolio_manager",
     "cto",
+    "cto_founder",
     "procurement",
     "application_manager",
     "application_architect",
@@ -139,9 +140,21 @@ ROLE_DEFAULT_PERSONAS: Dict[str, str] = {
 DEFAULT_CHAT_PERSONA = "enterprise_architect"
 
 
-def get_default_chat_persona(enterprise_role: Optional[str]) -> str:
-    """Return the selectable AI persona for a persisted enterprise role."""
-    return ROLE_DEFAULT_PERSONAS.get(enterprise_role or "", DEFAULT_CHAT_PERSONA)
+# A self-serve owner signs up with the "cto" lens; the assistant that answers
+# a startup's questions is the technical founder's, not the executive briefing
+# the assigned "cto" role gets.
+LENS_DEFAULT_PERSONAS: Dict[str, str] = {"cto": "cto_founder"}
+
+
+def get_default_chat_persona(
+    enterprise_role: Optional[str], persona_lens: Optional[str] = None
+) -> str:
+    """Return the selectable AI persona: the chosen lens first, then the role."""
+    if persona_lens in LENS_DEFAULT_PERSONAS:
+        return LENS_DEFAULT_PERSONAS[persona_lens]
+    return ROLE_DEFAULT_PERSONAS.get(
+        persona_lens or enterprise_role or "", DEFAULT_CHAT_PERSONA
+    )
 
 
 def _validate_role_default_personas() -> None:
@@ -172,9 +185,13 @@ _EVIDENCE_RULES = """
 HARD RULES (non-negotiable):
 1. EVIDENCE: every number, name, or status you state MUST come from the
    "Live Platform Data" section below or from context the platform injected.
-   If the data is not there, say "I don't have that data loaded" and name the
-   Entelim page or API where the user can verify (e.g. /solutions/programmes,
-   /applications/rationalization, /dashboard/overview).
+   If the data is not there, use the search results the platform ran for this turn. Only
+   when a search ran this turn and found nothing may you say no record was
+   found, naming what you searched for; otherwise say "I don't have that data
+   loaded" and name the Entelim page or API where the user can verify (e.g.
+   /solutions/programmes, /applications/rationalization, /dashboard/overview).
+   Say you searched only when a lookup ran this turn. A fact the person told
+   you earlier in the conversation is theirs, not a record: say you were told it.
 2. NO FABRICATION: never invent application names, counts, scores, vendors,
    or dates. Never extrapolate a number and present it as fact.
 3. PROPOSE, DON'T DISPOSE: you recommend; humans decide at the Architecture
@@ -414,6 +431,26 @@ ONE next action with a specific Entelim page. No architecture jargon unless
 asked.
 {_EVIDENCE_RULES}""",
 
+    "cto_founder": f"""You are Entelim's AI assistant for a CTO or technical founder running a young company's technology.
+
+MISSION: answer the four questions a technical founder asks of their estate,
+in this order of usefulness: what breaks, who owns it, what it costs, and
+what to fix first. You speak plainly, without architecture jargon, and you
+never assume a large organisation, a review board or a mature process.
+
+SCOPE OF DUTY:
+- What breaks: which applications depend on which, and what an outage of one
+  would reach, from the recorded links only.
+- Who owns it: applications with no recorded owner are findings, named.
+- What it costs: the recorded annual cost per application; an application
+  with no recorded cost is reported as "no cost recorded", never as zero.
+- What to fix first: rank by reach (how much depends on it) and by missing
+  ownership, and say why.
+
+HOW YOU ANSWER: lead with the answer in plain sentences, name the
+applications involved, then ONE next action with a specific Entelim page.
+{_EVIDENCE_RULES}""",
+
     "procurement": f"""You are Entelim's AI Procurement Steward — the commercial view of the estate.
 
 MISSION: keep vendor contracts, licence positions, and spend legible to the
@@ -421,8 +458,10 @@ people who negotiate and renew them. You think in contracts, entitlements,
 and vendor risk — never in solution architecture.
 
 SCOPE OF DUTY:
-- Renewals: contracts with a renewal_date inside the next 90 days are the
-  headline; name them, don't bury them in a total.
+- Renewals: active contracts whose renewal (or, with none, end) date falls
+  inside the next 90 days, with overdue renewals first, then by date, are the
+  headline; name them, don't bury them in a total. A contract that is not
+  active has no renewal.
 - Licence position: entitled vs. deployed vs. used, per licence — shelfware
   (entitled, unused) and over-deployment (used > entitled) are both findings.
 - Spend: cost aggregated by contract category/type; call out concentration.
@@ -1061,27 +1100,40 @@ def _cto_context() -> str:
     return "\n".join(lines)
 
 
+def _cto_founder_context() -> str:
+    lines = []
+
+    def portfolio_total():
+        from app.models.application_portfolio import ApplicationComponent
+        n = db.session.query(func.count(ApplicationComponent.id)).scalar() or 0
+        return f"- Applications recorded: {n}"
+
+    lines.append(_safe("portfolio_total", portfolio_total))
+    return "\n".join(lines)
+
+
 def _procurement_context() -> str:
     lines = []
 
     def renewals():
-        from datetime import date, timedelta
-        from app.models.application_portfolio import VendorContract
-        horizon = date.today() + timedelta(days=90)
-        upcoming = (
-            VendorContract.query
-            .filter(VendorContract.renewal_date.isnot(None))
-            .filter(VendorContract.renewal_date <= horizon)
-            .order_by(VendorContract.renewal_date.asc())
-            .limit(8)
-            .all()
-        )
-        if not upcoming:
+        from app.services import vendor_register
+        due = []
+        ledger = vendor_register.contract_ledger()
+        for c in vendor_register.renewing_contracts(ledger):
+            state = vendor_register.renewal_state(c)
+            if vendor_register.contract_renewal_due(c):
+                due.append((state, c))
+        due.sort(key=lambda sc: sc[0].on)
+        total = len(due)
+        due = due[:8]
+        if not due:
             return "- Renewals within 90 days: none"
         items = "; ".join(
-            f"{c.contract_name} ({c.renewal_date})" for c in upcoming
+            f"{c.contract_name} ({state.on}{', ' + state.text.lower() if state.kind == 'overdue' else ''}"
+            f"{', the system is retired and the contract is still active' if vendor_register.on_retired_system(c.id, ledger) else ''})"
+            for state, c in due
         )
-        return f"- Renewals within 90 days ({len(upcoming)}): {items}"
+        return f"- Renewals within 90 days ({total}): {items}"
 
     def licence_position():
         from app.models.license_entitlement import LicenseEntitlement
@@ -1095,16 +1147,12 @@ def _procurement_context() -> str:
         return f"- Licence compliance (entitled vs deployed vs used): {mix}"
 
     def spend_by_category():
-        from app.models.application_portfolio import VendorContract
-        rows = (
-            db.session.query(VendorContract.contract_category, func.sum(VendorContract.annual_cost))
-            .filter(VendorContract.annual_cost.isnot(None))
-            .group_by(VendorContract.contract_category).all()
-        )
+        from app.services import vendor_register
+        rows = vendor_register.counted_cost_by_category(vendor_register.contract_ledger())
         if not rows:
-            return "- Spend by category: no contract costs recorded"
-        mix = ", ".join(f"{k or 'uncategorised'}: {v:,.0f}" for k, v in rows)
-        return f"- Annual spend by category: {mix}"
+            return "- Annual contract spend by category: no contract costs recorded"
+        mix = ", ".join(f"{k}: {v:,.0f}" for k, v in rows.items())
+        return f"- Annual contract spend by category (contracts only, not the costs recorded on systems): {mix}"
 
     def vendor_risk():
         from app.models.application_portfolio import VendorContract
@@ -1238,9 +1286,9 @@ def _security_architect_context() -> str:
         open_risks = db.session.query(Risk).filter(Risk.status == RiskStatus.OPEN).all()
         if not open_risks:
             return "- Open risks: none recorded"
-        high = [r for r in open_risks if r.risk_score >= 9]
-        top = sorted(high, key=lambda r: r.risk_score, reverse=True)[:3]
-        detail = "; ".join(f"{r.title} (score {r.risk_score})" for r in top)
+        high = [r for r in open_risks if r.risk_level in ("high", "critical")]
+        top = sorted(high, key=lambda r: r._effective_score, reverse=True)[:3]
+        detail = "; ".join(f"{r.title} ({r.score_text})" for r in top)
         return (f"- Open risks: {len(open_risks)} ({len(high)} high/critical)"
                 + (f" — top: {detail}" if detail else ""))
 
@@ -1495,6 +1543,7 @@ _CONTEXT_BUILDERS: Dict[str, Callable[[], str]] = {
     "arb_member": _arb_member_context,
     "portfolio_manager": _portfolio_manager_context,
     "cto": _cto_context,
+    "cto_founder": _cto_founder_context,
     "procurement": _procurement_context,
     "application_manager": _application_manager_context,
     "application_architect": _application_architect_context,

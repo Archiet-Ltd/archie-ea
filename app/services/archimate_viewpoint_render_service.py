@@ -23,7 +23,7 @@ class ArchimateViewpointRenderService:
                 layer = e.layer or "unknown"
                 elements_by_layer.setdefault(layer, []).append({
                     "id": e.id, "name": e.name, "type": e.type,
-                    "layer": e.layer, "plateau": e.plateau,
+                    "layer": e.layer, "plateau": e.togaf_plateau,
                     "building_block_type": e.building_block_type
                 })
             rels = [{"id": r.id, "type": r.type, "source_id": r.source_id, "target_id": r.target_id} for r in relationships]
