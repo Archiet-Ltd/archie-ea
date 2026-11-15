@@ -37,8 +37,22 @@ def _link_expired(title, message, action_label, action_href):
     ), 410
 
 
+def _education_url(user):
+    """The eligibility page for a person whose confirmed address is at a listed university or
+    college, when the address was confirmed from a mailed link; otherwise None."""
+    from app.services import academic_domains
+
+    if "education.eligibility" not in current_app.view_functions or academic_domains.match(user.email) is None:
+        return None
+    return url_for("education.eligibility")
+
+
 def _after_confirmation_url(user):
-    """Where a newly confirmed person goes: an owner lands on inviting the team."""
+    """Where a newly confirmed person goes: a university or college address lands on Education,
+    an owner on inviting the team."""
+    education = _education_url(user)
+    if education:
+        return education
     if "account.welcome" in current_app.view_functions and getattr(user, "is_org_admin", False):
         return url_for("account.welcome")
     return url_for("dashboard.overview")
@@ -227,7 +241,8 @@ def confirm_view(token):
         return redirect(_after_confirmation_url(user))
     flash(message + " Sign in to continue.", "form-success")
     # The chosen plan stays in the session; signing in lands on its checkout.
-    return redirect(url_for("account.login"))
+    education = _education_url(user)
+    return redirect(url_for("account.login", next=education) if education else url_for("account.login"))
 
 
 def _invitation_gone():

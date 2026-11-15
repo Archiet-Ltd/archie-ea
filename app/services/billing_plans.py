@@ -51,6 +51,10 @@ class Plan:
     # "people" counts every member; "editors" leaves read-only members free.
     counts: str = "people"
     price_env: Dict[str, str] = field(default_factory=dict)
+    # False for a plan that is only ever granted (Education): the billing grid, the
+    # pricing page and the structured data leave it out.
+    listed: bool = True
+
     # Who the plan is for, in the words the pricing page, the home page and
     # the structured data all show.
     audience: str = ""
@@ -160,6 +164,15 @@ PLANS: Tuple[Plan, ...] = (
         display_price_unit="editor",
     ),
     Plan(
+        key="education",
+        name="Education",
+        summary="Free for teaching and learning at a university or college, with no limit on people.",
+        purchasable=False,
+        user_limit=None,
+        listed=False,
+        display_price_monthly=0,
+    ),
+    Plan(
         key="enterprise",
         name="Enterprise",
         summary="Annual contract. Unlimited editors, SAML, audit export, supported self-hosting.",
@@ -212,6 +225,8 @@ def renewal_summary(sub, plan: Plan, live: bool) -> Dict[str, Optional[str]]:
     "Nothing to renew" when the plan is free, never a bare dash."""
     if plan.key == "free":
         return {"label": "Next renewal", "value": "Nothing to renew", "note": None}
+    if plan.key == "education" and sub is not None and sub.current_period_end is not None:
+        return {"label": "Free until", "value": sub.current_period_end.strftime("%d %b %Y"), "note": None}
     if sub is not None and sub.offer == "startup_credit" and not live and sub.current_period_end is not None:
         return {
             "label": "Free until",
@@ -237,6 +252,11 @@ def renewal_summary(sub, plan: Plan, live: bool) -> Dict[str, Optional[str]]:
         "value": when,
         "note": ("%s a %s" % (amount, interval)) if amount and interval else None,
     }
+
+
+def listed_plans() -> Tuple[Plan, ...]:
+    """The plans shown in a grid of choices: every plan except a granted-only one."""
+    return tuple(p for p in PLANS if p.listed)
 
 
 def purchasable_plans() -> Tuple[Plan, ...]:
@@ -334,6 +354,10 @@ def offer_lapsed(row, now=None) -> bool:
         row.offer == "startup_credit"
         and _name(row.plan) == "startup"
         and _name(row.status) == "trialing"
+    ) or (
+        row.offer == "education"
+        and _name(row.plan) == "education"
+        and _name(row.status) == "active"
     )
 
 
@@ -687,3 +711,17 @@ def install_user_limit_guard() -> None:
 
     if not event.contains(Session, "before_flush", _guard_flush):
         event.listen(Session, "before_flush", _guard_flush)
+
+
+def education_summary(sub, plan: Plan) -> Optional[Dict[str, str]]:
+    """What the billing page says about the Education offer, from the organisation's own row:
+    ``{"state": "active", "text": "Education, free until 31 Aug 2027"}``, or ``ended`` once the
+    period has passed. None when the organisation never had the offer."""
+    if sub is None or getattr(sub, "offer", None) != "education" or sub.current_period_end is None:
+        return None
+    when = sub.current_period_end.strftime("%d %b %Y")
+    if plan.key == "education":
+        return {"state": "active", "text": "Education, free until %s" % when}
+    if offer_lapsed(sub):
+        return {"state": "ended", "text": "Your free Education period ended on %s. Your organisation is on Community." % when}
+    return None
