@@ -201,3 +201,102 @@ def test_every_lens_question_is_answered_with_cards_or_a_plain_empty_state(clien
         assert body["found"] is True and body["lens"] == lens, lens
         assert "data-lens-cards" in body["html"] and "Payments service" in body["html"]
         assert "We could not look that up" not in body["html"], lens
+
+
+def _move_last_run_back_an_hour(org_id):
+    db.session.execute(
+        db.text(
+            "UPDATE intelligence_derivation_runs SET started_at = started_at - interval '1 hour', "
+            "finished_at = finished_at - interval '1 hour' WHERE organization_id = :o"
+        ),
+        {"o": org_id},
+    )
+    db.session.commit()
+
+
+def _add_relationship_after_the_run(org_id):
+    """A relationship written now, stamped by the database in this session's own time zone."""
+    from app.models import ArchiMateElement, ArchiMateRelationship
+
+    ids = [e.id for e in ArchiMateElement.query.filter_by(organization_id=org_id).limit(2).all()]
+    rel = ArchiMateRelationship(source_id=ids[0], target_id=ids[1], type="Association", organization_id=org_id)
+    db.session.add(rel)
+    db.session.flush()
+    # The fixture holds one outer transaction, which pins now() to the test's start; in service each write
+    # is its own, later, transaction. clock_timestamp() gives the stamp such a write would carry, in this session's zone.
+    db.session.execute(
+        db.text("UPDATE archimate_relationships SET created_at = clock_timestamp(), updated_at = clock_timestamp() WHERE id = :i"),
+        {"i": rel.id},
+    )
+    db.session.commit()
+
+
+def test_a_relationship_added_after_the_run_is_counted_by_the_panel_and_the_answer_in_a_non_utc_session(
+    client, login_as, make_org
+):
+    org = make_org()
+    user = _architect(org, "chat-ask-realchange@example.com")
+    org_id = org.id
+    # A zone behind UTC: read as UTC, a stamp written after the run would look earlier than it.
+    db.session.execute(db.text("SET TIME ZONE 'America/Los_Angeles'"))
+    try:
+        _load(client, login_as, user)
+        html = _ask(client, QUESTION).get_json()["html"]
+        assert _panel_count(html) == 0
+        assert "been added or changed since" not in html
+
+        _add_relationship_after_the_run(org_id)
+        html = _ask(client, QUESTION).get_json()["html"]
+        assert _panel_count(html) == 1
+        assert re.search(r"1 relationship has been added or changed since", html)
+    finally:
+        db.session.execute(db.text("RESET TIME ZONE"))
+        db.session.commit()
+
+
+def _panel_count(html):  # relationships changed since the last run
+    return int(re.search(r"data-derivation-changed>(\d+)<", html).group(1))
+
+
+def test_the_answer_and_its_panel_agree_about_the_last_run_and_what_changed_since(client, login_as, make_org):
+    org = make_org()
+    user = _architect(org, "chat-ask-fresh@example.com")
+    _load(client, login_as, user)
+    org_id = org.id
+    # Loading the sample works the connections out: the panel names the run and counts nothing changed since.
+    html = _ask(client, QUESTION).get_json()["html"]
+    assert "Not worked out yet." not in html
+    assert _panel_count(html) == 0
+    assert "been added or changed since" not in html
+
+    # The model changes after that run: the answer names the run and counts what changed, as the panel does.
+    _move_last_run_back_an_hour(org_id)
+    html = _ask(client, QUESTION).get_json()["html"]
+    panel = _panel_count(html)
+    assert panel > 0
+    assert re.search(r"last updated [^<;]*\d{4}[^<;]*; %d relationships? ha(?:s|ve) been added or changed since" % panel, html)
+    assert "We haven't worked out the indirect connections for your model yet" not in html
+
+    # One derived connection is flagged out of date: the two quantities differ and each says its own unit.
+    changed = panel
+    db.session.execute(
+        db.text(
+            "UPDATE archimate_derived_relationships SET stale = TRUE, stale_since = now(), stale_reason = 'relationship_changed' "
+            "WHERE id = (SELECT MIN(id) FROM archimate_derived_relationships WHERE organization_id = :o)"
+        ),
+        {"o": org_id},
+    )
+    db.session.commit()
+    html = _ask(client, QUESTION).get_json()["html"]
+    assert re.search(r"Connections that may be out of date</dt><dd[^>]*data-derivation-stale>1<", html)
+    assert re.search(r"Relationships added or changed since</dt><dd[^>]*data-derivation-changed>%d<" % changed, html)
+    assert changed != 1
+
+    # The element has no connections worked out but a run is recorded: the answer never claims it was not worked out.
+    db.session.execute(db.text("DELETE FROM archimate_derived_relationships WHERE organization_id = :o"), {"o": org_id})
+    db.session.commit()
+    html = _ask(client, QUESTION).get_json()["html"]
+    assert "We haven't worked out the indirect connections for your model yet" not in html
+    assert "Not worked out yet." not in html
+    assert "No indirect connections were found for Payments service when your model was last worked out" in html
+    assert re.search(r"when your model was last worked out \([^)]*\d{4}[^)]*\); %d relationships? ha(?:s|ve) been added or changed since" % _panel_count(html), html)
