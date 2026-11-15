@@ -7,6 +7,7 @@ Tests that the capability column:
 3. The matrix scrolls horizontally within its container
 """
 import json
+import os
 import uuid
 
 import pytest
@@ -141,6 +142,18 @@ def _seed_vendor_matrix_data(app, org_id, admin_user_id):
     }
 
 
+def _save_shots(page, name):
+    """Save light and dark screenshots when SMOKE_SHOT_DIR is set."""
+    out = os.environ.get("SMOKE_SHOT_DIR")
+    if not out:
+        return
+    os.makedirs(out, exist_ok=True)
+    for scheme in ("light", "dark"):
+        page.emulate_media(color_scheme=scheme)
+        page.wait_for_timeout(200)
+        page.screenshot(path=os.path.join(out, f"{name}_{scheme}.png"), full_page=True)
+
+
 def _goto(page, live_server, path):
     page.goto(f"{live_server}{path}", wait_until="networkidle", timeout=PAGE_TIMEOUT)
 
@@ -264,6 +277,7 @@ def test_matrix_capability_column_width_mobile(browser, live_server, matrix_org)
         
         # Measure column widths
         measurements = _measure_capability_column(page)
+        _save_shots(page, "matrix_390")
         assert measurements is not None, "Could not measure column widths"
         
         print(f"\nMobile (390px) measurements:")
@@ -308,6 +322,7 @@ def test_matrix_capability_column_width_desktop(browser, live_server, matrix_org
         
         # Check long name readability
         readability = _check_long_name_readability(page)
+        _save_shots(page, "matrix_1440")
         print(f"\nDesktop (1440px) readability:")
         for r in readability:
             print(f"  '{r['text']}...' - width: {r['width']}px, truncated: {r['isTruncated']}, wraps: {r['hasWrap']}")
