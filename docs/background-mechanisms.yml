@@ -202,8 +202,8 @@ mechanisms:
   tenant_context: 'none: the thread only stops a preview container held in memory'
 - kind: process-pool
   file: app/modules/solutions_strategic/v2/routes/journey_v2_routes.py
-  entry: batch_accept_proposals
-  purpose: Spawns a process to apply accepted proposals in bulk
+  entry: confirm_domain
+  purpose: Spawns a process to promote a confirmed domain's elements in bulk
   class: request-helper
   disposition: move-to-pool
   tenant_context: the organisation id is passed as an argument and the child sets its scope with tenant_scope

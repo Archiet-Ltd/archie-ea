@@ -246,7 +246,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       {% call ui.button(type='submit', variant='outline', size='sm', attrs={'data-testid': 'approval-undo-' ~ r.id}) %}{{ lucide('rotate-ccw') }}Undo{% endcall %}
     </form>
-    {% elif r.label in ('Applied', 'Undone') or r.undo_note %}
+    {% elif r.undo_note %}
     <span class="text-sm text-muted-foreground" data-testid="approval-undo-note-{{ r.id }}">{{ r.undo_note }}</span>
     {% endif %}
   {% endcall %}

@@ -95,7 +95,7 @@ def outcomes(page):
     """{proposal name: the outcome word its card shows}."""
     found = {}
     for card in page.locator("[data-testid^='blueprint-proposal-verdict-']").locator("xpath=..").all():
-        name = card.locator("p.truncate").first.inner_text().strip()
+        name = card.get_by_test_id("blueprint-proposal-name").inner_text().strip()
         found[name] = card.locator("[data-testid^='blueprint-proposal-verdict-'] p").first.inner_text().strip()
     return found
 
@@ -131,7 +131,7 @@ def test_1_the_extracted_elements_settle_with_no_accept_control_and_each_shows_i
     expect(page.get_by_text("being checked")).to_be_hidden()
     # No internal ids or type names in the words a person reads.
     text = page.locator("body").inner_text()
-    assert "(element " not in text and "(ApplicationComponent)" not in text
+    assert "(element " not in text and "ApplicationComponent" not in text
     # Another organisation's proposal is not listed here.
     assert world["rival"] not in text
     shoot(page, "blueprint-settled-1440.png")
@@ -190,6 +190,7 @@ def test_3_undo_on_the_approvals_record_puts_the_model_back_and_survives_a_reloa
     assert added() == 0, "undoing it removed the element it added"
     expect(page.get_by_test_id("approval-undo-%d" % approval_id)).to_have_count(0)
     expect(page.locator("body")).to_contain_text("Undone")
+    assert "None" not in page.get_by_role("row").filter(has_text="Brand new desk").inner_text(), "no stray None in a cell"
     assert re.search(r"Undone on \d{1,2} [A-Z][a-z]{2} \d{4}", page.locator("body").inner_text()), "the date reads like 15 Nov 2026"
     shoot(page, "blueprint-record-after-undo-1440.png")
     context.close()
@@ -202,7 +203,38 @@ def test_4_a_narrow_dark_screen_shows_the_same_verdicts(browser, live_server, wo
     expect(page.get_by_text("3 elements extracted")).to_be_visible()
     expect(rows(page)).to_have_count(3)
     expect(page.get_by_role("button", name="Accept", exact=True)).to_have_count(0)
+    # Each verdict sits fully inside the screen, beside its element's name, not off to one side.
+    for index in range(3):
+        box = rows(page).nth(index).bounding_box()
+        assert box["x"] >= 0 and box["x"] + box["width"] <= 390, box
+    expect(page.get_by_test_id("blueprint-proposal-name").filter(has_text=world["new"])).to_be_visible()  # the whole name
     overflow = page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
     assert overflow <= 1, "the page does not scroll sideways on a phone (%s px)" % overflow
     shoot(page, "blueprint-settled-390-dark.png")
+    context.close()
+
+
+def test_5_the_old_accept_addresses_accept_nothing_by_hand(browser, live_server, world, app):
+    """A script or an old page that still posts to the accept addresses changes no proposal: the answer says
+    nobody accepts them by hand, and the proposal's status is what the review left it."""
+    from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
+    from tests.smoke.fresh_org import api
+
+    def status_of(proposal_id):
+        with app.app_context():
+            return SolutionBlueprintProposal.query.filter_by(id=proposal_id).one().status
+
+    with app.app_context():
+        dropped = SolutionBlueprintProposal.query.filter_by(
+            organization_id=world["one"]["org_id"], name=world["dropped"]).one().id
+    world["base"] = str(live_server)
+    context, page = new_page(browser, world)
+    base = "%s/architecture-journey/%d" % (world["base"], world["solution_one"])
+    before = status_of(dropped)
+    code, one = api(page, "POST", "%s/proposals/%d/accept" % (base, dropped))
+    assert code == 200 and (one.get("data") or one)["accepted"] == 0, one
+    code, many = api(page, "POST", "%s/proposals/batch-accept" % base, {"proposal_ids": [dropped]})
+    assert code == 200 and (many.get("data") or many)["accepted"] == 0, many
+    assert "nobody accepts them by hand" in (many.get("data") or many)["message"]
+    assert status_of(dropped) == before == "rejected", "a proposal taken out of the design stays out"
     context.close()

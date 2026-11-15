@@ -210,7 +210,7 @@ def test_a_proposal_past_its_time_is_checked_again_and_never_declined_for_being_
     org = make_org("expired")
     _administrator(db_session, org.id)
     solution = _solution(db_session, org.id)
-    reviewer = Reviewer(monkeypatch)
+    Reviewer(monkeypatch)
     name = _unique("Old idea")
     with tenant_ctx(org.id):
         approval = _propose(db_session, org.id, solution, name)

@@ -68,7 +68,7 @@ def test_the_job_checks_the_thirty_five_again_though_each_is_past_its_time_and_a
     _administrator(db_session, org.id)
     _administrator(db_session, other.id)
     suffix = uuid.uuid4().hex[:5]
-    reviewer = Reviewer(monkeypatch)
+    Reviewer(monkeypatch)
     with tenant_ctx(other.id):
         theirs = _propose(db_session, other.id, _solution(db_session, other.id), "Theirs %s" % suffix)
         theirs.expires_at = datetime(2026, 10, 19, 9, 0)

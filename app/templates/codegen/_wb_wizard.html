@@ -164,7 +164,7 @@
                                 <span x-show="pendingProposalCount > 0" class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30"
                                       x-text="pendingProposalCount + ' being checked'"></span>
                                 <span x-show="acceptedProposalCount > 0" class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30"
-                                      x-text="acceptedProposalCount + ' added to the model'"></span>
+                                      x-text="acceptedProposalCount + ' in the model'"></span>
                             </div>
                             <div class="flex items-center gap-2">
                                 <label class="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-2xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
@@ -177,17 +177,17 @@
                         </div>
 
                         {# Proposal cards #}
-                        <div class="grid gap-1.5 max-h-64 overflow-y-auto pr-1">
+                        <div class="grid gap-1.5 max-h-96 overflow-y-auto pr-1">
                             <template x-for="proposal in docProposals" :key="proposal.id">
-                                <div class="flex items-start gap-2 px-3 py-2 rounded-lg border transition-colors"
+                                <div class="flex flex-wrap items-start gap-2 px-3 py-2 rounded-lg border transition-colors"
                                      :class="proposal.outcome === 'Applied' || proposal.outcome === 'Linked' ? 'border-success/30 bg-success/5' : proposal.outcome === 'Declined' ? 'border-destructive/20 bg-destructive/5' : 'border-border bg-background'">
                                     {# Type badge #}
                                     <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border shrink-0 mt-0.5"
                                           :class="_proposalTypeBadgeClass(proposal.archimate_type)"
-                                          x-text="proposal.archimate_type"></span>
+                                          x-text="proposal.kind_label || proposal.archimate_type"></span>
                                     {# Content #}
-                                    <div class="flex-1 min-w-0">
-                                        <p class="text-xs font-medium text-foreground truncate" x-text="proposal.name"></p>
+                                    <div class="flex-1 min-w-[8rem]">
+                                        <p class="text-xs font-medium text-foreground break-words" data-testid="blueprint-proposal-name" x-text="proposal.name"></p>
                                         <p class="text-2xs text-muted-foreground line-clamp-1" x-text="proposal.description"></p>
                                     </div>
                                     {# Confidence — labeled chip (dot + %), semantic + theme-aware #}
@@ -199,7 +199,7 @@
                                         <span x-text="Math.round(proposal.confidence * 100) + '%'"></span>
                                     </span>
                                     {# What the review decided #}
-                                    <div class="shrink-0 max-w-[14rem] text-right" :data-testid="'blueprint-proposal-verdict-' + proposal.id">
+                                    <div class="w-full sm:w-auto sm:max-w-[14rem] sm:text-right" :data-testid="'blueprint-proposal-verdict-' + proposal.id">
                                         <p class="text-xs font-medium text-foreground" x-text="proposal.outcome"></p>
                                         <p class="text-2xs text-muted-foreground" x-text="proposal.verdict"></p>
                                         <p class="text-2xs text-muted-foreground" x-show="proposal.reason" x-text="proposal.reason"></p>

@@ -280,6 +280,7 @@ class DocumentIngestionService:
                 {
                     "id": p.id,
                     "archimate_type": p.archimate_type,
+                    "kind_label": self._kind_label(p.archimate_type),
                     "name": p.name,
                     "description": p.description,
                     "confidence": p.confidence,
@@ -293,6 +294,13 @@ class DocumentIngestionService:
             )
             for p in proposals
         ]
+
+    @staticmethod
+    def _kind_label(archimate_type):
+        """An ArchiMate type as a person says it ('Application component')."""
+        from app.navigation.registry import element_type_label
+
+        return element_type_label(archimate_type) if archimate_type else None
 
     @staticmethod
     def _verdicts(proposals):
