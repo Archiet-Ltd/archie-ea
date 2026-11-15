@@ -151,7 +151,9 @@ def _save_shots(page, name):
     for scheme in ("light", "dark"):
         page.emulate_media(color_scheme=scheme)
         page.wait_for_timeout(200)
-        page.screenshot(path=os.path.join(out, f"{name}_{scheme}.png"), full_page=True)
+        page.locator('[data-testid="matrix-table-container"]').screenshot(
+            path=os.path.join(out, f"{name}_{scheme}.png")
+        )
 
 
 def _goto(page, live_server, path):
@@ -280,7 +282,7 @@ def test_matrix_capability_column_width_mobile(browser, live_server, matrix_org)
         _save_shots(page, "matrix_390")
         assert measurements is not None, "Could not measure column widths"
         
-        print(f"\nMobile (390px) measurements:")
+        print("\nMobile (390px) measurements:")
         print(f"  Container width: {measurements['containerWidth']}px")
         print(f"  Header width: {measurements['headerWidth']}px ({measurements['headerPercent']}%)")
         print(f"  Cell width: {measurements['cellWidth']}px ({measurements['cellPercent']}%)")
@@ -323,7 +325,7 @@ def test_matrix_capability_column_width_desktop(browser, live_server, matrix_org
         # Check long name readability
         readability = _check_long_name_readability(page)
         _save_shots(page, "matrix_1440")
-        print(f"\nDesktop (1440px) readability:")
+        print("\nDesktop (1440px) readability:")
         for r in readability:
             print(f"  '{r['text']}...' - width: {r['width']}px, truncated: {r['isTruncated']}, wraps: {r['hasWrap']}")
         
