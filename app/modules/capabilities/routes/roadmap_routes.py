@@ -705,15 +705,18 @@ def api_roadmap_gaps():
 
         # The one gap count is the recorded gaps; the list above is signals
         # computed from capability coverage, and is counted separately.
-        from app.services.gap_register_service import count_gaps
+        from app.services import result_footer_service
+
+        figures = result_footer_service.roadmap_figures(current_org_id())
 
         return jsonify(
             {
                 "success": True,
                 "gaps": gaps,
                 "statistics": stats,
-                "recorded_gaps": count_gaps(current_org_id()),
+                "recorded_gaps": figures["recorded_gaps"],
                 "signal_count": len(gaps),
+                "figures": figures,
             }
         )
 
@@ -763,7 +766,12 @@ def api_roadmap_create_gap():
 
         plateau_id = data.get("plateau_id")
         if plateau_id:
-            plateau = Plateau.query.get(plateau_id)
+            # Only this organisation's own plateau: a lookup that always reaches the
+            # database, so another organisation's row is never handed back from cache.
+            plateau = Plateau.query.filter(
+                Plateau.id == plateau_id,
+                Plateau.organization_id == current_org_id(),
+            ).first()
             if not plateau:
                 return jsonify({"success": False, "error": "Plateau not found"}), 404
 
@@ -1337,18 +1345,17 @@ def api_roadmap_work_packages():
         root_only = request.args.get("root_only", "true").lower() == "true"
         include_children = request.args.get("include_children", "true").lower() == "true"
 
-        try:
-            query = work_package_service.query_for(org_id)
-            if root_only:
-                query = query.filter(UWP.parent_id.is_(None))
-            if gap_id:
-                # The one reader of a work package's gap links (the relationships).
-                query = query.filter(UWP.id.in_(
-                    work_package_service.work_package_ids_for_gap(gap_id, org_id)))
-            work_packages = query.order_by(UWP.start_date, UWP.id).all()
-        except Exception as qe:
-            current_app.logger.warning(f"Work packages query failed: {qe}", exc_info=True)
-            work_packages = []
+        query = work_package_service.query_for(org_id)
+        if gap_id:
+            # The one reader of a work package's gap links (the relationships).
+            query = query.filter(UWP.id.in_(
+                work_package_service.work_package_ids_for_gap(gap_id, org_id)))
+        # Every package of the organisation (parts included): the figure the roadmap
+        # board and the headline count give, whatever rows this answer lists.
+        all_count = query.count()
+        if root_only:
+            query = query.filter(UWP.parent_id.is_(None))
+        work_packages = query.order_by(UWP.start_date, UWP.id).all()
 
         serialized = []
         for wp in work_packages:
@@ -1362,19 +1369,21 @@ def api_roadmap_work_packages():
                 current_app.logger.warning(f"WorkPackage {wp.id} serialization failed: {se}")
                 serialized.append({"id": wp.id, "name": wp.name, "status": wp.status})
 
-        if request.args.get("footer"):
-            # The roadmap draws each row in the browser, so the one footer travels with it as markup.
-            from app.services import result_footer_service
+        # Always include footer data for the evidence line
+        from app.services import result_footer_service
 
-            for wp, item in zip(work_packages, serialized):
-                item["footer_html"] = result_footer_service.render_footer(
-                    result_footer_service.work_package_footer(wp, name_shown=True))
+        figures = result_footer_service.roadmap_figures(org_id)
+        for wp, item in zip(work_packages, serialized):
+            item["footer_html"] = result_footer_service.render_footer(
+                result_footer_service.work_package_footer(wp, name_shown=True))
 
         return jsonify(
             {
                 "success": True,
                 "work_packages": serialized,
                 "total_count": len(serialized),
+                "all_count": all_count,
+                "figures": figures,
             }
         )
 
@@ -1538,7 +1547,12 @@ def api_roadmap_create_standalone_work_package():
 
         plateau = None
         if plateau_id:
-            plateau = Plateau.query.get(plateau_id)
+            # Only this organisation's own plateau: a lookup that always reaches the
+            # database, so another organisation's row is never handed back from cache.
+            plateau = Plateau.query.filter(
+                Plateau.id == plateau_id,
+                Plateau.organization_id == current_org_id(),
+            ).first()
             if not plateau:
                 return jsonify({"success": False, "error": "Plateau not found"}), 404
 
@@ -1839,12 +1853,17 @@ def api_roadmap_get_plateaus():
         from app.utils.tenant import current_organization_id
 
         org_id = current_organization_id()
-        plateaus = Plateau.query.order_by(Plateau.sequence_order.asc(), Plateau.id.asc()).all()
+        from app.services import result_footer_service
+
+        plateaus = result_footer_service.plateaus_for(org_id).order_by(
+            Plateau.sequence_order.asc(), Plateau.id.asc()).all()
         ids = [p.id for p in plateaus]
         # The one rule for what a plateau holds: the gaps linked to it or closed
         # by its packages, and the packages that realise it.
         gaps_by_plateau = get_plateau_gap_rows(ids, org_id)
         wps_by_plateau = work_package_service.plateau_work_package_ids(ids, org_id)
+        from app.services import result_footer_service
+
         shown = [
             {
                 "id": p.id,
@@ -1854,15 +1873,12 @@ def api_roadmap_get_plateaus():
                 "target_date": p.target_date.isoformat() if p.target_date else None,
                 "gaps": gaps_by_plateau.get(p.id, []),
                 "work_package_ids": sorted(wps_by_plateau.get(p.id, ())),
+                "footer_html": result_footer_service.render_footer(result_footer_service.plateau_footer(p)),
             }
             for p in plateaus
         ]
-        if request.args.get("footer"):
-            from app.services import result_footer_service
-
-            for p, item in zip(plateaus, shown):
-                item["footer_html"] = result_footer_service.render_footer(result_footer_service.plateau_footer(p))
-        return jsonify({"success": True, "plateaus": shown})
+        return jsonify({"success": True, "plateaus": shown,
+                        "figures": result_footer_service.roadmap_figures(org_id)})
     except Exception as e:
         current_app.logger.error(f"Error fetching plateaus: {e}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
@@ -2065,11 +2081,15 @@ def api_roadmap_detect_gaps():
 
         db.session.commit()
 
+        from app.services import result_footer_service
+        from app.utils.tenant import current_organization_id
+
         return jsonify({
             "success": True,
             "created": created_count,
             "updated": updated_count,
             "gaps": gap_results,
+            "figures": result_footer_service.roadmap_figures(current_organization_id()),
         })
 
     except Exception as e:

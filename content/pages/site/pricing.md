@@ -14,5 +14,5 @@ $49 a month for a team of ten, $29 per editor a month for larger teams with peop
 free, and Enterprise from $24,000 a year. Self-host the open-source edition free.
 
 Startups run on the free plan or on Startup: the business model canvas, the value streams behind your
-revenue and the twin map, set up in minutes. Companies of 50 to 500 people move to Team, where owners,
+revenue and the twin map, set up in minutes. Growing companies move to Team, where owners,
 architects and the review board work in one model and everyone else asks questions at no cost.
