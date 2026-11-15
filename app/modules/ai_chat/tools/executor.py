@@ -50,6 +50,40 @@ GENOME_NOTICE = "Answer written by AI from your model"
 _SCOPE_ARG_KEYS = frozenset({"organization_id", "organisation_id", "org_id", "tenant_id"})
 
 
+_FIELD_WORDS = {"name": "name", "title": "title", "description": "description", "target_date": "target date",
+                "status": "status", "likelihood": "likelihood", "impact": "impact",
+                "mitigation_plan": "mitigation plan"}
+
+
+def _element_url(element_id) -> str:
+    """The page of a Goal element, the one place a goal's facts are shown (``ae=1``: the id is the element's)."""
+    from app.services.result_footer_service import page_link
+
+    return (page_link("archimate_crud.detail_element", layer="motivation", element_type="Goal",
+                      element_id=element_id, ae=1)
+            or "/architecture/motivation/Goal/%s?ae=1" % element_id)
+
+
+def _on_date(value) -> str:
+    if value is None:
+        return ""
+    return " with target date %d %s %d" % (value.day, value.strftime("%b"), value.year)
+
+
+def _plain_failure(tool_name: str, error: Exception) -> str:
+    """What a person reads when a tool raised. A goal or risk says what could not be saved and that nothing
+    changed (a refusal the goal store words itself is shown as it is); any other tool keeps its error text."""
+    from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME
+    from app.services.goal_store import GoalError
+
+    kind = (TOOL_SCHEMA_BY_NAME.get(tool_name) or {}).get("record_kind")
+    if not kind:
+        return str(error)
+    if isinstance(error, GoalError):
+        return "%s Nothing was changed." % str(error)
+    return "The %s could not be saved, so nothing was changed." % kind
+
+
 def _strip_scope_args(arguments: dict) -> dict:
     if not isinstance(arguments, dict):
         return arguments
@@ -578,6 +612,17 @@ class ToolExecutor:
                         "writes_paused": True,
                     }
 
+            refusal = None
+            if user is not None and schema is not None and schema.get("permission"):
+                # A record tool declares the matrix pair it needs; the review asks the same question.
+                from app.modules.ai_chat.services.change_review import role_refusal
+
+                refusal = role_refusal(user, schema, self._get_organization_id())
+            if refusal is not None:
+                record_refused_tool_call(user, tool_call.name, tool_call.arguments, via="agent")
+                return {"success": False, "error": refusal, "code": "PERMISSION_DENIED",
+                        "permission_denied": True}
+
             if not user or not self._user_can_write():
                 logger.warning(
                     "ToolExecutor: refusing mutating tool '%s' for user_id=%s — no write permission",
@@ -595,10 +640,10 @@ class ToolExecutor:
             return handler(arguments)
         except Exception as e:
             db.session.rollback()
-            logger.exception("Tool %s failed", tool_call.name)
+            logger.exception("Tool %s failed (approval %s)", tool_call.name, tool_call.id)
             if propagate_errors:
                 raise
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": _plain_failure(tool_call.name, e)}
 
     # ------------------------------------------------------------------ #
     # Helpers                                                              #
@@ -1163,23 +1208,38 @@ class ToolExecutor:
     # ------------------------------------------------------------------ #
 
     def _tool_create_goal(self, args: dict) -> dict:
-        from app.models.solution_architect_models import SolutionGoal
-        problem_id = self._get_or_create_problem_id(args["solution_id"])
-        goal = SolutionGoal(
-            problem_id=problem_id,
-            name=args["name"],
-            description=args.get("description", ""),
-            priority=args.get("priority", 3),
-            ai_generated=True,
-            organization_id=self._get_organization_id(),
-        )
-        db.session.add(goal)
-        sync_archimate_element(goal)
-        db.session.commit()
+        from app.services import goal_store
+
+        goal = goal_store.create_goal(
+            self._get_organization_id(), args["name"], description=args.get("description"),
+            target_date=args.get("target_date"), status=args.get("status"))
+        url = _element_url(goal.archimate_element_id)
         return {
             "success": True,
-            "result": {"id": goal.id, "name": goal.name, "entity_type": "goal", "solution_id": args["solution_id"]},
-            "message": f"Added goal '{goal.name}' to solution {args['solution_id']}.",
+            "result": {"id": goal.id, "element_id": goal.archimate_element_id, "name": goal.name,
+                       "entity_type": "goal", "record_url": url},
+            "message": 'created Goal "%s"%s' % (goal.name, _on_date(goal.target_date)),
+            "record_url": url,
+        }
+
+    def _tool_update_goal(self, args: dict) -> dict:
+        from app.services import goal_store
+
+        org_id = self._get_organization_id()
+        found = self._resolver.resolve_goal(args["goal_name"], org_id)
+        if not found.get("resolved"):
+            return self._clarify("goal", found)
+        changes = {k: args[k] for k in ("name", "description", "target_date", "status")
+                   if args.get(k) not in (None, "")}
+        goal = goal_store.update_goal(org_id, found["id"], **changes)
+        url = _element_url(goal.archimate_element_id)
+        what = ", ".join(_FIELD_WORDS[k] for k in changes) or "nothing"
+        return {
+            "success": True,
+            "result": {"id": goal.id, "element_id": goal.archimate_element_id, "name": goal.name,
+                       "entity_type": "goal", "record_url": url},
+            "message": 'changed Goal "%s" (%s)%s' % (goal.name, what, _on_date(goal.target_date)),
+            "record_url": url,
         }
 
     # ------------------------------------------------------------------ #
@@ -1236,27 +1296,51 @@ class ToolExecutor:
     # ------------------------------------------------------------------ #
 
     def _tool_create_risk(self, args: dict) -> dict:
-        """Writes through the canonical risk register (app/services/risk_service.py)
-        -- the one writer -- instead of creating a SolutionRisk row directly,
-        so the superseded store gets no new row."""
-        from app.modules.solutions_strategic.v2.routes.solution_routes import _level_to_int
+        """Writes through the canonical risk register (app/services/risk_service.py), the one writer."""
+        from app.modules.ai_chat.services.change_review import _touch_problem
         from app.services import risk_service
 
-        description = args["risk_description"]
+        org_id = self._get_organization_id()
+        pairs, problem = _touch_problem(org_id, args.get("touches"))
+        if problem:
+            return {"success": False, "error": problem}
         risk = risk_service.create_risk(
-            solution_id=args["solution_id"],
-            title=description[:255],
-            description=description,
-            likelihood=_level_to_int(args["probability"]),
-            impact=_level_to_int(args["impact"]),
+            solution_id=args.get("solution_id"),
+            title=args["title"],
+            description=args.get("description"),
+            likelihood=args["likelihood"],
+            impact=args["impact"],
             owner=None,
             mitigation_plan=args.get("mitigation") or None,
+            links=pairs,
+            organization_id=org_id,
         )
-        risk_service.add_risk_link(risk.id, "solution", args["solution_id"])
+        url = "/risks/%d" % risk.id
         return {
             "success": True,
-            "result": {"id": risk.id, "entity_type": "risk", "solution_id": args["solution_id"]},
-            "message": f"Added risk '{args['risk_description'][:60]}' (impact={args['impact']}) to solution {args['solution_id']}.",
+            "result": {"id": risk.id, "entity_type": "risk", "record_url": url},
+            "message": 'created Risk "%s" (likelihood %d, impact %d)' % (risk.title, risk.likelihood, risk.impact),
+            "record_url": url,
+        }
+
+    def _tool_update_risk(self, args: dict) -> dict:
+        from app.services import risk_service
+
+        org_id = self._get_organization_id()
+        found = self._resolver.resolve_risk(args["risk_title"], org_id)
+        if not found.get("resolved"):
+            return self._clarify("risk", found)
+        changes = {k: args[k] for k in ("title", "description", "likelihood", "impact", "mitigation_plan")
+                   if args.get(k) not in (None, "")}
+        risk = risk_service.update_risk(found["id"], organization_id=org_id, **changes)
+        url = "/risks/%d" % risk.id
+        what = ", ".join(_FIELD_WORDS[k] for k in changes) or "nothing"
+        return {
+            "success": True,
+            "result": {"id": risk.id, "entity_type": "risk", "record_url": url},
+            "message": 'changed Risk "%s" (%s; likelihood %d, impact %d)' % (
+                risk.title, what, risk.likelihood, risk.impact),
+            "record_url": url,
         }
 
     # ------------------------------------------------------------------ #

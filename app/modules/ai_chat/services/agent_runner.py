@@ -14,6 +14,7 @@ declined by the server in the same turn.
 """
 
 from app.modules.ai_chat.tools.executor import ToolCall
+from app.modules.ai_chat.services import change_review
 import json
 import logging
 import threading
@@ -1008,6 +1009,9 @@ class AgentRunner:
         ]
         # Records the read tools actually returned this turn, for citation.
         sources = []
+        # The server's own words for each goal or risk write this turn, and whether any other tool ran.
+        record_lines = []
+        other_tools = False
 
         chain_pos = 0
         for iteration in range(MAX_ITERATIONS):
@@ -1151,6 +1155,7 @@ class AgentRunner:
                         ),
                     }
                 elif tc.name not in offered_tools:
+                    other_tools = True
                     # Tool selection is the server's: only a tool offered on the
                     # chat surface can run, whatever text (a pasted document, a
                     # retrieved excerpt, an earlier tool result) names another.
@@ -1163,6 +1168,12 @@ class AgentRunner:
                         "error": f"Tool '{tc.name}' is not available here.",
                         "code": "TOOL_NOT_OFFERED",
                     }
+                elif (question := self._record_question(tc)):
+                    # A goal or risk request that names a record that cannot be told apart is asked about
+                    # before anything is recorded; nothing is written.
+                    record_lines.append(question)
+                    result = {"success": False, "needs_clarification": True, "message": question,
+                              "instruction": "Ask the person this one question, in these words, and write nothing."}
                 elif self._should_queue(schema, self.auto_execute):
                     # A write is recorded, then checked and reviewed by a model other than
                     # this one, and applied or declined by the server in this same turn.
@@ -1189,6 +1200,10 @@ class AgentRunner:
                         "record_url": verdict.get("record_url"),
                     })
                     result = self._verdict_result(approval_id, verdict)
+                    if change_review.record_schema(tc.name) is not None and verdict.get("state") != "in_review":
+                        record_lines.append(self._record_line(verdict))
+                    else:
+                        other_tools = True
                     if verdict.get("state") == "in_review":
                         self._emit({"type": "approval_queued", "tool": tc.name, "approval_id": approval_id})
                     else:
@@ -1196,6 +1211,7 @@ class AgentRunner:
                                     "state": verdict.get("state"), "message": verdict.get("message")})
                 else:
                     # Auto-execute
+                    other_tools = True
                     self._emit({"type": "tool_start", "tool": tc.name, "args": tc.arguments})
                     result = executor.execute(tc)
                     self._collect_sources(tc.name, result, sources)
@@ -1220,6 +1236,27 @@ class AgentRunner:
                         required_actions.append(result["recovery"])
 
                 tool_results.append((tc_raw, result))
+
+            if record_lines and not other_tools:
+                # Every tool this turn was a goal or risk write: the reply is the server's own words, from the
+                # verdicts, and the model is not asked to paraphrase them.
+                self._release_held_tokens(False)
+                return self._finalize(
+                    {
+                        "response": "\n\n".join(record_lines),
+                        "actions_taken": actions_taken,
+                        "required_actions": required_actions,
+                        "pending_approvals": pending_approvals,
+                        "sources": sources,
+                        "system_generated": True,
+                    },
+                    user_message=user_message,
+                    domain=domain,
+                    context=context,
+                    persona=persona,
+                    model_used=model,
+                    provider_used=provider,
+                )
 
             # Feed results back into messages for next iteration
             messages = self._append_tool_results(provider, messages, llm_resp, tool_results)
@@ -1888,6 +1925,34 @@ class AgentRunner:
         return {"success": False, "in_review": True, "approval_id": approval_id, "message": message,
                 "instruction": "Tell the person the change is being checked and its result will be on its record."}
 
+    def _record_question(self, tc: "ToolCall") -> Optional[str]:
+        """The one short question a goal or risk request needs answered first, or None."""
+        from app.modules.ai_chat.services.ai_chat_approval_service import _load_acting_user
+
+        org_id = self._active_organization_id(_load_acting_user(self.user_id))
+        if org_id is None or change_review.record_schema(tc.name) is None:
+            return None
+        return change_review.preflight(tc.name, tc.arguments, org_id)
+
+    @staticmethod
+    def _record_line(verdict: dict) -> str:
+        """The reply for one goal or risk write: the verdict's words, and the record it made or changed."""
+        text = verdict.get("message") or ""
+        url = verdict.get("record_url")
+        if verdict.get("state") == "applied" and url:
+            text += " [Open it](%s)" % url
+        return text
+
+    @staticmethod
+    def _active_organization_id(actor) -> Optional[int]:
+        """The workspace the person is working in now; their home workspace only when none is active."""
+        from app.middleware.tenant_context import current_org_id
+
+        active = current_org_id()
+        if active is not None:
+            return active
+        return actor.organization_id if actor else None
+
     def _queue_approval(self, tc: "ToolCall", persona: Optional[str] = None) -> int:
         """Write the AIChatCRUDApproval record for a write, settle it, and return its ID.
 
@@ -1909,7 +1974,7 @@ class AgentRunner:
         provider, model, request_text = getattr(self, "_drafter", None) or (None, None, None)
         actor = _load_acting_user(self.user_id)
         approval = create_approval_record(
-            organization_id=actor.organization_id if actor else None,
+            organization_id=self._active_organization_id(actor),
             operation_type="tool_use",
             entity_type=tc.name,
             original_command=(request_text or tc.name)[:4000],

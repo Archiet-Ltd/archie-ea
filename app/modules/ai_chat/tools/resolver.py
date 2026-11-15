@@ -6,6 +6,10 @@ Resolver returns:
   {"resolved": True,  "id": 42, "name": "Salesforce CRM"}    # unambiguous
   {"resolved": False, "candidates": [{id, name}, ...]}        # ambiguous
   {"resolved": False, "candidates": []}                       # not found
+
+Every resolver names the organisation in its statement. A caller with no request (the chat's worker thread)
+passes it; one inside a request may leave it out and gets the active organisation. With neither, nothing
+resolves.
 """
 
 import logging
@@ -15,108 +19,85 @@ logger = logging.getLogger(__name__)
 MAX_CANDIDATES = 6
 
 
+
+def _own_org(organization_id):
+    if organization_id is not None:
+        return organization_id
+    from app.middleware.tenant_context import current_org_id
+
+    return current_org_id()
+
+
+def _by_name(model, name, organization_id, label, extra=()):
+    """Resolve one row of ``model`` in the organisation by name: the exact name, else the only partial match."""
+    org_id = _own_org(organization_id)
+    if org_id is None:
+        return {"resolved": False, "candidates": []}
+    scope = [model.organization_id == org_id, *extra]
+    exact = model.query.filter(model.name.ilike(name), *scope).order_by(model.id).all()
+    if len(exact) == 1:
+        return {"resolved": True, "id": exact[0].id, "name": exact[0].name}
+    if len(exact) > 1:
+        return {"resolved": False,
+                "candidates": [{"id": r.id, "name": r.name} for r in exact[:MAX_CANDIDATES]]}
+    candidates = model.query.filter(model.name.ilike(f"%{name}%"), *scope).order_by(model.id).limit(
+        MAX_CANDIDATES).all()
+    if len(candidates) == 1:
+        return {"resolved": True, "id": candidates[0].id, "name": candidates[0].name}
+    return {"resolved": False, "candidates": [{"id": r.id, "name": r.name} for r in candidates]}
+
+
 class EntityResolver:
 
-    # ------------------------------------------------------------------ #
-    # Applications                                                         #
-    # ------------------------------------------------------------------ #
-
     @staticmethod
-    def resolve_application(name: str) -> dict:
+    def resolve_application(name: str, organization_id=None) -> dict:
         try:
             from app.models.application_component_fast import ApplicationComponent
-            exact = ApplicationComponent.query.filter(
-                ApplicationComponent.name.ilike(name)
-            ).first()
-            if exact:
-                return {"resolved": True, "id": exact.id, "name": exact.name}
-            candidates = ApplicationComponent.query.filter(
-                ApplicationComponent.name.ilike(f"%{name}%")
-            ).limit(MAX_CANDIDATES).all()
-            if len(candidates) == 1:
-                return {"resolved": True, "id": candidates[0].id, "name": candidates[0].name}
-            return {
-                "resolved": False,
-                "candidates": [{"id": a.id, "name": a.name} for a in candidates],
-            }
+            return _by_name(ApplicationComponent, name, organization_id, "application")
         except Exception as e:
             logger.warning("resolve_application error: %s", e)
             return {"resolved": False, "candidates": [], "error": str(e)}
 
-    # ------------------------------------------------------------------ #
-    # Capabilities                                                         #
-    # ------------------------------------------------------------------ #
-
     @staticmethod
-    def resolve_capability(name: str) -> dict:
+    def resolve_capability(name: str, organization_id=None) -> dict:
         try:
             from app.models.business_capabilities import BusinessCapability
-            exact = BusinessCapability.query.filter(
-                BusinessCapability.name.ilike(name)
-            ).first()
-            if exact:
-                return {"resolved": True, "id": exact.id, "name": exact.name}
-            candidates = BusinessCapability.query.filter(
-                BusinessCapability.name.ilike(f"%{name}%")
-            ).limit(MAX_CANDIDATES).all()
-            if len(candidates) == 1:
-                return {"resolved": True, "id": candidates[0].id, "name": candidates[0].name}
-            return {
-                "resolved": False,
-                "candidates": [{"id": c.id, "name": c.name} for c in candidates],
-            }
+            return _by_name(BusinessCapability, name, organization_id, "capability")
         except Exception as e:
             logger.warning("resolve_capability error: %s", e)
             return {"resolved": False, "candidates": [], "error": str(e)}
 
-    # ------------------------------------------------------------------ #
-    # Solutions                                                            #
-    # ------------------------------------------------------------------ #
-
     @staticmethod
-    def resolve_solution(name: str) -> dict:
+    def resolve_solution(name: str, organization_id=None) -> dict:
         try:
             from app.models.solution_models import Solution
-            exact = Solution.query.filter(
-                Solution.name.ilike(name)
-            ).first()
-            if exact:
-                return {"resolved": True, "id": exact.id, "name": exact.name}
-            candidates = Solution.query.filter(
-                Solution.name.ilike(f"%{name}%")
-            ).limit(MAX_CANDIDATES).all()
-            if len(candidates) == 1:
-                return {"resolved": True, "id": candidates[0].id, "name": candidates[0].name}
-            return {
-                "resolved": False,
-                "candidates": [{"id": s.id, "name": s.name} for s in candidates],
-            }
+            return _by_name(Solution, name, organization_id, "solution")
         except Exception as e:
             logger.warning("resolve_solution error: %s", e)
             return {"resolved": False, "candidates": [], "error": str(e)}
 
-    # ------------------------------------------------------------------ #
-    # ArchiMate Elements                                                  #
-    # ------------------------------------------------------------------ #
-
     @staticmethod
-    def resolve_archimate_element(name: str) -> dict:
+    def resolve_archimate_element(name: str, organization_id=None, element_type=None) -> dict:
         try:
             try:
                 from app.models.archimate_core import ArchiMateElement
             except ImportError:
                 from app.models.models import ArchiMateElement
-            from app.middleware.tenant_context import current_org_id
             from app.modules.dashboard.services.overview_figures import element_named
 
-            org_id = current_org_id()
-            meant = element_named(org_id, name) if org_id is not None else None
+            org_id = _own_org(organization_id)
+            if org_id is None:
+                return {"resolved": False, "candidates": []}
+            of_type = [ArchiMateElement.type == element_type] if element_type else []
+            meant = element_named(org_id, name) if not element_type else None
             exact = ArchiMateElement.query.filter_by(id=meant, organization_id=org_id).first() if meant else None
             if exact:
                 return {"resolved": True, "id": exact.id, "name": exact.name, "type": exact.type, "layer": exact.layer}
             candidates = ArchiMateElement.query.filter(
-                ArchiMateElement.name.ilike(f"%{name}%")
-            ).limit(MAX_CANDIDATES).all()
+                ArchiMateElement.organization_id == org_id,
+                ArchiMateElement.name.ilike(f"%{name}%"),
+                *of_type,
+            ).order_by(ArchiMateElement.id).limit(MAX_CANDIDATES).all()
             if len(candidates) == 1:
                 c = candidates[0]
                 return {"resolved": True, "id": c.id, "name": c.name, "type": c.type, "layer": c.layer}
@@ -128,12 +109,54 @@ class EntityResolver:
             logger.warning("resolve_archimate_element error: %s", e)
             return {"resolved": False, "candidates": [], "error": str(e)}
 
-    # ------------------------------------------------------------------ #
-    # Vendor Products                                                     #
-    # ------------------------------------------------------------------ #
+    @staticmethod
+    def resolve_goal(name: str, organization_id=None) -> dict:
+        """A goal of the organisation by name, as its element: the exact name (every one of that name when
+        there are several), else the only goal whose name contains the words."""
+        try:
+            from app.models.archimate_core import ArchiMateElement
+
+            org_id = _own_org(organization_id)
+            if org_id is None:
+                return {"resolved": False, "candidates": []}
+            base = [ArchiMateElement.organization_id == org_id, ArchiMateElement.type == "Goal"]
+            exact = ArchiMateElement.query.filter(ArchiMateElement.name.ilike(name), *base).order_by(
+                ArchiMateElement.id).limit(MAX_CANDIDATES).all()
+            if not exact:
+                exact = ArchiMateElement.query.filter(ArchiMateElement.name.ilike(f"%{name}%"), *base).order_by(
+                    ArchiMateElement.id).limit(MAX_CANDIDATES).all()
+            if len(exact) == 1:
+                return {"resolved": True, "id": exact[0].id, "name": exact[0].name}
+            return {"resolved": False, "candidates": [{"id": e.id, "name": e.name} for e in exact]}
+        except Exception as e:
+            logger.warning("resolve_goal error: %s", e)
+            return {"resolved": False, "candidates": [], "error": str(e)}
 
     @staticmethod
-    def resolve_vendor_product(name: str) -> dict:
+    def resolve_risk(title: str, organization_id=None) -> dict:
+        """A risk of the organisation by title, the same way."""
+        try:
+            from app.models.risk import Risk
+
+            org_id = _own_org(organization_id)
+            if org_id is None:
+                return {"resolved": False, "candidates": []}
+            base = [Risk.organization_id == org_id]
+            found = Risk.query.filter(Risk.title.ilike(title), *base).order_by(Risk.id).limit(MAX_CANDIDATES).all()
+            if not found:
+                found = Risk.query.filter(Risk.title.ilike(f"%{title}%"), *base).order_by(Risk.id).limit(
+                    MAX_CANDIDATES).all()
+            if len(found) == 1:
+                return {"resolved": True, "id": found[0].id, "name": found[0].title}
+            return {"resolved": False, "candidates": [{"id": r.id, "name": r.title} for r in found]}
+        except Exception as e:
+            logger.warning("resolve_risk error: %s", e)
+            return {"resolved": False, "candidates": [], "error": str(e)}
+
+    @staticmethod
+    def resolve_vendor_product(name: str, organization_id=None) -> dict:
+        # The vendor product list is one catalogue shared by every organisation: it has no organisation
+        # column to filter on, so the argument is accepted for a uniform call and not used.
         try:
             from app.models.vendor.vendor_organization import VendorProduct
             exact = VendorProduct.query.filter(

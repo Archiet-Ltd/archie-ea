@@ -563,9 +563,205 @@ def _target_score_rationalization(args: Dict[str, Any], org_id: int) -> Target:
                   facts={"application": app_obj.name, "has_a_score_already": score is not None})
 
 
+# --------------------------------------------------------------------------- #
+# The goal and risk tools: what they act on, who may use them, what is asked first #
+# --------------------------------------------------------------------------- #
+
+
+def record_schema(tool_name: str) -> Optional[Dict[str, Any]]:
+    """The registry entry of a record tool (one that declares the kind of record it writes), else None."""
+    from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME
+
+    schema = TOOL_SCHEMA_BY_NAME.get(tool_name)
+    return schema if schema and schema.get("record_kind") else None
+
+
+def role_refusal(user, schema: Optional[Dict[str, Any]], org_id: Optional[int]) -> Optional[str]:
+    """The plain refusal when the person's role in the organisation does not allow the tool, else None.
+
+    One question, asked of the one permission matrix the screens use, with the pair the tool declares."""
+    pair = (schema or {}).get("permission")
+    if not pair:
+        return None
+    from app.core.auth.permissions import can, role_key
+    from app.models.organization import Organization
+    from app.utils.role_access import get_role_display_name
+
+    if can(user, pair[0], pair[1], org_id):
+        return None
+    role = get_role_display_name(role_key(user, org_id))
+    organisation = db.session.execute(
+        db.select(Organization.name).where(Organization.id == org_id)).scalar_one_or_none() or "this workspace"
+    if role == "Viewer":
+        return ("Your role in %s is Viewer. Viewers can read records but not change them. An administrator "
+                "can change your role on the members page." % organisation)
+    return ("Your role in %s is %s, which does not allow changing %ss. An administrator can change your role "
+            "on the members page." % (organisation, role, (schema.get("record_kind") or "record")))
+
+
+def _date_problem(args: Dict[str, Any]) -> str:
+    value = args.get("target_date")
+    if value in (None, ""):
+        return ""
+    try:
+        from datetime import date as _date
+
+        _date.fromisoformat(str(value).strip()[:10])
+    except ValueError:
+        return "The target date '%s' is not a date; give it as day, month and year." % value
+    return ""
+
+
+def _named_goals(org_id: int, name: str) -> list:
+    from app.models.archimate_core import ArchiMateElement
+
+    return list(db.session.execute(
+        db.select(ArchiMateElement).where(ArchiMateElement.organization_id == org_id,
+                                          ArchiMateElement.type == "Goal",
+                                          db.func.lower(ArchiMateElement.name) == name.lower())
+        .order_by(ArchiMateElement.id)).scalars())
+
+
+def _goal_facts(org_id: int, element) -> Dict[str, Any]:
+    from app.services import goal_store
+
+    row = goal_store.goal_for_element(org_id, element.id)
+    return {"record": "Goal", "id": element.id, "name": element.name,
+            "target_date": row.target_date.isoformat() if row is not None and row.target_date else None,
+            "status": row.status if row is not None else None, "description": element.description}
+
+
+def _target_create_goal(args: Dict[str, Any], org_id: int) -> Target:
+    name = _clean_name(args, "name")
+    target = Target(True, label=name, creates=True,
+                    before={"kind": "create", "note": "Nothing existed before; undoing it removes the new goal."},
+                    facts={"goal": name, "target_date": args.get("target_date"), "status": args.get("status")})
+    if _named_goals(org_id, name):
+        target.value_reason = "A goal called '%s' already exists in this workspace." % name
+    else:
+        target.value_reason = _date_problem(args)
+    return target
+
+
+def _target_update_goal(args: Dict[str, Any], org_id: int) -> Target:
+    from app.modules.ai_chat.tools.resolver import EntityResolver
+
+    name = _clean_name(args, "goal_name")
+    found = EntityResolver.resolve_goal(name, org_id)
+    if not found.get("resolved"):
+        return Target(False, _not_found_or_which("goal", name, found))
+    from app.models.archimate_core import ArchiMateElement
+
+    element = db.session.execute(db.select(ArchiMateElement).where(
+        ArchiMateElement.id == found["id"], ArchiMateElement.organization_id == org_id)).scalar_one()
+    changes = {k: args[k] for k in ("name", "description", "target_date", "status") if args.get(k) not in (None, "")}
+    target = Target(True, label=element.name, before=_goal_facts(org_id, element),
+                    facts={"goal": element.name, "changes": changes, "element_id": element.id})
+    target.value_reason = _date_problem(args)
+    return target
+
+
+def _not_found_or_which(kind: str, name: str, found: Dict[str, Any]) -> str:
+    names = [c.get("name") for c in found.get("candidates", []) if c.get("name")]
+    if names:
+        return "More than one %s matches '%s': %s." % (kind, name, ", ".join(names[:5]))
+    return 'There is no %s named "%s" in this workspace.' % (kind, name)
+
+
+def _touch_problem(org_id: int, touches) -> Tuple[list, str]:
+    """(pairs ready for the risk store, a plain problem) for what a risk touches, each named as the person did."""
+    from app.modules.ai_chat.tools.resolver import EntityResolver
+
+    resolvers = {"application": EntityResolver.resolve_application, "capability": EntityResolver.resolve_capability,
+                 "solution": EntityResolver.resolve_solution,
+                 "archimate_element": EntityResolver.resolve_archimate_element}
+    pairs = []
+    for touch in touches or []:
+        kind, name = touch.get("entity_type"), str(touch.get("name") or "").strip()
+        resolver = resolvers.get(kind)
+        if resolver is None:
+            return [], "A risk can touch an application, capability, solution or element, not '%s'." % kind
+        found = resolver(name, org_id)
+        if not found.get("resolved"):
+            return [], _not_found_or_which(kind.replace("_", " "), name, found)
+        pairs.append((kind, found["id"]))
+    return pairs, ""
+
+
+def _target_create_risk(args: Dict[str, Any], org_id: int) -> Target:
+    from app.models.risk import Risk
+
+    title = _clean_name(args, "title")
+    target = Target(True, label=title, creates=True,
+                    before={"kind": "create", "note": "Nothing existed before; undoing it removes the new risk."},
+                    facts={"risk": title, "likelihood": args.get("likelihood"), "impact": args.get("impact"),
+                           "touches": [t.get("name") for t in args.get("touches") or []]})
+    if db.session.execute(db.select(Risk.id).where(Risk.organization_id == org_id,
+                                                   db.func.lower(Risk.title) == title.lower())
+                          ).first() is not None:
+        target.value_reason = "A risk titled '%s' already exists in this workspace." % title
+        return target
+    _pairs, problem = _touch_problem(org_id, args.get("touches"))
+    if problem:
+        target.value_reason = problem
+    return target
+
+
+def _target_update_risk(args: Dict[str, Any], org_id: int) -> Target:
+    from app.models.risk import Risk
+    from app.modules.ai_chat.tools.resolver import EntityResolver
+
+    title = _clean_name(args, "risk_title")
+    found = EntityResolver.resolve_risk(title, org_id)
+    if not found.get("resolved"):
+        return Target(False, _not_found_or_which("risk", title, found))
+    risk = db.session.execute(db.select(Risk).where(Risk.id == found["id"], Risk.organization_id == org_id)
+                              ).scalar_one()
+    before = {"record": "Risk", "id": risk.id, "title": risk.title, "likelihood": risk.likelihood,
+              "impact": risk.impact, "description": risk.description, "mitigation_plan": risk.mitigation_plan}
+    changes = {k: args[k] for k in ("title", "description", "likelihood", "impact", "mitigation_plan")
+               if args.get(k) not in (None, "")}
+    return Target(True, label=risk.title, before=before,
+                  facts={"risk": risk.title, "changes": changes, "risk_id": risk.id})
+
+
+def preflight(tool_name: str, args: Dict[str, Any], org_id: int) -> Optional[str]:
+    """One short question when a record tool's request names a record that cannot be told apart, else None.
+
+    Read before anything is recorded, from the organisation's own records, so a question writes nothing."""
+    if not isinstance(args, dict) or record_schema(tool_name) is None:
+        return None
+    from app.modules.ai_chat.tools.resolver import EntityResolver
+
+    if tool_name in ("create_goal", "update_goal"):
+        name = _clean_name(args, "name" if tool_name == "create_goal" else "goal_name")
+        found = {"candidates": [{"name": e.name} for e in _named_goals(org_id, name)]}
+        kind = "goal"
+        if tool_name == "update_goal" and not found["candidates"]:
+            found = EntityResolver.resolve_goal(name, org_id)
+            if found.get("resolved"):
+                return None
+    elif tool_name == "update_risk":
+        name, kind = _clean_name(args, "risk_title"), "risk"
+        found = EntityResolver.resolve_risk(name, org_id)
+        if found.get("resolved"):
+            return None
+    else:
+        return None
+    candidates = found.get("candidates") or []
+    if len(candidates) > 1:
+        return ("There are %d %ss called '%s'. Which one do you mean? Say which, or give the other a different "
+                "name." % (len(candidates), kind, name))
+    return None
+
+
 # The tools whose target the review reads from the organisation's own records. The eight an owner-founder's
 # assistant may use are all here; any other tool's change is checked for its shape only and says so.
 _TOOL_TARGETS = {
+    "create_goal": _target_create_goal,
+    "update_goal": _target_update_goal,
+    "create_risk": _target_create_risk,
+    "update_risk": _target_update_risk,
     "bulk_update_application_status": _target_bulk_update_application_status,
     "create_archimate_element": _target_create_archimate_element,
     "create_archimate_relationship": _target_create_archimate_relationship,
@@ -626,11 +822,16 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
         return passed
 
     active = getattr(g, "current_org_id", None)
+    from app.services.rbac_service import rbac_service
+
+    # A workspace the person belongs to, not only the home one: a change made in the workspace they switched
+    # to belongs to that workspace.
+    member = org_id is not None and org_id in rbac_service.org_ids_for(requester)
     if not add(
         "Belongs to this workspace",
-        org_id is not None and requester.organization_id == org_id and (active is None or active == org_id),
+        member and (active is None or active == org_id),
         "The change belongs to the same workspace as the person who asked for it."
-        if org_id is not None and requester.organization_id == org_id
+        if member
         else "The change does not belong to the workspace of the person who asked for it.",
     ):
         return checks, Target(False)
@@ -658,6 +859,11 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
                        "Your assistant is set up to make this kind of change." if permitted
                        else CHARTER_REFUSED_REASON):
                 return checks, Target(False)
+        refusal = role_refusal(requester, schema, org_id)
+        if schema and schema.get("permission") and not add(
+                "The person who asked may make it", refusal is None,
+                "The person who asked has a role that allows this change." if refusal is None else refusal):
+            return checks, Target(False)
         problem = schema_problem(schema.get("parameters") or {}, payload) if schema else None
         if not add("The request is complete", problem is None,
                    "Every required detail is given and has the right kind of value." if problem is None
@@ -1001,13 +1207,22 @@ def _count_waits(approval: AIChatCRUDApproval) -> int:
 # --------------------------------------------------------------------------- #
 
 
-def verdict(approval: AIChatCRUDApproval, state: str, summary: str, reasons: List[str]) -> Dict[str, Any]:
-    """The one answer settling returns: what the assistant tells the person in the same turn."""
+def verdict(approval: AIChatCRUDApproval, state: str, summary: str, reasons: List[str],
+            record_url: Optional[str] = None) -> Dict[str, Any]:
+    """The one answer settling returns: what the assistant tells the person in the same turn.
+
+    A change to a goal or a risk is worded "Done: ..." or "Not applied: ..." and links the record it made or
+    changed; every other change keeps its words and links the record of the review."""
     saved = _state(approval)
+    review_url = record_path(approval.id)
+    if record_schema(approval.entity_type) is not None:
+        applied_word, declined_word = "Done", "Not applied"
+    else:
+        applied_word, declined_word, record_url = "Applied", "Declined", None
     if state == "applied":
-        message = "Applied: %s" % summary
+        message = "%s: %s" % (applied_word, summary)
     elif state == "declined":
-        message = "Declined: %s" % (" ".join(reasons) or summary)
+        message = "%s: %s" % (declined_word, " ".join(reasons) or summary)
     else:
         message = "In review: %s" % summary
         if reasons:
@@ -1023,7 +1238,8 @@ def verdict(approval: AIChatCRUDApproval, state: str, summary: str, reasons: Lis
         "drafter_model": approval.drafter_model,
         "reviewer_model": approval.reviewer_model,
         "same_provider": bool(saved.get("same_provider")),
-        "record_url": record_path(approval.id),
+        "record_url": (record_url if state == "applied" and record_url else review_url),
+        "review_url": review_url,
     }
 
 
@@ -1232,7 +1448,7 @@ def _apply(
         _save(approval, state)
         _event(service, approval, "applied", summary)
         db.session.commit()
-        return verdict(approval, "applied", summary, [])
+        return verdict(approval, "applied", summary, [], record_url=inner.get("record_url"))
     if result.get("code") == "CONFLICT" and approval.status != ApprovalStatus.PENDING:
         # Someone else settled it first; report what happened to it.
         return verdict(approval, "applied" if approval.status == ApprovalStatus.APPROVED else "declined",

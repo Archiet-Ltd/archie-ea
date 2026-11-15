@@ -376,26 +376,57 @@ TOOL_SCHEMAS = [
     {
         "name": "create_goal",
         "surfaces": ["chat", "blueprint"],
-        "route": "SolutionGoal",
+        "route": "goal_store.create_goal",
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
-        "record_types_written": ["SolutionGoal"],
+        "record_types_written": ["Goal"],
+        "permission": ["create", "motivation_element"],
+        "record_kind": "goal",
         "description": (
-            "Add a goal to a solution (ArchiMate Motivation layer). "
-            "Use when the user describes a desired outcome or success criterion."
+            "Add a goal to the organisation (ArchiMate Motivation layer), with a target date when the person "
+            "gives one. Use when the user describes a desired outcome or success criterion. It is the "
+            "organisation's goal, not a solution's."
         ),
         "parameters": {
             "type": "object",
             "properties": {
-                "solution_id": {"type": "integer"},
-                "name": {"type": "string", "description": "Goal statement, e.g. 'Reduce TCO 20% in 12 months'"},
+                "name": {"type": "string", "description": "Goal statement, e.g. 'Enter the German market'"},
                 "description": {"type": "string"},
-                "priority": {"type": "integer", "description": "1 (highest) to 5 (lowest)", "minimum": 1, "maximum": 5},
+                "target_date": {"type": "string", "format": "date",
+                                "description": "When the goal should be reached, as YYYY-MM-DD"},
+                "status": {"type": "string", "enum": ["draft", "active", "on_hold", "achieved", "cancelled"]},
             },
-            "required": ["solution_id", "name"],
+            "required": ["name"],
         },
         "tier": "auto",
+    },
+    {
+        "name": "update_goal",
+        "surfaces": ["chat"],
+        "route": "goal_store.update_goal",
+        "fenced_fields": [],
+        "risk_class": "write",
+        "mutates": True,
+        "record_types_written": ["Goal"],
+        "permission": ["edit", "motivation_element"],
+        "record_kind": "goal",
+        "description": (
+            "Change a goal of the organisation: its target date, status, description or name. Use when the "
+            "person asks to move a date, mark a goal achieved or reword it. Name the goal as the person did."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "goal_name": {"type": "string", "description": "The goal's current name"},
+                "name": {"type": "string", "description": "A new name, only when the person renames it"},
+                "description": {"type": "string"},
+                "target_date": {"type": "string", "format": "date", "description": "The new date, YYYY-MM-DD"},
+                "status": {"type": "string", "enum": ["draft", "active", "on_hold", "achieved", "cancelled"]},
+            },
+            "required": ["goal_name"],
+        },
+        "tier": "approve",
     },
     {
         "name": "create_constraint",
@@ -455,27 +486,72 @@ TOOL_SCHEMAS = [
     {
         "name": "create_risk",
         "surfaces": ["chat", "blueprint"],
-        "route": "SolutionRisk",
+        "route": "risk_service.create_risk",
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
-        "record_types_written": ["RiskRegisterEntry"],
+        "record_types_written": ["Risk"],
+        "permission": ["create", "motivation_element"],
+        "record_kind": "risk",
         "description": (
-            "Add a risk to the risk register, linked to the solution. "
-            "Use when the user identifies a threat, concern, or uncertainty for the solution."
+            "Add a risk to the organisation's risk register, with what it touches when the person names it. "
+            "Use when the user identifies a threat, concern or uncertainty. Likelihood and impact are 1 "
+            "(lowest) to 5 (highest). Give a solution only when the person names one."
         ),
         "parameters": {
             "type": "object",
             "properties": {
-                "solution_id": {"type": "integer"},
-                "risk_description": {"type": "string", "description": "Description of the risk"},
-                "impact": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
-                "probability": {"type": "string", "enum": ["low", "medium", "high"]},
-                "mitigation": {"type": "string", "description": "Optional mitigation strategy"},
+                "title": {"type": "string", "description": "A short title, e.g. 'Payments vendor may exit'"},
+                "description": {"type": "string", "description": "What could happen and why it matters"},
+                "likelihood": {"type": "integer", "minimum": 1, "maximum": 5},
+                "impact": {"type": "integer", "minimum": 1, "maximum": 5},
+                "mitigation": {"type": "string", "description": "Optional mitigation plan"},
+                "solution_id": {"type": "integer", "description": "Only when the person names a solution"},
+                "touches": {
+                    "type": "array",
+                    "description": "What the risk would hit, each named as the person named it",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "entity_type": {"type": "string",
+                                            "enum": ["application", "capability", "solution", "archimate_element"]},
+                            "name": {"type": "string"},
+                        },
+                        "required": ["entity_type", "name"],
+                    },
+                },
             },
-            "required": ["solution_id", "risk_description", "impact", "probability"],
+            "required": ["title", "likelihood", "impact"],
         },
         "tier": "auto",
+    },
+    {
+        "name": "update_risk",
+        "surfaces": ["chat"],
+        "route": "risk_service.update_risk",
+        "fenced_fields": [],
+        "risk_class": "write",
+        "mutates": True,
+        "record_types_written": ["Risk"],
+        "permission": ["edit", "motivation_element"],
+        "record_kind": "risk",
+        "description": (
+            "Change a risk in the register: its likelihood, impact, title, description, owner or mitigation "
+            "plan. Use when the person asks to raise, lower or reword a risk. Name the risk by its title."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "risk_title": {"type": "string", "description": "The risk's current title"},
+                "title": {"type": "string", "description": "A new title, only when the person renames it"},
+                "description": {"type": "string"},
+                "likelihood": {"type": "integer", "minimum": 1, "maximum": 5},
+                "impact": {"type": "integer", "minimum": 1, "maximum": 5},
+                "mitigation_plan": {"type": "string"},
+            },
+            "required": ["risk_title"],
+        },
+        "tier": "approve",
     },
     {
         "name": "create_option",

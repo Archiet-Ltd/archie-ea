@@ -119,11 +119,17 @@ def update_risk_status(risk_id, status):
 _EDITABLE_FIELDS = ("title", "description", "likelihood", "impact", "owner", "mitigation_plan")
 
 
-def update_risk(risk_id, **fields):
+def update_risk(risk_id, organization_id=None, **fields):
     """Full edit of an existing Risk. Only keys in _EDITABLE_FIELDS are applied;
     unknown keys are ignored rather than raising, so a caller can pass a whole
-    form payload safely."""
-    risk = Risk.query.get_or_404(risk_id)
+    form payload safely. With ``organization_id`` the risk is found in that organisation
+    only, so a caller with no request is fenced the same as one inside it."""
+    if organization_id is not None:
+        risk = get_risk(organization_id, risk_id)
+        if risk is None:
+            raise ValueError("There is no such risk in this workspace.")
+    else:
+        risk = Risk.query.get_or_404(risk_id)
     for key in _EDITABLE_FIELDS:
         if key in fields and fields[key] is not None:
             value = fields[key]
