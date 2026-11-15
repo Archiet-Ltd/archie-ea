@@ -1286,7 +1286,7 @@ jobs:
         run: >-
           pytest tests/smoke -q -p no:randomly --timeout=900
           -W ignore::DeprecationWarning
-          -m "not adversarial and not census and not ai_protocol and not guide_history"
+          -m "not adversarial and not census and not ai_protocol and not guide_history and not load"
           -p scripts.ci.test_sharding
           --junitxml=tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
       - uses: actions/upload-artifact@v6
@@ -1437,6 +1437,12 @@ jobs:
           pytest tests/smoke/test_interaction_reality.py -q -p no:randomly
           -m census --timeout=1200 -W ignore::DeprecationWarning
           --junitxml=tests/smoke/_artifacts/chromium-census.xml
+      - name: Concurrent page load (sidebar pages requested at once)
+        if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
+        run: >-
+          pytest tests/smoke/test_concurrent_page_load.py -q -p no:randomly
+          -m load --timeout=1800 -W ignore::DeprecationWarning
+          --junitxml=tests/smoke/_artifacts/chromium-load.xml
       - name: Enabled AI protocol and persistence journeys (local provider only)
         if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
         env:
@@ -1461,6 +1467,7 @@ jobs:
           name: smoke-junit-other
           path: |
             tests/smoke/_artifacts/chromium-census.xml
+            tests/smoke/_artifacts/chromium-load.xml
             tests/smoke/_artifacts/chromium-ai-protocol.xml
             tests/smoke/_artifacts/chromium-guide-history.xml
           if-no-files-found: error
@@ -1472,6 +1479,7 @@ jobs:
           name: smoke-other
           path: |
             tests/smoke/_artifacts/chromium-census.xml
+            tests/smoke/_artifacts/chromium-load.xml
             tests/smoke/_artifacts/chromium-ai-protocol.xml
             tests/smoke/_artifacts/chromium-guide-history.xml
             tests/smoke/_shots/
@@ -1505,7 +1513,7 @@ jobs:
         run: |
           set -euo pipefail
           reports=()
-          for name in chromium-main-0.xml chromium-main-1.xml chromium-main-2.xml chromium-adversarial.xml chromium-census.xml chromium-ai-protocol.xml chromium-guide-history.xml; do
+          for name in chromium-main-0.xml chromium-main-1.xml chromium-main-2.xml chromium-adversarial.xml chromium-census.xml chromium-load.xml chromium-ai-protocol.xml chromium-guide-history.xml; do
             found=$(find shard-artifacts -name "${name}" | head -1)
             if [ -z "$found" ]; then
               echo "missing browser report ${name}"
