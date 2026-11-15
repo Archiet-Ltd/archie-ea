@@ -647,6 +647,22 @@ class AgentRunner:
             self._collect_answer_sources(result, sources)
             return
         entity_type = self._TOOL_ENTITY.get(tool_name)
+        if tool_name == "explain_element":
+            # The element read is the citation: its name links to its own record page.
+            body = result.get("result") if isinstance(result, dict) and result.get("success") else None
+            if isinstance(body, dict) and body.get("element_id") is not None:
+                key = ("archimate_element", body["element_id"])
+                if not any((s["type"], s["id"]) == key for s in sources) and len(sources) < self.MAX_SOURCES:
+                    sources.append({
+                        "type": "archimate_element",
+                        "id": body["element_id"],
+                        "name": body["element_name"],
+                        "url": self._source_url("archimate_element", {
+                            "id": body["element_id"], "layer": body.get("element_layer"),
+                            "type": body.get("element_type"),
+                        }),
+                    })
+            return
         if tool_name == "get_application_capabilities":
             # Each capability is cited to its own fact sheet, as the keyword answer cites it.
             for row in (result.get("result") if isinstance(result, dict) and result.get("success") else None) or []:

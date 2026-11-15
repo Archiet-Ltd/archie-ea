@@ -10,6 +10,8 @@ Resolver returns:
 
 import logging
 
+from sqlalchemy.exc import SQLAlchemyError
+
 logger = logging.getLogger(__name__)
 
 MAX_CANDIDATES = 6
@@ -121,26 +123,24 @@ class EntityResolver:
 
             # Also search motivation element tables that have archimate_element_id
             # These tables store the "journey layer" motivation entities which mirror to ArchiMateElement
-            motivation_models = []
-            try:
-                from app.models.solution_architect_models import (
-                    SolutionDriver, SolutionGoal, SolutionConstraint,
-                    SolutionRequirement, SolutionRisk
-                )
-                motivation_models = [
-                    (SolutionDriver, "Driver"),
-                    (SolutionGoal, "Goal"),
-                    (SolutionConstraint, "Constraint"),
-                    (SolutionRequirement, "Requirement"),
-                    (SolutionRisk, "Assessment"),
-                ]
-            except ImportError:
-                pass
+            from app.models.solution_architect_models import (
+                SolutionConstraint, SolutionDriver, SolutionGoal, SolutionRequirement,
+            )
+            from app.models.solution_lifecycle_models import SolutionRisk
 
-            for model_class, element_type in motivation_models:
+            # (model, the column holding its name)
+            motivation_models = [
+                (SolutionDriver, "name"),
+                (SolutionGoal, "name"),
+                (SolutionConstraint, "name"),
+                (SolutionRequirement, "name"),
+                (SolutionRisk, "risk_name"),
+            ]
+
+            for model_class, name_column in motivation_models:
                 # Search by name in the motivation table
                 candidate = model_class.query.filter(
-                    model_class.name.ilike(name),
+                    getattr(model_class, name_column).ilike(name),
                     model_class.organization_id == org_id,
                     model_class.archimate_element_id.isnot(None)
                 ).first()
@@ -164,9 +164,9 @@ class EntityResolver:
 
             # Also collect candidates from motivation tables for ambiguity reporting
             motivation_candidates = []
-            for model_class, element_type in motivation_models:
+            for model_class, name_column in motivation_models:
                 cands = model_class.query.filter(
-                    model_class.name.ilike(f"%{name}%"),
+                    getattr(model_class, name_column).ilike(f"%{name}%"),
                     model_class.organization_id == org_id,
                     model_class.archimate_element_id.isnot(None)
                 ).limit(MAX_CANDIDATES).all()
@@ -191,8 +191,8 @@ class EntityResolver:
                 "resolved": False,
                 "candidates": unique_candidates[:MAX_CANDIDATES],
             }
-        except Exception as e:
-            logger.warning("resolve_archimate_element error: %s", e)
+        except SQLAlchemyError as e:
+            logger.exception("resolve_archimate_element database error")
             return {"resolved": False, "candidates": [], "error": str(e)}
 
     # ------------------------------------------------------------------ #
