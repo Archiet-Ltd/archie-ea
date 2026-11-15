@@ -72,3 +72,18 @@ def test_an_architect_can_record_change_and_remove_support(client, login_as, db_
     login_as(client, architect)
     assert client.post(url, data=data).status_code in (302, 303)
     assert cs.support_rows(org.id) == []
+
+
+def test_another_organisations_application_is_not_found_on_remove(client, login_as, db_session, make_org):
+    from app.extensions import db
+
+    org, app_row, record, made = _world(db_session, make_org)
+    other = make_org("roles-other")
+    outsider = _user(db_session, other, "Architect")
+    login_as(client, outsider)
+    url, data = _requests(app_row, record, made.row_id)["delete"]
+    assert client.post(url, data=data).status_code == 404
+    still = db_session.execute(
+        db.text("SELECT count(*) FROM unified_application_capability_mapping WHERE id = :i"), {"i": made.row_id}
+    ).scalar()
+    assert still == 1

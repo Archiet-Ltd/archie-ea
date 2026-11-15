@@ -7,7 +7,7 @@ import json
 import logging
 from datetime import datetime
 
-from flask import current_app, flash, g, jsonify, request, session
+from flask import abort, current_app, flash, g, jsonify, request, session
 from flask_login import current_user, login_required
 from sqlalchemy import func, select
 
@@ -392,7 +392,13 @@ def application_capability_mapping_delete(id, mapping_id):
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping as Row
     from app.services import capability_support as support
 
-    app = ApplicationComponent.query.get_or_404(id)
+    org_id = getattr(g, "current_org_id", None)
+    app = db.session.execute(
+        db.select(ApplicationComponent).where(
+            ApplicationComponent.id == id, ApplicationComponent.organization_id == org_id)
+    ).scalar_one_or_none()
+    if app is None:
+        abort(404)
     row = Row.query.filter_by(id=mapping_id, organization_id=app.organization_id).first()
     if row is None or row.application_component_id != app.id:
         flash("That capability mapping does not belong to this application.", "error")
