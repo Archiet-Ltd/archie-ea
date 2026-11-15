@@ -7,6 +7,8 @@
    assign_link where a capability not yet in the capability store is owned instead
    legacy_text an owner recorded only as text, shown until a person is assigned
    person_url  set where a person with no account may be recorded as an owner (the application page)
+   owner_source  the sentence that says where a connector-recorded owner came from
+   owner_reason  the sentence that says why no owner was set from the connector's data
    Pages keep their own data-testid on the wrapper they put this inside. #}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
@@ -34,11 +36,17 @@
   </li>
   {% endfor %}
 </ul>
+{% if owner_source %}
+<p class="mt-2 text-xs text-muted-foreground" data-testid="owner-source">{{ owner_source }}</p>
+{% endif %}
 {% elif legacy_text %}
 <p class="font-medium text-foreground">{{ legacy_text }}</p>
 <p class="text-xs font-normal text-muted-foreground">Recorded as text. Assign a person to make it an owner record.</p>
 {% else %}
 <p class="font-normal text-muted-foreground">No owner recorded</p>
+{% if owner_reason %}
+<p class="text-xs font-normal text-muted-foreground" data-testid="owner-reason">{{ owner_reason }}</p>
+{% endif %}
 {% endif %}
 {% if can_edit and not assign_url and assign_link %}
 <a href="{{ assign_link }}" class="text-primary hover:underline">Assign owner</a>
