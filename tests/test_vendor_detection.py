@@ -224,15 +224,21 @@ def test_the_people_who_decide_are_told_and_the_bell_opens_the_inbox(orgs, catal
 
 
 def _decide(tenant_ctx, org_id, person, approval_id, action="approve", reason=None):
-    """Settle a proposal through the service, as the automatic review does: the page has no approve or
-    reject address."""
+    """Settle a proposal the way the automatic review does (the page has no approve or reject address): the
+    checks run, a second model, here one that passes everything, reviews it, and it is applied."""
+    from _pytest.monkeypatch import MonkeyPatch
+
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+    from tests.test_change_review import PASS_ALL, FakeReviewer
 
     with tenant_ctx(org_id):
         service = AIChatApprovalService(person.id)
-        if action == "approve":
-            return service.approve_and_execute(approval_id, person.id)
-        return service.reject_approval(approval_id, reason)
+        if action != "approve":
+            return service.reject_approval(approval_id, reason)
+        with MonkeyPatch.context() as patch:
+            FakeReviewer([PASS_ALL]).install(patch)
+            body = service.settle_after_review(approval_id)
+        return {**body, "success": body.get("state") == "applied"}
 
 
 def test_approving_records_the_vendor_product_and_link_in_that_organisation_only(
