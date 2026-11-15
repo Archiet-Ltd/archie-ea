@@ -602,13 +602,23 @@ class ToolExecutor:
             if tool_call.name == "submit_for_arb_review":
                 tool_call_digest = hashlib.sha256(str(tool_call.id).encode("utf-8")).hexdigest()
                 arguments["_trusted_command_key"] = f"ai-tool-{tool_call_digest}"
-            return handler(arguments)
+            result = handler(arguments)
+            if isinstance(result, dict) and result.get("success") is False and isinstance(result.get("error"), str):
+                from app.modules.ai_chat.services.customer_words import WRITE_FAILED, is_database_error
+
+                if is_database_error(result["error"]):
+                    logger.warning("Tool %s returned a database error: %s", tool_call.name, result["error"])
+                    db.session.rollback()
+                    result = dict(result, error=WRITE_FAILED)
+            return result
         except Exception as e:
             db.session.rollback()
             logger.exception("Tool %s failed", tool_call.name)
             if propagate_errors:
                 raise
-            return {"success": False, "error": str(e)}
+            from app.modules.ai_chat.services.customer_words import WRITE_FAILED, is_database_error
+
+            return {"success": False, "error": WRITE_FAILED if is_database_error(e) else str(e)}
 
     # ------------------------------------------------------------------ #
     # Helpers                                                              #

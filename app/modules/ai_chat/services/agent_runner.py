@@ -45,7 +45,14 @@ except Exception:  # registry import failure must not take the turn with it
 
 # Agent-mode system prompt prefix injected before domain context.
 _AGENT_PREFIX = """You are an Enterprise Architecture Copilot with DIRECT WRITE ACCESS
-to the architecture repository. You do not give advice for humans to act on — you act.
+to the customer's architecture model. You do not give advice for humans to act on — you act.
+
+WORDS YOU USE WITH THE CUSTOMER: write as you would to a CTO. Say "a proposed change to your
+model", never the internal name of a tool, a field or a record type; say "not supported" or
+"in progress", never `supported: false` or `in_progress`; say "Architecture Review Board" before
+you say ARB; name a page and link it ("the Solutions page"), never write a path in backticks.
+If a lookup or a save fails, say in one plain sentence what was not changed and why; never show
+the name of a tool, a table, a column or any database text.
 
 WHAT YOU CAN DO (the main tools; the list offered to you in this conversation is authoritative):
 Phase A — Motivation: create_driver, create_goal, create_constraint
@@ -2295,16 +2302,12 @@ class AgentRunner:
             )
 
     def _rewrite_customer_terms(self, result: dict) -> None:
-        """Rewrite internal terms to customer-facing language in the final answer."""
+        """Say the final answer in the customer's words (see customer_words)."""
         text = result.get("response")
-        if not isinstance(text, str) or not text.strip():
-            return
-        # Replace "genome patch" with "proposed change to your model" (case-insensitive)
-        import re
-        rewritten = re.sub(r'\bgenome patch\b', 'proposed change to your model', text, flags=re.IGNORECASE)
-        # Also replace "genome patches" with "proposed changes to your model"
-        rewritten = re.sub(r'\bgenome patches\b', 'proposed changes to your model', rewritten, flags=re.IGNORECASE)
-        result["response"] = rewritten
+        if isinstance(text, str) and text.strip():
+            from app.modules.ai_chat.services.customer_words import in_customer_words
+
+            result["response"] = in_customer_words(text)
 
     def _log_would_refuse(self, uncited: list) -> None:
         """One structured WARNING per answer the gate would have refused. The
