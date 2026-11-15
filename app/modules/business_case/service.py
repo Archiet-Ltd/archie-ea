@@ -23,6 +23,7 @@ from app.models.business_case import BUSINESS_CASE_STATUSES, BusinessCase
 from app.models.cost_intelligence import CapabilityCostAllocation
 from app.models.solution_models import Solution
 from app.models.strategic import StrategicInitiative
+from app.services.cost_visibility import BUSINESS_CASE_MONEY_KEYS
 from app.models.unified_capability import UnifiedCapability
 
 logger = logging.getLogger(__name__)
@@ -48,13 +49,7 @@ EDITABLE_FIELDS = (
     "payback_months",
 )
 
-_MONEY_FIELDS = {
-    "financial_benefit_annual",
-    "capex",
-    "opex_annual",
-    "tco_3yr",
-    "roi_percentage",
-}
+_MONEY_FIELDS = set(BUSINESS_CASE_MONEY_KEYS) - {"payback_months"}
 _INT_FIELDS = {"capability_id", "strategic_initiative_id", "solution_id", "payback_months"}
 
 

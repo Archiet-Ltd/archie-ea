@@ -16,6 +16,7 @@ import logging
 import re
 from datetime import datetime  # dead-code-ok
 from app.models.archimate_element_types import is_application_kind
+from app.services.cost_visibility import SHARE_FIGURE_KEYS
 
 # Define the logger
 logger = logging.getLogger(__name__)
@@ -2324,6 +2325,15 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         skip_ids=unpromoted_import_ids(app_obj.organization_id, [app_obj.id]),
     ).get(app_obj.id)
 
+    owner_source, owner_reason = None, None
+    if imported_gaps:
+        owner_gap = next((x for x in imported_gaps["gaps"] if x["key"] == "owner"), None)
+        owner_reason = owner_gap.get("note") if owner_gap else None
+    if owner_rows:
+        from app.connectors.github_gaps import owner_source_note
+
+        owner_source = owner_source_note(app_obj, owner_rows)
+
     # The one cost rule decides here; the page only prints what it is given.
     from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
 
@@ -2331,7 +2341,7 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
     if costs_withheld:
         cost_breakdown = withhold_costs(cost_breakdown, keys=tuple(cost_breakdown))
         technology_cost_shares = withhold_costs(
-            technology_cost_shares, keys=("total", "share", "currency"))
+            technology_cost_shares, keys=SHARE_FIGURE_KEYS)
 
     technology_linked_count = 0
     completeness_notes = {}
@@ -2360,6 +2370,8 @@ def render_application_detail(id, form_values=None, form_errors=None, status=200
         linked_requirements=linked_requirements,
         requirement_options=requirement_options,
         owner_rows=owner_rows,
+        owner_source=owner_source,
+        owner_reason=owner_reason,
         owner_assign_url=owner_assign_url,
         # Not yet computed for this view. Pass None (never 0.0) so the template
         # renders an em dash instead of asserting a measured score of zero —

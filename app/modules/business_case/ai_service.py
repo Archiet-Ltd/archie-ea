@@ -22,6 +22,7 @@ import json
 import logging
 from typing import Any, Dict
 
+from app.services.cost_visibility import BUSINESS_CASE_MONEY_KEYS
 from app.modules.ai_chat.services.llm_service_impl import LLMService
 
 logger = logging.getLogger(__name__)
@@ -42,14 +43,7 @@ SECTION_LABELS = {
     "key_risks": "Key Risks",
 }
 
-_FINANCIAL_FIELDS = (
-    "capex",
-    "opex_annual",
-    "tco_3yr",
-    "roi_percentage",
-    "financial_benefit_annual",
-    "payback_months",
-)
+_FINANCIAL_FIELDS = BUSINESS_CASE_MONEY_KEYS
 
 
 class BusinessCaseAIDraftError(Exception):
@@ -61,7 +55,7 @@ class BusinessCaseAIDraftError(Exception):
     """
 
 
-def _build_context(business_case, section_key: str) -> Dict[str, Any]:
+def _build_context(business_case, section_key: str, include_financials: bool = True) -> Dict[str, Any]:
     """Assemble only the context this function actually queries: the case's
     other filled-in narrative sections, its linked entities' real names,
     and its own already-entered financial figures. Nothing is inferred or
@@ -94,7 +88,7 @@ def _build_context(business_case, section_key: str) -> Dict[str, Any]:
         context["linked_solution"] = solution.name
 
     financials: Dict[str, Any] = {}
-    for field in _FINANCIAL_FIELDS:
+    for field in _FINANCIAL_FIELDS if include_financials else ():
         value = getattr(business_case, field)
         if value is not None:
             financials[field] = float(value) if field != "payback_months" else value
@@ -196,7 +190,7 @@ def generate_case_seed(description: str) -> Dict[str, Any]:
     return {"title": _clean(data.get("title")), "description": _clean(data.get("description"))}
 
 
-def generate_section_draft(business_case, section_key: str) -> Dict[str, Any]:
+def generate_section_draft(business_case, section_key: str, include_financials: bool = True) -> Dict[str, Any]:
     """Generate an AI draft for one Business Case document section.
 
     Advisory only — the caller must not persist this directly; the UI feeds
@@ -208,7 +202,7 @@ def generate_section_draft(business_case, section_key: str) -> Dict[str, Any]:
     if section_key not in SECTION_KEYS:
         raise ValueError(f"Unknown business case section: {section_key}")
 
-    context = _build_context(business_case, section_key)
+    context = _build_context(business_case, section_key, include_financials)
     prompt = _build_prompt(context, section_key)
     raw = LLMService.generate_from_prompt(prompt, use_cache=False)
     return _parse_draft(raw, section_key)

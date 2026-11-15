@@ -22,12 +22,17 @@ prioritisation_bp = Blueprint(
 @login_required
 def get_prioritised_backlog():
     """GET /api/backlog/prioritised?method=wsjf&solution_id=N"""
+    from app.core.auth.permissions import is_read_only_member
+
     method = request.args.get("method", "wsjf")
     solution_id = request.args.get("solution_id", type=int)
     # A backlog requirement written before it was ranked has no ranked copy yet: give it one, so the board
     # holds every requirement the backlog holds. Idempotent, and fenced to the caller's own organisation.
-    if prioritisation_service.project_backlog_requirements(getattr(current_user, "organization_id", None)):
-        db.session.commit()
+    # Reading never stores anything for a person whose organisation role is viewer: the ranking is computed
+    # for them without writing the backfill.
+    if not is_read_only_member(current_user):
+        if prioritisation_service.project_backlog_requirements(getattr(current_user, "organization_id", None)):
+            db.session.commit()
     items = prioritisation_service.get_backlog_prioritised(solution_id=solution_id, method=method)
     return jsonify(items), 200
 
