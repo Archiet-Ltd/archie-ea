@@ -29,6 +29,19 @@
     actions=[],
     class=''
 ) %}
+{#- No breadcrumbs given: draw the registry trail for the current page (the sidebar's group
+    and entry), with the page title as the last crumb unless the trail already ends in it —
+    the same rule page_shell applies, so every signed-in page shows exactly one trail. -#}
+{%- if not breadcrumbs -%}
+  {%- set _where = page_trail() if page_trail is defined else {'trail': []} -%}
+  {%- if _where.trail -%}
+    {%- set _ns = namespace(trail=[{'label': 'Home', 'href': url_for('main.index')}]) -%}
+    {%- for l, h in close_trail(_where.trail, title) -%}
+      {%- set _ns.trail = _ns.trail + [{'label': l, 'href': h}] -%}
+    {%- endfor -%}
+    {%- set breadcrumbs = _ns.trail -%}
+  {%- endif -%}
+{%- endif -%}
 <div class="mb-6 {{ class }}">
     <!-- Breadcrumbs -->
     {% if breadcrumbs %}

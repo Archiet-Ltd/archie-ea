@@ -19,9 +19,10 @@ from flask import Blueprint, g, jsonify, render_template, request
 from flask_login import current_user, login_required
 from sqlalchemy import or_
 
+from app._bootstrap.write_access import commit_unless_read_only
 from app.decorators import audit_log
 from app.services.application_cost_accessor import set_annual_cost
-from app.services.cost_visibility import costs_visible
+from app.services.cost_visibility import COSTS_WITHHELD, costs_visible, withhold_costs
 
 from .. import db
 from ..models.application_portfolio import ApplicationComponent
@@ -89,7 +90,8 @@ def dashboard():
             logger.debug("Could not resolve dashboard registry URL: %s", e)
             dashboard_registry_url = "/auto-dashboard/registry"
         return render_template(
-            "consolidation_list/dashboard.html", dashboard_registry_url=dashboard_registry_url
+            "consolidation_list/dashboard.html", dashboard_registry_url=dashboard_registry_url,
+            costs_withheld=not costs_visible(current_user), costs_withheld_sentence=COSTS_WITHHELD,
         )
     except HTTPException:
         raise
@@ -104,15 +106,15 @@ def _portfolio_annual_cost():
     The figure is the one the Overview and the application list state. It is None, with the reason, when
     the signed-in person may not read cost or when no contract or system states one.
     """
-    from flask_login import current_user
-
     from app.modules.dashboard.services.overview_figures import run_cost_line
     from app.utils.tenant import current_organization_id
 
+    if not costs_visible(current_user):
+        return None, None  # the reply states once that costs are withheld; no second sentence rides on the figure
     org_id = current_organization_id()
     line = run_cost_line(org_id, current_user) if org_id is not None else None
     if line is None:
-        return None, "Cost figures are not shown for your role."
+        return None, "No active contract or system states an annual cost yet."
     if line["total"] is None:
         return None, "No active contract or system states an annual cost yet."
     return line["total"], None
@@ -214,7 +216,7 @@ def get_entries():
                     else:
                         ed["time_action"] = None
                         ed["time_score"] = None
-                db.session.commit()
+                commit_unless_read_only()
         except HTTPException:
             raise
         except Exception as e:
@@ -311,21 +313,22 @@ def get_entries():
         except Exception as e:
             logger.warning("Could not enrich summary with rationalization data: %s", e)
 
-        return jsonify(
-            {
-                "success": True,
-                "entries": entries_data,
-                "summary": summary,
-                "pagination": {
-                    "page": pagination.page,
-                    "per_page": pagination.per_page,
-                    "total": pagination.total,
-                    "pages": pagination.pages,
-                    "has_prev": pagination.has_prev,
-                    "has_next": pagination.has_next,
-                },
-            }
-        )
+        reply = {
+            "success": True,
+            "entries": entries_data,
+            "summary": summary,
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "total": pagination.total,
+                "pages": pagination.pages,
+                "has_prev": pagination.has_prev,
+                "has_next": pagination.has_next,
+            },
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except HTTPException:
         raise
     except Exception as e:
@@ -485,7 +488,7 @@ def get_entry_detail(entry_id):
             "architecture_assistant": "/architecture-assistant/",
         }
 
-        return jsonify({
+        reply = {
             "success": True,
             "financial": {
                 "license_cost": license_cost,
@@ -511,7 +514,10 @@ def get_entry_detail(entry_id):
                 "name": entry.target_application.name if entry.target_application else None,
             } if entry.target_application_id else None,
             "links": links,
-        })
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
     except HTTPException:
         raise
     except Exception as e:
@@ -636,6 +642,8 @@ def update_entry(entry_id):
         if benefits_prompt:
             result["benefits_prompt"] = True
             result["estimated_savings"] = float(entry.estimated_savings or 0)
+        if not costs_visible(current_user):
+            result = withhold_costs(result)
         return jsonify(result)
 
     except HTTPException:
@@ -965,16 +973,17 @@ def recalculate_savings():
 
         logger.info(f"Recalculated savings for {updated_count} consolidation entries")
 
-        return jsonify(
-            {
-                "success": True,
-                "message": f"Recalculated savings for {updated_count} entries",
-                "updated_count": updated_count,
-                "real_data_count": real_data_count,
-                "baseline_count": baseline_count,
-                "details": entry_details,
-            }
-        )
+        reply = {
+            "success": True,
+            "message": f"Recalculated savings for {updated_count} entries",
+            "updated_count": updated_count,
+            "real_data_count": real_data_count,
+            "baseline_count": baseline_count,
+            "details": entry_details,
+        }
+        if not costs_visible(current_user):
+            reply = withhold_costs(reply)
+        return jsonify(reply)
 
     except HTTPException:
 
