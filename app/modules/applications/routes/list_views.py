@@ -149,6 +149,9 @@ def application_list():
         footers_by_app={},
         repository_ids=set(),
         imported_gaps={},
+        not_counted=False,
+        kind_notes={},
+        left_out_records=0,
         sort="",
         dir="asc",
         load_error="The application portfolio could not be read.",
@@ -197,6 +200,7 @@ def application_list():
         sort_dir = "desc" if dir_param == "desc" else "asc"
 
         # APP-031: default hide decommissioned; ?include_decom=true shows full portfolio
+        not_counted = request.args.get("not_counted", "").strip().lower() in ("1", "true", "yes")
         include_decom = request.args.get("include_decom", "").strip().lower() in (
             "1",
             "true",
@@ -266,7 +270,9 @@ def application_list():
         ).count()
 
         # ── 3. Build filtered query ───────────────────────────────────────────
-        query = ApplicationComponent.query.filter(_is_application)
+        # "Not counted" lists the records the application count leaves out (parts and things that are not
+        # software), so a record taken off the list can be found and changed back.
+        query = ApplicationComponent.query.filter(~_is_application if not_counted else _is_application)
 
         # Exclude duplicate-flagged applications from default view unless
         # the user is explicitly searching for them.
@@ -611,6 +617,20 @@ def application_list():
             for key in ("has_owner", "no_domain")
         }
 
+        from app.services.application_kind import kind_of
+
+        kind_notes = {listed.id: kind_of(listed) for listed in pagination.items} if not_counted else {}
+        left_out_records = 0
+        if g.current_org_id is not None:
+            from app.modules.dashboard.services.overview_figures import (
+                left_out_applications,
+                left_out_not_applications,
+            )
+
+            left_out_records = (
+                left_out_applications(g.current_org_id)["repository"] + left_out_not_applications(g.current_org_id)
+            )
+
         run_cost = None
         try:
             from flask_login import current_user as _viewer
@@ -671,6 +691,9 @@ def application_list():
             footers_by_app=footers_by_app,
             repository_ids=repository_ids,
             imported_gaps=imported_gaps,
+            not_counted=not_counted,
+            kind_notes=kind_notes,
+            left_out_records=left_out_records,
         )
 
     except Exception as exc:

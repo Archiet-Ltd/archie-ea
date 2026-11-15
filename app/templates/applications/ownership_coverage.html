@@ -34,9 +34,9 @@
       {% set left_out_parts = [] %}
       {% if left_out.decommissioned %}{% set _ = left_out_parts.append(left_out.decommissioned ~ ' decommissioned') %}{% endif %}
       {% if left_out.duplicate %}{% set _ = left_out_parts.append(left_out.duplicate ~ ' duplicate') %}{% endif %}
-      {% if left_out.repository %}{% set _ = left_out_parts.append(left_out.repository ~ (' imported repository nobody owns yet' if left_out.repository == 1 else ' imported repositories nobody owns yet')) %}{% endif %}
-      {% if left_out_not_applications %}{% set _ = left_out_parts.append(left_out_not_applications ~ ' that are parts of an application or not software') %}{% endif %}
-      {% if left_out_parts %}<p class="text-xs text-muted-foreground mt-1" data-testid="left-out-note">Leaves out {{ left_out_parts | join(', ') }}, as the Overview does.</p>{% endif %}
+      {% if left_out.repository %}{% set _ = left_out_parts.append(left_out.repository ~ ' not software') %}{% endif %}
+      {% if left_out_not_applications %}{% set _ = left_out_parts.append(left_out_not_applications ~ (' part of an application' if left_out_not_applications == 1 else ' parts of an application')) %}{% endif %}
+      {% if left_out_parts %}<p class="text-xs text-muted-foreground mt-1" data-testid="left-out-note">Leaves out {{ left_out_parts | join(', ') }}, as the Overview does.{% if left_out.repository or left_out_not_applications %} <a href="{{ url_for('unified_applications.application_list', not_counted='true') }}" class="underline" data-testid="left-out-link">See which</a>{% endif %}</p>{% endif %}
     </div>
     <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm text-muted-foreground">With named owner</p>

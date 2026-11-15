@@ -46,9 +46,9 @@ class SADAutoPopulationService:
     def _draft_sad_03(self) -> dict:
         """Application Architecture — arch_pattern breakdown + rationalisation summary."""
         try:
-            from app.models.application_layer import ApplicationComponent
+            from app.services.application_kind import applications_query
 
-            components = ApplicationComponent.query.all()
+            components = applications_query().all()
 
             arch_pattern_breakdown: Dict[str, int] = {}
             rationalization_summary = []

@@ -25,6 +25,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app import db
+from app.services.application_kind import applications_query
 from app.models.archimate import ArchiMateView
 
 logger = logging.getLogger(__name__)
@@ -948,9 +949,8 @@ class SolutionComposerService:
                 ]
 
             if include_applications:
-                from app.models.application_portfolio import ApplicationComponent
 
-                apps = ApplicationComponent.query.limit(100).all()
+                apps = applications_query().limit(100).all()
                 palette["application_components"] = [
                     {
                         "id": a.id,

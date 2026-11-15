@@ -187,10 +187,10 @@ def debt_scores():
         }
     """
     try:
-        from app.models.application_portfolio import ApplicationComponent
+        from app.services.application_kind import applications_query
         from app.services.technology_roadmap_service import TechnologyRoadmapService
 
-        apps = ApplicationComponent.query.all()
+        apps = applications_query().all()
         svc = TechnologyRoadmapService()
         scores = []
         summary = {"critical": 0, "high": 0, "medium": 0, "low": 0, "not_rated": 0}

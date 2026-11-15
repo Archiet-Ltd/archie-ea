@@ -38,6 +38,7 @@ from datetime import date, timedelta
 from typing import Any, Callable, Dict, List, Optional
 
 from app import db
+from app.services.application_kind import applications_query
 
 logger = logging.getLogger(__name__)
 
@@ -365,7 +366,7 @@ class EnterprisePostureService:
             "unified_applications.rationalization_dashboard",
         )
 
-        total = ApplicationComponent.query.count()
+        total = applications_query().count()
         with_lifecycle = ApplicationComponent.query.filter(
             ApplicationComponent.lifecycle_status.isnot(None),
             ApplicationComponent.lifecycle_status != "",

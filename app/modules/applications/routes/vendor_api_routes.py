@@ -12,6 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import joinedload
 
 from app import db
+from app.services.application_kind import applications_query
 from app.decorators import audit_log
 from app.models.application_portfolio import ApplicationComponent
 from app.services.cost_visibility import vendor_analysis_reply
@@ -54,7 +55,7 @@ def match_applications_to_vendors():
         )
 
         # Get applications (capped to prevent unbounded queries)
-        applications = ApplicationComponent.query.limit(500).all()
+        applications = applications_query().limit(500).all()
 
         # Get all vendor products with eager loading to prevent N + 1 on vendor_organization access
         vendor_products = (

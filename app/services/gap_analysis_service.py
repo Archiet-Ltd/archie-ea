@@ -26,6 +26,7 @@ from typing import Dict, List
 from flask import current_app
 
 from app.services.decorators import transactional
+from app.services.application_kind import applications_query
 from app.services.element_ownership_service import application_is_owned
 
 from .. import db
@@ -737,7 +738,7 @@ class ArchitecturalGapAnalyzer:
             )
 
         # Find orphaned applications (no capabilities, no processes, no business owner)
-        orphaned_apps = ApplicationComponent.query.all()
+        orphaned_apps = applications_query().all()
         for app in orphaned_apps:
             from ..models.application_capability import ApplicationCapabilityMapping
 

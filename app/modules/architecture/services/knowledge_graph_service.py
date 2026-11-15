@@ -13,7 +13,7 @@ import logging
 from typing import Dict, List, Optional
 
 
-from app.models.application_layer import ApplicationComponent
+from app.services.application_kind import applications_query
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 from app.models.vendor.vendor_organization import VendorOrganization
 
@@ -141,7 +141,7 @@ class KnowledgeGraphService:
                 }
 
             # Load applications
-            applications = ApplicationComponent.query.all()
+            applications = applications_query().all()
             for app in applications:
                 graph["applications"][app.id] = {
                     "id": app.id,

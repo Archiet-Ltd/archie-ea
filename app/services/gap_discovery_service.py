@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional
 
 
 from app.models.business_capabilities import BusinessCapability
+from app.services.application_kind import applications_query
 
 from .. import db
 from . import gap_register_service
@@ -155,7 +156,7 @@ class GapDiscoveryService:
 
         try:
             # Get all applications
-            applications = ApplicationComponent.query.all()
+            applications = applications_query().all()
 
             for app in applications:
                 # Analyze application lifecycle

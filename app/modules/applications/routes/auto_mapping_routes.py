@@ -8,6 +8,7 @@ from flask import Response, current_app, flash, jsonify, request, stream_with_co
 from flask_login import current_user, login_required
 
 from app import db
+from app.services.application_kind import applications_query
 from app.decorators import audit_log
 from app.models.application_portfolio import ApplicationComponent
 from app.services.ai_import_service import get_ai_import_service
@@ -1020,7 +1021,7 @@ def estimate_auto_map_cost():
 
         if application_ids:
             apps_to_analyze = len(application_ids)
-            total_apps = ApplicationComponent.query.count()
+            total_apps = applications_query().count()
         else:
             apps_query = ApplicationComponent.query.filter(
                 db.or_(

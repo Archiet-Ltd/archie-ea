@@ -13,6 +13,7 @@ import logging
 import re
 
 from app import db
+from app.services.application_kind import applications_query
 
 logger = logging.getLogger(__name__)
 
@@ -1509,8 +1510,7 @@ class ArchitectureGenerationService:
     def _get_catalog_context(self) -> str:
         """Return flat application catalog with integer IDs for combined prompts."""
         try:
-            from app.models.application_portfolio import ApplicationComponent
-            apps = ApplicationComponent.query.limit(40).all()
+            apps = applications_query().limit(40).all()
             if not apps:
                 return "No applications in catalog"
             return "\n".join("- [id:%d] %s" % (a.id, a.name) for a in apps)
@@ -1550,8 +1550,7 @@ class ArchitectureGenerationService:
 
         # Fallback: flat list
         try:
-            from app.models.application_portfolio import ApplicationComponent
-            apps = ApplicationComponent.query.limit(30).all()
+            apps = applications_query().limit(30).all()
             return "\n".join(f"- {a.name}" for a in apps) or "No applications in catalog"
         except Exception:
             return "No applications in catalog"

@@ -24,6 +24,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from app.decorators import audit_log, require_roles, user_has_any_role
+from app.services.application_kind import applications_query
 from app.services.cost_visibility import PIPELINE_FIGURE_KEYS
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import or_, text
@@ -192,7 +193,7 @@ def capability_map_dashboard():
     try:
         # Get capability statistics
         capability_count = count_business_capabilities()
-        application_count = ApplicationComponent.query.count()
+        application_count = applications_query().count()
 
         # Get capability categories
         categories = db.session.query(BusinessCapability.level).distinct().all()
@@ -419,7 +420,7 @@ def consolidation_dashboard():
             data = dashboard_data["data"]
             return render_template(
                 "consolidation_list/dashboard.html",
-                total_applications=ApplicationComponent.query.count(),
+                total_applications=applications_query().count(),
                 duplicate_candidates=data.get("recent_candidates", []),
                 consolidation_opportunities=data.get("recent_opportunities", []),
                 statistics=statistics.get("data", {})
@@ -431,7 +432,7 @@ def consolidation_dashboard():
         else:
             return render_template(
                 "consolidation_list/dashboard.html",
-                total_applications=ApplicationComponent.query.count(),
+                total_applications=applications_query().count(),
                 duplicate_candidates=[],
                 consolidation_opportunities=[],
                 costs_withheld=withheld, costs_withheld_sentence=COSTS_WITHHELD,
@@ -448,7 +449,7 @@ COMPARE_ROLES = ("admin", "architect", "business_architect")
 def _comparison_context():
     """Who may run the comparison, and how many applications this organisation has to compare."""
     try:
-        application_count = ApplicationComponent.query.count()
+        application_count = applications_query().count()
     except Exception:
         db.session.rollback()
         application_count = None
@@ -745,7 +746,7 @@ def api_strategic_metrics():
 
         metrics = {
             "total_capabilities": BusinessCapability.query.count(),
-            "total_applications": ApplicationComponent.query.count(),
+            "total_applications": applications_query().count(),
             "total_elements": ArchiMateElement.query.count(),
             "total_relationships": ArchiMateRelationship.query.count(),
         }
@@ -842,7 +843,7 @@ def get_capability_map_statistics():
     try:
         return {
             "capabilities": BusinessCapability.query.count(),
-            "applications": ApplicationComponent.query.count(),
+            "applications": applications_query().count(),
             "mapped_relationships": 0,  # Placeholder
         }
     except Exception:

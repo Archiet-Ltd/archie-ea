@@ -10,6 +10,7 @@ from sqlalchemy import func
 from .. import db
 from ..models.application_layer import ApplicationInterface
 from ..models.application_portfolio import ApplicationComponent
+from ..services.application_kind import applications_query
 from . import application_mgmt
 
 
@@ -25,7 +26,7 @@ def dashboard():
     - Table: Recent Applications
     """
     # Metric 1: Total Applications
-    total_apps = ApplicationComponent.query.count()
+    total_apps = applications_query().count()
 
     # Metric 2: Active Interfaces
     try:

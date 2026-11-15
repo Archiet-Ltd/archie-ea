@@ -208,10 +208,10 @@ def get_dashboard_metrics():
     """
     try:
         # Calculate metrics
-        total_applications = ApplicationComponent.query.count()
-        active_applications = ApplicationComponent.query.filter_by(
-            deployment_status="production"
-        ).count()
+        from app.services.application_kind import applications_query
+
+        total_applications = applications_query().count()
+        active_applications = applications_query().filter_by(deployment_status="production").count()
 
         total_capabilities = BusinessCapability.query.count()
         total_vendors = VendorOrganization.query.count()

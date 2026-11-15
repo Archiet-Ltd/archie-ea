@@ -153,22 +153,19 @@ def _is_decommissioned(A):
 def _active_applications():
     """The applications the Systems list shows by default, by the one rule of ``is_application_expression``:
     a part of an application and something that is not software (a code repository) are not applications.
-    A repository a connector brought in and did not classify as an application is not one until a person
-    says so."""
-    from app.connectors.github import unpromoted_import_expression
+    A repository is not one until a person says so; a person's choice is
+    read first, here and everywhere."""
     from app.models.application_portfolio import ApplicationComponent as A
     from app.services.application_kind import is_application_expression
 
-    return db.select(A).where(
-        is_application_expression(A), ~unpromoted_import_expression(A), ~_is_duplicate(A), ~_is_decommissioned(A)
-    )
+    return db.select(A).where(is_application_expression(A), ~_is_duplicate(A), ~_is_decommissioned(A))
 
 
 def left_out_applications(org_id) -> dict:
     """How many of the organisation's application records the count leaves out, by the one reason
-    each has: a duplicate, a decommissioned application, or a repository nobody owns yet."""
-    from app.connectors.github import unpromoted_import_expression
+    each has: a duplicate, a decommissioned application, or something that is not software (a repository)."""
     from app.models.application_portfolio import ApplicationComponent as A
+    from app.services.application_kind import NOT_SOFTWARE, kind_expression
 
     def count(*conditions):
         return db.session.execute(
@@ -178,22 +175,20 @@ def left_out_applications(org_id) -> dict:
     return {
         "duplicate": count(_is_duplicate(A)),
         "decommissioned": count(~_is_duplicate(A), _is_decommissioned(A)),
-        "repository": count(~_is_duplicate(A), ~_is_decommissioned(A), unpromoted_import_expression(A)),
+        "repository": count(~_is_duplicate(A), ~_is_decommissioned(A), kind_expression(A) == NOT_SOFTWARE),
     }
 
 
 def left_out_not_applications(org_id) -> int:
     """How many of the organisation's records the application count leaves out because they are a part of an
-    application or not software. A duplicate, a decommissioned application and an unowned imported repository
-    are counted by ``left_out_applications``, each once."""
-    from app.connectors.github import unpromoted_import_expression
+    application. A duplicate, a decommissioned application and something that is not software are counted by
+    ``left_out_applications``, each once."""
     from app.models.application_portfolio import ApplicationComponent as A
-    from app.services.application_kind import is_application_expression
+    from app.services.application_kind import PART, kind_expression
 
     return db.session.execute(
         db.select(func.count(A.id)).where(
-            A.organization_id == org_id, ~_is_duplicate(A), ~_is_decommissioned(A),
-            ~unpromoted_import_expression(A), ~is_application_expression(A),
+            A.organization_id == org_id, ~_is_duplicate(A), ~_is_decommissioned(A), kind_expression(A) == PART
         )
     ).scalar_one()
 

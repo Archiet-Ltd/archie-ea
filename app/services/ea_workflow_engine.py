@@ -30,6 +30,7 @@ Usage:
 # mass-deletion-ok — cumulative DEMO-001 branch refactor; all deletions are restructured code replaced in-place
 
 from app.services.archimate_backbone import sync_archimate_element
+from app.services.application_kind import applications_query
 import logging
 import traceback
 import uuid
@@ -1701,13 +1702,12 @@ class EAWorkflowEngine:
         Checks upstream data sources and returns a structured explanation
         of what is missing and what actions to take.
         """
-        from app.models.application_portfolio import ApplicationComponent
         from app.models.business_capability import BusinessCapability
 
         diagnostic = {"checks": [], "summary": "", "recommended_actions": []}
 
         try:
-            app_count = ApplicationComponent.query.count()
+            app_count = applications_query().count()
             cap_count = BusinessCapability.query.count()
 
             # Check capability-to-application mappings
@@ -5978,8 +5978,7 @@ provides foundation for subsequent architecture development phases.
 
     def _handle_application_baseline_pull(self, instance, step_def, input_data) -> Dict:
         """SA-010: Pull application baseline from ApplicationComponent. SA-013: imports Phase B anchors if linked."""
-        from app.models.application_portfolio import ApplicationComponent
-        apps = ApplicationComponent.query.all()
+        apps = applications_query().all()
         baseline = [
             {
                 "id": a.id,
@@ -6130,7 +6129,6 @@ provides foundation for subsequent architecture development phases.
 
     def _handle_tech_debt_scoring(self, instance, step_def, input_data) -> Dict:
         """TD-003: Score technology debt for each ApplicationComponent via TechnologyRoadmapService."""
-        from app.models.application_portfolio import ApplicationComponent
         try:
             from app.services.technology_roadmap_service import TechnologyRoadmapService
             svc = TechnologyRoadmapService()
@@ -6138,7 +6136,7 @@ provides foundation for subsequent architecture development phases.
             svc = None
         scores = []
         try:
-            apps = ApplicationComponent.query.all()
+            apps = applications_query().all()
             for app in apps:
                 if svc and hasattr(svc, "score_technology_debt"):
                     try:

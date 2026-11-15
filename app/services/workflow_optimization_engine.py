@@ -15,6 +15,7 @@ from typing import Any, Dict, List
 
 
 from app.models.application_portfolio import ApplicationComponent
+from app.services.application_kind import applications_query
 from app.models.unified_capability import UnifiedCapability
 from app.models.vendor.vendor_organization import VendorOrganization
 
@@ -135,7 +136,7 @@ class WorkflowOptimizationEngine:
         recommendations = []
 
         # Analyze application creation workflow
-        app_count = ApplicationComponent.query.count()
+        app_count = applications_query().count()
 
         if app_count > 100:
             recommendations.append(

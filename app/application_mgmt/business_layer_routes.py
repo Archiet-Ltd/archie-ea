@@ -9,6 +9,7 @@ Handles ArchiMate business-layer element management:
 """
 
 from app.application_mgmt.routes import _link_application_to_processes
+from app.services.application_kind import applications_query
 import logging
 from datetime import datetime
 
@@ -589,7 +590,7 @@ def bulk_process_link():
     dry_run = data.get("dry_run", True)
 
     if app_ids == "all":
-        apps = ApplicationComponent.query.limit(
+        apps = applications_query().limit(
             1000
         ).all()  # Limit to prevent OOM on large datasets
     else:

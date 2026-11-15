@@ -21,6 +21,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 from app.models.application_portfolio import ApplicationComponent
+from app.services.application_kind import applications_query
 from app.models.unified_capability import UnifiedCapability
 from app.models.vendor.vendor_organization import VendorOrganization
 
@@ -376,7 +377,7 @@ class PredictiveAnalyticsEngine:
 
     def get_application_sunset_predictions(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get applications most likely to be sunset."""
-        applications = ApplicationComponent.query.limit(100).all()
+        applications = applications_query().limit(100).all()
 
         if not applications:
             return []

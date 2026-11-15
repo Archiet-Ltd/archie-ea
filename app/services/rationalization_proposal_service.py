@@ -202,13 +202,14 @@ class RationalizationProposalService:
             from app.models.application_portfolio import ApplicationComponent
             from app import db
             from sqlalchemy import func
+            from app.services.application_kind import is_application_expression
 
             on_prem = db.session.query(func.count(ApplicationComponent.id)).filter(
-                ApplicationComponent.deployment_model == "on-premise"
+                is_application_expression(ApplicationComponent), ApplicationComponent.deployment_model == "on-premise"
             ).scalar() or 0
 
             saas = db.session.query(func.count(ApplicationComponent.id)).filter(
-                ApplicationComponent.deployment_model.in_(["saas", "cloud", "hybrid"])
+                is_application_expression(ApplicationComponent), ApplicationComponent.deployment_model.in_(["saas", "cloud", "hybrid"])
             ).scalar() or 0
 
             if on_prem > 0 and saas > 0 and on_prem > saas:

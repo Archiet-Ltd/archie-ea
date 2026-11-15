@@ -32,6 +32,7 @@ from sqlalchemy.orm import joinedload
 from werkzeug.exceptions import HTTPException
 
 from app import db
+from app.services.application_kind import applications_query
 from app.decorators import audit_log, require_roles
 from app.models.application_portfolio import ApplicationComponent
 from app.utils.api_helpers import api_error
@@ -733,7 +734,7 @@ def api_find_duplicates():
         request.args.get("include_processed", "false").lower() == "true"
 
         # Get all applications
-        apps = ApplicationComponent.query.limit(2000).all()
+        apps = applications_query().limit(2000).all()
 
         # Compare each pair
         duplicates = []
@@ -1308,7 +1309,7 @@ def api_bulk_process_link():
     dry_run = data.get("dry_run", True)
 
     if app_ids == "all":
-        apps = ApplicationComponent.query.limit(1000).all()
+        apps = applications_query().limit(1000).all()
     else:
         apps = ApplicationComponent.query.filter(
             ApplicationComponent.id.in_(app_ids)
@@ -1526,7 +1527,7 @@ def api_match_vendors():
             VendorProduct,
         )
 
-        applications = ApplicationComponent.query.limit(1000).all()
+        applications = applications_query().limit(1000).all()
         vendor_products = (
             db.session.query(VendorProduct)
             .options(joinedload(VendorProduct.vendor_organization))

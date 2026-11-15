@@ -6,7 +6,7 @@ Applications table, the application count and owner coverage all read ``is_appli
 The kind is one stored fact, ``ApplicationComponent.application_kind``. When a person has set it, that
 is the answer. When it is empty the rule decides: a record composed into or aggregated by another
 application component is a part of that application; a record that is a code repository
-(``repository_type`` filled, or imported by the connector as a repository that nobody owns yet) is not software; every
+(``repository_type`` filled, or a component type of "repository" that nobody owns yet, however it was entered) is not software; every
 other record is an application.
 """
 from __future__ import annotations
@@ -16,7 +16,6 @@ from datetime import datetime
 from sqlalchemy import case, func
 
 from app import db
-from app.services.archimate_import_service import _PARENT_RELATIONSHIPS as PARENT_RELATIONSHIPS
 
 APPLICATION = "application"
 PART = "part"
@@ -24,6 +23,12 @@ NOT_SOFTWARE = "not_software"
 KINDS = (APPLICATION, PART, NOT_SOFTWARE)
 KIND_LABELS = {APPLICATION: "Application", PART: "Part of an application", NOT_SOFTWARE: "Not software"}
 
+
+
+def _parent_relationships():
+    from app.services.archimate_import_service import _PARENT_RELATIONSHIPS
+
+    return _PARENT_RELATIONSHIPS
 
 
 def _has_parent_expression(model):
@@ -50,20 +55,24 @@ def _has_parent_expression(model):
             R.organization_id == model.organization_id,
             source.organization_id == model.organization_id,
             source.deleted_at.is_(None),
-            func.lower(R.type).in_(PARENT_RELATIONSHIPS),
+            func.lower(R.type).in_(_parent_relationships()),
         )
         .exists()
     )
 
 
 def _is_repository_expression(model):
-    """SQL boolean: the record is a code repository: it names the kind of repository it is, or the connector
-    brought it in as one and nobody has named an owner for it yet (a person naming an owner says it is run)."""
-    from app.connectors.github import unpromoted_import_expression
+    """SQL boolean: the record is a code repository: it names the kind of repository it is, its component type
+    is "repository", or the connector brought it in as one and nobody has named an owner for it yet (a person
+    naming an owner says it is run)."""
+    from app.services.element_ownership_service import application_is_owned_expression
 
     return db.or_(
         db.and_(model.repository_type.isnot(None), func.btrim(model.repository_type) != ""),
-        unpromoted_import_expression(model),
+        db.and_(
+            func.lower(func.btrim(func.coalesce(model.component_type, ""))) == "repository",
+            ~application_is_owned_expression(model),
+        ),
     )
 
 
@@ -82,6 +91,14 @@ def kind_expression(model=None):
 def is_application_expression(model=None):
     """SQL boolean: the record is an application. Every list and count of applications uses this."""
     return kind_expression(model) == APPLICATION
+
+
+def applications_query():
+    """``ApplicationComponent.query`` narrowed to applications: the starting point for any list or count of
+    applications that a person or the chat reads. The organisation filter is applied by the session."""
+    from app.models.application_portfolio import ApplicationComponent
+
+    return ApplicationComponent.query.filter(is_application_expression(ApplicationComponent))
 
 
 def wholes_of(organization_id, element_ids, applications_only=True) -> dict:
@@ -109,7 +126,7 @@ def wholes_of(organization_id, element_ids, applications_only=True) -> dict:
         .where(
             R.organization_id == organization_id,
             R.target_id.in_(element_ids),
-            func.lower(R.type).in_(PARENT_RELATIONSHIPS),
+            func.lower(R.type).in_(_parent_relationships()),
             R.source_id != R.target_id,
         )
         .order_by(E.name)
@@ -135,7 +152,7 @@ def parts_of(application) -> list:
             R.source_id == application.archimate_element_id,
             A.organization_id == application.organization_id,
             A.id != application.id,
-            func.lower(R.type).in_(PARENT_RELATIONSHIPS),
+            func.lower(R.type).in_(_parent_relationships()),
         )
         .order_by(A.name)
     ).all()
@@ -168,9 +185,11 @@ def kind_of(application) -> dict:
 
 
 def _is_repository(application) -> bool:
-    from app.connectors.github import is_unpromoted_import
+    from app.services.element_ownership_service import application_is_owned
 
-    return bool((application.repository_type or "").strip()) or is_unpromoted_import(application)
+    return bool((application.repository_type or "").strip()) or (
+        (application.component_type or "").strip().lower() == "repository" and not application_is_owned(application)
+    )
 
 
 def _day(moment) -> str:

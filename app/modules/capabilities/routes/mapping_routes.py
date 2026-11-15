@@ -34,6 +34,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 
 from app.decorators import audit_log
+from app.services.application_kind import applications_query
 
 from app import db
 from app.exceptions import (
@@ -1671,10 +1672,9 @@ def api_bulk_map_applications():
 def api_statistics():
     """API endpoint to get mapping statistics"""
     try:
-        from app.models.application_layer import ApplicationComponent
         from app.models.business_capabilities import ApplicationCapabilityCoverage
 
-        total_applications = ApplicationComponent.query.count()
+        total_applications = applications_query().count()
         mapped_applications = (
             db.session.query(ApplicationCapabilityCoverage.application_component_id)
             .distinct()

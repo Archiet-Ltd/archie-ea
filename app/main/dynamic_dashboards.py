@@ -16,6 +16,7 @@ from app.models.application_layer import (
     DataObject,
 )
 from app.models.application_portfolio import ApplicationComponent
+from app.services.application_kind import applications_query
 
 # Import ONLY the models we need to avoid conflicts
 from app.models.business_capabilities import BusinessCapability
@@ -267,7 +268,6 @@ def workflow_pipeline():
     """Capability Gaps Dashboard - Shows capabilities, applications, and gaps"""
     try:
         # Get capability mapping data
-        from app.models.application_layer import ApplicationComponent
         from app.models.application_portfolio import ApplicationCapabilityMapping
         from app.models.business_capabilities import BusinessCapability
 
@@ -275,7 +275,7 @@ def workflow_pipeline():
         all_capabilities = BusinessCapability.query.limit(2000).all()
 
         # Get all applications
-        all_applications = ApplicationComponent.query.limit(2000).all()
+        all_applications = applications_query().limit(2000).all()
 
         # Get all mappings
         # tenant-scoping-ok: scoped via the TenantMixin FK parent

@@ -699,9 +699,9 @@ class VisualGenerationService:
     def _load_applications_for_graph(self, focus_app: str = None, limit: int = 15) -> List[Dict]:
         """Load applications for dependency graph."""
         try:
-            from app.models.application_portfolio import ApplicationComponent
+            from app.services.application_kind import applications_query
 
-            query = ApplicationComponent.query.limit(limit)
+            query = applications_query().limit(limit)
             apps = query.all()
             return [
                 {
@@ -719,9 +719,9 @@ class VisualGenerationService:
     def _load_applications_for_matrix(self, limit: int = 30) -> List[Dict]:
         """Load applications for portfolio matrix."""
         try:
-            from app.models.application_portfolio import ApplicationComponent
+            from app.services.application_kind import applications_query
 
-            apps = ApplicationComponent.query.limit(limit).all()
+            apps = applications_query().limit(limit).all()
             return [
                 {
                     "id": app.id,

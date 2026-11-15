@@ -21,6 +21,7 @@ from typing import Any, Dict, List
 from sqlalchemy import func, or_  # dead-code-ok: used in scan methods
 
 from app import db
+from app.services.application_kind import applications_query
 from app.models.application_portfolio import ApplicationComponent
 from app.models.business_capabilities import BusinessCapability
 from app.models.vendor.vendor_organization import VendorOrganization  # dead-code-ok: used in vendor scanning
@@ -151,7 +152,7 @@ class RecommendationsEngineService:
         recommendations = []
 
         try:
-            applications = ApplicationComponent.query.all()
+            applications = applications_query().all()
 
             # Track statistics
             no_owner_count = 0
@@ -541,7 +542,7 @@ class RecommendationsEngineService:
         try:
             # Check for capability gaps (capabilities without supporting applications)
             capabilities = BusinessCapability.query.all()
-            applications = ApplicationComponent.query.all()
+            applications = applications_query().all()
 
             # Build a map of application names for matching
             app_names_lower = {app.name.lower(): app for app in applications if app.name}
@@ -811,7 +812,7 @@ class RecommendationsEngineService:
     def get_quick_stats(self) -> Dict[str, Any]:
         """Get quick statistics for dashboard display."""
         try:
-            app_count = ApplicationComponent.query.count()
+            app_count = applications_query().count()
             capability_count = BusinessCapability.query.count()
             vendor_count = VendorOrganization.query.count()
 

@@ -161,6 +161,16 @@
        actions_caller=_apps_page_actions
   ) }}
 
+  {# Records the count leaves out stay reachable: the note says how many and links to them. #}
+  {% if not_counted %}
+  {% call quiet_alert('info', title='Not counted as applications', testid='not-counted-alert',
+                link_href=url_for('unified_applications.application_list'), link_text='Back to applications', class='flex-wrap') %}
+    <span>These {{ total_count }} records are left out of the application count because each is a part of an application or not software. Open one to see why and to change it.</span>
+  {% endcall %}
+  {% elif left_out_records %}
+  <p class="mb-3 text-sm text-muted-foreground" data-testid="not-counted-link">{{ left_out_records }} {{ 'record is' if left_out_records == 1 else 'records are' }} left out of this list because {{ 'it is' if left_out_records == 1 else 'they are' }} parts of an application or not software. <a href="{{ url_for('unified_applications.application_list', not_counted='true') }}" class="font-medium text-foreground underline" data-testid="view-not-counted">View them</a></p>
+  {% endif %}
+
   {# What is missing, said once, with a link to exactly those applications. #}
   {% if stats.summary_total %}
   {%- set total_n = stats.summary_total -%}
@@ -421,6 +431,7 @@
             </td>
             <td class="px-2 align-middle">
               <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="block max-w-[220px] truncate text-sm font-medium text-foreground hover:underline" title="{{ app.name | e }}{% if app.description %} — {{ app.description[:120] | e }}{% endif %}">{{ app.name }}</a>
+              {% if kind_notes.get(app.id) %}<p class="max-w-[220px] whitespace-normal text-xs text-muted-foreground" data-testid="kind-note-{{ app.id }}">{{ kind_notes[app.id].label }}: {{ kind_notes[app.id].reason }}. <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="underline" data-testid="kind-change-{{ app.id }}">Change</a></p>{% endif %}
               {% if imported_gaps.get(app.id) %}{% set gaps = imported_gaps.get(app.id) %}{% set compact = true %}{% set sfx = '' %}{% set cap_onclick = "openMappingForApp(" ~ app.id ~ ", " ~ (app.name | tojson | forceescape) ~ ", 'capability')" %}{% include 'applications/_imported_needs.html' with context %}{% endif %}
             </td>
             <td class="px-2 align-middle">
@@ -481,6 +492,7 @@
               <div class="min-w-0">
                 <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="block truncate text-base font-semibold text-foreground hover:underline">{{ app.name }}</a>
                 {% if imported_gaps.get(app.id) %}{% set gaps = imported_gaps.get(app.id) %}{% set compact = true %}{% set sfx = '-mobile' %}{% set cap_onclick = "openMappingForApp(" ~ app.id ~ ", " ~ (app.name | tojson | forceescape) ~ ", 'capability')" %}{% include 'applications/_imported_needs.html' with context %}{% endif %}
+                {% if kind_notes.get(app.id) %}<p class="mt-1 text-xs text-muted-foreground" data-testid="kind-note-mobile-{{ app.id }}">{{ kind_notes[app.id].label }}: {{ kind_notes[app.id].reason }}. <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}" class="underline">Change</a></p>{% endif %}
                 {% if app.id in repository_ids %}<p class="mt-1 text-xs text-muted-foreground" data-testid="app-type-mobile-{{ app.id }}">Repository</p>{% endif %}
                 {% if app.description %}<p class="mt-1 text-xs text-muted-foreground">{{ app.description[:100] }}{% if app.description | length > 100 %}…{% endif %}</p>{% endif %}
               </div>

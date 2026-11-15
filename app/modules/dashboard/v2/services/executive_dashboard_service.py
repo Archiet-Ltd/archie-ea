@@ -10,6 +10,7 @@ import logging
 from flask import g
 
 from app import db
+from app.services.application_kind import is_application_expression
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +249,7 @@ class ExecutiveDashboardService:
         try:
             from app.models.application_portfolio import ApplicationComponent
 
-            stats["applications"] = db.session.query(db.func.count(ApplicationComponent.id)).scalar() or 0
+            stats["applications"] = db.session.query(db.func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).scalar() or 0
         except Exception as exc:
             logger.warning("Executive dashboard: application count unavailable: %s", exc)
 
@@ -272,7 +273,7 @@ class ExecutiveDashboardService:
             org_id = getattr(g, "current_org_id", None)
             if org_id is not None:
                 stats["retiring_applications"] = (
-                    db.session.query(db.func.count(ApplicationComponent.id))
+                    db.session.query(db.func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent))
                     .filter(
                         ApplicationComponent.organization_id == org_id,
                         ApplicationComponent.lifecycle_status == "retiring",

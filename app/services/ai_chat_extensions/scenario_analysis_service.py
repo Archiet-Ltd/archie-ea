@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from app.utils.tenant_sql import org_scope
+from app.services.application_kind import applications_query
 
 logger = logging.getLogger(__name__)
 
@@ -441,9 +442,8 @@ class ScenarioAnalysisService:
         migration plan for the portfolio. analyze_scenario logs the exception
         with a traceback and answers {"success": False, "error": ...}.
         """
-        from app.models.application_portfolio import ApplicationComponent
 
-        apps = ApplicationComponent.query.limit(limit).all()
+        apps = applications_query().limit(limit).all()
         return [
             {
                 "id": app.id,

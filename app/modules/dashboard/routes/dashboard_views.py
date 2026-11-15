@@ -154,15 +154,14 @@ def _build_overview_context():
         data_coverage["criticality"] = round(row[2] / total_apps * 100)
         if _org is not None:
             from app.models.application_portfolio import ApplicationComponent
-            from app.services.application_kind import is_application_expression
             from app.services.element_ownership_service import application_is_owned_expression
 
-            listed = db.select(db.func.count(ApplicationComponent.id)).where(
-                ApplicationComponent.organization_id == _org, is_application_expression(ApplicationComponent)
-            )
-            owned = db.session.execute(listed.where(application_is_owned_expression(ApplicationComponent))).scalar_one()
-            applications_here = db.session.execute(listed).scalar_one()
-            data_coverage["owner"] = round(owned / applications_here * 100) if applications_here else 0
+            owned = db.session.execute(
+                db.select(db.func.count(ApplicationComponent.id))
+                .where(ApplicationComponent.organization_id == _org)
+                .where(application_is_owned_expression(ApplicationComponent))
+            ).scalar_one()
+            data_coverage["owner"] = round(owned / total_apps * 100)
     except Exception as e:
         db.session.rollback()
         data_coverage["query_error"] = str(e)

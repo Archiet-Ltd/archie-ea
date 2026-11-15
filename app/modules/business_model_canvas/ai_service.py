@@ -14,6 +14,7 @@ import logging
 from typing import Any, Dict
 
 from app.models.business_model import CANVAS_BLOCKS
+from app.services.application_kind import applications_query
 from app.modules.ai_chat.services.llm_service_impl import LLMService
 
 logger = logging.getLogger(__name__)
@@ -59,11 +60,10 @@ def _build_context(canvas, block_key: str) -> Dict[str, Any]:
             context["other_blocks"][key] = value
 
     try:
-        from app.models.application_portfolio import ApplicationComponent
 
         # ApplicationComponent is TenantMixin, so this count is already
         # scoped to the current org by do_orm_execute.
-        context["application_count"] = ApplicationComponent.query.count()
+        context["application_count"] = applications_query().count()
     except Exception:
         logger.exception("Failed to count applications for BMC draft context")
 

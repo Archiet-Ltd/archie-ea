@@ -48,6 +48,7 @@ from typing import Callable, Dict, Optional
 from sqlalchemy import func
 
 from app import db
+from app.services.application_kind import is_application_expression
 
 logger = logging.getLogger(__name__)
 
@@ -886,8 +887,8 @@ def _da_context() -> str:
 
     def classification():
         from app.models.application_portfolio import ApplicationComponent
-        total = db.session.query(func.count(ApplicationComponent.id)).scalar() or 1
-        classified = db.session.query(func.count(ApplicationComponent.id)).filter(
+        total = db.session.query(func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).scalar() or 1
+        classified = db.session.query(func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).filter(
             ApplicationComponent.data_classification.isnot(None),
             ApplicationComponent.data_classification != "",
         ).scalar() or 0
@@ -1091,7 +1092,7 @@ def _cto_context() -> str:
 
     def portfolio_total():
         from app.models.application_portfolio import ApplicationComponent
-        n = db.session.query(func.count(ApplicationComponent.id)).scalar() or 0
+        n = db.session.query(func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).scalar() or 0
         return f"- Application portfolio total: {n} apps"
 
     lines.append(_safe("solutions", solutions))
@@ -1105,7 +1106,7 @@ def _cto_founder_context() -> str:
 
     def portfolio_total():
         from app.models.application_portfolio import ApplicationComponent
-        n = db.session.query(func.count(ApplicationComponent.id)).scalar() or 0
+        n = db.session.query(func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).scalar() or 0
         return f"- Applications recorded: {n}"
 
     lines.append(_safe("portfolio_total", portfolio_total))
@@ -1294,10 +1295,10 @@ def _security_architect_context() -> str:
 
     def classification():
         from app.models.application_portfolio import ApplicationComponent
-        total = db.session.query(func.count(ApplicationComponent.id)).scalar() or 0
+        total = db.session.query(func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).scalar() or 0
         if not total:
             return "- Data classification: no applications recorded"
-        classified = db.session.query(func.count(ApplicationComponent.id)).filter(
+        classified = db.session.query(func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).filter(
             ApplicationComponent.data_classification.isnot(None),
             ApplicationComponent.data_classification != "",
         ).scalar() or 0
@@ -1376,7 +1377,7 @@ def _systems_architect_context() -> str:
 
     def lifecycle():
         from app.models.application_portfolio import ApplicationComponent
-        n = db.session.query(func.count(ApplicationComponent.id)).filter(
+        n = db.session.query(func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).filter(
             ApplicationComponent.lifecycle_status.in_(["end_of_life", "deprecated"])
         ).scalar() or 0
         return f"- Applications at end-of-life/deprecated (DR/BC review candidates): {n}"

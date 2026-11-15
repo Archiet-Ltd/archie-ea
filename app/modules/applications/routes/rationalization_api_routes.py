@@ -9,6 +9,7 @@ from flask import current_app, flash, g, jsonify, redirect, render_template, ren
 from flask_login import current_user, login_required
 
 from app import db
+from app.services.application_kind import applications_query
 from app.decorators import audit_log, require_roles
 from app.middleware.tenant_decorators import platform_admin_required
 from app.models.application_portfolio import ApplicationComponent
@@ -177,7 +178,7 @@ def rationalization_dashboard():
         service = UnifiedDuplicateDetectionService()
 
         # Get statistics
-        total_apps = ApplicationComponent.query.count()
+        total_apps = applications_query().count()
         groups = service.get_duplicate_groups("simple", include_applications=True)
         runs = service.get_detection_runs("simple")
 
@@ -3970,7 +3971,7 @@ def _build_data_quality_report(total_apps: int) -> dict:
     try:
         from app.models.application_capability import ApplicationCapabilityMapping
 
-        apps = ApplicationComponent.query.limit(total_apps or 1000).all()
+        apps = applications_query().limit(total_apps or 1000).all()
         if not apps:
             return {"total_processed": 0, "field_coverage": {}}
 

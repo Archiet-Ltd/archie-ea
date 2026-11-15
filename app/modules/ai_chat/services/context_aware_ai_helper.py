@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import func  # dead-code-ok
 
 from app import db
+from app.services.application_kind import applications_query
 from app.extensions.cache import org_scoped_cache_key
 from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_capability import UnifiedCapability
@@ -234,7 +235,7 @@ class ContextAwareAIHelper:
         """Load context for application form."""
         context = {
             "context_type": ContextType.APPLICATION_FORM,
-            "total_applications": ApplicationComponent.query.count() + 1,
+            "total_applications": applications_query().count() + 1,
         }
 
         # Get recent applications for pattern analysis

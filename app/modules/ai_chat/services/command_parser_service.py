@@ -447,8 +447,11 @@ class CommandParserService:
 
         try:
             from app.models.application_portfolio import ApplicationComponent
+            from app.services.application_kind import is_application_expression
 
-            stats["Applications"] = ApplicationComponent.query.count()
+            stats["Applications"] = ApplicationComponent.query.filter(
+                is_application_expression(ApplicationComponent)
+            ).count()
         except Exception:
             stats["Applications"] = "unavailable"
 
@@ -1182,8 +1185,11 @@ class CommandParserService:
         if target_domain in ("general", "technology"):
             try:
                 from app.models.application_portfolio import ApplicationComponent
+                from app.services.application_kind import is_application_expression
 
-                metrics["Applications"] = ApplicationComponent.query.count()
+                metrics["Applications"] = ApplicationComponent.query.filter(
+                    is_application_expression(ApplicationComponent)
+                ).count()
             except Exception:
                 metrics["Applications"] = "unavailable"
 

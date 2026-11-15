@@ -774,9 +774,12 @@ def system_coverage(org_id: Optional[int] = None) -> Optional[Dict]:
                                                            ApplicationComponent.id)
     ).scalars().all()
     # copies are left out of the Systems list altogether, so they are not "decommissioned" either
+    from app.services.application_kind import is_application_expression
+
     every = db.session.execute(
         db.select(func.count(ApplicationComponent.id)).where(
-            *_undeleted_apps(org_id), ~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\"))).scalar_one()
+            *_undeleted_apps(org_id), is_application_expression(ApplicationComponent),
+            ~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\"))).scalar_one()
     return {
         "total_systems": total,
         "supplied_count": total - len(unmapped),

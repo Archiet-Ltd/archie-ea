@@ -10,6 +10,7 @@ from flask import current_app, jsonify, request
 from flask_login import login_required
 
 from app.decorators import audit_log
+from app.services.application_kind import applications_query
 
 from . import capability_map
 
@@ -913,7 +914,6 @@ def api_process_applications(process_id):
         description: Applications list with mapping status
     """
     try:
-        from app.models.application_layer import ApplicationComponent
         from app.models.apqc_process import APQCProcess, ProcessApplicationMapping
         from app.services.apqc_mapping_tenant_fence import (
             fenced_application_mappings_query,
@@ -925,7 +925,7 @@ def api_process_applications(process_id):
             return jsonify({"error": f"Process {process_id} not found"}), 404
 
         # Get all applications
-        applications = ApplicationComponent.query.all()
+        applications = applications_query().all()
 
         # Get existing mappings for this process. ProcessApplicationMapping
         # has no organization_id of its own; unfenced, this loaded every

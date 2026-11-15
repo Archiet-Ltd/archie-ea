@@ -11,6 +11,7 @@ from flask_login import login_required
 
 
 from app import db
+from app.services.application_kind import is_application_expression
 from app.utils.api_response import error_response, success_response
 
 logger = logging.getLogger(__name__)
@@ -177,7 +178,7 @@ def get_enterprise_metrics():
         from sqlalchemy import func
 
         app_count = (
-            db.session.query(func.count(ApplicationComponent.id)).scalar() or 0
+            db.session.query(func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).scalar() or 0
         )
 
         cap_count = (

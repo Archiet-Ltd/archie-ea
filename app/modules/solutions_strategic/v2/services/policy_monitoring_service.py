@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import Integer, desc, func
 
 from app import db
+from app.services.application_kind import applications_query
 from app.models.application_portfolio import ApplicationComponent
 from app.models.policy_monitoring import (
     ArchitecturePolicy,
@@ -403,7 +404,7 @@ class PolicyMonitoringService:
             Dictionary with overall scan results
         """
         try:
-            applications = ApplicationComponent.query.all()
+            applications = applications_query().all()
 
             results = {
                 "success": True,

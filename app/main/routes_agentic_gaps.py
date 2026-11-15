@@ -14,6 +14,7 @@ from werkzeug.exceptions import HTTPException
 from flask_login import current_user, login_required
 
 from app import db
+from app.services.application_kind import applications_query
 from app.middleware.tenant_decorators import platform_admin_required
 from app.models.agentic_gaps import AgentConfiguration, AgentSchedule
 from app.services.archimate.agentic_gap_implementation_service import (
@@ -543,9 +544,8 @@ def get_agent_recommendations():
 
         # Check application count
         try:
-            from app.models.application_layer import ApplicationComponent
 
-            app_count = ApplicationComponent.query.count()
+            app_count = applications_query().count()
             if app_count > 10:
                 recommendations.append(
                     {

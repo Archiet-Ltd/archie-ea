@@ -18,6 +18,7 @@ from werkzeug.exceptions import HTTPException
 from flask_login import current_user, login_required
 
 from app.decorators import audit_log
+from app.services.application_kind import applications_query
 
 logger = logging.getLogger(__name__)
 
@@ -574,7 +575,7 @@ def software_architecture_dashboard():
         from app.models.application_portfolio import ApplicationComponent
         from app.models.archimate_core import ArchiMateElement
 
-        component_count = ApplicationComponent.query.count()
+        component_count = applications_query().count()
 
         from flask import g as _g
         _org = getattr(_g, "current_org_id", None)

@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy.orm import relationship
 
 from app import db
+from app.services.application_kind import applications_query
 
 
 class ApplicationMetricsSnapshot(db.Model):
@@ -42,7 +43,7 @@ class ApplicationMetricsSnapshot(db.Model):
         from app.models.application_layer import ApplicationComponent
         from app.services.application_status import words_for_status
 
-        total = ApplicationComponent.query.count()
+        total = applications_query().count()
         production = ApplicationComponent.query.filter(
             ApplicationComponent.deployment_status.in_(["production", "done"])
         ).count()

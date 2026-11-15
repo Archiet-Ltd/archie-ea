@@ -54,6 +54,7 @@ from app import db
 from app.models import User
 from app.utils.tenant_sql import org_scope
 from app.models.vector_embeddings import ChatMessageEmbedding
+from app.services.application_kind import applications_query
 from app.middleware.tenant_context import current_org_id
 
 # Import AI Chat Extension Services
@@ -3934,9 +3935,8 @@ Use enterprise architecture terminology appropriate for this role."""
                 db.session.rollback()
             except Exception:
                 logger.debug("Failed to rollback session before portfolio health query", exc_info=True)
-            from app.models.application_portfolio import ApplicationComponent
 
-            apps = ApplicationComponent.query.limit(50).all()
+            apps = applications_query().limit(50).all()
             health_distribution = {"healthy": 0, "warning": 0, "critical": 0, "unknown": 0}
             for app in apps:
                 status = app.lifecycle_status or "unknown"
@@ -4103,9 +4103,8 @@ Use enterprise architecture terminology appropriate for this role."""
                 db.session.rollback()
             except Exception:
                 logger.debug("Failed to rollback session before application health query", exc_info=True)
-            from app.models.application_portfolio import ApplicationComponent
 
-            apps = ApplicationComponent.query.limit(30).all()
+            apps = applications_query().limit(30).all()
             return {
                 "application_count": len(apps),
                 "applications": [
@@ -4136,11 +4135,10 @@ Use enterprise architecture terminology appropriate for this role."""
                 db.session.rollback()
             except Exception:
                 logger.debug("Failed to rollback session before dependencies query", exc_info=True)
-            from app.models.application_portfolio import ApplicationComponent
             from app.models.archimate_core import ArchiMateRelationship
 
             # Get applications with dependencies
-            apps = ApplicationComponent.query.limit(30).all()
+            apps = applications_query().limit(30).all()
 
             # Get relationships that might indicate dependencies
             relationships = (
@@ -4433,10 +4431,9 @@ Use enterprise architecture terminology appropriate for this role."""
                 db.session.rollback()
             except Exception:
                 logger.debug("Failed to rollback session before KPI query", exc_info=True)
-            from app.models.application_portfolio import ApplicationComponent
 
             # Get application health metrics as KPIs
-            apps = ApplicationComponent.query.limit(50).all()
+            apps = applications_query().limit(50).all()
             risk_scores = []
             for app in apps:
                 if app.technical_risk is not None:
@@ -4488,10 +4485,9 @@ Use enterprise architecture terminology appropriate for this role."""
                 db.session.rollback()
             except Exception:
                 logger.debug("Failed to rollback session before risks query", exc_info=True)
-            from app.models.application_portfolio import ApplicationComponent
 
             # Get applications with risk indicators (lifecycle status, health)
-            apps = ApplicationComponent.query.limit(50).all()
+            apps = applications_query().limit(50).all()
             risk_indicators = []
             for app in apps:
                 status = app.lifecycle_status or ""
@@ -4524,10 +4520,9 @@ Use enterprise architecture terminology appropriate for this role."""
                 db.session.rollback()
             except Exception:
                 logger.debug("Failed to rollback session before investments query", exc_info=True)
-            from app.models.application_portfolio import ApplicationComponent
 
             # Get applications with investment data (if available)
-            apps = ApplicationComponent.query.limit(50).all()
+            apps = applications_query().limit(50).all()
             investment_data = []
             for app in apps:
                 if app.total_cost_of_ownership is not None:
@@ -4566,10 +4561,9 @@ Use enterprise architecture terminology appropriate for this role."""
                 db.session.rollback()
             except Exception:
                 logger.debug("Failed to rollback session before compliance query", exc_info=True)
-            from app.models.application_portfolio import ApplicationComponent
 
             # Get applications with compliance status (if available)
-            apps = ApplicationComponent.query.limit(50).all()
+            apps = applications_query().limit(50).all()
             compliance_status = {}
             for app in apps:
                 if app.lifecycle_status:
@@ -4781,7 +4775,6 @@ Use enterprise architecture terminology appropriate for this role."""
         """Load business capability context with application coverage data."""
         try:
             from app.models.business_capabilities import BusinessCapability
-            from app.models.application_portfolio import ApplicationComponent
             from sqlalchemy import text
 
             capabilities = BusinessCapability.query.all()
@@ -4841,7 +4834,7 @@ Use enterprise architecture terminology appropriate for this role."""
                     "business_criticality": getattr(cap, "strategic_importance", None) or "unknown",
                 })
 
-            total_apps = ApplicationComponent.query.count()
+            total_apps = applications_query().count()
             covered = sum(1 for c in cap_list if c["coverage_status"] == "covered")
 
             # AIC-106: Rank capabilities by investment priority
@@ -5073,7 +5066,7 @@ Use enterprise architecture terminology appropriate for this role."""
                 logger.debug(f"Vendor concentration query skipped: {e}")
 
             # Summary counts
-            total_apps = ApplicationComponent.query.count()
+            total_apps = applications_query().count()
             total_caps = len(all_caps)
             mapped_count = len(mapped_cap_ids)
 
@@ -5437,7 +5430,7 @@ Use enterprise architecture terminology appropriate for this role."""
             from app.models.vendor.vendor_organization import VendorOrganization
             from sqlalchemy import text
 
-            total_apps = ApplicationComponent.query.count()
+            total_apps = applications_query().count()
             total_caps = BusinessCapability.query.count()
             total_vendors = VendorOrganization.query.count()
             try:
@@ -7191,11 +7184,10 @@ At the end, tell the user: "Review the above and reply with any changes, or type
         # Load real data
         data_section = ""
         try:
-            from app.models.application_portfolio import ApplicationComponent
             from app.models.business_capabilities import BusinessCapability
             from sqlalchemy import text
 
-            total_apps = ApplicationComponent.query.count()
+            total_apps = applications_query().count()
             total_caps = BusinessCapability.query.count()
             mapped = db.session.execute(text(
                 "SELECT COUNT(DISTINCT business_capability_id) FROM application_capability_mapping"  # tenant-filtered: scoped via parent FK
@@ -7963,7 +7955,7 @@ End with: "Type **'next'** to complete the design workflow."
         try:
             from app.models.models import ApplicationComponent, VendorOrganization  # dead-code-ok: conditional
 
-            total_apps = ApplicationComponent.query.count()
+            total_apps = applications_query().count()
             total_vendors = VendorOrganization.query.count()
             deprecated = ApplicationComponent.query.filter_by(lifecycle_status="retired").count()
 

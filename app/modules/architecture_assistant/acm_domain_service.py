@@ -5,6 +5,7 @@ import logging
 import re
 
 from app import db
+from app.services.application_kind import applications_query
 
 logger = logging.getLogger(__name__)
 
@@ -435,9 +436,8 @@ class AcmDomainService:
 
     def _get_catalog_context(self):
         try:
-            from app.models.application_portfolio import ApplicationComponent
 
-            apps = ApplicationComponent.query.limit(30).all()
+            apps = applications_query().limit(30).all()
             if not apps:
                 return "No applications in catalog"
             # Include IDs so LLM can reference them as integers in existing_id

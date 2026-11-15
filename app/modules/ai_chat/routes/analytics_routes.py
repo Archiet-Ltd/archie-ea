@@ -184,6 +184,7 @@ def get_first_questions():
     from app.models import ArchiMateElement
     from app.models.application_portfolio import ApplicationComponent
     from app.modules.dashboard.services.overview_figures import element_each_name_means, relationship_ends
+    from app.services.application_kind import is_application_expression
 
     org_id = current_org_id()
     if org_id is None:
@@ -196,13 +197,19 @@ def get_first_questions():
     recorded = max(
         db.session.execute(
             db.select(db.func.count(db.distinct(folded_column(ApplicationComponent.name)))).where(
-                ApplicationComponent.organization_id == org_id
+                ApplicationComponent.organization_id == org_id, is_application_expression(ApplicationComponent)
             )
         ).scalar_one(),
         db.session.execute(
             db.select(db.func.count(db.distinct(folded_column(ArchiMateElement.name)))).where(
                 ArchiMateElement.organization_id == org_id,
                 ArchiMateElement.type.in_(("ApplicationComponent", "Application")),
+                ~ArchiMateElement.id.in_(
+                    db.select(ApplicationComponent.archimate_element_id).where(
+                        ApplicationComponent.archimate_element_id.isnot(None),
+                        ~is_application_expression(ApplicationComponent),
+                    )
+                ),
             )
         ).scalar_one(),
     )

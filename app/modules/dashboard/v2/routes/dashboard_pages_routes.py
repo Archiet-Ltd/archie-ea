@@ -22,6 +22,7 @@ from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_te
 from flask_login import current_user, login_required
 
 from app.core.compat import mark_blueprint_guardrailed
+from app.services.application_kind import applications_query, is_application_expression
 from app.core.decorators import timed_route
 from app.decorators import audit_log
 from app.middleware.tenant_decorators import platform_admin_required
@@ -220,7 +221,6 @@ def import_history():
 @login_required
 def rationalization_dashboard():
     """Application Rationalization Dashboard - TIME Framework."""
-    from app.models import ApplicationComponent
     from app.modules.dashboard.v2.services import UnifiedDuplicateDetectionService
     from config import CurrencyConfig
 
@@ -233,7 +233,7 @@ def rationalization_dashboard():
 
     try:
         service = UnifiedDuplicateDetectionService()
-        total_apps = ApplicationComponent.query.count()
+        total_apps = applications_query().count()
         groups = service.get_duplicate_groups("simple", include_applications=True)
         runs = service.get_detection_runs("simple")
 
@@ -890,10 +890,9 @@ def validate_scoring_weights():
 @login_required
 def rationalization_assessment():
     """Render the rationalization assessment questionnaire page."""
-    from app.models import ApplicationComponent
 
     # ApplicationComponent has no is_active field — query all
-    applications = ApplicationComponent.query.all()
+    applications = applications_query().all()
     return render_template(
         "application_mgmt/rationalization_assessment.html", applications=applications
     )
@@ -998,8 +997,8 @@ def get_tco_cost_tiers():
         scope_filter = ApplicationComponent.lifecycle_status.in_(
             ["operational", "testing", "development", "deprecated"]
         )
-        total_portfolio = db.session.query(func.count(ApplicationComponent.id)).filter(scope_filter).scalar() or 0
-        apps_with_tco = db.session.query(func.count(ApplicationComponent.id)).filter(
+        total_portfolio = db.session.query(func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).filter(scope_filter).scalar() or 0
+        apps_with_tco = db.session.query(func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).filter(
             scope_filter, cost_col.isnot(None)
         ).scalar() or 0
         portfolio_tco = db.session.query(func.sum(cost_col)).filter(
@@ -1008,7 +1007,7 @@ def get_tco_cost_tiers():
 
         results = []
         for tier in tiers:
-            query = db.session.query(func.count(ApplicationComponent.id)).filter(
+            query = db.session.query(func.count(ApplicationComponent.id)).filter(is_application_expression(ApplicationComponent)).filter(
                 cost_col.isnot(None)
             )
 
@@ -1120,10 +1119,9 @@ def api_rationalization_onboard():
 @login_required
 def response_validation():
     """Render the response validation and data comparison page."""
-    from app.models import ApplicationComponent
 
     # ApplicationComponent has no is_active field — query all
-    applications = ApplicationComponent.query.all()
+    applications = applications_query().all()
     return render_template(
         "application_mgmt/response_validation.html", applications=applications
     )

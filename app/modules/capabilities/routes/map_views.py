@@ -18,6 +18,7 @@ from flask import abort, current_app, flash, g, jsonify, redirect, render_templa
 from flask_login import current_user, login_required
 
 from app.extensions.cache import cached
+from app.services.application_kind import applications_query
 from app import db
 
 from . import capability_map
@@ -435,9 +436,8 @@ def _dashboard_context():
         catalog = ApplicationCapabilityCatalogService.get_catalog_hierarchy()
 
         # Get application statistics
-        from app.models.application_layer import ApplicationComponent
 
-        applications = ApplicationComponent.query.count()
+        applications = applications_query().count()
         from app.models.business_capabilities import ApplicationCapabilityCoverage
 
         mappings = ApplicationCapabilityCoverage.query.count()

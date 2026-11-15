@@ -50,7 +50,7 @@ def build_data_freshness() -> Dict[str, Any]:
     """Portfolio-wide completeness roll-up across applications and capabilities."""
     from app import db  # noqa: PLC0415
     from app.models.application_owner import ApplicationOwner  # noqa: PLC0415
-    from app.models.application_portfolio import ApplicationComponent  # noqa: PLC0415
+    from app.services.application_kind import applications_query
     from app.models.business_capabilities import BusinessCapability  # noqa: PLC0415
     from app.services.application_fact_sheet import (  # noqa: PLC0415
         compute_completeness as app_completeness,
@@ -59,7 +59,7 @@ def build_data_freshness() -> Dict[str, Any]:
         _completeness as cap_completeness,
     )
 
-    apps = ApplicationComponent.query.limit(_SCAN_LIMIT).all()
+    apps = applications_query().limit(_SCAN_LIMIT).all()
     caps = BusinessCapability.query.limit(_SCAN_LIMIT).all()
 
     app_ids = [app.id for app in apps]

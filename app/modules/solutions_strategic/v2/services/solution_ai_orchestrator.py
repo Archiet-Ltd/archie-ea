@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app import db
+from app.services.application_kind import applications_query
 from app.models.solution_models import Solution
 from app.models.solution_reasoning import SolutionAIReasoningState
 
@@ -2808,7 +2809,7 @@ CRITICAL -- TRACEABILITY:
                     nfr_checklist=motiv_ctx['nfr_checklist'],
                     business_services_json=_json.dumps(biz_services, indent=2),
                     capabilities_json=caps_json,
-                    app_count=ApplicationComponent.query.count(),
+                    app_count=applications_query().count(),
                     existing_apps_json=existing_apps_json,
                 )
                 # Inject real app-capability coverage data

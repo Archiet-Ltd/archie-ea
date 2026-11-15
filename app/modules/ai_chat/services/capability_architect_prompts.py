@@ -102,9 +102,9 @@ def _platform_data_block() -> str:
     """
     lines = []
     try:
-        from app.models.application_layer import ApplicationComponent
+        from app.services.application_kind import applications_query
 
-        lines.append(f"- {ApplicationComponent.query.count()} applications (lifecycle_status uses Abacus codes: \"2.1 STRATEGIC\", \"5. DECOMMISSIONED\")")
+        lines.append(f"- {applications_query().count()} applications (lifecycle_status uses Abacus codes: \"2.1 STRATEGIC\", \"5. DECOMMISSIONED\")")
     except Exception:
         lines.append("- applications: count unavailable")
 
