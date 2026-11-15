@@ -66,13 +66,25 @@ def test_a_row_of_another_organisation_cannot_be_changed_or_removed(db_session, 
 
 
 def test_a_relationship_across_two_organisations_is_never_projected(db_session, make_org):
+    from sqlalchemy import text
+
     from app.models.archimate_core import ArchiMateRelationship
+    from app.models.relationship_guard import CrossOrganisationRelationship
     from app.services import capability_support as cs
 
     (org_a, app_a, cap_a), (org_b, app_b, cap_b) = _two_orgs(db_session, make_org)
-    db_session.add(ArchiMateRelationship(
-        type="realization", source_id=app_a.archimate_element_id, target_id=cap_b.archimate_element_id,
-        organization_id=org_a.id))
+    with pytest.raises(CrossOrganisationRelationship):
+        db_session.add(ArchiMateRelationship(
+            type="realization", source_id=app_a.archimate_element_id,
+            target_id=cap_b.archimate_element_id, organization_id=org_a.id))
+        db_session.flush()
+    db_session.rollback()
+    (org_a, app_a, cap_a), (org_b, app_b, cap_b) = _two_orgs(db_session, make_org)
+    # A row written before the organisation fence existed: plain SQL, no ORM event.
+    db_session.execute(
+        text("INSERT INTO archimate_relationships (type, source_id, target_id, organization_id) "
+             "VALUES ('realization', :s, :t, :o)"),
+        {"s": app_a.archimate_element_id, "t": cap_b.archimate_element_id, "o": org_a.id})
     db_session.flush()
     assert cs.support_rows(org_a.id) == [] and cs.support_rows(org_b.id) == []
 
