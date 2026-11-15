@@ -8,9 +8,8 @@ about before anything is written.
 import uuid
 from datetime import date
 
-import pytest
 
-from tests.test_change_review import PASS_ALL, FakeReviewer, _row, _user
+from tests.test_change_review import PASS_ALL, FakeReviewer, _user
 
 
 def _ask(user, tool, arguments, words="Please do it"):
