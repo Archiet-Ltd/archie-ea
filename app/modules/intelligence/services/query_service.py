@@ -28,6 +28,7 @@ from app.modules.intelligence.services.derived_facts import list_derived_facts
 from app.modules.intelligence.services.latency_probe import record_query_latency
 from app.modules.intelligence.services.plain_terms import plain_terms_sentence
 from app.modules.intelligence.services.reason_codes import validate_reason_code
+from app.services.archimate_import_service import _PARENT_RELATIONSHIPS
 from app.services.relationship_origin import manual_origin_text
 from app.models.archimate_element_types import is_application_kind
 
@@ -107,6 +108,71 @@ NFR5_INCLUDE_DERIVED = "true"
 # Shape-B trigger's threshold_seconds -- never as a yield target (task 02
 # constraint: no fabricated target anywhere in the payload).
 SHAPE_B_THRESHOLD_SECONDS = 2.0
+
+
+
+def _own_application_component(element, org_id):
+    """The application record the element itself carries (its own link first, the
+    reverse link second), inside the asking organisation; None when it has none."""
+    from app.models.application_portfolio import ApplicationComponent
+
+    component = None
+    if getattr(element, "application_component_id", None):
+        component = db.session.get(ApplicationComponent, element.application_component_id)
+    if component is None and is_application_kind(element.type):
+        component = ApplicationComponent.query.filter_by(archimate_element_id=element.id).first()
+    if component is not None and getattr(component, "organization_id", org_id) != org_id:
+        return None
+    return component
+
+
+def resolve_application_component(element, org_id):
+    """``(component, resolved_through)`` for the application record answering for *element*.
+
+    An element with a record of its own answers with it (``resolved_through`` is None). A
+    part of another element keeps no record of its own, so it is followed up through
+    composition and aggregation, nearest whole first, to the first one that has a record;
+    ``resolved_through`` then names the relationships followed and the whole's element id.
+    ``(None, None)`` when neither the element nor anything it is part of has one. The walk is
+    ``cross_layer_impact`` upstream, so it never leaves the asking organisation.
+    """
+    component = _own_application_component(element, org_id)
+    if component is not None:
+        return component, None
+
+    from app.models import ArchiMateElement, ArchiMateRelationship
+
+    walk = IntelligenceQueryService.cross_layer_impact(
+        element.id, direction="upstream", include_derived=False, with_owner=False, max_depth=5
+    )
+    rows = [
+        row
+        for row in walk.get("rows") or []
+        if row["relation"]["kind"] == "explicit"
+        and str(row["relation"].get("type") or "").lower() in _PARENT_RELATIONSHIPS
+    ]
+    rows.sort(key=lambda row: row["relation"]["depth"])
+    for row in rows:
+        chain = row["relation"]["chain"]
+        types = db.session.execute(
+            db.select(ArchiMateRelationship.type).where(ArchiMateRelationship.id.in_(chain))
+        ).scalars().all()
+        if len(types) != len(chain) or any(str(t or "").lower() not in _PARENT_RELATIONSHIPS for t in types):
+            continue
+        whole = db.session.execute(
+            db.select(ArchiMateElement).where(ArchiMateElement.id == row["element_id"])
+        ).scalar_one_or_none()
+        if whole is None or whole.organization_id != org_id:
+            continue
+        component = _own_application_component(whole, org_id)
+        if component is not None:
+            return component, {"relationship_ids": list(chain), "parent_element_id": whole.id, "parent_name": whole.name}
+    return None, None
+
+
+def part_of_sentence(part_name, application_name):
+    """The plain sentence saying a part answers with the application it belongs to."""
+    return "%s is part of %s; figures are %s's." % (part_name, application_name, application_name)
 
 
 def _include_derived_gate(include_derived: bool) -> bool:
@@ -567,6 +633,62 @@ def _element_ids_in_rows(rows: List[Dict[str, Any]]) -> List[int]:
         ids.append(row["element_id"])
         ids.extend(row["relation"].get("chain_elements") or [])
     return ids
+
+
+def filter_relationships_by_org(
+    relationships: List[Any], org_id: Optional[int], *, direction: str = "both"
+) -> List[Any]:
+    """Return only relationships whose far end belongs to ``org_id``.
+
+    This is the single shared fence for every screen that lists relationships.
+    The element drawer, the relationships list, the element relationships
+    endpoint, the enterprise relationships list and the drawer's solutions
+    list all use it, so a far end that belongs to another organisation is
+    left out everywhere.
+
+    Elements carry no shared-reference rows (the element table refuses a row with
+    no organisation), so there is no unowned far end to allow; ``org_id`` of
+    ``None`` sees nothing.
+
+    Args:
+        relationships: List of ArchiMateRelationship objects (or objects with
+            ``source_id`` and ``target_id`` attributes).
+        org_id: The organisation to fence on. If ``None``, returns an empty list
+            (no tenant context means nothing is shown).
+        direction: "incoming" keeps relationships where the source is in the org;
+            "outgoing" keeps relationships where the target is in the org;
+            "both" (default) keeps relationships where both ends are in the org.
+
+    Returns:
+        Filtered list of the same relationship objects, in the same order.
+    """
+
+    if org_id is None:
+        return []
+
+    # Collect all far-end element IDs we need to check
+    far_end_ids: List[int] = []
+    for rel in relationships:
+        if direction in ("incoming", "both"):
+            far_end_ids.append(rel.source_id)
+        if direction in ("outgoing", "both"):
+            far_end_ids.append(rel.target_id)
+
+    # Resolve in one batched query: only elements inside org_id are returned
+    resolved = _resolve_elements_batch(far_end_ids, org_id)
+    allowed_ids = set(resolved.keys())
+
+    # Filter relationships
+    kept = []
+    for rel in relationships:
+        if direction in ("incoming", "both"):
+            if str(rel.source_id) not in allowed_ids:
+                continue
+        if direction in ("outgoing", "both"):
+            if str(rel.target_id) not in allowed_ids:
+                continue
+        kept.append(rel)
+    return kept
 
 
 def _name_in(elements: Dict[str, Dict[str, Any]], element_id: Optional[int]) -> Optional[str]:
@@ -1576,14 +1698,10 @@ class IntelligenceQueryService:
         algorithm, per the platform convention against parallel scoring
         logic.
 
-        Scope note, not silently dropped: ``RiskEntityLink`` (a risk
-        threatening an Application/Solution/Programme with no direct
-        ``archimate_element_id`` of its own on this element) is not resolved
-        here -- none of those three models carry an ArchiMate mirror id
-        today, so there is no element to seed a traversal from. Only
-        directly-mirrored risks are answered; an indirect risk is invisible
-        to this query, not wrongly reported as "none". Tracked as a
-        follow-up, not implemented speculatively.
+        A risk is also found when a link points at the record this element mirrors (an
+        application, capability or programme) or at the element itself, read through
+        ``risk_service.risk_ids_touching_elements``. The legacy pointer branch stays for an
+        element that is not the risk's own mirror.
 
         Score is a **display** label, not a stored fact (per
         ``intelligence-lenses-v1.md`` L6): each risk's own
@@ -1618,13 +1736,21 @@ class IntelligenceQueryService:
                     "elements": {},
                 }
 
+            from app.services import risk_service
+
+            touching = risk_service.risk_ids_touching_elements(org_id, [element_id])
             seed_risks = (
                 db.session.execute(
-                    db.select(Risk).where(Risk.archimate_element_id == element_id)
+                    db.select(Risk).where(
+                        Risk.organization_id == org_id,
+                        db.or_(Risk.archimate_element_id == element_id,
+                               Risk.id.in_(list(touching) or [-1])),
+                    ).order_by(Risk.id)
                 )
                 .scalars()
                 .all()
             )
+            ranked = {row["risk_id"]: row for row in risk_service.ranked_risks(org_id)["rows"]}
 
             if not seed_risks:
                 return {
@@ -1635,14 +1761,15 @@ class IntelligenceQueryService:
 
             all_elements: Dict[str, Dict[str, Any]] = {}
             risk_payloads: List[Dict[str, Any]] = []
+            blast = IntelligenceQueryService.cross_layer_impact(
+                element_id,
+                include_derived=include_derived,
+                max_depth=max_depth,
+                with_owner=True,
+            )
+            all_elements.update(blast.get("elements") or {})
             for risk in seed_risks:
-                blast = IntelligenceQueryService.cross_layer_impact(
-                    element_id,
-                    include_derived=include_derived,
-                    max_depth=max_depth,
-                    with_owner=True,
-                )
-                all_elements.update(blast.get("elements") or {})
+                row = ranked.get(risk.id) or {}
                 risk_payloads.append(
                     {
                         "risk_id": risk.id,
@@ -1655,6 +1782,8 @@ class IntelligenceQueryService:
                         "risk_level": risk.risk_level,
                         "owner": risk.owner,
                         "mitigation_plan": risk.mitigation_plan,
+                        "touches": row.get("touches") or [],
+                        "url": "/risks/%d" % risk.id,
                         "affected_rows": blast.get("rows", []),
                         "affected_summary": blast.get("summary", {}),
                     }
@@ -2396,17 +2525,16 @@ class IntelligenceQueryService:
                 "component": None,
             }
 
-        component = None
-        if getattr(element, "application_component_id", None):
-            component = db.session.get(ApplicationComponent, element.application_component_id)
-        if component is None and is_application_kind(element.type):
-            component = ApplicationComponent.query.filter_by(archimate_element_id=element.id).first()
+        component, resolved_through = resolve_application_component(element, org_id)
 
         if component is None:
             return {
                 "application_component_id": None,
                 "reasons": [NO_APPLICATION_COMPONENT_REASON],
                 "component": None,
+                "resolved_through": None,
+                "part_of": None,
+                "message": "%s is not part of any application in the model." % element.name,
             }
 
         licence_entries = _licence_entries(component, org_id)
@@ -2423,6 +2551,9 @@ class IntelligenceQueryService:
             "application_component_id": component.id,
             "reasons": [],
             "component": component_block,
+            "resolved_through": resolved_through,
+            "part_of": part_of_sentence(element.name, component.name) if resolved_through else None,
+            "message": None,
         }
 
     @staticmethod
@@ -3030,7 +3161,6 @@ class IntelligenceQueryService:
 
         from app.models import ArchiMateElement
         from app.models.application_compliance import ApplicationComplianceControl
-        from app.models.application_portfolio import ApplicationComponent
         from app.models.compliance_models import ComplianceControl, RegulatoryFramework
         from app.models.policy_monitoring import ArchitecturePolicy, ComplianceStatus, PolicyViolation
 
@@ -3050,19 +3180,8 @@ class IntelligenceQueryService:
         if element is None:
             return {**empty, "reasons": [ELEMENT_NOT_FOUND_REASON]}
 
-        component_id = None
-        if getattr(element, "application_component_id", None):
-            component_id = db.session.execute(
-                db.select(ApplicationComponent.id)
-                .where(ApplicationComponent.id == element.application_component_id)
-                .where(predicate(ApplicationComponent, org_id))
-            ).scalar_one_or_none()
-        if component_id is None:
-            component_id = db.session.execute(
-                db.select(ApplicationComponent.id)
-                .where(ApplicationComponent.archimate_element_id == element_id)
-                .where(predicate(ApplicationComponent, org_id))
-            ).scalars().first()
+        resolved, _through = resolve_application_component(element, org_id)
+        component_id = resolved.id if resolved is not None else None
         if component_id is None:
             return {**empty, "reasons": [NO_APPLICATION_COMPONENT_REASON]}
 

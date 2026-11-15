@@ -510,6 +510,22 @@ def require_roles(*allowed_roles):
                 )
                 abort(403)
 
+            # The organisation role is the ceiling: a platform role or a persona that admits a viewer to
+            # a route that writes does not let the viewer write.
+            from flask import request
+
+            from app._bootstrap.write_access import WRITE_METHODS
+            from app.core.auth.permissions import is_read_only_member
+
+            if request.method in WRITE_METHODS and is_read_only_member(current_user):
+                from app._bootstrap.write_access import _reason_for, _refusal
+
+                return _refusal(_reason_for(request.endpoint))
+
+            # The route's own role check admitted the person; the write guard reads this note.
+            from app.core.auth.permissions import note_route_granted_write
+
+            note_route_granted_write()
             return f(*args, **kwargs)
 
         # R2-5 (PR 428 round 3): only when "admin" is among the roles this
@@ -523,6 +539,10 @@ def require_roles(*allowed_roles):
         # is active.
         if any(_normalize_role_name(r) == "admin" for r in allowed_roles):
             decorated_function._active_org_rbac_gate = "require_roles"
+        # The write guard reads this to let the route give its own refusal to a person it refuses.
+        decorated_function.role_guard = frozenset(
+            n for n in (_normalize_role_name(r) for r in allowed_roles) if n
+        )
 
         return decorated_function
 
