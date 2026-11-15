@@ -79,3 +79,68 @@ def test_undo_removes_what_a_blueprint_proposal_added_and_refuses_a_link(db_sess
         refused = service.undo_applied(repeat_id)
         assert refused["success"] is False and "Nothing was added" in refused["error"]
         assert _count(org.id, "Existing hub %s" % suffix) == 1
+
+
+def test_undo_refuses_to_overwrite_a_field_edited_after_the_change(db_session, make_org, tenant_ctx, monkeypatch):
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.ai_chat.services import change_review
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    org, other = make_org("undo-d"), make_org("undo-e")
+    founder = _user(db_session, org.id)
+    founder.confirmed = True
+    name = "Atlas %s" % uuid.uuid4().hex[:6]
+    atlas = _application(db_session, org.id, name, "development")
+    theirs = _application(db_session, other.id, name, "development")
+    FakeReviewer([PASS_ALL]).install(monkeypatch)
+
+    with tenant_ctx(org.id):
+        approval_id, verdict = _ask_for_status(founder, name, "production")
+        assert verdict["state"] == "applied" and _status_of(atlas.id) == "production"
+        # A person edits the same field afterwards.
+        ApplicationComponent.query.filter_by(id=atlas.id, organization_id=org.id).one().deployment_status = "decommissioned"
+        db.session.commit()
+
+        refused = AIChatApprovalService(founder.id).undo_applied(approval_id)
+
+        assert refused["success"] is False and refused["code"] == "CONFLICT", refused
+        assert name in refused["error"] and "deployment status" in refused["error"] and "overwrite" in refused["error"]
+        assert _status_of(atlas.id) == "decommissioned", "the later edit is still there"
+        assert change_review.record_row(_row(approval_id))["label"] == "Applied"
+    with tenant_ctx(other.id):
+        assert _status_of(theirs.id) == "development", "the other organisation's record was not touched"
+
+
+def test_undo_keeps_a_relationship_added_after_the_change(db_session, make_org, tenant_ctx, monkeypatch):
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.modules.ai_chat.services import change_review
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    org, other = make_org("undo-f"), make_org("undo-g")
+    admin = _administrator(db_session, org.id)
+    _administrator(db_session, other.id)
+    solution = _solution(db_session, org.id)
+    suffix = uuid.uuid4().hex[:5]
+    hub = _element(db_session, org.id, "Reporting hub %s" % suffix)
+    Reviewer(monkeypatch)
+    with tenant_ctx(org.id):
+        fresh = _propose(db_session, org.id, solution, "Brand new desk %s" % suffix)
+        change_review.settle_proposals(org.id)
+        fresh_id = fresh.id
+        desk = ArchiMateElement.query.filter_by(
+            organization_id=org.id, name="Brand new desk %s" % suffix, type="ApplicationComponent").one()
+        # A person links the new desk to the hub afterwards.
+        later = ArchiMateRelationship(organization_id=org.id, source_id=desk.id, target_id=hub.id, type="Serving")
+        db_session.add(later)
+        db_session.commit()
+        later_id, desk_id = later.id, desk.id
+
+        refused = AIChatApprovalService(admin.id).undo_applied(fresh_id)
+
+        assert refused["success"] is False and refused["code"] == "CONFLICT", refused
+        assert "Brand new desk %s" % suffix in refused["error"] and "added after this item" in refused["error"]
+        db_session.expire_all()
+        assert ArchiMateRelationship.query.filter_by(id=later_id, organization_id=org.id).count() == 1
+        assert ArchiMateElement.query.filter_by(id=desk_id, organization_id=org.id).one().deleted_at is None
+        assert change_review.record_row(_row(fresh_id))["label"] == "Applied"

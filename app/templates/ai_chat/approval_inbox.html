@@ -91,7 +91,7 @@
     {% endfor %}
 
     {% if record.undone %}
-    <p class="text-sm text-muted-foreground" data-testid="review-record-undone">Undone on {{ record.undone.at[:10] }}. {{ record.undone.what }}</p>
+    <p class="text-sm text-muted-foreground" data-testid="review-record-undone">Undone on {{ record.undone.at|format_date }}. {{ record.undone.what }}</p>
     {% elif record.undo_problem %}
     <p class="text-sm text-muted-foreground" data-testid="review-record-undo">Undo: {{ record.undo_problem }}</p>
     {% endif %}

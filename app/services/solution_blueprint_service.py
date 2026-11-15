@@ -9,6 +9,13 @@ from app import db
 from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
 
 
+def _kind_words(archimate_type) -> str:
+    """An ArchiMate type as a person says it ('application component')."""
+    from app.navigation.registry import element_type_label
+
+    return element_type_label(str(archimate_type or "element")).lower()
+
+
 def create_solution_blueprint_proposal(**kwargs) -> "SolutionBlueprintProposal":
     """Consolidation: the one place every pending SolutionBlueprintProposal is created.
 
@@ -39,7 +46,7 @@ def create_solution_blueprint_proposal(**kwargs) -> "SolutionBlueprintProposal":
             operation_type="propose",
             entity_type="solution_blueprint_element",
             entity_id=proposal.id,
-            summary=f"Blueprint proposal: {proposal.name} ({proposal.archimate_type})",
+            summary=f"Blueprint proposal: {proposal.name} ({_kind_words(proposal.archimate_type)})",
             operation_payload={
                 "solution_blueprint_proposal_id": proposal.id,
                 "solution_id": proposal.solution_id,

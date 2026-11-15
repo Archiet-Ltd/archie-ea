@@ -3,15 +3,15 @@
 Before proposals settled on the server, a solution blueprint, a read of GitHub or a connection could leave
 proposals pending, and some of them expired. This command runs each one through the same loop everything else
 now uses (``app.modules.ai_chat.services.change_review``): the deterministic checks, a reviewer other than the
-drafter, then applied, linked to the element the workspace already has, declined with reasons, or, when past its
-time, retired with "expired on <date>; not applied".
+drafter, then applied, linked to the element the workspace already has, or declined with reasons. One that waited
+past its time is checked again like the rest; being late is never a reason to decline it.
 
     flask --app manage settle-waiting-proposals --dry-run
     flask --app manage settle-waiting-proposals
     flask --app manage settle-waiting-proposals --organization-id 7
 
 ``--dry-run`` writes nothing and calls no model: it runs only the deterministic checks and says how many items
-would be linked, retired and declined, and how many pass the checks and go to the reviewer. It is a command
+would be linked, applied and declined, and how many pass the checks and go to the reviewer. It is a command
 for the deploy to run by hand, after a backup; it is not a migration and it is not part of the schema deploy.
 """
 

@@ -199,7 +199,11 @@ def _fail(criterion, reason):
                          for n in range(1, 8)]}
 
 
-def test_a_proposal_past_its_time_is_retired_and_never_applied(db_session, make_org, tenant_ctx, monkeypatch):
+def test_a_proposal_past_its_time_is_checked_again_and_never_declined_for_being_late(
+    db_session, make_org, tenant_ctx, monkeypatch
+):
+    """Nobody looked at it before its date, so lateness says nothing about it: it is checked again, now, and
+    settles on its merits."""
     from app.models.ai_chat_crud_approval import ApprovalStatus
     from app.modules.ai_chat.services import change_review
 
@@ -217,14 +221,13 @@ def test_a_proposal_past_its_time_is_retired_and_never_applied(db_session, make_
         counts = change_review.settle_proposals(org.id)
 
         row = _row(approval.id)
-        assert row.status == ApprovalStatus.REJECTED
-        assert _saved(row)["outcome"] == "retired"
-        assert "Expired on 19 October 2026; not applied." in " ".join(_saved(row)["outcome_reasons"])
-        assert row.rejected_reason.startswith("Expired on 19 October 2026")
-        assert _count(org.id) == before and _count(org.id, name) == 0
-        assert reviewer.prompts == []  # no reviewer was asked about it
-        assert counts["retired"] == 1
-        assert change_review.describe(row)["verdict"] == "Retired"
+        assert row.status == ApprovalStatus.APPROVED
+        assert _saved(row)["outcome"] == "applied" and counts["applied"] == 1 and counts["retired"] == 0
+        reasons = " ".join(c["reason"] for c in _saved(row)["checks"])
+        assert "checked again now" in reasons and "19 Oct 2026" in reasons
+        assert "Expired" not in reasons and not (row.rejected_reason or "")
+        assert _count(org.id, name, "ApplicationComponent") == 1 and _count(org.id) > before
+        assert change_review.describe(row)["verdict"] != "Retired"
 
 
 def test_an_item_the_reviewer_fails_twice_is_declined_with_the_reason_and_leaves_nothing_waiting(

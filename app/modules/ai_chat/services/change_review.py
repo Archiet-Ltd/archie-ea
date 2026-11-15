@@ -111,7 +111,14 @@ CHAT_CRUD_ENTITIES = (
 # The writers whose proposals this review settles whatever made them, with no person asking: a solution
 # blueprint, a read of GitHub, and a change to or read of a connection. The organisation's system actor
 # decides them (see ``system_actor``).
-PROPOSAL_SOURCES = ("solution_blueprint_proposals", "github_connector", "connector_config")
+PROPOSAL_SOURCES = (
+    "solution_blueprint_proposals", "github_connector", "connector_config",
+    # The other writers of proposals nobody asked for: a confidence review, a suggested relationship, a match a
+    # connector could not make alone, a vendor detection, a vendor product deadline, a read of the website, an
+    # application's owner and an architecture review item.
+    "review_queue_items", "relationship_suggestions", "matcher_service", "vendor_detection", "vendor_products",
+    "website_crawler", "application_ownership", "arb_review_items",
+)
 EXPIRED_CHECK_NAME = "Still current"
 # How alike two names must score (SimpleDuplicateService) for the reviewer to be shown the existing element. Low on
 # purpose: the reviewer, not the score, decides whether two close names are one thing.
@@ -680,6 +687,35 @@ def resolve_target(approval: AIChatCRUDApproval, payload: Any, org_id: int) -> T
                   before={"kind": "create", "note": "Nothing existed before; undoing it removes the new record."})
 
 
+def _element_words(element: Dict[str, Any]) -> str:
+    """An element as a person names it: 'Payments Service (application component)', never its id."""
+    from app.navigation.registry import element_type_label
+
+    kind = element_type_label(element["type"]).lower() if element.get("type") else ""
+    return "%s (%s)" % (element["name"], kind) if kind else str(element["name"])
+
+
+def _plain_summary(approval: AIChatCRUDApproval, payload: Dict[str, Any]) -> str:
+    """The item's one-line summary with an internal ArchiMate type written as a plain kind."""
+    summary = approval.summary or ""
+    kind = payload.get("archimate_type") if isinstance(payload, dict) else None
+    if kind and "(%s)" % kind in summary:
+        from app.navigation.registry import element_type_label
+
+        summary = summary.replace("(%s)" % kind, "(%s)" % element_type_label(kind).lower())
+    return summary
+
+
+def _plain_date(value) -> str:
+    """A date the way a person reads it: 15 Nov 2026."""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return value
+    return value.strftime("%d %b %Y").lstrip("0") if value else ""
+
+
 def is_proposal(approval: AIChatCRUDApproval) -> bool:
     """True for a proposal written by a connector or a blueprint (see PROPOSAL_SOURCES), asked for by no one."""
     return approval.source_table in PROPOSAL_SOURCES
@@ -702,6 +738,10 @@ def in_scope(approval: AIChatCRUDApproval) -> bool:
     """True for a change this review settles: a proposal from any writer in PROPOSAL_SOURCES, the
     assistant's tool calls, and the chat's own changes (see CHAT_CRUD_OPERATIONS)."""
     if is_proposal(approval):
+        return True
+    if approval.rubric_version is not None and not approval.source_table:
+        # Any other writer's change that was entered into the review when it was written (a person's request
+        # for a classification, a charter or a stewardship change) is settled the same way.
         return True
     if approval.user_id is None or approval.source_table:
         return False
@@ -742,13 +782,13 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
         return checks, Target(False)
 
     if is_proposal(approval):
-        # A proposal past its due time is never applied, whatever it says.
+        # A proposal that waited past its due time was not looked at, not judged: it is checked again, now,
+        # against the model as it stands today, and settles on its merits like any other.
         expires = approval.expires_at
-        expired = expires is not None and expires < datetime.utcnow()
-        if not add(EXPIRED_CHECK_NAME, not expired,
-                   "It is still within the time it was proposed for." if not expired
-                   else "Expired on %s; not applied." % expires.strftime("%d %B %Y").lstrip("0")):
-            return checks, Target(False)
+        late = expires is not None and expires < datetime.utcnow()
+        add(EXPIRED_CHECK_NAME, True,
+            "It was proposed for %s and had not been looked at by then, so it is checked again now against the model as it is today."
+            % _plain_date(expires) if late else "It is still within the time it was proposed for.")
 
     payload = _payload_of(approval)
     if approval.operation_type == "tool_use":
@@ -813,10 +853,17 @@ def run_checks(service, approval: AIChatCRUDApproval, requester) -> Tuple[List[C
                    "Everything it refers to is already in the model." if blocker is None else blocker):
             return checks, target
     if approval.source_table == "solution_blueprint_proposals":
+        from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
+
+        proposal = SolutionBlueprintProposal.query.filter_by(id=approval.source_id, organization_id=org_id).first()
+        if not add("Still in the design", proposal is not None and proposal.status != "rejected",
+                   "It is still part of the design." if proposal is not None and proposal.status != "rejected"
+                   else "It was removed from the design before it was checked, so it is not applied."):
+            return checks, target
         if target.link:
             add("Not already in the model", True,
-                "It is already in the model as %s (element %d), so it is linked to that one and not added again."
-                % (target.link["name"], target.link["id"]))
+                "It is already in the model as %s, so it is linked to that one and not added again."
+                % _element_words(target.link))
         else:
             add("Not already in the model", True,
                 ("Nothing of that name and type is in the model; %d look similar and are judged by the reviewer."
@@ -1071,6 +1118,8 @@ def _state(approval: AIChatCRUDApproval) -> Dict[str, Any]:
         "linked_to": state.get("linked_to"),
         SETTLED_ON_CHECKS_KEY: state.get(SETTLED_ON_CHECKS_KEY),
         "undone": state.get("undone"),
+        "written": state.get("written"),
+        "added_relationships": state.get("added_relationships"),
     }
 
 
@@ -1285,16 +1334,14 @@ def settle(
     failed = next((c for c in checks if not c.passed), None)
     if failed is not None:
         return _decline(service, approval, state, [failed.reason],
-                        charter_refused=failed.name == CHARTER_CHECK_NAME,
-                        outcome="retired" if failed.name == EXPIRED_CHECK_NAME else "declined")
+                        charter_refused=failed.name == CHARTER_CHECK_NAME)
 
     # 2b. An exact repeat of an element already in the model is linked to it: nothing is added and no reviewer
     # is called.
     if target.link:
         state["linked_to"] = target.link
         return _apply_on_checks(service, approval, state, target,
-                                "Linked to the existing %s (element %d); nothing was added." % (
-                                    target.link["name"], target.link["id"]))
+                                "Linked to the existing %s; nothing was added." % _element_words(target.link))
 
     # 3. The reviewer: never the model that drafted. It stays the same across the rounds of one change.
     drafter_provider, drafter_model = split_ref(approval.drafter_model)
@@ -1353,8 +1400,8 @@ def settle(
                 state["linked_to"] = moved
                 target.link = moved
                 return _apply_on_checks(service, approval, state, target,
-                                        "The reviewer judged it the same as %s (element %d), so it is linked to "
-                                        "that one and nothing was added." % (moved["name"], moved["id"]),
+                                        "The reviewer judged it the same as %s, so it is linked to "
+                                        "that one and nothing was added." % _element_words(moved),
                                         reviewed=True)
             state["rounds"].append({"round": number, "passed": passed, "criteria": results,
                                     "summary": approval.summary})
@@ -1438,15 +1485,48 @@ def _apply_on_checks(
     return _apply(service, approval, state, None, note=note)
 
 
+def _newest_relationship_id(org_id: int) -> int:
+    from app.models.archimate_core import ArchiMateRelationship
+
+    return db.session.query(db.func.max(ArchiMateRelationship.id)).filter(
+        ArchiMateRelationship.organization_id == org_id).scalar() or 0
+
+
+def _remember_what_was_written(approval: AIChatCRUDApproval, state: Dict[str, Any], org_id: int,
+                               newest_relationship: int) -> None:
+    """Record what this change itself set, so Undo can tell it from what someone changed afterwards: the value of
+    each field it overwrote, and the relationships that appeared on the elements it added."""
+    snapshot = approval.before_snapshot if isinstance(approval.before_snapshot, dict) else {}
+    written: Dict[str, Any] = {}
+    for item in _restorable(snapshot):
+        model = _model_named(item["record"])
+        row = _scoped_row(model, item["id"], org_id) if model is not None else None
+        if row is not None:
+            written["%s:%s" % (item["record"], item["id"])] = {
+                key: _plain_value(getattr(row, key)) for key in item["fields"] if hasattr(row, key)}
+    state["written"] = written or None
+    elements = _created_ids(approval).get("elements", [])
+    if elements:
+        from app.models.archimate_core import ArchiMateRelationship
+
+        state["added_relationships"] = sorted({
+            r.id for r in ArchiMateRelationship.query.filter(
+                ArchiMateRelationship.organization_id == org_id, ArchiMateRelationship.id > newest_relationship,
+                db.or_(ArchiMateRelationship.source_id.in_(elements), ArchiMateRelationship.target_id.in_(elements)),
+            ).all()} | set(_created_ids(approval).get("relationships", [])))
+
+
 def _apply(
     service, approval: AIChatCRUDApproval, state: Dict[str, Any], approved_by: Optional[int] = None,
     note: Optional[str] = None,
 ) -> Dict[str, Any]:
     approval_id, org_id = approval.id, approval.organization_id
+    newest_relationship = _newest_relationship_id(org_id)
     result = service.approve_and_execute(approval_id, settled_by_review=True, approved_by=approved_by)
     db.session.expire_all()
     approval = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=org_id).first()
     if result.get("success"):
+        _remember_what_was_written(approval, state, org_id, newest_relationship)
         inner = result.get("result") if isinstance(result.get("result"), dict) else {}
         summary = _short(inner.get("message") or approval.summary, 300)
         linked = bool(inner.get("linked") or inner.get("already_in_model") or state.get("linked_to"))
@@ -1661,7 +1741,7 @@ def record_row(approval: AIChatCRUDApproval, people: Optional[Dict[int, str]] = 
             if saved["rounds"] and approval.reviewer_model else "Checked and applied.")
         if saved["undone"]:
             label, tone = "Undone", "neutral"
-            reason = "Undone on %s. %s" % (str(saved["undone"].get("at") or "")[:10], reason)
+            reason = "Undone on %s. %s" % (_plain_date(saved["undone"].get("at")), reason)
     else:
         label, tone = LOOP_OUTCOME_WORDS["retired" if saved["outcome"] == "retired" else "declined"]
         reason = " ".join(saved["outcome_reasons"]) or approval.rejected_reason or "No reason was recorded."
@@ -1683,7 +1763,7 @@ def record_row(approval: AIChatCRUDApproval, people: Optional[Dict[int, str]] = 
     problem = undo_problem(approval)
     return {
         "id": approval.id,
-        "summary": approval.summary,
+        "summary": _plain_summary(approval, payload),
         "label": label,
         "tone": tone,
         "reason": reason,
@@ -1692,10 +1772,18 @@ def record_row(approval: AIChatCRUDApproval, people: Optional[Dict[int, str]] = 
         "source_key": approval.source_table or "chat",
         "when": approval.executed_at or approval.approved_at or approval.created_at,
         "can_undo": problem is None,
-        "undo_note": None if problem is None else "Cannot be undone",
+        "undo_note": None if problem is None else _undo_note(approval, saved, problem),
         "record_url": record_path(approval.id),
         "requested_by": (people or {}).get(approval.user_id) or "The system",
     }
+
+
+def _undo_note(approval: AIChatCRUDApproval, saved: Dict[str, Any], problem: str) -> Optional[str]:
+    """The short note beside a row with no Undo: only an applied item that truly cannot be undone says so.
+    A declined, waiting, linked or already undone row has nothing to undo, so it says nothing."""
+    if approval.status != ApprovalStatus.APPROVED or saved["undone"] or saved["outcome"] == "linked":
+        return None
+    return "Cannot be undone"
 
 
 def undo(service, approval: AIChatCRUDApproval, actor) -> Dict[str, Any]:
@@ -1707,13 +1795,27 @@ def undo(service, approval: AIChatCRUDApproval, actor) -> Dict[str, Any]:
     org_id = approval.organization_id
     snapshot = approval.before_snapshot if isinstance(approval.before_snapshot, dict) else {}
     restorable = _restorable(snapshot)
+    saved = _state(approval)
     if restorable:
         model = _model_named(restorable[0]["record"])
-        restored, names = 0, set()
+        rows = []
         for item in restorable:
             row = _scoped_row(model, item["id"], org_id) if model is not None else None
             if row is None:
                 continue
+            # Only what this change set is put back: a field someone has edited since is not touched.
+            written = (saved["written"] or {}).get("%s:%s" % (item["record"], item["id"]))
+            later = [key for key in item["fields"]
+                     if written is not None and key in written and hasattr(row, key)
+                     and _plain_value(getattr(row, key)) != written[key]]
+            if later:
+                return {"success": False, "code": "CONFLICT", "error": (
+                    "Not undone: %s was changed after this item (%s), and putting the old value back would "
+                    "overwrite that change." % (getattr(row, "name", None) or "the record",
+                                                 ", ".join(k.replace("_", " ") for k in later)))}
+            rows.append((row, item))
+        restored, names = 0, set()
+        for row, item in rows:
             for key, value in item["fields"].items():  # request-field-writes-ok: the values come from this server's own before_snapshot, not from a request body
                 if hasattr(row, key):
                     setattr(row, key, value)
@@ -1721,14 +1823,33 @@ def undo(service, approval: AIChatCRUDApproval, actor) -> Dict[str, Any]:
             restored += 1
         if not restored:
             return {"success": False, "code": "CONFLICT", "error": "The record it changed is no longer in this workspace."}
-        what = "Put back %s on %d record%s." % (", ".join(sorted(names)), restored, "" if restored == 1 else "s")
+        what = "Put back %s on %d record%s." % (", ".join(sorted(names)), restored,
+                                              "" if restored == 1 else "s")
     else:
         from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+        from app.models.solution_models import SolutionArchiMateElement
 
         created = _created_ids(approval)
         now = datetime.utcnow()
+        ours = set(created.get("relationships", [])) | set(saved["added_relationships"] or [])
+        # A relationship that joins what this item added to something, but that this item did not add, was made
+        # later by a person; it is never removed, and the element it joins is not removed from under it.
+        for element_id in created.get("elements", []):
+            element = ArchiMateElement.query.filter_by(id=element_id, organization_id=org_id).first()
+            if element is None:
+                continue
+            others = ArchiMateRelationship.query.filter(
+                ArchiMateRelationship.organization_id == org_id,
+                db.or_(ArchiMateRelationship.source_id == element_id, ArchiMateRelationship.target_id == element_id),
+                ~ArchiMateRelationship.id.in_(ours or {0}),
+            ).count()
+            if others:
+                return {"success": False, "code": "CONFLICT", "error": (
+                    "Not undone: %s now has %d relationship%s that %s added after this item. Remove %s first, "
+                    "then undo this." % (element.name, others, "" if others == 1 else "s",
+                                         "was" if others == 1 else "were", "it" if others == 1 else "them"))}
         removed = 0
-        for rel_id in created.get("relationships", []):
+        for rel_id in ours:
             rel = ArchiMateRelationship.query.filter_by(id=rel_id, organization_id=org_id).first()
             if rel is not None:
                 db.session.delete(rel)
@@ -1737,13 +1858,6 @@ def undo(service, approval: AIChatCRUDApproval, actor) -> Dict[str, Any]:
             element = ArchiMateElement.query.filter_by(id=element_id, organization_id=org_id).first()
             if element is None:
                 continue
-            for rel in ArchiMateRelationship.query.filter(
-                ArchiMateRelationship.organization_id == org_id,
-                db.or_(ArchiMateRelationship.source_id == element_id, ArchiMateRelationship.target_id == element_id),
-            ).all():
-                db.session.delete(rel)
-            from app.models.solution_models import SolutionArchiMateElement
-
             for junction in SolutionArchiMateElement.query.filter_by(element_id=element_id).all():
                 db.session.delete(junction)
             if hasattr(element, "deleted_at"):
@@ -1941,6 +2055,17 @@ def queue_settling(organization_id: int) -> None:
                            payload={"organization_id": organization_id}))
 
 
+def _entered_not_started():
+    """A person's change that was entered into the review when it was written and that no review has begun on:
+    the settle pass takes it. One a review is part-way through (it has events) is left to that review or the sweep."""
+    return db.and_(
+        AIChatCRUDApproval.user_id.isnot(None), AIChatCRUDApproval.source_table.is_(None),
+        AIChatCRUDApproval.rubric_version.isnot(None),
+        ~db.exists().where(db.and_(AIChatApprovalAuditLog.approval_id == AIChatCRUDApproval.id,
+                                   AIChatApprovalAuditLog.event.in_(LOOP_EVENTS))),
+    )
+
+
 def settle_proposals(
     organization_id: int, sources: Optional[Tuple[str, ...]] = None, budget: Optional[ReviewBudget] = None,
     only_ids: Optional[List[int]] = None,
@@ -1982,7 +2107,8 @@ def _settle_proposals_locked(
         query = AIChatCRUDApproval.query.filter(
             AIChatCRUDApproval.organization_id == organization_id,
             AIChatCRUDApproval.status == ApprovalStatus.PENDING,
-            AIChatCRUDApproval.source_table.in_(sources or PROPOSAL_SOURCES),
+            AIChatCRUDApproval.source_table.in_(sources) if sources else db.or_(
+                AIChatCRUDApproval.source_table.in_(PROPOSAL_SOURCES), _entered_not_started()),
         )
         if only_ids is not None:
             query = query.filter(AIChatCRUDApproval.id.in_(only_ids))

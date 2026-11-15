@@ -140,7 +140,7 @@ def create_approval_record(
         source_id=source_id,
         persona=persona,
         drafter_model=drafter_model,
-        rubric_version=_review_rubric_version() if (settle or enter_review) else None,
+        rubric_version=_review_rubric_version(),
     )
     db.session.add(approval)
     db.session.flush()
@@ -154,6 +154,12 @@ def create_approval_record(
             actor_type="user" if user_id is not None else "system",
         )
     )
+    if not settle:
+        # Every record a writer makes is entered into the review: the job worker settles it as soon as the
+        # writer saves, and nobody approves it. (Added to the writer's own transaction.)
+        from app.modules.ai_chat.services.change_review import queue_settling
+
+        queue_settling(organization_id)
     if settle and user_id is not None:
         db.session.commit()
         approval.review_verdict = AIChatApprovalService(user_id).settle_after_review(

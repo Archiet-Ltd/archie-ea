@@ -55,9 +55,11 @@ def _seed(db_session, org, solution, suffix, due):
     return proposals
 
 
-def test_the_job_retires_all_thirty_five_because_each_is_past_its_time_and_adds_nothing(
+def test_the_job_checks_the_thirty_five_again_though_each_is_past_its_time_and_adds_no_second_element(
     db_session, make_org, tenant_ctx, monkeypatch
 ):
+    """Nobody looked at them before 19 October 2026, so lateness is not a reason: each is checked now, the
+    sixteen exact repeats link to what is there, and none is declined for being late."""
     from app.commands.settle_waiting_proposals import plan_organisation
     from app.models.ai_chat_crud_approval import ApprovalStatus
     from app.modules.ai_chat.services import change_review
@@ -79,17 +81,18 @@ def test_the_job_retires_all_thirty_five_because_each_is_past_its_time_and_adds_
 
         plan = plan_organisation(org.id)
         print("DRY RUN (as they are on production, due 19 October 2026):", plan)
-        assert plan["total"] == 35 and plan["retire"] == 35 and plan["link"] == plan["apply"] == plan["decline"] == 0
+        assert plan["total"] == 35 and plan["retire"] == 0 and plan["decline"] == 0
+        assert plan["link"] + plan["apply"] == 35
         assert _count(org.id) == before and all(_row(i).status == ApprovalStatus.PENDING for i in ids), "a dry run writes nothing"
 
         counts = change_review.settle_proposals(org.id)
 
-        assert counts["retired"] == 35 and counts["applied"] == counts["linked"] == counts["declined"] == 0, counts
-        assert all(_row(i).status == ApprovalStatus.REJECTED for i in ids)
-        assert all(_saved(_row(i))["outcome"] == "retired" for i in ids)
-        assert all("Expired on 19 October 2026; not applied." in _row(i).rejected_reason for i in ids)
-        assert _count(org.id) == before, "nothing was added to the model"
-        assert reviewer.prompts == [], "no reviewer was asked about an item past its time"
+        assert counts["retired"] == 0 and counts["declined"] == 0 and counts["in_review"] == 0, counts
+        assert counts["linked"] >= 16, counts
+        assert all(_row(i).status == ApprovalStatus.APPROVED for i in ids)
+        assert not any("Expired" in (_row(i).rejected_reason or "") for i in ids)
+        for name in EXACT:
+            assert _count(org.id, "%s %s" % (name, suffix), "ApplicationComponent") == 1, name
     with tenant_ctx(other.id):
         assert _row(their_id).status == ApprovalStatus.PENDING, "the other organisation's proposal was not touched"
 
