@@ -28,6 +28,7 @@
                     {% else %}
                         {{ disabled_action('Import', 'Only an architect can import model files. Ask an administrator in Team settings.', 'import-oef-reason', icon='upload') }}
                     {% endif %}
+                    {{ button(text='Open in the Composer', variant='outline', icon='network', href=url_for('archimate.composer_page', viewpoint='layered'), testid='btn-open-composer', aria_label='Open this model in the Composer') }}
                     {{ button(text='Export', variant='outline', icon='download', attrs_dict={'@click': "window.location.href='" + url_for('architect_ui.export_oef') + "'"}, testid='btn-export-oef', aria_label='Export OEF') }}
                     {% set _more_items = [] %}
                     {% set _more_items = _more_items + [

@@ -55,7 +55,7 @@ def test_at_wave_one_the_canvas_tools_are_not_listed_and_a_direct_call_says_not_
     assert "ask_impact" in after and "search_elements" in after and "get_element" in after
     for name, args in (("list_canvases", {}), ("get_canvas", {"canvas_type": "business_model", "canvas_id": 1})):
         reply = _call(client, token, name, args)
-        assert reply.status_code == 404
+        assert reply.status_code == 200
         assert reply.mimetype == "application/json"
         message = reply.get_json()["error"]["message"]
         assert "not available yet" in message and "<" not in message

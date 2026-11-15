@@ -131,6 +131,22 @@
                 : d.href;
         }
 
+        // "1547 of 1562 elements" when the register holds elements the map does not draw, "1547 elements drawn,
+        // total not known" when the register could not be counted, else just the figure.
+        function ofTotal(drawn, total) {
+            var noun = drawn === 1 ? ' element' : ' elements';
+            if (total === null || total === undefined) return drawn + noun + ' drawn, total not known';
+            if (total > drawn) return drawn + ' of ' + total + ' elements';
+            return drawn + noun;
+        }
+
+        // The figure the dashboard gives for what is on screen: the asked layer's, or the whole model's.
+        function layerTotal(data) {
+            if (!data.layer) return data.store_total;
+            var row = (data.counts || []).filter(function (c) { return c.layer === data.layer; })[0];
+            return row ? row.total : 0;
+        }
+
         function render(data) {
             hide('impact-loading');
             var nodes = data.nodes || [];
@@ -143,9 +159,9 @@
             var ringRadius = Math.min(width, height) * 0.44;
 
             if (clusters) {
-                text('impact-counts', data.total + ' elements, drawn one circle per layer. Click a layer to open it.');
+                text('impact-counts', ofTotal(data.total, data.store_total) + ', drawn one circle per layer. Click a layer to open it.');
             } else {
-                text('impact-counts', nodes.length + ' elements · ' + edges.length + ' relationships'
+                text('impact-counts', ofTotal(nodes.length, layerTotal(data)) + ' · ' + edges.length + ' relationships'
                     + (data.truncated ? ' · first ' + data.max_nodes + ' shown, pick a layer to narrow it' : ''));
             }
 

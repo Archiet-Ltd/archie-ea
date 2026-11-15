@@ -35,6 +35,9 @@ document.addEventListener('alpine:init', function() {
                 return Object.values(this.layerCounts).reduce(function(a, b) { return a + (b || 0); }, 0);
             },
             layerCounts: {},
+            // True from the page's first moment until the counts answer: a tab or card with no figure yet
+            // says it is counting, and only a count that failed says it is unavailable.
+            countsLoading: true,
             // Per layer, how many of its records the model map does not draw (a gap entered in the gap
             // register has no model element). Read from the same counts answer as layerCounts.
             notOnModelMap: {},
@@ -363,7 +366,7 @@ document.addEventListener('alpine:init', function() {
             },
 
             get layerCountHint() {
-                if (!this.layerCountKnown) return 'Layer total unavailable';
+                if (!this.layerCountKnown) return this.countsLoading ? 'Counting this layer' : 'Layer total unavailable';
                 if (this.layerNotOnModelMap > 0) {
                     return this.layerNotOnModelMap + ' entered in a register and not on the model map';
                 }
@@ -534,6 +537,9 @@ document.addEventListener('alpine:init', function() {
             restoreUrlState() {
                 let params = new URLSearchParams(window.location.search);
                 let wantedLayer = params.get('layer') || APP_CONFIG.initialLayer || 'motivation';
+                if (this.layerConfig[wantedLayer] && this.layerConfig[wantedLayer].folded_into) {
+                    wantedLayer = this.layerConfig[wantedLayer].folded_into;
+                }
                 this.activeTab = this.layerConfig[wantedLayer] ? wantedLayer : 'motivation';
 
                 let wantedType = params.get('element_type') || APP_CONFIG.initialElementType || '';
@@ -626,12 +632,8 @@ document.addEventListener('alpine:init', function() {
                     this.elements = data.elements || [];
                     this.pagination = data.pagination || { page: 1, pages: 0, per_page: this.perPage, total: null, has_next: false, has_prev: false };
                     this.currentPage = this.pagination.page || this.currentPage;
-                    // Only an unnarrowed list is the whole layer; a search or filter total is not its count.
-                    if (!this.listNarrowed) {
-                        this.layerCounts[this.activeTab] = data.pagination && typeof data.pagination.total === 'number'
-                            ? data.pagination.total
-                            : null;
-                    }
+                    // The tab's count is the layer's count from the counting service and nothing the list
+                    // returns changes it: opening a tab must not move its number.
                     this.loadedLayer = this.activeTab;
                 } catch (err) {
                     // The template already renders an error state + Retry button on
@@ -639,7 +641,6 @@ document.addEventListener('alpine:init', function() {
                     this.loadError = err.message || 'Could not load elements for this layer';
                     this.elements = [];
                     this.pagination = { page: this.currentPage, pages: 0, per_page: this.perPage, total: null, has_next: false, has_prev: false };
-                    this.layerCounts[this.activeTab] = null;   // unknown, not zero
                     // Platform.fetch already showed a toast unless silent:true; we passed silent:true,
                     // so we need to show our own toast here to maintain existing behavior.
                     if (window.Platform && Platform.toast) Platform.toast.error(this.loadError);
@@ -652,7 +653,10 @@ document.addEventListener('alpine:init', function() {
 
             async loadAllLayerCounts() {
                 let self = this;
-                let layerKeys = Object.keys(this.layerConfig);
+                // A layer folded into another (Physical, held in Technology) has no count of its own.
+                let layerKeys = Object.keys(this.layerConfig).filter(function(key) {
+                    return !(self.layerConfig[key] && self.layerConfig[key].folded_into);
+                });
                 let uncounted = [];
                 // One batched request instead of one per layer. The per-layer
                 // sweep issued 7-14 requests per page load, and the app rate-limits
@@ -727,6 +731,7 @@ document.addEventListener('alpine:init', function() {
                     }
                 }
 
+                self.countsLoading = false;
                 self.countsLoaded = true;
 
                 // One toast for the whole sweep — six per-layer toasts would be worse

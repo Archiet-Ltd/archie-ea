@@ -542,8 +542,15 @@ def _first_recorded(element_ids: List[int], organization_id: int) -> Dict[int, A
 def _source_line(element, first_recorded=None) -> str:
     """Where an element came from and when, in the words the dashboard uses:
     "from <source>, as of <date>", or "added by hand on <date>" when no source
-    is recorded. Never blank."""
-    when = element.source_recorded_at or element.recorded_at or first_recorded
+    is recorded. Never blank. The day is the day the fact was first written: a
+    later edit moves the element's own recorded_at, so that column is only a
+    fallback when the change history has no entry. A history entry from year 1 is the
+    placeholder for an unknown start, not a day, so it names no day at all."""
+    if first_recorded is not None and first_recorded.year <= 1:
+        first_recorded, fallback = None, None
+    else:
+        fallback = element.recorded_at
+    when = element.source_recorded_at or first_recorded or fallback
     date = "%d %s" % (when.day, when.strftime("%b %Y")) if when else None
     label = (element.source_label or "").strip()
     if getattr(element, "source_kind", None) == "sample":
