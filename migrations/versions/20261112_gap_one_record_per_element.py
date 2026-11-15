@@ -104,11 +104,12 @@ def upgrade():
     bind = op.get_bind()
     _merge_duplicates(bind)
     _adopt_gap_elements(bind)
-    op.create_index(
-        INDEX, "gaps", ["organization_id", "archimate_element_id"], unique=True,
-        postgresql_where=sa.text("archimate_element_id IS NOT NULL"),
-    )
+    # a database built by create_all already carries the index from the model; do not make it twice
+    bind.execute(sa.text(
+        f"CREATE UNIQUE INDEX IF NOT EXISTS {INDEX} ON gaps (organization_id, archimate_element_id) "
+        "WHERE archimate_element_id IS NOT NULL"
+    ))
 
 
 def downgrade():
-    op.drop_index(INDEX, table_name="gaps")
+    op.execute(sa.text(f"DROP INDEX IF EXISTS {INDEX}"))
