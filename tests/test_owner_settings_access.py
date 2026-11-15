@@ -80,7 +80,7 @@ def test_the_owner_is_refused_the_platforms_settings_and_its_saved_values(two_ow
     a_client, *_ = two_owners
     for path in ("/settings", "/api/system-settings"):
         resp = a_client.get(path)
-        assert resp.status_code == 403, (path, resp.status_code)
+        assert resp.status_code == (404 if path == "/settings" else 403), (path, resp.status_code)
     assert "session" not in a_client.get("/api/system-settings").get_data(as_text=True).lower()
     resp = a_client.post("/api/system-settings/save", json={"settings": {"app-name": "Mine"}})
     assert resp.status_code == 403
@@ -126,7 +126,7 @@ def test_a_member_of_an_owners_organisation_without_an_administrator_role_is_ref
     db.session.commit()
     client = _Person(_anonymous(app))
     assert client.post("/account/login", data={"email": member.email, "password": PASSWORD}).status_code == 302
-    assert client.get("/settings").status_code == 403
+    assert client.get("/settings").status_code == 404
     assert client.get("/api/system-settings").status_code == 403
 
 
@@ -137,7 +137,7 @@ def test_each_organisations_owner_reaches_only_their_own_organisation_page(two_o
     assert not is_platform_admin(a) and not is_platform_admin(b)
     for client in (a_client, b_client):
         assert client.get("/admin/").status_code == 200
-        assert client.get("/settings").status_code == 403
+        assert client.get("/settings").status_code == 404
 
 
 @pytest.mark.parametrize("path", [
