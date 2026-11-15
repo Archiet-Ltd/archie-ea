@@ -3201,12 +3201,14 @@ def view_solution(solution_id: int):
 @login_required
 def get_copilot_insights(solution_id: int):
     """Return unseen, undismissed CopilotInsights for the blueprint page."""
+    from app.core.auth.permissions import is_read_only_member
     Solution.query.get_or_404(solution_id)
     from app.models.copilot_insight import CopilotInsight
     insights = CopilotInsight.get_unseen_for_solution(solution_id)
-    for i in insights:
-        i.seen = True
-    db.session.commit()
+    if not is_read_only_member(current_user):
+        for i in insights:
+            i.seen = True
+        db.session.commit()
     return jsonify({"insights": [i.to_dict() for i in insights]})
 
 
@@ -12000,6 +12002,11 @@ def api_raci_matrix(solution_id):
 def api_set_raci(solution_id):
     """FRAG-030: Set RACI assignment."""
     require_entity(Solution, solution_id, description="Solution not found")
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
     try:
         from app.services.raci_service import set_raci_assignment
         data = request.get_json()
