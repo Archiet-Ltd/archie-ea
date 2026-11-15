@@ -305,6 +305,13 @@ def init_context_processors(app):
             return {"applications": [], "vendors": []}
 
     @app.context_processor
+    def inject_costs_withheld_sentence():
+        """The one sentence a page says when the cost rule withholds figures from the signed-in person."""
+        from app.services.cost_visibility import COSTS_WITHHELD
+
+        return {"costs_withheld_sentence": COSTS_WITHHELD}
+
+    @app.context_processor
     def inject_flask():
         """Make flask object available to all templates to fix flash messaging issues"""
         return {"flask": flask}
@@ -879,6 +886,11 @@ def init_context_processors(app):
     from app.navigation.registry import element_type_label
     app.jinja_env.filters["type_label"] = element_type_label
 
+    # A page for a person the cost rule withholds from passes the text of a record through this filter.
+    from app.services.cost_visibility import without_amounts
+
+    app.jinja_env.filters["without_amounts"] = without_amounts
+
     # Register date/datetime formatting filters
     def _filter_format_date(value, fmt='%d %b %Y'):
         if value is None:
@@ -1050,3 +1062,9 @@ def init_context_processors(app):
             return {"sample_company_restore_point_id": None}
         except Exception:
             return {"sample_company_restore_point_id": None}
+
+    @app.context_processor
+    def inject_canonical_origin():
+        """Make the canonical origin available to all templates."""
+        from app.services.origin import canonical_origin
+        return {"canonical_origin": canonical_origin()}

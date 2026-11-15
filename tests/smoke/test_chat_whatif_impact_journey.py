@@ -130,6 +130,11 @@ def _assert_cited_dependents(page):
                 "row %r has no as-of date" % name
     for dependent in DEPENDENTS:
         assert dependent in names, "%r not among the cited dependents: %s" % (dependent, names)
+    # The answer and its panel agree: a panel that names a last run never sits under an
+    # answer saying the connections were not worked out.
+    panel = answer.locator("[data-derivation-last-run]").inner_text().strip()
+    assert panel and panel != "\u2014", "the panel names no last run: %s" % text
+    assert "haven't worked out the indirect connections" not in text, text
     return names
 
 
@@ -316,5 +321,53 @@ def test_what_if_a_near_name_is_listed_first_and_unrelated_names_are_not(
         if WALK:
             os.makedirs(WALK, exist_ok=True)
             page.screenshot(path=os.path.join(WALK, shot))
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("width,height,dark,shot", [
+    (1440, 900, False, "changed-since-1440-light.png"),
+    (390, 844, False, "changed-since-390-light.png"),
+    (390, 844, True, "changed-since-390-dark.png"),
+])
+def test_the_answer_says_when_connections_were_last_worked_out_and_how_many_relationships_changed_since(
+    browser, echo_provider_server, app, width, height, dark, shot
+):
+    """After a run, relationships are added: the answer names that run and counts them, and
+    the panel's "Relationships added or changed since" shows the same number."""
+    import re
+
+    from app.extensions import db
+
+    email, org_id = _empty_organisation_user(echo_provider_server)
+    context = _unknown_context(browser, width, height, dark)
+    page = context.new_page()
+    try:
+        _login(page, echo_provider_server, email)
+        _load_sample_from_chat(page, echo_provider_server)
+        with app.app_context():
+            # A person adds a relationship after the run: stamped by the database, in its own time zone.
+            from app.models import ArchiMateElement, ArchiMateRelationship
+
+            ids = [e.id for e in ArchiMateElement.query.filter_by(organization_id=org_id).limit(4)]
+            for target in ids[1:]:
+                db.session.add(ArchiMateRelationship(source_id=ids[0], target_id=target, type="Association", organization_id=org_id))
+            db.session.commit()
+        _ask_what_if(page, echo_provider_server)
+        answer = page.get_by_test_id("estate-answer")
+        expect(answer).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        text = answer.inner_text()
+        figure = answer.locator("[data-derivation-changed]").inner_text().strip()
+        assert figure.isdigit() and int(figure) > 0, text
+        assert "%s relationship" % figure in answer.locator("[data-changed-since-notice]").inner_text()
+        notice = answer.locator("[data-changed-since-notice]").inner_text()
+        assert re.search(r"last updated .*\d{4}", notice), notice
+        assert "%s relationships have been added or changed since" % figure in notice, notice
+        assert "haven't worked out the indirect connections" not in text
+        if WALK:
+            os.makedirs(WALK, exist_ok=True)
+            notice_box = answer.locator("[data-changed-since-notice]")
+            notice_box.scroll_into_view_if_needed()
+            notice_box.screenshot(path=os.path.join(WALK, shot))
     finally:
         context.close()
