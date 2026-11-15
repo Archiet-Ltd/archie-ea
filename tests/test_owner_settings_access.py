@@ -192,3 +192,23 @@ def test_a_browser_that_times_out_on_the_patterns_address_gets_a_page(app, two_o
     script = a_client.get(path, headers={"Accept": "application/json"})
     assert script.status_code == 504
     assert script.get_json()["error"] == "The AI provider did not answer in time. Try again in a moment."
+
+
+def test_a_browser_that_meets_a_fault_on_the_patterns_address_gets_a_page(app, two_owners, monkeypatch):
+    from app.services import application_pattern_classifier_service as svc
+
+    def broken(self, *a, **k):
+        raise RuntimeError("the classifier fell over")
+
+    monkeypatch.setattr(svc.ApplicationPatternClassifierService, "classify_portfolio", broken)
+    a_client, *_ = two_owners
+    path = "/api/ea-workflows/sa/application-patterns"
+    page = a_client.get(path, headers=BROWSER)
+    assert page.status_code == 500
+    html = page.get_data(as_text=True)
+    assert "Could not classify the portfolio. Try again in a moment." in html
+    assert "<h1" in html
+    assert "/dashboard/overview" in html
+    script = a_client.get(path, headers={"Accept": "application/json"})
+    assert script.status_code == 500
+    assert script.get_json()["error"] == "Could not classify the portfolio. Try again in a moment."

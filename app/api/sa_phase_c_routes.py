@@ -78,7 +78,10 @@ def get_application_patterns():
         return jsonify({"error": message}), 504
     except Exception as exc:
         logger.error("application-patterns error: %s", exc, exc_info=True)
-        return jsonify({"error": "Could not classify the portfolio. Try again in a moment."}), 500
+        message = "Could not classify the portfolio. Try again in a moment."
+        if is_browser_page_request():
+            return render_plain_error(500, title=message, message=PLAIN[500][2])
+        return jsonify({"error": message}), 500
 
 
 # ---------------------------------------------------------------------------
