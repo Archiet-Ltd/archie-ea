@@ -103,7 +103,7 @@ def test_no_committer_who_is_a_member_says_why(db_session, make_org):
 
     assert primaries(db_session, component) == []
     hint = _commit_hint(element, org.id)
-    assert hint == {"note": "No code owner or recent committer of archie-ea is a member of this organisation."}
+    assert hint == {"note": "GitHub names no single code owner of archie-ea, and no one author leads its commits in the last 90 days."}
 
 
 def test_an_owner_a_person_recorded_is_never_overwritten(db_session, make_org):

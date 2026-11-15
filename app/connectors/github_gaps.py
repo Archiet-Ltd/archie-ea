@@ -79,7 +79,9 @@ def _commit_hint(element, org_id) -> Dict[str, Any]:
             named.append({"user_id": user.id, "name": _person_name(user), "commits": entry.get("commits")})
     if not named:
         short = repository.rsplit("/", 1)[-1] or "this repository"
-        return {"note": f"No code owner or recent committer of {short} is a member of this organisation."}
+        days = summary.get("days") or 90
+        return {"note": f"GitHub names no single code owner of {short}, and no one author leads its commits "
+                        f"in the last {days} days."}
     shared = ", ".join(f"{c['name']} ({c['commits']})" for c in named)
     return {"note": f"Recent commits are shared: {shared}.", "candidates": named}
 

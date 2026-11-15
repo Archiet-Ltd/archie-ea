@@ -164,7 +164,7 @@ def test_no_committer_is_a_member_and_the_page_says_so(architect, live_server, e
     architect.goto("%s/applications/%s" % (live_server, estate["nobody"]), wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     reason = architect.get_by_test_id("need-owner-reason")
     expect(reason).to_have_text(
-        "No code owner or recent committer of billing-hub-%s is a member of this organisation." % estate["tag"],
+        "GitHub names no single code owner of billing-hub-%s, and no one author leads its commits in the last 90 days." % estate["tag"],
         timeout=PAGE_TIMEOUT)
     assert architect.get_by_test_id("owner-candidates").count() == 0
     expect(architect.get_by_test_id("owner-reason")).to_be_visible()
