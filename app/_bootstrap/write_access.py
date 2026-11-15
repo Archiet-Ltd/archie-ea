@@ -240,6 +240,7 @@ REPORT_SYSTEM_TABLES = {
     "usage_events": "The activity log of what the person opened.",
     "notifications": "The person's own notifications.",
     "oauth_tokens": "The person's own connector tokens.",
+    "oauth_authorization_codes": "The person's own one-time connector sign-in codes.",
     "transformation_outbox_events": "Event queue entries written beside the change that caused them.",
 }
 
