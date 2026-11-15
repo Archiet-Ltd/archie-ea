@@ -20,8 +20,6 @@ HELD_ACCOUNT_OPEN = frozenset(
         "account.reset_password_request",
         "account.reset_password",
         "account.session_keepalive",
-        "account.sso_login",
-        "account.sso_callback",
         "account.join",
         "account.join_from_invite",
     }
