@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BLUEPRINT = ROOT / "app/templates/solutions/blueprint.html"
 PHASE_GATE = ROOT / "app/templates/solutions/partials/_phase_gate_checklist.html"
 GOVERNANCE = ROOT / "app/templates/solutions/partials/_governance_compliance.html"
+COMPLIANCE_PANEL = ROOT / "app/templates/solutions/partials/_compliance_gap_panel.html"
 DASHBOARD = ROOT / "app/templates/dashboards/overview.html"
 
 
@@ -24,7 +25,8 @@ def test_blueprint_modal_roots_have_the_ids_the_modal_registry_uses():
 
 
 def test_solution_governance_uses_an_icon_shipped_by_the_lucide_bundle():
-    template = GOVERNANCE.read_text(encoding="utf-8")
+    # the governance partial includes the compliance panel, which holds the loading spinner
+    template = GOVERNANCE.read_text(encoding="utf-8") + COMPLIANCE_PANEL.read_text(encoding="utf-8")
 
     assert 'data-lucide="loader-circle"' not in template
     assert 'data-lucide="loader-2"' in template
