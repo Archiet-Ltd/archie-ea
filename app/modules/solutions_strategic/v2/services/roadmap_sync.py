@@ -489,8 +489,8 @@ class RoadmapDataSync:
             db.session.add(wp)
             db.session.commit()
 
-        # Create deliverable (use RoadmapDeliverable which has source_application_id)
-        deliverable = RoadmapDeliverable(
+        # Create deliverable (Deliverable is RoadmapDeliverable, which has source_application_id)
+        deliverable = Deliverable(
             name=f"{application.name} Modernization",
             description=f"Complete modernization of {application.name}",
             work_package_id=wp.id,
