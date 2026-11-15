@@ -15,11 +15,25 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 INTERVALS = ("year", "month")
+
+_NUMBER_WORDS = {
+    1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
+    8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 15: "fifteen",
+    20: "twenty", 25: "twenty-five", 50: "fifty",
+}
+
+STARTUP_USER_LIMIT = 10
+
+
+def _count_words(n: int) -> str:
+    """A head count as the words a person reads (10 -> "ten")."""
+    return _NUMBER_WORDS.get(n, str(n))
 
 
 @dataclass(frozen=True)
@@ -37,6 +51,29 @@ class Plan:
     # "people" counts every member; "editors" leaves read-only members free.
     counts: str = "people"
     price_env: Dict[str, str] = field(default_factory=dict)
+    # False for a plan that is only ever granted (Education): the billing grid, the
+    # pricing page and the structured data leave it out.
+    listed: bool = True
+
+    # Who the plan is for, in the words the pricing page, the home page and
+    # the structured data all show.
+    audience: str = ""
+    # Feature lines after "everything in the plan below"; a plan with a fixed
+    # user_limit also leads with that head count (see ``features``).
+    extra_features: Tuple[str, ...] = ()
+
+    @property
+    def people_words(self) -> Optional[str]:
+        """The fixed head count in words ("ten"), or None when it is not fixed."""
+        if self.user_limit is None or self.per_seat:
+            return None
+        return _count_words(self.user_limit)
+
+    @property
+    def features(self) -> Tuple[str, ...]:
+        words = self.people_words
+        lead = (f"{words.capitalize()} people",) if words else ()
+        return lead + self.extra_features
 
     # ----------------------------------------------------------------- #
     # Display price: the human-facing dollar figures shown on the        #
@@ -76,16 +113,23 @@ PLANS: Tuple[Plan, ...] = (
         summary="One organisation, three people. Every question, the Business Model Canvas, the ArchiMate Composer.",
         purchasable=False,
         user_limit=3,
+        audience="Evaluation, one-person companies and self-hosters.",
         display_price_monthly=0,
     ),
     Plan(
         key="startup",
         name="Startup",
         summary=(
-            "Ten people and email support, everything in Community included."
+            f"{_count_words(STARTUP_USER_LIMIT).capitalize()} people and email "
+            "support, everything in Community included."
         ),
         purchasable=True,
-        user_limit=10,
+        user_limit=STARTUP_USER_LIMIT,
+        audience=(
+            "Founders and small teams, up to "
+            f"{_count_words(STARTUP_USER_LIMIT)} people."
+        ),
+        extra_features=("Email support",),
         price_env={"month": "STRIPE_PRICE_STARTUP_MONTHLY", "year": "STRIPE_PRICE_STARTUP_ANNUAL"},
         display_price_monthly=49,
         display_price_annual=490,
@@ -102,6 +146,17 @@ PLANS: Tuple[Plan, ...] = (
         per_seat=True,
         default_seats=15,
         counts="editors",
+        audience=(
+            "Growing companies and services firms with more than "
+            f"{_count_words(STARTUP_USER_LIMIT)} people."
+        ),
+        extra_features=(
+            "Pay for editors only; everyone else asks for free",
+            "Single sign-on",
+            "The review-board workflow",
+            "Your own model key",
+            "Email support",
+        ),
         price_env={"month": "STRIPE_PRICE_TEAM_MONTHLY", "year": "STRIPE_PRICE_TEAM_ANNUAL"},
         display_price_monthly=29,
         display_price_annual=290,
@@ -109,11 +164,21 @@ PLANS: Tuple[Plan, ...] = (
         display_price_unit="editor",
     ),
     Plan(
+        key="education",
+        name="Education",
+        summary="Free for teaching and learning at a university or college, with no limit on people.",
+        purchasable=False,
+        user_limit=None,
+        listed=False,
+        display_price_monthly=0,
+    ),
+    Plan(
         key="enterprise",
         name="Enterprise",
         summary="Annual contract. Unlimited editors, SAML, audit export, supported self-hosting.",
         purchasable=False,
         user_limit=None,
+        audience="Enterprise architecture teams.",
         display_price_floor_annual=24000,
     ),
 )
@@ -160,6 +225,14 @@ def renewal_summary(sub, plan: Plan, live: bool) -> Dict[str, Optional[str]]:
     "Nothing to renew" when the plan is free, never a bare dash."""
     if plan.key == "free":
         return {"label": "Next renewal", "value": "Nothing to renew", "note": None}
+    if plan.key == "education" and sub is not None and sub.current_period_end is not None:
+        return {"label": "Free until", "value": sub.current_period_end.strftime("%d %b %Y"), "note": None}
+    if sub is not None and sub.offer == "startup_credit" and not live and sub.current_period_end is not None:
+        return {
+            "label": "Free until",
+            "value": sub.current_period_end.strftime("%d %b %Y").lstrip("0"),
+            "note": "Buy Startup before then to keep ten people",
+        }
     if not live or sub is None or sub.current_period_end is None:
         return {"label": "Next renewal", "value": "No renewal yet", "note": None}
     when = sub.current_period_end.strftime("%d %b %Y")
@@ -179,6 +252,11 @@ def renewal_summary(sub, plan: Plan, live: bool) -> Dict[str, Optional[str]]:
         "value": when,
         "note": ("%s a %s" % (amount, interval)) if amount and interval else None,
     }
+
+
+def listed_plans() -> Tuple[Plan, ...]:
+    """The plans shown in a grid of choices: every plan except a granted-only one."""
+    return tuple(p for p in PLANS if p.listed)
 
 
 def purchasable_plans() -> Tuple[Plan, ...]:
@@ -251,6 +329,38 @@ def _subscription_row(org_id: int):
     return Subscription.query.filter_by(organization_id=org_id).first()
 
 
+def _name(value) -> Optional[str]:
+    """An enum member or a plain string, as its text."""
+    return getattr(value, "value", value)
+
+
+def offer_lapsed(row, now=None) -> bool:
+    """True when *row* is on a free offer whose end has passed.
+
+    The one lapse rule, read at the moment of use so the limit is exact at the
+    second the offer ends and no job rewrites the row. A row with a live
+    provider subscription (Stripe or Monelytics) is never lapsed: the provider
+    owns its plan. *row* may be a Subscription or a Core row carrying the same
+    columns.
+    """
+    if row is None or not getattr(row, "offer", None):
+        return False
+    if getattr(row, "stripe_subscription_id", None) or getattr(row, "monelytics_subscription_id", None):
+        return False
+    end = getattr(row, "current_period_end", None)
+    if end is None or end >= (now or datetime.utcnow()):
+        return False
+    return (
+        row.offer == "startup_credit"
+        and _name(row.plan) == "startup"
+        and _name(row.status) == "trialing"
+    ) or (
+        row.offer == "education"
+        and _name(row.plan) == "education"
+        and _name(row.status) == "active"
+    )
+
+
 def effective_plan(sub) -> Plan:
     """The plan whose limits apply now.
 
@@ -264,6 +374,8 @@ def effective_plan(sub) -> Plan:
     from app.models.subscription import SubscriptionStatus
 
     if sub.status == SubscriptionStatus.cancelled:
+        return _BY_KEY["free"]
+    if offer_lapsed(sub):
         return _BY_KEY["free"]
     return get_plan(sub.plan.value if sub.plan is not None else None)
 
@@ -434,7 +546,52 @@ def user_limit_status(org_id: int) -> Dict:
     sub = current_subscription(org) if org is not None else None
     plan = effective_plan(sub)
     limit = _limit_for(plan, sub.seats_purchased if sub is not None else None)
-    return _status(plan, limit, _count_members(db.session.connection(), org_id, plan.counts))
+    status = _status(plan, limit, _count_members(db.session.connection(), org_id, plan.counts))
+    status["offer"] = sub.offer if sub is not None and not offer_lapsed(sub) else None
+    return status
+
+
+def ai_usage_status(org_id: int, now=None) -> Dict:
+    """The AI questions *org_id*'s people asked this calendar month, and whose AI answered.
+
+    ``limit`` is None because no plan sets an allowance on AI questions. Reads only: the count is
+    the questions kept in conversations made in the organisation (one per question a person typed),
+    whichever organisation the person belongs to at home.
+    """
+    from datetime import datetime
+
+    from app import db
+    from app.models.conversation import ConversationMessageRecord, ConversationThreadRecord
+    now = now or datetime.utcnow()
+    start = datetime(now.year, now.month, 1)
+    used = (
+        db.session.query(db.func.count(ConversationMessageRecord.id))
+        .join(ConversationThreadRecord, ConversationThreadRecord.id == ConversationMessageRecord.thread_id)
+        .filter(
+            ConversationThreadRecord.organization_id == org_id,
+            ConversationMessageRecord.role == "user",
+            ConversationMessageRecord.created_at >= start,
+        )
+        .scalar()
+    ) or 0
+    return {"used": int(used), "limit": None, "provider": _own_key_provider(org_id)}
+
+
+def _own_key_provider(org_id: int) -> Optional[str]:
+    """The provider name of the organisation's own working key, or None when the built-in AI answers."""
+    from app import db
+    from app.models.models import APISettings
+    from app.modules.account.services.onboarding_service import PROVIDERS
+
+    names = dict(PROVIDERS)
+    row = (
+        db.session.query(APISettings)
+        .filter(APISettings.organization_id == org_id, APISettings.enabled.is_(True),
+                APISettings.provider.in_(list(names)))
+        .order_by(APISettings.id)
+        .first()
+    )
+    return names.get(row.provider) if row is not None else None
 
 
 class PlanLimitReached(Exception):
@@ -494,13 +651,21 @@ def check_capacity(connection, org_id: int, change: "_Change") -> None:
     org = connection.execute(columns.with_for_update()).first()
     subs = Subscription.__table__
     row = connection.execute(
-        select(subs.c.plan, subs.c.status, subs.c.seats_purchased)
+        select(
+            subs.c.plan,
+            subs.c.status,
+            subs.c.seats_purchased,
+            subs.c.offer,
+            subs.c.current_period_end,
+            subs.c.stripe_subscription_id,
+            subs.c.monelytics_subscription_id,
+        )
         .where(subs.c.organization_id == org_id)
     ).first()
     if row is None:
         plan_enum, seats = _seed_plan(org.plan, org.max_users)
         plan = get_plan(plan_enum.value)
-    elif row.status == SubscriptionStatus.cancelled:
+    elif row.status == SubscriptionStatus.cancelled or offer_lapsed(row):
         plan, seats = _BY_KEY["free"], None
     else:
         plan, seats = get_plan(row.plan.value if row.plan is not None else None), row.seats_purchased
@@ -589,3 +754,17 @@ def install_user_limit_guard() -> None:
 
     if not event.contains(Session, "before_flush", _guard_flush):
         event.listen(Session, "before_flush", _guard_flush)
+
+
+def education_summary(sub, plan: Plan) -> Optional[Dict[str, str]]:
+    """What the billing page says about the Education offer, from the organisation's own row:
+    ``{"state": "active", "text": "Education, free until 31 Aug 2027"}``, or ``ended`` once the
+    period has passed. None when the organisation never had the offer."""
+    if sub is None or getattr(sub, "offer", None) != "education" or sub.current_period_end is None:
+        return None
+    when = sub.current_period_end.strftime("%d %b %Y")
+    if plan.key == "education":
+        return {"state": "active", "text": "Education, free until %s" % when}
+    if offer_lapsed(sub):
+        return {"state": "ended", "text": "Your free Education period ended on %s. Your organisation is on Community." % when}
+    return None

@@ -181,7 +181,7 @@ def test_the_figures_agree_on_every_page_and_with_the_seed(browser, live_server,
         link.click()
 
         # Impact Analysis: the same risk, the same confidence, the same reason.
-        page.wait_for_url(re.compile(r"/strategic/impact-analysis#priority-actions$"))
+        page.wait_for_url(re.compile(r"/enterprise/analysis/impact-analysis#priority-actions$"))
         action = page.get_by_test_id("priority-action-row").filter(has_text=mine["risk"])
         expect(action).to_have_count(1)
         assert _footer_after(page, action) == on_register

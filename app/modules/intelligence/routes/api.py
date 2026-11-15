@@ -660,6 +660,9 @@ def portfolio_component_for_element(element_id: int):
             "application_component_id": result.get("application_component_id"),
             "reasons": result.get("reasons") or [],
             "component": component,
+            "resolved_through": result.get("resolved_through"),
+            "part_of": result.get("part_of"),
+            "message": result.get("message"),
         }
     )
 
@@ -1009,7 +1012,13 @@ def query_catalogue_run(entry_id):
         return not_found_response(f"no catalogue entry named '{entry_id}'")
 
     params = {name: request.args.get(name) for name in entry.params if request.args.get(name) is not None}
-    result = run_entry(entry_id, organization_id, **params)
+    run_params = dict(params)
+    if entry_id == "canvas_box_entries":
+        # cost lines follow the one cost rule the canvas page and the chat follow
+        from app.services.cost_visibility import costs_visible
+
+        run_params["show_costs"] = costs_visible(current_user)
+    result = run_entry(entry_id, organization_id, **run_params)
     return success_response({"entry_id": entry_id, "title": entry.title, "params": params, **result})
 
 

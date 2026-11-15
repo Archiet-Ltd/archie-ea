@@ -35,6 +35,7 @@
             {% call card_description() %}
                 {% if answer.records and answer.sentence %}<span data-testid="catalogue-sentence">{{ answer.sentence }}</span>
                 {% elif answer.records %}{{ answer.summary[:1] | upper }}{{ answer.summary[1:] }}: {{ answer.total if answer.total is not none else answer.records | length }} in your records.
+                {% elif answer.costs_withheld %}{{ answer.reason }}
                 {% elif answer.complete %}{{ sentence }}.
                 {% elif answer.unmatched %}Nothing is recorded under that name.
                 {% else %}Your records cannot answer this yet.{% endif %}

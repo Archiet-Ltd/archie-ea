@@ -1,7 +1,6 @@
 <meta name="shadcn-nearest" content="dashboard-01">
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
 {% from 'components/dialog.html' import dialog %}
@@ -14,6 +13,8 @@
 {% from 'components/input.html' import input, label, textarea %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell as signal_cell %}
 
 {% block title %}Enterprise Capability Roadmap{% endblock %}
 
@@ -50,22 +51,9 @@
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-{% call breadcrumb() %}
-  {% call breadcrumb_item(href=url_for('main.index')) %}Home{% endcall %}
-  {{ breadcrumb_separator() }}
-  {% call breadcrumb_item(href=url_for('archimate_crud.dashboard') + '#business') %}Business Layer{% endcall %}
-  {{ breadcrumb_separator() }}
-  {% call breadcrumb_item(href=url_for('capability_map.index')) %}Capabilities{% endcall %}
-  {{ breadcrumb_separator() }}
-  {% call breadcrumb_item(active=true) %}Capability Roadmap{% endcall %}
-{% endcall %}
-{% endblock %}
-
 {% block content %}
 <div id="capability-roadmap-app"
      x-data="enterpriseCapabilityRoadmap()"
-     x-init="init()"
      class="space-y-6">
 
   <input type="hidden" id="rdm-csrf-token" value="{{ csrf_token() }}">
@@ -90,7 +78,7 @@
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Recorded gaps{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-recorded-gaps" x-text="recordedGaps === null ? '—' : recordedGaps"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-recorded-gaps" x-text="gapsLoading ? '—' : gapsError ? '!' : (recordedGaps === null ? '—' : recordedGaps)">{{ recorded_gaps }}</span>{% endcall %}
       {% endcall %}
       {% call card_footer(direction='col') %}
         <p class="text-sm text-muted-foreground" data-testid="rdm-gap-signals">Capability Gaps Detected: <span x-text="signalCount"></span> signals from capability coverage, not yet recorded.</p>
@@ -99,19 +87,19 @@
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Plateaus{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_plateaus"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-plateaus-tile" x-text="metrics.total_plateaus">{{ plateau_count }}</span>{% endcall %}
       {% endcall %}
     {% endcall %}
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}Work Packages{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span x-text="metrics.total_wps"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-work-packages-tile" x-text="metrics.total_wps">{{ work_package_count }}</span>{% endcall %}
       {% endcall %}
     {% endcall %}
     {% call card() %}
       {% call card_header() %}
         {% call card_description() %}AI Generated{% endcall %}
-        {% call card_title(class='tabular-nums') %}<span x-text="metrics.ai_generated"></span>{% endcall %}
+        {% call card_title(class='tabular-nums') %}<span data-testid="rdm-ai-generated" x-text="gapsLoading ? '—' : gapsError ? '!' : metrics.ai_generated">{{ ai_generated }}</span>{% endcall %}
       {% endcall %}
     {% endcall %}
     {% call card() %}
@@ -131,7 +119,33 @@
       {% endcall %}
     {% endcall %}
   </div>
-  <div data-testid="roadmap-summary-footer">{{ result_footer(summary_footer) }}</div>
+  <div data-testid="roadmap-summary-footer">{{ evidence_line_html | safe }}</div>
+
+  {# ── Gap signals: one row for each signal the figure above counts ── #}
+  <section id="gap-signals" class="scroll-mt-20 space-y-3" data-testid="gap-signals-section" aria-labelledby="gap-signals-title">
+    <div>
+      <h2 id="gap-signals-title" class="text-base font-semibold text-foreground">Capability gap signals</h2>
+      <p class="text-sm text-muted-foreground">Found by checking the capability map. They are not recorded as gaps until you detect them.</p>
+    </div>
+    {% if gap_signals_error %}
+    <p class="text-sm text-destructive-emphasis" data-testid="gap-signals-error">The gap signals could not be read. This is not "none found". Reload the page to try again.</p>
+    {% elif gap_signals %}
+    {% call(signal) list_table(rows=gap_signals, columns=[{'label': 'Capability', 'sortable': true}, {'label': 'Finding', 'sortable': true}, {'label': 'Priority', 'sortable': true, 'class': 'hidden md:table-cell'}],
+                               caption='Capability gap signals', testid='gap-signals-table', row_testid='gap-signal-row',
+                               server_pagination=true) %}
+      {% call signal_cell(class='max-w-[360px]') %}
+        <a href="{{ url_for('enterprise_crud.capability_fact_sheet', capability_id=signal.capability_id) }}" class="block truncate font-medium text-foreground hover:underline" data-testid="gap-signal-link-{{ signal.capability_id }}">{{ signal.name or 'Untitled capability' }}</a>
+      {% endcall %}
+      {% call signal_cell() %}{{ signal.gap_details|join('; ') if signal.gap_details else (signal.primary_gap or 'unclassified')|capitalize }}{% endcall %}
+      {% call signal_cell(class='hidden md:table-cell whitespace-nowrap', attrs={'data-sort': signal.priority or ''}) %}{{ (signal.priority or 'unrated')|capitalize }}{% endcall %}
+    {% endcall %}
+    {% else %}
+    <div class="rounded-lg border border-border p-6 text-center" data-testid="gap-signals-empty">
+      <p class="text-sm text-muted-foreground">No capability has a coverage, quality, retirement or modernisation finding, so there are no signals. {% if capability_count %}Record a gap yourself if you know of one.{% else %}Add capabilities to the capability map first; the check reads them.{% endif %}</p>
+      <div class="mt-4 flex justify-center">{{ button(text=('Open the capability map'), variant='outline', size='sm', href=url_for('capability_map.index')) }}</div>
+    </div>
+    {% endif %}
+  </section>
 
   {# ── Plateau Timeline ── #}
   {% call card() %}
@@ -142,10 +156,10 @@
       </div>
     {% endcall %}
     {% call card_content() %}
-      <template x-if="loading">
+      <template x-if="plateausLoading">
         <div>{{ skeleton_list(rows=3) }}</div>
       </template>
-      <template x-if="!loading && errorMessage">
+      <template x-if="!plateausLoading && plateausError">
         {{ empty_state(
           icon='alert-triangle',
           title='Error loading plateaus',
@@ -153,7 +167,7 @@
           class='py-10'
         ) }}
       </template>
-      <template x-if="!loading && !errorMessage && plateaus.length === 0">
+      <template x-if="!plateausLoading && !plateausError && plateaus.length === 0">
         {{ empty_state(
           icon='layers',
           title='No plateaus defined',
@@ -164,7 +178,7 @@
           class='py-10'
         ) }}
       </template>
-      <template x-if="!loading && plateaus.length > 0">
+      <template x-if="!plateausLoading && plateaus.length > 0">
         <div data-testid="figure-cards" class="grid gap-4" :class="plateaus.length === 1 ? 'grid-cols-1' : plateaus.length === 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'">
           <template x-for="plateau in plateaus" :key="plateau.id">
             <div data-testid="rdm-plateau">
@@ -226,26 +240,26 @@
           </tr>
         {% endcall %}
         {% call table_body() %}
-          <template x-if="loading">
+          <template x-if="workPackagesLoading">
             <tr>
               <td colspan="7" class="p-4 text-center">{{ skeleton_table(rows=3, columns=7) }}</td>
             </tr>
           </template>
-          <template x-if="!loading && errorMessage">
+          <template x-if="!workPackagesLoading && workPackagesError">
             <tr>
               <td colspan="7" class="p-4 text-center text-sm text-destructive-emphasis">
                 Work packages could not be read — this is not "none yet".
               </td>
             </tr>
           </template>
-          <template x-if="!loading && !errorMessage && workPackages.length === 0">
+          <template x-if="!workPackagesLoading && !workPackagesError && workPackages.length === 0">
             <tr>
               <td colspan="7" class="p-4 text-center text-sm text-muted-foreground">
                 No work packages yet. Add a gap first, then create work packages to resolve it.
               </td>
             </tr>
           </template>
-          <template x-for="wp in (loading ? [] : workPackages)" :key="wp.id">
+          <template x-for="wp in (workPackagesLoading ? [] : workPackages)" :key="wp.id">
             {% call table_row(attrs_dict={'class': 'hover:bg-muted/30'}) %}
               {% call table_cell() %}
                 <input type="checkbox" class="rounded border-input"
@@ -297,9 +311,13 @@
   {% endcall %}
 
   {# ── Error Banner ── #}
-  <template x-if="errorMessage">
-    <div class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis"
-      x-text="errorMessage"></div>
+  <template x-if="gapsError || plateausError || workPackagesError || errorMessage">
+    <div data-testid="rdm-error-banner" class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis">
+      <template x-if="gapsError"><div x-text="gapsError"></div></template>
+      <template x-if="plateausError"><div x-text="plateausError"></div></template>
+      <template x-if="workPackagesError"><div x-text="workPackagesError"></div></template>
+      <template x-if="errorMessage"><div data-testid="rdm-detect-error" x-text="errorMessage"></div></template>
+    </div>
   </template>
 
 </div>
@@ -396,7 +414,7 @@
             </div>
             <div class="flex items-center justify-end gap-2 border-t pt-4">
               {% call button(text='Cancel', variant='ghost', on_click="Platform.modal.close('rdm-create-plateau-modal')") %}{% endcall %}
-              {% call button(text='Create Plateau', variant='default', attrs_dict={':disabled': 'isSubmitting'}) %}{% endcall %}
+              {% call button(text='Create Plateau', variant='default', type='submit', attrs_dict={':disabled': 'isSubmitting'}) %}{% endcall %}
             </div>
           </form>
         </div>
@@ -554,6 +572,23 @@
 (function () {
   'use strict';
 
+  // One request per data source per page load; the page's parts share the answer.
+  // `again` asks the server afresh after something was saved or removed.
+  const sourceUrls = {
+    'gaps': '/capability-map/api/roadmap/gaps',
+    'plateaus': '/capability-map/api/roadmap/plateaus',
+    'work-packages': '/capability-map/api/roadmap/work-packages',
+  };
+  const sourceAnswers = {};
+  window.rdmSource = function (key, again) {
+    if (again || !sourceAnswers[key]) {
+      const asked = Platform.fetch(sourceUrls[key], { silent: true });
+      sourceAnswers[key] = asked;
+      asked.catch(() => { if (sourceAnswers[key] === asked) delete sourceAnswers[key]; });
+    }
+    return sourceAnswers[key];
+  };
+
   const CSRF = () => document.getElementById('rdm-csrf-token')?.value || '';
 
   // ── Alpine Store: shared state between page and modal sub-components ──
@@ -578,11 +613,21 @@
       gaps: [],
       plateaus: [],
       workPackages: [],
+      workPackageCount: {{ work_package_count | tojson }},
+      plateauCount: {{ plateau_count | tojson }},
       gapFilter: { priority: '', type: '' },
       selectedGapIds: [],
       isDetecting: false,
+      gapsError: '',
+      plateausError: '',
+      workPackagesError: '',
+      recordedGaps: {{ recorded_gaps | tojson }},
+      aiGenerated: {{ ai_generated | tojson }},
       errorMessage: '',
-      loading: true,
+      signalCount: 0,
+      gapsLoading: true,
+      plateausLoading: true,
+      workPackagesLoading: true,
 
       get gapModalTitle() {
         const editing = Alpine.store('rdm').editingGap;
@@ -605,61 +650,99 @@
       get metrics() {
         return {
           total_gaps: this.gaps.length,
-          total_plateaus: this.plateaus.length,
-          total_wps: this.workPackages.length,
-          ai_generated: this.gaps.filter(g => g.auto_generated).length,
+          total_plateaus: this.plateauCount,
+          total_wps: this.workPackageCount,
+          ai_generated: this.aiGenerated,
         };
       },
 
 
       async init() {
         // A gap saved in the dialog changes the recorded-gaps figure, so the tile reads the register again.
-        window.addEventListener('rdm-gap-saved', () => this.loadGaps());
-        window.addEventListener('rdm-work-package-saved', () => this.loadWorkPackages());
-        this.loading = true;
-        try {
-          await Promise.all([this.loadGaps(), this.loadPlateaus(), this.loadWorkPackages()]);
-        } finally {
-          this.loading = false;
-        }
+        window.addEventListener('rdm-gap-saved', () => this.refreshAfterGapSave());
+        window.addEventListener('rdm-work-package-saved', () => this.refreshAfterWorkPackageSave());
+        window.addEventListener('rdm-plateau-saved', () => this.refreshAfterPlateauSave());
+        // Alpine runs init() itself; each part fills in when its own answer arrives.
+        // Start all three loads independently; do not wait for all to finish.
+        this.loadGaps();
+        this.loadPlateaus();
+        this.loadWorkPackages();
       },
 
-      async loadGaps() {
+      async loadGaps(again) {
         try {
-          const d = await Platform.fetch('/capability-map/api/roadmap/gaps', { silent: true });
+          const d = await window.rdmSource('gaps', again);
           this.gaps = d.gaps || [];
-          this.recordedGaps = d.recorded_gaps === undefined ? null : d.recorded_gaps;
+          this.applyFigures(d.figures);
           this.signalCount = d.signal_count === undefined ? this.gaps.length : d.signal_count;
           Alpine.store('rdm').gaps = this.gaps;
+          this.gapsError = '';
         } catch (e) {
           this.gaps = [];
           Alpine.store('rdm').gaps = [];
-          this.errorMessage = 'Failed to load gaps (' + e.message + ').';
+          this.gapsError = 'Failed to load gaps (' + e.message + ').';
+        } finally {
+          this.gapsLoading = false;
         }
       },
 
-      async loadPlateaus() {
+      async loadPlateaus(again) {
         try {
-          const d = await Platform.fetch('/capability-map/api/roadmap/plateaus?footer=1', { silent: true });
+          const d = await window.rdmSource('plateaus', again);
           this.plateaus = d.plateaus || [];
+          this.applyFigures(d.figures);
+          this.plateausError = '';
           Alpine.store('rdm').plateaus = this.plateaus;
         } catch (e) {
           this.plateaus = [];
           Alpine.store('rdm').plateaus = [];
-          this.errorMessage = 'Failed to load plateaus (' + e.message + ').';
+          this.plateausError = 'Failed to load plateaus (' + e.message + ').';
+        } finally {
+          this.plateausLoading = false;
         }
       },
 
-      async loadWorkPackages() {
+      async loadWorkPackages(again) {
         try {
-          const d = await Platform.fetch('/capability-map/api/roadmap/work-packages?footer=1', { silent: true });
+          const d = await window.rdmSource('work-packages', again);
           this.workPackages = d.work_packages || [];
+          this.applyFigures(d.figures);
+          this.workPackagesError = '';
           Alpine.store('rdm').workPackages = this.workPackages;
         } catch (e) {
           this.workPackages = [];
           Alpine.store('rdm').workPackages = [];
-          this.errorMessage = 'Failed to load work packages (' + e.message + ').';
+          this.workPackagesError = 'Failed to load work packages (' + e.message + ').';
+        } finally {
+          this.workPackagesLoading = false;
         }
+      },
+
+      async refreshAfterGapSave() {
+        await this.loadGaps(true);
+        if (typeof window.rdmRedrawTimeline === 'function') window.rdmRedrawTimeline();
+      },
+
+      async refreshAfterWorkPackageSave() {
+        await this.loadWorkPackages(true);
+        if (typeof window.rdmRedrawTimeline === 'function') window.rdmRedrawTimeline();
+      },
+
+      async refreshAfterPlateauSave() {
+        await this.loadPlateaus(true);
+        if (typeof window.rdmRedrawTimeline === 'function') window.rdmRedrawTimeline();
+      },
+
+      // Every answer carries the figures and the evidence line counted together; the tiles and the line
+      // are set from that one answer in the same step. An answer that failed never reaches here.
+      applyFigures(figures) {
+        if (!figures) return;
+        this.plateauCount = figures.plateau_count;
+        this.workPackageCount = figures.work_package_count;
+        this.recordedGaps = figures.recorded_gaps;
+        this.aiGenerated = figures.ai_generated;
+        const footer = document.querySelector('[data-testid="roadmap-summary-footer"]');
+        if (footer && figures.footer_html) footer.innerHTML = figures.footer_html;
       },
 
       async detectGaps() {
@@ -671,7 +754,7 @@
         try {
           const d = await Platform.fetch.post('/capability-map/api/roadmap/gaps/detect', undefined, { silent: true });
           if (!d.success) throw new Error(d.error || 'Detection failed');
-          await this.loadGaps();
+          await this.loadGaps(true);
           Platform.alert(`Detection complete: ${d.created} gap(s) created, ${d.updated} updated.`);
         } catch (e) {
           this.errorMessage = e.message || 'Gap detection failed.';
@@ -726,10 +809,10 @@
         try {
           const d = await Platform.fetch.delete(`/capability-map/api/roadmap/gaps/${gap.id}`, { silent: true });
           if (!d.success) throw new Error(d.error || 'Delete failed');
-          this.gaps = this.gaps.filter(g => g.id !== gap.id);
-          Alpine.store('rdm').gaps = this.gaps;
+          this.gapsError = '';
+          await this.loadGaps(true);
         } catch (e) {
-          this.errorMessage = e.message || 'Failed to delete gap.';
+          this.gapsError = e.message || 'Failed to delete gap.';
         }
       },
 
@@ -737,13 +820,16 @@
         if (!await Platform.confirm({ title: `Delete work package "${wp.name}"?`,
                 message: 'This cannot be undone.', confirmText: 'Delete',
                 variant: 'destructive' })) return;
+        this.workPackagesError = '';
         try {
           const d = await Platform.fetch.delete(`/capability-map/api/roadmap/work-packages/${wp.id}`, { silent: true });
           if (!d.success) throw new Error(d.error || 'Delete failed');
-          this.workPackages = this.workPackages.filter(w => w.id !== wp.id);
-          Alpine.store('rdm').workPackages = this.workPackages;
+          // Re-fetch from server so the tile count and evidence line agree (includes parts).
+          await this.loadWorkPackages(true);
+          // Refresh the evidence line from the server's markup.
+            if (typeof window.rdmRedrawTimeline === 'function') window.rdmRedrawTimeline();
         } catch (e) {
-          this.errorMessage = e.message || 'Failed to delete work package.';
+          this.workPackagesError = e.message || 'Failed to delete work package.';
         }
       },
 
@@ -859,6 +945,7 @@
           store.plateaus = [...store.plateaus, d.plateau].sort((a, b) => a.sequence_order - b.sequence_order);
           this.form = { name: '', sequence_order: store.plateaus.length + 1, target_date: '', description: '' };
           Platform.modal.close('rdm-create-plateau-modal');
+          window.dispatchEvent(new CustomEvent('rdm-plateau-saved'));
         } catch (e) {
           Platform.alert(e.message || 'Failed to create plateau.');
         } finally {
@@ -1023,6 +1110,7 @@
           const store = Alpine.store('rdm');
           store.workPackages = [...created.filter(Boolean), ...store.workPackages];
           Alpine.store('rdm').aiOpen = false;
+          window.dispatchEvent(new CustomEvent('rdm-work-package-saved'));
           Platform.alert(`${created.length} work package(s) created from the roadmap preview.`);
         } catch (e) {
           Platform.alert(e.message || 'Failed to create work packages.');
@@ -1184,9 +1272,9 @@
   async function loadAndRender() {
     try {
       const [wpData, gapData, plateauData] = await Promise.all([
-        Platform.fetch('/capability-map/api/roadmap/work-packages', { silent: true }),
-        Platform.fetch('/capability-map/api/roadmap/gaps', { silent: true }),
-        Platform.fetch('/capability-map/api/roadmap/plateaus', { silent: true }),
+        window.rdmSource('work-packages'),
+        window.rdmSource('gaps'),
+        window.rdmSource('plateaus'),
       ]);
       const workPackages = (wpData.work_packages || [])
         .filter(wp => wp.start_date && (wp.end_date || wp.target_date));
@@ -1264,6 +1352,7 @@
   } else {
     loadAndRender();
   }
+  window.rdmRedrawTimeline = loadAndRender;
 }());
 </script>
 {% endblock %}

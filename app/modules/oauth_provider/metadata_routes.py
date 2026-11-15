@@ -3,22 +3,21 @@
 GET /.well-known/oauth-protected-resource       — RFC 9728
 GET /.well-known/oauth-authorization-server     — RFC 8414
 
-Every URL here is built from PUBLIC_BASE_URL, the one configured origin —
-never from the incoming request's Host header, and never from a literal
-fallback host. app/_bootstrap/blueprints.py refuses to boot with
-MCP_ENABLED true and PUBLIC_BASE_URL empty, so these routes only ever run
-with a real base configured.
+Every URL here is built from the request's origin when it matches the
+canonical PUBLIC_BASE_URL or a configured alias (PUBLIC_BASE_URL_ALIASES);
+otherwise the canonical origin is used. This allows the metadata to answer
+correctly on both entelim.tech and entelim.org without redirecting.
+app/_bootstrap/blueprints.py refuses to boot with MCP_ENABLED true and
+PUBLIC_BASE_URL empty, so these routes only ever run with a real base configured.
 """
 
 from __future__ import annotations
 
-from flask import Blueprint, current_app, jsonify
+from flask import Blueprint, jsonify
+
+from app.services.origin import request_origin
 
 oauth_metadata_bp = Blueprint("oauth_metadata", __name__)
-
-
-def _public_base_url() -> str:
-    return (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
 
 
 @oauth_metadata_bp.route("/.well-known/oauth-protected-resource")
@@ -30,7 +29,7 @@ def protected_resource_metadata():
     either path finds the same document — the ``WWW-Authenticate`` challenge
     on 401 points at the ``/mcp`` path.
     """
-    base = _public_base_url()
+    base = request_origin()
     return jsonify({
         "resource": f"{base}/mcp",
         "authorization_servers": [base],
@@ -42,7 +41,7 @@ def protected_resource_metadata():
 @oauth_metadata_bp.route("/.well-known/oauth-authorization-server")
 def authorization_server_metadata():
     """RFC 8414: Authorization Server Metadata."""
-    base = _public_base_url()
+    base = request_origin()
     return jsonify({
         "issuer": base,
         "authorization_endpoint": f"{base}/oauth/authorize",

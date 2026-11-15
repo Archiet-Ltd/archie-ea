@@ -91,6 +91,7 @@ def _init_blueprints(app):
     # --- Core blueprints (always registered) ---
     _register_main(app)
     _register_account(app)
+    _register_account_oauth(app)
     _register_application_mgmt(app)
     _register_admin(app, csrf)
     _register_vendors(app, csrf)
@@ -224,6 +225,8 @@ def _register_optional_standalone(app):
         ("app.modules.admin.rate_limit_routes", "rate_limits_bp", "/admin"),
         ("app.modules.admin.billing_routes", "billing_bp", "/admin/billing"),
         ("app.modules.admin.team_routes", "team_bp", "/admin"),
+        # Education eligibility: the free plan for a confirmed university or college address.
+        ("app.modules.education", "education_bp", "/education"),
         # Navigation v3: the platform administration tools, out of the customer sidebar.
         ("app.modules.admin.platform_area_routes", "platform_area_bp", "/admin"),
         ("app.modules.business_model_canvas.routes", "business_model_bp", "/business-model"),
@@ -389,6 +392,16 @@ def _register_main(app):
         app.register_blueprint(main_blueprint)
     except Exception as e:
         app.logger.warning("Failed to register main blueprint: %s", e)
+
+
+def _register_account_oauth(app):
+    """Continue with Google / Microsoft: one blueprint, whichever account blueprint copy is active."""
+    try:
+        from app.modules.account.oauth_routes import oauth_bp
+
+        app.register_blueprint(oauth_bp)
+    except Exception as e:
+        app.logger.error(f"[MODULE] Account sign-in with Google/Microsoft failed to register: {e}")
 
 
 def _register_account(app):
@@ -632,8 +645,8 @@ def _register_always_on_apis(app, csrf):
             raise RuntimeError(
                 "MCP_ENABLED is true but PUBLIC_BASE_URL is empty. The OAuth "
                 "issuer, every metadata URL and the MCP 'resource' identifier "
-                "are built from PUBLIC_BASE_URL — set it to this server's "
-                "externally-reachable origin (e.g. https://app.example.com) "
+                "are built from PUBLIC_BASE_URL, so set PUBLIC_BASE_URL to this "
+                "server's externally-reachable origin (e.g. https://app.example.com) "
                 "before enabling MCP_ENABLED."
             )
 

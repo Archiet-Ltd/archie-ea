@@ -46,7 +46,7 @@
                 {% if paid_online %}
                 <div>
                     <p class="block text-sm font-medium mb-1">Plan</p>
-                    <p class="text-sm" data-testid="org-plan-paid-online">{{ {'free': 'Community', 'startup': 'Startup', 'team': 'Team', 'enterprise': 'Enterprise'}[plan_key] }}{% if plan_key == 'team' %} ({{ seats }} seats){% endif %}</p>
+                    <p class="text-sm" data-testid="org-plan-paid-online">{{ {'free': 'Community', 'startup': 'Startup', 'team': 'Team', 'education': 'Education', 'enterprise': 'Enterprise'}[plan_key] }}{% if plan_key == 'team' %} ({{ seats }} seats){% endif %}</p>
                     <p class="mt-1 text-xs text-muted-foreground">Paid online. The organisation changes its plan from its own billing page.</p>
                 </div>
                 {% else %}
@@ -57,6 +57,7 @@
                         <option value="free" {% if plan_key == 'free' %}selected{% endif %}>Community (3 people)</option>
                         <option value="startup" {% if plan_key == 'startup' %}selected{% endif %}>Startup (10 people)</option>
                         <option value="team" {% if plan_key == 'team' %}selected{% endif %}>Team (seats below)</option>
+                        {% if plan_key == 'education' %}<option value="education" selected>Education (free, no limit)</option>{% endif %}
                         <option value="enterprise" {% if plan_key == 'enterprise' %}selected{% endif %}>Enterprise (no limit)</option>
                     </select>
                 </div>

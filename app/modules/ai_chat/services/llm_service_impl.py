@@ -2393,17 +2393,27 @@ Output clean, executable test code."""
             )
         else:
             deadline = time.monotonic() + max(0.0, float(time_limit))
-            with one_attempt():
-                response, interaction = LLMService._call_llm(
-                    prompt=prompt,
-                    model=model,
-                    provider=provider,
-                    pipeline_stage_id=pipeline_stage_id,
-                    expected_schema=expected_schema,
-                    job_id=job_id,
-                    timeout=timeout,
-                    deadline=deadline,
-                )
+
+            def attempt():
+                with one_attempt():
+                    return LLMService._call_llm(
+                        prompt=prompt,
+                        model=model,
+                        provider=provider,
+                        pipeline_stage_id=pipeline_stage_id,
+                        expected_schema=expected_schema,
+                        job_id=job_id,
+                        timeout=timeout,
+                        deadline=deadline,
+                    )
+
+            from app.modules.ai_chat.services.agent_runner import read_before
+
+            def whole_call(read):
+                read.first.set()  # one plain call has no first token: only the deadline limits it
+                return attempt()
+
+            response, interaction = read_before(whole_call, deadline)
 
         # Cache the response
         if use_cache:

@@ -8,6 +8,7 @@ from werkzeug.exceptions import HTTPException
 from flask import Blueprint, request
 from flask_login import login_required
 
+from app.core.auth.decorators import require_permission
 from app.decorators import audit_log
 from sqlalchemy import or_
 
@@ -248,6 +249,7 @@ def get_application(application_id):
 
 @applications_bp.route("/", methods=["POST"])
 @login_required
+@require_permission("create", "application")
 @audit_log("api_application_create")
 def create_application():
     """
@@ -362,6 +364,7 @@ def create_application():
 
 @applications_bp.route("/<int:application_id>", methods=["PUT"])
 @login_required
+@require_permission("edit", "application")
 @audit_log("api_application_update")
 def update_application(application_id):
     """
@@ -467,6 +470,7 @@ def update_application(application_id):
 
 @applications_bp.route("/<int:application_id>", methods=["DELETE"])
 @login_required
+@require_permission("delete", "application")
 @audit_log("api_application_delete")
 def delete_application(application_id):
     """
@@ -718,6 +722,7 @@ def get_application_acm(application_id):
 
 @applications_bp.route("/<int:application_id>/acm/<int:mapping_id>", methods=["DELETE"])
 @login_required
+@require_permission("edit", "application")
 @audit_log("api_acm_mapping_delete")
 def delete_application_acm_mapping(application_id, mapping_id):
     """
@@ -786,6 +791,7 @@ def delete_application_acm_mapping(application_id, mapping_id):
 
 @applications_bp.route("/<int:application_id>/acm", methods=["POST"])
 @login_required
+@require_permission("edit", "application")
 @audit_log("api_acm_mapping_create")
 def add_application_acm_mapping(application_id):
     """
@@ -913,7 +919,8 @@ def api_application_tco(app_id):
         service = TCOCalculationService()
         breakdown = service.calculate_tco_breakdown(app_obj)
         roi = service.calculate_roi_score(app_obj)
-        return success_response(data={"tco": breakdown, "roi": roi})
+        from app.services.cost_visibility import withhold_reply
+        return success_response(data=withhold_reply({"tco": breakdown, "roi": roi}))
     except HTTPException:
         raise
     except Exception as e:

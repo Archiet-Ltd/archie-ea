@@ -36,6 +36,7 @@ from app.models.implementation_planning import (
     ImplementationPlateau,
 )
 from app.services import work_package_service
+from app.services.gap_register_service import count_gaps, gap_register_query
 from app.utils.tenant import current_organization_id
 
 logger = logging.getLogger(__name__)
@@ -613,9 +614,7 @@ class RoadmapBuilderService:
         """Generate gap nodes."""
         nodes = []
 
-        gaps = ImplementationGap.query.filter(
-            ImplementationGap.resolution_status.notin_(["resolved", "closed"])
-        ).all()
+        gaps = gap_register_query(current_organization_id(), closed=False).order_by(ImplementationGap.id).all()
 
         for idx, gap in enumerate(gaps):
             node_data = {
@@ -1043,9 +1042,7 @@ class RoadmapBuilderService:
         plateaus = ImplementationPlateau.query.all()
         current_plateau = next((p for p in plateaus if p.is_current()), None)
 
-        gaps = ImplementationGap.query.filter(
-            ImplementationGap.resolution_status.notin_(["resolved", "closed"])
-        ).count()
+        gaps = count_gaps(current_organization_id(), closed=False)
 
         # Calculate critical path
         critical_path_result = self.calculate_critical_path()

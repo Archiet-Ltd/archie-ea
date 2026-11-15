@@ -54,8 +54,18 @@ def create_risk():
     missing = [f for f in required if not data.get(f)]
     if missing:
         return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+    from app.middleware.tenant_context import current_org_id
+
+    links = data.get("links") or []
+    if not isinstance(links, list) or any(
+        not isinstance(link, dict) or link.get("entity_type") not in ENTITY_TYPES or not link.get("entity_id")
+        for link in links
+    ):
+        return jsonify({"error": f"links must be a list of entity_type (one of {ENTITY_TYPES}) and entity_id"}), 400
     try:
         risk = risk_service.create_risk(
+            links=[(link["entity_type"], link["entity_id"]) for link in links],
+            organization_id=current_org_id(),
             solution_id=data.get("solution_id"),
             title=data["title"],
             description=data.get("description"),
@@ -150,8 +160,12 @@ def add_risk_link(risk_id):
         return jsonify(
             {"error": f"entity_type (one of {ENTITY_TYPES}) and entity_id are required"}
         ), 400
+    from app.middleware.tenant_context import current_org_id
+
     try:
-        link = risk_service.add_risk_link(risk_id, entity_type, entity_id)
+        link = risk_service.add_risk_link(
+            risk_id, entity_type, entity_id, organization_id=current_org_id()
+        )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify(
@@ -569,11 +583,24 @@ def risk_register():
     )
     ctx = _prefetch_risk_context(risks)
     risk_rows = [serialize_risk_row(r, ctx) for r in risks]
+    # ?show=open|mitigated|critical|high|medium|low lists the risks a count card counts: the open risks, the
+    # mitigated ones, or the open risks of one level (the figures of risk_service.level_counts)
+    show = (request.args.get("show") or "").strip().lower()
+    if show == "open":
+        listed_rows = [r for r in risk_rows if r["status"] == "open"]
+    elif show == "mitigated":
+        listed_rows = [r for r in risk_rows if r["status"] == "mitigated"]
+    elif show in ("critical", "high", "medium", "low"):
+        listed_rows = [r for r in risk_rows if r["status"] == "open" and r["risk_level"] == show]
+    else:
+        show, listed_rows = "", risk_rows
     ranked = risk_service.ranked_risks()
     return render_template(
         "governance/risk_register.html",
         risks=risks,
-        risk_rows=risk_rows,
+        show=show,
+        listed_rows=listed_rows,
+        risk_rows=listed_rows,
         grid=heat_data.get("grid", []),
         total=len(risks),
         current_sort=sort_key if sort_key in _RISK_SORT_COLUMNS else "id",

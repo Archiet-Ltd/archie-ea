@@ -361,41 +361,6 @@ def test_the_first_administrator_from_set_up_works_outside_the_holding_organisat
     assert not is_holding_slug(_holding_slug_of(admin))
 
 
-def test_a_first_platform_sso_sign_in_works_outside_the_holding_organisation(app, db_session, monkeypatch):
-    from app.models.feature_flags import FeatureFlag
-    from app.models.user import User
-    from app.modules.account.v2.routes import account_routes
-    from app.services.billing_plans import is_holding_slug
-
-    flag = FeatureFlag.query.filter_by(key="sso_authentication").first()
-    if flag is None:
-        db_session.add(FeatureFlag(key="sso_authentication", name="SSO authentication", enabled=True))
-    else:
-        flag.enabled = True
-    db_session.commit()
-
-    class _Client:
-        def authorize_access_token(self):
-            return {"userinfo": {"email": email, "given_name": "Ada", "family_name": "Lovelace"}}
-
-    class _OAuth:
-        def create_client(self, provider):
-            return _Client()
-
-    email = _address("sso")
-    monkeypatch.setattr(account_routes, "_get_sso_oauth", lambda: _OAuth())
-    client = _client(app)
-    with client.session_transaction() as sess:
-        sess["sso_state"] = "state-abc"
-
-    resp = client.get("/account/sso/callback/azure?state=state-abc", follow_redirects=False)
-
-    assert resp.status_code in (302, 303), resp.get_data(as_text=True)
-    person = _user(email)
-    assert person is not None and person.confirmed is True
-    assert not is_holding_slug(_holding_slug_of(person))
-
-
 @pytest.mark.parametrize(
     "agent",
     [

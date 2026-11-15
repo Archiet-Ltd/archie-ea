@@ -24,7 +24,7 @@ info:
     identifier: AGPL-3.0-only
   contact:
     name: Entelim
-    url: https://entelim.org
+    url: https://entelim.tech
   x-api-lifecycle:
     versioning: 'Major version in the path (/v1). Within a major version only additive
       changes ship: new operations, new optional fields, new enum values that clients
@@ -42,7 +42,7 @@ servers:
   description: The organisation's Entelim host, hosted or self-hosted.
   variables:
     host:
-      default: entelim.org
+      default: entelim.tech
       description: Host name of the Entelim instance.
 security:
 - entelimOAuth: []
@@ -146,7 +146,7 @@ components:
         metadata, and error and scope where relevant.
       schema:
         type: string
-      example: Bearer resource_metadata="https://entelim.org/.well-known/oauth-protected-resource",
+      example: Bearer resource_metadata="https://entelim.tech/.well-known/oauth-protected-resource",
         error="invalid_token"
   parameters:
     Id:

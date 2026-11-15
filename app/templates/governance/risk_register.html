@@ -10,22 +10,12 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/provenance.html' import result_footer %}
 {% from 'components/risk_matrix.html' import risk_matrix %}
+{% from 'components/risk_link_picker.html' import risk_link_picker, risk_link_picker_script with context %}
 {% from 'components/alert.html' import alert as quiet_alert %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
-{% block title %}Risk Register{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Governance', 'href': url_for('capability_governance.governance_dashboard')},
-    {'text': 'Risk Register', 'current': true}
-]) }}
-{% endblock %}
-
-{% block content %}
+{% block title %}Risk Register{% endblock %}{% block content %}
 {#
   This page was a stub: an "Add Risk" button with no handler of any kind, and a
   single placeholder line where the register should be. The QA audit of 30 Aug
@@ -68,24 +58,39 @@
     {# Open and Critical are the one open-risk count the route passes in (risk_service.level_counts):
        a closed or mitigated risk is not current exposure, and the risk assessment shows the same figures. #}
     {% set _mit = risks | selectattr('status.value', 'equalto', 'mitigated') | list | length %}
+    {% macro _count_card(href, testid=none, title=none) -%}
+    {%- set inner = caller() -%}
+    {%- if href -%}<a href="{{ href }}" class="block rounded-lg border border-border bg-card p-4 outline-none hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50"{% if testid %} data-testid="{{ testid }}"{% endif %}>{{ inner }}</a>
+    {%- else -%}<div class="rounded-lg border border-border bg-card p-4"{% if testid %} data-testid="{{ testid }}"{% endif %}>{{ inner }}</div>{%- endif -%}
+    {%- endmacro %}
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="rounded-lg border border-border bg-card p-4">
+        {% call _count_card(url_for('risk.risk_register') if total else none, 'register-card-total') %}
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground">{{ total if total is not none else '—' }}</div>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground" data-testid="register-total">{{ total if total is not none else 'Not available' }}</div>
+            <div class="text-xs text-muted-foreground">Every risk, whatever its status</div>
+        {% endcall %}
+        {% call _count_card(url_for('risk.risk_register', show='open') if counts.open else none, 'register-card-open') %}
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Open</div>
             <div class="mt-1 text-2xl font-semibold tabular-nums text-foreground" data-testid="register-open">{{ counts.open }}</div>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
-            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground" title="Open critical risks only -- a closed or mitigated critical does not count as current exposure">Critical</div>
+            <div class="text-xs text-muted-foreground">Still to be treated</div>
+        {% endcall %}
+        {% call _count_card(url_for('risk.risk_register', show='critical') if counts.critical else none, 'register-card-critical') %}
+            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Critical</div>
             <div class="mt-1 text-2xl font-semibold tabular-nums text-destructive-emphasis" data-testid="register-critical">{{ counts.critical }}</div>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
+            <div class="text-xs text-muted-foreground">Open risks at the critical level; a closed or mitigated one is not current exposure</div>
+        {% endcall %}
+        {% call _count_card(url_for('risk.risk_register', show='mitigated') if _mit else none, 'register-card-mitigated') %}
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mitigated</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-success-emphasis">{{ _mit }}</div>
-        </div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-success-emphasis" data-testid="register-mitigated">{{ _mit }}</div>
+            <div class="text-xs text-muted-foreground">Risks marked mitigated</div>
+        {% endcall %}
     </div>
+    {% if show %}
+    <p class="flex flex-wrap items-center gap-2 text-sm" data-testid="register-filter-note">
+        <span class="text-muted-foreground">Showing only {{ 'the open risks' if show == 'open' else 'the mitigated risks' if show == 'mitigated' else 'the open risks at the ' ~ show ~ ' level' }} ({{ risk_rows|length }} of {{ total }}).</span>
+        <a href="{{ url_for('risk.risk_register') }}" class="font-medium text-primary hover:underline" data-testid="register-filter-clear">Show every risk</a>
+    </p>
+    {% endif %}
 
     {# Ranked list: exposure comes from the one impact answer, see risk_service.ranked_risks. #}
     {% if ranked is defined and ranked %}
@@ -147,7 +152,7 @@
     {% endif %}
 
     <div class="rounded-lg border border-border bg-card p-4">
-        <h2 class="text-sm font-semibold text-foreground mb-3">All risks</h2>
+        <h2 class="text-sm font-semibold text-foreground mb-3">{{ 'Risks' if show else 'All risks' }}</h2>
 
         {# Migrated onto the shared data_table component (components/data_table.html)
            instead of a hand-rolled <table class="dense-table"> — it already had search, sort, a
@@ -313,9 +318,13 @@
     </div>
 
     {% if can_write %}
-    {% call modal(id='create-risk-modal', title='Add Risk', description='Record an enterprise architecture risk.', size='lg') %}
+    {% call modal(id='create-risk-modal', title='', labelledby='create-risk-modal-heading', size='lg') %}
     <div class="space-y-4">
-        <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span> — use Map to… on the risk's own row to link it to an Application, Capability, Solution or Programme.</p>
+        <div class="flex flex-col space-y-1.5 pr-8 -mt-1">
+            <h2 id="create-risk-modal-heading" class="text-base font-semibold text-foreground" x-text="editingId ? 'Edit risk' : 'Add risk'">Add risk</h2>
+            <p class="text-sm text-muted-foreground">Record an enterprise architecture risk.</p>
+        </div>
+        <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing <span x-text="editingTitle"></span>. Change what it touches with Map to… on the risk's own row.</p>
         {% call form_group(id='risk-title', label='Title', required=true) %}
             {{ input(id='risk-title', type='text', size='sm', placeholder='What could go wrong?', attrs_dict={'x-model': 'form.title'}) }}
         {% endcall %}
@@ -336,6 +345,10 @@
         {% call form_group(id='risk-mitigation', label='Mitigation plan') %}
             {{ textarea(id='risk-mitigation', rows=2, placeholder='What reduces it?', attrs_dict={'x-model': 'form.mitigation_plan'}) }}
         {% endcall %}
+        <div x-show="!editingId" x-cloak>
+            <p class="mb-1 text-sm font-medium text-foreground">What it touches</p>
+            {{ risk_link_picker('chooseLink(entity)', chips=true, testid='add-risk-link-picker') }}
+        </div>
         <div x-show="error" x-cloak role="alert"
              class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
              x-text="error"></div>
@@ -343,7 +356,7 @@
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
         {{ button(text='Cancel', type='button', variant='outline', attrs_dict={'data-modal-close': 'create-risk-modal'}) }}
         {% call button(text='', type='button', on_click='submit()', attrs_dict={':disabled': 'saving'}) %}
-            <span x-text="saving ? 'Saving' : (editingId ? 'Save Changes' : 'Add Risk')"></span>
+            <span x-text="saving ? 'Saving' : (editingId ? 'Save changes' : 'Add risk')"></span>
         {% endcall %}
     </div>
     {% endcall %}
@@ -417,16 +430,8 @@
                     <p x-show="!(selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length)" x-cloak class="text-xs text-muted-foreground">Not mapped to any Application, Capability, Solution or Programme yet.</p>
 
                     {% if can_write %}
-                    <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3 space-y-2">
-                        <div class="flex gap-2">
-                            {% call native_select(size='sm', aria_label='Entity type to link', options=[('application','Application'),('capability','Capability'),('solution','Solution'),('programme','Programme')], attrs_dict={'x-model': 'linkType', 'class': 'h-8 text-xs'}) %}{% endcall %}
-                            {{ input(type='text', size='xs', aria_label='Search entities to link', attrs_dict={'x-model': 'linkSearch', '@input.debounce.300ms': 'searchLinkEntities()', ':placeholder': "'Search ' + linkType + 's…'"}) }}
-                        </div>
-                        <div x-show="linkResults.length > 0" x-cloak class="max-h-40 overflow-y-auto rounded-md border border-border divide-y divide-border">
-                            <template x-for="entity in linkResults" :key="entity.id">
-                                {% call button(type='button', variant='ghost', size='bare', class='w-full text-left px-2.5 py-1.5 text-xs', attrs_dict={'@click': 'addLink(entity)', 'x-text': 'entity.name'}) %}{% endcall %}
-                            </template>
-                        </div>
+                    <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3">
+                        {{ risk_link_picker('addLink(entity)') }}
                     </div>
                     {% endif %}
                 </div>
@@ -445,9 +450,12 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ risk_link_picker_script() }}
 <script>
 function riskRegister() {
     return {
+        ...riskLinkPicker(),
+        pendingLinks: [],
         saving: false,
         error: '',
         form: {
@@ -455,6 +463,7 @@ function riskRegister() {
             owner: '', mitigation_plan: ''
         },
         editingId: null,
+        editingTitle: '',
 
         // H2: detail slide-over state.
         panelOpen: false,
@@ -462,9 +471,6 @@ function riskRegister() {
 
         // H1: entity-link picker state, scoped to whichever risk the panel is showing.
         showMapPicker: false,
-        linkType: 'application',
-        linkSearch: '',
-        linkResults: [],
 
         updatingId: null,
 
@@ -500,6 +506,7 @@ function riskRegister() {
 
         openCreate() {
             this.editingId = null;
+            this.editingTitle = '';
             this.form.title = '';
             this.form.description = '';
             this.form.likelihood = '3';
@@ -508,6 +515,9 @@ function riskRegister() {
             this.form.mitigation_plan = '';
             this.error = '';
             this.saving = false;
+            this.pendingLinks = [];
+            this.linkSearch = '';
+            this.linkResults = [];
             Platform.modal.open('create-risk-modal');
         },
 
@@ -517,6 +527,7 @@ function riskRegister() {
             if (!row) return;
             this.panelOpen = false;
             this.editingId = row.id;
+            this.editingTitle = row.title || 'this risk';
             this.form.title = row.title || '';
             this.form.description = row.description || '';
             this.form.likelihood = String(row.likelihood);
@@ -572,23 +583,16 @@ function riskRegister() {
             });
         },
 
-        // H1: entity picker backing /api/{applications|solutions|programmes}/search.
-        searchLinkEntities() {
-            const q = this.linkSearch.trim();
-            if (q.length < 2) { this.linkResults = []; return; }
-            const self = this;
-            const endpoints = {
-                application: '/applications/api/list?search=' + encodeURIComponent(q) + '&limit=10',
-                capability: '/solutions/capabilities/search?limit=10&q=' + encodeURIComponent(q),
-                solution: '/api/solutions/search?q=' + encodeURIComponent(q),
-                programme: '/api/programmes/search?q=' + encodeURIComponent(q)
-            };
-            Platform.fetch.get(endpoints[this.linkType], null, { silent: true })
-                .then(function (data) {
-                    const rows = data.applications || data.items || data.capabilities || data || [];
-                    self.linkResults = rows.map(function (r) { return { id: r.id, name: r.name }; });
-                })
-                .catch(function () { self.linkResults = []; });
+        // Add Risk dialog: a choice becomes a chip; the chips are saved with the risk in one request.
+        chooseLink(entity) {
+            const known = this.pendingLinks.some(function (c) { return c.type === entity.type && c.id === entity.id; });
+            if (!known) this.pendingLinks.push({ type: entity.type, id: entity.id, name: entity.name });
+            this.linkSearch = '';
+            this.linkResults = [];
+        },
+
+        removeChip(chip) {
+            this.pendingLinks = this.pendingLinks.filter(function (c) { return c !== chip; });
         },
 
         addLink(entity) {
@@ -596,7 +600,7 @@ function riskRegister() {
             const self = this;
             Platform.fetch(`/api/risks/${this.selectedRisk.id}/links`, {
                 method: 'POST',
-                body: { entity_type: this.linkType, entity_id: entity.id },
+                body: { entity_type: entity.type, entity_id: entity.id },
                 silent: true
             })
                 .then(function (link) {
@@ -666,6 +670,9 @@ function riskRegister() {
                 owner: this.form.owner,
                 mitigation_plan: this.form.mitigation_plan
             };
+            if (!this.editingId) {
+                payload.links = this.pendingLinks.map(function (c) { return { entity_type: c.type, entity_id: c.id }; });
+            }
             // silent: this modal shows its own inline error, so a toast would duplicate it.
             const request = this.editingId
                 ? Platform.fetch('/api/risks/' + this.editingId, { method: 'PATCH', body: payload, silent: true })
