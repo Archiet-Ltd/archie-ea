@@ -281,6 +281,9 @@
                         } else if (ev.genome_answer && ev.response) {
                             /* Checked and drawn on the server; nothing streamed is kept. */
                             full = ev.response;
+                        } else if (ev.reworded && ev.response) {
+                            /* The server said the answer in the customer's words; what streamed is replaced. */
+                            full = ev.response;
                         } else if (!full && ev.response) {
                             full = ev.response;
                         }

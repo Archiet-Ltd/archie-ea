@@ -129,7 +129,7 @@
 <div class="mt-7">
     <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-semibold text-foreground flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-primary inline-block"></span>Compliance Gap Analysis</h3>
-        <button type="button" @click="loadComplianceGap()"
+        <button type="button" @click="runComplianceAnalysis()"
                 x-show="!complianceGapLoaded && !complianceGapLoading" x-cloak
                 class="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
             <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
@@ -160,13 +160,15 @@
                         <li class="flex items-start gap-2 text-sm">
                             <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0 mt-0.5 text-warning"></i>
                             <span class="text-muted-foreground" x-text="gap.description || gap.control_id || String(gap)"></span>
+                            <span class="text-xs text-muted-foreground" x-show="gap.source" x-text="'Source: ' + gap.source"></span>
                         </li>
                     </template>
                 </ul>
             </div>
         </template>
         <template x-if="complianceGap && (!complianceGap.gaps || complianceGap.gaps.length === 0)">
-            <p class="text-sm text-success-emphasis">No compliance gaps identified.</p>
+            <p class="text-sm" :class="complianceGap.compliance_status === 'compliant' ? 'text-success-emphasis' : 'text-muted-foreground'"
+               x-text="complianceGap.message || 'No compliance gaps identified.'"></p>
         </template>
     </div>
 </div>
