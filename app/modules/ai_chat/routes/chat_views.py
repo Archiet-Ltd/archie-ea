@@ -235,7 +235,7 @@ def index():
         own_key_admin=own_key_admin,
         not_set_up_sentence=FEATURE_INTROS["chat"],
         failure_table=failure_table_for_page(),
-        known_pages=known_pages(current_app),
+        known_pages=known_pages(current_app, current_user),
         lookup_abort_ms=int(
             (model_defaults.PROVIDER_FIRST_TOKEN_SECONDS + model_defaults.CHAT_TURN_MARGIN_SECONDS) * 1000
         ),

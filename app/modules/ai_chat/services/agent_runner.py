@@ -450,6 +450,8 @@ class AgentRunner:
         # Tokens of the model call in flight, held back until the gate has
         # judged the text so a refused answer is never partly shown.
         self._held_tokens: Optional[list] = None
+        self._streaming_words = None
+        self._write_failed = False
         self._withheld_claims: list = []   # sentences refused (enforce mode)
         self._would_withhold: list = []    # sentences logged only (log mode)
         # The verdict on each change this runner recorded, by record id, and the model drafting now
@@ -495,13 +497,31 @@ class AgentRunner:
         if self._held_tokens is not None:
             self._held_tokens.append(text)
         else:
-            self._emit({"type": "token", "text": text})
+            self._emit_in_customer_words(text)
+
+    def _emit_in_customer_words(self, text: str) -> None:
+        """Stream *text* the way the finished answer will read: a name only the
+        product uses is never on screen, not even for the length of the stream."""
+        from app.modules.ai_chat.services.customer_words import StreamingWords
+
+        words = getattr(self, "_streaming_words", None)
+        if words is None:
+            words = self._streaming_words = StreamingWords(lambda: bool(getattr(self, "_write_failed", False)))
+        said = words.feed(text)
+        if said:
+            self._emit({"type": "token", "text": said})
+
+    def _flush_customer_words(self) -> None:
+        words = getattr(self, "_streaming_words", None)
+        rest = words.finish() if words is not None else ""
+        if rest:
+            self._emit({"type": "token", "text": rest})
 
     def _release_held_tokens(self, release: bool) -> None:
         held, self._held_tokens = self._held_tokens, None
         if release:
             for text in held or []:
-                self._emit({"type": "token", "text": text})
+                self._emit_in_customer_words(text)
 
     @staticmethod
     def _inject_trusted_tool_context(
@@ -1233,6 +1253,8 @@ class AgentRunner:
                     )
                     self._emit({"type": "tool_result", "tool": tc.name, "result": result})
 
+                    if result.get("success") is False and tc.name in _MUTATING_TOOLS:
+                        self._write_failed = True
                     if result.get("success"):
                         actions_taken.append({
                             "tool": tc.name,
@@ -2393,7 +2415,7 @@ class AgentRunner:
         if isinstance(text, str) and text.strip():
             from app.modules.ai_chat.services.customer_words import in_customer_words
 
-            said = in_customer_words(text)
+            said = in_customer_words(text, bool(getattr(self, "_write_failed", False)))
             if said != text:
                 # The streamed words were already shown; the client swaps them for these.
                 result["reworded"] = True
@@ -2444,6 +2466,7 @@ class AgentRunner:
         self._apply_honesty_rules(result)
         self._apply_genome_post_check(result, provider_used)
         self._apply_citation_gate(result)
+        self._flush_customer_words()
         self._rewrite_customer_terms(result)
         if (result.get("citation_gate") or {}).get("refused"):
             result.pop("genome_answer", None)
