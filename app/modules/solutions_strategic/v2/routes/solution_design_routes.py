@@ -2808,6 +2808,84 @@ def api_phase_summary(solution_id: int):
     })
 
 
+# A control mapping that is not verified is a shortfall; the status decides how
+# serious. A mapping not yet assessed is reported, not recorded: nobody has
+# found a shortfall in it.
+_COMPLIANCE_SHORTFALL_SEVERITY = {"non_compliant": "high", "partial": "medium"}
+
+
+@solution_design_bp.route("/<int:solution_id>/api/compliance-gap", methods=["POST"])
+@login_required
+def api_compliance_gap(solution_id: int):
+    """Assess the solution's compliance mappings and record each shortfall in
+    the one gap register, inside the solution's organisation.
+
+    Only controls whose recorded verification status is non-compliant or
+    partial become gaps, each naming the mapping it came from. A solution with
+    no mappings, or none with a shortfall, records nothing and says so.
+    """
+    solution = Solution.query.get_or_404(solution_id)
+    if not _check_solution_access(solution):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    from app.models.solution_sad_models import SolutionComplianceMapping
+    from app.services.gap_register_service import create_gap
+
+    mappings = SolutionComplianceMapping.query.filter_by(solution_id=solution.id).order_by(
+        SolutionComplianceMapping.id
+    ).all()
+    if not mappings:
+        return jsonify({
+            "success": True,
+            "compliance_status": "not_assessed",
+            "gaps": [],
+            "message": "No compliance controls are mapped to this solution, so there is nothing to assess.",
+        })
+
+    gaps = []
+    for mapping in mappings:
+        severity = _COMPLIANCE_SHORTFALL_SEVERITY.get(mapping.verification_status)
+        if severity is None:
+            continue
+        status_text = mapping.verification_status.replace("_", " ")
+        where = " on %s" % mapping.element_name if mapping.element_name else ""
+        description = "%s control %s%s is %s." % (mapping.framework, mapping.control_id, where, status_text)
+        gap, created = create_gap(
+            organization_id=solution.organization_id,
+            name="Compliance gap: %s %s (%s, solution %d)" % (
+                mapping.framework, mapping.control_id, solution.name, solution.id),
+            description=description,
+            gap_type="compliance",
+            priority=severity,
+            severity=severity,
+            resolution_status="identified",
+            current_state_ref="solution_compliance_mappings:%d" % mapping.id,
+            auto_generated=True,
+            generation_source="solution_compliance_mapping",
+        )
+        gaps.append({
+            "id": gap.id,
+            "description": description,
+            "control_id": mapping.control_id,
+            "severity": severity,
+            "source": "%s control %s, status %s" % (mapping.framework, mapping.control_id, status_text),
+            "created": created,
+        })
+    db.session.commit()
+
+    statuses = {m.verification_status for m in mappings}
+    if "non_compliant" in statuses:
+        overall = "non_compliant"
+    elif gaps or statuses - {"verified"}:
+        overall = "partial"
+    else:
+        overall = "compliant"
+    message = None
+    if not gaps and overall == "partial":
+        message = "No shortfall found, but some mapped controls have not been assessed yet."
+    return jsonify({"success": True, "compliance_status": overall, "gaps": gaps, "message": message})
+
+
 def _build_blueprint_context(solution):
     """Build template context for the blueprint page.
 
@@ -6479,6 +6557,10 @@ def api_solution_gantt_data(solution_id: int):
 def api_solution_work_packages(solution_id, wp_id=None):
     """CRUD for solution work packages (used by Gantt component)."""
     from app.models.roadmap_models import RoadmapWorkPackage
+
+    action = {"POST": "create", "PUT": "edit", "DELETE": "delete"}[request.method]
+    if not _matrix_can(current_user, action, "work_package"):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
 
     solution = Solution.query.get_or_404(solution_id)
 
