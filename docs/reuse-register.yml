@@ -376,6 +376,24 @@ entries:
       - path: app/modules/solutions_strategic/v2/services/roadmap_automation.py
         reason: retired-store legacy copy, to be removed with the store
 
+  - id: work-package-write-permission
+    concept: Whether a person may create, change or delete a work package
+    status: active
+    canonical:
+      path: app/core/auth/permissions.py
+      symbols: [can, can_change_model]
+    reuse: >
+      Two helpers, two questions. can(user, action, "work_package") is the organisation's permission matrix and
+      the only rule for writing a work package: every work-package writer and every button that offers one reads
+      it, so the Permissions tab changes what the server allows. can_change_model(user) answers whether the role
+      may change the architecture model at all (capabilities, gaps, plateaus) and is the rule for those writers
+      only. A writer never runs both on one request: the roadmap API names its work-package endpoints in
+      _WORK_PACKAGE_WRITES and sends every other write to can_change_model. Do not add a role list, a
+      require_roles tuple or a second helper for work packages.
+    must_not_create:
+      - id: work-package-role-check
+        regex: 'def\s+_?(may|can)_(write|change|edit)_work_packages?\s*\('
+
   - id: entity-matching
     concept: Matching an incoming record to an existing one by identifier or name
     status: active

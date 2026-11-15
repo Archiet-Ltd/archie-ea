@@ -209,7 +209,7 @@ Temporary fixture page for a test.
 def test_sitemap_includes_vs_hub(app):
     """/sitemap.xml includes the /vs hub."""
     with app.test_client() as client:
-        xml = client.get("/sitemap.xml").data.decode()
+        xml = client.get("/sitemap-en.xml").data.decode()
         assert f"<loc>{canonical_origin()}/vs</loc>" in xml
 
 

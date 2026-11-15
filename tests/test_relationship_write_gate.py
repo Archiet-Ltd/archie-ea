@@ -66,6 +66,28 @@ def _relationship(db_session, org, a, b):
     return rel
 
 
+def _crossing_relationship(db_session, org, a, b):
+    """A relationship in `org` whose ends belong to another organisation.
+
+    Seeded with plain SQL, the shape of data written before the model guard
+    refused such rows, so the write routes can be shown to treat it as not
+    found for the caller.
+    """
+    from sqlalchemy import text
+
+    from app.models.archimate_core import ArchiMateRelationship
+
+    rel_id = db_session.execute(
+        text(
+            "INSERT INTO archimate_relationships "
+            "(organization_id, source_id, target_id, type, source_kind, created_at, updated_at) "
+            "VALUES (:org, :s, :t, 'flow', 'manual', now(), now()) RETURNING id"
+        ),
+        {"org": org.id, "s": a.id, "t": b.id},
+    ).scalar_one()
+    return db_session.get(ArchiMateRelationship, rel_id)
+
+
 def _count(db_session, *elements):
     """Relationships touching the given elements (this test's own rows only).
 
@@ -179,7 +201,7 @@ class TestEdit:
         # Foreign relationship, and a relationship in the caller's organisation
         # whose endpoints belong to the other organisation.
         foreign = _relationship(db_session, org_b, x, y)
-        mixed = _relationship(db_session, org_a, x, y)
+        mixed = _crossing_relationship(db_session, org_a, x, y)
         db_session.commit()
         login_as(client, architect)
         from app.models.archimate_core import ArchiMateRelationship
@@ -229,7 +251,7 @@ class TestDelete:
         architect = _user(db_session, org_a, "architect")
         x, y = _element(db_session, org_b, "X"), _element(db_session, org_b, "Y")
         foreign = _relationship(db_session, org_b, x, y)
-        mixed = _relationship(db_session, org_a, x, y)
+        mixed = _crossing_relationship(db_session, org_a, x, y)
         ids = (foreign.id, mixed.id)
         db_session.commit()
         login_as(client, architect)

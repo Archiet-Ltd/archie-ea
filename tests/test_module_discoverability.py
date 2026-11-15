@@ -37,7 +37,7 @@ import pytest
 _INFRA_RULES = {
     "/favicon.ico",
     "/robots.txt",
-    "/sitemap.xml",
+    "/sitemap-en.xml",
     "/llms.txt",  # crawler/agent meta file, same category as robots.txt
     "/llms-full.txt",  # crawler/agent meta file, same category as robots.txt
     "/apidocs/",

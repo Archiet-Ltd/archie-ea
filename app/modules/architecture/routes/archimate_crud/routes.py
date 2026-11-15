@@ -1996,6 +1996,9 @@ def add_product_element(product_id):
         request.form.get("section", ""))
     element_type = request.form.get("element_type", "")
     name = (request.form.get("name") or "").strip()
+    existing_id = request.form.get("existing_id", type=int)
+    if existing_id is not None:
+        return _join_existing_element(product_ae, section, existing_id, org_id, back)
     if section is None or element_type not in section[0]:
         flash("Choose a layer and one of its element types.", "error")
         return redirect(back)
@@ -2018,6 +2021,35 @@ def add_product_element(product_id):
         flash("The element could not be added. Nothing was changed.", "error")
         return redirect(back)
     flash("%s added to %s." % (name, product_ae.name), "success")
+    return redirect(back)
+
+
+def _join_existing_element(product_ae, section, existing_id, org_id, back):
+    """Join an element the organisation already holds to a Product by the layer's relationship, once."""
+    from app.modules.architecture.services.archimate_relationship_service import ArchiMateRelationshipService
+
+    target = ArchiMateElement.query.filter_by(id=existing_id, organization_id=org_id).first()
+    if section is None or target is None or target.type not in section[0] or target.id == product_ae.id:
+        flash("Choose an element of this layer that your organisation already holds.", "error")
+        return redirect(back)
+    relationship = section[1].lower()
+    already = ArchiMateRelationship.query.filter_by(
+        source_id=product_ae.id, target_id=target.id, type=relationship, organization_id=org_id).first()
+    if already is not None:
+        flash("%s is already joined to %s. Nothing was added." % (target.name, product_ae.name), "info")
+        return redirect(back)
+    try:
+        joined = ArchiMateRelationshipService.create_relationship(
+            product_ae, target, relationship, architecture_id=None, organization_id=org_id, rollback=False)
+        if joined is None:
+            raise ValueError("relationship not allowed")
+        db.session.commit()
+    except Exception:  # noqa: BLE001 - the person sees one plain sentence, the log keeps the cause
+        db.session.rollback()
+        current_app.logger.exception("Joining element %s to product %s failed", existing_id, product_ae.id)
+        flash("The element could not be joined. Nothing was changed.", "error")
+        return redirect(back)
+    flash("%s joined to %s." % (target.name, product_ae.name), "success")
     return redirect(back)
 
 

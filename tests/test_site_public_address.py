@@ -82,7 +82,7 @@ def test_public_page_canonical_address_is_entelim_tech(app, client, path, host):
 
 
 def test_sitemap_lists_only_entelim_tech_addresses(app, client):
-    response = _get("/sitemap.xml", client, "entelim.org")
+    response = _get("/sitemap-en.xml", client, "entelim.org")
     assert response.status_code == 200
     xml = response.data.decode()
     origins = re.findall(r"<loc>(https://[^/]+)", xml)

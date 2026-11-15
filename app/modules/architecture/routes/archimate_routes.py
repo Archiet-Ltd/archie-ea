@@ -1529,6 +1529,7 @@ def api_create_relationship():
         solution_id (int): Optional — mapped to architecture_id for scoping.
     """
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.models import CrossOrganisationRelationship
 
     data = request.get_json(silent=True) or {}
 
@@ -1611,7 +1612,12 @@ def api_create_relationship():
     )
 
     db.session.add(rel)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except CrossOrganisationRelationship as exc:
+        # Plain refusal, not a 500: the model guard refused a crossing row.
+        db.session.rollback()
+        return api_error(str(exc), 400)
 
     # Return flat JSON (no api_success wrapper) — all JS callers check data.id directly.
     return jsonify({
@@ -2535,6 +2541,8 @@ def api_elements_search():
     Query params:
         q        - name substring filter (case-insensitive)
         type     - exact element type filter (e.g. ApplicationComponent)
+        types    - comma-separated element types; an element of any of them matches
+        similar  - 1 to add "similar": names close to q (not equal to it) among the matching types
         layer    - layer filter (case-insensitive, e.g. application)
         limit    - max results (default 30, max 200)
         solution_id - restrict to elements linked to this solution
@@ -2546,6 +2554,10 @@ def api_elements_search():
     elem_type = request.args.get("type", "").strip()
     if elem_type:
         query = query.filter(ArchiMateElement.type == elem_type)
+
+    type_list = [t.strip() for t in request.args.get("types", "").split(",") if t.strip()]
+    if type_list:
+        query = query.filter(ArchiMateElement.type.in_(type_list))
 
     layer = request.args.get("layer", "").strip()
     if layer:
@@ -2641,7 +2653,7 @@ def api_elements_search():
         except Exception as exc:
             current_app.logger.debug("ARCH-002: solution count query failed: %s", exc)
 
-    return jsonify({
+    payload = {
         "data": [
             {
                 "id": el.id,
@@ -2654,7 +2666,16 @@ def api_elements_search():
             }
             for el in elements
         ]
-    })
+    }
+    if request.args.get("similar") == "1" and search_q:
+        # Names close to what was typed, from the duplicate guard's one near-match check.
+        from app.utils.duplicate_guard import find_similar_entities
+
+        payload["similar"] = find_similar_entities(
+            ArchiMateElement, search_q,
+            extra_filters=[ArchiMateElement.type.in_(type_list)] if type_list else None, threshold=0.6,
+        )
+    return jsonify(payload)
 
 
 # ── Element Detail API (for composer detail panel) ───────────────────────────
