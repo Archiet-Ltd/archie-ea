@@ -329,10 +329,12 @@ def test_escalation_notifies_only_the_overdue_items_organisation(db_session, mak
         "app._bootstrap._digest_emails._safe_send_email", _fake_send
     )
 
-    stats = escalate_overdue_approvals(current_app._get_current_object())
+    escalate_overdue_approvals(current_app._get_current_object())
 
-    assert stats["organisations_notified"] == 1
-    assert sent["recipients"] == [admin_a.email]
+    # A change past its expiry is declined, not chased: no administrator is told about it.
+    assert admin_a.email not in sent.get("recipients", [])
+    db_session.expire_all()
+    assert AIChatCRUDApproval.query.filter_by(id=approval_a.id).one().status.value == "rejected"
 
 
 def test_escalation_reaches_a_real_org_admin_without_platform_admin_role(db_session, make_org, monkeypatch):
@@ -371,10 +373,14 @@ def test_escalation_reaches_a_real_org_admin_without_platform_admin_role(db_sess
         "app._bootstrap._digest_emails._safe_send_email", _fake_send
     )
 
-    stats = escalate_overdue_approvals(current_app._get_current_object())
+    escalate_overdue_approvals(current_app._get_current_object())
 
-    assert stats["organisations_notified"] == 1
-    assert sent["recipients"] == [org_admin_a.email]
+    # The organisation's own administrator is not told about a change that was declined at its expiry.
+    assert org_admin_a.email not in sent.get("recipients", [])
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+
+    db_session.expire_all()
+    assert AIChatCRUDApproval.query.filter_by(id=approval_a.id).one().status.value == "rejected"
 
 
 # --------------------------------------------------------------------- #

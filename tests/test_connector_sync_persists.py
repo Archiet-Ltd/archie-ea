@@ -20,6 +20,8 @@ import uuid
 from datetime import datetime, timedelta
 
 import pytest
+
+from tests.settle_helpers import settle_as_the_review
 from sqlalchemy import text
 
 # The trigger and guard installers other suites use, so the event log and the
@@ -627,7 +629,7 @@ def test_sync_is_still_behind_the_approval_gate(
         status=ApprovalStatus.PENDING,
     ).first()
     login_as(client, approver)
-    result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+    result = settle_as_the_review(approver.id, proposal.id)
     assert result.get("success") is True, result
     assert len(_elements(db_session, org_a.id)) == len(kind["expected"])
 

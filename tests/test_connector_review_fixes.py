@@ -18,6 +18,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from tests.settle_helpers import settle_as_the_review
+
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
@@ -291,7 +293,7 @@ class TestH3OnlyAnAdministratorMayApproveAConnectorChange:
         approver = _make_admin(db_session, org_a.id, "RealApprover")
         db_session.commit()
 
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        result = settle_as_the_review(approver.id, proposal.id)
         assert result.get("success") is True, result
         assert ConnectorConfig.query.filter_by(
             organization_id=org_a.id, connector_type="servicenow"
@@ -323,7 +325,7 @@ class TestM2ServiceNowFormAndServiceReadTheSameStore:
 
         approver = _make_admin(db_session, org_a.id, "ServiceNowApprover")
         db_session.commit()
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        result = settle_as_the_review(approver.id, proposal.id)
         assert result.get("success") is True, result
 
         seen = ServiceNowConnectorService._get_config(org_a.id, "servicenow")
@@ -393,7 +395,7 @@ class TestM4BuiltConnectorCanActuallyAuthenticate:
 
         approver = _make_admin(db_session, org_a.id, "JiraM4Approver")
         db_session.commit()
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        result = settle_as_the_review(approver.id, proposal.id)
         assert result.get("success") is True, result
 
         from app.models.connector_config import ConnectorConfig
@@ -463,7 +465,7 @@ class TestM1CredentialDoesNotTakeEffectBeforeApproval:
 
         approver = _make_admin(db_session, org_a.id, "M1Approver")
         db_session.commit()
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        result = settle_as_the_review(approver.id, proposal.id)
         assert result.get("success") is True, result
 
         vault = OrgCredentialVault()
@@ -691,7 +693,7 @@ class TestN4CredentialPromotedOnlyAfterTheWriteSucceeds:
 
         approver = _make_admin(db_session, org_a.id, "N4Approver")
         db_session.commit()
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        result = settle_as_the_review(approver.id, proposal.id)
         assert result.get("success") is False, (
             "the write for a deleted connector must fail, not silently succeed"
         )
@@ -769,7 +771,7 @@ class TestF2RotationDropsTheSupersededRowKey:
 
         approver = _make_admin(db_session, org_a.id, "F2Approver")
         db_session.commit()
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        result = settle_as_the_review(approver.id, proposal.id)
         assert result.get("success") is True, result
 
         db_session.refresh(cfg)
@@ -811,7 +813,7 @@ class TestF2RotationDropsTheSupersededRowKey:
 
         approver = _make_admin(db_session, org_a.id, "F2NoRotationApprover")
         db_session.commit()
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        result = settle_as_the_review(approver.id, proposal.id)
         assert result.get("success") is True, result
 
         db_session.refresh(cfg)
@@ -840,7 +842,7 @@ def _create_approved_jira_connector(db_session, org, admin, client, login_as):
     ).first()
     approver = _make_admin(db_session, org.id, "SetupApprover")
     db_session.commit()
-    AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+    settle_as_the_review(approver.id, proposal.id)
 
     from app.models.connector_config import ConnectorConfig
 
@@ -933,7 +935,7 @@ class TestN6GenericPageCredentialReachesTheConnector:
 
         approver = _make_admin(db_session, org_a.id, "N6Approver")
         db_session.commit()
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        result = settle_as_the_review(approver.id, proposal.id)
         assert result.get("success") is True, result
 
         from app.models.connector_config import ConnectorConfig
@@ -1001,7 +1003,7 @@ class TestD1GenericPageRotationDropsTheSupersededRowKey:
 
         approver = _make_admin(db_session, org_a.id, "D1Approver")
         db_session.commit()
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        result = settle_as_the_review(approver.id, proposal.id)
         assert result.get("success") is True, result
 
         db_session.refresh(cfg)

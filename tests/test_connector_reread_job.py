@@ -488,7 +488,7 @@ def test_the_sync_button_does_not_queue_a_second_request_while_one_is_waiting(
     assert any("already waiting for approval" in message for _c, message in flashed), flashed
 
 
-def test_a_request_made_by_the_hourly_job_is_shown_as_the_system_in_plain_words(
+def test_a_request_made_by_the_hourly_job_is_shown_as_the_connector_sync_in_plain_words(
     db_session, github, connect, tenant_ctx, org_a
 ):
     from app.modules.ai_chat.services.ai_chat_approval_service import card_words
@@ -498,7 +498,7 @@ def test_a_request_made_by_the_hourly_job_is_shown_as_the_system_in_plain_words(
     _reread(tenant_ctx, org_a)
     (approval,) = _pending_syncs(org_a.id, cfg)
 
-    assert card_words(approval, {}, {})["requester"] == "The system"
+    assert card_words(approval, {}, {})["requester"] == "Connector sync"
 
 
 def test_a_saved_schedule_that_is_not_used_is_said_so_on_the_connectors_page(

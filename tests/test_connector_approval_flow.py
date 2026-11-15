@@ -22,6 +22,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from tests.settle_helpers import settle_as_the_review
+
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
@@ -366,9 +368,7 @@ class TestEveryConnectorChangeIsProposedOrDelegatedOrRefused:
 
         approver = _make_admin(db_session, org_a.id, "FlowApprover")
         db_session.commit()
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(
-            proposal.id
-        )
+        result = settle_as_the_review(approver.id, proposal.id)
         assert result.get("success") is True, result
 
         cfg = ConnectorConfig.query.filter_by(
@@ -553,9 +553,7 @@ class TestConnectorsPageJourney:
             AIChatApprovalService,
         )
 
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(
-            proposal.id
-        )
+        result = settle_as_the_review(approver.id, proposal.id)
         assert result.get("success") is True, result
 
         resp = client.get("/admin/connectors")
@@ -637,9 +635,7 @@ class TestConnectorsPageJourney:
         monkeypatch.setattr(JiraALMConnector, "batch_sync", _recorded_batch_sync)
 
         login_as(client, admin_a)
-        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(
-            sync_proposal.id
-        )
+        result = settle_as_the_review(approver.id, sync_proposal.id)
         assert result.get("success") is True, result
 
         # Health + last synchronisation on the org A connector.
