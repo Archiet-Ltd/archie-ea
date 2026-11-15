@@ -598,6 +598,8 @@ class TestingConfig(Config):
     SIGNUP_FORM_TOKEN_REQUIRED = _env_bool("SIGNUP_FORM_TOKEN_REQUIRED", False)
     # Tests use recorded DNS answers, never live lookups.
     VENDOR_DNS_LOOKUPS = False
+    # A test may fix the date the Money page reads as today (an ISO date); production never sets it.
+    FINANCE_FACTS_TODAY = os.environ.get("FINANCE_FACTS_TODAY", "")
     ALLOW_INTERNAL_WEBHOOK_TARGETS = os.environ.get(
         "ALLOW_INTERNAL_WEBHOOK_TARGETS", ""
     ).lower() in ("1", "true", "yes")

@@ -61,7 +61,14 @@ def _commit_hint(element, org_id) -> Dict[str, Any]:
 
     summary = _fact(element, "github_commit_owners")
     if not isinstance(summary, dict):
-        return {}
+        where = _where(element)
+        if not where:
+            return {}
+        short = where.split(",")[0].split(" at ")[0].rsplit("/", 1)[-1]
+        return {"note": f"No owner has been worked out yet: the recent commits of {short} have not been read. "
+                        "They are read the next time GitHub is read."}
+    if summary.get("unavailable"):
+        return {"note": str(summary["unavailable"])}
     repository = str(summary.get("repository") or "")
     named = []
     for entry in summary.get("candidates") or []:
@@ -95,14 +102,21 @@ def _owner_hint(element, org_id) -> Dict[str, Any]:
         if teams:
             hint["note"] = f"GitHub also names {', '.join(teams)}."
         return hint
-    named = ", ".join(owners)
-    hint = {"note": f"GitHub names {named} as code owner in {where}. Pick the person here who is that owner."}
-    history = _commit_hint(element, org_id)
-    if history:
-        hint["note"] += " " + history["note"]
+    source = _fact(element, "github_owner_source")
+    if isinstance(source, dict) and source.get("user_id") is None and str(source.get("text") or "").startswith(
+            "No owner was set: GitHub names"):
+        hint = {"note": str(source["text"])}
+        history = _commit_hint(element, org_id)
         if history.get("candidates"):
             hint["candidates"] = history["candidates"]
-    return hint
+        return hint
+    named = ", ".join(owners)
+    history = _commit_hint(element, org_id)
+    if history.get("candidates"):
+        return {"note": f"GitHub names {named} as code owner in {where}. Pick the person here who is that owner. "
+                        + history["note"], "candidates": history["candidates"]}
+    # Nobody to pick from: say why no owner was set, and ask for nothing.
+    return {"note": f"No owner was set: GitHub names {named} as code owner in {where}. " + history.get("note", "")}
 
 
 def _capability_hint(element, org_id) -> Dict[str, Any]:
@@ -195,17 +209,39 @@ def application_gaps(org_id, applications: Iterable[Any], skip_ids: Iterable[int
     return out
 
 
-def owner_source_note(application, owner_rows) -> Optional[str]:
-    """Where a primary owner recorded from the commit history came from, while that person is still the owner."""
+def owner_source(application, owner_rows, element=None) -> Optional[dict]:
+    """The recorded source of a primary owner taken from the commit history, while that person is still the
+    owner. ``element`` is the application's element when the caller has already loaded it."""
     from app.models.archimate_core import ArchiMateElement
 
     if not application.archimate_element_id:
         return None
-    element = db.session.get(ArchiMateElement, application.archimate_element_id)
+    if element is None:
+        element = db.session.get(ArchiMateElement, application.archimate_element_id)
     if element is None or element.organization_id != application.organization_id:
         return None
     source = _fact(element, "github_owner_source")
     if not isinstance(source, dict) or not source.get("text"):
         return None
     primary = {r.get("user_id") for r in owner_rows if r.get("ownership_type") == "primary"}
-    return source["text"] if source.get("user_id") in primary else None
+    return source if source.get("user_id") in primary else None
+
+
+def owner_source_note(application, owner_rows, element=None) -> Optional[str]:
+    """Where a primary owner recorded from the commit history came from, while that person is still the owner."""
+    source = owner_source(application, owner_rows, element)
+    return source["text"] if source else None
+
+
+def owner_sources(applications, owners_by_app) -> dict:
+    """``owner_source`` for each listed application, loading their elements in one query."""
+    from app.models.archimate_core import ArchiMateElement
+
+    ids = {a.archimate_element_id for a in applications if a.archimate_element_id}
+    elements = {e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(ids)).all()} if ids else {}
+    found = {}
+    for a in applications:
+        source = owner_source(a, owners_by_app.get(a.id, []), elements.get(a.archimate_element_id))
+        if source:
+            found[a.id] = source
+    return found

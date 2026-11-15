@@ -34,7 +34,8 @@
                     </div>
                 </template>
                 <p x-show="elements.filter(e => getLifecyclePhase(e) === phase.key).length === 0"
-                   class="text-sm text-muted-foreground italic px-1">None</p>
+                   class="text-sm text-muted-foreground italic px-1"
+                   x-text="'No elements marked ' + phase.label.toLowerCase() + '.'"></p>
             </div>
         </template>
     </div>

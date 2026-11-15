@@ -45,7 +45,7 @@ package AsBuilt_application_overview {
     part vocabulary_deployment_status_2 : VocabularySource {
         :>> columnName = "deployment_status";
         :>> sourceKind = "tool-enum";
-        :>> sourceFile = "app/modules/ai_chat/tools/registry.py:214";
+        :>> sourceFile = "app/modules/ai_chat/tools/registry.py:219";
         :>> origin = "app/services/application_status.py";
         :>> valueList = "";
     }
@@ -66,7 +66,7 @@ package AsBuilt_application_overview {
     part vocabulary_deployment_status_5 : VocabularySource {
         :>> columnName = "deployment_status";
         :>> sourceKind = "template-field";
-        :>> sourceFile = "app/templates/applications/dashboard.html:341";
+        :>> sourceFile = "app/templates/applications/dashboard.html:343";
         :>> origin = "app/services/application_status.py";
         :>> valueList = "";
     }

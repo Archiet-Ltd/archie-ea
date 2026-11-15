@@ -99,7 +99,7 @@ def test_the_owning_applications_own_mapping_can_still_be_updated(app, db_sessio
     login_as(client, db_session.get(User, user_id))
     response = client.post(
         f"/dashboard/applications/{app_a_id}/capability-mapping/{own_mapping_id}/update",
-        data={"support_level": "full", "notes": "updated"},
+        data={"support_level": "primary", "notes": "updated"},
     )
 
     assert response.status_code in (302, 303)
@@ -107,4 +107,4 @@ def test_the_owning_applications_own_mapping_can_still_be_updated(app, db_sessio
         text("select support_level, notes from unified_application_capability_mapping where id = :i"),
         {"i": own_mapping_id},
     ).one()
-    assert stored.support_level == "full" and stored.notes == "updated"
+    assert stored.support_level == "primary" and stored.notes == "updated"

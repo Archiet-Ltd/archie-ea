@@ -52,7 +52,7 @@ def _records(db_session, org):
     db_session.add_all([app_row, bcap, ucap, vendor])
     db_session.flush()
     mapping = UnifiedApplicationCapabilityMapping(
-        unified_capability_id=ucap.id, application_component_id=app_row.id,
+        unified_capability_id=ucap.id, application_component_id=app_row.id, organization_id=org.id,
         support_level="partial", coverage_percentage=10,
     )
     db_session.add(mapping)

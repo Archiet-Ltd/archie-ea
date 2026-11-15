@@ -37,7 +37,8 @@ PROFILES = {
         "subtitle": "An application the business runs.",
         "groups": [
             (("Node", "Device", "SystemSoftware", "TechnologyService"), "Runs on"),
-            (("Capability", "BusinessFunction", "BusinessProcess"), "Supports"),
+            (("Capability",), "Supports"),
+            (("BusinessFunction", "BusinessProcess"), "Takes part in"),
             (("ApplicationComponent", "ApplicationService", "ApplicationInterface"), "Connects to"),
             (_GOAL_TYPES, "Works towards"),
         ],
@@ -230,10 +231,14 @@ def answer_lines(element_type, connections, *, user, plain_name):
     lines = []
     for types, lead in profile["groups"]:
         match = [r for r in rows if r["id"] not in claimed and ("*" in types or base_type(r["type"]) in types)]
+        if lead == "Supports":
+            match = _support_rows_only(match)
         if not match:
             continue
         claimed.update(r["id"] for r in match)
-        lines.append(_line(lead, match, user, plain_name))
+        line = _line(lead, match, user, plain_name)
+        line["show_kind"] = lead == "Supports"
+        lines.append(line)
     rest = [r for r in rows if r["id"] not in claimed]
     by_type = {}
     for r in rest:
@@ -241,6 +246,20 @@ def answer_lines(element_type, connections, *, user, plain_name):
     for kind, match in by_type.items():
         lines.append(_line("Also connected to", match, user, plain_name))
     return lines
+
+
+def _support_rows_only(rows):
+    """Capabilities this application realizes or serves, once each, Realizes first.
+
+    Any other link to a capability is not support and falls to "Also connected to"."""
+    best = {}
+    for r in rows:
+        kind = (r.get("relationship_raw") or "").strip().lower()
+        if r.get("direction") != "outgoing" or kind not in ("realization", "serving"):
+            continue
+        if r["id"] not in best or kind == "realization":
+            best[r["id"]] = r
+    return list(best.values())
 
 
 def _line(lead, match, user, plain_name):

@@ -52,6 +52,29 @@ CASE_SEED = {
     'stream': False,
 }
 
+# Provider refusals in the shape each provider sends them. A prompt carrying the
+# marker gets the refusal on whichever transport the app uses.
+REFUSALS = {
+    'credit_openrouter': {
+        'marker': 'ARCHIE_CI_REFUSE_CREDIT_402_V1',
+        'status': 402,
+        'body': {'error': {'message': 'Insufficient credits. Add more using https://openrouter.ai/settings/credits',
+                           'code': 402}},
+    },
+    'credit_openai': {
+        'marker': 'ARCHIE_CI_REFUSE_CREDIT_429_V1',
+        'status': 429,
+        'body': {'error': {'message': 'You exceeded your current quota, please check your plan and billing details.',
+                           'type': 'insufficient_quota', 'code': 'insufficient_quota'}},
+    },
+    'rate_per_minute': {
+        'marker': 'ARCHIE_CI_REFUSE_RATE_V1',
+        'status': 429,
+        'body': {'error': {'message': "Quota exceeded for quota metric 'Generate Content API requests per minute'",
+                           'code': 429}},
+    },
+}
+
 
 class AIProtocolStub:
     """Loopback HTTP transport, strict scenarios and a metadata-only request ledger."""
@@ -123,6 +146,14 @@ class AIProtocolStub:
                         str(m.get('content')) for m in messages if isinstance(m, dict)))
                 last = messages[-1]
                 content = last.get('content')
+                refused = [(name, r) for name, r in REFUSALS.items()
+                           if isinstance(content, str) and r['marker'] in content]
+                if last.get('role') == 'user' and len(refused) == 1:
+                    name, refusal = refused[0]
+                    self._record(refusal['status'], scenario=name, model=MODEL,
+                                 stream=bool(body.get('stream', False)))
+                    self._json(refusal['status'], refusal['body'])
+                    return
                 matches = [(name, scenario) for name, scenario in [
                     ('chat', CHAT), ('guide', GUIDE),
                     ('programme_prefill', PROGRAMME_PREFILL), ('case_seed', CASE_SEED),

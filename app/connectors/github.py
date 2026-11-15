@@ -281,11 +281,18 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
     from app.models.user import User
 
     by_email: Dict[str, int] = {}
+    by_login: Dict[str, Dict[str, int]] = {}
     stamps: List[Tuple[str, str]] = []
     for item in commits or []:
         detail = item.get("commit") if isinstance(item, dict) else None
         author = (detail or {}).get("author") or {}
         email = str(author.get("email") or "").strip().lower()
+        login = str(((item.get("author") if isinstance(item, dict) else None) or {}).get("login") or "").strip().lower()
+        if login:
+            tally = by_login.setdefault(login, {"": 0})
+            tally[""] += 1
+            if email:
+                tally[email] = tally.get(email, 0) + 1
         if str(item.get("sha") or "") and author.get("date"):
             stamps.append((str(author["date"]), str(item["sha"])[:7]))
         if email:
@@ -305,6 +312,16 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
         key=lambda c: (-c["commits"], c["user_id"]),
     )
     stamps.sort()
+    # What each GitHub account's own commits say about who it is: only members of this organisation are kept.
+    logins: Dict[str, Dict[str, Any]] = {}
+    for login, tally in by_login.items():
+        matched: Dict[str, int] = {}
+        for email, n in tally.items():
+            if email and len(members.get(email, [])) == 1:
+                key = str(members[email][0])
+                matched[key] = matched.get(key, 0) + n
+        if matched:
+            logins[login] = {"commits": tally[""], "members": matched}
     return {
         "repository": repository,
         "days": COMMIT_WINDOW_DAYS,
@@ -312,7 +329,59 @@ def summarise_commits(org_id, repository: str, commits: List[dict]) -> Dict[str,
         "newest": stamps[-1][1] if stamps else None,
         "member_commits": sum(counts.values()),
         "candidates": candidates[:MAX_SUGGESTED_OWNERS],
+        "logins": logins,
     }
+
+
+def code_owner_handles(element) -> List[str]:
+    """The GitHub accounts (not teams, not e-mail addresses) named as code owner of an application."""
+    entry = (getattr(element, "acm_properties", None) or {}).get("github_code_owners")
+    owners = entry.get("value") if isinstance(entry, dict) else None
+    return [o for o in (owners or []) if isinstance(o, str) and o.startswith("@") and "/" not in o and len(o) > 1]
+
+
+def handle_owner(org_id, summary: Dict[str, Any], handles: List[str]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """The member a code-owner account is, shown only by its own commits.
+
+    An account becomes a person when the commits it made in the window carry the e-mail of
+    exactly one member of this organisation. Returns ``(match, reason)``: the match is
+    ``{"user_id", "handle", "commits", "of"}`` when one person is named by the evidence, else the
+    plain reason no owner was set. Two accounts pointing at different people name nobody."""
+    from app.models.user import User
+
+    days = (summary or {}).get("days") or COMMIT_WINDOW_DAYS
+    logins = (summary or {}).get("logins") or {}
+    found: Dict[int, Dict[str, Any]] = {}
+    for handle in handles:
+        entry = logins.get(handle[1:].lower())
+        members = (entry or {}).get("members") or {}
+        if len(members) == 1:
+            user_id, n = next(iter(members.items()))
+            belongs = db.session.execute(
+                db.select(User.id).where(User.id == int(user_id)).where(User.organization_id == org_id)).scalar()
+            if belongs is not None:
+                found.setdefault(int(user_id), {"user_id": int(user_id), "handle": handle, "commits": n, "of": entry["commits"]})
+    if len(found) == 1:
+        return next(iter(found.values())), None
+    if not handles:
+        return None, None
+    named = ", ".join(handles)
+    if found:
+        return None, (f"No owner was set: GitHub names {named} as code owner, and their commits in the last "
+                      f"{days} days point at more than one member of this organisation.")
+    those = "that account's commits" if len(handles) == 1 else "those accounts' commits"
+    return None, (f"No owner was set: GitHub names {named} as code owner, and none of {those} in the last "
+                  f"{days} days use the e-mail of a member of this organisation.")
+
+
+def handle_provenance(summary: Dict[str, Any], match: Dict[str, Any], user) -> str:
+    """The words that say why a code-owner account was taken to be this member."""
+    email = (getattr(user, "email", None) or "").strip()
+    return (
+        f"From commit history: GitHub names {match['handle']} as code owner; {match['commits']} of that account's "
+        f"{match['of']} commits in the last {summary.get('days') or COMMIT_WINDOW_DAYS} days use the e-mail {email} "
+        f"of a member of this organisation ({summary['repository']})"
+    )
 
 
 def commit_leader(summary: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -335,6 +404,15 @@ def commit_provenance(summary: Dict[str, Any], candidate: Dict[str, Any]) -> str
     )
 
 
+def commit_limit_reason(repository: str) -> str:
+    """The words that say why no owner could be suggested from a very busy repository."""
+    short = repository.rsplit("/", 1)[-1] or "this repository"
+    return (
+        f"No owner was suggested: {short} has too many commits in the last {COMMIT_WINDOW_DAYS} days "
+        "to name one person from them."
+    )
+
+
 def apply_commit_history(org_id, element, component, summary: Dict[str, Any], assigned_by=None) -> bool:
     """Keep what the commits show on the element and, where one member leads, record that member
     as the primary owner through the one owner writer. An application that already has a primary
@@ -347,15 +425,126 @@ def apply_commit_history(org_id, element, component, summary: Dict[str, Any], as
     owned = bool(component is not None and ApplicationOwner.query.filter_by(
         application_id=component.id, organization_id=org_id, ownership_type="primary").first())
     written = False
-    if leader is not None and component is not None and not owned:
+    match, handle_reason = (None, None) if owned or component is None else handle_owner(
+        org_id, summary, code_owner_handles(element))
+    if match is not None:
+        from app.models.user import User
+
+        record = set_application_owner(
+            component, match["user_id"], "primary", organization_id=org_id, assigned_by=assigned_by)
+        record.source_table = PROPOSAL_SOURCE
+        facts["github_owner_source"] = {
+            "user_id": match["user_id"], "text": handle_provenance(summary, match, db.session.get(User, match["user_id"]))}
+        written = True
+    elif leader is not None and component is not None and not owned:
         record = set_application_owner(
             component, leader["user_id"], "primary", organization_id=org_id, assigned_by=assigned_by)
         record.source_table = PROPOSAL_SOURCE
         facts["github_owner_source"] = {"user_id": leader["user_id"], "text": commit_provenance(summary, leader)}
         written = True
+    elif summary.get("unavailable") and not owned:
+        facts["github_owner_source"] = {"user_id": None, "text": summary["unavailable"]}
+    elif handle_reason and not owned:
+        facts["github_owner_source"] = {"user_id": None, "text": handle_reason}
     _write_facts(element, facts)
     db.session.flush()
     return written
+
+
+def commit_unreadable_reason(repository: str, cause: Optional[str] = None) -> str:
+    """The words that say why no owner could be suggested because the commits could not be read."""
+    short = repository.rsplit("/", 1)[-1] or "this repository"
+    status = re.search(r"HTTP (\d+)", cause or "")
+    if cause is None:
+        why = "GitHub is not connected for this organisation"
+    elif status and status.group(1) in ("401", "403", "404"):
+        why = "the GitHub connection has no access to it"
+    elif status and status.group(1) == "429":
+        why = "GitHub's request limit was reached"
+    else:
+        why = "GitHub did not answer"
+    return f"No owner was suggested: the commits of {short} could not be read because {why}."
+
+
+def _unreadable_summary(repository: str, cause: Optional[str] = None) -> Dict[str, Any]:
+    return {
+        "repository": repository,
+        "days": COMMIT_WINDOW_DAYS,
+        "oldest": None,
+        "newest": None,
+        "member_commits": 0,
+        "candidates": [],
+        "unavailable": commit_unreadable_reason(repository, cause),
+    }
+
+
+def application_repository(element) -> Optional[str]:
+    """The repository an imported application was read from, else None."""
+    try:
+        ref = json.loads(element.source_ref or "")
+    except (TypeError, ValueError):
+        return None
+    repository = ref.get("repository") if isinstance(ref, dict) else None
+    return repository if isinstance(repository, str) and _REPO_RE.match(repository) else None
+
+
+def owners_from_commits(org_id) -> List[Dict[str, Any]]:
+    """Work out the owner of every connector-imported application of one organisation that has no
+    primary owner, from its recent commits, or record the one sentence that says why not. The
+    same step the connector's read runs (``apply_commit_history``), so a run changes nothing that
+    a read would not, and an application that has an owner is only reported. One entry per
+    application: ``{"application", "repository", "outcome", "text"}`` where outcome is
+    ``owner set``, ``reason recorded``, ``already owned`` or ``unchanged``."""
+    from app.models.application_owner import ApplicationOwner
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.connector_framework import _load_org_connector, build_connector
+
+    rows = db.session.execute(
+        db.select(ApplicationComponent, ArchiMateElement)
+        .join(ArchiMateElement, ArchiMateElement.id == ApplicationComponent.archimate_element_id)
+        .where(ApplicationComponent.organization_id == org_id)
+        .where(ArchiMateElement.organization_id == org_id)
+        .order_by(ApplicationComponent.id)
+    ).all()
+    cfg = _load_org_connector(org_id, connector_type="github")
+    evidence = None
+    cause: Optional[str] = None
+    if cfg is not None:
+        try:
+            connector = build_connector(cfg, org_id)
+            evidence = _RepositoryEvidence(connector, connector._client(), org_id, connector._organization(), {})
+        except Exception as exc:  # no token, a token this server cannot open: the commits cannot be read
+            cause = str(exc) or "no access"
+            cause = cause if "HTTP" in cause else "no access (HTTP 403)"
+    lines: List[Dict[str, Any]] = []
+    for component, element in rows:
+        repository = application_repository(element)
+        if repository is None:
+            continue
+        line = {"application": component.name, "repository": repository}
+        owned = ApplicationOwner.query.filter_by(
+            application_id=component.id, organization_id=org_id, ownership_type="primary").first()
+        if owned is not None:
+            lines.append({**line, "outcome": "already owned", "text": "Owner already recorded"})
+            continue
+        before = ((element.acm_properties or {}).get("github_commit_owners") or {}).get("value")
+        if evidence is not None:
+            try:
+                summary = evidence._commit_history(repository)
+            except GitHubConnectorError as exc:
+                summary = _unreadable_summary(repository, str(exc))
+        else:
+            summary = _unreadable_summary(repository, cause if cfg is not None else None)
+        if apply_commit_history(org_id, element, component, summary):
+            source = (element.acm_properties or {}).get("github_owner_source", {}).get("value") or {}
+            lines.append({**line, "outcome": "owner set", "text": source.get("text", "")})
+            continue
+        after = ((element.acm_properties or {}).get("github_commit_owners") or {}).get("value")
+        text = summary.get("unavailable") or "No single member leads the recent commits"
+        outcome = "unchanged" if before == after and before is not None else "reason recorded"
+        lines.append({**line, "outcome": outcome, "text": text})
+    return lines
 
 
 def execute_github_proposal(approval, data_service=None) -> Dict[str, Any]:
@@ -1412,8 +1601,17 @@ class _RepositoryEvidence:
                 if len(data) < PAGE_SIZE or len(inside) < len(data):
                     break
             else:
-                raise GitHubConnectorError(
-                    f"More than {MAX_PAGES * PAGE_SIZE} commits were listed; the read was stopped")
+                # Too many to count: give up on the owner alone, so the application and its facts are still written.
+                self._histories[full_name] = {
+                    "repository": full_name,
+                    "days": COMMIT_WINDOW_DAYS,
+                    "oldest": None,
+                    "newest": None,
+                    "member_commits": 0,
+                    "candidates": [],
+                    "unavailable": commit_limit_reason(full_name),
+                }
+                return self._histories[full_name]
             self._histories[full_name] = summarise_commits(self.org_id, full_name, commits)
         return self._histories[full_name]
 
@@ -1425,7 +1623,11 @@ class _RepositoryEvidence:
         ).first()
         if component is None:
             return False
-        return apply_commit_history(self.org_id, element, component, self._commit_history(full_name))
+        try:
+            summary = self._commit_history(full_name)
+        except GitHubConnectorError as exc:  # the application and its facts are still written, with the reason
+            summary = _unreadable_summary(full_name, str(exc))
+        return apply_commit_history(self.org_id, element, component, summary)
 
     def _person_for(self, owners: List[str]):
         """The one user of the organisation named by an e-mail code owner, else None."""

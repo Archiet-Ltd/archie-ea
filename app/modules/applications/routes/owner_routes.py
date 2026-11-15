@@ -170,11 +170,15 @@ def make_owner_from_commits(app_id: int):
     except CrossOrganisationElementOwner:
         abort(404)
     except DuplicateElementOwner:
-        pass
+        # Not newly assigned here, so the recorded source is left as it was.
+        db.session.commit()
+        flash("%s is already a primary owner. Nothing was changed." % candidates[user_id]["name"], "info")
+        return redirect(url_for("unified_applications.application_detail", id=app_id) + "#ownership")
     summary = _fact(element, "github_commit_owners")
     PropertyService().merge_element_properties(
         element,
-        {"github_owner_source": {"user_id": user_id, "text": commit_provenance(summary, candidates[user_id])}},
+        {"github_owner_source": {"user_id": user_id, "text": commit_provenance(summary, candidates[user_id]),
+                                 "picked": True}},
         source="github",
     )
     db.session.commit()

@@ -130,6 +130,53 @@ def _seed_board_with_cards(org_id, user_id, suffix):
     return board_id
 
 
+def _seed_second_board(org_id, user_id, suffix):
+    """A second board whose figures differ from the first: 9d cycle, 11d lead, 1 WIP card."""
+    from app import create_app, db
+    from app.models.adm_kanban import KanbanBoard, KanbanCard, ADMPhase
+
+    app = create_app("testing")
+    with app.app_context():
+        phase = ADMPhase.query.filter_by(code="A").first()
+        board = KanbanBoard(
+            name="Second Flow Board %s" % suffix,
+            organization_id=org_id,
+            created_by_id=user_id,
+        )
+        db.session.add(board)
+        db.session.flush()
+        now = datetime.datetime.utcnow()
+        for i in range(2):
+            db.session.add(KanbanCard(
+                title="Second Board Done %d %s" % (i + 1, suffix),
+                description="Test card",
+                board_id=board.id,
+                adm_phase_id=phase.id,
+                card_type="requirement",
+                status="done",
+                created_by_id=user_id,
+                created_at=now - datetime.timedelta(days=14),
+                started_at=now - datetime.timedelta(days=12),
+                completed_at=now - datetime.timedelta(days=3),
+                organization_id=org_id,
+            ))
+        db.session.add(KanbanCard(
+            title="Second Board WIP %s" % suffix,
+            description="In progress card",
+            board_id=board.id,
+            adm_phase_id=phase.id,
+            card_type="requirement",
+            status="in_progress",
+            created_by_id=user_id,
+            created_at=now - datetime.timedelta(days=2),
+            organization_id=org_id,
+        ))
+        db.session.commit()
+        board_id = board.id
+        db.session.remove()
+    return board_id
+
+
 def _save_screenshots(browser, live_server, email, board_id, walk_dir):
     """Save full-page screenshots at 1440 and 390, light and dark."""
     os.makedirs(walk_dir, exist_ok=True)
@@ -184,6 +231,7 @@ def test_flow_analytics_journey(browser, live_server):
     email = org["emails"][PERSONA]
 
     board_id = _seed_board_with_cards(org_id, user_id, suffix)
+    second_board_id = _seed_second_board(org_id, user_id, suffix)
 
     # Assert the persona is correct before the browser starts
     _assert_persona(email)
@@ -272,7 +320,19 @@ def test_flow_analytics_journey(browser, live_server):
         expect(page.get_by_role("cell", name="In progress", exact=True)).to_be_visible()
         expect(page.get_by_text("in_progress")).to_have_count(0)
 
-        # 13. Save screenshots if WALK_DIR is set
+        # 13. Picking the other board replaces every figure with that board's own
+        board_selector.select_option(str(second_board_id))
+        expect(page.get_by_role("heading").filter(has_text="WIP Snapshot").first
+               ).to_contain_text("total: 1")
+        expect(page.get_by_text("9d").first).to_be_visible()
+        expect(page.get_by_text("81.8%").first).to_be_visible()
+        expect(page.get_by_text("76.5%")).to_have_count(0)
+        expect(page.get_by_text("13d")).to_have_count(0)
+        assert not page_errors, "Page raised errors after switching board: %s" % page_errors
+        board_selector.select_option(str(board_id))
+        expect(page.get_by_text("76.5%").first).to_be_visible()
+
+        # 14. Save screenshots if WALK_DIR is set
         walk_dir = os.environ.get("WALK_DIR")
         if walk_dir:
             _save_screenshots(browser, live_server, email, board_id, walk_dir)

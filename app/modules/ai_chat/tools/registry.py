@@ -105,13 +105,13 @@ TOOL_SCHEMAS = [
     {
         "name": "link_application_to_capability",
         "surfaces": ["chat", "blueprint"],
-        "route": "ApplicationCapabilityMapping",
+        "route": "capability_support.record_capability_support",
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
-        "record_types_written": ["ApplicationCapabilityMapping"],
+        "record_types_written": ["ArchiMateRelationship"],
         "description": (
-            "Map an application to a business capability it supports. "
+            "Record that an application supports a capability. "
             "Use when the user wants to record which applications cover a capability."
         ),
         "parameters": {
@@ -125,10 +125,15 @@ TOOL_SCHEMAS = [
                     "type": "string",
                     "description": "Name of the business capability (fuzzy matched)",
                 },
-                "coverage_level": {
+                "how": {
                     "type": "string",
-                    "description": "Degree to which the application covers the capability",
-                    "enum": ["full", "partial", "planned"],
+                    "description": "Whether the application realizes the capability or serves it",
+                    "enum": ["realizes", "serves"],
+                },
+                "support_level": {
+                    "type": "string",
+                    "description": "How well the application supports the capability ('full' means primary)",
+                    "enum": ["primary", "secondary", "partial", "legacy", "planned", "linked", "full"],
                 },
                 "notes": {"type": "string"},
             },
