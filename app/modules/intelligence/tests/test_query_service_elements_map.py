@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime as _dt
+import re
 import time
 import uuid
 
@@ -92,6 +93,24 @@ def _relationship(db_session, org_id, source, target, type_="Serving"):
     return rel
 
 
+def _legacy_crossing_relationship(db_session, org_id, source, target, type_="Serving"):
+    """A relationship row that predates the same-organisation guard.
+
+    The guard now refuses to save one through the model, so the stored row is written
+    with plain SQL: the fence under test exists for rows already in the table.
+    """
+    from sqlalchemy import text
+
+    db_session.execute(
+        text(
+            "INSERT INTO archimate_relationships (source_id, target_id, type, organization_id) "
+            "VALUES (:source_id, :target_id, :type, :org_id)"
+        ),
+        {"source_id": source.id, "target_id": target.id, "type": type_, "org_id": org_id},
+    )
+    db_session.flush()
+
+
 def _derived(
     db_session,
     org_id,
@@ -154,13 +173,19 @@ def _ids_named_by_rows(rows):
 
 
 class _ElementsStatementCounter:
-    """Records every SELECT that reads ``archimate_elements``."""
+    """Records every round trip whose own FROM clause is ``archimate_elements``.
+
+    A relationship statement that tests element liveness in an EXISTS reads the table
+    inside that one statement; it is a relationship round trip, not an element select,
+    so only the first (outer) FROM of a statement decides whether it is counted.
+    """
 
     def __init__(self):
         self.statements = []
 
     def __call__(self, conn, cursor, statement, parameters, context, executemany):
-        if "FROM archimate_elements" in statement:
+        outer_from = re.search(r"\sFROM\s+(\w+)", statement)
+        if outer_from and outer_from.group(1) == "archimate_elements":
             self.statements.append(statement)
 
     @property
@@ -422,8 +447,9 @@ def test_map_is_one_batched_select_however_many_elements(app, db_session, make_o
     # One identity select, whether the result set names 4 elements or 13.
     assert small_lookups == 1, elements_counter.statements
     assert big_lookups == 1, elements_counter.statements
-    # And the number of statements touching archimate_elements does not scale
-    # with the number of elements (root-existence check + the one batch).
+    # And the number of round trips selecting FROM archimate_elements does not scale
+    # with the number of elements (root-existence check + the one batch); liveness rides
+    # inside the relationship statement and is not an element round trip.
     assert small_total == big_total == 2, (small_total, big_total)
 
 
@@ -501,7 +527,7 @@ def _cross_tenant_fixture(db_session, make_org):
     b = _element(db_session, org_a.id, "Bravo")
     foreign = _element(db_session, org_b.id, FOREIGN_NAME, description=FOREIGN_DESCRIPTION)
     _relationship(db_session, org_a.id, a, b)
-    _relationship(db_session, org_a.id, a, foreign)
+    _legacy_crossing_relationship(db_session, org_a.id, a, foreign)
     _derived(db_session, org_a.id, a, foreign, chain_element_ids=[a.id, b.id, foreign.id], confidence=0.82)
     db_session.commit()
     return org_a, org_b, user_a, a, b, foreign

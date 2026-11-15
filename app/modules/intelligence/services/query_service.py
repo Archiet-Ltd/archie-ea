@@ -1006,15 +1006,19 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
     Cycle-safe: a node already visited is never re-queued, so this
     terminates even on a cyclic graph within ``max_depth`` iterations.
     """
-    from sqlalchemy.orm import aliased
-
     from app.models import ArchiMateElement, ArchiMateRelationship
 
     # A relationship with a deleted element at either end is not walked: the row stays for a
     # restore, but no answer reads it, so no row is named for an element that is gone.
-    # Joined, not sub-selected: the liveness test rides in the one relationship statement.
-    source_end = aliased(ArchiMateElement)
-    target_end = aliased(ArchiMateElement)
+    # EXISTS, not a join: the liveness test rides in the one relationship statement and the
+    # planner stops at the first live row instead of building both ends of every edge.
+    def _end_is_live(end_column):
+        return (
+            db.select(ArchiMateElement.id)
+            .where(ArchiMateElement.id == end_column, ArchiMateElement.deleted_at.is_(None))
+            .exists()
+        )
+
     frontier: Dict[int, Dict[str, List[int]]] = {root_id: {"chain": [], "chain_elements": [root_id]}}
     visited = {root_id}
     rows: List[Dict[str, Any]] = []
@@ -1033,13 +1037,10 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
 
         rels = (
             db.session.execute(
-                db.select(ArchiMateRelationship)
-                .join(source_end, source_end.id == ArchiMateRelationship.source_id)
-                .join(target_end, target_end.id == ArchiMateRelationship.target_id)
-                .where(
+                db.select(ArchiMateRelationship).where(
                     db.or_(*conditions),
-                    source_end.deleted_at.is_(None),
-                    target_end.deleted_at.is_(None),
+                    _end_is_live(ArchiMateRelationship.source_id),
+                    _end_is_live(ArchiMateRelationship.target_id),
                 )
             )
             .scalars()
