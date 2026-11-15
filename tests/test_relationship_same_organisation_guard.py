@@ -179,6 +179,39 @@ class TestComposerRouteSameOrg:
         # Plain refusal (4xx), never a 500.
         assert 400 <= resp.status_code < 500, resp.get_data(as_text=True)
 
+    def test_guard_refusal_after_lookups_pass_is_plain_400(
+        self, app, db_session, make_org, login_as, client, monkeypatch
+    ):
+        """Both ends are visible to the caller, so the 404/409 lookups pass and
+        the refusal comes from the guard at commit: a 400 carrying the guard's
+        reason, with nothing stored."""
+        from app.models.archimate_core import ArchiMateRelationship
+        from app.models.models import CrossOrganisationRelationship
+
+        org_a = make_org("composer-late-a")
+        source = _make_element(db_session, org_a, "Source")
+        target = _make_element(db_session, org_a, "Target")
+        db_session.commit()
+        architect = self._make_user(db_session, org_a, "architect")
+        login_as(client, architect)
+
+        def refuse(*args, **kwargs):
+            raise CrossOrganisationRelationship("end belongs to another organisation")
+
+        monkeypatch.setattr(
+            "app.models.relationship_guard.assert_relationship_same_organisation", refuse
+        )
+        resp = client.post("/archimate/api/relationships", json={
+            "source_element_id": source.id,
+            "target_element_id": target.id,
+            "relationship_type": "flow",
+        })
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        assert "another organisation" in resp.get_data(as_text=True)
+        assert ArchiMateRelationship.query.filter_by(
+            source_id=source.id, target_id=target.id
+        ).count() == 0
+
 
 class TestAcceptSuggestionRouteSameOrg:
     """One other request writer (accept relationship suggestion) must return
@@ -228,10 +261,52 @@ class TestAcceptSuggestionRouteSameOrg:
         login_as(client, user)
 
         resp = client.post(
-            f"/api/archimate/relationship-suggestions/{suggestion_id}/accept"
+            f"/capability-map/api/archimate/relationship-suggestions/{suggestion_id}/accept"
         )
         # Plain refusal (4xx), never a 500.
         assert 400 <= resp.status_code < 500, resp.get_data(as_text=True)
+
+    def test_guard_refusal_after_lookups_pass_is_plain_400(
+        self, app, db_session, make_org, login_as, client, monkeypatch
+    ):
+        """Both ends are visible, so the suggestion and element lookups pass and
+        the refusal comes from the guard: a 400 with its reason, and the
+        suggestion stays pending."""
+        from app.models.archimate_core import RelationshipSuggestion
+        from app.models.models import CrossOrganisationRelationship
+
+        org_a = make_org("sugg-late-a")
+        source = _make_element(db_session, org_a, "Source")
+        target = _make_element(db_session, org_a, "Target")
+        suggestion = RelationshipSuggestion(
+            source_element_id=source.id,
+            target_element_id=target.id,
+            relationship_type="flow",
+            confidence=0.9,
+            status="pending",
+        )
+        db_session.add(suggestion)
+        db_session.flush()
+        suggestion_id = suggestion.id
+        user = self._make_user(db_session, org_a, "architect")
+        db_session.commit()
+        login_as(client, user)
+
+        def refuse(*args, **kwargs):
+            raise CrossOrganisationRelationship("end belongs to another organisation")
+
+        monkeypatch.setattr(
+            "app.modules.architecture.services.archimate_relationship_service."
+            "assert_relationship_same_organisation",
+            refuse,
+        )
+        resp = client.post(
+            f"/capability-map/api/archimate/relationship-suggestions/{suggestion_id}/accept"
+        )
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        assert "another organisation" in resp.get_data(as_text=True)
+        db_session.expire_all()
+        assert db_session.get(RelationshipSuggestion, suggestion_id).status == "pending"
 
 
 class TestGitHubConnectorSameOrg:

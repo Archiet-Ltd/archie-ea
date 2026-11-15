@@ -51,8 +51,8 @@ def assert_relationship_same_organisation(
         )
     for end, end_id in (("source", source_id), ("target", target_id)):
         row = connection.execute(
-            # nosec B608 - table name comes from the literal map above, never from input
-            text(f"SELECT organization_id FROM {table} WHERE id = :end_id"),
+            # table name comes from the literal map above, never from input
+            text(f"SELECT organization_id FROM {table} WHERE id = :end_id"),  # nosec B608
             {"end_id": end_id},
         ).first()
         if row is None:
