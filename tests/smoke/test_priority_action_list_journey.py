@@ -434,3 +434,39 @@ def test_show_all_preserves_element_parameter(browser, live_server):
         assert len(_order(page)) == 13
     finally:
         context.close()
+
+
+def test_show_all_then_show_first_ten_returns_to_ten_rows(browser, live_server):
+    """Clicking 'Show all' then 'Show the first 10' returns to ten rows."""
+    org = create_fresh_org("enterprise_architect")
+    suffix = org["suffix"]
+    from app import create_app, db
+    from app.models.implementation_migration import Gap
+
+    app = create_app("testing")
+    with app.app_context():
+        for n in range(13):
+            db.session.add(Gap(name="Return-to-ten gap %02d %s" % (n, suffix), severity="high",
+                               organization_id=org["org_id"]))
+        db.session.commit()
+        db.session.remove()
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + LIST_PAGES[0], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert len(_order(page)) == 10
+
+        # Show all 13 actions
+        page.get_by_role("link", name="Show all 13 actions").click()
+        page.wait_for_url(lambda url: "all_actions=1" in url, timeout=PAGE_TIMEOUT)
+        assert len(_order(page)) == 13
+
+        # Show the first 10 again: all_actions must be dropped from the link
+        page.get_by_role("link", name="Show the first 10").click()
+        page.wait_for_url(lambda url: "all_actions=1" not in url, timeout=PAGE_TIMEOUT)
+        assert "all_actions=1" not in page.url, "all_actions was not dropped: %s" % page.url
+        assert len(_order(page)) == 10
+    finally:
+        context.close()
