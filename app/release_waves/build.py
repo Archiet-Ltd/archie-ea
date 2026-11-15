@@ -122,9 +122,12 @@ PREFIX_OVERRIDES: tuple = (
 # Rules whose path is ambiguous after normalisation (two rules read /<x>): named by endpoint.
 ENDPOINT_OVERRIDES: dict = {
     "main.public_legal_page": ("W1", "PG-PUB", "legal pages"),
+    "education.eligibility": ("W1", "PG-ORG", "the education offer check a university or college member opens from billing"),
     "main.public_site_page": ("W1", "PG-PUB", "public site pages"),
     "main.indexnow_key_file": ("A", "infra", "search engine key file"),
     "main.index": ("W1", "PG-PUB", "home"),
+    "main.translated_page": ("W1", "PG-PUB", "a public page in another language; its English page's wave decides what it shows"),
+    "main.language_sitemap_xml": ("A", "infra", "one sitemap per language (lists released pages only)"),
     "main.public_module": ("W1", "PG-PUB", "module pages; the page's own wave decides what it shows"),
     "main.public_share": ("W1", "PG-PUB", "the page one module recording is shared from; opens with the module page it shows"),
     "risk.risk_loss_save": ("W1", "PG-RISK", "the yearly loss a risk is given, saved from the risk page that opens in wave 1"),

@@ -11,8 +11,10 @@ Handles ArchiMate implementation & migration layer element management:
 import json
 import logging
 
-from flask import current_app, flash, jsonify, redirect, request, session, url_for
-from flask_login import login_required
+from flask import abort, current_app, flash, jsonify, redirect, request, session, url_for
+from flask_login import current_user, login_required
+
+from app.core.auth.permissions import can
 from werkzeug.exceptions import HTTPException
 
 logger = logging.getLogger(__name__)
@@ -116,6 +118,9 @@ def update_implementation_layer(id):
                 wp_delete = wp_data.get("_delete")
 
                 if wp_id and wp_delete:
+                    if not can(current_user, "delete", "work_package"):
+                        db.session.rollback()
+                        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
                     wp_obj = WorkPackage.query.get(int(wp_id))
                     if wp_obj:
                         db.session.delete(wp_obj)
@@ -217,6 +222,8 @@ def update_implementation_layer(id):
 @application_mgmt.route("/applications/<int:app_id>/work-packages", methods=["POST"])
 @login_required
 def add_work_package(app_id):
+    if not can(current_user, "create", "work_package"):
+        abort(403, "Your role may read the roadmap but not change it.")
     # Application realized by Work Package (Work Package -> Realization -> Application) OR Association
     # Usually Work Package realizes an Application (Outcome).
     # Let's use Realization (Source=WorkPackage, Target=App).
@@ -235,6 +242,8 @@ def add_work_package(app_id):
 )
 @login_required
 def delete_work_package(app_id, id):
+    if not can(current_user, "delete", "work_package"):
+        abort(403, "Your role may read the roadmap but not change it.")
     return _delete_archimate_element(id, "realization")
 
 
@@ -314,6 +323,8 @@ def delete_plateau(app_id, id):
 @login_required
 def work_package_delete(id, work_package_id):
     """Delete a work package from an application"""
+    if not can(current_user, "delete", "work_package"):
+        abort(403, "Your role may read the roadmap but not change it.")
     ApplicationComponent.query.get_or_404(id)
     work_package = WorkPackage.query.get_or_404(work_package_id)
 
@@ -381,6 +392,8 @@ def plateau_delete(id, plateau_id):
 @login_required
 def work_package_edit(id, work_package_id):
     """Update Work Package properties"""
+    if not can(current_user, "edit", "work_package"):
+        abort(403, "Your role may read the roadmap but not change it.")
     ApplicationComponent.query.get_or_404(id)
     work_package = WorkPackage.query.get_or_404(work_package_id)
 
@@ -437,6 +450,8 @@ def deliverable_edit(id, deliverable_id):
 @login_required
 def work_package_add(id):
     """Link existing Work Package to Application (direct FK)"""
+    if not can(current_user, "edit", "work_package"):
+        abort(403, "Your role may read the roadmap but not change it.")
     app = ApplicationComponent.query.get_or_404(id)
     work_package_id = request.form.get("element_id")
 
