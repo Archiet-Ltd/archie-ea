@@ -379,7 +379,9 @@ class PredictiveInsightsService:
         try:
             from app.models.application_portfolio import ApplicationComponent
 
-            app = ApplicationComponent.query.get(app_id)
+            app = ApplicationComponent.query.filter(
+                ApplicationComponent.id == app_id
+            ).first()
             if app and app.created_at:
                 age = (datetime.utcnow() - app.created_at).days / 365.25
                 # Determine vendor support status from available fields
@@ -392,6 +394,7 @@ class PredictiveInsightsService:
                     vendor_support = app.vendor_type
 
                 return {
+                    "application_name": app.name,
                     "age_years": round(age, 1),
                     "technology_currency": 0,
                     "vendor_support_status": vendor_support,

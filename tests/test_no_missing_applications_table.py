@@ -153,117 +153,112 @@ class TestGenerateWorkPackagesCapability:
 
 
 class TestRoadmapSyncApplications:
-    """Test roadmap_sync path that reads applications."""
+    """The application sync reads applications through the application model."""
 
-    def test_sync_applications_to_deliverables_no_error(
+    def test_sync_creates_deliverable_for_own_application_only(
         self, db_session, make_org, client, login_as
     ):
-        """Drive the roadmap_sync path and assert no error and org's own application name in result."""
         org_a, user_a = _org_with_user(db_session, make_org, "a")
         org_b, user_b = _org_with_user(db_session, make_org, "b")
-
-        # Create applications for both orgs
-        app_a = _application(db_session, org_a, "Application A")
-        app_b = _application(db_session, org_b, "Application B")
-
+        _application(db_session, org_a, "Ledger Alpha")
+        _application(db_session, org_b, "Ledger Beta")
         db_session.commit()
 
-        # Login as org A user
         login_as(client, user_a)
+        response = client.post("/api/roadmap/sync/applications", json={})
+        assert response.status_code == 200, response.get_data(as_text=True)
 
-        # Call the sync endpoint
-        response = client.post(
-            "/api/roadmap/sync/applications",
-            json={"organization_id": org_a.id},
-        )
+        result = response.get_json()["sync_result"]
+        assert result["errors"] == []
+        assert result["created"] == 1
 
-        # Should succeed
-        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.get_data(as_text=True)}"
+        from app.models.roadmap_models import RoadmapDeliverable
 
-        data = response.get_json()
-        sync_result = data.get("sync_result", {})
-        assert "created" in sync_result or "updated" in sync_result or "archived" in sync_result
-
-        # Verify the sync only touched org A's applications
-        # (The sync should only process applications belonging to org_a)
-        from app.models.implementation_migration import Deliverable
-        deliverables_a = Deliverable.query.filter(
-            Deliverable.organization_id == org_a.id
-        ).all()
-        deliverables_b = Deliverable.query.filter(
-            Deliverable.organization_id == org_b.id
-        ).all()
-
-        # At least org A's application should have a deliverable if it needs one
-        # (depends on _application_needs_deliverable logic)
-        # The key assertion is no error and org-scoped operation
+        names = [
+            d.name
+            for d in RoadmapDeliverable.query.filter(
+                RoadmapDeliverable.created_by == user_a.id
+            ).all()
+        ]
+        assert "Ledger Alpha Modernization" in names
+        assert not any("Ledger Beta" in n for n in names)
 
 
 class TestPredictiveInsightsApplication:
-    """Test predictive_insights_service path that reads applications."""
+    """The lifecycle prediction reads the application through the application model."""
 
-    def test_predict_application_lifecycle_no_error(
-        self, db_session, make_org, client, login_as
+    def test_prediction_reports_own_application_and_its_vendor_status(
+        self, db_session, make_org, tenant_ctx
     ):
-        """Drive the predictive-insights path and assert no error and org's own application name in result."""
-        org_a, user_a = _org_with_user(db_session, make_org, "a")
-        org_b, user_b = _org_with_user(db_session, make_org, "b")
-
-        # Create applications for both orgs
-        app_a = _application(db_session, org_a, "Application A")
-        app_a.technology_stack = "Python, PostgreSQL"
+        org_a, _ = _org_with_user(db_session, make_org, "a")
+        org_b, _ = _org_with_user(db_session, make_org, "b")
+        app_a = _application(db_session, org_a, "Ledger Alpha")
         app_a.created_at = datetime(2020, 1, 1)
-
-        app_b = _application(db_session, org_b, "Application B")
-        app_b.technology_stack = "Java, Oracle"
+        app_a.vendor_risk = "high"
+        app_b = _application(db_session, org_b, "Ledger Beta")
         app_b.created_at = datetime(2018, 1, 1)
-
         db_session.commit()
 
-        # Login as org A user
-        login_as(client, user_a)
+        from app.services.ai_chat_extensions.predictive_insights_service import (
+            PredictiveInsightsService,
+        )
 
-        # Call the predictive insights endpoint for org A's application
-        from app.services.ai_chat_extensions.predictive_insights_service import PredictiveInsightsService
         service = PredictiveInsightsService()
+        with tenant_ctx(org_a.id):
+            result = service.predict_application_lifecycle(app_id=app_a.id)
+            other = service.predict_application_lifecycle(app_id=app_b.id)
 
-        # This should not raise an error
-        result = service.predict_application_lifecycle(app_id=app_a.id)
-
-        # Should return a result with the application's data
-        assert "application_id" in result
-        assert result["application_id"] == app_a.id
-        assert "current_stage" in result
-        assert "signals_analyzed" in result
         signals = result["signals_analyzed"]
-        # vendor_support_status may be "unknown" if not set on the application
-        assert signals["vendor_support_status"] in ["active", "unknown", "low", "medium", "high", "critical"]
-        assert signals["technology_currency"] == 0  # placeholder value
+        assert result["application_id"] == app_a.id
+        assert signals["application_name"] == "Ledger Alpha"
+        assert signals["vendor_support_status"] == "high"
+        assert signals["age_years"] > 5
+        # Another organisation's application is not read at all.
+        assert "application_name" not in other["signals_analyzed"]
+        assert other["signals_analyzed"]["vendor_support_status"] == "unknown"
 
-        # Verify org B's application is not accessible
-        # (The service should be scoped to the current organisation)
-        # Note: The service currently doesn't enforce org scoping in _gather_lifecycle_signals
-        # This test documents the expected behavior after the fix
+    def test_application_with_no_vendor_fields_is_unknown(
+        self, db_session, make_org, tenant_ctx
+    ):
+        org_a, _ = _org_with_user(db_session, make_org, "a")
+        app_a = _application(db_session, org_a, "Ledger Alpha")
+        app_a.created_at = datetime(2020, 1, 1)
+        app_a.vendor_risk = None
+        app_a.support_level = None
+        app_a.vendor_type = None
+        db_session.commit()
+
+        from app.services.ai_chat_extensions.predictive_insights_service import (
+            PredictiveInsightsService,
+        )
+
+        with tenant_ctx(org_a.id):
+            result = PredictiveInsightsService().predict_application_lifecycle(
+                app_id=app_a.id
+            )
+        signals = result["signals_analyzed"]
+        assert signals["application_name"] == "Ledger Alpha"
+        assert signals["vendor_support_status"] == "unknown"
 
 
 class TestNoRawSQLOnApplicationsTable:
-    """Verify no raw SQL queries against the missing 'applications' table."""
+    """No code under app/ runs SQL against a table named `applications`."""
 
     def test_grep_no_applications_table_in_app(self):
-        """git grep for actual SQL queries against 'applications' table returns nothing."""
         import subprocess
-        # Match actual SQL queries: SELECT/INSERT/UPDATE/DELETE followed by FROM/JOIN applications
-        # Exclude comments, docstrings, and template text
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent
         result = subprocess.run(
             [
                 "git", "grep", "-n", "-i", "-E",
-                r"(select|insert|update|delete)\s+.*\s+(from|join)\s+applications\b",
-                "--", "app"
+                r"(select|insert|update|delete)\s+.*\s+(from|join)\s+applications\b"
+                r"|^\s+(left\s+|inner\s+)?join\s+applications\b",
+                "--", "app",
             ],
             capture_output=True,
             text=True,
-            cwd="/home/ubuntu/verify/wt-appstable01"
+            cwd=root,
         )
-        # Should return no matches (exit code 1 for no matches)
-        assert result.returncode == 1, f"Found raw SQL against 'applications' table:\n{result.stdout}"
-        assert result.stdout == "", f"Found raw SQL against 'applications' table:\n{result.stdout}"
+        assert result.stdout == "", f"raw SQL against 'applications':\n{result.stdout}"
+        assert result.returncode == 1
