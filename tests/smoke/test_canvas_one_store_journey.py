@@ -13,7 +13,7 @@ import pytest
 from playwright.sync_api import expect
 
 from .chat_ask import ask, sign_in_as
-from .conftest import PAGE_TIMEOUT
+from .conftest import PAGE_TIMEOUT, _seed_standard_org
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -249,13 +249,19 @@ def test_the_canvas_page_shows_cost_lines_to_a_cto_and_the_reason_to_a_business_
             context.close()
 
 
+@pytest.fixture(scope="module")
+def empty_cost_org(request, ai_protocol_stub, live_server):
+    """A fresh organisation with no application costs, whatever order the file runs in."""
+    return _seed_standard_org(request, ai_protocol_stub)
+
+
 @pytest.mark.parametrize("width,scheme", [(1440, "light"), (390, "dark")])
 def test_an_empty_canvas_cost_box_says_why_it_is_empty_to_each_kind_of_person(
-        browser, live_server, seeded, width, scheme):
+        browser, live_server, empty_cost_org, width, scheme):
     from app import create_app, db
     from app.models.business_model import BusinessModelCanvas
 
-    org_id = seeded["ids"]["org"]
+    org_id = empty_cost_org["ids"]["org"]
     with create_app("testing").app_context():
         canvas = BusinessModelCanvas(name="Empty cost page model", organization_id=org_id)
         db.session.add(canvas)
@@ -268,7 +274,7 @@ def test_an_empty_canvas_cost_box_says_why_it_is_empty_to_each_kind_of_person(
         context.set_default_navigation_timeout(PAGE_TIMEOUT)
         page = context.new_page()
         try:
-            sign_in_as(page, live_server, seeded, persona)
+            sign_in_as(page, live_server, empty_cost_org, persona)
             page.goto("%s/business-model/%d" % (live_server, canvas_id))
             box = page.locator("#box-cost-structure + *")
             expect(box).to_be_visible()

@@ -108,7 +108,9 @@
 {%- endmacro %}
 
 {#- The notes of one box (or sub-area): one note card per entry, or the empty state when there is none.
-    empty says what is missing and what to do; an editable box also offers its add dialog. -#}
+    empty says what is missing and what to do; an editable box also offers its add dialog.
+    data-canvas-empty marks a box with nothing to show; data-canvas-withheld marks a box whose costs are hidden for this role
+    (it carries both, so select withheld to tell the two apart). -#}
 {% macro notes(canvas_id, key, items, title, element='Note', canvas_name='', empty='', add=false, tight=false) -%}
 {% if items %}
 <ul class="flex flex-col gap-2" data-canvas-notes="{{ key }}" data-title="{{ title }}" aria-label="{{ title }} notes">
