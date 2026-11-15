@@ -658,6 +658,55 @@ def relationship_fence_clause(org_id: Optional[int], *, direction: str = "both")
     return and_(*clauses)
 
 
+def relationships_page(
+    org_id: Optional[int], page: int, per_page: int, focus_id: Optional[int] = None
+) -> Dict[str, Any]:
+    """One page of an organisation's relationships, fenced and paged in the query.
+
+    Returns ``{relationships, total, pages, page}``; each relationship carries
+    its id, type, both ends' ids and their names. The database reads one page
+    plus a count, never the whole organisation. ``focus_id`` narrows the list to
+    one relationship (still fenced). A ``page`` past the last one gives the last.
+    """
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    listing = ArchiMateRelationship.query
+    if focus_id is not None:
+        listing = listing.filter(ArchiMateRelationship.id == focus_id)
+    ordered = listing.filter(relationship_fence_clause(org_id, direction="both")).order_by(
+        ArchiMateRelationship.type, ArchiMateRelationship.id
+    )
+    pagination = ordered.paginate(page=page, per_page=per_page, error_out=False)
+    if page > 1 and not pagination.items and pagination.pages:
+        page = pagination.pages
+        pagination = ordered.paginate(page=page, per_page=per_page, error_out=False)
+
+    end_ids = {end for rel in pagination.items for end in (rel.source_id, rel.target_id)}
+    names_by_id: Dict[int, str] = {}
+    if end_ids:
+        names_by_id = dict(
+            db.session.query(ArchiMateElement.id, ArchiMateElement.name).filter(
+                ArchiMateElement.id.in_(end_ids)
+            )
+        )
+    return {
+        "relationships": [
+            {
+                "id": rel.id,
+                "type": rel.type,
+                "source_id": rel.source_id,
+                "target_id": rel.target_id,
+                "source_name": names_by_id.get(rel.source_id),
+                "target_name": names_by_id.get(rel.target_id),
+            }
+            for rel in pagination.items
+        ],
+        "total": pagination.total,
+        "pages": max(pagination.pages, 1),
+        "page": page,
+    }
+
+
 def filter_relationships_by_org(
     relationships: List[Any], org_id: Optional[int], *, direction: str = "both"
 ) -> List[Any]:

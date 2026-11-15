@@ -29,7 +29,7 @@ from app.models.archimate_core import (
 )
 from app.modules.intelligence.services.query_service import (
     filter_relationships_by_org,
-    relationship_fence_clause,
+    relationships_page,
 )
 from app.services.architecture_validation_service import ArchitectureValidator
 from app.services.architecture_search_service import ArchitectureSearchService
@@ -320,58 +320,18 @@ def list_relationships():
     is the caller's org while the far element belongs to another). Only relationships
     where both source and target elements belong to the current organisation are listed.
     """
-    from app.models.archimate_core import ArchiMateRelationship
-
     page = safe_int_arg('page', 1, minimum=1)
     per_page = request.args.get("per_page", 20, type=int)
     if per_page not in (10, 20, 25, 30, 40, 50):
         per_page = 20
 
-    org_id = current_org_id()
-
     # An address that names one relationship ("Open relationship record" in an
     # answer) shows that relationship, so the row it points at is on the page.
     focus_id = request.args.get("relationship", type=int)
-    listing = ArchiMateRelationship.query
-    if focus_id is not None:
-        listing = listing.filter(ArchiMateRelationship.id == focus_id)
-
-    # The fence is part of the query, so the database counts and pages only
-    # the rows that belong on the page.
-    listing = listing.filter(relationship_fence_clause(org_id, direction="both"))
-    ordered = listing.order_by(ArchiMateRelationship.type, ArchiMateRelationship.id)
-    pagination = ordered.paginate(page=page, per_page=per_page, error_out=False)
-    if page > 1 and not pagination.items and pagination.pages:
-        page = pagination.pages
-        pagination = ordered.paginate(page=page, per_page=per_page, error_out=False)
-    page_items = pagination.items
-    total = pagination.total
-
-    element_ids = set()
-    for rel in page_items:
-        element_ids.add(rel.source_id)
-        element_ids.add(rel.target_id)
-
-    names_by_id = {}
-    if element_ids:
-        names_by_id = dict(
-            db.session.query(ArchitectureElement.id, ArchitectureElement.name)
-            .filter(ArchitectureElement.id.in_(element_ids))
-        )
-
-    relationships = [
-        {
-            "id": rel.id,
-            "type": rel.type,
-            "source_id": rel.source_id,
-            "target_id": rel.target_id,
-            "source_name": names_by_id.get(rel.source_id),
-            "target_name": names_by_id.get(rel.target_id),
-        }
-        for rel in page_items
-    ]
-
-    pages = max(pagination.pages, 1)
+    listing = relationships_page(current_org_id(), page, per_page, focus_id)
+    relationships, total, pages, page = (
+        listing["relationships"], listing["total"], listing["pages"], listing["page"]
+    )
 
     return render_template(
         "architecture/relationships.html",
