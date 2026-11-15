@@ -137,37 +137,27 @@ def test_a_member_who_may_write_and_the_systems_own_writes_log_no_line(app, db_s
     db_session.rollback()
 
 
-def test_a_persona_admitted_without_a_grant_is_reported_in_report_mode_and_refused_otherwise(
-    app, db_session, two_orgs, caplog
-):
+def test_a_persona_admitted_without_a_grant_is_refused_in_production_mode(app, db_session, two_orgs):
     from app._bootstrap.write_access import ChangeNotGrantedByRoute
 
     org_a, _ = two_orgs
     person = _member(db_session, org_a, "viewer")
-    caplog.set_level(logging.WARNING, logger="app.write_access")
-    previous = app.config.get("WRITE_ACCESS_REPORT_ONLY")
+    previous_testing = app.testing
+    previous_flag = app.config.pop("WRITE_ACCESS_REPORT_ONLY", None)
+    app.testing = False
     try:
-        app.config["WRITE_ACCESS_REPORT_ONLY"] = True
-        with app.test_request_context("/persona", method="POST"):
-            g._login_user = person
-            g.current_org_id = org_a.id
-            g.write_admitted_for_route_check = True
-            g.route_granted_write = False
-            _store_an_application(db_session, org_a, "Persona, no grant")
-        assert len(_lines(caplog)) == 1 and "no route granted" in _lines(caplog)[0]
-        db_session.rollback()
-
-        app.config["WRITE_ACCESS_REPORT_ONLY"] = False
         with app.test_request_context("/persona", method="POST"):
             g._login_user = person
             g.current_org_id = org_a.id
             g.write_admitted_for_route_check = True
             g.route_granted_write = False
             with pytest.raises(ChangeNotGrantedByRoute):
-                _store_an_application(db_session, org_a, "Persona, enforced")
+                _store_an_application(db_session, org_a, "Persona, production")
         db_session.rollback()
     finally:
-        app.config["WRITE_ACCESS_REPORT_ONLY"] = previous
+        app.testing = previous_testing
+        if previous_flag is not None:
+            app.config["WRITE_ACCESS_REPORT_ONLY"] = previous_flag
 
 
 def test_a_raw_statement_with_no_check_is_named_for_a_viewer_of_either_organisation(

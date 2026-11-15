@@ -261,19 +261,6 @@ def note_write_admitted(persona_only=False):
             g.write_admitted_for_route_check = True
 
 
-def report_only():
-    """Whether the backstop reports what it would refuse instead of refusing it.
-
-    Production reports; the test configuration enforces. ``WRITE_ACCESS_REPORT_ONLY`` overrides either.
-    """
-    from flask import current_app
-
-    configured = current_app.config.get("WRITE_ACCESS_REPORT_ONLY")
-    if configured is not None:
-        return bool(configured)
-    return not current_app.testing
-
-
 def _tenant_tables(tables):
     """The tables among ``tables`` that hold an organisation's records and are not system bookkeeping."""
     from app import db
@@ -319,17 +306,6 @@ def _hold_unadmitted_write(tables):
         logger.debug("write-access report failed", exc_info=True)
     finally:
         g.write_access_reporting = False
-
-
-def _hold_ungranted_write(tables):
-    from flask import g
-
-    held = getattr(g, "write_access_held", None) or {
-        "kind": "admitted for a persona but no route granted the change",
-        "tables": set(),
-    }
-    held["tables"] |= {t for t in tables if t}
-    g.write_access_held = held
 
 
 def _report_stored_change(_session):
@@ -385,9 +361,6 @@ def _refuse_ungranted_change(session, _flush_context, _instances):
         for obj in _model_changes(session):
             table = getattr(obj, "__tablename__", None)
             if table not in BOOKKEEPING_TABLES:
-                if report_only():
-                    _hold_ungranted_write({table})
-                    return
                 # Noted as well as raised: a route that catches every error still answers with the refusal.
                 g.ungranted_change_refused = True
                 raise ChangeNotGrantedByRoute(GENERAL_REASON)
@@ -424,9 +397,6 @@ def _refuse_ungranted_statement(_conn, _cursor, statement, _parameters, _context
     if getattr(g, "route_granted_write", False):
         return
     if table not in BOOKKEEPING_TABLES:
-        if report_only():
-            _hold_ungranted_write({table})
-            return
         g.ungranted_change_refused = True
         raise ChangeNotGrantedByRoute(GENERAL_REASON)
 
