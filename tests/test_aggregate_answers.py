@@ -824,7 +824,7 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
             return e
 
         process = element("Handle customer checkout", "BusinessProcess", org.id)
-        small = element("Order Service", "ApplicationService", org.id, recorded_at=datetime(2026, 10, 24, 8, 0))
+        small = element("Order Service", "ApplicationService", org.id)
         big = element(
             "Customer Database", "DataObject", org.id,
             source_label="Application portfolio", source_recorded_at=datetime(2026, 10, 25, 9, 0),
@@ -841,6 +841,17 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
             db.session.add(ArchiMateRelationship(
                 type="Serving", source_id=caller.id, target_id=foreign.id, organization_id=other.id,
             ))
+        db.session.flush()
+        # The day Order Service was added is 24 Oct; it was edited afterwards, which
+        # moves the element's own last-recorded time to now but not the day added.
+        db.session.execute(
+            db.text(
+                "UPDATE entity_history SET valid_from = :day, recorded_at = :day "
+                "WHERE table_name = 'archimate_elements' AND record_id = :id"
+            ),
+            {"day": datetime(2026, 10, 24, 8, 0), "id": small.id},
+        )
+        small.description = "Takes customer orders"
         db.session.flush()
         db.session.expire_all()
 
