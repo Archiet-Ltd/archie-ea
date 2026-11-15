@@ -146,7 +146,9 @@
                 {% call card_title(class='text-lg') %}What it costs{% endcall %}
               {% endcall %}
               {% call card_content() %}
-                {% if cost.recorded %}
+                {% if costs_withheld %}
+                <p class="text-sm text-muted-foreground" data-testid="record-cost" role="status">{{ costs_withheld_sentence }}</p>
+                {% elif cost.recorded %}
                 <dl class="grid grid-cols-2 gap-3 text-sm" data-testid="record-cost">
                   <div><dt class="text-xs text-muted-foreground">One-off</dt><dd class="text-xl font-semibold tabular-nums whitespace-nowrap" data-testid="cost-one-off">{{ cost.one_off_text }}</dd></div>
                   <div><dt class="text-xs text-muted-foreground">Running, a year</dt><dd class="text-xl font-semibold tabular-nums whitespace-nowrap" data-testid="cost-running">{{ cost.running_text }}</dd></div>
@@ -161,7 +163,7 @@
                 {% else %}
                 <p class="text-sm text-muted-foreground" data-testid="record-cost">No cost recorded yet. Record the one-off and running cost so the board can weigh it.</p>
                 {% endif %}
-                <div class="mt-3">{{ button(text='Record the cost', variant='outline', size='sm', href=base ~ '?edit=1', testid='cost-record-link') }}</div>
+                {% if not costs_withheld %}                <div class="mt-3">{{ button(text='Record the cost', variant='outline', size='sm', href=base ~ '?edit=1', testid='cost-record-link') }}</div>{% endif %}
               {% endcall %}
             {% endcall %}
         </div>
