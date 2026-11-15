@@ -8,6 +8,7 @@ model records one) its health, with each owner named once and no prompt to work
 the indirect connections out; when an answer fails, presses Retry and gets it;
 opens the removal dialog and closes it by its name.
 """
+import json
 import os
 import re
 
@@ -102,6 +103,7 @@ def test_first_answer_is_cited_and_the_figures_agree(browser, live_server, seede
 
 
 def test_a_failed_answer_offers_try_again(browser, live_server, seeded):
+    """The AI's own answer request fails: the person reads the plain sentence, presses Retry and gets an answer."""
     email, org_id = _empty_organisation_user(live_server)
     context = browser.new_context(viewport={"width": 1440, "height": 900})
     context.set_default_timeout(PAGE_TIMEOUT)
@@ -112,19 +114,60 @@ def test_a_failed_answer_offers_try_again(browser, live_server, seeded):
         _load_sample(page, live_server)
 
         failures = {"left": 1}
+        asked = []
+        reply = "Payments service connects to the Order database and the Customer web app."
 
-        def refuse_once(route):
+        def ai_answer(route):
+            asked.append(route.request.url)
             if failures["left"]:
                 failures["left"] -= 1
                 route.abort()
-            else:
-                route.continue_()
+                return
+            body = "".join("data: %s\n\n" % json.dumps(e) for e in (
+                {"type": "token", "text": reply},
+                {"type": "done", "response": reply, "sources": [], "actions_taken": [], "pending_approvals": []}))
+            route.fulfill(status=200, content_type="text/event-stream", body=body)
 
-        page.route(re.compile(r"/ai-chat/estate-answer"), refuse_once)
+        # The records lookup is left to answer on its own here; only the AI's answer request is refused.
+        page.route(re.compile(r"/ai-chat/message/stream"), ai_answer)
+        page.route(re.compile(r"/ai-chat/message$"), lambda route: route.abort())
+        page.route(re.compile(r"/ai-chat/estate-answer"), lambda route: route.abort())
         _ask_payments(page, live_server)
         expect(page.get_by_text(FAILED_ANSWER).first).to_be_visible(timeout=PAGE_TIMEOUT)
         page.get_by_role("button", name="Retry").click()
-        expect(page.locator("[data-answer-row]").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator("#messages-container .message-content", has_text=reply).last).to_be_visible(
+            timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text(FAILED_ANSWER)).to_have_count(0)
+    finally:
+        context.close()
+
+
+def test_an_aborted_records_lookup_still_sends_the_question_to_the_ai(browser, live_server, seeded):
+    email, org_id = _empty_organisation_user(live_server)
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+        _login(page, live_server, email)
+        _load_sample(page, live_server)
+
+        asked = []
+        reply = "Payments service connects to the Order database."
+
+        def ai_answer(route):
+            asked.append(json.loads(route.request.post_data)["message"])
+            body = "".join("data: %s\n\n" % json.dumps(e) for e in (
+                {"type": "token", "text": reply},
+                {"type": "done", "response": reply, "sources": [], "actions_taken": [], "pending_approvals": []}))
+            route.fulfill(status=200, content_type="text/event-stream", body=body)
+
+        page.route(re.compile(r"/ai-chat/estate-answer"), lambda route: route.abort())
+        page.route(re.compile(r"/ai-chat/message/stream"), ai_answer)
+        _ask_payments(page, live_server)
+        expect(page.locator("#messages-container .message-content", has_text=reply).last).to_be_visible(
+            timeout=PAGE_TIMEOUT)
+        assert asked == ["What breaks if Payments service fails"], asked
         expect(page.get_by_text(FAILED_ANSWER)).to_have_count(0)
     finally:
         context.close()
