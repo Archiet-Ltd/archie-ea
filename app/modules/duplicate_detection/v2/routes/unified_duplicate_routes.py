@@ -219,7 +219,8 @@ def get_simple_runs():
     try:
         limit = min(safe_int_arg('limit', 10, minimum=1, maximum=500), 100)
         runs = (
-            UnifiedDetectionRun.query.order_by(UnifiedDetectionRun.created_at.desc())
+            UnifiedDetectionRun.query.filter(UnifiedDetectionRun.organization_id == g.current_org_id)
+            .order_by(UnifiedDetectionRun.created_at.desc())
             .limit(limit)
             .all()
         )
@@ -739,7 +740,9 @@ def get_unified_stats():
     try:
         enterprise_runs = DuplicateDetectionRun.query.count()
         enterprise_groups = DuplicateGroup.query.count()
-        simple_runs = UnifiedDetectionRun.query.count()
+        simple_runs = UnifiedDetectionRun.query.filter(
+            UnifiedDetectionRun.organization_id == g.current_org_id
+        ).count()
         simple_groups = UnifiedDuplicateGroup.query.count()
         stats = {
             "enterprise": {"total_runs": enterprise_runs, "total_groups": enterprise_groups},

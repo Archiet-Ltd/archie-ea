@@ -78,7 +78,7 @@ unified_group_members = db.Table(
 )
 
 
-def _signed_in_organisation_id():
+def signed_in_organisation_id():
     """The organisation of the request that creates a run (None on the command line)."""
     from flask import g, has_request_context
 
@@ -132,7 +132,7 @@ class UnifiedDetectionRun(db.Model):
         ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
-        default=_signed_in_organisation_id,
+        default=signed_in_organisation_id,
     )
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

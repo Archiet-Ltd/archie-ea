@@ -286,7 +286,7 @@ def get_simple_runs():
     try:
         limit = min(safe_int_arg('limit', 10, minimum=1, maximum=500), 100)
         runs = (
-            UnifiedDetectionRun.query.order_by(UnifiedDetectionRun.created_at.desc())
+            UnifiedDetectionRun.query.order_by(UnifiedDetectionRun.created_at.desc())  # tenant-scoping-ok: unserved legacy copy of the v2 route; the served route filters by organisation
             .limit(limit)
             .all()
         )
@@ -459,7 +459,7 @@ def get_simple_statistics():
     try:
         # Latest run for simple/fast strategies
         latest_run = (
-            UnifiedDetectionRun.query.filter(
+            UnifiedDetectionRun.query.filter(  # tenant-scoping-ok: unserved legacy copy of the v2 route; the served route filters by organisation
                 UnifiedDetectionRun.strategy.in_(["fast", "hybrid"]),
                 UnifiedDetectionRun.status == "completed",
             )
@@ -1066,7 +1066,7 @@ def get_unified_stats():
         enterprise_groups = DuplicateGroup.query.count()
 
         # Get simple stats
-        simple_runs = UnifiedDetectionRun.query.count()
+        simple_runs = UnifiedDetectionRun.query.count()  # tenant-scoping-ok: unserved legacy copy of the v2 route; the served route filters by organisation
         simple_groups = UnifiedDuplicateGroup.query.count()
 
         stats = {
@@ -1252,7 +1252,7 @@ def ai_analyze():
 def ai_insights(run_id):
     """View AI insights for a specific detection run"""
     try:
-        run = UnifiedDetectionRun.query.get(run_id)
+        run = UnifiedDetectionRun.query.get(run_id)  # tenant-scoping-ok: unserved legacy copy of the v2 route; the served route filters by organisation
         if run is None:
             return render_plain_error(404)
 

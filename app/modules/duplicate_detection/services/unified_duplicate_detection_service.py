@@ -1433,7 +1433,12 @@ class UnifiedDuplicateDetectionService:
                 enterprise_data = []
 
             if mode == "simple" or mode == "all":
-                simple_runs = UnifiedDetectionRun.query.all()
+                from flask import g
+
+                run_query = UnifiedDetectionRun.query
+                if getattr(g, "current_org_id", None) is not None:
+                    run_query = run_query.filter(UnifiedDetectionRun.organization_id == g.current_org_id)
+                simple_runs = run_query.all()
                 simple_data = [
                     {
                         "id": run.id,

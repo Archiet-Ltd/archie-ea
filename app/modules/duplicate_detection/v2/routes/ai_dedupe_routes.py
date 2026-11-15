@@ -12,7 +12,7 @@ from werkzeug.exceptions import HTTPException
 import json
 import logging
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, g, jsonify, render_template, request
 from app.middleware.tenant_decorators import platform_admin_required
 from flask_login import login_required
 
@@ -145,7 +145,10 @@ def ai_analyze():
 def ai_insights(run_id):
     """View AI insights for a specific detection run"""
     try:
-        run = UnifiedDetectionRun.query.get_or_404(run_id)
+        run = UnifiedDetectionRun.query.filter(
+            UnifiedDetectionRun.id == run_id,
+            UnifiedDetectionRun.organization_id == g.current_org_id,
+        ).first_or_404()
         if (getattr(run, "strategy", "") or "").startswith("ai_"):
             groups = UnifiedDuplicateGroup.query.filter_by(detection_run_id=run_id).all()
             ai_insights_data = {

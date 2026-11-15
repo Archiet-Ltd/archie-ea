@@ -18,6 +18,7 @@ from sqlalchemy.exc import OperationalError
 from app import db
 from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_duplicate_detection import (
+    signed_in_organisation_id,
     GroupStatus,
     UnifiedDetectionRun,
     UnifiedDuplicateGroup,
@@ -371,6 +372,9 @@ class UnifiedDuplicateService:
     ) -> List[Dict[str, Any]]:
         """Get recent detection runs"""
         query = UnifiedDetectionRun.query
+        org_id = signed_in_organisation_id()
+        if org_id is not None:
+            query = query.filter(UnifiedDetectionRun.organization_id == org_id)
 
         if status:
             query = query.filter_by(status=status)
@@ -383,7 +387,11 @@ class UnifiedDuplicateService:
     @classmethod
     def get_run(cls, run_id: int) -> Optional[Dict[str, Any]]:
         """Get a single detection run by ID"""
-        run = UnifiedDetectionRun.query.get(run_id)
+        run = UnifiedDetectionRun.query.filter(UnifiedDetectionRun.id == run_id)
+        org_id = signed_in_organisation_id()
+        if org_id is not None:
+            run = run.filter(UnifiedDetectionRun.organization_id == org_id)
+        run = run.first()
         if run:
             result = run.to_dict()
             result["groups"] = [g.to_dict() for g in run.groups]
@@ -404,9 +412,11 @@ class UnifiedDuplicateService:
         ).count()
 
         # Get latest run
-        latest_run = UnifiedDetectionRun.query.order_by(
-            UnifiedDetectionRun.created_at.desc()
-        ).first()
+        org_id = signed_in_organisation_id()
+        runs = UnifiedDetectionRun.query
+        if org_id is not None:
+            runs = runs.filter(UnifiedDetectionRun.organization_id == org_id)
+        latest_run = runs.order_by(UnifiedDetectionRun.created_at.desc()).first()
 
         # Calculate total potential savings
         total_savings = (
@@ -425,7 +435,7 @@ class UnifiedDuplicateService:
             ).count(),
             "total_potential_savings": float(total_savings),
             "latest_run": latest_run.to_dict() if latest_run else None,
-            "total_runs": UnifiedDetectionRun.query.count(),
+            "total_runs": runs.count(),
         }
 
     # ===== Bulk Operations =====
