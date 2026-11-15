@@ -126,3 +126,60 @@ def test_unlinking_keeps_the_association_while_another_link_reaches_the_same_ele
         remaining = RiskEntityLink.query.filter_by(risk_id=ids["risk"]).one()
         risk_service.remove_risk_link(ids["risk"], remaining.id)
         assert _associations(db_session, org, mirror) == []
+
+
+def test_unmapping_keeps_an_association_a_person_drew(app, db_session, make_org):
+    from app.models.archimate_core import ArchiMateRelationship
+    from app.services import risk_service
+
+    org = make_org("relmap-hand")
+    ids = _seed(app, db_session, org)
+    with app.test_request_context("/"):
+        g.current_org_id = org.id
+        from app.services.archimate_backbone import ensure_archimate_element
+        from app.models.risk import Risk
+        mirror = ensure_archimate_element(db_session.get(Risk, ids["risk"])).id
+        drawn = ArchiMateRelationship(type="association", source_id=mirror, target_id=ids["app_element"],
+                                      organization_id=org.id, source_kind="manual")
+        db_session.add(drawn)
+        db_session.flush()
+        link = risk_service.add_risk_link(ids["risk"], "application", ids["app"], organization_id=org.id)
+        risk_service.remove_risk_link(ids["risk"], link.id)
+        assert [r.id for r in _associations(db_session, org, mirror)] == [drawn.id]
+
+
+def test_a_projected_association_is_marked_derived_and_removed_with_its_link(app, db_session, make_org):
+    from app.services import risk_service
+
+    org = make_org("relmap-derived")
+    ids = _seed(app, db_session, org)
+    with app.test_request_context("/"):
+        g.current_org_id = org.id
+        link = risk_service.add_risk_link(ids["risk"], "application", ids["app"], organization_id=org.id)
+        mirror = _mirror(db_session, ids["risk"])
+        assert [r.source_kind for r in _associations(db_session, org, mirror)] == ["derived"]
+        risk_service.remove_risk_link(ids["risk"], link.id)
+        assert _associations(db_session, org, mirror) == []
+
+
+def test_the_dry_run_counts_what_the_real_run_draws_when_two_links_reach_one_element(
+        app, db_session, make_org):
+    from app.models.risk_entity_link import RiskEntityLink
+    from app.services import risk_service
+
+    org = make_org("relmap-dry")
+    ids = _seed(app, db_session, org)
+    with app.test_request_context("/"):
+        g.current_org_id = org.id
+        db_session.add_all([
+            RiskEntityLink(organization_id=org.id, risk_id=ids["risk"], entity_type="application",
+                           entity_id=ids["app"]),
+            RiskEntityLink(organization_id=org.id, risk_id=ids["risk"], entity_type="archimate_element",
+                           entity_id=ids["app_element"]),
+            RiskEntityLink(organization_id=org.id, risk_id=ids["risk"], entity_type="archimate_element",
+                           entity_id=ids["product"]),
+        ])
+        db_session.flush()
+        dry = risk_service.project_all_links(organization_id=org.id, dry_run=True)
+        real = risk_service.project_all_links(organization_id=org.id)
+    assert dry == real == (3, 2)

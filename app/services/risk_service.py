@@ -221,6 +221,9 @@ def element_type_word(element_type):
 #: any two elements, so one rule serves every kind of target.
 LINK_RELATIONSHIP = "association"
 
+#: Provenance of a relationship the mapping drew itself (the model's "derived" kind).
+PROJECTED_SOURCE_KIND = "derived"
+
 
 def _link_target_element(link, organization_id):
     """The ArchiMate element a link points at (for a record, the element that record mirrors, created
@@ -272,11 +275,16 @@ def project_link_on_model(risk, link, organization_id):
     if existing:
         return existing[0]
     source = db.session.get(ArchiMateElement, source.id)
-    return ArchiMateRelationshipService.create_relationship(
+    relationship = ArchiMateRelationshipService.create_relationship(
         source, target, LINK_RELATIONSHIP,
         architecture_id=source.architecture_id or target.architecture_id,
         organization_id=organization_id, rollback=False,
     )
+    if relationship is not None:
+        # Drawn by the mapping, not by a person: only a relationship carrying this mark is taken
+        # off again when the mapping goes.
+        relationship.source_kind = PROJECTED_SOURCE_KIND
+    return relationship
 
 
 def unproject_link_from_model(risk, link, organization_id):
@@ -292,7 +300,8 @@ def unproject_link_from_model(risk, link, organization_id):
         other_target = _link_target_element(other, organization_id)
         if other_target is not None and other_target.id == target.id:
             return 0
-    removed = _mirror_relationships(risk.archimate_element_id, target.id, organization_id)
+    removed = [r for r in _mirror_relationships(risk.archimate_element_id, target.id, organization_id)
+               if r.source_kind == PROJECTED_SOURCE_KIND]
     for relationship in removed:
         db.session.delete(relationship)
     return len(removed)
@@ -355,6 +364,7 @@ def project_all_links(organization_id=None, dry_run=False):
     if organization_id is not None:
         query = query.where(RiskEntityLink.organization_id == organization_id)
     seen = drawn = 0
+    planned = set()
     for link in db.session.execute(query).scalars().all():
         if link.organization_id is None:
             continue
@@ -368,8 +378,12 @@ def project_all_links(organization_id=None, dry_run=False):
                 ArchiMateRelationship.type == LINK_RELATIONSHIP))
         if dry_run:
             target = _link_target_element(link, link.organization_id)
-            if (target is not None and risk.archimate_element_id is not None
-                    and not _mirror_relationships(risk.archimate_element_id, target.id, link.organization_id)):
+            mirror_id = risk.archimate_element_id
+            if (target is not None and target.id != mirror_id
+                    and (risk.id, target.id) not in planned
+                    and (mirror_id is None
+                         or not _mirror_relationships(mirror_id, target.id, link.organization_id))):
+                planned.add((risk.id, target.id))
                 drawn += 1
             continue
         project_link_on_model(risk, link, link.organization_id)
