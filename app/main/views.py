@@ -46,16 +46,17 @@ main.register_blueprint(framework_management_bp)
 
 @main.before_app_request
 def _redirect_www_to_apex():
-    """301 any request to www.entelim.org to the same path on entelim.org.
+    """301 any request to www. plus one of the site's own hosts to the same path without it.
 
     A host check, not server config -- the app owns this redirect the same
     way it owns every other canonicalisation decision in this module. Only
-    ever fires for that exact host, so local/dev/test requests (localhost,
+    ever fires for those exact hosts, so local/dev/test requests (localhost,
     127.0.0.1, the test client's default "localhost") are untouched.
     """
-    host = (request.host or "").split(":", 1)[0].lower()
-    if host == "www.entelim.org":
-        target = request.url.replace("www.entelim.org", "entelim.org", 1)
+    from app.services.origin import www_redirect_target
+
+    target = www_redirect_target(request.host, request.url)
+    if target:
         return redirect(target, code=301)
     return None
 
@@ -528,9 +529,10 @@ def llms_txt():
     section. Held, merged and withdrawn pages are excluded, same as
     sitemap.xml -- see app/services/public_pages.py::load_feed_pages."""
     from app.services.public_pages import load_feed_pages
+    from app.services.origin import canonical_origin
 
     pages = load_feed_pages()
-    base_url = "https://entelim.org"
+    base_url = canonical_origin()
     lines = ["# Entelim"]
     lines.append("")
     lines.append(
@@ -566,9 +568,10 @@ def llms_full_txt():
     excluded, same as sitemap.xml -- see
     app/services/public_pages.py::load_feed_pages."""
     from app.services.public_pages import load_feed_pages
+    from app.services.origin import canonical_origin
 
     pages = load_feed_pages()
-    base_url = "https://entelim.org"
+    base_url = canonical_origin()
     lines = ["# Entelim — Full Content"]
     lines.append("")
     lines.append(
@@ -829,6 +832,7 @@ def public_use_cases_index():
     app/services/public_pages.py::load_feed_pages.
     """
     from app.services.public_pages import USE_CASE_SEGMENT_LABELS, family_hub_groups
+    from app.services.origin import canonical_origin
 
     groups = family_hub_groups(
         "function-per-segment",
@@ -838,7 +842,7 @@ def public_use_cases_index():
     return render_template(
         "public/hub_index.html",
         title="Use cases",
-        canonical_url="https://entelim.org/use-cases",
+        canonical_url=f"{canonical_origin()}/use-cases",
         description=(
             "What Entelim answers for startup founders, scale-up CTOs, "
             "enterprise architecture teams and operations leads."
@@ -892,10 +896,12 @@ def _render_family_hub(family: str, path: str, fallback_title: str, extra_entrie
             SimpleNamespace(url=card["href"], title=card["title"])
             for group in role_cards for card in group["cards"]
         ]
+    from app.services.origin import canonical_origin
+
     return render_template(
         "public/hub_index.html",
         title=title,
-        canonical_url=f"https://entelim.org{path}",
+        canonical_url=f"{canonical_origin()}{path}",
         description=description,
         intro_html=intro.body_html if live_intro else None,
         role_cards=role_cards,
@@ -1038,7 +1044,7 @@ def public_comparison_hub():
     Reuses the same page loader as every other public page (no second loader):
     a comparison page's own front-matter `routing` decides its real address — most
     carry an archiet.ai canonical URL, so the hub links there rather than assuming
-    every comparison page lives on entelim.org.
+    every comparison page lives on entelim.tech.
 
     load_feed_pages(), not load_all_pages(): a comparison page withdrawn from
     discovery (state: not_planned) still renders at its own URL but must drop
@@ -1046,15 +1052,16 @@ def public_comparison_hub():
     /use-cases index.
     """
     from app.services.public_pages import load_feed_pages
+    from app.services.origin import canonical_origin
 
-    site_url = "https://entelim.org"
+    site_url = canonical_origin()
     pages = [p for p in load_feed_pages() if p.family == "comparison"]
     entries = [
         {
             "competitor": p.front_matter.get("competitor", p.title),
             "real_url": p.external_url or f"{site_url}{p.url}",
-            # The entelim.org page itself, so a visitor who stays on this
-            # site (and a crawler following only entelim.org links) can
+            # The entelim.tech page itself, so a visitor who stays on this
+            # site (and a crawler following only entelim.tech links) can
             # still reach it even when real_url points at archiet.ai --
             # only shown when it differs from real_url, to avoid a second,
             # identical link.
@@ -1300,13 +1307,15 @@ def get_widget_metrics():
     """
     try:
         # Sample metrics data - in production, this would come from database
+        from app.services.cost_visibility import withhold_reply
+
         metrics = {
             "total_users": 1234,
             "active_sessions": 89,
             "revenue": 45678.90,
             "conversion_rate": 3.45,
         }
-        return jsonify(metrics)
+        return jsonify(withhold_reply(metrics))
 
     except Exception as e:
         current_app.logger.error(f"Widget metrics fetch failed: {e}")
@@ -1471,7 +1480,7 @@ def integrations():
 
 @main.route("/settings")
 @login_required
-@platform_admin_required
+@platform_admin_required(hide=True)
 @admin_required
 def settings():
     """System Settings - Application configuration and user preferences.
