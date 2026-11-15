@@ -16,6 +16,7 @@ from datetime import datetime
 from sqlalchemy import case, func
 
 from app import db
+from app.services.archimate_import_service import _PARENT_RELATIONSHIPS as PARENT_RELATIONSHIPS
 
 APPLICATION = "application"
 PART = "part"
@@ -23,7 +24,6 @@ NOT_SOFTWARE = "not_software"
 KINDS = (APPLICATION, PART, NOT_SOFTWARE)
 KIND_LABELS = {APPLICATION: "Application", PART: "Part of an application", NOT_SOFTWARE: "Not software"}
 
-PARENT_RELATIONSHIPS = ("composition", "aggregation")
 
 
 def _has_parent_expression(model):
