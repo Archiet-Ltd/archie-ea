@@ -57,6 +57,27 @@ def test_the_rule_settles_parts_repositories_and_a_persons_choice(db_session, ma
         assert kind_of(part)["reason"] == "Part of Alerts gateway and consumers"
 
 
+def test_a_row_with_no_stored_kind_is_read_by_the_rule_never_blank(db_session, make_org, tenant_ctx):
+    org = make_org("kind-null")
+    billing = _row(org, "Billing")
+    repo = _row(org, "billing-repo", repository_type="GitHub")
+    db_session.flush()
+    db_session.execute(
+        db.text(
+            "UPDATE application_components SET application_kind = NULL, application_kind_set_by_id = NULL,"
+            " application_kind_set_at = NULL WHERE id IN (:a, :b)"
+        ),
+        {"a": billing.id, "b": repo.id},
+    )
+    db_session.expire_all()
+    with tenant_ctx(org.id):
+        for row, kind in ((billing, "application"), (repo, "not_software")):
+            found = kind_of(row)
+            assert row.application_kind is None
+            assert found["kind"] == kind
+            assert found["label"] and found["reason"]
+
+
 # Every place that counts applications or owner coverage: each must read the one helper.
 COUNTING_FILES = (
     "app/modules/dashboard/services/overview_figures.py",
