@@ -135,6 +135,10 @@ def create_app(config=None):
     # 2. Security headers, guardrails, batch config
     init_security(app)
 
+    # 2b. A role with no write permission cannot change anything through the API.
+    from app._bootstrap.write_access import init_write_access
+    init_write_access(app)
+
     # 3. Inline routes (health check, API auth endpoints)
     init_inline_routes(app, config_name)
 

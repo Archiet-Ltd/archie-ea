@@ -610,6 +610,14 @@ def stream_job_progress(job_id):
     if BatchImportJob.query.get(job_id).user_id != current_user.id:
         abort(404, description="Job not found")
 
+    # The stream processes the job and stores what it imports, so it is a write that the browser's
+    # event source can only ask for with GET: the one write rule is asked here, before it opens.
+    from app._bootstrap.write_access import refuse_read_only
+
+    denied = refuse_read_only()
+    if denied is not None:
+        return denied
+
     def generate():
         """Generator function for SSE events."""
         try:
