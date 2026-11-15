@@ -32289,9 +32289,11 @@
     "button",
     "card",
     "checkbox",
+    "fact-list",
     "field",
     "input",
-    "page-header"
+    "page-header",
+    "radio-group"
    ],
    "confidence": "high",
    "controls": {
