@@ -46,16 +46,17 @@ main.register_blueprint(framework_management_bp)
 
 @main.before_app_request
 def _redirect_www_to_apex():
-    """301 any request to www.entelim.org to the same path on entelim.org.
+    """301 any request to www. plus one of the site's own hosts to the same path without it.
 
     A host check, not server config -- the app owns this redirect the same
     way it owns every other canonicalisation decision in this module. Only
-    ever fires for that exact host, so local/dev/test requests (localhost,
+    ever fires for those exact hosts, so local/dev/test requests (localhost,
     127.0.0.1, the test client's default "localhost") are untouched.
     """
-    host = (request.host or "").split(":", 1)[0].lower()
-    if host == "www.entelim.org":
-        target = request.url.replace("www.entelim.org", "entelim.org", 1)
+    from app.services.origin import www_redirect_target
+
+    target = www_redirect_target(request.host, request.url)
+    if target:
         return redirect(target, code=301)
     return None
 
@@ -1337,13 +1338,15 @@ def get_widget_metrics():
     """
     try:
         # Sample metrics data - in production, this would come from database
+        from app.services.cost_visibility import withhold_reply
+
         metrics = {
             "total_users": 1234,
             "active_sessions": 89,
             "revenue": 45678.90,
             "conversion_rate": 3.45,
         }
-        return jsonify(metrics)
+        return jsonify(withhold_reply(metrics))
 
     except Exception as e:
         current_app.logger.error(f"Widget metrics fetch failed: {e}")
@@ -1508,7 +1511,7 @@ def integrations():
 
 @main.route("/settings")
 @login_required
-@platform_admin_required
+@platform_admin_required(hide=True)
 @admin_required
 def settings():
     """System Settings - Application configuration and user preferences.

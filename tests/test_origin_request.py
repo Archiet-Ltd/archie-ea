@@ -88,3 +88,34 @@ def test_metadata_on_server_ip_names_canonical(client, app):
         assert pr["resource"] == "https://entelim.tech/mcp", pr
         assert pr["authorization_servers"] == ["https://entelim.tech"], pr
         assert as_["issuer"] == "https://entelim.tech", as_
+
+
+def test_the_token_endpoint_accepts_only_listed_addresses_as_the_resource(client, app):
+    with _set_config(
+        app,
+        PUBLIC_BASE_URL="https://entelim.tech",
+        PUBLIC_BASE_URL_ALIASES="https://entelim.org",
+    ):
+        def refusal(resource):
+            response = client.post(
+                "/oauth/token",
+                data={"grant_type": "refresh_token", "resource": resource},
+            )
+            return response.status_code, (response.get_json() or {}).get("error")
+
+        assert refusal("https://unlisted.example/mcp") == (400, "invalid_target")
+        assert refusal("https://entelim.tech.unlisted.example/mcp") == (400, "invalid_target")
+        assert refusal("https://entelim.tech/mcp")[1] != "invalid_target"
+        assert refusal("https://entelim.org/mcp")[1] != "invalid_target"
+
+
+def test_a_token_for_an_unlisted_address_does_not_open_the_connector(app):
+    from app.modules.oauth_provider import identity
+
+    with _set_config(
+        app,
+        PUBLIC_BASE_URL="https://entelim.tech",
+        PUBLIC_BASE_URL_ALIASES="https://entelim.org",
+    ):
+        with app.app_context():
+            assert identity.allowed_origins() == ["https://entelim.tech", "https://entelim.org"]

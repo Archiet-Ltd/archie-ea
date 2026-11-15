@@ -19,11 +19,11 @@ from app.models.agentic_gaps import AgentConfiguration, AgentSchedule
 from app.services.archimate.agentic_gap_implementation_service import (
     AgenticGapImplementationService,
 )
+from app.services.gap_register_service import effective_severity, gap_register_query
 
 # Import main blueprint - use relative import to avoid circular dependency
 from .views import main
 from app.utils.pagination import safe_int_arg
-from app.services.gap_register_service import effective_severity
 
 logger = logging.getLogger(__name__)
 
@@ -695,10 +695,10 @@ def get_reuse_candidates(gap_id):
         max_candidates = request.args.get("max_candidates", 10, type=int)
 
         # Get the gap from database
-        from app.models.roadmap_models import ImplementationGap
+        from app.models.implementation_migration import Gap
         from app.models.unified_capability import UnifiedCapability
 
-        gap = ImplementationGap.query.filter_by(id=gap_id).first()
+        gap = gap_register_query(g.current_org_id).filter(Gap.id == gap_id).first()
         if not gap:
             # Try looking up as capability_id instead
             capability = UnifiedCapability.visible_to_organization(
@@ -783,10 +783,10 @@ def get_reuse_recommendation():
             return jsonify({"success": False, "error": "gap_id is required"}), 400
 
         # Get gap information
-        from app.models.roadmap_models import ImplementationGap
+        from app.models.implementation_migration import Gap
         from app.models.unified_capability import UnifiedCapability
 
-        gap = ImplementationGap.query.filter_by(id=gap_id).first()
+        gap = gap_register_query(g.current_org_id).filter(Gap.id == gap_id).first()
         if not gap:
             capability = UnifiedCapability.visible_to_organization(
                 gap_id, g.current_org_id

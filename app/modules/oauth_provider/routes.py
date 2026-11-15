@@ -19,7 +19,7 @@ from flask import Blueprint, current_app, g, jsonify, redirect, render_template,
 from flask_login import current_user, login_required
 
 from app.extensions import csrf
-from app.services.origin import _allowed_origins, canonical_origin
+from app.services.origin import allowed_origins, canonical_origin
 from app.modules.oauth_provider.models import (
     OAuthAuthorizationCode,
     OAuthClient,
@@ -62,12 +62,12 @@ def _hash_code_verifier(verifier: str) -> str:
 
 def _mcp_resource_urls() -> list[str]:
     """All configured MCP resource identifiers (canonical + aliases)."""
-    return [f"{origin}/mcp" for origin in _allowed_origins()]
+    return [f"{origin}/mcp" for origin in allowed_origins()]
 
 
 def _api_resource_urls() -> list[str]:
     """All configured API resource identifiers (canonical + aliases)."""
-    return [f"{origin}/api/v1" for origin in _allowed_origins()]
+    return [f"{origin}/api/v1" for origin in allowed_origins()]
 
 
 def _mcp_resource_url() -> str | None:

@@ -11,6 +11,9 @@ server's IP address name and a forged header — gets the canonical origin.
 
 from __future__ import annotations
 
+import os
+from urllib.parse import urlsplit
+
 from flask import current_app, has_app_context, request
 
 
@@ -25,16 +28,21 @@ def canonical_origin() -> str:
     """The site's canonical origin.
 
     Returns PUBLIC_BASE_URL when set, otherwise defaults to https://entelim.tech.
-    Never returns an empty string. Works inside or outside an application context.
+    Never returns an empty string. Outside an application context it reads the same variable from the
+    environment, so scripts name the address the deployment is configured with.
     """
     if has_app_context():
         base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
         if base:
             return base
+    else:
+        base = (os.environ.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+        if base:
+            return base
     return "https://entelim.tech"
 
 
-def _allowed_origins() -> list[str]:
+def allowed_origins() -> list[str]:
     """All origins this deployment answers on: canonical + aliases."""
     if has_app_context():
         aliases = _parse_aliases(current_app.config.get("PUBLIC_BASE_URL_ALIASES"))
@@ -51,10 +59,29 @@ def request_origin() -> str:
     canonical origin. This prevents origin poisoning from forged Host headers or
     the server's IP address name.
     """
-    allowed = _allowed_origins()
+    allowed = allowed_origins()
     # request.host includes port if non-standard; request.host_url is scheme+host+/
     # We need just the origin (scheme+host).
     req_origin = request.host_url.rstrip("/")
     if req_origin in allowed:
         return req_origin
     return canonical_origin()
+
+
+def site_host() -> str:
+    """The host name of the canonical origin, for text that names the site without a scheme."""
+    return urlsplit(canonical_origin()).netloc
+
+
+def www_redirect_target(host: str, url: str) -> str | None:
+    """Where a request to ``www.`` plus one of this site's own hosts should go, else None.
+
+    Only the canonical host and the listed aliases are covered; any other host is left alone.
+    """
+    bare = (host or "").split(":", 1)[0].lower()
+    if not bare.startswith("www."):
+        return None
+    own = {urlsplit(origin).hostname for origin in allowed_origins()}
+    if bare[4:] not in own:
+        return None
+    return url.replace(bare, bare[4:], 1)
