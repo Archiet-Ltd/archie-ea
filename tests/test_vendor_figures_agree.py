@@ -173,39 +173,52 @@ def test_every_vendor_figure_agrees_across_vendors_vendor_page_spend_and_renewal
     with tenant_ctx(mine.id):
         rows = {r["id"]: r for r in vendor_register.register(mine.id)}
         summary = get_spend_summary(mine.id)
-    assert rows[a.id]["annual_cost"] == 300.0
-    assert rows[b.id]["annual_cost"] == 21000.0
+    # a contract counts for the supplier it names: the 20000 on Bravo's system is Alpha's
+    assert rows[a.id]["annual_cost"] == 20300.0
+    assert rows[b.id]["annual_cost"] == 1000.0
     # the contract on A's decommissioned system adds no cost but still renews, and it is the earliest
     assert rows[a.id]["next_renewal"] == (date.today() + timedelta(days=10)).isoformat()
     assert summary["total_contracts"] == 3
     assert summary["total_annual_cost"] == 21300.0
     assert [(n, v["annual_cost"]) for n, v in summary["top_vendors"]] == [
-        (f"Bravo m{tag}", 21000.0), (f"Alpha m{tag}", 300.0)]
+        (f"Alpha m{tag}", 20300.0), (f"Bravo m{tag}", 1000.0)]
 
     client = _admin_client(app, db_session, mine)
     _forget_cached_user()
     page = _answer(client.get(f"/applications/vendors/{a.id}").get_data(as_text=True))
-    assert "300.00 a year" in page and "Systems supplied" in page
+    assert "300.00 a year" in page and "20,000.00 a year" in page and "Systems supplied" in page
     headline = re.search(r"of your systems?,? (£[\d,.]+) a year", page)
-    assert headline and _money(headline.group(1)) == {300.0}
+    assert headline and _money(headline.group(1)) == {20300.0}
     # The contracts the cost leaves out are listed, each with the reason, and none states a figure
     assert "Not counted" in page
     for left_out in ("dead", "expired", "cross"):
         assert f"{left_out} m{tag}" in page
-    assert "9,000" not in page and "20,000" not in page and "5,000" not in page
+    assert "9,000" not in page and "5,000" not in page
     _forget_cached_user()
     b_page = _answer(client.get(f"/applications/vendors/{b.id}").get_data(as_text=True))
-    assert re.search(r"1 of your systems?,? £21,000\.00 a year", b_page)
-    # The cross contract names Alpha (vendor a) but sits on Bravo's system;
-    # it appears on Alpha's page, not Bravo's. Bravo's page shows only its own contract.
-    assert f"own m{tag}" in b_page and "1,000.00 a year" in b_page
-    assert f"cross m{tag}" not in b_page
+    assert re.search(r"1 of your systems?,? £1,000\.00 a year", b_page)
+    # The cross contract names Alpha but sits on Bravo's system: it is counted in Alpha's headline and listed on
+    # Alpha's page (asserted above), and Bravo's page, whose headline is 1,000, lists only its own contract.
+    assert f"own m{tag}" in b_page and f"cross m{tag}" not in b_page and "20,000" not in b_page
+    # every contract counted in a supplier's headline is listed on that supplier's page, and the headline is
+    # the sum of the contracts the page lists as counted
+    with tenant_ctx(mine.id):
+        ledger = vendor_register.contract_ledger(mine.id)
+        for vendor, expected in ((a, 20300.0), (b, 1000.0)):
+            standing = vendor_register.contracts_with_standing(vendor.id, mine.id, ledger)
+            listed_ids = {c.id for c, _ in standing}
+            counted = ledger["by_vendor"][vendor.id]
+            assert {c.id for c in counted} <= listed_ids
+            added = [c.annual_cost for c, reason in standing if reason is None]
+            assert sum(added) == sum(c.annual_cost for c in counted)
+        assert sum(c.annual_cost for c in ledger["by_vendor"][b.id]) == rows[b.id]["annual_cost"]
+        assert sum(c.annual_cost for c in ledger["by_vendor"][a.id]) == rows[a.id]["annual_cost"]
     _forget_cached_user()
     vendors = _answer(client.get("/applications/vendors").get_data(as_text=True))
-    assert "21,000.00" in vendors and "777" not in vendors
+    assert "20,300.00" in vendors and "1,000.00" in vendors and "777" not in vendors
     _forget_cached_user()
     spend = _answer(client.get("/procurement/spend").get_data(as_text=True))
-    assert "£21k" in spend or "21,300" in spend
+    assert "£21.3k" in spend and "£20.3k" in spend and "£1k" in spend
     assert "9,000" not in spend and "30,300" not in spend
 
 

@@ -313,11 +313,20 @@ def not_added_reason(code: str, reporting_currency: str) -> str:
     return "Not added: " + not_added_cause(code, reporting_currency)
 
 
+def _counted_for(contract, owner_of: Dict) -> Optional[int]:
+    """The vendor a live contract counts for: the one it names, which is the supplier page that lists it,
+    unless it sits on a system that names no vendor, which leaves it unassigned."""
+    if contract.application_id is not None and owner_of.get(contract.application_id) is None:
+        return None
+    return contract.vendor_id
+
+
 def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) -> Dict:
     """The one rule for which contracts a cost figure adds up, applied to every contract at once.
 
-    An active contract counts for the vendor of the live system it sits on, else for the vendor it names
-    when it sits on no system. A contract on a decommissioned or removed system adds no cost to any vendor, but it
+    An active contract counts for the vendor it names, which is the supplier page that lists it; one that
+    names no vendor counts for none. A contract on a system that names no vendor is not counted for the
+    vendor it names either. A contract on a decommissioned or removed system adds no cost to any vendor, but it
     is still active, so it is listed in ``retired_system`` and renews.
     Returns ``{"by_vendor": {vendor id: [contracts]}, "unassigned": [contracts that name no vendor],
     "left_out": {contract id: reason}, "counted": every counted contract, "superseded": {contract id: reason}
@@ -359,12 +368,12 @@ def contract_ledger(org_id: Optional[int] = None, today: Optional[date] = None) 
             # an amount in another currency is never added under the organisation's symbol
             ledger["left_out"][c.id] = not_added_reason(c.currency, currency)
             ledger["other_currency"].append(c)
-            owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
+            owner = _counted_for(c, owner_of)
             if owner is not None:
                 ledger["other_by_vendor"].setdefault(owner, []).append(c)
                 ledger["renewing_by_vendor"].setdefault(owner, []).append(c)
         else:
-            owner = c.vendor_id if c.application_id is None else owner_of[c.application_id]
+            owner = _counted_for(c, owner_of)
             ledger["counted"].append(c)
             if c.application_id in records_cost:
                 ledger["superseded"][c.id] = NOT_ADDED_SYSTEM_COST
@@ -517,7 +526,9 @@ def annual_cost_with_basis(systems, vendor_id: Optional[int] = None, org_id: Opt
     stated = [get_run_cost_with_source(s, on_system.get(s.id, [])) for s in systems]
     stated = [(v, src) for v, src in stated if v is not None]
     if vendor_id is not None:
-        loose = [c for c in counted if c.application_id is None]
+        # a contract on no system, or on a system another vendor supplies, is added by its stated cost
+        supplied = {s.id for s in systems}
+        loose = [c for c in counted if c.application_id not in supplied]
         amounts = [a for a in (get_contract_amounts(c)["annual_cost"] for c in loose) if a is not None]
         if amounts:
             stated.append((float(total_of_stated(amounts)[0]),

@@ -74,8 +74,8 @@ def test_the_banner_counts_the_organisation_the_person_switched_to(app, db_sessi
 
 
 def test_both_cost_columns_of_a_row_add_the_same_contracts(db_session, make_org, tenant_ctx, monkeypatch):
-    """The rule: a vendor's active contracts that sit on one of its live systems or on no system. A
-    contract on a decommissioned system or on another vendor's system counts in neither column."""
+    """The rule: a vendor's active contracts that sit on a live system or on no system, whichever vendor
+    supplies that system. A contract on a decommissioned system counts in neither column."""
     from app.models.application_portfolio import ApplicationComponent, VendorContract
     from app.models.vendor.vendor_organization import VendorOrganization
     from app.services import vendor_register
@@ -98,9 +98,9 @@ def test_both_cost_columns_of_a_row_add_the_same_contracts(db_session, make_org,
     db_session.flush()
     with tenant_ctx(mine.id):
         row = next(r for r in vendor_register.list_context()["register_rows"] if r["id"] == vendor.id)
-    assert row["annual_cost"] == 53000.0
+    assert row["annual_cost"] == 54000.0
     assert row["contract_annual_cost"] == row["annual_cost"]
-    assert row["contract_count"] == 4
+    assert row["contract_count"] == 5
 
 
 def _own_decommissioned_system(db_session, org, vendor, tag, cost):
@@ -138,7 +138,7 @@ def test_a_contract_on_the_vendors_own_decommissioned_system_counts_nowhere(
 
 
 def test_spends_largest_vendor_is_the_vendors_contract_cost_a_year(db_session, make_org, tenant_ctx, monkeypatch):
-    """A contract naming vendor A that sits on vendor B's system counts for B on both screens."""
+    """A contract naming vendor A that sits on vendor B's system counts for A on both screens."""
     from app.models.application_portfolio import VendorContract
     from app.models.vendor.vendor_organization import VendorOrganization
     from app.modules.procurement.services import get_spend_summary
@@ -152,7 +152,7 @@ def test_spends_largest_vendor_is_the_vendors_contract_cost_a_year(db_session, m
     other = VendorOrganization(name=f"Other {tag}")
     db_session.add(other)
     db_session.flush()
-    # names the other vendor but sits on this vendor's system: counted once, under the system's vendor
+    # names the other vendor but sits on this vendor's system: counted once, under the vendor it names
     db_session.add(VendorContract(contract_name=f"Cross {tag}", organization_id=mine.id, vendor_id=other.id,
                                   application_id=apps[0].id, annual_cost=20000.0, status="active",
                                   start_date=date.today() - timedelta(days=30)))
@@ -162,9 +162,8 @@ def test_spends_largest_vendor_is_the_vendors_contract_cost_a_year(db_session, m
         summary = get_spend_summary(mine.id)
     name, data = summary["top_vendors"][0]
     assert name == vendor.name
-    assert data["annual_cost"] == rows[vendor.id]["contract_annual_cost"] == 68000.0
-    assert dict(summary["top_vendors"]).get(other.name) is None or \
-        dict(summary["top_vendors"])[other.name]["annual_cost"] == rows.get(other.id, {}).get("contract_annual_cost")
+    assert data["annual_cost"] == rows[vendor.id]["contract_annual_cost"] == 48000.0
+    assert dict(summary["top_vendors"])[other.name]["annual_cost"] == rows[other.id]["contract_annual_cost"] == 20000.0
 
 
 def test_the_contract_figures_cost_the_same_statements_however_many_vendors(db_session, make_org, tenant_ctx,
