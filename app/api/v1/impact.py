@@ -229,10 +229,14 @@ def _derived_elements_for_element(element_id: int, *, include_derived: bool, max
     above), which returns a proper 500 -- a bug looks like a bug, not like
     an un-run derivation.
     """
-    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+    from app.modules.intelligence.services.query_service import (
+        IntelligenceQueryService,
+        without_relations,
+    )
 
     result = IntelligenceQueryService.cross_layer_impact(
         element_id,
+        with_relations=True,
         include_derived=include_derived,
         include_stale=False,
         max_depth=max_depth,
@@ -249,7 +253,13 @@ def _derived_elements_for_element(element_id: int, *, include_derived: bool, max
     # should raise (surfacing as a 500 via the caller's except block), not be
     # papered over with an invented value.
     derivation_state = summary["derivation_state"]
-    derived_rows = [row for row in (result.get("rows") or []) if row["relation"]["kind"] == "derived"]
+    derived_rows = without_relations(
+        [
+            row
+            for row in (result.get("rows") or [])
+            if any(rel["kind"] == "derived" for rel in row.get("relations") or [row["relation"]])
+        ]
+    )
     return derived_rows, derivation_state
 
 
