@@ -271,7 +271,7 @@
                 <a :href="'/implementation/work-packages/' + wp.id" class="font-medium text-primary hover:underline"
                    data-testid="roadmap-wp-link" x-text="wp.name"></a>
                 <p class="mt-0.5 text-xs text-muted-foreground" x-text="wp.element_type || 'WorkPackage'"></p>
-                <div class="min-w-72 whitespace-normal" x-html="wp.footer_html" data-testid="roadmap-wp-footer"></div>
+                <div class="min-w-0 max-w-full whitespace-normal break-words" x-html="wp.footer_html" data-testid="roadmap-wp-footer"></div>
               {% endcall %}
               {% call table_cell() %}
                 <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
@@ -600,6 +600,15 @@
     return sourceAnswers[key];
   };
 
+  // The one guard: an answer is shown only if no newer answer for the same part has been shown already.
+  const shownSequence = {};
+  window.rdmIsNewest = function (part, sequence) {
+    if (sequence === undefined) return true;
+    if (sequence < (shownSequence[part] || 0)) return false;
+    shownSequence[part] = sequence;
+    return true;
+  };
+
   const CSRF = () => document.getElementById('rdm-csrf-token')?.value || '';
 
   // ── Alpine Store: shared state between page and modal sub-components ──
@@ -638,7 +647,6 @@
       signalCount: 0,
       gapsLoading: true,
       plateausLoading: true,
-      shownSequence: {},
       workPackagesLoading: true,
 
       get gapModalTitle() {
@@ -751,12 +759,8 @@
       // Every answer carries the figures and the evidence line counted together; the tiles and the line
       // are set from that one answer in the same step. An answer that failed never reaches here, and an answer
       // older than the one already shown is left out.
-      // The one guard: an answer is shown only if no newer answer for the same part has been shown already.
       isNewest(part, sequence) {
-        if (sequence === undefined) return true;
-        if (sequence < (this.shownSequence[part] || 0)) return false;
-        this.shownSequence[part] = sequence;
-        return true;
+        return window.rdmIsNewest(part, sequence);
       },
 
       applyFigures(figures, sequence) {
@@ -1301,6 +1305,7 @@
         window.rdmSource('gaps'),
         window.rdmSource('plateaus'),
       ]);
+      if (!window.rdmIsNewest('timeline', wpData.sequence)) return;
       const workPackages = (wpData.work_packages || [])
         .filter(wp => wp.start_date && (wp.end_date || wp.target_date));
       const gaps    = gapData.gaps     || [];
