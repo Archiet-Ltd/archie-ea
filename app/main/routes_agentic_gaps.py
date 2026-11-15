@@ -24,7 +24,6 @@ from app.services.gap_register_service import effective_severity, gap_register_q
 # Import main blueprint - use relative import to avoid circular dependency
 from .views import main
 from app.utils.pagination import safe_int_arg
-from app.services.gap_register_service import effective_severity
 
 logger = logging.getLogger(__name__)
 
