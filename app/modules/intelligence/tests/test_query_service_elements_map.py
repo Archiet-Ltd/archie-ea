@@ -58,7 +58,7 @@ FORBIDDEN_KEYS = (
 # --- fixtures / helpers ------------------------------------------------------
 
 
-def _user(db_session, org_id):
+def _user(db_session, org_id, role="enterprise_architect"):
     from app.models.user import User
 
     user = User(
@@ -67,7 +67,7 @@ def _user(db_session, org_id):
         last_name="Tester",
         organization_id=org_id,
         confirmed=True,
-        enterprise_role="enterprise_architect",
+        enterprise_role=role,
     )
     db_session.add(user)
     db_session.flush()
@@ -747,16 +747,28 @@ CANONICAL_KEYS = {
     "diagram", "risk_level", "summary", "total_score",
 }
 NEW_RELATION_KEYS = {"derived_id", "engine_version", "plain_terms"}
+# The two keys a reply gains for a person the cost rule refuses; a person it grants gets neither.
+COSTS_WITHHELD_KEYS = {"costs_withheld", "costs_withheld_sentence"}
+# Enterprise architects are refused costs by the one rule; chief technology officers are granted them.
+REFUSED_ROLE = "enterprise_architect"
+GRANTED_ROLE = "cto"
 
 
-def _canonical_fixture(db_session, make_org, label):
+def _canonical_fixture(db_session, make_org, label, role=REFUSED_ROLE):
     org = make_org(label)
-    user = _user(db_session, org.id)
+    user = _user(db_session, org.id, role)
     a = _element(db_session, org.id, "Alpha")
     b = _element(db_session, org.id, "Bravo")
     c = _element(db_session, org.id, "Charlie")
     _relationship(db_session, org.id, a, b)
     _derived(db_session, org.id, a, c, chain_element_ids=[a.id, b.id, c.id])
+    # Alpha is a costed application, so the answer holds a real yearly figure the cost rule can withhold.
+    from app.models.application_portfolio import ApplicationComponent
+
+    db_session.add(ApplicationComponent(
+        name="Alpha", organization_id=org.id, archimate_element_id=a.id,
+        total_cost_of_ownership=7300, lifecycle_status="3. Production",
+    ))
     a_id = a.id
     db_session.commit()
     return user, a_id
@@ -773,10 +785,43 @@ def _all_keys(node):
             yield from _all_keys(item)
 
 
+def _money_figures(node):
+    """Every number held under a key the cost rule treats as money, anywhere in a decoded document."""
+    from app.services.cost_visibility import is_money_key
+
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if is_money_key(key) and isinstance(value, (int, float)) and not isinstance(value, bool):
+                yield key, value
+            yield from _money_figures(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _money_figures(item)
+
+
+def _assert_costs_withheld(body):
+    from app.services.cost_visibility import COSTS_WITHHELD
+
+    data = body["data"]
+    assert data["costs_withheld"] is True
+    assert data["costs_withheld_sentence"] == COSTS_WITHHELD
+    assert list(_money_figures(body)) == []
+
+
+def _assert_costs_shown(body):
+    data = body["data"]
+    assert not data.get("costs_withheld")
+    assert not (set(_all_keys(body)) & COSTS_WITHHELD_KEYS)
+    # The money field is still in the answer and still holds a measured figure, not a withheld blank.
+    assert "estimated_financial_risk" in data["breakdown"]
+    assert data["breakdown"]["estimated_financial_risk"] == 7300.0
+
+
+@pytest.mark.parametrize("role", [REFUSED_ROLE, GRANTED_ROLE], ids=["costs_refused", "costs_granted"])
 def test_canonical_include_derived_true_pins_the_exact_derived_relation_key_set(
-    app, db_session, make_org, client, login_as
+    app, db_session, make_org, client, login_as, role
 ):
-    user, a_id = _canonical_fixture(db_session, make_org, "map-canon-pin")
+    user, a_id = _canonical_fixture(db_session, make_org, f"map-canon-pin-{role}", role)
 
     login_as(client, user)
     resp = client.post(
@@ -784,9 +829,15 @@ def test_canonical_include_derived_true_pins_the_exact_derived_relation_key_set(
         json={"element_id": a_id, "scenario": "modification", "include_derived": True},
     )
     assert resp.status_code == 200
-    data = resp.get_json()["data"]
+    body = resp.get_json()
+    data = body["data"]
 
-    assert set(data.keys()) == CANONICAL_KEYS
+    if role == REFUSED_ROLE:
+        assert set(data.keys()) == CANONICAL_KEYS | COSTS_WITHHELD_KEYS
+        _assert_costs_withheld(body)
+    else:
+        assert set(data.keys()) == CANONICAL_KEYS
+        _assert_costs_shown(body)
     assert "elements" not in data  # the identity map is not added to this endpoint
     assert data["derivation_state"] == "current"
     assert data["affected_elements"]  # not vacuous
@@ -803,11 +854,12 @@ def test_canonical_include_derived_true_pins_the_exact_derived_relation_key_set(
         assert row["relation"]["plain_terms"].startswith("We worked this out because ")
 
 
+@pytest.mark.parametrize("role", [REFUSED_ROLE, GRANTED_ROLE], ids=["costs_refused", "costs_granted"])
 @pytest.mark.parametrize("extra", [{}, {"include_derived": False}], ids=["key_absent", "explicit_false"])
 def test_canonical_default_request_returns_no_derived_rows_and_none_of_the_new_keys(
-    app, db_session, make_org, client, login_as, extra
+    app, db_session, make_org, client, login_as, extra, role
 ):
-    user, a_id = _canonical_fixture(db_session, make_org, "map-canon-default")
+    user, a_id = _canonical_fixture(db_session, make_org, f"map-canon-default-{role}", role)
 
     login_as(client, user)
     resp = client.post(
@@ -818,7 +870,12 @@ def test_canonical_default_request_returns_no_derived_rows_and_none_of_the_new_k
     body = resp.get_json()
     data = body["data"]
 
-    assert set(data.keys()) == CANONICAL_KEYS
+    if role == REFUSED_ROLE:
+        assert set(data.keys()) == CANONICAL_KEYS | COSTS_WITHHELD_KEYS
+        _assert_costs_withheld(body)
+    else:
+        assert set(data.keys()) == CANONICAL_KEYS
+        _assert_costs_shown(body)
     assert data["derived_elements"] == []
     # A real, current derivation exists for this element (so an empty list is a
     # consequence of the default, not of there being nothing to return).
