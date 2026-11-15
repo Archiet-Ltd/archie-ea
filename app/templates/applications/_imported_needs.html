@@ -27,7 +27,7 @@
 <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="imported-needs-card">
   <div class="flex flex-col space-y-1.5 p-6 pb-3">
     <h3 class="text-lg font-semibold">What this application still needs</h3>
-    <p class="text-sm text-muted-foreground">Read from GitHub{% if gaps.where %}: {{ gaps.where }}{% endif %}. GitHub does not say these, so each one is filled by a person.</p>
+    <p class="text-sm text-muted-foreground">Read from GitHub{% if gaps.where %}: {{ gaps.where }}{% endif %}. Where GitHub does not say it, a person fills it in.</p>
   </div>
   <ul class="space-y-3 p-6 pt-0 text-sm">
     {% for gap in gaps.gaps %}

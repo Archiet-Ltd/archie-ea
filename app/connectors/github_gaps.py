@@ -223,7 +223,11 @@ def owner_source(application, owner_rows, element=None) -> Optional[dict]:
     source = _fact(element, "github_owner_source")
     if not isinstance(source, dict) or not source.get("text"):
         return None
-    primary = {r.get("user_id") for r in owner_rows if r.get("ownership_type") == "primary"}
+    primary = {r.get("user_id") for r in owner_rows if r.get("ownership_type") == "primary" and r.get("user_id")}
+    if source.get("user_id") is None:
+        named = {r.get("user_name") for r in owner_rows
+                 if r.get("ownership_type") == "primary" and not r.get("has_account", True)}
+        return source if source.get("person_name") and source["person_name"] in named else None
     return source if source.get("user_id") in primary else None
 
 
