@@ -68,6 +68,9 @@ CASES = [
     ("DELETE", "/capability-map/api/roadmap/work-packages/{wp}", None),
     ("POST", "/capability-map/api/roadmap/work-packages/{wp}/children", NAME),
     ("POST", GAP + "/work-packages", NAME),
+    ("POST", "/interface-register/gaps/1/work-packages", None),
+    ("POST", "/capability-map/api/archimate/elements", {"type": "WorkPackage", "name": "Written by the test"}),
+    ("POST", "/api/architecture-assistant/roadmap-elements", {}),
     ("POST", GAP + "/link-work-package/{wp}", None),
     ("POST", GAP + "/unlink-work-package/{wp}", None),
 ]
