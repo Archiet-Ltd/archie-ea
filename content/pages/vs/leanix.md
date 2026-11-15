@@ -2,6 +2,7 @@
 wave: 1
 page_family: comparison
 competitor: LeanIX (SAP LeanIX)
+description: "Entelim vs LeanIX: LeanIX is a cloud EA platform priced per application; Entelim is open source, self-hostable, with ArchiMate 3.2 modelling and derivation."
 url_slug: archiet.ai/vs/leanix
 routing: >
   Stays at its existing archiet.ai address per peer ruling 2026-09-23: the comparison-page cluster

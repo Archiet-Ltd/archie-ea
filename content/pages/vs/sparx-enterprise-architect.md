@@ -2,6 +2,7 @@
 wave: 1
 page_family: comparison
 competitor: Sparx Systems Enterprise Architect
+description: "Entelim vs Sparx Enterprise Architect: EA is desktop ArchiMate modelling; Entelim is a web platform with derivation, governance and plain-language questions."
 url_slug: archiet.ai/vs/sparx-enterprise-architect
 routing: >
   New page, placed at its archiet.ai address to match the rest of the /vs comparison cluster rather

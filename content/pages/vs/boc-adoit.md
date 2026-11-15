@@ -2,6 +2,7 @@
 wave: 1
 page_family: comparison
 competitor: BOC Group ADOIT
+description: "Entelim vs BOC ADOIT: ADOIT is a governance-focused EA platform; Entelim is open source, self-hostable, built on ArchiMate 3.2 with derivation."
 url_slug: archiet.ai/vs/boc-adoit
 routing: >
   New page, placed at its archiet.ai address to match the rest of the /vs comparison cluster rather

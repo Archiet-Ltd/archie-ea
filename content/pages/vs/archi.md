@@ -2,6 +2,7 @@
 wave: 1
 page_family: comparison
 competitor: Archi (archimatetool.com)
+description: "Entelim vs Archi: Archi is a free open source ArchiMate editor; Entelim adds derivation, governance and plain-language questions over your model."
 url_slug: archiet.ai/vs/archi
 routing: >
   New page, placed at its archiet.ai address to match the rest of the /vs comparison cluster rather

@@ -2,6 +2,7 @@
 wave: 1
 page_family: comparison
 competitor: Orbus Software (iServer / OrbusInfinity)
+description: "Entelim vs Orbus iServer: iServer is enterprise EA software; Entelim is open source, self-hostable, with ArchiMate 3.2 modelling and impact analysis."
 url_slug: archiet.ai/vs/orbus-iserver
 routing: >
   New page, placed at its archiet.ai address to match the rest of the /vs comparison cluster rather

@@ -2,6 +2,7 @@
 wave: 1
 page_family: comparison
 competitor: ServiceNow Application Portfolio Management
+description: "Entelim vs ServiceNow APM: ServiceNow APM is ITSM-integrated application portfolio management; Entelim is open source, self-hostable, ArchiMate 3.2."
 url_slug: archiet.ai/vs/servicenow-apm
 routing: >
   New page, placed at its archiet.ai address to match the rest of the /vs comparison cluster rather

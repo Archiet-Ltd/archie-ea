@@ -2,6 +2,7 @@
 wave: 1
 page_family: comparison
 competitor: Ardoq
+description: "Entelim vs Ardoq: Ardoq is a data-driven EA platform priced per application; Entelim is open source, self-hostable, built on ArchiMate 3.2."
 url_slug: archiet.ai/vs/ardoq
 routing: >
   Stays at its existing archiet.ai address per peer ruling 2026-09-23: real ranking history there

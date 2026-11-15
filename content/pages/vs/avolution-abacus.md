@@ -2,6 +2,7 @@
 wave: 1
 page_family: comparison
 competitor: Avolution ABACUS
+description: "Entelim vs Avolution ABACUS: ABACUS is Open Group certified for ArchiMate 3.0; Entelim models in ArchiMate 3.2 with derivation and governance."
 url_slug: archiet.ai/vs/avolution-abacus
 routing: >
   New page, placed at its archiet.ai address to match the rest of the /vs comparison cluster rather
