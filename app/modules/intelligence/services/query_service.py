@@ -635,6 +635,29 @@ def _element_ids_in_rows(rows: List[Dict[str, Any]]) -> List[int]:
     return ids
 
 
+def relationship_fence_clause(org_id: Optional[int], *, direction: str = "both"):
+    """The fence of :func:`filter_relationships_by_org`, as a clause for a query.
+
+    Apply it to a relationship query before paging or counting, so a request
+    reads only rows that belong on the page. It keeps the same relationships
+    the list form keeps: ``direction`` names which far ends must sit in
+    ``org_id``. ``org_id`` of ``None`` keeps nothing.
+    """
+    from sqlalchemy import and_, false
+
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    if org_id is None:
+        return false()
+    inside = db.select(ArchiMateElement.id).where(ArchiMateElement.organization_id == org_id)
+    clauses = []
+    if direction in ("incoming", "both"):
+        clauses.append(ArchiMateRelationship.source_id.in_(inside))
+    if direction in ("outgoing", "both"):
+        clauses.append(ArchiMateRelationship.target_id.in_(inside))
+    return and_(*clauses)
+
+
 def filter_relationships_by_org(
     relationships: List[Any], org_id: Optional[int], *, direction: str = "both"
 ) -> List[Any]:

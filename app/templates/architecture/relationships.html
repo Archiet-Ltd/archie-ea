@@ -1,6 +1,37 @@
 {# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
+{% import 'basecoat/index.html' as ui %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/list_table.html' import list_table %}
+{% from 'basecoat/table.html' import table_cell %}
+{% from 'basecoat/native-select.html' import native_select_wrapper, native_select, native_select_option %}
+
+{% macro _pager() -%}
+{%- set _keep = {'relationship': focus_id} if focus_id is not none else {} -%}
+<div class="flex flex-wrap items-center justify-between gap-2 px-2" data-slot="data-table-pagination" data-testid="relationships-pages">
+  <p class="flex-1 text-sm text-muted-foreground tabular-nums" data-table-count>{% if total %}Rows {{ (page - 1) * per_page + 1 }} to {{ [page * per_page, total]|min }} of {{ total }}{% else %}0 rows{% endif %}</p>
+  <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+    <form method="get" action="{{ url_for('architecture_crud.list_relationships') }}" class="flex items-center gap-2">
+      {% if focus_id is not none %}{{ ui.input(name='relationship', value=focus_id, type='hidden') }}{% endif %}
+      {{ ui.label(text='Rows per page', attrs={'for': 'relationships-per-page'}) }}
+      {% call native_select_wrapper(class='w-[72px]') %}
+        {% call native_select(size='sm', name='per_page', id='relationships-per-page') %}
+          {% for opt in [10, 20, 25, 30, 40, 50] %}{{ native_select_option(text=opt|string, value=opt|string, selected=(opt == per_page)) }}{% endfor %}
+        {% endcall %}
+      {% endcall %}
+      {{ ui.button(text='Apply', type='submit', variant='outline', size='sm') }}
+    </form>
+    <div class="flex items-center justify-center text-sm font-medium tabular-nums" data-table-page>Page {{ page }} of {{ pages }}</div>
+    <div class="flex items-center gap-2">
+      {% set _go = [('First page', 1, 'chevrons-left', page > 1), ('Previous page', page - 1, 'chevron-left', page > 1), ('Next page', page + 1, 'chevron-right', page < pages), ('Last page', pages, 'chevrons-right', page < pages)] %}
+      {% for label, target, icon, enabled in _go %}
+        {% if enabled %}{% call ui.button(href=url_for('architecture_crud.list_relationships', page=target, per_page=(per_page if per_page != 20 else none), **_keep), variant='outline', size='icon', class='size-8', attrs={'aria-label': label}) %}{{ lucide(icon) }}{% endcall %}
+        {% else %}{% call ui.button(type='button', variant='outline', size='icon', class='size-8', disabled=true, attrs={'aria-label': label}) %}{{ lucide(icon) }}{% endcall %}{% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{%- endmacro %}
 
 {% block title %}Architecture Relationships{% endblock %}
 
@@ -14,28 +45,13 @@
         <a class="text-foreground underline underline-offset-4" href="{{ url_for('architecture_crud.list_relationships') }}">Show all relationships</a>
     </p>
     {% endif %}
-    <div data-slot="card" class="rounded-lg border border-border bg-card">
-        <table class="dense-table w-full text-sm">
-            <thead>
-                <tr class="border-b border-border">
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Source</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Relationship</th>
-                    <th class="px-6 py-3 text-left font-medium text-muted-foreground">Target</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-border">{# actionable-rows-ok: no per-element link here -- open the
-                 element from the ArchiMate element list or the Composer instead. #}
-                {% for rel in relationships %}
-                <tr id="relationship-{{ rel.id }}" class="hover:bg-muted/30">
-                    <td class="px-6 py-3 text-foreground">{{ rel.source_name or ('#' ~ rel.source_id) }}</td>
-                    <td class="px-6 py-3 text-muted-foreground">{{ rel.type|default('—') }}</td>
-                    <td class="px-6 py-3 text-foreground">{{ rel.target_name or ('#' ~ rel.target_id) }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="3" class="px-6 py-8 text-center text-muted-foreground">No relationships found.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    {% call(rel) list_table(rows=relationships, columns=[('Source', ''), ('Relationship', ''), ('Target', '')],
+                            caption='Relationships between architecture elements', testid='relationships-table', row_testid='relationship-row',
+                            toolbar=false, page_size=per_page, server_pagination=_pager, row_id_prefix='relationship-',
+                            empty_message='No relationships found.') %}
+      {% call table_cell(class='font-medium') %}{{ rel.source_name or ('#' ~ rel.source_id) }}{% endcall %}
+      {% call table_cell(class='text-muted-foreground') %}{{ rel.type|default('—') }}{% endcall %}
+      {% call table_cell(class='font-medium') %}{{ rel.target_name or ('#' ~ rel.target_id) }}{% endcall %}
+    {% endcall %}
 </div>
 {% endblock %}

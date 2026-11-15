@@ -14,7 +14,6 @@ constrained to the caller's organisation).
 from __future__ import annotations
 
 import re
-from collections import deque
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from app import db
@@ -80,39 +79,45 @@ def _dependency_chain(element_id: int, depth: int, want: str, org_id: Optional[i
     Only elements in ``org_id`` are walked: a dependency edge into another
     organisation stops at the boundary.
     """
-    from app.models.archimate_core import (  # noqa: PLC0415
-        ArchiMateElement, ArchiMateRelationship,
+    from app.models.archimate_core import ArchiMateRelationship  # noqa: PLC0415
+    from app.modules.intelligence.services.query_service import (  # noqa: PLC0415
+        _resolve_elements_batch,
     )
 
     hops: Dict[int, int] = {}
-    frontier: deque = deque([(element_id, 0)])
-    while frontier:
-        cur_id, dist = frontier.popleft()
-        if dist >= depth:
-            continue
+    level = [element_id]
+    dist = 0
+    while level and dist < depth:
         rels = ArchiMateRelationship.query.filter(
-            db.or_(ArchiMateRelationship.source_id == cur_id,
-                   ArchiMateRelationship.target_id == cur_id)
-        ).all()
-        for r in rels:
-            ends = dependency_ends(r.type, r.source_id, r.target_id)
-            if ends is None:
-                continue
-            dependent, provider = ends
-            if want == "consumers" and provider == cur_id:
-                nxt = dependent
-            elif want == "providers" and dependent == cur_id:
-                nxt = provider
-            else:
-                continue
-            if nxt == element_id or nxt in hops:
-                continue
-            if org_id is not None:
-                nxt_el = db.session.get(ArchiMateElement, nxt)
-                if nxt_el is None or getattr(nxt_el, "organization_id", None) != org_id:
+            db.or_(ArchiMateRelationship.source_id.in_(level),
+                   ArchiMateRelationship.target_id.in_(level))
+        ).order_by(ArchiMateRelationship.id).all()
+        reached: List[int] = []
+        for cur_id in level:
+            for r in rels:
+                if cur_id not in (r.source_id, r.target_id):
                     continue
-            hops[nxt] = dist + 1
-            frontier.append((nxt, dist + 1))
+                ends = dependency_ends(r.type, r.source_id, r.target_id)
+                if ends is None:
+                    continue
+                dependent, provider = ends
+                if want == "consumers" and provider == cur_id:
+                    nxt = dependent
+                elif want == "providers" and dependent == cur_id:
+                    nxt = provider
+                else:
+                    continue
+                if nxt == element_id or nxt in hops or nxt in reached:
+                    continue
+                reached.append(nxt)
+        if org_id is not None and reached:
+            # One fenced query for the whole level, through the shared batched helper.
+            inside = _resolve_elements_batch(reached, org_id)
+            reached = [n for n in reached if str(n) in inside]
+        dist += 1
+        for nxt in reached:
+            hops[nxt] = dist
+        level = reached
     return hops
 
 
@@ -140,6 +145,9 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
     from app.models.archimate_core import (  # noqa: PLC0415
         ArchiMateElement, ArchiMateRelationship,
     )
+    from app.modules.intelligence.services.query_service import (  # noqa: PLC0415
+        _resolve_elements_batch,
+    )
 
     depth = max(1, min(int(depth or 2), 4))
     center = db.session.get(ArchiMateElement, element_id)
@@ -153,70 +161,57 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
     truncated = False
 
     def _add_node(el, distance: int, direction: str):
-        n = nodes.get(el.id)
+        el_id = el["id"]
+        n = nodes.get(el_id)
         if n is None:
-            nodes[el.id] = {
-                "id": el.id,
-                "name": getattr(el, "name", None) or f"Element {el.id}",
-                "type": getattr(el, "type", None),
-                "layer": _layer_of(el),
+            nodes[el_id] = {
+                "id": el_id,
+                "name": el.get("name") or f"Element {el_id}",
+                "type": el.get("type"),
+                "layer": (el.get("layer") or "other").lower(),
                 "distance": distance,
                 "direction": direction,
-                "is_center": el.id == element_id,
+                "is_center": el_id == element_id,
             }
         else:
             n["distance"] = min(n["distance"], distance)
             if not n["is_center"] and n["direction"] != direction:
                 n["direction"] = "both"
 
-    _add_node(center, 0, "center")
+    _add_node({"id": center.id, "name": center.name, "type": center.type, "layer": center.layer}, 0, "center")
 
-    # BFS frontier of (element_id, distance)
-    frontier: deque = deque([(element_id, 0)])
+    # Breadth-first, one level at a time: every far end of a level is fenced in
+    # one query through the shared batched helper.
     seen: Set[int] = {element_id}
-
-    while frontier:
-        cur_id, dist = frontier.popleft()
-        if dist >= depth:
-            continue
-
-        # Outgoing (cur depends on target) and incoming (source depends on cur).
-        out_rels = ArchiMateRelationship.query.filter_by(source_id=cur_id).all()
-        in_rels = ArchiMateRelationship.query.filter_by(target_id=cur_id).all()
-
-        for r in out_rels:
-            other = db.session.get(ArchiMateElement, r.target_id)
-            if other is None:
-                continue
-            if center_org_id is not None and getattr(other, "organization_id", None) != center_org_id:
-                continue
-            _add_node(other, dist + 1, "downstream")
-            edges.setdefault((r.source_id, r.target_id, r.type),
-                             {"source": r.source_id, "target": r.target_id,
-                              "type": r.type})
-            if other.id not in seen:
-                if len(nodes) >= _MAX_NODES:
-                    truncated = True
+    level = [element_id]
+    dist = 0
+    while level and dist < depth:
+        out_rels = ArchiMateRelationship.query.filter(
+            ArchiMateRelationship.source_id.in_(level)).order_by(ArchiMateRelationship.id).all()
+        in_rels = ArchiMateRelationship.query.filter(
+            ArchiMateRelationship.target_id.in_(level)).order_by(ArchiMateRelationship.id).all()
+        inside = _resolve_elements_batch(
+            [r.target_id for r in out_rels] + [r.source_id for r in in_rels], center_org_id)
+        next_level: List[int] = []
+        for cur_id in level:
+            steps = ([(r, r.target_id, "downstream") for r in out_rels if r.source_id == cur_id]
+                     + [(r, r.source_id, "upstream") for r in in_rels if r.target_id == cur_id])
+            for r, far_id, direction in steps:
+                other = inside.get(str(far_id))
+                if other is None:
                     continue
-                seen.add(other.id)
-                frontier.append((other.id, dist + 1))
-
-        for r in in_rels:
-            other = db.session.get(ArchiMateElement, r.source_id)
-            if other is None:
-                continue
-            if center_org_id is not None and getattr(other, "organization_id", None) != center_org_id:
-                continue
-            _add_node(other, dist + 1, "upstream")
-            edges.setdefault((r.source_id, r.target_id, r.type),
-                             {"source": r.source_id, "target": r.target_id,
-                              "type": r.type})
-            if other.id not in seen:
-                if len(nodes) >= _MAX_NODES:
-                    truncated = True
-                    continue
-                seen.add(other.id)
-                frontier.append((other.id, dist + 1))
+                _add_node(other, dist + 1, direction)
+                edges.setdefault((r.source_id, r.target_id, r.type),
+                                 {"source": r.source_id, "target": r.target_id,
+                                  "type": r.type})
+                if far_id not in seen:
+                    if len(nodes) >= _MAX_NODES:
+                        truncated = True
+                        continue
+                    seen.add(far_id)
+                    next_level.append(far_id)
+        level = next_level
+        dist += 1
 
     consumer_hops = _dependency_chain(element_id, depth, "consumers", center_org_id)
     provider_hops = _dependency_chain(element_id, depth, "providers", center_org_id)
@@ -227,13 +222,14 @@ def build_impact_graph(element_id: int, depth: int = 2) -> Optional[Dict[str, An
         node["direction"] = "both" if up and down else "upstream" if up else "downstream" if down else "related"
 
     def _listed(hops: Dict[int, int]) -> List[Dict[str, Any]]:
+        found = _resolve_elements_batch(list(hops), center_org_id)
         out = []
         for el_id, n_hops in hops.items():
-            el = db.session.get(ArchiMateElement, el_id)
+            el = found.get(str(el_id))
             if el is None:
                 continue
-            out.append({"id": el.id, "name": getattr(el, "name", None) or f"Element {el.id}",
-                        "type": getattr(el, "type", None), "layer": _layer_of(el), "hops": n_hops})
+            out.append({"id": el_id, "name": el["name"] or f"Element {el_id}",
+                        "type": el["type"], "layer": (el["layer"] or "other").lower(), "hops": n_hops})
         return sorted(out, key=lambda item: (item["hops"], item["name"].lower()))
 
     consumers = _listed(consumer_hops)

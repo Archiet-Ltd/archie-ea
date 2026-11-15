@@ -22,6 +22,7 @@ from flask import (
     request,
     url_for,
 )
+from app.middleware.tenant_context import current_org_id
 from flask_login import current_user, login_required
 import sqlalchemy as sa
 from sqlalchemy import or_
@@ -2843,7 +2844,7 @@ def api_element_detail(element_id):
     # is already in the session identity map (Query.get would skip it).
     element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
 
-    org_id = getattr(element, "organization_id", None)
+    org_id = getattr(element, "organization_id", None) or current_org_id()
 
     # Outgoing relationships: fence on target element's organisation
     outgoing_rels = ArchiMateRelationship.query.filter_by(source_id=element_id).limit(50).all()
@@ -3378,7 +3379,10 @@ def _get_element_relationships(element, element_id):
     from app.modules.intelligence.services.query_service import filter_relationships_by_org
 
     relationships = []
-    org_id = getattr(element, "organization_id", None)
+    # An element that carries no organisation of its own is fenced by the
+    # signed-in organisation, so it shows that organisation's neighbours and no
+    # other's.
+    org_id = getattr(element, "organization_id", None) or current_org_id()
 
     # Resolve the archimate_element_id to use for relationship lookup
     ae_id = None
