@@ -1650,7 +1650,7 @@ class ToolExecutor:
             result["typed_record"] = {"model": type(typed_record).__name__, **typed_record.to_dict()}
 
         said = [f"Element '{ae.name}' ({ae.type})."]
-        said.append(f"Description: {ae.description}" if ae.description else "No description is recorded.")
+        said.append(f"Description: {ae.description.strip().rstrip('.')}." if ae.description else "No description is recorded.")
         if properties:
             suffix = f" ({origin})" if origin else ""
             said.append("Properties: " + "; ".join(f"{k}: {v}{suffix}" for k, v in properties.items()) + ".")
