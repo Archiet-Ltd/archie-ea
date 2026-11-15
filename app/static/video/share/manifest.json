@@ -1,5 +1,5 @@
 {
-  "site": "https://entelim.org",
+  "site": "https://entelim.tech",
   "recordings": [
     {
       "slug": "applications",
@@ -56,8 +56,8 @@
           "height": 1920
         }
       },
-      "share_url": "https://entelim.org/see/applications",
-      "module_url": "https://entelim.org/modules/applications",
+      "share_url": "https://entelim.tech/see/applications",
+      "module_url": "https://entelim.tech/modules/applications",
       "alt": "Recording of the Applications module: the portfolio list, then narrowed by search to one application with its owner.",
       "source_sha256": "756f146eaeb5116f52bf034850a5bdf35d2525c0b9e2ebad4a3e1221ce44f3e9"
     },
@@ -122,8 +122,8 @@
           "height": 1920
         }
       },
-      "share_url": "https://entelim.org/see/business-model-canvas",
-      "module_url": "https://entelim.org/modules/business-model-canvas",
+      "share_url": "https://entelim.tech/see/business-model-canvas",
+      "module_url": "https://entelim.tech/modules/business-model-canvas",
       "alt": "Recording of the Business Model Canvas module: the canvas library and a canvas filled with elements of the model.",
       "source_sha256": "e4d7d5c730fbca9b83d2887a11ba521b91b77602efff9eaf253c565803b621a1"
     },
@@ -188,8 +188,8 @@
           "height": 1920
         }
       },
-      "share_url": "https://entelim.org/see/compliance-frameworks",
-      "module_url": "https://entelim.org/modules/compliance-frameworks",
+      "share_url": "https://entelim.tech/see/compliance-frameworks",
+      "module_url": "https://entelim.tech/modules/compliance-frameworks",
       "alt": "Recording of the Compliance Frameworks module: the compliance dashboard and one control opened with its applications and their status.",
       "source_sha256": "96d096ae52e5382352aabaf934f3e8db9732333a382a64850950c063b51f4d87"
     },
@@ -254,8 +254,8 @@
           "height": 1920
         }
       },
-      "share_url": "https://entelim.org/see/digital-twin",
-      "module_url": "https://entelim.org/modules/digital-twin",
+      "share_url": "https://entelim.tech/see/digital-twin",
+      "module_url": "https://entelim.tech/modules/digital-twin",
       "alt": "Recording of the digital twin: the map around Calibration Ledger and the list of its connections.",
       "source_sha256": "ca1709aee2d45237cd9830b77d64b7b95b37fa9f11642184ad04dfb39abd4a50"
     },
@@ -314,8 +314,8 @@
           "height": 1920
         }
       },
-      "share_url": "https://entelim.org/see/industry-apqc",
-      "module_url": "https://entelim.org/modules/industry-apqc",
+      "share_url": "https://entelim.tech/see/industry-apqc",
+      "module_url": "https://entelim.tech/modules/industry-apqc",
       "alt": "Recording of the Industry Process Frameworks module: the framework list, the banking framework's categories and one category opened.",
       "source_sha256": "054b74c8ae8721ed22c5e854a8466e3cded4ee968fd999921c31baecbff77e8c"
     },
@@ -380,8 +380,8 @@
           "height": 1920
         }
       },
-      "share_url": "https://entelim.org/see/risk-register",
-      "module_url": "https://entelim.org/modules/risk-register",
+      "share_url": "https://entelim.tech/see/risk-register",
+      "module_url": "https://entelim.tech/modules/risk-register",
       "alt": "Recording of the Risk Register module: the ranked risks with the elements each reaches, and the impact graph of one application they name.",
       "source_sha256": "29db887266226e466cf9600fc6044115551268862264343c9976a4bb5a1e750e"
     }
