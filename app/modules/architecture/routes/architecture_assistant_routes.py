@@ -28,6 +28,8 @@ from xml.sax.saxutils import escape
 from flask import Blueprint, Response, current_app, jsonify, render_template, request, session
 from flask_login import current_user, login_required
 
+from app.core.auth.permissions import can
+
 from app.decorators import require_roles
 from app.extensions.cache import org_scoped_cache_key
 from app.models.archimate_motivation import (
@@ -3537,6 +3539,8 @@ def get_archimate_model():
 @login_required
 def create_roadmap_elements():
     """Create persisted WorkPackage/Deliverable ArchiMate elements from gap + option data."""
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"error": "Your role may read work packages but not create them. Administrators and architects may create, edit and delete work packages."}), 403
     data = request.get_json() or {}
     gap_elements = data.get("gap_elements") or []
     solution_option = data.get("solution_option") or {}

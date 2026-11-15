@@ -268,7 +268,7 @@ def test_the_public_menus_footer_and_sitemap_list_only_released_pages(wave1):
                if not is_released_path(link["href"].split("#")[0])
                and link["label"] not in coming and not link["href"].startswith("/early-access")]
         assert not bad, bad
-    xml = wave1.test_client().get("/sitemap.xml").get_data(as_text=True)
+    xml = wave1.test_client().get("/sitemap-en.xml").get_data(as_text=True)
     base = canonical_origin()
     paths = re.findall(rf"<loc>{re.escape(base)}([^<]*)</loc>", xml)
     assert paths
