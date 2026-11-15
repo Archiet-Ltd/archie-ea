@@ -61,7 +61,7 @@ def test_unapproved_pages_are_not_served_while_the_flag_is_off(flag_off, slug):
 def test_nothing_links_to_unapproved_pages_while_the_flag_is_off(flag_off):
     client = flag_off.test_client()
     footer_page = client.get("/terms").get_data(as_text=True)
-    sitemap = client.get("/sitemap.xml").get_data(as_text=True)
+    sitemap = client.get("/sitemap-en.xml").get_data(as_text=True)
     llms = client.get("/llms.txt").get_data(as_text=True)
     for slug in GATED:
         assert f'href="/{slug}"' not in footer_page
@@ -95,7 +95,7 @@ def test_the_footer_links_every_legal_page_when_the_flag_is_on(flag_on):
 
 def test_the_sitemap_and_llms_list_the_pages_when_the_flag_is_on(flag_on):
     client = flag_on.test_client()
-    sitemap = client.get("/sitemap.xml").get_data(as_text=True)
+    sitemap = client.get("/sitemap-en.xml").get_data(as_text=True)
     llms = client.get("/llms.txt").get_data(as_text=True)
     for slug in GATED:
         assert f"/{slug}</loc>" in sitemap

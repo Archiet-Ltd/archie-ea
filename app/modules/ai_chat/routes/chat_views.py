@@ -12,6 +12,7 @@ from flask import current_app, render_template
 from flask_login import current_user, login_required
 
 from app.modules.ai_chat.services import model_defaults
+from app.modules.ai_chat.services.customer_words import known_pages
 from app.modules.ai_chat.services.failure_messages import FEATURE_INTROS, failure_table_for_page
 from app.services.multi_domain_chat_service import MultiDomainChatService
 from . import unified_ai_chat_bp
@@ -234,6 +235,7 @@ def index():
         own_key_admin=own_key_admin,
         not_set_up_sentence=FEATURE_INTROS["chat"],
         failure_table=failure_table_for_page(),
+        known_pages=known_pages(current_app, current_user),
         lookup_abort_ms=int(
             (model_defaults.PROVIDER_FIRST_TOKEN_SECONDS + model_defaults.CHAT_TURN_MARGIN_SECONDS) * 1000
         ),

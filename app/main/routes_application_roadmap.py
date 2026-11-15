@@ -5,6 +5,7 @@ from datetime import datetime
 
 from flask import current_app, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from app.core.auth.permissions import can
 
 from app import db
 
@@ -202,6 +203,8 @@ def application_roadmap(id):
 @login_required
 def create_application_work_package(id):
     """Create new work package for specific application"""
+    if not can(current_user, "create", "work_package"):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         data = request.get_json()
 
@@ -303,6 +306,8 @@ def create_application_work_package(id):
 @login_required
 def update_application_work_package(id, wp_id):
     """Update work package for specific application"""
+    if not can(current_user, "edit", "work_package"):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         data = request.get_json()
 
@@ -419,6 +424,8 @@ def update_application_work_package(id, wp_id):
 @login_required
 def delete_application_work_package(id, wp_id):
     """Delete work package for specific application"""
+    if not can(current_user, "delete", "work_package"):
+        return jsonify({"success": False, "error": "Your role may read the roadmap but not change it."}), 403
     try:
         work_package = WorkPackage.query.get_or_404(wp_id)
 
